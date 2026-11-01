@@ -25,8 +25,36 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Sixteen Rust test functions are authored for delayed-observation non-leakage,
+Twenty-seven Rust test functions are authored for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
 has run for this draft.
+
+
+## Microsecond bitemporal source revisions
+
+The same candidate-side crate includes an append-only event revision ledger.
+Event time is the valid/world-time coordinate; `recorded_at_us` is the
+transaction/knowledge-time coordinate. Each event has a contiguous revision
+sequence. Corrections append `Supersede` records and removals append
+`Retract` records; old revisions remain in the digest-bound history.
+
+Transactions are atomic and share one recorded-at timestamp; committed
+transaction timestamps strictly increase. A record cannot be committed before
+its declared availability. Corrections preserve entity/modality/source identity
+and must target the latest active revision. As-known queries apply both a
+valid-time cutoff and a knowledge-time cutoff, so a later correction/retraction
+cannot rewrite an earlier decision view.
+
+The microsecond ledger is a precision extension for streaming sensor events; it
+does not replace Broca's existing day-granularity bitemporal source ledger
+(`crates/domains/symthaea-broca/src/memory_bitemporal.rs`, PR #9109) or its
+alternative-justification composition (PR #9292). This adapter layer only
+records source-event history and does not maintain derived proofs.
+
+The 11 additional bitemporal test functions cover late correction and
+retraction visibility, independent valid/knowledge clocks, source-identity
+preservation, transaction atomicity, revision sequencing, target rules,
+availability-before-commit rejection, source sequence collision rejection,
+and deterministic history digests.
