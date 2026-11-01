@@ -1345,10 +1345,15 @@ fn fill_score(
         .into_iter()
         .filter(|neighbour| adjacency.contains_key(neighbour))
         .collect::<Vec<_>>();
-    let neighbour_set = neighbours.iter().copied().collect::<BTreeSet<_>>();
     let degree = neighbours.len();
+    if degree <= 1 {
+        // Zero or one neighbour cannot contain a missing neighbour pair. Avoid
+        // walking a high-degree hub's adjacency list for each of its leaves.
+        return Ok((0, degree));
+    }
+    let neighbour_set = neighbours.iter().copied().collect::<BTreeSet<_>>();
     let possible_pairs = degree
-        .checked_mul(degree.saturating_sub(1))
+        .checked_mul(degree - 1)
         .ok_or(FactorGraphError::IndexOverflow)?
         / 2;
 
@@ -1486,7 +1491,9 @@ mod tests {
         assert_eq!(plan.induced_width, 1);
         assert_eq!(plan.predicted_peak_factor_entries, 4);
         assert_eq!(plan.planner_work.fill_score_evaluations, leaves + 1);
-        assert_eq!(plan.planner_work.fill_score_adjacency_visits, leaves * 2);
+        // Initial leaf scores return immediately; only the hub's score
+        // visits its leaves once.
+        assert_eq!(plan.planner_work.fill_score_adjacency_visits, leaves);
         assert_eq!(plan.planner_work.affected_adjacency_visits, 0);
         assert_eq!(plan.planner_work.affected_candidates_refreshed, 0);
         assert_eq!(plan.planner_work.leaf_fast_path_updates, leaves);
