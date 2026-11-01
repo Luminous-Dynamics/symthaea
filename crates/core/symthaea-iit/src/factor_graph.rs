@@ -1361,7 +1361,7 @@ fn has_hub_leaf_frontier(
                 adjacency.get(leaf).is_some_and(|leaf_neighbours| {
                     leaf_neighbours
                         .iter()
-                        .filter(|candidate| active.contains(candidate))
+                        .filter(|candidate| adjacency.contains_key(candidate))
                         .count()
                         == 1
                 })
