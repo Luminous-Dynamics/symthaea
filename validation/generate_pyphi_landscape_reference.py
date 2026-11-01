@@ -16,6 +16,7 @@ import importlib.metadata
 import json
 import math
 import platform
+import struct
 import sys
 from pathlib import Path
 from typing import Any
@@ -90,6 +91,27 @@ def _json_value(value: Any) -> Any:
     raise TypeError(f"unsupported landscape output value: {type(value).__name__}")
 
 
+def _mip_cut_identity(sia: Any) -> tuple[str | None, list[list[int]] | None]:
+    partition = getattr(sia, "partition", None)
+    if partition is None:
+        return None, None
+    removed = sorted(
+        (int(source), int(target))
+        for source, target in partition.removed_edges()
+    )
+    removed_set = set(removed)
+    flat = [
+        (source, target) in removed_set
+        for source in CANDIDATE
+        for target in CANDIDATE
+    ]
+    encoded = b"SYMTHAEA-IIT-LANDSCAPE-CUT\\0v0.1\\0"
+    encoded += struct.pack("<Q", len(flat))
+    encoded += bytes(int(value) for value in flat)
+    import hashlib
+    return hashlib.sha256(encoded).hexdigest(), [list(edge) for edge in removed]
+
+
 def generate(output_path: Path) -> dict[str, Any]:
     installed = importlib.metadata.version("pyphi")
     if installed != PINNED_PYPHI_VERSION:
@@ -149,14 +171,17 @@ def generate(output_path: Path) -> dict[str, Any]:
         raise RuntimeError(f"landscape incomplete: {len(records)}/{len(GRID)}")
 
     points: list[dict[str, Any]] = []
-    for expected, raw in zip(expected_inputs, records, strict=True):
+    for expected, raw, sia in zip(expected_inputs, records, section.sias, strict=True):
         theta = float(raw["theta"])
         if not math.isclose(theta, expected["theta"], rel_tol=0.0, abs_tol=1e-14):
             raise RuntimeError(
                 f"landscape output order/value mismatch: {theta} != {expected['theta']}"
             )
+        mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(sia)
         point = {
             **expected,
+            "mip_cut_sha256": mip_cut_sha256,
+            "mip_cut_removed_edges": mip_cut_removed_edges,
             "phi": _json_value(raw.get("phi")),
             "signed_phi": _json_value(raw.get("signed_phi")),
             "normalized_phi": _json_value(raw.get("normalized_phi")),
