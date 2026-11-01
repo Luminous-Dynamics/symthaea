@@ -844,20 +844,14 @@ pub fn validate_phase_energy_audit_receipt(
                     ));
                 }
             }
-            for (field, value) in [
-                ("duration_ms", window.duration_ms),
-                ("time_weighted_mean_current_ua", window.time_weighted_mean_current_ua),
-                ("mean_power_uw", window.mean_power_uw),
-                ("boundary_alignment_energy_uncertainty_uj", window.boundary_alignment_energy_uncertainty_uj),
-            ] {
-                if !value.is_finite() || value <= 0.0 {
-                    return Err(PhaseEnergyAuditError::new(
-                        format!("receipt.events.{}.phase_windows.{}.{}", event.event_id, window.phase_id, field),
-                        "must be finite and positive",
-                    ));
-                }
-            }
-            if !window.boundary_alignment_error_bound_ms.is_finite()
+            if !window.duration_ms.is_finite() || window.duration_ms <= 0.0
+                || !window.time_weighted_mean_current_ua.is_finite()
+                || window.time_weighted_mean_current_ua < 0.0
+                || !window.mean_power_uw.is_finite()
+                || window.mean_power_uw < 0.0
+                || !window.boundary_alignment_energy_uncertainty_uj.is_finite()
+                || window.boundary_alignment_energy_uncertainty_uj < 0.0
+                || !window.boundary_alignment_error_bound_ms.is_finite()
                 || window.boundary_alignment_error_bound_ms < 0.0
                 || window.end_ppk2_time_ms <= window.start_ppk2_time_ms
                 || (window.end_ppk2_time_ms - window.start_ppk2_time_ms - window.duration_ms).abs() > 1e-9
@@ -964,6 +958,10 @@ pub fn validate_phase_energy_audit_receipt(
                     2.0 * max_current * receipt.voltage_v
                         * event.phase_windows.first().map(|w| w.boundary_alignment_error_bound_ms).unwrap_or(0.0)
                         / 1_000.0;
+                let maximum_phase_current = event.phase_windows.iter()
+                    .map(|window| window.maximum_observed_current_ua)
+                    .max_by(f64::total_cmp)
+                    .unwrap_or(0.0);
                 let close = |left: f64, right: f64| {
                     (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
                 };
@@ -975,6 +973,7 @@ pub fn validate_phase_energy_audit_receipt(
                         && event.status == PhaseEnergyEventStatus::CompletePhaseCoverage
                     || !event.missing_phase_ids.is_empty()
                         && event.status == PhaseEnergyEventStatus::CompletePhaseCoverage
+                    || max_current < maximum_phase_current
                     || !close(boundary_energy, expected_boundary_energy)
                 {
                     return Err(PhaseEnergyAuditError::new(
