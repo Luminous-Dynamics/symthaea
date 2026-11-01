@@ -175,10 +175,10 @@ These are hypothesis gates. No result should be promoted because it satisfies a 
 ## Causal data path and prequential audit
 
 The synthetic stream now separates two different data types:
-- `TemporalObservation`: timestamp, sensor features and missing-feature mask only; no ground-truth label field exists on this model-facing type.
-- `DelayedGroundTruth`: evaluator-only label, release timestamp, regime transition and OOD metadata.
+- `TemporalObservation`: timestamp, sensor features and missing-feature mask only; no ground-truth label field exists on this model-facing type. Dropped sensor values are actually zero-filled before the observation is emitted; labels still use the latent complete signal.
+- private `DelayedGroundTruth`: evaluator-only label, release timestamp, regime transition and OOD metadata.
 
-The dataset fixture stores both streams for replay, but candidate model code should receive only the observation stream. This prevents the benchmark API from accidentally making labels available in the same per-event record as the prediction input.
+The combined evaluator-owned dataset intentionally does not implement `Debug`, `Serialize` or `Deserialize`; its delayed-label field is private. Candidate implementations should receive only the observation slice, not the evaluator-owned container. This is an API/data-boundary improvement, not a process sandbox: a real deployment benchmark must physically isolate the evaluator label channel.
 
 A prequential execution trace is a time-ordered sequence of:
 1. `Prediction` — timestamp, predicted class/abstention, positive-class Q15 probability and the model-state digest used;
