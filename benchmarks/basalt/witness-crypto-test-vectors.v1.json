@@ -1,0 +1,20 @@
+{
+  "suite_id": "basalt-witness-crypto-test-vectors",
+  "version": 1,
+  "claim_ceiling": "DSSE pre-authentication encoding vector only. It contains no cryptographic signature, no trusted key, and no witness acceptance proof.",
+  "vectors": [
+    {
+      "vector_id": "DSSE-PAE-001",
+      "payload_type": "application/vnd.luminous.basalt.witness-checkpoint.v1+json",
+      "canonical_payload_utf8": "{\"record_type\":\"basalt.authority.witness-checkpoint\",\"schema_version\":1}",
+      "canonical_payload_base64": "eyJyZWNvcmRfdHlwZSI6ImJhc2FsdC5hdXRob3JpdHkud2l0bmVzcy1jaGVja3BvaW50Iiwic2NoZW1hX3ZlcnNpb24iOjF9",
+      "payload_byte_length": 72,
+      "payload_sha256": "sha256:2d18cd09e9a8ce3e62831ecb73aeafa398720c343ec8ef5675f594f9c8a7e811",
+      "pae_utf8": "DSSEv1 58 application/vnd.luminous.basalt.witness-checkpoint.v1+json 72 {\"record_type\":\"basalt.authority.witness-checkpoint\",\"schema_version\":1}",
+      "pae_hex": "445353457631203538206170706c69636174696f6e2f766e642e6c756d696e6f75732e626173616c742e7769746e6573732d636865636b706f696e742e76312b6a736f6e203732207b227265636f72645f74797065223a22626173616c742e617574686f726974792e7769746e6573732d636865636b706f696e74222c22736368656d615f76657273696f6e223a317d",
+      "pae_byte_length": 171,
+      "pae_sha256": "sha256:1a6dad0d0a835dd1825f3187251d3c1292fdc818e2fc02b83aaf7188f450cdb0",
+      "signature_status": "not_present"
+    }
+  ]
+}
