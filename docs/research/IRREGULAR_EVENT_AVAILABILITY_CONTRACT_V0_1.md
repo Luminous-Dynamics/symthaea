@@ -125,10 +125,50 @@ The current source contains 55 authored Rust test functions:
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
-- 10 Time-IMM adapter tests.
+- 10 Time-IMM adapter tests;
+- 14 source-watermark/completeness tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
 not evidence of passing tests. The Time-IMM sample metadata records the
 repository's released file shape, but the Rust parser has not been executed
 against the files. No real-data performance result or SOTA claim is made.
+
+
+## 9. Source progress watermarks and qualified absence
+
+The `watermarks` module extends asynchronous source semantics with explicit
+progress. Each source progress revision binds source identity, stream
+generation, monotonic sequence, exclusive event-time watermark, transaction
+time and a nonzero progress-policy digest. The maximum event time observed is
+not sufficient to infer a watermark; the source or an explicitly named
+adapter policy must make that progress claim.
+
+For query interval [start,end), every required source must have a visible
+watermark >= end, or explicitly declare end-of-stream, before the interval is
+Complete. Missing progress is Incomplete, not evidence that no event occurred.
+The query uses known_at, preserving the historical completeness view.
+
+A late event with event_time < an already recorded exclusive watermark is
+retained as a breach receipt and changes subsequent completeness to Contested
+for affected intervals. An event exactly at the watermark is not late. Every
+event arrival classification (including OnTime) is idempotently recorded so
+replaying an already accepted event cannot become a late breach after later
+progress. Historical queries before the late receipt remain unchanged. The
+caller must append the raw event to BitemporalEventLedger separately; the
+watermark ledger owns progress and breach evidence, not the authoritative
+source event.
+
+The source-completeness report separates Complete, Incomplete and Contested,
+shows each required source's progress and returns the exact blocked source and
+late-breach sets. Terminal/end-of-stream is stronger than a finite watermark
+and closes intervals beyond its final event-time bound.
+
+Fourteen source-authored tests cover missing progress, multi-source minimum,
+exclusive boundary behavior, as-known watermarks, late arrivals, terminal
+sources, monotonicity/generation, policy identity, atomic batches, duplicate
+arrivals and replay/index digest parity.
+
+This is a source-provided progress contract, not proof that a sensor's claim is
+authentic or physically true. Signature verification, source authorization,
+durable WAL and a trusted progress-policy registry remain out of scope.
