@@ -22,9 +22,7 @@ pub struct ProofFrontierFeatures {
 
 impl ProofFrontierFeatures {
     pub fn validate(self) -> Result<(), FrontierModelError> {
-        if self.mandatory_obligations > self.unresolved_obligations
-            || self.mandatory_verifier_operations > self.mandatory_obligations
-        {
+        if self.mandatory_obligations > self.unresolved_obligations {
             return Err(FrontierModelError::InconsistentFeatureCounts);
         }
         if self.unresolved_obligations == 0
@@ -605,6 +603,19 @@ mod tests {
     }
 
     #[test]
+    fn frontier_can_require_multiple_mandatory_verifiers_for_one_obligation() {
+        let feature_set = ProofFrontierFeatures {
+            unresolved_obligations: 1,
+            mandatory_obligations: 1,
+            mandatory_verifier_operations: 3,
+            ..ProofFrontierFeatures::default()
+        };
+        assert!(model()
+            .predict(feature_set, [4; 32], COHORT, ShiftStatus::InDomain)
+            .is_ok());
+    }
+
+    #[test]
     fn max_score_uses_the_worst_normalized_residual_across_all_resources() {
         let predicted = prediction(4);
         let observed = ResourceVector::new(
@@ -686,6 +697,34 @@ mod tests {
         assert_eq!(
             calibrator.predict_upper(changed),
             Err(VectorConformalError::PredictionFromDifferentModel)
+        );
+    }
+
+    #[test]
+    fn calibration_and_prediction_must_share_the_declared_population_cohort() {
+        let mut changed_cohort = prediction(4);
+        changed_cohort.population_cohort_digest = [99; 32];
+        let example = CompletedCalibrationExample {
+            episode_id: 55,
+            prediction: changed_cohort,
+            observed_remaining: changed_cohort.point_cost,
+            completion_verifier_digest: [9; 32],
+        };
+        assert_eq!(
+            SplitVectorConformalCalibrator::fit(
+                &[example],
+                0.10,
+                MODEL,
+                CALIBRATION,
+                COHORT
+            ),
+            Err(VectorConformalError::DifferentCalibrationCohort)
+        );
+
+        let calibrator = calibrator(9, 0.10);
+        assert_eq!(
+            calibrator.predict_upper(changed_cohort),
+            Err(VectorConformalError::DifferentCalibrationCohort)
         );
     }
 
