@@ -162,3 +162,25 @@ Input: \`schemas/decision-value-input.schema.json\`. Output: \`schemas/decision-
 ### Boundary
 
 EVSI values depend on the utility matrix, target population and downstream actions. They are not the expected benefit of administering the experimental perturbation, and they do not justify unsafe actions. Experimental costs and biological safety must remain separate hard constraints. The worst-case EVSI guarantee is only over the caller-specified finite ambiguity set; the model-adequacy gate and held-out mechanism calibration remain required.
+
+
+## Threshold-hit acquisition (Probability-of-Hit style)
+
+Some scientific searches care about discovering interventions likely to cross a preregistered meaningful threshold, not identifying the complete mechanism and not necessarily optimizing a downstream utility matrix. The threshold-hit objective declares:
+- a numeric outcome value for every candidate outcome label;
+- a threshold and direction (at least / at most);
+- the exact outcome ordering for every candidate.
+
+The selector calculates the prior-predictive probability of a threshold-crossing outcome under each declared likelihood scenario, reports best/worst probability and probability per cost, and ranks by worst-case hit probability per cost. This is a transparent discrete Probability-of-Hit-style acquisition, not a claim to reproduce the full continuous Bayesian-optimization method from Rubbi et al.
+
+### Synthetic known-answer
+
+With priors [0.3, 0.3, 0.3, 0.1] and a functional-output hit threshold of at least 0.8:
+- The mechanism discriminator has hit probability 0.50.
+- The hit-focused discriminator has hit probability 0.56 and ranks first at equal cost.
+
+This objective is distinct from global EIG, target-query EIG and EVSI. It seeks the chance of crossing a specified outcome threshold; it does not say whether crossing is safe, useful, causally identified, or the best downstream decision. Safety and feasibility remain hard gates.
+
+Input: \`schemas/hit-probability-input.schema.json\`. Output: \`schemas/hit-probability-output.schema.json\`. Fixtures: \`fixtures/hit-probability.example.json\` and \`fixtures/hit-probability-known-answers.json\`.
+
+Related comparator: Rubbi et al., Many Needles in a Haystack (ICML 2026), https://proceedings.mlr.press/v306/rubbi26a.html.
