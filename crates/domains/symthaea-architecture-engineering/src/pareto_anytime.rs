@@ -23,7 +23,7 @@ use super::pareto_objectives::{
 };
 
 const SCHEMA: &str = "symthaea.architecture-engineering.pareto-anytime";
-const VERSION: &str = "0.1.0";
+const VERSION: &str = "0.2.0";
 const TARGET_PLAN_SCHEMA: &str = "symthaea.architecture-engineering.anytime-target-plan";
 const TARGET_PLAN_VERSION: &str = "0.1.0";
 
