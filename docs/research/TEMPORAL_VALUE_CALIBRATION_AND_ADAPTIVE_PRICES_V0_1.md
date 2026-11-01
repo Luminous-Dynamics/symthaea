@@ -30,7 +30,7 @@ For dimension (i):
 
 `price_i(t+1) = clamp(price_i(t) + eta (smooth_i(t)-target_i), 0, max_i)`
 
-Ratios and prices are fixed-point parts-per-million. A single configured target is used in v0.1; per-dimension target vectors are a straightforward extension once deployment profiles exist. The twelve prices are not added together and have no cross-unit comparability. Sensor policies consume the observation price, memory policies the retained-byte-time/byte prices, compute policies the compute price, and verification policies the verification/receipt prices.
+Ratios and prices are fixed-point parts-per-million. Each resource has its own configured target utilization in v0.1, so a battery/latency target does not impose the same operating point as memory or receipt bandwidth. The twelve prices are not added together and have no cross-unit comparability. Sensor policies consume the observation price, memory policies the retained-byte-time/byte prices, compute policies the compute price, and verification policies the verification/receipt prices.
 
 The update is based on completed-episode measured usage. EWMA damps transient spikes; the bounded projected update avoids unbounded price growth. It is a heuristic, not a formal convergence guarantee.
 
