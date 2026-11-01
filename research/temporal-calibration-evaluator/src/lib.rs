@@ -178,13 +178,11 @@ pub fn audit_temporal_value_calibration(
         });
     }
 
-    let axes = ExposureAxis::ALL.map(|axis| {
-        audit_axis(fit_samples, holdout_samples, axis)
-    });
+    let [wrong_axis, abstention_axis, missing_axis] = ExposureAxis::ALL;
     let axes = [
-        axes[0].clone()?,
-        axes[1].clone()?,
-        axes[2].clone()?,
+        audit_axis(fit_samples, holdout_samples, wrong_axis)?,
+        audit_axis(fit_samples, holdout_samples, abstention_axis)?,
+        audit_axis(fit_samples, holdout_samples, missing_axis)?,
     ];
 
     Ok(CalibrationAuditReport {
