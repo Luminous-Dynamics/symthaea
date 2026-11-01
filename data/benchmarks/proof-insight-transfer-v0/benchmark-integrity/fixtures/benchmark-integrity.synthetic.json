@@ -66,5 +66,6 @@
     "reviewer_identity": "",
     "reviewer_attestation_sha256": null
   },
-  "integrity_status": "not_attempted"
+  "integrity_status": "not_attempted",
+  "evidence_artifacts": null
 }
