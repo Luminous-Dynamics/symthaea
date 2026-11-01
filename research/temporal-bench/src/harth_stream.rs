@@ -380,7 +380,7 @@ where
     }
     let has_export_index_column = headers.len() == 9
         && headers.first().is_some_and(|header| is_optional_export_index_header(header));
-    let column_offset = usize::from(has_export_index_column);
+    let column_offset = if has_export_index_column { 1 } else { 0 };
     let expected_len = EXPECTED_HEADERS.len() + column_offset;
     if headers.len() != expected_len {
         return Err(HarthCsvError::new(
