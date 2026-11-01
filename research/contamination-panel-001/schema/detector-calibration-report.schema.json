@@ -375,6 +375,7 @@
           "target_fpr_permille",
           "detector_left",
           "detector_right",
+          "calibration_resolution_sufficient",
           "comparable_test_support",
           "disagree_count",
           "both_flag_contaminated",
@@ -407,7 +408,7 @@
           },
           "comparable_test_support": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 0
           },
           "disagree_count": {
             "type": "integer",
@@ -436,6 +437,9 @@
             ],
             "minimum": 0,
             "maximum": 1
+          },
+          "calibration_resolution_sufficient": {
+            "type": "boolean"
           }
         }
       }
