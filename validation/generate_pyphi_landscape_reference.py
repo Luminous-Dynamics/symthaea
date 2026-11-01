@@ -122,6 +122,7 @@ def generate(output_path: Path) -> dict[str, Any]:
     import numpy as np
     import pyphi
     from pyphi import connectivity
+    from pyphi import resolve_ties
     from pyphi.formalism.iit4 import evaluate_partition
     from pyphi.formalism.iit4.formalism import IIT4_2023Formalism
     from pyphi.measures.distribution import resolve_system_measure
@@ -229,6 +230,7 @@ def generate(output_path: Path) -> dict[str, Any]:
         ))
         system_measure = resolve_system_measure("GENERALIZED_INTRINSIC_DIFFERENCE")
         per_partition_scores = []
+        partition_result_objects = []
         for partition_index, partition in enumerate(partitions):
             partition_sia = evaluate_partition(
                 partition,
@@ -236,6 +238,7 @@ def generate(output_path: Path) -> dict[str, Any]:
                 system_state,
                 system_measure=system_measure,
             )
+            partition_result_objects.append(partition_sia)
             partition_cut_sha, partition_cut_edges = _mip_cut_identity(
                 type("PartitionSia", (), {"partition": partition})()
             )
@@ -258,20 +261,34 @@ def generate(output_path: Path) -> dict[str, Any]:
             })
         if not per_partition_scores:
             raise RuntimeError("PyPhi partition diagnostic emitted no scores")
+        # Retain the numerical tie class *before* PARTITION_LEX. PyPhi's
+        # default SIA strategy is NORMALIZED_PHI, NEGATIVE_PHI, PARTITION_LEX;
+        # fixed_state_sia.ties therefore contains only the final lex winner.
+        numeric_mip_ties = list(resolve_ties.sias(
+            partition_result_objects,
+            strategy=("NORMALIZED_PHI", "NEGATIVE_PHI"),
+        ))
         mip_tie_cuts = []
-        for tied_sia in fixed_state_sia.ties:
+        for tied_sia in numeric_mip_ties:
             tied_sha, tied_edges = _mip_cut_identity(tied_sia)
             if tied_sha is None or tied_edges is None:
-                raise RuntimeError("fixed-state PyPhi MIP tie has no cut identity")
+                raise RuntimeError("fixed-state PyPhi numerical MIP tie has no cut identity")
             mip_tie_cuts.append((tied_sha, tied_edges))
         mip_tie_cuts = sorted({sha: edges for sha, edges in mip_tie_cuts}.items())
         mip_tie_cut_sha256s = [sha for sha, _ in mip_tie_cuts]
         mip_tie_cut_removed_edges = [edges for _, edges in mip_tie_cuts]
+        default_resolved_ties = list(fixed_state_sia.ties)
+        default_resolved_cut_shas = sorted(
+            sha for sha, _ in (_mip_cut_identity(tied_sia) for tied_sia in default_resolved_ties)
+            if sha is not None
+        )
         mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(sia)
         if mip_cut_sha256 not in mip_tie_cut_sha256s:
             raise RuntimeError(
-                "landscape SIA representative is missing from the fixed-state MIP tie set"
+                "landscape SIA representative is missing from pre-lex numerical MIP tie set"
             )
+        if len(default_resolved_cut_shas) != 1 or default_resolved_cut_shas[0] != mip_cut_sha256:
+            raise RuntimeError("PyPhi PARTITION_LEX did not resolve to the landscape SIA representative")
         point = {
             **expected,
             "mip_cut_sha256": mip_cut_sha256,
@@ -279,6 +296,8 @@ def generate(output_path: Path) -> dict[str, Any]:
             "mip_tie_count": len(mip_tie_cut_sha256s),
             "mip_tie_cut_sha256s": mip_tie_cut_sha256s,
             "mip_tie_cut_removed_edges": mip_tie_cut_removed_edges,
+            "mip_default_resolved_tie_count": len(default_resolved_cut_shas),
+            "mip_default_resolved_cut_sha256s": default_resolved_cut_shas,
             "partition_scores": per_partition_scores,
             "phi": _json_value(raw.get("phi")),
             "signed_phi": _json_value(raw.get("signed_phi")),
@@ -320,6 +339,8 @@ def generate(output_path: Path) -> dict[str, Any]:
             "parameter_name": PARAMETER_NAME,
             "grid": list(GRID),
             "grid_semantics": "13 exact point evaluations; no interpolation or continuous interval certificate",
+            "sia_tie_resolution": list(pyphi.config.formalism.iit.sia_tie_resolution),
+            "numerical_mip_tie_semantics": "all cuts surviving NORMALIZED_PHI then NEGATIVE_PHI, before the final PARTITION_LEX representative selection",
         },
         "points": points,
         "grid_resolution_boundaries": boundaries,
