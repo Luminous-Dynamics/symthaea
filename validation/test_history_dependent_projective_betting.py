@@ -147,6 +147,19 @@ class HistoryDependentProjectiveBettingTests(unittest.TestCase):
         )
         self.assertGreater(check["historical_projectivity_checks"], 0)
 
+    def test_tampered_arrival_policy_receipt_is_rejected(self):
+        result = build_history_dependent_projective_paths(
+            self.active, self.observations, arrival_policy=self.arrival_policy
+        )
+        tampered = copy.deepcopy(result)
+        tampered["arrival_schedule_audit"]["active_by_time"] = ((1,), (1,), (1,))
+        check = verify_history_dependent_projective_receipt(tampered)
+        self.assertFalse(check["valid"])
+        self.assertIn(
+            "predictable_arrival_replay_failed",
+            [failure[0] for failure in check["failures"]],
+        )
+
     def test_tampered_lambda_receipt_is_rejected(self):
         result = build_history_dependent_projective_paths(
             self.active, self.observations
