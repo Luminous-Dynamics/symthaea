@@ -44,10 +44,16 @@ def validate_ids(ids: Iterable[int]) -> tuple[int, ...]:
     return tuple(sorted(values))
 
 
+def _validate_scheme(scheme: str) -> None:
+    if scheme not in ("geometric", "telescoping"):
+        raise ValueError("weight scheme must be 'geometric' or 'telescoping'")
+
+
 def coordinate_weight(index: int, scheme: str = "geometric") -> Fraction:
     """Exactly summable ex-ante global coordinate weights."""
     if isinstance(index, bool) or not isinstance(index, int) or index < 1:
         raise ValueError("coordinate index must be a positive integer")
+    _validate_scheme(scheme)
     if scheme == "geometric":
         return Fraction(1, 1 << index)
     if scheme == "telescoping":
@@ -56,6 +62,7 @@ def coordinate_weight(index: int, scheme: str = "geometric") -> Fraction:
 
 
 def finite_weight_mass(ids: Iterable[int], scheme: str = "geometric") -> Fraction:
+    _validate_scheme(scheme)
     return sum((coordinate_weight(i, scheme) for i in validate_ids(ids)), Fraction(0))
 
 
@@ -75,6 +82,7 @@ def projective_certificate(
     scheme: str = "geometric",
 ) -> Fraction:
     """E_t^S = 1 - sum_{i in S}w_i + sum_{i in S}w_i M_{i,t}."""
+    _validate_scheme(scheme)
     total = Fraction(1)
     for i in validate_ids(intersection):
         if i not in coordinate_values:
@@ -109,6 +117,7 @@ def separate_local_closure(
     The maximizing subset contains exactly the coordinates with positive
     bracket values, so all 2^|I|-1 constraints reduce to one linear scan.
     """
+    _validate_scheme(scheme)
     ids = validate_ids(active)
     rejected = validate_ids(rejections)
     if not set(rejected).issubset(ids):
@@ -220,6 +229,7 @@ def verify_countable_global_projective_path(
     The true-null set is finite in this oracle. The mathematical construction
     extends to countable true-null sets by nonnegative countable mixing.
     """
+    _validate_scheme(scheme)
     level = as_fraction(alpha)
     if not 0 < level < 1:
         raise ValueError("alpha must lie strictly between zero and one")
