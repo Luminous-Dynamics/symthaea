@@ -307,6 +307,60 @@ jobs:
           assert information_fixture["options"][0]["expected_value_of_sample_information"] == 1.5
           assert information_fixture["options"][0]["net_information_value"] == 0.5
           assert information_fixture["options"][1]["net_information_value"] == -0.5
+
+          def canonical_information_option_digest(option):
+              payload = bytearray(b"cmaq-018-evsi-option-v0.1\\0")
+
+              def append_text(value):
+                  encoded = value.encode("utf-8")
+                  payload.extend(struct.pack("<Q", len(encoded)))
+                  payload.extend(encoded)
+
+              def append_ids(values):
+                  payload.extend(struct.pack("<Q", len(values)))
+                  for value in values:
+                      payload.extend(struct.pack("<Q", value))
+
+              append_text(option["history_sha256"])
+              append_text(option["action_manifest_sha256"])
+              append_text(option["query_manifest_sha256"])
+              append_text(option["query_id"])
+              append_ids(option["action_ids"])
+              payload.extend(struct.pack("<Q", len(option["outcome_ids"])))
+              for outcome_id in option["outcome_ids"]:
+                  append_text(outcome_id)
+              payload.extend(struct.pack("<d", option["acquisition_cost"]))
+              payload.extend(struct.pack("<Q", len(option["outcome_probabilities"])))
+              for probability in option["outcome_probabilities"]:
+                  payload.extend(struct.pack("<d", probability))
+              payload.extend(struct.pack("<Q", len(option["conditional_action_utilities"])))
+              for row in option["conditional_action_utilities"]:
+                  payload.extend(struct.pack("<Q", len(row)))
+                  for utility in row:
+                      payload.extend(struct.pack("<d", utility))
+              return hashlib.sha256(payload).hexdigest()
+
+          known_option = {
+              "history_sha256": "a" * 64,
+              "action_manifest_sha256": "b" * 64,
+              "query_manifest_sha256": "c" * 64,
+              "query_id": "camera_peek",
+              "action_ids": [17, 3],
+              "outcome_ids": ["grasp_success", "slip_detected"],
+              "acquisition_cost": 1.0,
+              "outcome_probabilities": [0.5, 0.5],
+              "conditional_action_utilities": [[6.0, 3.0], [2.0, 7.0]],
+          }
+          expected_evsi_digest = "80f500f511bff1bccfd0ca03aa164de21ea84a64e8c924a4b2385132e62257e8"
+          assert canonical_information_option_digest(known_option) == expected_evsi_digest
+          assert information_fixture["options"][0]["evidence_sha256"] == expected_evsi_digest
+          hostile_evsi = json.loads(json.dumps(known_option))
+          hostile_evsi["conditional_action_utilities"][0][0] += 0.01
+          assert canonical_information_option_digest(hostile_evsi) != expected_evsi_digest
+          hostile_evsi = json.loads(json.dumps(known_option))
+          hostile_evsi["outcome_probabilities"][0] = 0.6
+          assert canonical_information_option_digest(hostile_evsi) != expected_evsi_digest
+
           hostile_information = json.loads(json.dumps(information_fixture))
           hostile_information["options"][0]["net_information_value"] = -0.01
           assert (
