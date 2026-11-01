@@ -165,3 +165,10 @@ The generic anytime receipt marks deterministic archive target metrics `NotAppli
 The v0.2 candidate limit is **1,024**, not one million. Interval estimation is linear in retained replicates per objective, but the current certainty/possible-dominance report compares every candidate with every other candidate, yielding O(N²d) classification work for N candidates and d objectives. The cap bounds this exact implementation's worst-case comparison count.
 
 Before increasing the cap, implement a scalable multi-objective dominance-query structure and benchmark it against the pairwise classifier as the reference oracle. Required controls include duplicate vectors, dense antichains, total orders, near-ties, high-dimensional fronts and adversarial candidate orderings. The optimized algorithm must produce exactly the same certain/possible dominance relations as the reference implementation. Report build time, insertion throughput, report latency, memory footprint and worst-case behavior across objective dimensions. No scalability claim is made until those measurements exist.
+
+
+## 14. Optional-stopping coverage diagnostic
+
+An authored deterministic-seed simulation now runs 128 Bernoulli(0.5) observation streams for 128 prefixes each. At every prefix it reads the actual production confidence interval and flags whether the true mean leaves the interval. The test allows at most four streams with any miss. This is a regression diagnostic for accidental alpha-spending/interval implementation changes; it is **not** a proof of coverage, independence, or the Hoeffding guarantee, and has not been executed in this session.
+
+The mathematical guarantee remains conditional on independently sampled bounded observations under the frozen observation process. Add separate negative controls for serial correlation, repeated physical samples, regime drift and outcome-dependent sampling before any real scientific campaign is qualified.
