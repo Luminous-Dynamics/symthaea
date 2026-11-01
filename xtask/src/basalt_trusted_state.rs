@@ -785,6 +785,57 @@ pub fn run_conformance() -> ConformanceReport {
         competing_sources_passed,
     );
 
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+
+    let mut concurrent_state = TrustedState::new();
+    let initial_plan = match concurrent_state.preview(&fixture_candidate()) {
+        Ok(TransitionDecision::Advance(plan)) => Some(plan),
+        _ => None,
+    };
+    let bootstrap_passed = initial_plan
+        .and_then(|plan| concurrent_state.commit(plan).ok())
+        .is_some();
+    let concurrent_candidate = successor_candidate(&concurrent_state, 2, 28);
+    let concurrent_plan = concurrent_state.preview(&concurrent_candidate);
+    let thread_race_passed = if bootstrap_passed {
+        match concurrent_plan {
+            Ok(TransitionDecision::Advance(plan)) => {
+                let shared = Arc::new(Mutex::new(concurrent_state));
+                let handles: Vec<_> = (0..16)
+                    .map(|_| {
+                        let shared = Arc::clone(&shared);
+                        let plan = plan.clone();
+                        thread::spawn(move || shared.lock().unwrap().commit(plan))
+                    })
+                    .collect();
+                let outcomes: Vec<_> = handles
+                    .into_iter()
+                    .map(|handle| handle.join().unwrap())
+                    .collect();
+                let committed = outcomes
+                    .iter()
+                    .filter(|result| matches!(result, Ok(CommitOutcome::Committed { .. })))
+                    .count();
+                let conflicts = outcomes
+                    .iter()
+                    .filter(|result| matches!(result, Err(TransitionError::CompareConflict { .. })))
+                    .count();
+                committed == 1 && conflicts == 15 && shared.lock().unwrap().revision() == 2
+            }
+            _ => false,
+        }
+    } else {
+        false
+    };
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-017",
+        "16 concurrent identical plans produce one winner and 15 compare conflicts",
+        format!("{thread_race_passed}"),
+        thread_race_passed,
+    );
+
     let passed = cases.iter().all(|case| case.passed);
     let scenarios_run = cases.len();
     let scenarios_passed = cases.iter().filter(|case| case.passed).count();
