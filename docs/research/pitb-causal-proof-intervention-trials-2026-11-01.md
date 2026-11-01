@@ -79,7 +79,9 @@ The analyzer:
 - requires measured evidence files under a canonicalized evidence root, rejects path traversal/symlink escape, and hashes proof/checker/semantic/successor/run artifact bytes;
 - reports per-arm success/cost, paired win/loss/tie counts, paired ITT risk difference, component-cluster bootstrap intervals and paired mean cost difference.
 
-The analyzer deliberately emits `confirmatory_result_allowed=false`: it authenticates artifact bytes and checks receipt digests/joins, but it does not yet parse and independently validate the semantics of each checker, semantic-review, successor and run receipt type. Signed benchmark-integrity reviewer attestations and the pinned reviewer-key registry must be validated before a treatment effect is confirmatory. The synthetic generator exists only to exercise denominator, pairing, target-drift, budget and false-success negative controls; it is not an empirical result.
+The analyzer deliberately emits `confirmatory_result_allowed=false`. For measured successful outcomes it now invokes the existing signed benchmark-integrity verifier: all eleven task/source/toolchain/elaboration/axiom/probe/reviewer artifacts must verify under the evidence root; the Ed25519 reviewer attestation must bind the exact task, statement, cohort/snapshot, repository commit and source span; and the key must be active in an externally pinned reviewer registry whose digest is supplied out of band. The derived integrity receipt must be eligible and must match the paired outcome's task, target statement, source commit, Lean toolchain, cohort and snapshot. The analyzer separately counts how many verified successes carry such a signed semantic-integrity receipt.
+
+The checker, run and successor receipt bytes are SHA-256 authenticated and joined by digest, but their receipt-specific semantic structures are not yet parsed by the paired analyzer. Thus signed target integrity is verified, while the proof/checker execution trail is still an independent trust boundary. The analyzer keeps `confirmatory_result_allowed=false` until those receipt types receive strict semantic validators and exact identity joins. The synthetic generator exercises denominator, pairing, target-drift, budget and false-success negative controls; it is not an empirical result.
 
 The focused SorryDB workflow now validates the plan and outcome schemas/fixtures and runs both Rust CLIs' self-tests in the isolated PITB crate. The workflow has not yet produced exact-head CI evidence.
 
@@ -97,7 +99,7 @@ A null result is valuable: it distinguishes the value of semantic support select
 ## Remaining work
 
 1. Execute the outcome schema checks, compile/self-test the paired outcome analyzer, and inspect exact-head CI receipts.
-2. Add strict receipt-type parsing and signed reviewer-attestation / registry verification to the measured outcome path.
+2. Add strict checker, run and successor receipt parsers with exact proof/target/environment/resource bindings; signed benchmark-integrity reviewer receipts are already required for measured success rows.
 3. Add preregistered paired randomization inference and multiplicity-controlled comparisons alongside the component-cluster bootstrap.
 4. Generate a real exhaustive support lattice from a pinned Lean context and build the first integrity-reviewed cohort.
 5. Run a small validation smoke trial; freeze models, prompts, contexts, policy and caps before held-out testing.
