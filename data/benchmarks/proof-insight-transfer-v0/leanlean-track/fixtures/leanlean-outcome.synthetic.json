@@ -1,0 +1,69 @@
+{
+  "schema_version": "pitb.leanlean.outcome.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "run_status": "not_attempted",
+  "task": {
+    "cohort_id": "leanlean_20260914",
+    "task_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "repository_remote": "https://github.com/example/synthetic-leanlean",
+    "repository_commit": "2222222222222222222222222222222222222222",
+    "repository_license": "SYNTHETIC_ONLY",
+    "token_band": "10k_50k",
+    "baseline_stripped_tokens": 25000,
+    "protected_declaration_count": 620,
+    "protected_declarations_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "arm": {
+    "arm_id": "L2",
+    "model_id": "synthetic",
+    "model_version": "none",
+    "harness_version": "none",
+    "prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "config_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "environment": {
+    "lean_toolchain": "leanprover/lean4:v4.32.0",
+    "lean_strip_version": "lean-strip 1.0.0",
+    "comparator_source_commit": "6666666666666666666666666666666666666666",
+    "comparator_bundle_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "baseline_build_status": "not_run",
+    "candidate_build_status": "not_run"
+  },
+  "budget": {
+    "max_wall_ms": 43200000,
+    "max_model_calls": 1000,
+    "max_tokens": 1000000,
+    "max_tool_calls": 10000,
+    "max_lean_cpu_ms": 43200000,
+    "max_peak_rss_bytes": 68719476736,
+    "max_cost_microusd": 100000000
+  },
+  "resources": {
+    "wall_ms": 0,
+    "model_calls": 0,
+    "tokens": 0,
+    "tool_calls": 0,
+    "lean_cpu_ms": 0,
+    "peak_rss_bytes": 0,
+    "cost_microusd": 0
+  },
+  "outcome": {
+    "status": "not_attempted",
+    "official_compression_score": null,
+    "candidate_tokens": null,
+    "candidate_protected_declarations": null,
+    "comparator_passed": null,
+    "clean_rebuild_passed": null,
+    "missing_protected_declarations": 0,
+    "unapproved_axiom_changes": 0,
+    "unapproved_trust_changes": 0
+  },
+  "receipts": {
+    "candidate_tree_sha256": null,
+    "candidate_commit": null,
+    "comparator_receipt_sha256": null,
+    "baseline_build_receipt_sha256": null,
+    "candidate_build_receipt_sha256": null,
+    "action_log_sha256": null
+  }
+}
