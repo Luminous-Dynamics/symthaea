@@ -66,14 +66,14 @@
         "next_source_predecessor_digest": "sha256:abb00378458194ee9fc8c490f2b7baa796047b32c6d2770067922805855fc1af",
         "next_log_checkpoint": "la:1"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "committed",
         "receipt_id": "receipt-A",
         "receipt_acceptance_revision": "rev-1",
         "current_authority_revision": "rev-1",
         "reason": null
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-b-commit",
@@ -97,14 +97,14 @@
         "next_source_predecessor_digest": "sha256:73a5fffb52b6b9a2c0489ddaacd8a6edcdc5f759352fef4612c810f7d0b75e8d",
         "next_log_checkpoint": "lb:1"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "committed",
         "receipt_id": "receipt-B",
         "receipt_acceptance_revision": "rev-2",
         "current_authority_revision": "rev-2",
         "reason": null
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-a-exact-retry",
@@ -125,14 +125,14 @@
         "receipt_id": "receipt-A",
         "receipt_digest": "sha256:c2a02423003b98b568f46c55493e54df0a2bc3a7ac4661ea1c492f66f0f6b9bb"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "duplicate",
         "receipt_id": "receipt-A",
         "receipt_acceptance_revision": "rev-1",
         "current_authority_revision": "rev-2",
         "reason": "exact receipt identity; unrelated authority commit advanced current revision"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-c-race-winner",
@@ -159,14 +159,14 @@
         "next_source_predecessor_digest": "sha256:1d6988deab585b1a808936531845c3494836f89792368787ddcd94a020c09c36",
         "next_log_checkpoint": "la:2"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "committed",
         "receipt_id": "receipt-C",
         "receipt_acceptance_revision": "rev-3",
         "current_authority_revision": "rev-3",
         "reason": null
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-d-race-loser",
@@ -193,14 +193,14 @@
         "next_source_predecessor_digest": "sha256:e6e5e001db3751afc63c090fdbb73fc9949747551652cbf902d32cdaeb7bd909",
         "next_log_checkpoint": "la:2-alt"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "compare_conflict",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-3",
         "reason": "predecessor was consumed by receipt-C; no records advanced for receipt-D"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-e-commit-lost-response",
@@ -227,14 +227,14 @@
         "next_source_predecessor_digest": "sha256:241c6f76803684f74623216edbfb458b5338fd9c711c778fdcb88cd3bb505e83",
         "next_log_checkpoint": "lb:2"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "indeterminate",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
         "current_authority_revision": null,
         "reason": "server committed rev-4; successful response was dropped; client must resolve by exact receipt identity"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-e-recovery-lookup",
@@ -254,14 +254,14 @@
         "receipt_id": "receipt-E",
         "receipt_digest": "sha256:f970491f6f3fd58cf8a56b9ce5eec07ebe84c239fac7aa55ce0e604fa24edba2"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "receipt_found",
         "receipt_id": "receipt-E",
         "receipt_acceptance_revision": "rev-4",
         "current_authority_revision": "rev-4",
         "reason": "lost-response recovery found the already accepted immutable receipt"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-policy-publish",
@@ -282,14 +282,14 @@
         "expected_policy_digest": "sha256:78f5e07fe4681ad5eb93f076018227865270dab5af263fcd09d7f10d5e9ad50e",
         "next_policy_digest": "sha256:a782a382cb699ca623ef37906490be0d826b23224589024f907d1d757a459b6f"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "committed",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-5",
         "reason": "policy head advanced atomically from policy-v1 to policy-v2"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-stale-policy-rejected",
@@ -317,14 +317,14 @@
         "next_source_predecessor_digest": "sha256:7bab2385bd7d9bfafd3568521b52e06fbed4157560c577b361d85e14bd84f937",
         "next_log_checkpoint": "la:3"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "compare_conflict",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-5",
         "reason": "expected policy-v1 but commit-time policy head is policy-v2"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-serializable-attempt-1",
@@ -354,14 +354,14 @@
         "next_source_predecessor_digest": "sha256:63ff0b95aaae57e6c3bd7bef62138cb13b8d775e74bfffe4572edda7e4129248",
         "next_log_checkpoint": "lb:3"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "retryable_abort",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-5",
         "reason": "SQLSTATE 40001; the entire serializable transaction, including its read-derived decisions, rolled back"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-serializable-attempt-2",
@@ -390,14 +390,14 @@
         "next_source_predecessor_digest": "sha256:63ff0b95aaae57e6c3bd7bef62138cb13b8d775e74bfffe4572edda7e4129248",
         "next_log_checkpoint": "lb:3"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "committed",
         "receipt_id": "receipt-G",
         "receipt_acceptance_revision": "rev-6",
         "current_authority_revision": "rev-6",
         "reason": "second whole-transaction attempt committed after fresh transaction begin"
-      },
-      "runner_id": "runner-1"
+      }
     },
     {
       "op_id": "op-restore-old-snapshot",
@@ -419,15 +419,15 @@
         "witness_sequence_seen": 10,
         "restored_authority_revision": "rev-2"
       },
-      "result": {
+      "runner_id": "runner-1",
+      "expected_result": {
         "outcome": "rejected_anti_rollback",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-6",
         "reason": "restored store reports rev-2, while the independent witness head reports rev-6 at sequence 12; the restored state digest does not match that witnessed head",
         "observed_store_revision": "rev-2"
-      },
-      "runner_id": "runner-1"
+      }
     }
   ],
   "faults": [
