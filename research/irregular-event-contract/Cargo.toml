@@ -8,5 +8,8 @@ description = "Causality-preserving event and availability-time contract for irr
 
 [dependencies]
 sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+chrono-tz = "0.10"
+csv = "1"
 
 [workspace]
