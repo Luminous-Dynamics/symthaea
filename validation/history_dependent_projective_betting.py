@@ -315,6 +315,100 @@ def build_predictable_arrivals_from_history(
     return tuple(active)
 
 
+def verify_history_dependent_projective_receipt(result: dict) -> dict:
+    """Independently replay predictable factors and projective prefixes."""
+    active, observations, universe = _normalize_stream(
+        result.get("active_by_time", ()),
+        result.get("observations_by_time", ()),
+    )
+    policy = result.get("policy", {})
+    base_lambda = float(policy.get("base_lambda"))
+    gain = float(policy.get("gain"))
+    maximum_lambda = float(policy.get("maximum_lambda"))
+    intersections = ((),) + nonempty_subsets(universe)
+    failures = []
+    paths = result.get("log_e_process_paths", {})
+    receipts = result.get("factor_receipts", {})
+
+    for intersection in intersections:
+        if intersection not in paths or intersection not in receipts:
+            failures.append(("missing_intersection_receipt", intersection))
+            continue
+        if len(paths[intersection]) != len(active) or len(receipts[intersection]) != len(active):
+            failures.append(("intersection_receipt_horizon_mismatch", intersection))
+            continue
+        accumulated = 0.0
+        for t, active_ids in enumerate(active):
+            current = tuple(i for i in intersection if i in set(active_ids))
+            past = observations[:t]
+            receipt = receipts[intersection][t]
+            if tuple(receipt.get("active_intersection", ())) != current:
+                failures.append(("active_intersection_receipt_mismatch", intersection, t))
+            expected_lambda = (
+                0.0 if not current else adaptive_lambda(
+                    current, past, base_lambda=base_lambda,
+                    gain=gain, maximum_lambda=maximum_lambda,
+                )
+            )
+            if not math.isclose(
+                float(receipt.get("lambda", math.nan)),
+                expected_lambda,
+                rel_tol=0.0, abs_tol=1e-12,
+            ):
+                failures.append(("predictable_lambda_replay_failure", intersection, t))
+            expected_digest = _prefix_digest(current, past, expected_lambda)
+            if receipt.get("pre_update_prefix_sha256") != expected_digest:
+                failures.append(("pre_update_prefix_digest_failure", intersection, t))
+            if current:
+                sum_z = math.fsum(observations[t][i] for i in current)
+                expected_log_factor = (
+                    expected_lambda * sum_z
+                    - 0.5 * expected_lambda**2 * variance_of_shared_sum(len(current))
+                )
+            else:
+                expected_log_factor = 0.0
+            if not math.isclose(
+                float(receipt.get("log_factor", math.nan)),
+                expected_log_factor,
+                rel_tol=0.0, abs_tol=1e-12,
+            ):
+                failures.append(("conditional_factor_replay_failure", intersection, t))
+            accumulated += expected_log_factor
+            if not math.isclose(
+                float(paths[intersection][t]),
+                accumulated,
+                rel_tol=0.0, abs_tol=1e-12,
+            ):
+                failures.append(("log_wealth_replay_failure", intersection, t))
+
+    projectivity_checks = 0
+    for intersection in intersections:
+        if intersection not in paths:
+            continue
+        for t, active_ids in enumerate(active):
+            current = tuple(i for i in intersection if i in set(active_ids))
+            if current not in paths:
+                failures.append(("missing_projective_restriction", intersection, current, t))
+                continue
+            for u in range(t + 1):
+                projectivity_checks += 1
+                if not math.isclose(
+                    float(paths[intersection][u]),
+                    float(paths[current][u]),
+                    rel_tol=0.0, abs_tol=1e-12,
+                ):
+                    failures.append(("historical_projectivity_failure", intersection, current, u, t))
+
+    return {
+        "valid": not failures,
+        "failures": failures,
+        "intersections_checked": len(intersections),
+        "predictable_factors_replayed": sum(len(receipts.get(s, ())) for s in intersections),
+        "historical_projectivity_checks": projectivity_checks,
+        "scope": "independent finite path replay; conditional Gaussian model validity remains external",
+    }
+
+
 def verify_local_projective_closure(
     result: dict,
     rejections_by_time: Sequence[Iterable[int]],
