@@ -4754,11 +4754,28 @@ impl DelayedHorizonEvaluator {
             None => self.hdc_dim = Some(actual.dim()),
             _ => {}
         }
-        self.elapsed_seconds += dt as f64;
+        let now = self.elapsed_seconds + dt as f64;
+        if !now.is_finite() || now <= self.elapsed_seconds {
+            return Err("horizon evaluator clock overflowed or failed to advance".to_string());
+        }
+        let mut pending_after_maturation = vec![0usize; self.horizons.len()];
+        for forecast in &self.pending {
+            if forecast.due_time > now {
+                pending_after_maturation[forecast.horizon_index] += 1;
+            }
+        }
+        let forecasts_to_issue = pending_after_maturation
+            .iter()
+            .map(|queued| self.max_pending_per_horizon.saturating_sub(*queued))
+            .sum::<usize>();
+        let next_forecast_id_after = self
+            .next_forecast_id
+            .checked_add(forecasts_to_issue as u64)
+            .ok_or_else(|| "delayed-horizon forecast ID space exhausted".to_string())?;
+        self.elapsed_seconds = now;
 
         let target_observation_blake3 = visual_hv_blake3(actual);
         let target_frame_sequence = manifold.frame_count;
-        let now = self.elapsed_seconds;
         let mut scored = 0usize;
         let pending = std::mem::take(&mut self.pending);
         let mut still_pending = Vec::with_capacity(pending.len());
@@ -4842,6 +4859,7 @@ impl DelayedHorizonEvaluator {
         let source_observation_blake3 = Some(target_observation_blake3);
         let source_belief_blake3 = Some(visual_hv_blake3(&manifold.state));
         let predictor_parameter_blake3 = Some(transition_parameter_blake3(manifold));
+        let mut next_forecast_id = self.next_forecast_id;
         for (horizon_index, &horizon) in self.horizons.iter().enumerate() {
             let queued = self
                 .pending
@@ -4852,11 +4870,8 @@ impl DelayedHorizonEvaluator {
                 self.accumulators[horizon_index].dropped_forecasts += 1;
                 continue;
             }
-            let forecast_id = self.next_forecast_id;
-            self.next_forecast_id = self
-                .next_forecast_id
-                .checked_add(1)
-                .ok_or_else(|| "delayed-horizon forecast ID space exhausted".to_string())?;
+            let forecast_id = next_forecast_id;
+            next_forecast_id += 1;
             let predicted = manifold.predict_horizon(actual, horizon);
             let persistence = actual.clone();
             self.pending.push(PendingHorizonForecast {
@@ -4874,6 +4889,8 @@ impl DelayedHorizonEvaluator {
                 persistence,
             });
         }
+        debug_assert_eq!(next_forecast_id, next_forecast_id_after);
+        self.next_forecast_id = next_forecast_id_after;
         Ok(scored)
     }
 
