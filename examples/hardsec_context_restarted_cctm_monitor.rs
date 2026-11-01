@@ -788,13 +788,14 @@ fn update_restarted_processes(
     p_value: f64,
     epsilon: f64,
     smoothing_k: f64,
-    scale_c: f64,
+    cctm_scale: f64,
+    restart_weight_scale: f64,
     maximum_restart_age: usize,
     sequence_index: usize,
 ) -> Result<RestartUpdate, String> {
     context_state.restart_observation_count += 1;
     let observation_index = context_state.restart_observation_count;
-    let new_weight = restart_weight(observation_index, scale_c);
+    let new_weight = restart_weight(observation_index, restart_weight_scale);
     if !new_weight.is_finite() || new_weight <= 0.0 {
         return Err("restart weight must be finite and positive".to_owned());
     }
@@ -814,7 +815,7 @@ fn update_restarted_processes(
     // Every live local process receives the current observation. Its ONS
     // parameter was fixed using only earlier observations in that local run.
     for local in context_state.restart_states.iter_mut() {
-        let (beta, _, g_prime) = cctm_bet(p_value, local.eta, epsilon, smoothing_k, scale_c)?;
+        let (beta, _, g_prime) = cctm_bet(p_value, local.eta, epsilon, smoothing_k, cctm_scale)?;
         if beta == 0.0 {
             local.log_wealth = None;
             continue;
@@ -841,7 +842,7 @@ fn update_restarted_processes(
     let mut log_terms = vec![reserve.ln()];
     for local in &context_state.restart_states {
         if let Some(log_wealth) = local.log_wealth {
-            let weight = restart_weight(local.start_index, scale_c);
+            let weight = restart_weight(local.start_index, restart_weight_scale);
             log_terms.push(weight.ln() + log_wealth);
         }
     }
@@ -865,7 +866,7 @@ fn update_restarted_processes(
             };
             json!({
                 "start_index":local.start_index,
-                "weight":restart_weight(local.start_index, scale_c),
+                "weight":restart_weight(local.start_index, restart_weight_scale),
                 "age":age,
                 "local_log_wealth":local.log_wealth,
                 "status":status
@@ -1009,6 +1010,7 @@ fn audit_values_with_context_receipt(
             p_value,
             epsilon,
             smoothing_k,
+            score_scale,
             restart_weight_scale,
             maximum_restart_age,
             record.sequence_index,
@@ -1869,7 +1871,7 @@ mod tests {
                 single_accumulator = accumulator_next;
             }
 
-            update_restarted_processes(&mut context, p_value, epsilon, k, scale, 256, index)
+            update_restarted_processes(&mut context, p_value, epsilon, k, scale, 1.0 / 3.0, 256, index)
                 .unwrap();
         }
 
@@ -1884,7 +1886,7 @@ mod tests {
                 single_eta = eta_next;
                 single_accumulator = accumulator_next;
             }
-            update_restarted_processes(&mut context, 1.0, epsilon, k, scale, 256, 10_000 + delay)
+            update_restarted_processes(&mut context, 1.0, epsilon, k, scale, 1.0 / 3.0, 256, 10_000 + delay)
                 .unwrap();
 
             if restarted_delay.is_none() && context.restart_log_e_value >= threshold {
