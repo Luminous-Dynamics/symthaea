@@ -108,7 +108,8 @@
     "rust_tests_executed": false,
     "hardware_energy_measured": false,
     "benchmark_executed": false,
-    "evaluator_interaction_test_functions_authored": 6
+    "evaluator_interaction_test_functions_authored": 6,
+    "evaluator_higher_order_interaction_test_functions_authored": 8
   },
   "evaluator_attribution": {
     "module": "research/temporal-evaluator/src/interaction.rs",
@@ -124,7 +125,26 @@
     "reports_incompatible_context_counts": true,
     "reports_over_budget_context_counts": true,
     "test_functions_authored": 6,
-    "shapley_or_universal_causal_claim": false
+    "shapley_or_universal_causal_claim": false,
+    "higher_order_decomposition": {
+      "module": "research/temporal-evaluator/src/interaction_decomposition.rs",
+      "method": "exact Mobius/Harsanyi-dividend transform over the complete binary action lattice",
+      "exposure_axes": [
+        "wrong_belief_us",
+        "abstention_us",
+        "missing_output_us"
+      ],
+      "orders": "main effects, pairwise, third-order and higher",
+      "positive_sign": "additional exposure reduction beyond lower-order terms (synergy)",
+      "negative_sign": "antagonism",
+      "requires_all_subsets_compatible_and_within_hard_budget": true,
+      "missing_or_infeasible_counterfactuals_imputed_as_zero": false,
+      "reports_incompatible_and_over_budget_exclusions": true,
+      "maximum_action_factors": 16,
+      "worst_case_subsubset_enumeration_complexity": "O(3^n)",
+      "shapley_or_population_causal_claim": false,
+      "test_functions_authored": 8
+    }
   },
   "external_benchmark_lanes": [
     {
