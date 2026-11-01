@@ -143,6 +143,11 @@ impl ForecastJournal {
         Ok(())
     }
 
+    /// Iterate immutable forecast receipts in stable ForecastId order.
+    pub fn iter_forecasts(&self) -> impl Iterator<Item = &ForecastReceipt> {
+        self.forecasts.values()
+    }
+
     pub fn forecast(&self, id: ForecastId) -> Option<&ForecastReceipt> {
         self.forecasts.get(&id)
     }

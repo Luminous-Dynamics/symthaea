@@ -205,7 +205,27 @@ The reported observed FCR is the miss fraction among feedback-resolved selected 
 
 V1 evaluates one declared scalar resource dimension per statement. The exact feedback receipt carries the full metered resource vector and projects the declared dimension, preventing unit substitution. A scalar coverage result does not imply joint simultaneous coverage of tokens, tool calls, CPU, GPU, wall time, and money. A multivariate guarantee requires its own construction and theory.
 
-## 18. External comparators and claim limits
+## 18. Progressive rollout-prefix replay
+
+The first evaluator is specified in [PREFIX_REPLAY_V1.md](PREFIX_REPLAY_V1.md) and implemented in `prefix_replay.rs`. It consumes immutable pre-execution forecast receipts and separately appended outcome receipts from `ForecastJournal`, then emits rows in stable `(run_id, decision_sequence, forecast_id)` order and summaries partitioned by task family.
+
+Only `SufficientProof` outcomes with a non-empty independent verifier receipt enter exact point-error and exact-label q90/q95 coverage metrics. Right-censored outcomes contribute only definite upper-envelope exceedance diagnostics when their observed lower bound is already above q90/q95; they are not converted to exact labels. Competing terminals and missing outcomes remain distinct. The all-six-resource q90 coverage diagnostic is an empirical joint statistic, not evidence of simultaneous conformal validity.
+
+An optional state-bound `PrefixBudgetReceipt` adds descriptive feasibility replay. The evaluator declares a forecast feasible only when it is in-domain, has nonzero support, passes the configured completion-probability threshold, and its q90 vector plus mandatory verification reserve fits the remaining budget in all six resource dimensions. Shifted/unsupported forecasts abstain.
+
+Actual feasibility is known for independently verified sufficient-proof completions and for right-censored lower bounds that already exceed at least one remaining-budget dimension. A lower bound still within budget does not prove feasibility; pending and competing terminal events remain unknown. The evaluator reports false-feasible/false-infeasible counts and rates only over resolved predictions. These labels are descriptive and depend on the frozen replay episode and budget receipt; the q90 components are marginal and do not form a joint probabilistic guarantee.
+
+V1 still does not include forecast-query overhead, prefix-level action regeneration/re-execution, paired baseline comparisons, chronological/task-family holdouts, confidence intervals, or a BAGEN reproduction. Those are the next slices of issue #9752.
+
+## 19. Historical empirical baseline
+
+`historical_baseline.rs` fits family-specific q50/q90/q95 empirical profiles from independently verified sufficient-proof training outcomes. It excludes censored/competing/pending outcomes from exact-cost profiles and falls back to the global completed-proof profile for unseen task families. Evaluation is run-disjoint: any evaluation run ID present in the training journal is rejected.
+
+The CLI evaluates this historical baseline on the exact same seven frozen prefixes used by the frontier-conditioned replay fixture. q50 error and marginal q90/q95 coverage use the same independently verified completion labels. Right-censored lower-bound exceedances are reported separately. The historical upper quantiles are order statistics, not conformal prediction intervals and not distribution-free guarantees.
+
+The current comparison is a small deterministic fixture to prove accounting parity and correct label handling. It is not a measured claim that the frontier predictor is better; the paired real-world task suite, task-family/chronological splits, uncertainty intervals, and last-observed/linear/conformal/CAP comparators remain open.
+
+## 20. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.

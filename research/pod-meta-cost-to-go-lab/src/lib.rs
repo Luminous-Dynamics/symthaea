@@ -1,3 +1,6 @@
+pub mod historical_baseline;
+pub use historical_baseline::*;
+
 pub mod decision_driven_cap;
 pub use decision_driven_cap::*;
 
@@ -12,6 +15,9 @@ pub use landmark_ipcw::*;
 
 pub mod vector_conformal;
 pub use vector_conformal::*;
+
+pub mod prefix_replay;
+pub use prefix_replay::*;
 
 pub mod forecast_journal;
 pub mod survival;
