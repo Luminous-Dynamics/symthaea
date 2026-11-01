@@ -7,6 +7,7 @@ from supremum_anchored_eclosure import (
     build_supremum_anchored_certificates,
     build_additive_anchored_auxiliary,
     build_additive_anchored_coordinate_e_paths,
+    build_additive_anchored_portfolio_e_paths,
     select_additive_anchored_e_bh,
     fdp_for_intersection,
     pathwise_supremum_bound,
@@ -296,6 +297,129 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
                 coordinate_auxiliary_paths={
                     "a": [Fraction(1)], "b": [Fraction(-1)]
                 },
+                alpha=Fraction(1, 10),
+            )
+
+    def test_fixed_prior_budget_portfolio_is_exact_convex_mixture(self):
+        universe = ("a", "b", "c")
+        baseline = [("a",), ("a", "b")]
+        q = {i: Fraction(1, 10) for i in universe}
+        strategies = {
+            "balanced": {
+                "budgets": {i: Fraction(1, 5) for i in universe},
+                "paths": {
+                    "a": [Fraction(1), Fraction(2)],
+                    "b": [Fraction(2), Fraction(3)],
+                    "c": [Fraction(3), Fraction(4)],
+                },
+            },
+            "sparse": {
+                "budgets": {
+                    "a": Fraction(2, 5),
+                    "b": Fraction(1, 10),
+                    "c": Fraction(1, 10),
+                },
+                "paths": {
+                    "a": [Fraction(4), Fraction(5)],
+                    "b": [Fraction(1), Fraction(1)],
+                    "c": [Fraction(1), Fraction(2)],
+                },
+            },
+        }
+        prior = {"balanced": Fraction(1, 4), "sparse": Fraction(3, 4)}
+        paths = build_additive_anchored_portfolio_e_paths(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            strategies=strategies,
+            strategy_prior=prior,
+            alpha=Fraction(1, 5),
+        )
+        for i in universe:
+            for t in range(2):
+                expected = (
+                    (Fraction(1) if any(i in row for row in baseline[:t + 1]) else Fraction(0))
+                    / Fraction(1, 5)
+                    + prior["balanced"] * strategies["balanced"]["budgets"][i]
+                    * strategies["balanced"]["paths"][i][t]
+                    + prior["sparse"] * strategies["sparse"]["budgets"][i]
+                    * strategies["sparse"]["paths"][i][t]
+                )
+                self.assertEqual(paths[i][t], expected)
+
+    def test_fixed_prior_budget_portfolio_retains_baseline_and_is_closed(self):
+        universe = ("a", "b", "c")
+        baseline = [("a",), ("a", "b"), ("b", "c")]
+        q = {i: Fraction(1, 10) for i in universe}
+        strategies = {
+            "left": {
+                "budgets": {"a": Fraction(1, 5), "b": Fraction(1, 10), "c": Fraction(1, 10)},
+                "paths": {i: [Fraction(2), Fraction(1), Fraction(3)] for i in universe},
+            },
+            "right": {
+                "budgets": {"a": Fraction(1, 10), "b": Fraction(1, 10), "c": Fraction(1, 5)},
+                "paths": {i: [Fraction(1), Fraction(3), Fraction(2)] for i in universe},
+            },
+        }
+        paths = build_additive_anchored_portfolio_e_paths(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            strategies=strategies,
+            strategy_prior={"left": Fraction(1, 2), "right": Fraction(1, 2)},
+            alpha=Fraction(1, 10),
+        )
+        for t, baseline_set in enumerate(baseline):
+            values = {i: paths[i][t] for i in universe}
+            chosen = select_additive_anchored_e_bh(
+                coordinate_e_values=values,
+                alpha=Fraction(1, 10),
+                anchor=baseline_set,
+            )
+            self.assertTrue(frozenset(baseline_set) <= chosen)
+            local_values = {
+                frozenset(group): sum((values[i] for i in group), Fraction(0))
+                for size in range(1, len(universe) + 1)
+                for group in combinations(universe, size)
+            }
+            valid, _ = verify_closure_path(
+                universe=universe,
+                rejection_path=[chosen],
+                local_e_paths={key: (value,) for key, value in local_values.items()},
+                alpha=Fraction(1, 10),
+            )
+            self.assertTrue(valid)
+
+    def test_budget_portfolio_rejects_posthoc_or_invalid_weights(self):
+        universe = ("a", "b")
+        baseline = [("a",)]
+        strategies = {
+            "x": {
+                "budgets": {"a": Fraction(1, 4), "b": Fraction(1, 4)},
+                "paths": {"a": [Fraction(1)], "b": [Fraction(1)]},
+            },
+            "y": {
+                "budgets": {"a": Fraction(1, 4), "b": Fraction(1, 4)},
+                "paths": {"a": [Fraction(1)], "b": [Fraction(1)]},
+            },
+        }
+        with self.assertRaises(ValueError):
+            build_additive_anchored_portfolio_e_paths(
+                universe=universe,
+                baseline_path=baseline,
+                coordinate_budgets={"a": Fraction(1, 4), "b": Fraction(1, 4)},
+                strategies=strategies,
+                strategy_prior={"x": Fraction(1), "y": Fraction(1)},
+                alpha=Fraction(1, 10),
+            )
+        strategies["x"]["budgets"]["a"] = Fraction(1)
+        with self.assertRaises(ValueError):
+            build_additive_anchored_portfolio_e_paths(
+                universe=universe,
+                baseline_path=baseline,
+                coordinate_budgets={"a": Fraction(1, 4), "b": Fraction(1, 4)},
+                strategies=strategies,
+                strategy_prior={"x": Fraction(1, 2), "y": Fraction(1, 2)},
                 alpha=Fraction(1, 10),
             )
 
