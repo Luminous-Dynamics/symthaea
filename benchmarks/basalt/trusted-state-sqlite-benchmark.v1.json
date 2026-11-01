@@ -211,6 +211,24 @@
       "class": "safety",
       "unit": "count",
       "target": "0"
+    },
+    {
+      "id": "complete_acceptance_history_gaps",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "source_cursor_not_latest_acceptance",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "schema_version_mismatch_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
     }
   ],
   "benchmark_policy": {
