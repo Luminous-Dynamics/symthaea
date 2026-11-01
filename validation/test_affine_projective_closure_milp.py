@@ -188,7 +188,8 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
         self.assertIn("aux_2: 8 y_2 - 8 x_2 - r >= 0", lp)
         self.assertIn("closure_sum: 2 y_1 + 2 y_2 - r <= 0", lp)
         self.assertIn("Binaries", lp)
-        self.assertIn("Generals", lp)
+        self.assertIn("0 <= r <= 2", lp)
+        self.assertNotIn("Generals", lp)
         self.assertTrue(lp.endswith("End\\n"))
 
     def test_bad_model_inputs_fail_closed(self):
