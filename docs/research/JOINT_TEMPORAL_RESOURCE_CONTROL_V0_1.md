@@ -78,23 +78,15 @@ The key quantity is not merely prediction accuracy. It is the *marginal reductio
 
 A future value estimator should predict three effects separately:
 
-$
-\\Delta V(a) = (\\Delta W(a),\\Delta A(a),\\Delta O(a))
-$
+`DeltaV(a) = (DeltaW(a), DeltaA(a), DeltaO(a))`
 
-where (W) is wrong-belief exposure, (A) is abstention exposure, and (O) is missing-output exposure. These are not interchangeable. A system must not mask a large regression in one axis with a gain in another.
+where `W` is wrong-belief exposure, `A` is abstention exposure, and `O` is missing-output exposure. These are not interchangeable. A system must not mask a large regression in one axis with a gain in another.
 
 Resource costs remain a vector:
 
-$
-C(a) = (M, M_t, R, W, C_t, F, N_s, T_s, L, E, V, B_r)
-$
+`C(a) = (M, M_t, R, W, C_t, F, N_s, T_s, L, E, V, B_r)`
 
-with the twelve dimensions defined above. Feasibility is componentwise:
-
-[
-C_i(a) leq B_i quad orall i
-]
+with the twelve dimensions defined above. Feasibility is componentwise: `C_i(a) <= B_i` for every resource dimension `i`.
 
 Only after feasibility should the controller compare the three-axis benefit and twelve-axis cost Pareto surface. Future adaptive versions may use explicit per-resource shadow prices or a receding-horizon controller, but hard limits remain separate and every conversion/price must be recorded.
 
