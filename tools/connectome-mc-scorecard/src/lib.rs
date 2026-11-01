@@ -727,6 +727,8 @@ pub fn evaluate(
 pub struct PlannedReplicate {
     pub replicate_id: String,
     pub seed: u64,
+    pub structural_beta: f64,
+    pub null_is_true: bool,
 }
 
 /// Configuration for a common-random-number, paired method comparison.
@@ -755,6 +757,8 @@ impl Default for PairedComparisonConfig {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PairedRejectionDifference {
     pub planned_pairs: usize,
+    pub baseline_record_count: usize,
+    pub candidate_record_count: usize,
     pub matched_record_pairs: usize,
     pub complete_rejection_pairs: usize,
     pub unknown_pairs: usize,
@@ -864,19 +868,30 @@ pub fn compare_paired_rejection_rate(
         return Err(EvalError::EmptyInput);
     }
 
-    let mut planned_by_id = BTreeMap::<String, u64>::new();
+    let mut planned_by_id = BTreeMap::<String, &PlannedReplicate>::new();
     let mut planned_seeds = BTreeSet::new();
+    let mut planned_truth: Option<(f64, bool)> = None;
     for planned in planned_replicates {
         if planned.replicate_id.trim().is_empty() {
             return Err(EvalError::EmptyIdentifier);
         }
-        if planned_by_id.insert(planned.replicate_id.clone(), planned.seed).is_some() {
+        if !planned.structural_beta.is_finite() {
+            return Err(EvalError::NonFiniteStructuralTruth);
+        }
+        let truth = (planned.structural_beta, planned.null_is_true);
+        if planned_truth.is_some_and(|previous| previous != truth) {
+            return Err(EvalError::InconsistentPairedTruth);
+        }
+        planned_truth = Some(truth);
+        if planned_by_id.insert(planned.replicate_id.clone(), planned).is_some() {
             return Err(EvalError::DuplicateReplicate);
         }
         if !planned_seeds.insert(planned.seed) {
             return Err(EvalError::DuplicateSeed);
         }
     }
+
+    let planned_truth = planned_truth.ok_or(EvalError::EmptyInput)?;
 
     let mut baseline = BTreeMap::<String, &ReplicateRecord>::new();
     let mut candidate = BTreeMap::<String, &ReplicateRecord>::new();
@@ -886,11 +901,16 @@ pub fn compare_paired_rejection_rate(
             && (row.method_id == baseline_method_id || row.method_id == candidate_method_id)
     }) {
         validate_record(record)?;
-        let planned_seed = planned_by_id
+        let planned = planned_by_id
             .get(&record.replicate_id)
             .ok_or(EvalError::UnplannedReplicate)?;
-        if *planned_seed != record.seed {
+        if planned.seed != record.seed {
             return Err(EvalError::SeedAlignmentMismatch);
+        }
+        if planned.structural_beta != record.structural_beta
+            || planned.null_is_true != record.null_is_true
+        {
+            return Err(EvalError::InconsistentPairedTruth);
         }
         let destination = if record.method_id == baseline_method_id {
             &mut baseline
@@ -902,46 +922,26 @@ pub fn compare_paired_rejection_rate(
         }
     }
 
-    if baseline.is_empty() || candidate.is_empty() {
-        return Err(EvalError::MissingComparisonMethod);
-    }
-
-    let validate_method_group = |rows: &BTreeMap<String, &ReplicateRecord>| {
-        let first = rows.values().next().ok_or(EvalError::MissingComparisonMethod)?;
-        let mut seeds = BTreeSet::new();
-        for row in rows.values() {
-            if row.structural_beta != first.structural_beta
-                || row.null_is_true != first.null_is_true
-            {
-                return Err(EvalError::InconsistentPairedTruth);
-            }
-            if !seeds.insert(row.seed) {
-                return Err(EvalError::DuplicateSeed);
-            }
-        }
-        Ok((first.structural_beta, first.null_is_true))
-    };
-
-    let baseline_truth = validate_method_group(&baseline)?;
-    let candidate_truth = validate_method_group(&candidate)?;
-    if baseline_truth != candidate_truth {
-        return Err(EvalError::InconsistentPairedTruth);
-    }
-
+    // The independent plan supplies scenario truth even when one or both
+    // methods return no rows. Such total-run failures remain unknown pairs.
     let planned_pairs = planned_by_id.len();
+    let baseline_record_count = baseline.len();
+    let candidate_record_count = candidate.len();
     let mut matched_record_pairs = 0usize;
     let mut complete_rejection_pairs = 0usize;
     let mut known_difference_sum = 0.0f64;
 
-    for (replicate_id, planned_seed) in &planned_by_id {
+    for (replicate_id, planned) in &planned_by_id {
         match (baseline.get(replicate_id), candidate.get(replicate_id)) {
             (Some(base), Some(cand)) => {
                 matched_record_pairs += 1;
-                if base.seed != cand.seed || base.seed != *planned_seed {
+                if base.seed != cand.seed || base.seed != planned.seed {
                     return Err(EvalError::SeedAlignmentMismatch);
                 }
                 if base.structural_beta != cand.structural_beta
                     || base.null_is_true != cand.null_is_true
+                    || base.structural_beta != planned.structural_beta
+                    || base.null_is_true != planned.null_is_true
                 {
                     return Err(EvalError::InconsistentPairedTruth);
                 }
@@ -986,11 +986,13 @@ pub fn compare_paired_rejection_rate(
         scenario_id: scenario_id.to_string(),
         baseline_method_id: baseline_method_id.to_string(),
         candidate_method_id: candidate_method_id.to_string(),
-        structural_beta: baseline_truth.0,
-        null_is_true: baseline_truth.1,
+        structural_beta: planned_truth.0,
+        null_is_true: planned_truth.1,
         rejection_alpha: config.rejection_alpha,
         rejection_difference: PairedRejectionDifference {
             planned_pairs,
+            baseline_record_count,
+            candidate_record_count,
             matched_record_pairs,
             complete_rejection_pairs,
             unknown_pairs,
@@ -1423,8 +1425,8 @@ mod tests {
             record("alt", "candidate", "2", 1.0, false, ExecutionStatus::Completed, Some(0.04)),
         ];
         let plan = vec![
-            PlannedReplicate { replicate_id: "1".into(), seed: 1 },
-            PlannedReplicate { replicate_id: "2".into(), seed: 2 },
+            PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 1.0, null_is_true: false },
+            PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 1.0, null_is_true: false },
         ];
         let result = compare_paired_rejection_rate(
             &rows, &plan, "alt", "baseline", "candidate", PairedComparisonConfig::default()
@@ -1445,8 +1447,8 @@ mod tests {
             record("null", "candidate", "2", 0.0, true, ExecutionStatus::Completed, Some(0.01)),
         ];
         let plan = vec![
-            PlannedReplicate { replicate_id: "1".into(), seed: 1 },
-            PlannedReplicate { replicate_id: "2".into(), seed: 2 },
+            PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 0.0, null_is_true: true },
+            PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 0.0, null_is_true: true },
         ];
         let result = compare_paired_rejection_rate(
             &rows, &plan, "null", "baseline", "candidate", PairedComparisonConfig::default()
@@ -1463,9 +1465,9 @@ mod tests {
             record("alt", "baseline", "2", 1.0, false, ExecutionStatus::Completed, Some(0.5)),
         ];
         let plan = vec![
-            PlannedReplicate { replicate_id: "1".into(), seed: 1 },
-            PlannedReplicate { replicate_id: "2".into(), seed: 2 },
-            PlannedReplicate { replicate_id: "3".into(), seed: 3 },
+            PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 1.0, null_is_true: false },
+            PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 1.0, null_is_true: false },
+            PlannedReplicate { replicate_id: "3".into(), seed: 3, structural_beta: 1.0, null_is_true: false },
         ];
         let result = compare_paired_rejection_rate(
             &rows, &plan, "alt", "baseline", "candidate", PairedComparisonConfig::default()
@@ -1487,10 +1489,82 @@ mod tests {
         assert_eq!(
             compare_paired_rejection_rate(
                 &[baseline, candidate],
-                &[PlannedReplicate { replicate_id: "1".into(), seed: 0 }],
+                &[PlannedReplicate { replicate_id: "1".into(), seed: 0, structural_beta: 0.0, null_is_true: true }],
                 "s", "baseline", "candidate", PairedComparisonConfig::default()
             ),
             Err(EvalError::SeedAlignmentMismatch)
+        );
+    }
+
+    #[test]
+    fn paired_comparison_preserves_total_method_outage_from_frozen_truth() {
+        let plan = vec![
+            PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 0.0, null_is_true: true },
+            PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 0.0, null_is_true: true },
+        ];
+        let result = compare_paired_rejection_rate(
+            &[],
+            &plan,
+            "null",
+            "baseline",
+            "candidate",
+            PairedComparisonConfig::default(),
+        ).unwrap();
+        assert_eq!(result.structural_beta, 0.0);
+        assert!(result.null_is_true);
+        assert_eq!(result.rejection_difference.planned_pairs, 2);
+        assert_eq!(result.rejection_difference.baseline_record_count, 0);
+        assert_eq!(result.rejection_difference.candidate_record_count, 0);
+        assert_eq!(result.rejection_difference.matched_record_pairs, 0);
+        assert_eq!(result.rejection_difference.complete_rejection_pairs, 0);
+        assert_eq!(result.rejection_difference.unknown_pairs, 2);
+        assert_eq!(result.rejection_difference.conservative_interval.lower, -1.0);
+        assert_eq!(result.rejection_difference.conservative_interval.upper, 1.0);
+    }
+
+    #[test]
+    fn paired_comparison_rejects_plan_truth_mismatch() {
+        let mut row = record("s", "baseline", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5));
+        row.seed = 1;
+        let plan = vec![PlannedReplicate {
+            replicate_id: "1".into(),
+            seed: 1,
+            structural_beta: 1.0,
+            null_is_true: false,
+        }];
+        assert_eq!(
+            compare_paired_rejection_rate(
+                &[row],
+                &plan,
+                "s",
+                "baseline",
+                "candidate",
+                PairedComparisonConfig::default(),
+            ),
+            Err(EvalError::InconsistentPairedTruth)
+        );
+    }
+
+    #[test]
+    fn paired_plan_rejects_inconsistent_truth_across_replicates() {
+        let plan = vec![
+            PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 0.0, null_is_true: true },
+            PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 1.0, null_is_true: false },
+        ];
+        let rows = vec![
+            record("s", "baseline", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5)),
+            record("s", "candidate", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5)),
+        ];
+        assert_eq!(
+            compare_paired_rejection_rate(
+                &rows,
+                &plan,
+                "s",
+                "baseline",
+                "candidate",
+                PairedComparisonConfig::default(),
+            ),
+            Err(EvalError::InconsistentPairedTruth)
         );
     }
 
@@ -1501,7 +1575,7 @@ mod tests {
         assert_eq!(
             compare_paired_rejection_rate(
                 &[baseline, candidate],
-                &[PlannedReplicate { replicate_id: "2".into(), seed: 2 }],
+                &[PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 0.0, null_is_true: true }],
                 "s", "baseline", "candidate", PairedComparisonConfig::default()
             ),
             Err(EvalError::UnplannedReplicate)
@@ -1531,8 +1605,8 @@ mod tests {
             record("s", "c", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5)),
         ];
         let plan = vec![
-            PlannedReplicate { replicate_id: "2".into(), seed: 2 },
-            PlannedReplicate { replicate_id: "1".into(), seed: 1 },
+            PlannedReplicate { replicate_id: "2".into(), seed: 2, structural_beta: 0.0, null_is_true: true },
+            PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 0.0, null_is_true: true },
         ];
         let first = compare_paired_rejection_rate(
             &rows, &plan, "s", "b", "c", PairedComparisonConfig::default()
@@ -1551,7 +1625,7 @@ mod tests {
             record("s", "b", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5)),
             record("s", "c", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5)),
         ];
-        let plan = vec![PlannedReplicate { replicate_id: "1".into(), seed: 1 }];
+        let plan = vec![PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 0.0, null_is_true: true }];
         let report = evaluate_paired_report(
             &rows, &plan, "s", "b", "c", PairedComparisonConfig::default()
         ).unwrap();
