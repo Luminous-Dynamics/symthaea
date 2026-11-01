@@ -37,38 +37,36 @@ impl HarthLabelProfile {
     /// PaperMergedNineV1 uses the original paper's reported label aggregation:
     /// 3/6/140 -> Standing and 7/130 -> Sitting.
     pub fn target_class_id(self, raw: HarthActivity) -> u8 {
-        let code = raw.code();
         match self {
-            Self::NativeTwelve => match code {
-                1 => 1,
-                2 => 2,
-                3 => 3,
-                4 => 4,
-                5 => 5,
-                6 => 6,
-                7 => 7,
-                8 => 8,
-                13 => 9,
-                14 => 10,
-                130 => 11,
-                140 => 12,
-                _ => 0,
+            Self::NativeTwelve => match raw {
+                HarthActivity::Walking => 1,
+                HarthActivity::Running => 2,
+                HarthActivity::Shuffling => 3,
+                HarthActivity::StairsAscending => 4,
+                HarthActivity::StairsDescending => 5,
+                HarthActivity::Standing => 6,
+                HarthActivity::Sitting => 7,
+                HarthActivity::Lying => 8,
+                HarthActivity::CyclingSitting => 9,
+                HarthActivity::CyclingStanding => 10,
+                HarthActivity::Label130 => 11,
+                HarthActivity::Label140 => 12,
             },
-            Self::PaperMergedNineV1 => match code {
-                1 => 1,   // Walking
-                2 => 2,   // Running
-                3 | 6 | 140 => 3, // Standing (paper's merge)
-                7 | 130 => 4, // Sitting (paper's merge)
-                4 => 5,   // Stairs ascending
-                5 => 6,   // Stairs descending
-                8 => 7,   // Lying
-                13 => 8,  // Cycling seated
-                14 => 9,  // Cycling standing
-                _ => 0,   // Unreachable for a validated HarthActivity.
+            Self::PaperMergedNineV1 => match raw {
+                HarthActivity::Walking => 1,
+                HarthActivity::Running => 2,
+                HarthActivity::Shuffling
+                | HarthActivity::Standing
+                | HarthActivity::Label140 => 3,
+                HarthActivity::Sitting | HarthActivity::Label130 => 4,
+                HarthActivity::StairsAscending => 5,
+                HarthActivity::StairsDescending => 6,
+                HarthActivity::Lying => 7,
+                HarthActivity::CyclingSitting => 8,
+                HarthActivity::CyclingStanding => 9,
             },
         }
     }
-
     /// Domain-separated digest of the profile's complete raw-code mapping.
     pub fn mapping_sha256(self) -> [u8; 32] {
         let mut hasher = CanonicalHasher::new(b"symthaea.temporal.harth-label-profile.v1");
@@ -100,7 +98,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn native_profile_preserves_all_twelve_numeric_label_ids() {
+    fn native_profile_maps_twelve_source_ids_to_distinct_contiguous_target_classes() {
         for code in [1_u16, 2, 3, 4, 5, 6, 7, 8, 13, 14, 130, 140] {
             let raw = HarthActivity::from_code(code).unwrap();
             assert_eq!(
