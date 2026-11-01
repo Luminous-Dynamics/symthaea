@@ -1364,3 +1364,4 @@ pub mod training_receipt;
 
 pub mod causal_analysis;
 pub mod exposure_transfer;
+pub mod causal_power;
