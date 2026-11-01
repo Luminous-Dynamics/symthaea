@@ -217,7 +217,15 @@ Actual feasibility is known for independently verified sufficient-proof completi
 
 V1 still does not include forecast-query overhead, prefix-level action regeneration/re-execution, paired baseline comparisons, chronological/task-family holdouts, confidence intervals, or a BAGEN reproduction. Those are the next slices of issue #9752.
 
-## 19. External comparators and claim limits
+## 19. Historical empirical baseline
+
+`historical_baseline.rs` fits family-specific q50/q90/q95 empirical profiles from independently verified sufficient-proof training outcomes. It excludes censored/competing/pending outcomes from exact-cost profiles and falls back to the global completed-proof profile for unseen task families. Evaluation is run-disjoint: any evaluation run ID present in the training journal is rejected.
+
+The CLI evaluates this historical baseline on the exact same seven frozen prefixes used by the frontier-conditioned replay fixture. q50 error and marginal q90/q95 coverage use the same independently verified completion labels. Right-censored lower-bound exceedances are reported separately. The historical upper quantiles are order statistics, not conformal prediction intervals and not distribution-free guarantees.
+
+The current comparison is a small deterministic fixture to prove accounting parity and correct label handling. It is not a measured claim that the frontier predictor is better; the paired real-world task suite, task-family/chronological splits, uncertainty intervals, and last-observed/linear/conformal/CAP comparators remain open.
+
+## 20. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.
