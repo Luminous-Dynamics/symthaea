@@ -337,6 +337,7 @@ pub struct AnytimeHistoryHeader {
     pub source_commit: String,
     pub algorithm_id: String,
     pub algorithm_build_sha256: String,
+    pub search_config_sha256: String,
     pub evaluator_id: String,
     pub evaluator_build_sha256: String,
     pub verifier_id: String,
@@ -360,6 +361,7 @@ impl AnytimeHistoryHeader {
         source_commit: impl Into<String>,
         algorithm_id: impl Into<String>,
         algorithm_build_sha256: impl Into<String>,
+        search_config_sha256: impl Into<String>,
         evaluator_id: impl Into<String>,
         evaluator_build_sha256: impl Into<String>,
         verifier_id: impl Into<String>,
@@ -382,6 +384,7 @@ impl AnytimeHistoryHeader {
             source_commit: source_commit.into(),
             algorithm_id: algorithm_id.into(),
             algorithm_build_sha256: algorithm_build_sha256.into(),
+            search_config_sha256: search_config_sha256.into(),
             evaluator_id: evaluator_id.into(),
             evaluator_build_sha256: evaluator_build_sha256.into(),
             verifier_id: verifier_id.into(),
@@ -419,6 +422,7 @@ impl AnytimeHistoryHeader {
         }
         validate_git_commit(&self.source_commit, "header.source_commit")?;
         validate_sha256(&self.algorithm_build_sha256, "header.algorithm_build_sha256")?;
+        validate_sha256(&self.search_config_sha256, "header.search_config_sha256")?;
         validate_sha256(&self.evaluator_build_sha256, "header.evaluator_build_sha256")?;
         validate_sha256(&self.verifier_build_sha256, "header.verifier_build_sha256")?;
         validate_sha256(&self.execution_environment_sha256, "header.execution_environment_sha256")?;
@@ -1803,7 +1807,7 @@ mod tests {
             },
         ], vec![vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
         AnytimeHistoryHeader::new(
-            "test-run", "0123456789abcdef0123456789abcdef01234567", "test-optimizer", H1,
+            "test-run", "0123456789abcdef0123456789abcdef01234567", "test-optimizer", H1, H2,
             "fixed-evaluator", H2, "independent-verifier", H3, H4,
             "zdt1", 7,
             vec![
