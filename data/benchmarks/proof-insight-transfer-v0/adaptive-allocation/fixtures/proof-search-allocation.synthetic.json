@@ -10,7 +10,7 @@
   },
   "policy": {
     "policy_id": "pitb-lcb-shadow-price-v0",
-    "policy_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "policy_sha256": "d80417d62ce382fdcb437a24e34ef3c4ef99a21a7c5ca727894c79240deca1d6",
     "calibration_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
     "calibration_split": "validation",
     "calibration_sample_count": 1600,
