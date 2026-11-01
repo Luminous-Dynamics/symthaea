@@ -3635,11 +3635,7 @@ mod artifact_evaluator_tests_v1 {
     #[test]
     fn tampered_gold_claim_and_gold_path_artifacts_are_rejected() {
         let (planner, oracle, predictions, digest) = artifacts();
-        let tampered_claim = oracle.replacen(
-            "\tsupported\n",
-            "\tunknown\n",
-            1,
-        );
+        let tampered_claim = oracle.replacen("\tsupported\n", "\tunknown\n", 1);
         assert!(
             evaluate_poar_artifacts_v1(
                 planner.as_bytes(),
