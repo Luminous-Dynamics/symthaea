@@ -57,7 +57,7 @@ the interval is:
 
 This is intended to remain valid under optional stopping: a researcher may inspect the current interval after each replicate without repeatedly resetting a fixed-time confidence level. It is **not** valid merely because seed values are distinct; the observation process must meet the independence/boundedness assumptions.
 
-The implementation caps the candidate family at one million identities to keep the floating-point alpha allocation in a controlled range. It also validates nonzero finite per-coordinate and per-prefix alpha.
+The implementation caps the candidate family at 1,024 identities in v0.2. This is an explicit operational limit: the current certainty/possible-dominance classification compares candidate pairs, so report construction is O(N²d) after interval calculation. The prior one-million cap was statistically bounded but computationally misleading. The cap can be raised only after replacing pairwise classification with a measured scalable algorithm (for example, dimension-aware orthant queries or a sweep/tree structure) and proving identical classifications against the pairwise oracle on adversarial fixtures. Floating-point per-coordinate and per-prefix alpha allocations are also checked for nonzero finite values.
 
 ## 4. Confidence-aware Pareto relations
 
@@ -128,7 +128,7 @@ The plan also freezes:
 
 These digests make the assumptions inspectable and prevent protocol/noise/bound metadata from changing without changing the plan digest. They do not authenticate the certificate bytes or prove the assumptions; the separate evidence-artifact resolver and a domain-specific independent reviewer must resolve and assess those certificates.
 
-The plan caps the frozen candidate family at one million identities. This keeps the family allocation within a controlled floating-point range. It rejects per-coordinate or per-prefix alpha allocations that underflow.
+The plan caps the frozen candidate family at 1,024 identities because current dominance classification is O(N²d). This is a deliberately conservative operational limit, not a theorem about the maximum statistically valid family size. Raising it requires a scalable classifier and differential correctness tests against the current pairwise implementation. The plan also rejects per-coordinate or per-prefix alpha allocations that underflow.
 
 ## 9. Append and restart complexity
 
@@ -158,3 +158,10 @@ The adapter checks objective ID, order and direction equality between the noisy 
 The noisy-plan/report schema is `0.2.0`; the noisy/anytime joint campaign report has its own schema `symthaea.architecture-engineering.noisy-anytime-campaign-report` at `0.1.0`. It contains the exact anytime resource receipt, noisy Pareto report, history-tip digest, frozen plan digest and attempted/successful/failed replicate counts. The nested anytime receipt is schema `0.4.0`.
 
 The generic anytime receipt marks deterministic archive target metrics `NotApplicableInNoisyMode` for noisy runs. It does not report them as missed targets. The noisy confidence classifications remain in the nested noisy Pareto report.
+
+
+## 13. Complexity budget and scaling gate
+
+The v0.2 candidate limit is **1,024**, not one million. Interval estimation is linear in retained replicates per objective, but the current certainty/possible-dominance report compares every candidate with every other candidate, yielding O(N²d) classification work for N candidates and d objectives. The cap bounds this exact implementation's worst-case comparison count.
+
+Before increasing the cap, implement a scalable multi-objective dominance-query structure and benchmark it against the pairwise classifier as the reference oracle. Required controls include duplicate vectors, dense antichains, total orders, near-ties, high-dimensional fronts and adversarial candidate orderings. The optimized algorithm must produce exactly the same certain/possible dominance relations as the reference implementation. Report build time, insertion throughput, report latency, memory footprint and worst-case behavior across objective dimensions. No scalability claim is made until those measurements exist.
