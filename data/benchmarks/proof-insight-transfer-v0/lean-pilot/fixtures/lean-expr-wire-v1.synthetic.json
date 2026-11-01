@@ -1,1 +1,192 @@
-{"schema_version":"pitb.lean-expr-wire.v1","evidence_class":"synthetic_contract_fixture","environment":{"lean_toolchain":"leanprover/lean4:v4.34.1","lean_version":"4.34.1 (synthetic fixture)","lean_binary_sha256":"1111111111111111111111111111111111111111111111111111111111111111","task_id":"8888888888888888888888888888888888888888888888888888888888888888","source_repository":"https://example.invalid/pitb-synthetic","source_path":"Synthetic/Target.lean","source_file_sha256":"9999999999999999999999999999999999999999999999999999999999999999","source_commit":"2222222222222222222222222222222222222222","lean_toolchain_file_sha256":"3333333333333333333333333333333333333333333333333333333333333333","lakefile_sha256":"4444444444444444444444444444444444444444444444444444444444444444","lake_manifest_sha256":"5555555555555555555555555555555555555555555555555555555555555555","root_module_sha256":"6666666666666666666666666666666666666666666666666666666666666666","context_exporter_source_sha256":"7777777777777777777777777777777777777777777777777777777777777777","clean_checkout":true,"serializer_id":"pitb.lean-expr-wire.v1/binary-transcript-1"},"target":{"tag":"app","function":{"tag":"app","function":{"tag":"app","function":{"tag":"const","name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"Eq"},"levels":[{"tag":"succ","of":{"tag":"zero"}}]},"argument":{"tag":"const","name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"Nat"},"levels":[]}},"argument":{"tag":"fvar","local_index":0}},"argument":{"tag":"fvar","local_index":0}},"local_context":{"declarations":[{"local_index":0,"user_name":"n","binder_info":"explicit","is_aux_declaration":false,"is_implementation_detail":false,"is_let_declaration":false,"is_nondep":false,"type":{"tag":"const","name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"Nat"},"levels":[]},"transparent_value":null,"nondep_value_provenance":null},{"local_index":1,"user_name":"h","binder_info":"explicit","is_aux_declaration":false,"is_implementation_detail":false,"is_let_declaration":false,"is_nondep":false,"type":{"tag":"app","function":{"tag":"app","function":{"tag":"app","function":{"tag":"const","name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"Eq"},"levels":[{"tag":"succ","of":{"tag":"zero"}}]},"argument":{"tag":"const","name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"Nat"},"levels":[]}},"argument":{"tag":"fvar","local_index":0}},"argument":{"tag":"fvar","local_index":0}},"transparent_value":null,"nondep_value_provenance":null},{"local_index":2,"user_name":"inst","binder_info":"instance_implicit","is_aux_declaration":false,"is_implementation_detail":false,"is_let_declaration":false,"is_nondep":false,"type":{"tag":"const","name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"PITBLocalInstanceProbe"},"levels":[]},"transparent_value":null,"nondep_value_provenance":null}],"local_instances":[{"class_name":{"tag":"str","prefix":{"tag":"anonymous"},"value":"PITBLocalInstanceProbe"},"local_index":2}]},"digests":{"environment_sha256":"1c643593ddcc9bc7840d302025092a8f4dbff0e99bb187779b4afa94427bbbe7","target_expr_sha256":"ac38b21675e91722662517e159a4f2421f2acec47fd63ed393321741f9881e17","context_sha256":"740c0e257fe4073e61d320f5bdef0da965b9f7b78f137df23a4115ba23fd0ca5","proof_state_sha256":"264ee3744dc6bf3e1075fa6ae934322f62e5a871097b1ef039d90f7c339652a8"}}
+{
+  "schema_version": "pitb.lean-expr-wire.v1",
+  "evidence_class": "synthetic_contract_fixture",
+  "environment": {
+    "lean_toolchain": "leanprover/lean4:v4.34.1",
+    "lean_version": "4.34.1 (synthetic fixture)",
+    "lean_binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "task_id": "8888888888888888888888888888888888888888888888888888888888888888",
+    "source_repository": "https://example.invalid/pitb-synthetic",
+    "source_path": "Synthetic/Target.lean",
+    "source_file_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "source_commit": "2222222222222222222222222222222222222222",
+    "lean_toolchain_file_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "lakefile_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "lake_manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "root_module_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "context_exporter_source_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "clean_checkout": true,
+    "serializer_id": "pitb.lean-expr-wire.v1/binary-transcript-1",
+    "lean_runtime_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "imported_olean_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "target": {
+    "tag": "app",
+    "function": {
+      "tag": "app",
+      "function": {
+        "tag": "app",
+        "function": {
+          "tag": "const",
+          "name": {
+            "tag": "str",
+            "prefix": {
+              "tag": "anonymous"
+            },
+            "value": "Eq"
+          },
+          "levels": [
+            {
+              "tag": "succ",
+              "of": {
+                "tag": "zero"
+              }
+            }
+          ]
+        },
+        "argument": {
+          "tag": "const",
+          "name": {
+            "tag": "str",
+            "prefix": {
+              "tag": "anonymous"
+            },
+            "value": "Nat"
+          },
+          "levels": []
+        }
+      },
+      "argument": {
+        "tag": "fvar",
+        "local_index": 0
+      }
+    },
+    "argument": {
+      "tag": "fvar",
+      "local_index": 0
+    }
+  },
+  "local_context": {
+    "declarations": [
+      {
+        "local_index": 0,
+        "user_name": "n",
+        "binder_info": "explicit",
+        "is_aux_declaration": false,
+        "is_implementation_detail": false,
+        "is_let_declaration": false,
+        "is_nondep": false,
+        "type": {
+          "tag": "const",
+          "name": {
+            "tag": "str",
+            "prefix": {
+              "tag": "anonymous"
+            },
+            "value": "Nat"
+          },
+          "levels": []
+        },
+        "transparent_value": null,
+        "nondep_value_provenance": null
+      },
+      {
+        "local_index": 1,
+        "user_name": "h",
+        "binder_info": "explicit",
+        "is_aux_declaration": false,
+        "is_implementation_detail": false,
+        "is_let_declaration": false,
+        "is_nondep": false,
+        "type": {
+          "tag": "app",
+          "function": {
+            "tag": "app",
+            "function": {
+              "tag": "app",
+              "function": {
+                "tag": "const",
+                "name": {
+                  "tag": "str",
+                  "prefix": {
+                    "tag": "anonymous"
+                  },
+                  "value": "Eq"
+                },
+                "levels": [
+                  {
+                    "tag": "succ",
+                    "of": {
+                      "tag": "zero"
+                    }
+                  }
+                ]
+              },
+              "argument": {
+                "tag": "const",
+                "name": {
+                  "tag": "str",
+                  "prefix": {
+                    "tag": "anonymous"
+                  },
+                  "value": "Nat"
+                },
+                "levels": []
+              }
+            },
+            "argument": {
+              "tag": "fvar",
+              "local_index": 0
+            }
+          },
+          "argument": {
+            "tag": "fvar",
+            "local_index": 0
+          }
+        },
+        "transparent_value": null,
+        "nondep_value_provenance": null
+      },
+      {
+        "local_index": 2,
+        "user_name": "inst",
+        "binder_info": "instance_implicit",
+        "is_aux_declaration": false,
+        "is_implementation_detail": false,
+        "is_let_declaration": false,
+        "is_nondep": false,
+        "type": {
+          "tag": "const",
+          "name": {
+            "tag": "str",
+            "prefix": {
+              "tag": "anonymous"
+            },
+            "value": "PITBLocalInstanceProbe"
+          },
+          "levels": []
+        },
+        "transparent_value": null,
+        "nondep_value_provenance": null
+      }
+    ],
+    "local_instances": [
+      {
+        "class_name": {
+          "tag": "str",
+          "prefix": {
+            "tag": "anonymous"
+          },
+          "value": "PITBLocalInstanceProbe"
+        },
+        "local_index": 2
+      }
+    ]
+  },
+  "digests": {
+    "environment_sha256": "1cecfc3beef332e2e04ca84419a0b85de2c0e02614e224929b4515495ee243d6",
+    "target_expr_sha256": "a4a58a4b669fe897c5a11cf692ac592c666abdf1058985160d263f0931645cbb",
+    "context_sha256": "d7657303abf3885294a2fb691bda040cce76476548e4cc1c0f2114ed07007d0c",
+    "proof_state_sha256": "870f53707976a756cc17f7f390722de421e6b1f3b2ca946b714a6733dfa790ad"
+  }
+}
