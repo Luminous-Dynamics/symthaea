@@ -247,7 +247,9 @@ fn validate_observed_transition(
     .any(|id| id.trim().is_empty())
         || evidence.source_observation_id == evidence.target_observation_id
     {
-        return Err("episode, branch, forecast and distinct observation IDs must be non-empty".into());
+        return Err(
+            "episode, branch, forecast and distinct observation IDs must be non-empty".into(),
+        );
     }
     if evidence.source_sequence >= evidence.target_sequence {
         return Err("target observation sequence must be later than source sequence".into());
@@ -269,7 +271,9 @@ fn validate_observed_transition(
             && times[4] <= times[5]
             && times[2] <= times[3])
     {
-        return Err("transition times must be finite and satisfy source <= forecast <= action start <= requested target <= actual target, with action end >= action start".into());
+        return Err(
+            "transition times must be finite and satisfy source <= forecast <= action start <= requested target <= actual target, with action end >= action start".into(),
+        );
     }
     if evidence.target_observed_at_seconds - evidence.requested_target_time_seconds
         > evidence.max_target_lateness_seconds
@@ -638,9 +642,11 @@ mod tests {
         );
 
         let malformed = observed_evidence(&current, &next, 250);
-        assert!(candidate
-            .train_observed_transition(&current, &next, &malformed, 0.001)
-            .is_err());
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
 
         let malformed = observed_evidence(&current, &next, 2);
         assert!(
@@ -876,9 +882,16 @@ mod tests {
                 action_index: 1,
             },
         ];
-        assert!(engine
-            .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates)
-            .is_err());
+        assert!(
+            engine
+                .predict_action_set_one_step(
+                    &current,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    &candidates
+                )
+                .is_err()
+        );
 
         assert!(
             engine
