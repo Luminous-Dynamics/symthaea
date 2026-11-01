@@ -105,7 +105,70 @@ Files:
 
 This checker verifies deterministic inequalities only. It cannot establish the stochastic q_i or auxiliary running-supremum assumptions. Inputs called "adjusted auxiliary" must already be supported by a theorem/adjuster and source receipts.
 
-## 6. Benchmark targets
+## 6. Additive auxiliary special case: exact e-BH reduction
+
+There is a faster restricted construction when the auxiliary evidence is allocated coordinate by coordinate. Choose fixed nonnegative auxiliary budgets v_i such that
+
+    sum_i (q_i + v_i) <= 1,
+
+and coordinate auxiliary paths F_i,t satisfying
+
+    E_Hi[sup_t F_i,t] <= 1.
+
+Define each coordinate path
+
+    e_i,t = J_i,t/alpha + v_i F_i,t.
+
+For any intersection S,
+
+    E_S,t = sum_{i in S} e_i,t
+          = (1/alpha) sum_{i in S} J_i,t
+            + sum_{i in S} v_i F_i,t.
+
+The expected running supremum is at most
+
+    sum_{i in S}(q_i+v_i) <= 1.
+
+This is exactly the anchored construction with residual auxiliary term
+
+    F_S,t = [sum_{i in S} v_i F_i,t] / (1-c_S),
+
+when c_S<1. The global budget condition ensures the numerator has expected running supremum at most 1-c_S. If c_S=1, it forces all v_i inside S to be zero.
+
+### Why full e-closure reduces to e-BH here
+
+For a proposed rejection set R of size r>0, the closure inequality for every nonempty S is
+
+    FDP_S(R)/alpha <= sum_{i in S} e_i,t.
+
+Since
+
+    FDP_S(R)/alpha
+      = sum_{i in S} 1{i in R}/(alpha*r),
+
+the condition is equivalent to
+
+    sum_{i in S} [1{i in R}/(alpha*r) - e_i,t] <= 0
+    for every nonempty S.
+
+A finite family satisfies all subset-sum inequalities if and only if every singleton term is nonpositive. Therefore closure feasibility is exactly
+
+    e_i,t >= 1/(alpha*r)  for every i in R.
+
+Selecting the largest r satisfying the sorted e-value threshold is the e-BH rule. Sorting gives O(n log n) time and O(n) storage, rather than enumerating 2^n intersections. The baseline is retained: every ever-rejected coordinate has J_i,t=1 and hence e_i,t>=1/alpha; the e-BH cutoff for r>=1 is no larger than 1/alpha. If multiple coordinates already qualify, the maximal e-BH rank expands to include all of them.
+
+This is an exact computational special case, not a universal replacement for intersection-specific evidence. It can be conservative because all auxiliary mass is coordinate-separable and because the safe baseline uses ever-rejected indicators. The richer #9695/#9684 intersection processes may certify sets that this additive e-BH restriction cannot.
+
+### Files and finite verification
+
+The reference checker now includes:
+- `build_additive_anchored_auxiliary`, which constructs each normalized intersection auxiliary process F_S,t;
+- `build_additive_anchored_coordinate_e_paths`, which produces the per-coordinate e_i,t paths;
+- `select_additive_anchored_e_bh`, a deterministic O(n log n) selector with stable ID tie-breaking and an explicit anchor-retention check.
+
+Tests compare the constructed intersection paths with the sums of coordinate paths, compare e-BH against the exhaustive finite closure selector, verify every resulting closure inequality, and exercise residual-zero/invalid-budget/empty-horizon cases. These tests are authored but have not been executed from a repository checkout; no CI pass is claimed.
+
+## 7. Benchmark targets
 
 Compare separately:
 1. weighted e-Bonferroni baseline (known coordinate budgets);
@@ -125,7 +188,7 @@ Report:
 
 No SOTA claim is justified until the theorem, countable extension and matched confirmatory benchmark are complete.
 
-## 7. Prior art
+## 8. Prior art
 
 - Ramdas, Anchored multiple testing (October 2026): https://arxiv.org/abs/2610.11279
 - Tavyrikov, Goeman & de Heide, Carefree multiple testing with e-processes, EJS 20(2), 2026: https://doi.org/10.1214/26-EJS2546
