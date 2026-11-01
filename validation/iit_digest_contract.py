@@ -197,9 +197,9 @@ def primitive_request_digest(
     encoded.extend(struct.pack("<I", len(candidate)))
     for unit in candidate:
         encoded.extend(struct.pack("<I", unit))
-    encoded.extend(b"\\0")
+    encoded.extend(b"\0")
     encoded.extend(formalism.encode("utf-8"))
-    encoded.extend(b"\\0")
+    encoded.extend(b"\0")
     encoded.extend(operation_id.encode("utf-8"))
     for indices in (mech, pv):
         encoded.extend(struct.pack("<I", len(indices)))
