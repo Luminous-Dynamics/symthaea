@@ -1094,6 +1094,10 @@ pub struct EdgeBenchmarkManifest {
     pub maximum_false_alarms_per_hour: f64,
     pub maximum_missed_events_per_hour: f64,
     pub minimum_coverage: f64,
+    pub minimum_worst_regime_accuracy: f64,
+    pub minimum_open_set_auprc: f64,
+    pub maximum_drift_recovery_samples: usize,
+    pub maximum_regime_retention_loss_pp: f64,
     pub energy_semantics: EdgeEnergySemantics,
     pub prequential_predict_before_learn: bool,
     pub locked_test_labels: bool,
@@ -1173,8 +1177,15 @@ pub fn validate_edge_benchmark_manifest(
         || manifest.maximum_missed_events_per_hour < 0.0
         || !manifest.minimum_coverage.is_finite()
         || !(0.0..=1.0).contains(&manifest.minimum_coverage)
+        || !manifest.minimum_worst_regime_accuracy.is_finite()
+        || !(0.0..=1.0).contains(&manifest.minimum_worst_regime_accuracy)
+        || !manifest.minimum_open_set_auprc.is_finite()
+        || !(0.0..=1.0).contains(&manifest.minimum_open_set_auprc)
+        || manifest.maximum_drift_recovery_samples == 0
+        || !manifest.maximum_regime_retention_loss_pp.is_finite()
+        || manifest.maximum_regime_retention_loss_pp < 0.0
     {
-        return Err(EdgeBenchmarkError::new("quality_constraints", "quality and minimum coverage must be [0,1]; false/missed event limits must be finite and non-negative"));
+        return Err(EdgeBenchmarkError::new("quality_constraints", "quality/coverage/worst-regime/open-set limits must be [0,1]; false/missed/retention limits must be finite and non-negative; recovery horizon must be positive"));
     }
     if !manifest.prequential_predict_before_learn || !manifest.locked_test_labels {
         return Err(EdgeBenchmarkError::new("evaluation_policy", "must enforce predict-before-learn and locked test labels"));
@@ -1288,6 +1299,10 @@ mod tests {
             maximum_false_alarms_per_hour: 10.0,
             maximum_missed_events_per_hour: 10.0,
             minimum_coverage: 0.95,
+            minimum_worst_regime_accuracy: 0.80,
+            minimum_open_set_auprc: 0.80,
+            maximum_drift_recovery_samples: 100,
+            maximum_regime_retention_loss_pp: 5.0,
             energy_semantics: EdgeEnergySemantics::PerInference,
             prequential_predict_before_learn: true,
             locked_test_labels: true,
