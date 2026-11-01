@@ -11,12 +11,13 @@ Lean's Expr is the expression representation used by the elaborator and kernel. 
 
 ## Three identities, not one overloaded hash
 
-The wire format emits four domain-separated digests:
+The wire format emits five domain-separated digests:
 
 1. **Environment digest:** exact source/task identity, Lean binary and runtime-artifact manifest, imported OLean-closure manifest, toolchain file, Lake configuration and manifest, root module, exporter source, and clean-checkout assertion.
-2. **Target expression digest:** exact structural expression transcript, scoped to the environment digest.
-3. **Context digest:** ordered local declarations, binder metadata, value-role separation, and the ordered LocalInstances registry, scoped to the environment digest.
-4. **Proof-state digest:** environment + target-expression digest + context digest.
+2. **Goal metadata digest:** metavariable user name, kind, nesting depth, and scope-argument count. The volatile creation index is retained as diagnostic provenance but excluded from identity.
+3. **Target expression digest:** exact structural expression transcript, scoped to the environment digest.
+4. **Context digest:** ordered local declarations, binder metadata, value-role separation, and the ordered LocalInstances registry, scoped to the environment digest.
+5. **Proof-state digest:** environment + goal-metadata + target-expression + context digests.
 
 This is an environment-scoped structural identity, not a universal theorem identifier. It intentionally does not normalize definitional equality: two definitionally equal expressions may have different structural hashes. A successful proof still has to be checked by Lean's kernel against the exact target in the pinned project. The hash binds the structure being replayed; it does not itself prove the theorem, prove source authenticity, or replace an independent checker.
 
@@ -69,9 +70,10 @@ Conceptually:
 
 ~~~text
 E = SHA256(prefix || ENVIRONMENT || encode(environment))
+G = SHA256(prefix || GOAL_METADATA || E || encode(goal))
 T = SHA256(prefix || TARGET || E || encode(target_expr))
 C = SHA256(prefix || CONTEXT || E || encode(local_context))
-S = SHA256(prefix || PROOF_STATE || E || T || C)
+S = SHA256(prefix || PROOF_STATE || E || G || T || C)
 ~~~
 
 Every digest is recomputed by the Rust verifier; supplied digest strings are claims, not trusted input. A serializer change must use a new serializer_id and schema version. No cross-version or cross-environment digest comparison is valid without a separate equivalence study.
