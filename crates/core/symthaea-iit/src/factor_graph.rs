@@ -1304,9 +1304,14 @@ fn min_fill_order_scopes(
         }
 
         // Elimination makes the active neighbours a clique.
+        let neighbour_degree = neighbours.len();
+        let clique_pair_count = neighbour_degree
+            .checked_mul(neighbour_degree.saturating_sub(1))
+            .ok_or(FactorGraphError::IndexOverflow)?
+            / 2;
+        checked_accumulate_counter(&mut planner_work.clique_pair_checks, clique_pair_count)?;
         for (left_index, a) in neighbours.iter().copied().enumerate() {
             for b in neighbours.iter().copied().skip(left_index + 1) {
-                checked_increment(&mut planner_work.clique_pair_checks)?;
                 adjacency.entry(a).or_default().insert(b);
                 adjacency.entry(b).or_default().insert(a);
             }
@@ -1437,8 +1442,11 @@ fn min_fill_order_scopes_full_rescan(
                 affected.insert(*neighbour);
             }
             if let Some(edges) = adjacency.get(neighbour) {
+                checked_accumulate_counter(
+                    &mut planner_work.affected_adjacency_visits,
+                    edges.len(),
+                )?;
                 for candidate in edges.iter().copied() {
-                    checked_increment(&mut planner_work.affected_adjacency_visits)?;
                     if candidate != variable && active.contains(&candidate) {
                         let hits = neighbour_hits.entry(candidate).or_default();
                         *hits = hits.checked_add(1).ok_or(FactorGraphError::IndexOverflow)?;
@@ -1561,8 +1569,11 @@ fn fill_score(
     let mut existing_pairs = 0usize;
     for left in &neighbours {
         if let Some(edges) = adjacency.get(left) {
+            checked_accumulate_counter(
+                &mut planner_work.fill_score_adjacency_visits,
+                edges.len(),
+            )?;
             for right in edges {
-                checked_increment(&mut planner_work.fill_score_adjacency_visits)?;
                 if left < right && neighbour_set.contains(right) {
                     existing_pairs = existing_pairs
                         .checked_add(1)
