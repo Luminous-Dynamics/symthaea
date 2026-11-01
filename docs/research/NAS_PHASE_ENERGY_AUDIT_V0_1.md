@@ -53,7 +53,7 @@ The strict manifest binds:
 - benchmark and protocol identity;
 - ordered phase list and required/optional declaration;
 - required first and last boundary phases;
-- maximum acceptable unattributed gap;
+- maximum acceptable total unattributed duration;
 - task-outcome evaluator digest;
 - accepted-success outcome policy;
 - protocol digest.
