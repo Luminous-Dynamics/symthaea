@@ -18,7 +18,8 @@
     "vacuity_audit",
     "semantic_review",
     "integrity_status",
-    "evidence_artifacts"
+    "evidence_artifacts",
+    "reviewer_key_registry_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -364,6 +365,16 @@
               ]
             }
           }
+        }
+      ]
+    },
+    "reviewer_key_registry_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/sha256"
         }
       ]
     }
@@ -719,6 +730,9 @@
                 }
               }
             }
+          },
+          "reviewer_key_registry_sha256": {
+            "$ref": "#/$defs/sha256"
           }
         },
         "required": [
@@ -744,6 +758,32 @@
         "properties": {
           "evidence_artifacts": {
             "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "semantic_review": {
+            "properties": {
+              "status": {
+                "const": "approved"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "semantic_review"
+        ]
+      },
+      "then": {
+        "properties": {
+          "reviewer_key_registry_sha256": {
+            "$ref": "#/$defs/sha256"
           }
         }
       }
