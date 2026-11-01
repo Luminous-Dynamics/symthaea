@@ -205,16 +205,28 @@ class PredictableArrivalEclosureTests(unittest.TestCase):
                 self.hypotheses, bad, len(self.capacity)
             )
 
-    def test_canonical_order_and_contiguous_sequence_are_enforced(self):
-        bad_order = copy.deepcopy(self.events)
-        # On round 2, h2 is the only new activation; append an otherwise
-        # invalid duplicate so the canonical-order invariant is exercised
-        # without relying on a malformed catalogue.
-        bad_order[0]["seq"] = 7
+    def test_contiguous_sequence_is_enforced(self):
+        bad = copy.deepcopy(self.events)
+        bad[0]["seq"] = 7
         with self.assertRaisesRegex(ValueError, "contiguous and ordered"):
             audit_predictable_arrival_ledger(
-                self.hypotheses, bad_order, len(self.capacity)
+                self.hypotheses, bad, len(self.capacity)
             )
+
+    def test_same_round_activation_order_is_canonical(self):
+        rounds = [(["h1", "h2"], {"h1": 1, "h2": 1})]
+        events = make_ledger(self.hypotheses, rounds)
+        activations = [
+            i for i, event in enumerate(events)
+            if event["kind"] == "activation_commit"
+        ]
+        events[activations[0]], events[activations[1]] = (
+            events[activations[1]], events[activations[0]]
+        )
+        for seq, event in enumerate(events):
+            event["seq"] = seq
+        with self.assertRaisesRegex(ValueError, "canonical catalogue order"):
+            audit_predictable_arrival_ledger(self.hypotheses, events, 1)
 
     def test_result_verifier_rejects_receipt_tampering(self):
         result = select_predictable_arrival_capacity_actions(
