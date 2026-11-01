@@ -27,22 +27,6 @@ pub struct ExpectedIdentity<'a> {
     pub execution_order_index: u64,
 }
 
-const COMMON_FIELDS: [&str; 14] = [
-    "evidence_class",
-    "evidence_kind",
-    "trial_id",
-    "pair_id",
-    "arm_id",
-    "run_id",
-    "task_id",
-    "component_id",
-    "repository_commit",
-    "lean_toolchain",
-    "environment_sha256",
-    "initial_proof_state_sha256",
-    "target_statement_sha256",
-    "model_seed_sha256",
-];
 
 fn member<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
     if key.starts_with('/') {
