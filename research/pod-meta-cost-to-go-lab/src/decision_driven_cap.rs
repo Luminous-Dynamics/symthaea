@@ -10,9 +10,9 @@ use crate::{OnlineCostDimension, ResourceVector};
 pub struct CapCalibrationPoint {
     pub example_id: u64,
     pub holdout_partition_digest: [u8; 32],
-    pub training_partition_digest: [u8; 32],
     pub model_digest: [u8; 32],
     pub score_model_digest: [u8; 32],
+    pub selection_policy_digest: [u8; 32],
     pub feature_cohort_digest: [u8; 32],
     pub selection_score: u64,
     pub predicted_cost: u128,
@@ -44,6 +44,7 @@ pub struct DecisionDrivenCapConfig {
     pub base_threshold: u64,
     pub threshold_increment_per_selected: u64,
     pub holdout_partition_digest: [u8; 32],
+    pub training_partition_digest: [u8; 32],
     pub model_digest: [u8; 32],
     pub score_model_digest: [u8; 32],
     pub selection_policy_digest: [u8; 32],
@@ -106,6 +107,7 @@ pub enum DecisionDrivenCapError {
     CalibrationPartitionMismatch,
     CalibrationModelMismatch,
     CalibrationScoreModelMismatch,
+    CalibrationSelectionPolicyMismatch,
     CalibrationCohortMismatch,
     MissingMeterReceipt,
     MissingCompletionVerifier,
@@ -292,6 +294,9 @@ fn validate_holdout(
         if point.score_model_digest != config.score_model_digest {
             return Err(DecisionDrivenCapError::CalibrationScoreModelMismatch);
         }
+        if point.selection_policy_digest != config.selection_policy_digest {
+            return Err(DecisionDrivenCapError::CalibrationSelectionPolicyMismatch);
+        }
         if point.feature_cohort_digest != config.feature_cohort_digest {
             return Err(DecisionDrivenCapError::CalibrationCohortMismatch);
         }
@@ -389,6 +394,7 @@ mod tests {
             frontier_digest: [6; 32],
             model_digest: [2; 32],
             score_model_digest: [7; 32],
+            selection_policy_digest: [8; 32],
             feature_cohort_digest: [3; 32],
             selection_score: score,
             predicted_cost: predicted,
