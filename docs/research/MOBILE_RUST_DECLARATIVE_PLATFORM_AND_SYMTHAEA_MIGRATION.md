@@ -151,6 +151,24 @@ The first language can be TOML or JSON for operator readability, but its semanti
 
 The evaluator must never promote vendor documentation, CPU feature strings, ADB properties, or an event-name inventory into runtime enforcement or verified attestation.
 
+### 4.1.1 Declarative build envelope: Nix around Soong, not instead of Soong
+
+Use Nix to pin and reproduce the *build environment*:
+- host compiler/toolchain packages, Java/JDK, Android SDK/NDK where applicable, repo client and required utilities;
+- exact AOSP `repo` manifest URL, revision and resolved project SHAs;
+- Rust toolchain and crate dependencies for Luminous-owned components;
+- build flags, environment variables, locale and source-date configuration;
+- SBOM, provenance metadata, build logs and artifact hashes.
+
+Keep AOSP's own `repo` manifest, Soong/Ninja graph, platform-specific generators, signing, image assembly and vendor build steps authoritative. Nix should orchestrate a pinned environment and wrap the build, not replace Soong or silently reimplement vendor integration.
+
+A release candidate should bind:
+`Nix flake lock + repo manifest digest + source tree digests + toolchain digests + build configuration digest + output image digests`.
+
+The resulting build is reproducible only to the extent that the complete toolchain and all inputs are captured and the output is independently rebuilt and compared. A lockfile alone is not a reproducible-build proof.
+
+
+
 The compiler should emit an **obligation graph**, not just a pass/fail bit:
 
 `policy -> required configuration -> acquisition -> verifier -> claim -> residual risk`
