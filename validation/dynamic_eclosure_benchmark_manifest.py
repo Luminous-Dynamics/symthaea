@@ -182,16 +182,69 @@ def validate_benchmark_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
     digest = payload.pop("manifest_sha256", None)
     if payload.get("schema") != SCHEMA:
         raise ValueError("unsupported benchmark manifest schema")
-    expected_seed = derive_replicate_seed(
-        payload["seed"]["master_seed"],
-        payload["scenario_id"],
-        payload["seed"]["replicate_index"],
-    )
-    if payload["seed"].get("derivation") != SEED_DOMAIN:
-        raise ValueError("unknown seed derivation scheme")
-    if payload["seed"].get("derived_seed_u64") != expected_seed:
-        raise ValueError("derived seed does not match the deterministic seed contract")
+    required_fields = {
+        "schema", "method_id", "guarantee_class", "alpha", "source_sha256",
+        "generator_sha256", "comparison_contract", "scenario_id", "seed",
+        "samples", "horizon", "method_assumptions", "environment", "metrics",
+        "solver_config",
+    }
+    if set(payload) != required_fields:
+        raise ValueError(
+            f"manifest fields differ from schema: missing={sorted(required_fields-set(payload))}, "
+            f"unknown={sorted(set(payload)-required_fields)}"
+        )
+    if not isinstance(payload["method_id"], str) or not payload["method_id"].strip():
+        raise ValueError("method_id must be a nonempty string")
+    if payload["guarantee_class"] not in GUARANTEE_CLASSES:
+        raise ValueError(f"unknown guarantee class {payload['guarantee_class']!r}")
+    alpha = payload["alpha"]
+    if (
+        not isinstance(alpha, list)
+        or len(alpha) != 2
+        or any(isinstance(x, bool) or not isinstance(x, int) or x <= 0 for x in alpha)
+        or alpha[0] >= alpha[1]
+    ):
+        raise ValueError("manifest alpha must be a positive rational strictly between zero and one")
+    _validate_sha256(payload["source_sha256"], "source_sha256")
+    _validate_sha256(payload["generator_sha256"], "generator_sha256")
     validate_comparison_contract(payload["comparison_contract"])
+    if not isinstance(payload["scenario_id"], str) or not payload["scenario_id"]:
+        raise ValueError("scenario_id must be a nonempty string")
+    seed_record = payload["seed"]
+    if not isinstance(seed_record, Mapping):
+        raise TypeError("seed record must be a mapping")
+    if set(seed_record) != {"derivation", "master_seed", "replicate_index", "derived_seed_u64"}:
+        raise ValueError("seed record fields do not match schema")
+    expected_seed = derive_replicate_seed(
+        seed_record["master_seed"],
+        payload["scenario_id"],
+        seed_record["replicate_index"],
+    )
+    if seed_record.get("derivation") != SEED_DOMAIN:
+        raise ValueError("unknown seed derivation scheme")
+    if (
+        isinstance(seed_record.get("derived_seed_u64"), bool)
+        or not isinstance(seed_record.get("derived_seed_u64"), int)
+        or seed_record.get("derived_seed_u64") != expected_seed
+    ):
+        raise ValueError("derived seed does not match the deterministic seed contract")
+    for field in ("samples", "horizon"):
+        value = payload[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"{field} must be a positive integer")
+    for field in ("method_assumptions", "environment", "solver_config"):
+        if not isinstance(payload[field], Mapping):
+            raise TypeError(f"{field} must be a mapping")
+    metrics = payload["metrics"]
+    if (
+        not isinstance(metrics, list)
+        or any(not isinstance(name, str) or not name for name in metrics)
+        or len(set(metrics)) != len(metrics)
+    ):
+        raise ValueError("metrics must be a list of unique nonempty strings")
+    # Fail closed on nonfinite or unserializable nested metadata.
+    canonical_json(payload)
+    _validate_sha256(digest, "manifest_sha256")
     calculated = canonical_sha256(payload)
     if digest != calculated:
         raise ValueError("manifest_sha256 mismatch")
