@@ -36,6 +36,11 @@ fn digest_list(value: &Value, path: &str) -> Result<String> {
 
 fn make_measured_eligible(mut value: Value) -> Result<Value> {
     value["evidence_class"] = json!("measured_audit");
+    let source_task_id = value["dataset"]["source_task_id"]
+        .as_str()
+        .context("synthetic source task ID missing")?;
+    value["dataset"]["task_id"] =
+        json!(hex::encode(Sha256::digest(source_task_id.as_bytes())));
     value["elaboration"]["status"] = json!("passed");
     value["elaboration"]["receipt_sha256"] = json!("c".repeat(64));
     value["counterexample_audit"]["status"] = json!("not_found");
