@@ -53,11 +53,30 @@ jobs:
         shell: bash
         run: mkdir -p target/pyphi-reference
 
-      - name: Install exact PyPhi numerical reference environment
+      - name: Install pinned numerical dependencies
         shell: bash
         run: |
           python -m pip install --disable-pip-version-check \
             -r validation/requirements-pyphi-iit4-reference.txt
+
+      - name: Download and verify the exact PyPhi wheel
+        shell: bash
+        run: |
+          python -m pip download --disable-pip-version-check --no-deps \
+            --only-binary=:all: --dest target/pyphi-reference \
+            "pyphi==2.0.0rc4"
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          wheels = list(Path("target/pyphi-reference").glob("pyphi-2.0.0rc4-*.whl"))
+          assert len(wheels) == 1, f"expected one PyPhi wheel, found {wheels}"
+          expected = "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          actual = hashlib.sha256(wheels[0].read_bytes()).hexdigest()
+          assert actual == expected, f"PyPhi wheel SHA-256 mismatch: {actual}"
+          print(f"PASS: {wheels[0].name} SHA-256 {actual}")
+          PY
+          python -m pip install --disable-pip-version-check --no-deps \
+            target/pyphi-reference/pyphi-2.0.0rc4-py3-none-any.whl
           python -m pip check
 
       - name: Capture Python and PyPhi environment
