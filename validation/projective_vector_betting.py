@@ -240,3 +240,84 @@ class CoordinateHistory:
 
     def snapshot(self) -> tuple[tuple[float, ...], ...]:
         return tuple(tuple(x) for x in self._history)
+
+
+class CovariancePreconditionedBet:
+    """Predictable projected-gradient strategy for one fixed intersection.
+
+    Call bets(active) before revealing each round's scores, then call
+    observe(scores) exactly once. The update changes only the next round's
+    bet. Active coordinates must form a nested sequence. Scores for inactive
+    coordinates are ignored, which is important for projectivity.
+
+    The update is a power heuristic only. Validity follows from the ordinary
+    predictable nonnegative-bet e-factor and the caller's conditional mgf
+    envelope, not from convergence of the gradient update.
+    """
+
+    def __init__(
+        self,
+        mgf_proxy: Sequence[Sequence[float]],
+        step_size: float = 0.05,
+        cap: float = 1.5,
+    ):
+        assert_symmetric_psd(mgf_proxy)
+        self._proxy = [[float(x) for x in row] for row in mgf_proxy]
+        self._dimension = len(self._proxy)
+        self._diagonal = [self._proxy[i][i] for i in range(self._dimension)]
+        if any(x <= 0.0 for x in self._diagonal):
+            raise ValueError("mgf_proxy diagonal entries must be strictly positive")
+        if not isfinite(step_size) or step_size < 0.0:
+            raise ValueError("step_size must be finite and nonnegative")
+        if not isfinite(cap) or cap < 0.0:
+            raise ValueError("cap must be finite and nonnegative")
+        self.step_size = float(step_size)
+        self.cap = float(cap)
+        self._bets = [0.0] * self._dimension
+        self._seen_active = [False] * self._dimension
+        self._pending_active: list[bool] | None = None
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def bets(self, active: Sequence[bool]) -> list[float]:
+        """Freeze and return the pre-update bet vector for the current round."""
+        if self._pending_active is not None:
+            raise RuntimeError("observe the current round before requesting new bets")
+        mask = [bool(x) for x in active]
+        if len(mask) != self._dimension:
+            raise ValueError("active mask dimension mismatch")
+        if any(seen and not on for seen, on in zip(self._seen_active, mask)):
+            raise ValueError("active sets must be nested; retraction is not supported")
+        self._pending_active = mask
+        return [self._bets[i] if mask[i] else 0.0 for i in range(self._dimension)]
+
+    def observe(self, scores: Sequence[float]) -> None:
+        """Update next-round bets using only the just-observed active scores."""
+        if self._pending_active is None:
+            raise RuntimeError("call bets(active) before observing scores")
+        z = _finite_vector(scores, "scores")
+        if len(z) != self._dimension:
+            raise ValueError("score dimension mismatch")
+        active_ids = [i for i, on in enumerate(self._pending_active) if on]
+        old = list(self._bets)
+        updated = list(self._bets)
+        for i in active_ids:
+            covariance_drift = sum(
+                self._proxy[i][j] * old[j] for j in active_ids
+            )
+            gradient = z[i] - covariance_drift
+            candidate = old[i] + self.step_size * gradient / self._diagonal[i]
+            if not isfinite(candidate):
+                raise ValueError("bet update overflowed; refusing non-finite state")
+            updated[i] = min(self.cap, max(0.0, candidate))
+        self._bets = updated
+        self._seen_active = list(self._pending_active)
+        self._pending_active = None
+
+    def snapshot(self) -> tuple[tuple[float, ...], tuple[bool, ...]]:
+        """Return immutable bet/activation state for audit and prefix tests."""
+        if self._pending_active is not None:
+            raise RuntimeError("cannot snapshot while a round awaits observation")
+        return tuple(self._bets), tuple(self._seen_active)
