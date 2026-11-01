@@ -60,6 +60,7 @@ pub use predictor::LatentPredictor;
 pub use state::JepaState;
 pub use target::TargetEncoder;
 
+use sha2::{Digest, Sha256};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Telemetry snapshot from JEPA engine, for inclusion in `CycleMetadata`.
@@ -75,6 +76,278 @@ pub struct JepaTelemetry {
     pub collapse_detected: bool,
     /// Current variance regularization penalty.
     pub variance_penalty: f32,
+}
+
+pub const OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION: &str =
+    "symthaea-jepa-observed-transition-evidence-v0.1";
+pub const ONE_STEP_ACTION_SET_SCHEMA_VERSION: &str = "symthaea-jepa-one-step-action-set-v0.1";
+
+/// Evidence supplied by an observation adapter for one action-conditioned
+/// transition. Embedding digests are recomputed here; raw-observation, history
+/// and manifest digests identify upstream artifacts and require adapter-level
+/// byte verification.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservedTransitionEvidence {
+    pub schema_version: String,
+    pub source_history_sha256: String,
+    pub source_observation_sha256: String,
+    pub source_embedding_sha256: String,
+    pub target_observation_sha256: String,
+    pub target_embedding_sha256: String,
+    pub action_manifest_sha256: String,
+    pub action_binding_sha256: String,
+    pub predictor_parameters_sha256: String,
+    pub episode_id: String,
+    pub branch_id: String,
+    pub forecast_id: String,
+    pub source_observation_id: String,
+    pub target_observation_id: String,
+    pub source_sequence: u64,
+    pub target_sequence: u64,
+    pub action_id: u64,
+    pub action_index: u8,
+    pub source_observed_at_seconds: f64,
+    pub forecast_issued_at_seconds: f64,
+    pub action_started_at_seconds: f64,
+    pub action_ended_at_seconds: f64,
+    pub requested_target_time_seconds: f64,
+    pub target_observed_at_seconds: f64,
+    pub max_target_lateness_seconds: f64,
+}
+
+/// Stable candidate identity mapped to the JEPA discrete action embedding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionCandidate {
+    pub action_id: u64,
+    pub action_index: u8,
+}
+
+/// One deterministic JEPA latent prediction for a candidate action.
+/// This is a point prediction, not a calibrated distribution or joint draw.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionLatentPrediction {
+    pub action_id: u64,
+    pub action_index: u8,
+    pub predicted_latent: Vec<f32>,
+}
+
+/// Predictions for a frozen action set, all computed from one encoded context.
+/// The manifest/history digests are identifiers supplied by the caller.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OneStepActionSetPrediction {
+    pub schema_version: String,
+    pub source_history_sha256: String,
+    pub source_embedding_sha256: String,
+    pub action_manifest_sha256: String,
+    pub candidate_set_sha256: String,
+    pub predictor_parameters_sha256: String,
+    pub predictions: Vec<ActionLatentPrediction>,
+}
+
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Canonical digest of the finite HDC embedding values consumed by JEPA.
+/// This binds the exact f32 bit patterns and dimensionality, not the original
+/// camera bytes or the upstream observation capture.
+pub fn embedding_sha256(hv: &ContinuousHV) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-jepa-observation-embedding-v0.1\0");
+    hasher.update((hv.dim() as u64).to_le_bytes());
+    for value in hv.as_slice() {
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    digest_to_hex(&hasher.finalize())
+}
+
+fn append_f32_values(output: &mut Vec<u8>, values: &[f32]) {
+    output.extend_from_slice(&(values.len() as u64).to_le_bytes());
+    for value in values {
+        output.extend_from_slice(&value.to_bits().to_le_bytes());
+    }
+}
+
+fn append_f64_value(output: &mut Vec<u8>, value: f64) {
+    output.extend_from_slice(&value.to_bits().to_le_bytes());
+}
+
+/// Canonical binding of one stable action ID and its discrete JEPA index to
+/// the caller-supplied digest of the full action manifest.
+pub fn action_binding_sha256(
+    action_manifest_sha256: &str,
+    action_id: u64,
+    action_index: u8,
+) -> Result<String, String> {
+    if !is_lower_hex_sha256(action_manifest_sha256) {
+        return Err("action_manifest_sha256 must be a lowercase SHA-256 digest".into());
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-jepa-action-binding-v0.1\0");
+    hasher.update(action_manifest_sha256.as_bytes());
+    hasher.update(action_id.to_le_bytes());
+    hasher.update([action_index]);
+    Ok(digest_to_hex(&hasher.finalize()))
+}
+
+/// Canonical digest of the frozen action IDs and their discrete JEPA indices.
+/// The action-manifest digest remains the upstream binding to full descriptors.
+pub fn candidate_set_sha256(
+    action_manifest_sha256: &str,
+    candidates: &[ActionCandidate],
+) -> Result<String, String> {
+    if !is_lower_hex_sha256(action_manifest_sha256) {
+        return Err("action_manifest_sha256 must be a lowercase SHA-256 digest".into());
+    }
+    if candidates.len() < 2 {
+        return Err("at least two action candidates are required".into());
+    }
+    for (index, candidate) in candidates.iter().enumerate() {
+        if candidates[..index].iter().any(|previous| {
+            previous.action_id == candidate.action_id
+                || previous.action_index == candidate.action_index
+        }) {
+            return Err("candidate action IDs and action indices must be unique".into());
+        }
+    }
+    let mut ordered = candidates.to_vec();
+    ordered.sort_by_key(|candidate| candidate.action_id);
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-jepa-action-candidate-set-v0.1\0");
+    hasher.update(action_manifest_sha256.as_bytes());
+    hasher.update((ordered.len() as u64).to_le_bytes());
+    for candidate in ordered {
+        hasher.update(candidate.action_id.to_le_bytes());
+        hasher.update([candidate.action_index]);
+    }
+    Ok(digest_to_hex(&hasher.finalize()))
+}
+
+fn digest_to_hex(digest: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        let byte = *byte;
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+fn validate_observed_transition(
+    config: &JepaConfig,
+    current_hv: &ContinuousHV,
+    next_hv: &ContinuousHV,
+    evidence: &ObservedTransitionEvidence,
+) -> Result<(), String> {
+    if evidence.schema_version != OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION {
+        return Err("unsupported observed-transition evidence schema version".into());
+    }
+    for (name, digest) in [
+        ("source_history_sha256", &evidence.source_history_sha256),
+        (
+            "source_observation_sha256",
+            &evidence.source_observation_sha256,
+        ),
+        ("source_embedding_sha256", &evidence.source_embedding_sha256),
+        (
+            "target_observation_sha256",
+            &evidence.target_observation_sha256,
+        ),
+        ("target_embedding_sha256", &evidence.target_embedding_sha256),
+        ("action_manifest_sha256", &evidence.action_manifest_sha256),
+        ("action_binding_sha256", &evidence.action_binding_sha256),
+        (
+            "predictor_parameters_sha256",
+            &evidence.predictor_parameters_sha256,
+        ),
+    ] {
+        if !is_lower_hex_sha256(digest) {
+            return Err(format!("{name} must be a lowercase SHA-256 digest"));
+        }
+    }
+    if [
+        &evidence.episode_id,
+        &evidence.branch_id,
+        &evidence.forecast_id,
+        &evidence.source_observation_id,
+        &evidence.target_observation_id,
+    ]
+    .iter()
+    .any(|id| id.trim().is_empty())
+        || evidence.source_observation_id == evidence.target_observation_id
+    {
+        return Err(
+            "episode, branch, forecast and distinct observation IDs must be non-empty".into(),
+        );
+    }
+    if evidence.source_sequence >= evidence.target_sequence {
+        return Err("target observation sequence must be later than source sequence".into());
+    }
+    let times = [
+        evidence.source_observed_at_seconds,
+        evidence.forecast_issued_at_seconds,
+        evidence.action_started_at_seconds,
+        evidence.action_ended_at_seconds,
+        evidence.requested_target_time_seconds,
+        evidence.target_observed_at_seconds,
+        evidence.max_target_lateness_seconds,
+    ];
+    if !times.iter().all(|value| value.is_finite())
+        || evidence.max_target_lateness_seconds < 0.0
+        || !(times[0] <= times[1]
+            && times[1] <= times[2]
+            && times[3] <= times[4]
+            && times[4] <= times[5]
+            && times[2] <= times[3])
+    {
+        return Err(
+            "transition times must be finite and satisfy source <= forecast <= action start <= requested target <= actual target, with action end >= action start".into(),
+        );
+    }
+    if evidence.target_observed_at_seconds - evidence.requested_target_time_seconds
+        > evidence.max_target_lateness_seconds
+    {
+        return Err("target observation exceeds the declared maximum forecast lateness".into());
+    }
+    if action_binding_sha256(
+        &evidence.action_manifest_sha256,
+        evidence.action_id,
+        evidence.action_index,
+    )? != evidence.action_binding_sha256
+    {
+        return Err("action ID/index binding digest mismatch".into());
+    }
+    if evidence.action_index as usize >= config.num_actions {
+        return Err(format!(
+            "action index {} is outside configured action space {}",
+            evidence.action_index, config.num_actions
+        ));
+    }
+    if current_hv.dim() != config.input_dim || next_hv.dim() != config.input_dim {
+        return Err(format!(
+            "observed transition dimensions must both equal configured input dimension {}",
+            config.input_dim
+        ));
+    }
+    if !current_hv.as_slice().iter().all(|value| value.is_finite())
+        || !next_hv.as_slice().iter().all(|value| value.is_finite())
+    {
+        return Err("observed transition contains non-finite vector values".into());
+    }
+    if embedding_sha256(current_hv) != evidence.source_embedding_sha256
+        || embedding_sha256(next_hv) != evidence.target_embedding_sha256
+    {
+        return Err("observed transition embedding digest mismatch".into());
+    }
+    Ok(())
 }
 
 /// JEPA engine: the top-level API composing all components.
@@ -186,6 +459,154 @@ impl JepaEngine {
         total_loss
     }
 
+    /// Train JEPA against a separately acquired later observation.
+    ///
+    /// Unlike the low-level train_step API, this path requires explicit
+    /// observation/action provenance and strict temporal ordering. The evidence
+    /// digests are identifiers only: upstream adapters remain responsible for
+    /// authenticating that the vectors correspond to the retained observation
+    /// bytes and that the target was not generated by this model.
+    pub fn train_observed_transition(
+        &mut self,
+        current_hv: &ContinuousHV,
+        next_observed_hv: &ContinuousHV,
+        evidence: &ObservedTransitionEvidence,
+        learning_rate: f32,
+    ) -> Result<f32, String> {
+        validate_observed_transition(&self.config, current_hv, next_observed_hv, evidence)?;
+        if !learning_rate.is_finite()
+            || !(0.0..=1.0).contains(&learning_rate)
+            || learning_rate == 0.0
+        {
+            return Err("learning rate must be finite and in (0, 1]".into());
+        }
+        Ok(self.train_step(
+            current_hv,
+            next_observed_hv,
+            evidence.action_index,
+            learning_rate,
+        ))
+    }
+
+    /// Score an observation-grounded transition without updating model weights.
+    pub fn evaluate_observed_transition(
+        &mut self,
+        current_hv: &ContinuousHV,
+        next_observed_hv: &ContinuousHV,
+        evidence: &ObservedTransitionEvidence,
+    ) -> Result<(f32, f64), String> {
+        validate_observed_transition(&self.config, current_hv, next_observed_hv, evidence)?;
+        if self.predictor_parameters_sha256() != evidence.predictor_parameters_sha256 {
+            return Err(
+                "forecast predictor parameter digest does not match the loaded JEPA model".into(),
+            );
+        }
+        Ok(self.forward(current_hv, next_observed_hv, evidence.action_index, 1.0))
+    }
+
+    /// Produce one-step latent predictions for a frozen set of candidate
+    /// actions. The current observation is encoded exactly once; each candidate
+    /// is then evaluated from that same context. Outputs are deterministic
+    /// point predictions and must not be relabelled as uncertainty samples.
+    pub fn predict_action_set_one_step(
+        &self,
+        current_hv: &ContinuousHV,
+        source_history_sha256: &str,
+        action_manifest_sha256: &str,
+        candidates: &[ActionCandidate],
+    ) -> Result<OneStepActionSetPrediction, String> {
+        for (name, digest) in [
+            ("source_history_sha256", source_history_sha256),
+            ("action_manifest_sha256", action_manifest_sha256),
+        ] {
+            if !is_lower_hex_sha256(digest) {
+                return Err(format!("{name} must be a lowercase SHA-256 digest"));
+            }
+        }
+        if current_hv.dim() != self.config.input_dim
+            || !current_hv.as_slice().iter().all(|value| value.is_finite())
+        {
+            return Err("current observation has invalid dimension or non-finite values".into());
+        }
+        if candidates.len() < 2 {
+            return Err("at least two candidate actions are required".into());
+        }
+        for (index, candidate) in candidates.iter().enumerate() {
+            if candidate.action_index as usize >= self.config.num_actions {
+                return Err(format!(
+                    "candidate {index} has an out-of-range action index"
+                ));
+            }
+            if candidates[..index].iter().any(|previous| {
+                previous.action_id == candidate.action_id
+                    || previous.action_index == candidate.action_index
+            }) {
+                return Err("candidate action IDs and action indices must be unique".into());
+            }
+        }
+
+        let source_embedding_sha256 = embedding_sha256(current_hv);
+        let candidate_set_digest = candidate_set_sha256(action_manifest_sha256, candidates)?;
+        let predictor_parameters_sha256 = self.predictor_parameters_sha256();
+        let context = self.context.encode(current_hv);
+        let predictions = candidates
+            .iter()
+            .map(|candidate| ActionLatentPrediction {
+                action_id: candidate.action_id,
+                action_index: candidate.action_index,
+                predicted_latent: self.predictor.predict(&context, candidate.action_index),
+            })
+            .collect::<Vec<_>>();
+        if predictions.iter().any(|prediction| {
+            !prediction
+                .predicted_latent
+                .iter()
+                .all(|value| value.is_finite())
+        }) {
+            return Err("JEPA action-set prediction produced non-finite values".into());
+        }
+        Ok(OneStepActionSetPrediction {
+            schema_version: ONE_STEP_ACTION_SET_SCHEMA_VERSION.into(),
+            source_history_sha256: source_history_sha256.to_string(),
+            source_embedding_sha256,
+            action_manifest_sha256: action_manifest_sha256.to_string(),
+            candidate_set_sha256: candidate_set_digest,
+            predictor_parameters_sha256,
+            predictions,
+        })
+    }
+
+    /// Canonical digest of the exact predictive parameter state.
+    ///
+    /// Includes the prediction-relevant configuration, context encoder,
+    /// EMA target encoder and latent action predictor. Excludes telemetry and
+    /// counters so read-only forecasts do not change the digest.
+    pub fn predictor_parameters_sha256(&self) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea-jepa-predictor-parameters-v0.1\0");
+        bytes.extend_from_slice(&(self.config.input_dim as u64).to_le_bytes());
+        bytes.extend_from_slice(&(self.config.latent_dim as u64).to_le_bytes());
+        bytes.extend_from_slice(&(self.config.num_actions as u64).to_le_bytes());
+        append_f32_values(
+            &mut bytes,
+            &[
+                self.config.ema_momentum,
+                self.config.learning_rate,
+                self.config.tau_factor_sensitivity,
+                self.config.variance_floor,
+            ],
+        );
+        append_f64_value(&mut bytes, self.config.energy_cost_per_forward);
+
+        bytes.extend_from_slice(&(self.context.input_dim as u64).to_le_bytes());
+        bytes.extend_from_slice(&(self.context.latent_dim as u64).to_le_bytes());
+        append_f32_values(&mut bytes, &self.context.weights);
+        append_f32_values(&mut bytes, &self.context.bias);
+        self.target.append_parameters_to(&mut bytes);
+        self.predictor.append_parameters_to(&mut bytes);
+        digest_to_hex(&Sha256::digest(&bytes))
+    }
+
     /// Get the most recent latent prediction error.
     pub fn latent_pe(&self) -> f32 {
         self.state.last_pe
@@ -220,6 +641,459 @@ mod tests {
 
     fn make_engine() -> JepaEngine {
         JepaEngine::new(JepaConfig::default(), 12345)
+    }
+
+    fn observed_evidence(
+        current_hv: &ContinuousHV,
+        next_hv: &ContinuousHV,
+        action_index: u8,
+    ) -> ObservedTransitionEvidence {
+        ObservedTransitionEvidence {
+            schema_version: OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION.into(),
+            source_history_sha256: "a".repeat(64),
+            source_observation_sha256: "b".repeat(64),
+            source_embedding_sha256: embedding_sha256(current_hv),
+            target_observation_sha256: "c".repeat(64),
+            target_embedding_sha256: embedding_sha256(next_hv),
+            action_manifest_sha256: "d".repeat(64),
+            action_binding_sha256: action_binding_sha256(&"d".repeat(64), 42, action_index)
+                .unwrap(),
+            episode_id: "episode-1".into(),
+            branch_id: "branch-action-42".into(),
+            forecast_id: "forecast-10-a42".into(),
+            source_observation_id: "frame-10".into(),
+            target_observation_id: "frame-11".into(),
+            source_sequence: 10,
+            target_sequence: 11,
+            action_id: 42,
+            action_index,
+            source_observed_at_seconds: 1.0,
+            forecast_issued_at_seconds: 1.005,
+            action_started_at_seconds: 1.01,
+            action_ended_at_seconds: 1.05,
+            requested_target_time_seconds: 1.07,
+            target_observed_at_seconds: 1.08,
+            max_target_lateness_seconds: 0.02,
+        }
+    }
+
+    #[test]
+    fn observed_transition_training_accepts_later_observation_with_bound_action() {
+        let mut engine = make_engine();
+        let current = random_hv(501);
+        let observed_next = random_hv(502);
+        let loss = engine
+            .train_observed_transition(
+                &current,
+                &observed_next,
+                &observed_evidence(&current, &observed_next, 2),
+                0.001,
+            )
+            .unwrap();
+        assert!(loss.is_finite());
+        assert!(engine.latent_pe().is_finite());
+    }
+
+    #[test]
+    fn observed_transition_training_rejects_unverifiable_or_misaligned_evidence() {
+        let current = random_hv(511);
+        let next = random_hv(512);
+
+        let mut malformed = observed_evidence(&current, &next, 2);
+        malformed.target_observation_sha256 = "not-a-digest".into();
+        let mut candidate = make_engine();
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
+
+        let mut malformed = observed_evidence(&current, &next, 2);
+        malformed.target_sequence = malformed.source_sequence;
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
+
+        let mut malformed = observed_evidence(&current, &next, 2);
+        malformed.target_observed_at_seconds =
+            malformed.requested_target_time_seconds + malformed.max_target_lateness_seconds + 0.001;
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
+
+        let malformed = observed_evidence(&current, &next, 250);
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
+
+        let malformed = observed_evidence(&current, &next, 2);
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, f32::NAN)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn observed_transition_rejects_cross_episode_missing_branch_and_forecast_order_errors() {
+        let current = random_hv(517);
+        let next = random_hv(518);
+        let mut engine = make_engine();
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.branch_id.clear();
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.forecast_issued_at_seconds = evidence.action_started_at_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.action_ended_at_seconds = evidence.requested_target_time_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.requested_target_time_seconds = evidence.target_observed_at_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn observed_transition_rejects_action_id_index_binding_mismatch() {
+        let current = random_hv(519);
+        let next = random_hv(520);
+        let mut engine = make_engine();
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.action_id = 43;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn predictor_parameter_digest_is_stable_for_reads_and_changes_after_training() {
+        let mut engine = make_engine();
+        let before = engine.predictor_parameters_sha256();
+        let current = random_hv(523);
+        let next = random_hv(524);
+        let _ = engine
+            .predict_action_set_one_step(
+                &current,
+                &"a".repeat(64),
+                &"b".repeat(64),
+                &[
+                    ActionCandidate {
+                        action_id: 1,
+                        action_index: 1,
+                    },
+                    ActionCandidate {
+                        action_id: 2,
+                        action_index: 2,
+                    },
+                ],
+            )
+            .unwrap();
+        assert_eq!(engine.predictor_parameters_sha256(), before);
+        engine
+            .train_observed_transition(
+                &current,
+                &next,
+                &observed_evidence(&current, &next, 1),
+                0.001,
+            )
+            .unwrap();
+        assert_ne!(engine.predictor_parameters_sha256(), before);
+    }
+
+    #[test]
+    fn observed_transition_evaluation_requires_the_forecast_checkpoint() {
+        let mut engine = make_engine();
+        let current = random_hv(525);
+        let next = random_hv(526);
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.predictor_parameters_sha256 = engine.predictor_parameters_sha256();
+        assert!(
+            engine
+                .evaluate_observed_transition(&current, &next, &evidence)
+                .is_ok()
+        );
+
+        let mut changed = make_engine();
+        changed
+            .train_observed_transition(
+                &random_hv(527),
+                &random_hv(528),
+                &observed_evidence(&random_hv(527), &random_hv(528), 2),
+                0.001,
+            )
+            .unwrap();
+        assert!(
+            changed
+                .evaluate_observed_transition(&current, &next, &evidence)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn observed_transition_training_rejects_embedding_byte_mismatch() {
+        let mut engine = make_engine();
+        let current = random_hv(515);
+        let next = random_hv(516);
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.target_embedding_sha256 = "c".repeat(64);
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn jepa_digest_helpers_match_sha256_known_answer() {
+        assert_eq!(
+            digest_to_hex(&Sha256::digest(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        let left = random_hv(551);
+        let right = random_hv(551);
+        assert_eq!(embedding_sha256(&left), embedding_sha256(&right));
+        assert_eq!(embedding_sha256(&left).len(), 64);
+    }
+
+    #[test]
+    fn action_binding_digest_matches_canonical_known_answer() {
+        assert_eq!(
+            action_binding_sha256(&"d".repeat(64), 42, 2).unwrap(),
+            "7dcaef4622fc543531ab6970e802c4a1b271c8f16d1d4f5d65ec06f4a770f2fc"
+        );
+        assert_ne!(
+            action_binding_sha256(&"d".repeat(64), 42, 2).unwrap(),
+            action_binding_sha256(&"d".repeat(64), 43, 2).unwrap()
+        );
+    }
+
+    #[test]
+    fn candidate_set_digest_is_row_order_invariant_and_binds_action_mapping() {
+        let manifest = "b".repeat(64);
+        let left = [
+            ActionCandidate {
+                action_id: 700,
+                action_index: 1,
+            },
+            ActionCandidate {
+                action_id: 300,
+                action_index: 3,
+            },
+        ];
+        let right = [left[1], left[0]];
+        assert_eq!(
+            candidate_set_sha256(&manifest, &left).unwrap(),
+            candidate_set_sha256(&manifest, &right).unwrap()
+        );
+        let changed = [
+            ActionCandidate {
+                action_id: 700,
+                action_index: 2,
+            },
+            ActionCandidate {
+                action_id: 300,
+                action_index: 3,
+            },
+        ];
+        assert_ne!(
+            candidate_set_sha256(&manifest, &left).unwrap(),
+            candidate_set_sha256(&manifest, &changed).unwrap()
+        );
+    }
+
+    #[test]
+    fn action_set_predictions_share_one_context_and_preserve_candidate_identity() {
+        let engine = make_engine();
+        let current = random_hv(521);
+        let result = engine
+            .predict_action_set_one_step(
+                &current,
+                &"a".repeat(64),
+                &"b".repeat(64),
+                &[
+                    ActionCandidate {
+                        action_id: 700,
+                        action_index: 1,
+                    },
+                    ActionCandidate {
+                        action_id: 300,
+                        action_index: 3,
+                    },
+                    ActionCandidate {
+                        action_id: 900,
+                        action_index: 5,
+                    },
+                ],
+            )
+            .unwrap();
+        assert_eq!(
+            result
+                .predictions
+                .iter()
+                .map(|item| item.action_id)
+                .collect::<Vec<_>>(),
+            vec![700, 300, 900]
+        );
+        assert_eq!(
+            result.predictor_parameters_sha256,
+            engine.predictor_parameters_sha256()
+        );
+        assert_eq!(
+            result
+                .predictions
+                .iter()
+                .map(|item| item.predicted_latent.len())
+                .collect::<Vec<_>>(),
+            vec![engine.config().latent_dim; 3]
+        );
+        assert!(
+            result
+                .predictions
+                .iter()
+                .all(|item| { item.predicted_latent.iter().all(|value| value.is_finite()) })
+        );
+    }
+
+    #[test]
+    fn action_set_predictions_are_invariant_to_candidate_row_order() {
+        let engine = make_engine();
+        let current = random_hv(541);
+        let history = "a".repeat(64);
+        let manifest = "b".repeat(64);
+        let forward = engine
+            .predict_action_set_one_step(
+                &current,
+                &history,
+                &manifest,
+                &[
+                    ActionCandidate {
+                        action_id: 70,
+                        action_index: 2,
+                    },
+                    ActionCandidate {
+                        action_id: 20,
+                        action_index: 4,
+                    },
+                ],
+            )
+            .unwrap();
+        let reversed = engine
+            .predict_action_set_one_step(
+                &current,
+                &history,
+                &manifest,
+                &[
+                    ActionCandidate {
+                        action_id: 20,
+                        action_index: 4,
+                    },
+                    ActionCandidate {
+                        action_id: 70,
+                        action_index: 2,
+                    },
+                ],
+            )
+            .unwrap();
+        for expected in &forward.predictions {
+            let actual = reversed
+                .predictions
+                .iter()
+                .find(|candidate| candidate.action_id == expected.action_id)
+                .unwrap();
+            assert_eq!(actual.action_index, expected.action_index);
+            assert_eq!(actual.predicted_latent, expected.predicted_latent);
+        }
+    }
+
+    #[test]
+    fn action_set_prediction_rejects_duplicate_ids_indices_and_bad_digests() {
+        let engine = make_engine();
+        let current = random_hv(531);
+        let candidates = [
+            ActionCandidate {
+                action_id: 1,
+                action_index: 1,
+            },
+            ActionCandidate {
+                action_id: 1,
+                action_index: 2,
+            },
+        ];
+        assert!(
+            engine
+                .predict_action_set_one_step(
+                    &current,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    &candidates
+                )
+                .is_err()
+        );
+
+        let candidates = [
+            ActionCandidate {
+                action_id: 1,
+                action_index: 1,
+            },
+            ActionCandidate {
+                action_id: 2,
+                action_index: 1,
+            },
+        ];
+        assert!(
+            engine
+                .predict_action_set_one_step(
+                    &current,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    &candidates
+                )
+                .is_err()
+        );
+
+        assert!(
+            engine
+                .predict_action_set_one_step(&current, "bad", &"b".repeat(64), &candidates)
+                .is_err()
+        );
+        assert!(
+            engine
+                .predict_action_set_one_step(
+                    &current,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    &candidates[..1]
+                )
+                .is_err()
+        );
     }
 
     fn random_hv(seed: u64) -> ContinuousHV {

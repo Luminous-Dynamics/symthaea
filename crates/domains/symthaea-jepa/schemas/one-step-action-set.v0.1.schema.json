@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-jepa-one-step-action-set-v0.1.json",
+  "title": "JEPA one-step action-set latent predictions",
+  "description": "Deterministic point predictions from one encoded source embedding for a frozen candidate action set. This is not an uncertainty distribution or a calibrated joint draw bank.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_history_sha256",
+    "source_embedding_sha256",
+    "action_manifest_sha256",
+    "candidate_set_sha256",
+    "predictions",
+    "predictor_parameters_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-jepa-one-step-action-set-v0.1"
+    },
+    "source_history_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_embedding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "action_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidate_set_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 over sorted action_id/action_index pairs and the action-manifest digest."
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_index",
+          "predicted_latent"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "predicted_latent": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "predictor_parameters_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Canonical digest of the exact JEPA model/configuration parameter state that produced the latent means."
+    }
+  },
+  "x-rust-invariants": [
+    "action IDs must be unique",
+    "action indices must be unique and within the configured discrete action space",
+    "source embedding is encoded exactly once and reused for every action in the returned set",
+    "candidate_set_sha256 is invariant to input row order",
+    "predicted_latent entries are deterministic point predictions; never reinterpret them as posterior samples or calibrated intervals",
+    "predictor_parameters_sha256 binds prediction-relevant configuration and exact context, target and latent-predictor f32 parameter bits; mutable telemetry is excluded"
+  ]
+}
