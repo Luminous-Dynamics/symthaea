@@ -600,7 +600,7 @@ mod tests {
         second.selection.selected_operation_family = 10;
         assert_eq!(
             SelectionConditionedConformalCalibrator::fit(
-                &[rows[0], second],
+                &[rows[0].clone(), second],
                 0.10,
                 MODEL,
                 POLICY,
