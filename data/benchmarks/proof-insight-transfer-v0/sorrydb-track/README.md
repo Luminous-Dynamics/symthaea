@@ -215,3 +215,6 @@ The standalone R5 receipt schema and no-run fixture are:
 - `.github/workflows/pitb-sorrydb-snapshot-contract.yml`
 
 The LeanLean repository-compression cohort has a separate per-repository outcome contract under `leanlean-track/`; none of its scores are mixed into SorryDB or family-transfer reports.
+
+
+The R5 receipt's `proof_state_sha256` is recomputed over five component digests: environment, metavariable goal metadata, target expression, ordered local context and full MetavarContext. It is deliberately stronger than the static Lean Expr wire v1 proof-state digest; R5 must bind the mutable metavariable context as well.
