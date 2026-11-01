@@ -135,7 +135,10 @@ pub struct ApplicationEventEnergyUncertaintyReceipt {
     pub schema: String,
     pub version: String,
     pub phase_energy_receipt_sha256: String,
+    pub benchmark_id: String,
+    pub repeatability_id: String,
     pub phase_protocol_sha256: String,
+    pub replicate_design_sha256: String,
     pub repeatability_protocol_sha256: String,
     pub metrology_manifest_sha256: String,
     pub candidate_artifact_sha256: String,
@@ -354,7 +357,10 @@ pub fn evaluate_application_event_energy_uncertainty(
         schema: RECEIPT_SCHEMA.to_owned(),
         version: VERSION.to_owned(),
         phase_energy_receipt_sha256: phase_receipt.receipt_sha256.clone(),
+        benchmark_id: repeatability_protocol.benchmark_id.clone(),
+        repeatability_id: repeatability_protocol.repeatability_id.clone(),
         phase_protocol_sha256: phase_protocol.protocol_sha256.clone(),
+        replicate_design_sha256: repeatability_protocol.replicate_design_sha256.clone(),
         repeatability_protocol_sha256: repeatability_protocol.protocol_sha256.clone(),
         metrology_manifest_sha256: metrology_manifest.manifest_sha256.clone(),
         candidate_artifact_sha256: repeatability_protocol.candidate_artifact_sha256.clone(),
@@ -402,6 +408,7 @@ pub fn validate_application_event_energy_uncertainty_receipt(
     for (field, value) in [
         ("phase_energy_receipt_sha256", receipt.phase_energy_receipt_sha256.as_str()),
         ("phase_protocol_sha256", receipt.phase_protocol_sha256.as_str()),
+        ("replicate_design_sha256", receipt.replicate_design_sha256.as_str()),
         ("repeatability_protocol_sha256", receipt.repeatability_protocol_sha256.as_str()),
         ("metrology_manifest_sha256", receipt.metrology_manifest_sha256.as_str()),
         ("candidate_artifact_sha256", receipt.candidate_artifact_sha256.as_str()),
@@ -415,7 +422,9 @@ pub fn validate_application_event_energy_uncertainty_receipt(
             return Err(ApplicationEventUncertaintyError::new(field, "must be lowercase SHA-256 hex"));
         }
     }
-    if receipt.target_id.trim().is_empty()
+    if receipt.benchmark_id.trim().is_empty()
+        || receipt.repeatability_id.trim().is_empty()
+        || receipt.target_id.trim().is_empty()
         || receipt.board_revision.trim().is_empty()
         || receipt.instrument_serial.trim().is_empty()
         || receipt.current_range_id.trim().is_empty()
@@ -495,7 +504,10 @@ pub fn compare_application_event_energy(
     // session receipts intentionally differ; their target/board and instrument calibration must
     // remain matched. Systematic calibration error is not assumed to cancel.
     for (field, left, right) in [
+        ("benchmark_id", candidate.benchmark_id.as_str(), reference.benchmark_id.as_str()),
+        ("repeatability_id", candidate.repeatability_id.as_str(), reference.repeatability_id.as_str()),
         ("phase_protocol_sha256", candidate.phase_protocol_sha256.as_str(), reference.phase_protocol_sha256.as_str()),
+        ("replicate_design_sha256", candidate.replicate_design_sha256.as_str(), reference.replicate_design_sha256.as_str()),
         ("matched_input_sha256", candidate.matched_input_sha256.as_str(), reference.matched_input_sha256.as_str()),
         ("target_id", candidate.target_id.as_str(), reference.target_id.as_str()),
         ("board_revision", candidate.board_revision.as_str(), reference.board_revision.as_str()),
