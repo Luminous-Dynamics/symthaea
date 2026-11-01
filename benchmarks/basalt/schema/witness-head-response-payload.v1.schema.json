@@ -21,27 +21,67 @@
     "head_policy_digest"
   ],
   "properties": {
-    "record_type": { "const": "basalt.authority.witness-head-response" },
-    "schema_version": { "const": 1 },
+    "record_type": {
+      "const": "basalt.authority.witness-head-response"
+    },
+    "schema_version": {
+      "const": 1
+    },
     "challenge_nonce": {
       "type": "string",
       "minLength": 43,
-      "maxLength": 44,
+      "maxLength": 43,
       "pattern": "^[A-Za-z0-9_-]+$"
     },
-    "authority_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "authority_incarnation_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "authority_epoch": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-    "witness_set_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "witness_set_version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
-    "trust_root_version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
-    "head_sequence": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-    "head_checkpoint_digest": { "$ref": "#/$defs/digest" },
-    "head_authority_revision": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-    "head_state_digest": { "$ref": "#/$defs/digest" },
-    "head_policy_digest": { "$ref": "#/$defs/digest" }
+    "authority_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_incarnation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_epoch": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "witness_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "witness_set_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "trust_root_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "head_sequence": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "head_checkpoint_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "head_authority_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "head_state_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "head_policy_digest": {
+      "$ref": "#/$defs/digest"
+    }
   },
   "$defs": {
-    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
   }
 }
