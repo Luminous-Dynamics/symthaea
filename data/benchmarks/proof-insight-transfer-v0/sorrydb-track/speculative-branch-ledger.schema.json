@@ -9,6 +9,7 @@
     "evidence_class",
     "task",
     "arm_id",
+    "snapshot_receipt_sha256",
     "budget",
     "actual",
     "branches",
@@ -58,7 +59,8 @@
         "R1",
         "R2",
         "R3",
-        "R4"
+        "R4",
+        "R5"
       ]
     },
     "budget": {
@@ -541,6 +543,47 @@
           }
         }
       ]
+    },
+    "snapshot_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ],
+      "description": "SHA-256 of the separately verified post-elaboration live-snapshot receipt; required for R5 only."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "arm_id": {
+            "const": "R5"
+          }
+        },
+        "required": [
+          "arm_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "snapshot_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "snapshot_receipt_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
 }
