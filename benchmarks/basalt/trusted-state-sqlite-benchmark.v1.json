@@ -1,0 +1,266 @@
+{
+  "suite_id": "basalt-trusted-state-sqlite-benchmark-v1",
+  "benchmark_version": 1,
+  "title": "BASALT SQLite WAL/FULL trusted-state backend conformance",
+  "claim_ceiling": "Evaluates normalized local SQLite state persistence, transactional all-or-nothing behavior under injected write aborts, exact-receipt recovery, independent-connection CAS, schema constraints and state-digest consistency. It does not qualify physical power-loss durability, filesystem/VFS/hardware behavior, external freshness, malicious snapshot rollback, signatures, witnesses or a remote authoritative anchor.",
+  "implementation_path": "xtask/src/basalt_trusted_state.rs",
+  "command": "cargo run -p xtask -- basalt-trusted-state-sqlite-inspect --database PATH",
+  "scenarios": [
+    {
+      "id": "TSTATE-SQL-001",
+      "phase": "bootstrap_reopen",
+      "mutation": "Commit generation one, close database, reopen and inspect exact source/log/receipt state",
+      "expected": "revision and all three records persist; local anti-rollback remains false"
+    },
+    {
+      "id": "TSTATE-SQL-002",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort immediately after source cursor write and before log write",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-003",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort after log checkpoint write and before receipt write",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-004",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort after accepted receipt insert and before metadata revision update",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-005",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort after metadata write but before SQLite COMMIT",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-006",
+      "phase": "concurrency",
+      "mutation": "Two independent SQLite connections prepare the same receipt against one revision; first commits before second",
+      "expected": "second receives compare conflict; exact retry after reread returns already-committed"
+    },
+    {
+      "id": "TSTATE-SQL-007",
+      "phase": "concurrency",
+      "mutation": "Eight independent connections race the same prepared transition",
+      "expected": "exactly one durable commit; seven compare conflicts; no partial state"
+    },
+    {
+      "id": "TSTATE-SQL-008",
+      "phase": "snapshot_fork",
+      "mutation": "Submit a plan prepared against database A to a divergent database B with the same revision",
+      "expected": "reject exact-state snapshot mismatch and leave B unchanged"
+    },
+    {
+      "id": "TSTATE-SQL-009",
+      "phase": "integrity",
+      "mutation": "Mutate stored state digest without matching table state",
+      "expected": "reopen fails closed on state-digest mismatch"
+    },
+    {
+      "id": "TSTATE-SQL-010",
+      "phase": "integrity",
+      "mutation": "Attempt to insert a second receipt for the same host/source/partition/generation",
+      "expected": "SQLite uniqueness constraint rejects the second generation receipt"
+    },
+    {
+      "id": "TSTATE-SQL-011",
+      "phase": "configuration",
+      "mutation": "Open backend where WAL or synchronous FULL cannot be established",
+      "expected": "fail closed; do not advertise local atomicity backend configured"
+    },
+    {
+      "id": "TSTATE-SQL-012",
+      "phase": "claim_boundary",
+      "mutation": "Restore an older complete local database snapshot, including its old unkeyed digest",
+      "expected": "local checks may pass; anti-rollback must remain unknown/false without external anchor"
+    },
+    {
+      "id": "TSTATE-SQL-013",
+      "phase": "configuration",
+      "mutation": "Open an existing symlink, non-regular database path, or an over-limit persisted state",
+      "expected": "Reject unsafe path or fail closed before admitting any new state transition"
+    },
+    {
+      "id": "TSTATE-SQL-014",
+      "phase": "integrity",
+      "mutation": "Migrate an existing source to a new pinned transparency log with explicit continuity evidence, close and reopen the SQLite database",
+      "expected": "Persist the unchanged source key, next generation, predecessor seal and new log ID; retain old log history and reject migration without evidence"
+    },
+    {
+      "id": "TSTATE-SQL-015",
+      "phase": "integrity",
+      "mutation": "Roll back a source cursor to an older accepted receipt but recompute the unkeyed local state digest",
+      "expected": "Reject because the latest source cursor does not point to the last accepted generation in the complete receipt history"
+    },
+    {
+      "id": "TSTATE-SQL-016",
+      "phase": "configuration",
+      "mutation": "Change the persisted schema version to an unsupported value",
+      "expected": "Reject before interpreting or mutating state"
+    },
+    {
+      "id": "TSTATE-SQL-017",
+      "phase": "integrity",
+      "mutation": "Change or omit a profile, boot, log-origin or policy transition-evidence digest in accepted receipt history",
+      "expected": "Reject history whose transition authorization record is missing or malformed"
+    },
+    {
+      "id": "TSTATE-SQL-018",
+      "phase": "integrity",
+      "mutation": "Create an accepted receipt revision gap or duplicate acceptance revision",
+      "expected": "Reject incomplete or duplicated accepted-revision history"
+    },
+    {
+      "id": "TSTATE-SQL-019",
+      "phase": "integrity",
+      "mutation": "Change an accepted receipt's checkpoint evidence class from pinned bootstrap to same-tree and recompute the unkeyed state digest",
+      "expected": "Reject because the first accepted checkpoint for a log must have a matching pinned bootstrap"
+    },
+    {
+      "id": "TSTATE-SQL-020",
+      "phase": "integrity",
+      "mutation": "Roll the current log cursor back to an older accepted checkpoint and recompute the unkeyed state digest",
+      "expected": "Reject because the persisted log cursor must equal the last accepted checkpoint for that log"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "partial_state_advances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "duplicate_source_generation_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "exact_receipt_retry_double_advances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "snapshot_fork_plan_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "state_digest_mismatch_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "unanchored_anti_rollback_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "wal_or_full_mode_false_passes",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "local_durable_commit_p95",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 5 ms initial research target on pinned NVMe; not measured"
+    },
+    {
+      "id": "local_durable_commit_p95_16_writers",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 25 ms initial research target; report busy/conflict counts separately"
+    },
+    {
+      "id": "exact_retry_after_reopen_p95",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure; no second state advance"
+    },
+    {
+      "id": "wal_growth_per_accepted_epoch",
+      "class": "efficiency",
+      "unit": "bytes_per_epoch",
+      "target": "measure at 1k, 10k, 100k and 1M receipts"
+    },
+    {
+      "id": "restart_recovery_time",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure p50/p95/p99 after clean close and injected abort"
+    },
+    {
+      "id": "unsafe_database_path_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "accepted_history_gap_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "source_cursor_rollback_with_recomputed_digest_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "missing_transition_evidence_history_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "complete_acceptance_history_gaps",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "source_cursor_not_latest_acceptance",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "schema_version_mismatch_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "checkpoint_evidence_class_history_tamper_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "log_cursor_rollback_with_recomputed_digest_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    }
+  ],
+  "benchmark_policy": {
+    "all_safety_gates_before_efficiency": true,
+    "record_every_abort_boundary": true,
+    "no_power_loss_claim_from_abort_injection": true,
+    "local_digest_is_not_anti_rollback": true,
+    "wal_same_host_only": true,
+    "held_out_storage_profiles": true
+  }
+}

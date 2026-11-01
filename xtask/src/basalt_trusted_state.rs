@@ -1,19 +1,31 @@
 //! Pure reference state machine for BASALT trusted source-epoch advancement.
 //!
-//! This module models only the state-transition layer. It does not verify DSSE
-//! signatures, signer authorization, Merkle inclusion/consistency proofs,
-//! witness signatures, freshness, storage durability, or an external rollback
-//! anchor. Evidence variants are inputs from separately verified adapters and
-//! are deliberately named as such. Passing this model is not a trust verdict.
+//! The pure reference state machine models state-transition semantics only;
+//! evidence variants are inputs from separately verified adapters. The optional
+//! SQLite backend below implements a local WAL/FULL transaction adapter, but
+//! this module does not verify DSSE signatures, signer authorization, Merkle
+//! inclusion/consistency proofs, witness signatures, external freshness,
+//! physical storage/VFS durability, or protection against malicious snapshot
+//! rollback. Passing either the model or local adapter is not a trust verdict.
 //!
 //! The source cursor key is stable across observer-profile and boot changes:
 //! (provisioned host identity, source ID, partition ID). Profile and boot
 //! transitions require explicit authorization evidence and never reset the
 //! source generation.
 
+use anyhow::Context;
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::time::Duration;
+
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
+use sha2::{Digest, Sha256};
 
 const MAX_ID_BYTES: usize = 128;
+const SQLITE_SCHEMA_VERSION: i64 = 1;
+const MAX_SQLITE_LOG_CURSORS: usize = 128;
+const MAX_SQLITE_SOURCE_CURSORS: usize = 4_096;
+const MAX_SQLITE_ACCEPTED_RECEIPTS: usize = 100_000;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceKey {
@@ -67,6 +79,9 @@ pub struct Candidate {
     pub receipt_digest: String,
     pub observer_profile_digest: String,
     pub boot_incarnation_digest: String,
+    /// The selected transparency-log origin is a source-cursor attribute.
+    /// Switching origins requires explicit continuity evidence.
+    pub log_origin_transition_evidence_digest: Option<String>,
     /// Required only when the observer profile changes for an existing cursor.
     pub profile_transition_evidence_digest: Option<String>,
     /// Required only when the boot incarnation changes for an existing cursor.
@@ -85,6 +100,7 @@ pub struct SourceCursor {
     pub receipt_digest: String,
     pub observer_profile_digest: String,
     pub boot_incarnation_digest: String,
+    pub log_id: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -100,12 +116,18 @@ pub struct TrustedState {
 struct AcceptedReceipt {
     source: SourceKey,
     generation: u64,
+    accepted_revision: u64,
     previous_seal_digest: Option<String>,
     seal_digest: String,
     receipt_digest: String,
     observer_profile_digest: String,
     boot_incarnation_digest: String,
+    profile_transition_evidence_digest: Option<String>,
+    boot_transition_evidence_digest: Option<String>,
+    log_origin_transition_evidence_digest: Option<String>,
+    policy_transition_evidence_digest: Option<String>,
     checkpoint: LogCheckpoint,
+    checkpoint_evidence: CheckpointEvidence,
     policy_versions: PolicyVersions,
 }
 
@@ -122,6 +144,11 @@ impl AcceptedReceipt {
             && self.receipt_digest == candidate.receipt_digest
             && self.observer_profile_digest == candidate.observer_profile_digest
             && self.boot_incarnation_digest == candidate.boot_incarnation_digest
+            && self.profile_transition_evidence_digest == candidate.profile_transition_evidence_digest
+            && self.boot_transition_evidence_digest == candidate.boot_transition_evidence_digest
+            && self.log_origin_transition_evidence_digest == candidate.log_origin_transition_evidence_digest
+            && self.policy_transition_evidence_digest == candidate.policy_transition_evidence_digest
+            && self.checkpoint.log_id == candidate.checkpoint.log_id
     }
 }
 
@@ -156,6 +183,8 @@ pub enum TransitionError {
     UnexpectedProfileTransitionEvidence,
     UnauthorizedBootTransition,
     UnexpectedBootTransitionEvidence,
+    UnauthorizedLogOriginTransition,
+    UnexpectedLogOriginTransitionEvidence,
     LogBootstrapRequired,
     LogBootstrapMismatch,
     LogOriginMismatch,
@@ -258,6 +287,7 @@ impl TrustedState {
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
                 boot_incarnation_digest: candidate.boot_incarnation_digest.clone(),
+                log_id: candidate.checkpoint.log_id.clone(),
             },
         );
 
@@ -267,12 +297,18 @@ impl TrustedState {
             AcceptedReceipt {
                 source: candidate.source.clone(),
                 generation: candidate.generation,
+                accepted_revision: next_revision,
                 previous_seal_digest: candidate.previous_seal_digest.clone(),
                 seal_digest: candidate.seal_digest.clone(),
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
                 boot_incarnation_digest: candidate.boot_incarnation_digest.clone(),
+                profile_transition_evidence_digest: candidate.profile_transition_evidence_digest.clone(),
+                boot_transition_evidence_digest: candidate.boot_transition_evidence_digest.clone(),
+                log_origin_transition_evidence_digest: candidate.log_origin_transition_evidence_digest.clone(),
+                policy_transition_evidence_digest: candidate.policy_transition_evidence_digest.clone(),
                 checkpoint: candidate.checkpoint.clone(),
+                checkpoint_evidence: candidate.checkpoint_evidence.clone(),
                 policy_versions: candidate.policy_versions.clone(),
             },
         );
@@ -326,6 +362,7 @@ fn validate_candidate(candidate: &Candidate) -> Result<(), TransitionError> {
         || !valid_digest(&candidate.observer_profile_digest)
         || !valid_digest(&candidate.boot_incarnation_digest)
         || !valid_id(&candidate.checkpoint.log_id)
+        || candidate.log_origin_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
         || candidate.checkpoint.tree_size == 0
         || !valid_digest(&candidate.checkpoint.root_digest)
         || !valid_digest(&candidate.checkpoint.checkpoint_digest)
@@ -347,10 +384,14 @@ fn validate_source_transition(
             if candidate.generation != 1 || candidate.previous_seal_digest.is_some() {
                 return Err(TransitionError::GenerationBootstrapInvalid);
             }
-            if candidate.profile_transition_evidence_digest.is_some()
-                || candidate.boot_transition_evidence_digest.is_some()
-            {
+            if candidate.profile_transition_evidence_digest.is_some() {
                 return Err(TransitionError::UnexpectedProfileTransitionEvidence);
+            }
+            if candidate.boot_transition_evidence_digest.is_some() {
+                return Err(TransitionError::UnexpectedBootTransitionEvidence);
+            }
+            if candidate.log_origin_transition_evidence_digest.is_some() {
+                return Err(TransitionError::UnexpectedLogOriginTransitionEvidence);
             }
         }
         Some(current) => {
@@ -389,6 +430,14 @@ fn validate_source_transition(
                 (true, Some(digest)) if valid_digest(digest) => {}
                 (true, _) => return Err(TransitionError::UnauthorizedBootTransition),
                 (false, Some(_)) => return Err(TransitionError::UnexpectedBootTransitionEvidence),
+                (false, None) => {}
+            }
+
+            let log_changed = candidate.checkpoint.log_id != current.log_id;
+            match (log_changed, candidate.log_origin_transition_evidence_digest.as_deref()) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => return Err(TransitionError::UnauthorizedLogOriginTransition),
+                (false, Some(_)) => return Err(TransitionError::UnexpectedLogOriginTransitionEvidence),
                 (false, None) => {}
             }
         }
@@ -539,6 +588,7 @@ fn fixture_candidate() -> Candidate {
         receipt_digest: test_digest(2),
         observer_profile_digest: test_digest(3),
         boot_incarnation_digest: test_digest(4),
+        log_origin_transition_evidence_digest: None,
         profile_transition_evidence_digest: None,
         boot_transition_evidence_digest: None,
         policy_versions: PolicyVersions {
@@ -577,6 +627,7 @@ fn successor_candidate(state: &TrustedState, generation: u64, receipt_seed: u8) 
         receipt_digest: test_digest(receipt_seed),
         observer_profile_digest: current.observer_profile_digest.clone(),
         boot_incarnation_digest: current.boot_incarnation_digest.clone(),
+        log_origin_transition_evidence_digest: None,
         profile_transition_evidence_digest: None,
         boot_transition_evidence_digest: None,
         policy_versions: state.policy_versions().expect("fixture policy").clone(),
@@ -600,6 +651,7 @@ fn secondary_source_candidate(state: &TrustedState) -> Candidate {
         receipt_digest: test_digest(71),
         observer_profile_digest: test_digest(72),
         boot_incarnation_digest: test_digest(73),
+        log_origin_transition_evidence_digest: None,
         profile_transition_evidence_digest: None,
         boot_transition_evidence_digest: None,
         policy_versions: state.policy_versions().expect("fixture policy").clone(),
@@ -742,7 +794,42 @@ pub fn run_conformance() -> ConformanceReport {
     let authorized_boot_passed = matches!(authorized_boot_result, Ok(TransitionDecision::Advance(_)));
     record_case(&mut cases, "TSTATE-MODEL-012", "authorized boot transition preserves successor generation", format!("{authorized_boot_result:?}"), authorized_boot_passed);
 
-    let mut policy_rollback = successor_candidate(&state, 3, 24);
+    let mut log_origin_change = successor_candidate(&state, 3, 24);
+    log_origin_change.checkpoint.log_id = "basalt-log-alt".to_string();
+    log_origin_change.checkpoint.tree_size = 5;
+    log_origin_change.checkpoint.root_digest = test_digest(30);
+    log_origin_change.checkpoint.checkpoint_digest = test_digest(31);
+    log_origin_change.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+        pinned_checkpoint_digest: test_digest(31),
+    };
+    let log_origin_result = state.preview(&log_origin_change);
+    let log_origin_rejected = matches!(
+        log_origin_result,
+        Err(TransitionError::UnauthorizedLogOriginTransition)
+    );
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-019",
+        "source cannot move to a new log origin without continuity evidence",
+        format!("{log_origin_result:?}"),
+        log_origin_rejected,
+    );
+
+    log_origin_change.log_origin_transition_evidence_digest = Some(test_digest(32));
+    let authorized_log_origin_result = state.preview(&log_origin_change);
+    let authorized_log_origin_passed = matches!(
+        authorized_log_origin_result,
+        Ok(TransitionDecision::Advance(_))
+    );
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-020",
+        "authorized log-origin transition advances the same source generation lineage",
+        format!("{authorized_log_origin_result:?}"),
+        authorized_log_origin_passed,
+    );
+
+    let mut policy_rollback = successor_candidate(&state, 3, 33);
     policy_rollback.policy_versions.signer = 1;
     let policy_result = state.preview(&policy_rollback);
     let policy_passed = matches!(policy_result, Err(TransitionError::PolicyRollback));
@@ -926,6 +1013,35 @@ mod tests {
             state.preview(&original),
             Ok(TransitionDecision::AlreadyCommitted { revision: 2 })
         );
+    }
+
+    #[test]
+    fn source_log_origin_change_requires_explicit_continuity_evidence() {
+        let mut state = bootstrap();
+        let mut candidate = successor_candidate(&state, 2, 110);
+        candidate.checkpoint.log_id = "basalt-log-alt".to_string();
+        candidate.checkpoint.tree_size = 5;
+        candidate.checkpoint.root_digest = test_digest(111);
+        candidate.checkpoint.checkpoint_digest = test_digest(112);
+        candidate.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+            pinned_checkpoint_digest: test_digest(112),
+        };
+        assert_eq!(
+            state.preview(&candidate),
+            Err(TransitionError::UnauthorizedLogOriginTransition)
+        );
+
+        candidate.log_origin_transition_evidence_digest = Some(test_digest(113));
+        let plan = match state.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("new log-origin receipt"),
+        };
+        state.commit(plan).unwrap();
+        let cursor = state.source_cursor(&fixture_source_key()).unwrap();
+        assert_eq!(cursor.generation, 2);
+        assert_eq!(cursor.log_id, "basalt-log-alt");
+        assert!(state.log_cursor("basalt-log-prod").is_some());
+        assert!(state.log_cursor("basalt-log-alt").is_some());
     }
 
     #[test]
@@ -1185,4 +1301,1715 @@ mod tests {
         assert_eq!(state.source_cursor(&fixture_source_key()).unwrap().generation, 2);
         assert_eq!(state.accepted_receipt_count(), 2);
     }
+
+    #[test]
+    fn sqlite_store_reopens_with_exact_source_log_and_receipt_state() {
+        let path = temporary_sqlite_path("reopen");
+        let candidate = fixture_candidate();
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+            };
+            assert_eq!(
+                store.commit_plan(plan).unwrap(),
+                CommitOutcome::Committed { revision: 1 }
+            );
+            let report = store.report().unwrap();
+            assert_eq!(report.journal_mode.to_ascii_lowercase(), "wal");
+            assert_eq!(report.synchronous_level, 2);
+            assert!(!report.anti_rollback_qualified);
+            assert!(!report.signature_verification_performed);
+            assert!(!report.external_freshness_established);
+        }
+        {
+            let store = SqliteTrustedStateStore::open(&path).unwrap();
+            let state = store.read_state().unwrap();
+            assert_eq!(state.revision(), 1);
+            assert_eq!(state.source_cursor(&fixture_source_key()).unwrap().generation, 1);
+            assert_eq!(state.accepted_receipt_count(), 1);
+            assert_eq!(
+                store.preview(&candidate).unwrap(),
+                TransitionDecision::AlreadyCommitted { revision: 1 }
+            );
+        }
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_write_boundary_failures_rollback_all_rows() {
+        let stages = [
+            SqliteCommitStage::SourceCursorWritten,
+            SqliteCommitStage::LogCursorWritten,
+            SqliteCommitStage::ReceiptWritten,
+            SqliteCommitStage::MetaWritten,
+        ];
+        for (index, fail_stage) in stages.into_iter().enumerate() {
+            let path = temporary_sqlite_path(&format!("rollback-{index}"));
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let bootstrap_candidate = fixture_candidate();
+            let bootstrap_plan = match store.preview(&bootstrap_candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+            };
+            store.commit_plan(bootstrap_plan).unwrap();
+            let before = store.read_state().unwrap();
+            let candidate = successor_candidate(&before, 2, 90 + index as u8);
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("successor receipt is new"),
+            };
+            let result = store.commit_plan_with_hook(plan, |stage| {
+                if stage == fail_stage {
+                    anyhow::bail!("injected transactional abort at {stage:?}");
+                }
+                Ok(())
+            });
+            assert!(matches!(result, Err(DurableStoreError::Storage(_))));
+            drop(store);
+
+            let reopened = SqliteTrustedStateStore::open(&path).unwrap();
+            assert_eq!(reopened.read_state().unwrap(), before);
+            let quick_check: String = reopened
+                .connection
+                .query_row("PRAGMA quick_check", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(quick_check, "ok");
+            drop(reopened);
+            cleanup_sqlite_path(&path);
+        }
+    }
+
+    #[test]
+    fn sqlite_exact_receipt_retry_after_restart_discovers_committed_state() {
+        let path = temporary_sqlite_path("lost-ack");
+        let candidate = fixture_candidate();
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+            };
+            store.commit_plan(plan).unwrap();
+        }
+        {
+            let reopened = SqliteTrustedStateStore::open(&path).unwrap();
+            assert_eq!(
+                reopened.preview(&candidate).unwrap(),
+                TransitionDecision::AlreadyCommitted { revision: 1 }
+            );
+            assert_eq!(reopened.read_state().unwrap().accepted_receipt_count(), 1);
+        }
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_two_connections_recover_exact_retry_after_compare_conflict() {
+        let path = temporary_sqlite_path("two-connection");
+        let mut first = SqliteTrustedStateStore::open(&path).unwrap();
+        let mut second = SqliteTrustedStateStore::open(&path).unwrap();
+        let candidate = fixture_candidate();
+        let first_plan = match first.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+        };
+        let second_plan = match second.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("second connection read before commit"),
+        };
+        first.commit_plan(first_plan).unwrap();
+        assert!(matches!(
+            second.commit_plan(second_plan),
+            Err(DurableStoreError::Transition(TransitionError::CompareConflict { .. }))
+        ));
+        let reloaded = second.read_state().unwrap();
+        assert_eq!(
+            reloaded.preview(&candidate).unwrap(),
+            TransitionDecision::AlreadyCommitted { revision: 1 }
+        );
+        drop(first);
+        drop(second);
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_persists_authorized_source_log_origin_transition() {
+        let path = temporary_sqlite_path("log-origin");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let first = fixture_candidate();
+            let first_plan = match store.preview(&first).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(first_plan).unwrap();
+
+            let current = store.read_state().unwrap();
+            let mut migrated = successor_candidate(&current, 2, 114);
+            migrated.checkpoint.log_id = "basalt-log-alt".to_string();
+            migrated.checkpoint.tree_size = 5;
+            migrated.checkpoint.root_digest = test_digest(115);
+            migrated.checkpoint.checkpoint_digest = test_digest(116);
+            migrated.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+                pinned_checkpoint_digest: test_digest(116),
+            };
+            assert_eq!(
+                store.preview(&migrated).unwrap_err().to_string().contains("UnauthorizedLogOriginTransition"),
+                true
+            );
+
+            migrated.log_origin_transition_evidence_digest = Some(test_digest(117));
+            let plan = match store.preview(&migrated).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("migration receipt is new"),
+            };
+            store.commit_plan(plan).unwrap();
+        }
+
+        let reopened = SqliteTrustedStateStore::open(&path).unwrap();
+        let state = reopened.read_state().unwrap();
+        let cursor = state.source_cursor(&fixture_source_key()).unwrap();
+        assert_eq!(cursor.generation, 2);
+        assert_eq!(cursor.log_id, "basalt-log-alt");
+        assert!(state.log_cursor("basalt-log-prod").is_some());
+        assert!(state.log_cursor("basalt-log-alt").is_some());
+        drop(reopened);
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_plan_from_divergent_same_revision_database_snapshot() {
+        let path_a = temporary_sqlite_path("fork-a");
+        let path_b = temporary_sqlite_path("fork-b");
+        let mut store_a = SqliteTrustedStateStore::open(&path_a).unwrap();
+        let mut store_b = SqliteTrustedStateStore::open(&path_b).unwrap();
+
+        let candidate_a = fixture_candidate();
+        let mut candidate_b = fixture_candidate();
+        candidate_b.receipt_digest = test_digest(92);
+        candidate_b.seal_digest = test_digest(93);
+        candidate_b.checkpoint.root_digest = test_digest(94);
+        candidate_b.checkpoint.checkpoint_digest = test_digest(95);
+        candidate_b.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+            pinned_checkpoint_digest: test_digest(95),
+        };
+
+        let plan_a = match store_a.preview(&candidate_a).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database A"),
+        };
+        let plan_b = match store_b.preview(&candidate_b).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database B"),
+        };
+        store_a.commit_plan(plan_a).unwrap();
+        store_b.commit_plan(plan_b).unwrap();
+
+        let candidate_next = successor_candidate(&store_a.read_state().unwrap(), 2, 96);
+        let foreign_plan = match store_a.preview(&candidate_next).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("successor is new"),
+        };
+        assert!(matches!(
+            store_b.commit_plan(foreign_plan),
+            Err(DurableStoreError::Transition(TransitionError::StateSnapshotMismatch { .. }))
+        ));
+
+        drop(store_a);
+        drop(store_b);
+        cleanup_sqlite_path(&path_a);
+        cleanup_sqlite_path(&path_b);
+    }
+
+    #[test]
+    fn sqlite_eight_connections_have_one_winner_for_the_same_plan() {
+        use std::thread;
+
+        let path = temporary_sqlite_path("concurrent");
+        let mut seed = SqliteTrustedStateStore::open(&path).unwrap();
+        let bootstrap_candidate = fixture_candidate();
+        let bootstrap_plan = match seed.preview(&bootstrap_candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+        };
+        seed.commit_plan(bootstrap_plan).unwrap();
+
+        let candidate = successor_candidate(&seed.read_state().unwrap(), 2, 97);
+        let shared_plan = match seed.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("candidate is new"),
+        };
+        let stores: Vec<_> = (0..8)
+            .map(|_| SqliteTrustedStateStore::open(&path).unwrap())
+            .collect();
+        let handles: Vec<_> = stores
+            .into_iter()
+            .map(|mut store| {
+                let plan = shared_plan.clone();
+                thread::spawn(move || store.commit_plan(plan))
+            })
+            .collect();
+        let outcomes: Vec<_> = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        let committed = outcomes
+            .iter()
+            .filter(|result| matches!(result, Ok(CommitOutcome::Committed { .. })))
+            .count();
+        let conflicts = outcomes
+            .iter()
+            .filter(|result| {
+                matches!(
+                    result,
+                    Err(DurableStoreError::Transition(TransitionError::CompareConflict { .. }))
+                )
+            })
+            .count();
+        assert_eq!(committed, 1);
+        assert_eq!(conflicts, 7);
+        assert_eq!(seed.read_state().unwrap().revision(), 2);
+        drop(seed);
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_unsupported_schema_version() {
+        let path = temporary_sqlite_path("schema-version");
+        {
+            let store = SqliteTrustedStateStore::open(&path).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET schema_version=99 WHERE singleton=1",
+                    [],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_noncanonical_decimal_state_numbers() {
+        let path = temporary_sqlite_path("noncanonical-u64");
+        {
+            let store = SqliteTrustedStateStore::open(&path).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET revision='00' WHERE singleton=1",
+                    [],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_validates_contiguous_accepted_revision_history() {
+        let path = temporary_sqlite_path("revision-history-gap");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let candidate = fixture_candidate();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(plan).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_accepted_receipts SET accepted_revision='2' WHERE receipt_digest=?1",
+                    params![candidate.receipt_digest],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_cursor_rollback_even_when_local_digest_is_recomputed() {
+        let path = temporary_sqlite_path("cursor-history-rollback");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let first = fixture_candidate();
+            let first_plan = match store.preview(&first).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(first_plan).unwrap();
+
+            let before_second = store.read_state().unwrap();
+            let second = successor_candidate(&before_second, 2, 118);
+            let second_plan = match store.preview(&second).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("second receipt is new"),
+            };
+            store.commit_plan(second_plan).unwrap();
+
+            let mut rolled_back = store.read_state().unwrap();
+            let accepted_first = rolled_back
+                .accepted_receipts
+                .get(&first.receipt_digest)
+                .unwrap()
+                .clone();
+            let cursor = rolled_back
+                .source_cursors
+                .get_mut(&fixture_source_key())
+                .unwrap();
+            cursor.generation = accepted_first.generation;
+            cursor.seal_digest = accepted_first.seal_digest;
+            cursor.receipt_digest = accepted_first.receipt_digest;
+            cursor.observer_profile_digest = accepted_first.observer_profile_digest;
+            cursor.boot_incarnation_digest = accepted_first.boot_incarnation_digest;
+            cursor.log_id = accepted_first.checkpoint.log_id;
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_source_cursors
+                     SET generation=?1, seal_digest=?2, receipt_digest=?3,
+                         observer_profile_digest=?4, boot_incarnation_digest=?5, log_id=?6
+                     WHERE host_id=?7 AND source_id=?8 AND partition_id=?9",
+                    params![
+                        cursor.generation.to_string(),
+                        cursor.seal_digest,
+                        cursor.receipt_digest,
+                        cursor.observer_profile_digest,
+                        cursor.boot_incarnation_digest,
+                        cursor.log_id,
+                        fixture_source_key().provisioned_host_id,
+                        fixture_source_key().source_id,
+                        fixture_source_key().partition_id,
+                    ],
+                )
+                .unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                    params![trusted_state_digest(&rolled_back)],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_acceptance_history_with_missing_transition_evidence() {
+        let path = temporary_sqlite_path("transition-evidence-history");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let candidate = fixture_candidate();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(plan).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_accepted_receipts
+                     SET policy_transition_evidence_digest=NULL
+                     WHERE receipt_digest=?1",
+                    params![candidate.receipt_digest],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_checkpoint_transition_history_tamper_with_recomputed_digest() {
+        let path = temporary_sqlite_path("checkpoint-proof-history");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let candidate = fixture_candidate();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(plan).unwrap();
+
+            let mut altered = store.read_state().unwrap();
+            altered
+                .accepted_receipts
+                .get_mut(&candidate.receipt_digest)
+                .unwrap()
+                .checkpoint_evidence = CheckpointEvidence::VerifiedSameTree;
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_accepted_receipts
+                     SET checkpoint_evidence_kind='same_tree',
+                         checkpoint_evidence_digest=NULL
+                     WHERE receipt_digest=?1",
+                    params![candidate.receipt_digest],
+                )
+                .unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                    params![trusted_state_digest(&altered)],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_log_cursor_rollback_with_recomputed_digest() {
+        let path = temporary_sqlite_path("log-cursor-history-rollback");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let first = fixture_candidate();
+            let first_plan = match store.preview(&first).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(first_plan).unwrap();
+
+            let mut next = successor_candidate(&store.read_state().unwrap(), 2, 119);
+            next.checkpoint.tree_size = 11;
+            next.checkpoint.root_digest = test_digest(120);
+            next.checkpoint.checkpoint_digest = test_digest(121);
+            next.checkpoint_evidence = CheckpointEvidence::VerifiedConsistentExtension {
+                consistency_proof_digest: test_digest(122),
+            };
+            let plan = match store.preview(&next).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("second receipt is new"),
+            };
+            store.commit_plan(plan).unwrap();
+
+            let mut altered = store.read_state().unwrap();
+            let prior_checkpoint = altered
+                .accepted_receipts
+                .get(&first.receipt_digest)
+                .unwrap()
+                .checkpoint
+                .clone();
+            altered
+                .log_cursors
+                .insert(prior_checkpoint.log_id.clone(), prior_checkpoint.clone());
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_log_cursors
+                     SET tree_size=?1, root_digest=?2, checkpoint_digest=?3
+                     WHERE log_id=?4",
+                    params![
+                        prior_checkpoint.tree_size.to_string(),
+                        prior_checkpoint.root_digest,
+                        prior_checkpoint.checkpoint_digest,
+                        prior_checkpoint.log_id,
+                    ],
+                )
+                .unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                    params![trusted_state_digest(&altered)],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_unkeyed_state_digest_detects_inconsistent_database_edits() {
+        let path = temporary_sqlite_path("digest-corruption");
+        let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+        let candidate = fixture_candidate();
+        let plan = match store.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+        };
+        store.commit_plan(plan).unwrap();
+        store
+            .connection
+            .execute(
+                "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                params![test_digest(99)],
+            )
+            .unwrap();
+        drop(store);
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
 }
+
+
+// ---------------------------------------------------------------------------
+// SQLite durable backend prototype
+// ---------------------------------------------------------------------------
+//
+// This backend makes the local transaction boundary executable. It is not an
+// external anti-rollback anchor: an attacker who can restore an old database
+// snapshot can restore an old, internally consistent state. The state digest
+// detects accidental/inconsistent modification only; it is unkeyed.
+//
+// One SQLite row per logical record keeps source/log/receipt history queryable.
+// Every accepted receipt transition is written under one BEGIN IMMEDIATE
+// transaction. WAL + synchronous=FULL is set and checked on every connection.
+// The exact expected in-memory snapshot is compared after acquiring the writer
+// transaction; the revision alone is not sufficient.
+
+const SQLITE_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS basalt_state_meta (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL,
+    revision TEXT NOT NULL,
+    signer_policy_version TEXT,
+    witness_policy_version TEXT,
+    policy_bundle_digest TEXT,
+    state_digest TEXT NOT NULL,
+    CHECK (
+        (signer_policy_version IS NULL AND witness_policy_version IS NULL AND policy_bundle_digest IS NULL)
+        OR
+        (signer_policy_version IS NOT NULL AND witness_policy_version IS NOT NULL AND policy_bundle_digest IS NOT NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS basalt_log_cursors (
+    log_id TEXT PRIMARY KEY,
+    tree_size TEXT NOT NULL,
+    root_digest TEXT NOT NULL,
+    checkpoint_digest TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS basalt_source_cursors (
+    host_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    partition_id TEXT NOT NULL,
+    generation TEXT NOT NULL,
+    seal_digest TEXT NOT NULL,
+    receipt_digest TEXT NOT NULL,
+    observer_profile_digest TEXT NOT NULL,
+    boot_incarnation_digest TEXT NOT NULL,
+    log_id TEXT NOT NULL,
+    PRIMARY KEY (host_id, source_id, partition_id),
+    FOREIGN KEY (log_id) REFERENCES basalt_log_cursors(log_id)
+        DEFERRABLE INITIALLY DEFERRED
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS basalt_accepted_receipts (
+    receipt_digest TEXT PRIMARY KEY,
+    accepted_revision TEXT NOT NULL UNIQUE,
+    host_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    partition_id TEXT NOT NULL,
+    generation TEXT NOT NULL,
+    previous_seal_digest TEXT,
+    seal_digest TEXT NOT NULL,
+    observer_profile_digest TEXT NOT NULL,
+    boot_incarnation_digest TEXT NOT NULL,
+    profile_transition_evidence_digest TEXT,
+    boot_transition_evidence_digest TEXT,
+    log_origin_transition_evidence_digest TEXT,
+    policy_transition_evidence_digest TEXT,
+    checkpoint_evidence_kind TEXT NOT NULL,
+    checkpoint_evidence_digest TEXT,
+    log_id TEXT NOT NULL,
+    tree_size TEXT NOT NULL,
+    root_digest TEXT NOT NULL,
+    checkpoint_digest TEXT NOT NULL,
+    signer_policy_version TEXT NOT NULL,
+    witness_policy_version TEXT NOT NULL,
+    policy_bundle_digest TEXT NOT NULL,
+    UNIQUE (host_id, source_id, partition_id, generation),
+    FOREIGN KEY (host_id, source_id, partition_id)
+        REFERENCES basalt_source_cursors(host_id, source_id, partition_id),
+    FOREIGN KEY (log_id) REFERENCES basalt_log_cursors(log_id)
+) WITHOUT ROWID;
+";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DurableStoreError {
+    Transition(TransitionError),
+    Storage(String),
+    CommitOutcomeIndeterminate(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SqliteCommitStage {
+    SourceCursorWritten,
+    LogCursorWritten,
+    ReceiptWritten,
+    MetaWritten,
+}
+
+pub struct SqliteTrustedStateStore {
+    connection: Connection,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SqliteStoreReport {
+    pub report_version: u32,
+    pub schema_version: u32,
+    pub backend: String,
+    pub journal_mode: String,
+    pub synchronous_level: i64,
+    pub revision: u64,
+    pub log_cursor_count: usize,
+    pub source_cursor_count: usize,
+    pub accepted_receipt_count: usize,
+    pub state_digest: String,
+    pub local_atomicity_backend_configured: bool,
+    pub local_snapshot_digest_consistent: bool,
+    pub anti_rollback_qualified: bool,
+    pub signature_verification_performed: bool,
+    pub external_freshness_established: bool,
+}
+
+impl SqliteTrustedStateStore {
+    /// Opens or initializes the local state store with a pinned durability
+    /// configuration. The parent directory must already exist.
+    pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        // Refuse an existing symlink or non-regular file. The containing
+        // directory must itself be trusted against path replacement.
+        match std::fs::symlink_metadata(path.as_ref()) {
+            Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+                anyhow::bail!("BASALT SQLite state path must be a regular non-symlink file");
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+
+        let open_flags = OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+        let mut connection = Connection::open_with_flags(path.as_ref(), open_flags)
+            .with_context(|| format!("open BASALT SQLite state store at {}", path.as_ref().display()))?;
+        connection.busy_timeout(Duration::from_secs(5))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let metadata = std::fs::symlink_metadata(path.as_ref())?;
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                anyhow::bail!("BASALT SQLite state path changed to a non-regular file");
+            }
+            std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(0o600))?;
+        }
+
+        connection.pragma_update(None, "journal_mode", "WAL")?;
+        let journal_mode: String =
+            connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+        if !journal_mode.eq_ignore_ascii_case("wal") {
+            anyhow::bail!("BASALT SQLite backend requires WAL mode, got {journal_mode}");
+        }
+
+        // SQLite documents synchronous=FULL as syncing the WAL at each
+        // transaction commit. This is a local durability choice, not rollback
+        // protection against restoration of the complete database snapshot.
+        connection.pragma_update(None, "synchronous", 2_i64)?;
+        let synchronous_level: i64 =
+            connection.pragma_query_value(None, "synchronous", |row| row.get(0))?;
+        if synchronous_level != 2 {
+            anyhow::bail!(
+                "BASALT SQLite backend requires synchronous=FULL (2), got {synchronous_level}"
+            );
+        }
+        connection.pragma_update(None, "foreign_keys", 1_i64)?;
+
+        connection.execute_batch(SQLITE_SCHEMA)?;
+        {
+            let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing: Option<i64> = tx
+                .query_row(
+                    "SELECT singleton FROM basalt_state_meta WHERE singleton = 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if existing.is_none() {
+                let initial = TrustedState::new();
+                tx.execute(
+                    "INSERT INTO basalt_state_meta
+                     (singleton, schema_version, revision, signer_policy_version, witness_policy_version,
+                      policy_bundle_digest, state_digest)
+                     VALUES (1, ?1, '0', NULL, NULL, NULL, ?2)",
+                    params![SQLITE_SCHEMA_VERSION, trusted_state_digest(&initial)],
+                )?;
+            }
+            tx.commit()?;
+        }
+
+        // Fail closed on malformed, inconsistent or tampered persisted state.
+        let _ = read_sqlite_state(&connection)?;
+        Ok(Self { connection })
+    }
+
+    pub fn read_state(&self) -> anyhow::Result<TrustedState> {
+        read_sqlite_state(&self.connection)
+    }
+
+    /// Prepares against the exact state currently read from the database.
+    /// The returned plan is still only a proposal until commit_plan succeeds.
+    pub fn preview(&self, candidate: &Candidate) -> anyhow::Result<TransitionDecision> {
+        self.read_state()?
+            .preview(candidate)
+            .map_err(|error| anyhow::anyhow!("BASALT state transition rejected: {error:?}"))
+    }
+
+    pub fn commit_plan(
+        &mut self,
+        plan: AdvancePlan,
+    ) -> Result<CommitOutcome, DurableStoreError> {
+        self.commit_plan_with_hook(plan, |_| Ok(()))
+    }
+
+    fn commit_plan_with_hook<F>(
+        &mut self,
+        plan: AdvancePlan,
+        mut after_stage: F,
+    ) -> Result<CommitOutcome, DurableStoreError>
+    where
+        F: FnMut(SqliteCommitStage) -> anyhow::Result<()>,
+    {
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+
+        let current = read_sqlite_state(&tx)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+
+        if current.revision != plan.expected_revision {
+            return Err(DurableStoreError::Transition(
+                TransitionError::CompareConflict {
+                    expected: plan.expected_revision,
+                    actual: current.revision,
+                },
+            ));
+        }
+        if current != plan.expected_state {
+            return Err(DurableStoreError::Transition(
+                TransitionError::StateSnapshotMismatch {
+                    revision: current.revision,
+                },
+            ));
+        }
+        let Some(planned_receipt) = plan.next_state.accepted_receipts.get(&plan.receipt_digest) else {
+            return Err(DurableStoreError::Transition(
+                TransitionError::InvalidAdvancePlan,
+            ));
+        };
+        if current.log_cursors.len() >= MAX_SQLITE_LOG_CURSORS
+            && !current.log_cursors.contains_key(&planned_receipt.checkpoint.log_id)
+        {
+            return Err(DurableStoreError::Storage(
+                "BASALT SQLite log-cursor limit reached".to_string(),
+            ));
+        }
+        if current.source_cursors.len() >= MAX_SQLITE_SOURCE_CURSORS
+            && !current.source_cursors.contains_key(&planned_receipt.source)
+        {
+            return Err(DurableStoreError::Storage(
+                "BASALT SQLite source-cursor limit reached".to_string(),
+            ));
+        }
+        if current.accepted_receipts.len() >= MAX_SQLITE_ACCEPTED_RECEIPTS {
+            return Err(DurableStoreError::Storage(
+                "BASALT SQLite accepted-receipt limit reached".to_string(),
+            ));
+        }
+
+        let next_revision = current
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| DurableStoreError::Transition(TransitionError::RevisionOverflow))?;
+        if plan.next_state.revision != next_revision
+            || !plan.next_state.accepted_receipts.contains_key(&plan.receipt_digest)
+        {
+            return Err(DurableStoreError::Transition(
+                TransitionError::InvalidAdvancePlan,
+            ));
+        }
+
+        write_sqlite_transition(&tx, &plan, &mut after_stage)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+
+        tx.commit().map_err(|error| {
+            DurableStoreError::CommitOutcomeIndeterminate(error.to_string())
+        })?;
+        Ok(CommitOutcome::Committed {
+            revision: plan.next_state.revision,
+        })
+    }
+
+    pub fn report(&self) -> anyhow::Result<SqliteStoreReport> {
+        let state = self.read_state()?;
+        let journal_mode: String =
+            self.connection
+                .pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+        let synchronous_level: i64 =
+            self.connection
+                .pragma_query_value(None, "synchronous", |row| row.get(0))?;
+        Ok(SqliteStoreReport {
+            report_version: 1,
+            schema_version: SQLITE_SCHEMA_VERSION as u32,
+            backend: "sqlite-wal-full-v1".to_string(),
+            journal_mode,
+            synchronous_level,
+            revision: state.revision,
+            log_cursor_count: state.log_cursors.len(),
+            source_cursor_count: state.source_cursors.len(),
+            accepted_receipt_count: state.accepted_receipts.len(),
+            state_digest: trusted_state_digest(&state),
+            local_atomicity_backend_configured: journal_mode.eq_ignore_ascii_case("wal")
+                && synchronous_level == 2,
+            local_snapshot_digest_consistent: true,
+            // No independent anti-rollback/freshness anchor is connected here.
+            anti_rollback_qualified: false,
+            signature_verification_performed: false,
+            external_freshness_established: false,
+        })
+    }
+}
+
+fn parse_sql_u64(value: &str, field: &str) -> anyhow::Result<u64> {
+    let parsed = value
+        .parse::<u64>()
+        .with_context(|| format!("invalid persisted u64 in {field}"))?;
+    if parsed.to_string() != value {
+        anyhow::bail!("non-canonical persisted u64 encoding in {field}");
+    }
+    Ok(parsed)
+}
+
+fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
+    let (
+        schema_version,
+        revision_text,
+        signer_policy_text,
+        witness_policy_text,
+        policy_bundle_digest,
+        expected_state_digest,
+    ): (i64, String, Option<String>, Option<String>, Option<String>, String) =
+        connection.query_row(
+            "SELECT schema_version, revision, signer_policy_version, witness_policy_version,
+                    policy_bundle_digest, state_digest
+             FROM basalt_state_meta WHERE singleton = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+        )?;
+    if schema_version != SQLITE_SCHEMA_VERSION {
+        anyhow::bail!("unsupported BASALT SQLite schema version {schema_version}");
+    }
+
+    let revision = parse_sql_u64(&revision_text, "revision")?;
+
+    let log_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM basalt_log_cursors",
+        [],
+        |row| row.get(0),
+    )?;
+    let source_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM basalt_source_cursors",
+        [],
+        |row| row.get(0),
+    )?;
+    let receipt_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM basalt_accepted_receipts",
+        [],
+        |row| row.get(0),
+    )?;
+    if log_count < 0
+        || source_count < 0
+        || receipt_count < 0
+        || log_count as usize > MAX_SQLITE_LOG_CURSORS
+        || source_count as usize > MAX_SQLITE_SOURCE_CURSORS
+        || receipt_count as usize > MAX_SQLITE_ACCEPTED_RECEIPTS
+    {
+        anyhow::bail!("persisted BASALT SQLite state exceeds configured record bounds");
+    }
+
+    let policy_versions = match (
+        signer_policy_text,
+        witness_policy_text,
+        policy_bundle_digest,
+    ) {
+        (None, None, None) => None,
+        (Some(signer), Some(witness), Some(bundle_digest)) => {
+            let signer = parse_sql_u64(&signer, "signer_policy_version")?;
+            let witness = parse_sql_u64(&witness, "witness_policy_version")?;
+            if signer == 0 || witness == 0 || !valid_digest(&bundle_digest) {
+                anyhow::bail!("invalid persisted policy version or digest");
+            }
+            Some(PolicyVersions {
+                signer,
+                witness,
+                bundle_digest,
+            })
+        }
+        _ => anyhow::bail!("partial persisted policy-version tuple"),
+    };
+
+    let mut state = TrustedState {
+        revision,
+        log_cursors: BTreeMap::new(),
+        source_cursors: BTreeMap::new(),
+        accepted_receipts: BTreeMap::new(),
+        policy_versions,
+    };
+
+    {
+        let mut statement = connection.prepare(
+            "SELECT log_id, tree_size, root_digest, checkpoint_digest
+             FROM basalt_log_cursors ORDER BY log_id",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })?;
+        for row in rows {
+            let (log_id, tree_size, root_digest, checkpoint_digest) = row?;
+            let checkpoint = LogCheckpoint {
+                log_id: log_id.clone(),
+                tree_size: parse_sql_u64(&tree_size, "tree_size")?,
+                root_digest,
+                checkpoint_digest,
+            };
+            if !valid_id(&checkpoint.log_id)
+                || checkpoint.tree_size == 0
+                || !valid_digest(&checkpoint.root_digest)
+                || !valid_digest(&checkpoint.checkpoint_digest)
+                || state.log_cursors.insert(log_id, checkpoint).is_some()
+            {
+                anyhow::bail!("invalid or duplicate persisted log cursor");
+            }
+        }
+    }
+
+    {
+        let mut statement = connection.prepare(
+            "SELECT host_id, source_id, partition_id, generation, seal_digest,
+                    receipt_digest, observer_profile_digest, boot_incarnation_digest, log_id
+             FROM basalt_source_cursors ORDER BY host_id, source_id, partition_id",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
+            ))
+        })?;
+        for row in rows {
+            let (
+                host_id,
+                source_id,
+                partition_id,
+                generation,
+                seal_digest,
+                receipt_digest,
+                observer_profile_digest,
+                boot_incarnation_digest,
+                log_id,
+            ) = row?;
+            let key = SourceKey {
+                provisioned_host_id: host_id,
+                source_id,
+                partition_id,
+            };
+            let cursor = SourceCursor {
+                generation: parse_sql_u64(&generation, "source generation")?,
+                seal_digest,
+                receipt_digest,
+                observer_profile_digest,
+                boot_incarnation_digest,
+                log_id,
+            };
+            if !valid_id(&key.provisioned_host_id)
+                || !valid_id(&key.source_id)
+                || !valid_id(&key.partition_id)
+                || cursor.generation == 0
+                || !valid_digest(&cursor.seal_digest)
+                || !valid_digest(&cursor.receipt_digest)
+                || !valid_digest(&cursor.observer_profile_digest)
+                || !valid_digest(&cursor.boot_incarnation_digest)
+                || !valid_id(&cursor.log_id)
+                || state.source_cursors.insert(key, cursor).is_some()
+            {
+                anyhow::bail!("invalid or duplicate persisted source cursor");
+            }
+        }
+    }
+
+    {
+        let mut statement = connection.prepare(
+            "SELECT receipt_digest, accepted_revision, host_id, source_id, partition_id, generation,
+                    previous_seal_digest, seal_digest, observer_profile_digest,
+                    boot_incarnation_digest, profile_transition_evidence_digest,
+                    boot_transition_evidence_digest, log_origin_transition_evidence_digest,
+                    policy_transition_evidence_digest, checkpoint_evidence_kind,
+                    checkpoint_evidence_digest, log_id, tree_size, root_digest,
+                    checkpoint_digest, signer_policy_version, witness_policy_version,
+                    policy_bundle_digest
+             FROM basalt_accepted_receipts ORDER BY accepted_revision",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, Option<String>>(10)?,
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, Option<String>>(13)?,
+                row.get::<_, String>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, String>(16)?,
+                row.get::<_, String>(17)?,
+                row.get::<_, String>(18)?,
+                row.get::<_, String>(19)?,
+                row.get::<_, String>(20)?,
+                row.get::<_, String>(21)?,
+                row.get::<_, String>(22)?,
+            ))
+        })?;
+        for row in rows {
+            let (
+                receipt_digest,
+                accepted_revision,
+                host_id,
+                source_id,
+                partition_id,
+                generation,
+                previous_seal_digest,
+                seal_digest,
+                observer_profile_digest,
+                boot_incarnation_digest,
+                profile_transition_evidence_digest,
+                boot_transition_evidence_digest,
+                log_origin_transition_evidence_digest,
+                policy_transition_evidence_digest,
+                checkpoint_evidence_kind,
+                checkpoint_evidence_digest,
+                log_id,
+                tree_size,
+                root_digest,
+                checkpoint_digest,
+                signer_policy,
+                witness_policy,
+                bundle_digest,
+            ) = row?;
+            let generation = parse_sql_u64(&generation, "accepted receipt generation")?;
+            let accepted_revision =
+                parse_sql_u64(&accepted_revision, "accepted receipt revision")?;
+            let previous_valid = if generation == 1 {
+                previous_seal_digest.is_none()
+            } else {
+                previous_seal_digest.as_deref().is_some_and(valid_digest)
+            };
+            let checkpoint_evidence = match (
+                checkpoint_evidence_kind.as_str(),
+                checkpoint_evidence_digest,
+            ) {
+                ("pinned_bootstrap", Some(digest)) if valid_digest(&digest) => {
+                    CheckpointEvidence::VerifiedPinnedBootstrap {
+                        pinned_checkpoint_digest: digest,
+                    }
+                }
+                ("same_tree", None) => CheckpointEvidence::VerifiedSameTree,
+                ("consistent_extension", Some(digest)) if valid_digest(&digest) => {
+                    CheckpointEvidence::VerifiedConsistentExtension {
+                        consistency_proof_digest: digest,
+                    }
+                }
+                _ => anyhow::bail!("invalid persisted checkpoint transition evidence"),
+            };
+            let receipt = AcceptedReceipt {
+                source: SourceKey {
+                    provisioned_host_id: host_id,
+                    source_id,
+                    partition_id,
+                },
+                generation,
+                accepted_revision,
+                previous_seal_digest,
+                seal_digest,
+                receipt_digest: receipt_digest.clone(),
+                observer_profile_digest,
+                boot_incarnation_digest,
+                profile_transition_evidence_digest,
+                boot_transition_evidence_digest,
+                log_origin_transition_evidence_digest,
+                policy_transition_evidence_digest,
+                checkpoint: LogCheckpoint {
+                    log_id,
+                    tree_size: parse_sql_u64(&tree_size, "accepted tree_size")?,
+                    root_digest,
+                    checkpoint_digest,
+                },
+                checkpoint_evidence,
+                policy_versions: PolicyVersions {
+                    signer: parse_sql_u64(&signer_policy, "accepted signer policy")?,
+                    witness: parse_sql_u64(&witness_policy, "accepted witness policy")?,
+                    bundle_digest,
+                },
+            };
+            let retained_log = state
+                .log_cursors
+                .get(&receipt.checkpoint.log_id)
+                .ok_or_else(|| anyhow::anyhow!("accepted receipt references an unretained log origin"))?;
+            if receipt.checkpoint.tree_size > retained_log.tree_size
+                || (receipt.checkpoint.tree_size == retained_log.tree_size
+                    && receipt.checkpoint.root_digest != retained_log.root_digest)
+            {
+                anyhow::bail!("accepted receipt checkpoint is ahead of or forks the retained log cursor");
+            }
+
+            if !valid_digest(&receipt_digest)
+                || !valid_id(&receipt.source.provisioned_host_id)
+                || !valid_id(&receipt.source.source_id)
+                || !valid_id(&receipt.source.partition_id)
+                || !previous_valid
+                || !valid_digest(&receipt.seal_digest)
+                || !valid_digest(&receipt.observer_profile_digest)
+                || !valid_digest(&receipt.boot_incarnation_digest)
+                || !valid_id(&receipt.checkpoint.log_id)
+                || receipt.checkpoint.tree_size == 0
+                || !valid_digest(&receipt.checkpoint.root_digest)
+                || !valid_digest(&receipt.checkpoint.checkpoint_digest)
+                || receipt.profile_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.boot_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.log_origin_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.policy_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.policy_versions.signer == 0
+                || receipt.policy_versions.witness == 0
+                || !valid_digest(&receipt.policy_versions.bundle_digest)
+                || state.accepted_receipts.insert(receipt_digest, receipt).is_some()
+            {
+                anyhow::bail!("invalid or duplicate persisted accepted receipt");
+            }
+        }
+    }
+
+    validate_accepted_history(&state)?;
+
+    for (key, cursor) in &state.source_cursors {
+        let accepted = state
+            .accepted_receipts
+            .get(&cursor.receipt_digest)
+            .ok_or_else(|| anyhow::anyhow!("source cursor has no accepted receipt record"))?;
+        if &accepted.source != key
+            || !state.log_cursors.contains_key(&cursor.log_id)
+            || accepted.generation != cursor.generation
+            || accepted.seal_digest != cursor.seal_digest
+            || accepted.observer_profile_digest != cursor.observer_profile_digest
+            || accepted.boot_incarnation_digest != cursor.boot_incarnation_digest
+            || accepted.checkpoint.log_id != cursor.log_id
+        {
+            anyhow::bail!("source cursor does not match its accepted receipt");
+        }
+    }
+
+    for (log_id, cursor) in &state.log_cursors {
+        if !state.accepted_receipts.values().any(|receipt| {
+            receipt.checkpoint.log_id == *log_id && receipt.checkpoint == *cursor
+        }) {
+            anyhow::bail!("log cursor has no matching accepted receipt checkpoint");
+        }
+    }
+
+    let actual_state_digest = trusted_state_digest(&state);
+    if actual_state_digest != expected_state_digest {
+        anyhow::bail!("persisted trusted-state digest mismatch");
+    }
+    Ok(state)
+}
+
+fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
+    if state.accepted_receipts.len() as u64 != state.revision {
+        anyhow::bail!(
+            "accepted receipt count {} does not match state revision {}",
+            state.accepted_receipts.len(),
+            state.revision
+        );
+    }
+
+    let mut ordered: Vec<&AcceptedReceipt> = state.accepted_receipts.values().collect();
+    ordered.sort_by_key(|receipt| receipt.accepted_revision);
+
+    let mut expected_revision = 1_u64;
+    let mut previous_policy: Option<&PolicyVersions> = None;
+    let mut last_checkpoint_by_log = BTreeMap::<String, LogCheckpoint>::new();
+    let mut by_source = BTreeMap::<SourceKey, Vec<&AcceptedReceipt>>::new();
+
+    for receipt in &ordered {
+        if receipt.accepted_revision != expected_revision {
+            anyhow::bail!(
+                "accepted receipt revision gap: expected {}, got {}",
+                expected_revision,
+                receipt.accepted_revision
+            );
+        }
+        expected_revision = expected_revision
+            .checked_add(1)
+            .ok_or_else(|| anyhow::anyhow!("accepted receipt revision overflows"))?;
+
+        match previous_policy {
+            None => {
+                if !receipt
+                    .policy_transition_evidence_digest
+                    .as_deref()
+                    .is_some_and(valid_digest)
+                {
+                    anyhow::bail!("initial signer/witness policy lacks transition evidence");
+                }
+            }
+            Some(previous) => {
+                if receipt.policy_versions.signer < previous.signer
+                    || receipt.policy_versions.witness < previous.witness
+                {
+                    anyhow::bail!("accepted receipt history contains a policy rollback");
+                }
+                let versions_same = receipt.policy_versions.signer == previous.signer
+                    && receipt.policy_versions.witness == previous.witness;
+                if versions_same {
+                    if receipt.policy_versions.bundle_digest != previous.bundle_digest
+                        || receipt.policy_transition_evidence_digest.is_some()
+                    {
+                        anyhow::bail!("policy bundle changed without a version transition");
+                    }
+                } else if !receipt
+                    .policy_transition_evidence_digest
+                    .as_deref()
+                    .is_some_and(valid_digest)
+                {
+                    anyhow::bail!("policy version advancement lacks transition evidence");
+                }
+            }
+        }
+        match last_checkpoint_by_log.get(&receipt.checkpoint.log_id) {
+            None => match &receipt.checkpoint_evidence {
+                CheckpointEvidence::VerifiedPinnedBootstrap { pinned_checkpoint_digest }
+                    if pinned_checkpoint_digest == &receipt.checkpoint.checkpoint_digest => {}
+                _ => anyhow::bail!("first checkpoint for a log lacks a matching pinned bootstrap"),
+            },
+            Some(previous) => {
+                if receipt.checkpoint.tree_size < previous.tree_size {
+                    anyhow::bail!("accepted checkpoint history moves to a smaller tree size");
+                }
+                if receipt.checkpoint.tree_size == previous.tree_size {
+                    if receipt.checkpoint.root_digest != previous.root_digest {
+                        anyhow::bail!("accepted checkpoint history contains a same-size fork");
+                    }
+                    if !matches!(
+                        &receipt.checkpoint_evidence,
+                        CheckpointEvidence::VerifiedSameTree
+                    ) {
+                        anyhow::bail!("same-tree checkpoint refresh lacks same-tree evidence");
+                    }
+                } else if !matches!(
+                    &receipt.checkpoint_evidence,
+                    CheckpointEvidence::VerifiedConsistentExtension {
+                        consistency_proof_digest
+                    } if valid_digest(consistency_proof_digest)
+                ) {
+                    anyhow::bail!("larger checkpoint lacks a valid consistency-proof reference");
+                }
+            }
+        }
+        last_checkpoint_by_log.insert(
+            receipt.checkpoint.log_id.clone(),
+            receipt.checkpoint.clone(),
+        );
+
+        previous_policy = Some(&receipt.policy_versions);
+        by_source
+            .entry(receipt.source.clone())
+            .or_default()
+            .push(*receipt);
+    }
+
+    if expected_revision.checked_sub(1) != Some(state.revision) {
+        anyhow::bail!("accepted receipt revision history does not close at state revision");
+    }
+    if last_checkpoint_by_log.len() != state.log_cursors.len() {
+        anyhow::bail!("retained log cursor set does not match accepted checkpoint history");
+    }
+    for (log_id, latest_checkpoint) in &last_checkpoint_by_log {
+        if state.log_cursors.get(log_id) != Some(latest_checkpoint) {
+            anyhow::bail!("log cursor does not point to its latest accepted checkpoint");
+        }
+    }
+    match (ordered.last(), state.policy_versions.as_ref()) {
+        (None, None) => {}
+        (Some(last), Some(current)) if &last.policy_versions == current => {}
+        _ => anyhow::bail!("current policy cursor does not match the last accepted receipt"),
+    }
+
+    for (source_key, history) in &mut by_source {
+        history.sort_by_key(|receipt| receipt.generation);
+        let Some(first) = history.first() else {
+            continue;
+        };
+        if first.generation != 1 || first.previous_seal_digest.is_some() {
+            anyhow::bail!("source history for {:?} does not begin at generation one", source_key);
+        }
+        if first.profile_transition_evidence_digest.is_some()
+            || first.boot_transition_evidence_digest.is_some()
+            || first.log_origin_transition_evidence_digest.is_some()
+        {
+            anyhow::bail!("source bootstrap carries an unexpected continuity transition");
+        }
+
+        let latest = history.last().expect("source history contains its first receipt");
+        let cursor = state
+            .source_cursors
+            .get(source_key)
+            .ok_or_else(|| anyhow::anyhow!("accepted source history has no current cursor"))?;
+        if cursor.generation != latest.generation
+            || cursor.seal_digest != latest.seal_digest
+            || cursor.receipt_digest != latest.receipt_digest
+            || cursor.observer_profile_digest != latest.observer_profile_digest
+            || cursor.boot_incarnation_digest != latest.boot_incarnation_digest
+            || cursor.log_id != latest.checkpoint.log_id
+        {
+            anyhow::bail!("source cursor does not point to its latest accepted generation");
+        }
+
+        for pair in history.windows(2) {
+            let previous = pair[0];
+            let current = pair[1];
+            let expected_generation = previous
+                .generation
+                .checked_add(1)
+                .ok_or_else(|| anyhow::anyhow!("source generation overflows in accepted history"))?;
+            if current.generation != expected_generation
+                || current.previous_seal_digest.as_deref() != Some(previous.seal_digest.as_str())
+            {
+                anyhow::bail!("source history has a generation gap or predecessor mismatch");
+            }
+
+            let profile_changed =
+                current.observer_profile_digest != previous.observer_profile_digest;
+            match (
+                profile_changed,
+                current.profile_transition_evidence_digest.as_deref(),
+            ) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => anyhow::bail!("observer profile transition lacks valid evidence"),
+                (false, Some(_)) => anyhow::bail!("unexpected observer profile transition evidence"),
+                (false, None) => {}
+            }
+
+            let boot_changed =
+                current.boot_incarnation_digest != previous.boot_incarnation_digest;
+            match (
+                boot_changed,
+                current.boot_transition_evidence_digest.as_deref(),
+            ) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => anyhow::bail!("boot-incarnation transition lacks valid evidence"),
+                (false, Some(_)) => anyhow::bail!("unexpected boot transition evidence"),
+                (false, None) => {}
+            }
+
+            let log_changed = current.checkpoint.log_id != previous.checkpoint.log_id;
+            match (
+                log_changed,
+                current.log_origin_transition_evidence_digest.as_deref(),
+            ) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => anyhow::bail!("log-origin transition lacks valid continuity evidence"),
+                (false, Some(_)) => anyhow::bail!("unexpected log-origin transition evidence"),
+                (false, None) => {}
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn write_sqlite_transition<F>(
+    transaction: &Transaction<'_>,
+    plan: &AdvancePlan,
+    after_stage: &mut F,
+) -> anyhow::Result<()>
+where
+    F: FnMut(SqliteCommitStage) -> anyhow::Result<()>,
+{
+    let receipt = plan
+        .next_state
+        .accepted_receipts
+        .get(&plan.receipt_digest)
+        .ok_or_else(|| anyhow::anyhow!("advance plan receipt is absent from next state"))?;
+    let source = plan
+        .next_state
+        .source_cursors
+        .get(&receipt.source)
+        .ok_or_else(|| anyhow::anyhow!("advance plan source cursor is absent from next state"))?;
+    let checkpoint = plan
+        .next_state
+        .log_cursors
+        .get(&receipt.checkpoint.log_id)
+        .ok_or_else(|| anyhow::anyhow!("advance plan log cursor is absent from next state"))?;
+    let policies = plan
+        .next_state
+        .policy_versions
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("advance plan policy versions are absent"))?;
+
+    transaction.execute(
+        "INSERT INTO basalt_source_cursors
+         (host_id, source_id, partition_id, generation, seal_digest, receipt_digest,
+          observer_profile_digest, boot_incarnation_digest, log_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT(host_id, source_id, partition_id) DO UPDATE SET
+          generation=excluded.generation,
+          seal_digest=excluded.seal_digest,
+          receipt_digest=excluded.receipt_digest,
+          observer_profile_digest=excluded.observer_profile_digest,
+          boot_incarnation_digest=excluded.boot_incarnation_digest,
+          log_id=excluded.log_id",
+        params![
+            receipt.source.provisioned_host_id,
+            receipt.source.source_id,
+            receipt.source.partition_id,
+            source.generation.to_string(),
+            source.seal_digest,
+            source.receipt_digest,
+            source.observer_profile_digest,
+            source.boot_incarnation_digest,
+            source.log_id,
+        ],
+    )?;
+    after_stage(SqliteCommitStage::SourceCursorWritten)?;
+
+    transaction.execute(
+        "INSERT INTO basalt_log_cursors (log_id, tree_size, root_digest, checkpoint_digest)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(log_id) DO UPDATE SET
+          tree_size=excluded.tree_size,
+          root_digest=excluded.root_digest,
+          checkpoint_digest=excluded.checkpoint_digest",
+        params![
+            checkpoint.log_id,
+            checkpoint.tree_size.to_string(),
+            checkpoint.root_digest,
+            checkpoint.checkpoint_digest,
+        ],
+    )?;
+    after_stage(SqliteCommitStage::LogCursorWritten)?;
+
+    transaction.execute(
+        "INSERT INTO basalt_accepted_receipts
+         (receipt_digest, accepted_revision, host_id, source_id, partition_id, generation,
+          previous_seal_digest, seal_digest, observer_profile_digest, boot_incarnation_digest,
+          profile_transition_evidence_digest, boot_transition_evidence_digest,
+          log_origin_transition_evidence_digest, policy_transition_evidence_digest,
+          checkpoint_evidence_kind, checkpoint_evidence_digest,
+          log_id, tree_size, root_digest, checkpoint_digest,
+          signer_policy_version, witness_policy_version, policy_bundle_digest)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+        params![
+            receipt.receipt_digest,
+            receipt.accepted_revision.to_string(),
+            receipt.source.provisioned_host_id,
+            receipt.source.source_id,
+            receipt.source.partition_id,
+            receipt.generation.to_string(),
+            receipt.previous_seal_digest,
+            receipt.seal_digest,
+            receipt.observer_profile_digest,
+            receipt.boot_incarnation_digest,
+            receipt.profile_transition_evidence_digest,
+            receipt.boot_transition_evidence_digest,
+            receipt.log_origin_transition_evidence_digest,
+            receipt.policy_transition_evidence_digest,
+            match &receipt.checkpoint_evidence {
+                CheckpointEvidence::VerifiedPinnedBootstrap { .. } => "pinned_bootstrap",
+                CheckpointEvidence::VerifiedSameTree => "same_tree",
+                CheckpointEvidence::VerifiedConsistentExtension { .. } => "consistent_extension",
+            },
+            match &receipt.checkpoint_evidence {
+                CheckpointEvidence::VerifiedPinnedBootstrap { pinned_checkpoint_digest } => Some(pinned_checkpoint_digest.as_str()),
+                CheckpointEvidence::VerifiedSameTree => None,
+                CheckpointEvidence::VerifiedConsistentExtension { consistency_proof_digest } => Some(consistency_proof_digest.as_str()),
+            },
+            receipt.checkpoint.log_id,
+            receipt.checkpoint.tree_size.to_string(),
+            receipt.checkpoint.root_digest,
+            receipt.checkpoint.checkpoint_digest,
+            receipt.policy_versions.signer.to_string(),
+            receipt.policy_versions.witness.to_string(),
+            receipt.policy_versions.bundle_digest,
+        ],
+    )?;
+    after_stage(SqliteCommitStage::ReceiptWritten)?;
+
+    let updated = transaction.execute(
+        "UPDATE basalt_state_meta
+         SET revision=?1, signer_policy_version=?2, witness_policy_version=?3,
+             policy_bundle_digest=?4, state_digest=?5
+         WHERE singleton=1",
+        params![
+            plan.next_state.revision.to_string(),
+            policies.signer.to_string(),
+            policies.witness.to_string(),
+            policies.bundle_digest,
+            trusted_state_digest(&plan.next_state),
+        ],
+    )?;
+    if updated != 1 {
+        anyhow::bail!("expected exactly one BASALT state-meta row to advance");
+    }
+    after_stage(SqliteCommitStage::MetaWritten)?;
+    Ok(())
+}
+
+fn hash_state_string(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hash_state_u64(hasher: &mut Sha256, value: u64) {
+    hasher.update(value.to_be_bytes());
+}
+
+fn hash_state_optional_string(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            hasher.update([1_u8]);
+            hash_state_string(hasher, value);
+        }
+        None => hasher.update([0_u8]),
+    }
+}
+
+/// Deterministic, domain-separated digest of the normalized local state.
+/// It detects accidental inconsistency; it is not keyed and cannot prevent a
+/// capable attacker from restoring/recomputing an older complete database.
+pub fn trusted_state_digest(state: &TrustedState) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"basalt.trusted-state.snapshot.v1\0");
+    hash_state_u64(&mut hasher, state.revision);
+
+    match &state.policy_versions {
+        Some(policy) => {
+            hasher.update([1_u8]);
+            hash_state_u64(&mut hasher, policy.signer);
+            hash_state_u64(&mut hasher, policy.witness);
+            hash_state_string(&mut hasher, &policy.bundle_digest);
+        }
+        None => hasher.update([0_u8]),
+    }
+
+    hash_state_u64(&mut hasher, state.log_cursors.len() as u64);
+    for (log_id, checkpoint) in &state.log_cursors {
+        hash_state_string(&mut hasher, log_id);
+        hash_state_u64(&mut hasher, checkpoint.tree_size);
+        hash_state_string(&mut hasher, &checkpoint.root_digest);
+        hash_state_string(&mut hasher, &checkpoint.checkpoint_digest);
+    }
+
+    hash_state_u64(&mut hasher, state.source_cursors.len() as u64);
+    for (key, cursor) in &state.source_cursors {
+        hash_state_string(&mut hasher, &key.provisioned_host_id);
+        hash_state_string(&mut hasher, &key.source_id);
+        hash_state_string(&mut hasher, &key.partition_id);
+        hash_state_u64(&mut hasher, cursor.generation);
+        hash_state_string(&mut hasher, &cursor.seal_digest);
+        hash_state_string(&mut hasher, &cursor.receipt_digest);
+        hash_state_string(&mut hasher, &cursor.observer_profile_digest);
+        hash_state_string(&mut hasher, &cursor.boot_incarnation_digest);
+        hash_state_string(&mut hasher, &cursor.log_id);
+    }
+
+    hash_state_u64(&mut hasher, state.accepted_receipts.len() as u64);
+    for (digest, receipt) in &state.accepted_receipts {
+        hash_state_string(&mut hasher, digest);
+        hash_state_string(&mut hasher, &receipt.source.provisioned_host_id);
+        hash_state_string(&mut hasher, &receipt.source.source_id);
+        hash_state_string(&mut hasher, &receipt.source.partition_id);
+        hash_state_u64(&mut hasher, receipt.generation);
+        hash_state_u64(&mut hasher, receipt.accepted_revision);
+        hash_state_optional_string(&mut hasher, receipt.previous_seal_digest.as_deref());
+        hash_state_string(&mut hasher, &receipt.seal_digest);
+        hash_state_string(&mut hasher, &receipt.receipt_digest);
+        hash_state_string(&mut hasher, &receipt.observer_profile_digest);
+        hash_state_string(&mut hasher, &receipt.boot_incarnation_digest);
+        hash_state_optional_string(&mut hasher, receipt.profile_transition_evidence_digest.as_deref());
+        hash_state_optional_string(&mut hasher, receipt.boot_transition_evidence_digest.as_deref());
+        hash_state_optional_string(&mut hasher, receipt.log_origin_transition_evidence_digest.as_deref());
+        hash_state_optional_string(&mut hasher, receipt.policy_transition_evidence_digest.as_deref());
+        match &receipt.checkpoint_evidence {
+            CheckpointEvidence::VerifiedPinnedBootstrap { pinned_checkpoint_digest } => {
+                hasher.update([1_u8]);
+                hash_state_string(&mut hasher, pinned_checkpoint_digest);
+            }
+            CheckpointEvidence::VerifiedSameTree => hasher.update([2_u8]),
+            CheckpointEvidence::VerifiedConsistentExtension { consistency_proof_digest } => {
+                hasher.update([3_u8]);
+                hash_state_string(&mut hasher, consistency_proof_digest);
+            }
+        }
+        hash_state_string(&mut hasher, &receipt.checkpoint.log_id);
+        hash_state_u64(&mut hasher, receipt.checkpoint.tree_size);
+        hash_state_string(&mut hasher, &receipt.checkpoint.root_digest);
+        hash_state_string(&mut hasher, &receipt.checkpoint.checkpoint_digest);
+        hash_state_u64(&mut hasher, receipt.policy_versions.signer);
+        hash_state_u64(&mut hasher, receipt.policy_versions.witness);
+        hash_state_string(&mut hasher, &receipt.policy_versions.bundle_digest);
+    }
+
+    let digest = hasher.finalize();
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("sha256:{hex}")
+}
+
+#[cfg(test)]
+fn temporary_sqlite_path(label: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "basalt-{label}-{}-{nonce}-{}.sqlite",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+#[cfg(test)]
+fn cleanup_sqlite_path(path: &Path) {
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
+    let _ = std::fs::remove_file(path.with_extension("sqlite-shm"));
+}
+

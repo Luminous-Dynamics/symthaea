@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT SQLite trusted-state backend benchmark v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "title",
+    "claim_ceiling",
+    "implementation_path",
+    "command",
+    "scenarios",
+    "metrics",
+    "benchmark_policy"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-trusted-state-sqlite-benchmark-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_path": {
+      "const": "xtask/src/basalt_trusted_state.rs"
+    },
+    "command": {
+      "const": "cargo run -p xtask -- basalt-trusted-state-sqlite-inspect --database PATH"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 48,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "phase",
+          "mutation",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TSTATE-SQL-[0-9]{3}$"
+          },
+          "phase": {
+            "enum": [
+              "bootstrap_reopen",
+              "transaction_abort",
+              "concurrency",
+              "snapshot_fork",
+              "integrity",
+              "configuration",
+              "claim_boundary"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "safety",
+              "efficiency"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "benchmark_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "all_safety_gates_before_efficiency",
+        "record_every_abort_boundary",
+        "no_power_loss_claim_from_abort_injection",
+        "local_digest_is_not_anti_rollback",
+        "wal_same_host_only",
+        "held_out_storage_profiles"
+      ],
+      "properties": {
+        "all_safety_gates_before_efficiency": {
+          "const": true
+        },
+        "record_every_abort_boundary": {
+          "const": true
+        },
+        "no_power_loss_claim_from_abort_injection": {
+          "const": true
+        },
+        "local_digest_is_not_anti_rollback": {
+          "const": true
+        },
+        "wal_same_host_only": {
+          "const": true
+        },
+        "held_out_storage_profiles": {
+          "const": true
+        }
+      }
+    }
+  }
+}
