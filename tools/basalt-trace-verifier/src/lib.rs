@@ -264,6 +264,10 @@ fn hex_lower(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn valid_id(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 128 && !value.chars().any(char::is_control)
+}
+
 fn valid_digest(value: &str) -> bool {
     let Some(hex) = value.strip_prefix("sha256:") else { return false };
     hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
@@ -316,6 +320,61 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
         }
         if operation.completed_at_ns < operation.invoked_at_ns {
             push_error(errors, format!("{} completes before invocation", operation.op_id));
+        }
+        if !valid_id(&operation.scope.source_id) || !valid_id(&operation.scope.log_origin_id) {
+            push_error(errors, format!("{} has malformed scope identity", operation.op_id));
+        }
+        let request = &operation.request;
+        let required = match operation.kind.as_str() {
+            "advance" => vec![
+                ("expected_source_generation", request.expected_source_generation.is_some()),
+                ("expected_source_predecessor_digest", request.expected_source_predecessor_digest.is_some()),
+                ("expected_log_checkpoint", request.expected_log_checkpoint.is_some()),
+                ("expected_policy_digest", request.expected_policy_digest.is_some()),
+                ("receipt_id", request.receipt_id.is_some()),
+                ("receipt_digest", request.receipt_digest.is_some()),
+                ("next_source_cursor", request.next_source_cursor.is_some()),
+                ("next_source_predecessor_digest", request.next_source_predecessor_digest.is_some()),
+                ("next_log_checkpoint", request.next_log_checkpoint.is_some()),
+            ],
+            "receipt_lookup" => vec![
+                ("receipt_id", request.receipt_id.is_some()),
+                ("receipt_digest", request.receipt_digest.is_some()),
+            ],
+            "restore_verify" => vec![
+                ("restored_incarnation_id", request.restored_incarnation_id.is_some()),
+                ("restored_authority_revision", request.restored_authority_revision.is_some()),
+                ("restored_state_digest", request.restored_state_digest.is_some()),
+                ("witness_sequence_seen", request.witness_sequence_seen.is_some()),
+            ],
+            "policy_publish" => vec![
+                ("expected_policy_digest", request.expected_policy_digest.is_some()),
+                ("next_policy_digest", request.next_policy_digest.is_some()),
+            ],
+            other => {
+                push_error(errors, format!("{} has unsupported operation kind {other}", operation.op_id));
+                Vec::new()
+            }
+        };
+        for (field, present) in required {
+            if !present {
+                push_error(errors, format!("{} is missing required request field {field}", operation.op_id));
+            }
+        }
+        if !["committed", "duplicate", "compare_conflict", "indeterminate", "retryable_abort", "receipt_found", "restore_verified", "rejected_anti_rollback_unknown", "rejected_anti_rollback"].contains(&operation.expected_result.outcome.as_str()) {
+            push_error(errors, format!("{} has unsupported expected outcome", operation.op_id));
+        }
+        if operation.expected_result.reason.is_none() {
+            push_error(errors, format!("{} is missing expected-result rationale", operation.op_id));
+        }
+        for revision in [
+            operation.expected_result.receipt_acceptance_revision.as_deref(),
+            operation.expected_result.current_authority_revision.as_deref(),
+            operation.expected_result.observed_store_revision.as_deref(),
+        ].into_iter().flatten() {
+            if parse_revision(revision).is_none() || revision != revision_text(parse_revision(revision).unwrap_or(u64::MAX)) {
+                push_error(errors, format!("{} contains non-canonical result revision {revision}", operation.op_id));
+            }
         }
         if operation_map.insert(&operation.op_id, operation).is_some() {
             push_error(errors, format!("duplicate operation ID {}", operation.op_id));
@@ -915,6 +974,25 @@ mod tests {
         let report = verify_reference(&trace, b"missing-witness-control");
         assert_eq!(report.status, "fail");
         assert!(report.counterexamples.iter().any(|x| x.contains("witness")));
+    }
+
+    #[test]
+    fn malformed_advance_request_is_rejected_before_replay() {
+        let (mut trace, _) = fixture();
+        trace.operations.iter_mut().find(|x| x.op_id == "op-a-commit").unwrap().request.next_log_checkpoint = None;
+        let report = verify_reference(&trace, b"missing-next-log-control");
+        assert_eq!(report.status, "fail");
+        assert!(report.counterexamples.iter().any(|x| x.contains("next_log_checkpoint")));
+    }
+
+    #[test]
+    fn invalid_operation_interval_is_rejected() {
+        let (mut trace, _) = fixture();
+        let operation = trace.operations.iter_mut().find(|x| x.op_id == "op-a-commit").unwrap();
+        operation.completed_at_ns = operation.invoked_at_ns - 1;
+        let report = verify_reference(&trace, b"invalid-interval-control");
+        assert_eq!(report.status, "fail");
+        assert!(report.counterexamples.iter().any(|x| x.contains("completes before invocation")));
     }
 
     #[test]
