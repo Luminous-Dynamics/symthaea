@@ -494,7 +494,7 @@ pub fn calibrate_model_adequacy(
     }
 
     for family_id in omitted_families {
-        if in_scope_families.contains(family_id) {
+        if in_scope_families.contains(&family_id) {
             return Err(DesignError::MechanismFamilyLeakage {
                 mechanism_family_id: family_id.to_owned(),
             });
