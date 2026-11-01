@@ -1,0 +1,271 @@
+# Preregistered comparative benchmark protocol for dynamic e-closure
+
+**Status:** protocol and manifest implementation draft. This document defines matched comparison contracts; it does not claim any method currently beats state of the art.
+
+## 1. Why a shared protocol is necessary
+
+The current tracks do not all make the same assumptions:
+
+| Track | Statistical route | Principal limitation |
+|---|---|---|
+| #9538 | Global affine projective mergers plus persistent adjuster | Fixed global weight budget; finite exact optimizer |
+| #9539 | Self-financing / predictable portfolio mixtures | Must be compared against AWAIRE-style prior art |
+| #9648 | Predictable arrivals localized to finite deterministic envelopes | Requires a finite horizon envelope |
+| #9684 | Countable prior over all finite intersections | Prior mass is split over intersections |
+| #9695 | Countable global-projective affine closure | Requires global coordinate weights and neutral dormant padding |
+| #9712 | History-dependent joint intersection betting | Requires a correctly specified common conditional model |
+
+A method should not be declared more powerful because it was tested under a friendlier arrival process, a different filtration, or a different error-control target. The protocol therefore separates statistical guarantee classes from operational decision quality and single-intersection component diagnostics.
+
+## 1A. External baseline matrix (verified 2026-11-01)
+
+External methods must be assigned to the guarantee lane they actually prove. They are not all direct substitutes for dynamic closure.
+
+| Baseline | Scope to benchmark | Matching rule |
+|---|---|---|
+| Xu, Fischer & Ramdas (UAI 2026), online e-closure and compound e-values | One-pass online FDR under arbitrary dependence; paper reports strict power improvements and O(log t) decisions | Primary arbitrary-dependence online-FDR baseline. Match its stream/arrival contract; do not treat it as automatically solving repeated evidence updates for previously active hypotheses or SupFDR. |
+| Donation e-LOND (Xu, Fischer & Ramdas, UAI 2026; exact adapter #9813 / PR #9818) | SupFDR under arbitrary dependence for one e-value per arriving hypothesis; O(log t) via augmented order-statistics tree | Primary executable single-pass reference. Match the fixed summable gamma schedule and one-shot e-value contract; never feed it repeatedly updated old e-values without a new theorem. |
+| LORD variants, SAFFRON, ADDIS, GAI/weighted GAI++, LOND/e-LOND, alpha spending | Established sequential online procedures; include p-value and e-value variants where available | Use only methods whose assumptions and error target match the comparison cell. Freeze tuning parameters before confirmatory runs. |
+| Bioconductor onlineFDR 2.20.0 and Python online-fdr parity suite | Reference implementations for online procedures and asynchronous lifecycles | Pin package versions and parity-test method adapters. The current Python package describes sequential, asynchronous and batch APIs plus e-BH/e-LOND, and reports parity checks against onlineFDR 2.20.0. |
+| Tavyrikov, Goeman & de Heide (EJS 2026), carefree multiple testing with e-processes | SupFDR / FDR-sup with running suprema and adjusters under arbitrary dependence | Primary persistent-guarantee comparator. Do not use raw e-BH on unadjusted running suprema as a valid baseline. |
+| Ramdas, *Anchored multiple testing* (Oct 2026 preprint) | Uses slack in baseline FDR proofs to add valid local e-value mass while retaining baseline discoveries; includes anchored BH/BY/e-BH and ordered procedures | Static finite-family benchmark and template for new dynamic "supremum-anchored" closure. Do not assume its static coordinatewise bounds automatically imply a time-uniform/SupFDR result. |
+| #9777 supremum-anchored projective closure | Candidate: use a valid bound on the baseline path supremum as a local e-value budget, then add residual projective intersection evidence | Research hypothesis only. Requires subset-specific path budgets c_S; global SupFDR control alone may give c_S=1 and no residual power budget. |
+| #9780 additive supremum-anchored e-BH special case | Coordinate-local ever-rejected budgets plus coordinate auxiliary e-processes; local intersection e-values are additive, so all closure constraints reduce exactly to e-BH | Exact O(n log n) selector with exhaustive small-n parity; a restricted baseline-retaining special case, not a substitute for intersection-specific closure. |
+| Admissible running-maximum adjusters (Tavyrikov, Goeman & de Heide 2026) | Transform a valid intersection e-process maximum M_t into an adjusted e-process A(M_t), enabling a pathwise auxiliary with expected supremum <=1 | Include A_beta(x)=((1-beta)/beta)(x^beta-1), beta=0 log limit, and fixed-prior mixtures. Never use raw running maxima directly in e-BH. |
+| CRAN eClosure 0.9.7 (published 2026-10-21) | Batch closed BH, closed e-BH, closed Su and closed BY | Batch-only baseline. It is useful for fixed-horizon final-set comparisons, not a direct online arrival or repeated-monitoring comparator. |
+| seqcomp 0.3.0 adaptive betting (fixed fraction, aGRAPA, ONS-m, quantile heuristic) | Bet-selection comparators for bounded score-difference martingales and sequential model comparison | Compare at the betting-strategy layer only after translating and proving the exact increment/null assumptions. Its own vignette shows no universal best rule across temporal regimes; do not call our diagonal-preconditioned projected update novel merely because it is vector-valued. |
+| Covariance-preconditioned projective bets (#9756 / PR #9758) | Model-assisted conditional-mgf intersection process with predictable vector bets | Benchmark against fixed vector/scalar bets, aGRAPA, ONS-m-like updates, fixed-prior eta mixtures and an oracle direction; retain #9695 arbitrary-dependence fallback. |
+| Authenticated score receipts (#9759 / PR #9763) | Independently verifiable computation of the raw affine closure separator relative to a committed snapshot | Score verifier, proof size, snapshot build, proof generation and verification latency are operational/correctness metrics, not statistical power. |
+| #9538 / #9695 global-projective affine mergers | Dynamic two-axis setting: new hypotheses arrive while existing evidence evolves | Main internal arbitrary-dependence projective baseline; include exact verifier and solver/optimization cost. |
+| #9712 scalar and #9751 vector predictable betting | Structured shared-filtration conditional-mgf setting | Model-assisted power lane only; compare against the affine fallback under exactly the same null law and active-set policy. |
+
+The 2026 dynamic e-closure theory and the 2026 UAI online e-closure paper both use the phrase "online e-closure" but target different online problem formulations. Every adapter must state whether evidence for an already active hypothesis can continue evolving after later hypotheses arrive. This is a first-class benchmark dimension, not an implementation detail.
+
+### External reference pins
+
+- UAI 2026 online e-closure/compound e-values: https://proceedings.mlr.press/v337/xu26a.html
+- Ramdas, Anchored multiple testing (Oct 2026 preprint): https://arxiv.org/abs/2610.11279
+- Dynamic e-closure theory: https://riannedeheide.github.io/research/dynamic-e-closure/
+- SupFDR/FDR-sup adjusters: https://doi.org/10.1214/26-EJS2546
+- Adjuster result: if M_t is the running maximum of an e-process and A is increasing with integral_1^infinity A(x)/x^2 dx=1, then A(M_t) is an e-process; see the EJS article above.
+- Bioconductor onlineFDR 2.20.0 (release 3.23): https://bioconductor.org/packages/release/bioc/html/onlineFDR.html
+- CRAN seqcomp 0.3.0: https://www.stat.ethz.ch/CRAN/web/packages/seqcomp/index.html
+- seqcomp adaptive-betting vignette: https://www.stat.ethz.ch/CRAN/web/packages/seqcomp/vignettes/adaptive_betting.html
+- CRAN eClosure 0.9.7 (published 2026-10-21): https://mirror.nju.edu.cn/CRAN/web/packages/eClosure/index.html
+
+
+## 2. Comparison contract
+
+A matched comparison must register and hash:
+
+1. data generator and conditional law;
+2. global filtration and observation-delay semantics;
+3. predictable arrival policy;
+4. null configuration;
+5. alternative configuration;
+6. reporting/monitoring schedule;
+7. capacity and utility/cost contract.
+
+The following must also agree between methods in one comparison cell:
+- guarantee class;
+- alpha;
+- generator and all comparison-contract hashes;
+- scenario ID;
+- master seed and replicate index;
+- sample count and horizon.
+
+Method-specific assumptions (e.g. an assumed covariance upper bound) are recorded separately and stress-tested. They are not silently equalized or omitted.
+
+## 3. Guarantee-class leaderboards
+
+Run four distinct leaderboards:
+
+### A. Stopped-FDR
+
+The target is
+
+\[
+\mathbb E[\operatorname{FDP}(R_\tau)]\leq\alpha
+\]
+
+for every declared a.s.-finite global stopping time. Use the method's actual e-process and closure assumptions.
+
+### B. SupFDR
+
+The target is
+
+\[
+\mathbb E[\sup_t\operatorname{FDP}(R_t)]\leq\alpha.
+\]
+
+Time-monotone adjusted certificates and their integral budgets are required where the theorem needs them. Ordinary e-process validity is not sufficient.
+
+### C. Component e-process crossing
+
+This is a diagnostic benchmark for one fixed intersection test:
+
+\[
+P_{H_S}\left(\sup_{t\leq T}E_t^S\geq1/\alpha\right).
+\]
+
+It can evaluate joint betting, covariance calibration, and time-to-threshold. It is **not** a multiple-testing FDR result.
+
+### D. Operational decision quality
+
+Within a matched stopped-FDR or SupFDR guarantee, optimize the same value, cost, capacity, persistence, and queue rules. Report utility regret and false investigations as well as statistical metrics.
+
+## 4. Scenario matrix
+
+### Anchoring / baseline-retention layer
+For adjusted auxiliary paths, benchmark the admissible power-family adjuster A_beta over a frozen beta grid and fixed-prior mixtures. Report beta-wise and mixture power, calibration and pathwise maximum; do not select the best beta after observing the confirmatory data. Compare raw running maxima only as an explicitly invalid negative control, since e-BH on raw maxima can fail FDR-sup.
+
+
+For the additive #9780 special case, report e-BH selector latency and memory at n=10^2…10^6, independent O(n) closure feasibility checks, baseline retention (must be 100%), and exhaustive all-intersection parity at n<=16. Keep this separate from the general intersection-specific anchored method; the additive reduction only applies when each local intersection e-value is the sum of coordinate e-values.
+
+Add the Oct 2026 anchored-closure method as a distinct static comparator, then test the dynamic extension in #9777. Register:
+- baseline procedure and its exact FDR theorem;
+- whether the baseline has a subset-specific coordinatewise bound or only a global FDR bound;
+- static bound c_S or path bound E[sup_t FDP_S(B_t)/alpha] <= c_S;
+- auxiliary intersection e-value construction and residual budget 1-c_S;
+- whether the result targets fixed-horizon FDR, stopped-FDR or pathwise SupFDR.
+
+Do not infer a positive residual budget from FDR-sup <= alpha alone. A global FDR-sup bound may only certify c_S=1 for arbitrary subsets, leaving no augmentation budget. Compare baseline-retention and added discoveries separately.
+
+### Bet-selection layer
+
+For every structured conditional-mgf intersection process, benchmark the predictable bet-selection rule separately from the closure/multiple-testing layer:
+- fixed conservative bet;
+- coordinate-local empirical mean;
+- shared scalar bet;
+- diagonal covariance-preconditioned projected-gradient update;
+- aGRAPA-style regularized plug-in estimate;
+- ONS-m-style online Newton update;
+- fixed ex-ante mixtures over bet strategies/learning rates;
+- oracle bet direction using true simulation parameters, marked as an unattainable ceiling only.
+
+Sweep stationary, autocorrelated, periodic, abrupt-shift and time-varying covariance regimes. Report time-to-threshold, terminal log wealth, maximum drawdown, null crossing, and sensitivity to learning-rate/cap tuning. Tuning and confirmatory seeds must be disjoint. The seqcomp vignette documents aGRAPA/ONS-m and shows that strategy ranking depends on temporal structure; reproduce those baselines under their supported assumptions before adapting them to our vector conditional-mgf setting.
+
+### Dependence
+- independent coordinate increments;
+- shared-control Gaussian dependence;
+- block equicorrelation and common shocks;
+- comonotone and adversarially coupled null e-process increments;
+- covariance below, at, and above registered upper bounds;
+- heteroskedastic and time-varying conditional covariance;
+- heavy-tailed/sub-Gaussian conditional-mgf stress cases where a proof is available.
+
+### Arrivals and filtration
+- deterministic staggered arrivals;
+- random predictable arrivals based on lagged observations;
+- event-ordered replay with pre-observation arrival receipts and independent decision-policy verifier;
+- same-round lookahead negative controls that remain hash-consistent but fail policy replay;
+- late, duplicated, reordered and omitted source-event attacks against the arrival ledger;
+- bursty arrivals and long dormant periods;
+- explicit same-round lookahead negative controls;
+- continuing evidence after activation;
+- delayed, missing and asynchronous observations;
+- local/coarsened evidence streams that require adjust-then-combine.
+
+### Signal structures
+- global null;
+- sparse, dense and heterogeneous alternatives;
+- one strong signal among many weak signals;
+- clustered and dispersed signals;
+- nonstationary effects and treatment/control drift;
+- asymmetric utility/cost ratios and capacity saturation.
+
+For the joint Gaussian method, report the model-matched covariance setting and robust covariance-bound settings separately. For arbitrary-dependence methods, preserve their guarantee under the same simulated dependence without granting a stronger model assumption.
+
+## 5. Statistical metrics
+
+Report:
+- FDR and SupFDR estimates with Wilson or exact binomial intervals;
+- probability of any false discovery;
+- power and number of true discoveries;
+- precision@B and recall@B;
+- false escalations / false investigations;
+- time-to-first discovery and time-to-useful certification;
+- intersection log-wealth and calibration penalty;
+- expected utility and regret;
+- capacity utilization, queue delay and unserved actionable work;
+- sensitivity to prior/weight allocation and index ordering;
+- sensitivity to covariance misspecification and nuisance bounds.
+
+Use 5,000 exploratory streams followed by 50,000 frozen confirmatory streams. Freeze generator versions, seed derivation, analysis rules, and confirmatory seed range before inspecting confirmatory outcomes. Simulations diagnose performance; theorem assumptions establish validity.
+
+## 6. Optimization and solver scorecard
+
+For #9695 and related solver-backed methods, benchmark n=2,4,8,16,32,64,128,256,512,1000.
+
+For small n, compare with the exact exhaustive oracle. For larger n, preserve:
+- time to first feasible incumbent;
+- time to proven optimality;
+- primal objective and dual bound;
+- relative MIP gap and node count;
+- presolve reductions and model nonzeros;
+- p50/p95 end-to-end decision and exact-verifier latency;
+- peak memory and certificate size;
+- incumbent validity after time limits;
+- utility regret against the best known/exact reference.
+
+Compare at least three solvers where available (HiGHS, SCIP, CBC, and Gurobi/CP-SAT where licensed) under identical hardware, core/thread limits, time limits, solver tolerances, and generated instances. A feasible incumbent accepted by the exact verifier is not an optimality proof. Report solution quality and proof time separately.
+
+The affine closure MILP has O(n) variables and rows, but the binary utility/capacity/persistence problem remains combinatorial. Do not equate compact formulation size with polynomial-time optimization.
+
+### Structured dependence and update-cost scorecard
+
+For the projective equicorrelation envelope V_d=(1-rho_min)I+rho_max*11^T, do not benchmark only the dense matrix form. Compare:
+- dense O(d^2) matrix-vector and quadratic operations;
+- structured diagonal-plus-rank-one O(d) operations;
+- a generic low-rank factor representation for rank-k envelopes (target O(kd) work);
+- incremental/batched update and factor evaluation across active-set sizes and activation rates.
+
+Sweep d=2, 5, 10, 32, 100, 1,000, 10,000, 100,000 where memory permits. Report operator construction, factor evaluation, preconditioned update, peak memory, p50/p95 latency, and exact dense-reference parity at smaller d. Test principal-submatrix equality across all universe extensions. Time the sampling/generator path separately from the statistical method.
+
+For closure separation, pair the O(log n) sparse-update index (#9748) with the O(n) scan at change densities k/n from 0.001% through 100%. Report index build/rebuild cost separately; identify and measure the crossover where a scan is faster. The authenticated receipt (#9763) gets a separate proof-size/verifier scorecard.
+
+
+## 7. Immutable manifest and seed derivation
+
+The new \`validation/dynamic_eclosure_benchmark_manifest.py\` provides:
+- a versioned JSON manifest schema;
+- SHA-256 hashes for source, generator and comparison-contract dimensions;
+- deterministic unsigned 64-bit replicate seeds derived from master seed, scenario ID and replicate index using SHA-256 (never Python's randomized \`hash()\`);
+- a canonical JSON manifest digest;
+- validation of the manifest and seed derivation;
+- a comparator that rejects unlike guarantee classes, alpha values, generators, filtrations, arrivals, nulls, alternatives, reporting schedules, capacity/utility rules, scenarios, seeds, sample counts or horizons.
+
+No wall-clock timestamps are included in a manifest. Method-specific assumptions and solver settings are retained separately so a comparison can acknowledge, rather than conceal, different assumptions.
+
+## 8. Run artifacts
+
+Every run should emit:
+- the canonical JSON manifest and its SHA-256 digest;
+- the pre-observation arrival-decision event chain, policy-spec digest, prior-history digest and active-roster transitions;
+- independently authenticated source timestamp/sequence receipts and a monotonic checkpoint where available;
+- source and generator SHAs;
+- PR/commit head SHA;
+- alpha, guarantee class, scenario, seed, sample count and horizon;
+- null/alternative, dependence, arrival, filtration and reporting configuration;
+- utility, cost, capacity and persistence settings;
+- environment, package and solver versions;
+- raw per-stream outcomes or sufficient deterministic aggregates;
+- exact verifier receipts and solver logs;
+- a result status that distinguishes proven optimal, feasible incumbent, timeout, infeasible and invalid certificate.
+
+## 9. Initial implementation and remaining work
+
+Current files:
+- \`validation/dynamic_eclosure_benchmark_manifest.py\` — deterministic seed derivation, canonical manifest builder, SHA-256 validation and matched-contract verifier.
+- \`validation/test_dynamic_eclosure_benchmark_manifest.py\` — reproducibility, seed tampering, guarantee-class mismatch, filtration mismatch, invalid alpha/metadata and duplicate-method controls.
+
+Next:
+1. Add the auditable predictable-arrival replay adapter (#9806 / draft event-ledger PR) and distinguish simulator ordering from trusted source chronology.
+2. Add thin method adapters for each research track without forcing unlike procedures into one false abstraction.
+2. Add common exact null increment and shared-control Gaussian generators.
+3. Build the small-family cross-method oracle (n=2..12).
+4. Run exploratory null/alternative sweeps.
+5. Freeze confirmatory seeds and scorecard.
+6. Execute solver comparisons under pinned hardware/software settings.
+
+No SOTA or production-scale claim is justified until this protocol is executed with aligned guarantees and preserved artifacts.
