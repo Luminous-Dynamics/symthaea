@@ -303,14 +303,22 @@ mod tests {
     fn outcome_is_single_assignment_and_cannot_rewrite_a_forecast() {
         let mut journal = ForecastJournal::default();
         journal.append_forecast(receipt(1, 10, 1)).unwrap();
-        let original_probability = journal.forecast(ForecastId(1)).unwrap().forecast.completion_probability;
+        let original_probability = journal
+            .forecast(ForecastId(1))
+            .unwrap()
+            .forecast
+            .completion_probability;
         journal.append_outcome(completed_outcome(1, 2)).unwrap();
         assert_eq!(
             journal.append_outcome(completed_outcome(1, 3)),
             Err(ForecastJournalError::OutcomeAlreadyRecorded)
         );
         assert_eq!(
-            journal.forecast(ForecastId(1)).unwrap().forecast.completion_probability,
+            journal
+                .forecast(ForecastId(1))
+                .unwrap()
+                .forecast
+                .completion_probability,
             original_probability
         );
     }
