@@ -61,7 +61,7 @@ The one-step ratio ranks the cheap signal first. With a total budget of 2, takin
 - At most 16 distinct action IDs and 100,000 expanded policy nodes.
 - Every action ID is usable at most once. Repeated replicates are represented as distinct action IDs/slots.
 - Likelihood rows are conditional on the finite latent joint world. Dependence across measurements must be represented by enriching that joint world; otherwise conditional-independence assumptions are being made.
-- The budget is one integer resource. Multi-resource Pareto budgets and nonlinear cost are not yet implemented.
+- The budget is one integer resource and is capped at 2^53 - 1 so integer budget/cost units remain exactly representable in f64 fields. Multi-resource Pareto budgets and nonlinear cost are not yet implemented.
 - The current solver counts declared measurement costs. Controller compute, model fitting, acquisition optimisation, evidence retrieval, and verification must still be measured and charged in campaign-level comparisons.
 - Calculations enumerate all finite branches but use IEEE-754 `f64`; “exact” means no sampling approximation for the supplied finite model, subject to floating-point roundoff. It does not mean symbolic rational arithmetic.
 - A policy tree is digest-bound and reconstructed from the frozen problem. This proves deterministic reconstruction, not evaluator correctness or model truth.
