@@ -364,7 +364,8 @@
             "deterministic_automation",
             "proof_writer",
             "lemma_planner",
-            "recovery"
+            "recovery",
+            "stop"
           ]
         },
         "reasoning_effort": {
