@@ -812,7 +812,7 @@ pub struct PerformanceVoiceSummary {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PerformedNoteEvent {
     pub id: String,
-    pub voice_id: String,
+    pub voice_role: String,
     pub source_note_id: Option<String>,
     pub start_seconds: f64,
     pub duration_seconds: f64,
@@ -1455,7 +1455,7 @@ pub enum ObligationKindV1 {
         degree_label: String,
     },
     EnterVoice {
-        voice_id: String,
+        voice_role: String,
     },
     ReachClimax,
     RestoreIdentity {
