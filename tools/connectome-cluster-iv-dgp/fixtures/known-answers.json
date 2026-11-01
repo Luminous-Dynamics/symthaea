@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_DGP_ONLY",
+  "generator_algorithm": "splitmix64-box-muller-cos-open01-v2",
+  "config": {
+    "scenario_id": "small-cross-language-fixture-v1",
+    "seed": 42,
+    "structural_beta": 0.75,
+    "first_stage_coefficients": [
+      0.8,
+      0.35
+    ],
+    "direct_effect_coefficients": [
+      0.1,
+      -0.04
+    ],
+    "cluster_sizes": [
+      2,
+      2
+    ],
+    "instrument_assignment_level": "within_cluster",
+    "first_stage_cluster_multipliers": [
+      1,
+      0.5
+    ],
+    "direct_effect_cluster_multipliers": [
+      1,
+      1.2
+    ],
+    "cluster_noise_multipliers": [
+      1,
+      0.8
+    ],
+    "instrument_equicorrelation": 0.25,
+    "cluster_shock_sd": 0.7,
+    "idiosyncratic_shock_sd": 0.9,
+    "cluster_endogeneity_correlation": 0.4,
+    "idiosyncratic_endogeneity_correlation": 0.5,
+    "registered_direct_effect_rms_bound": 0.2
+  },
+  "cluster_truth": [
+    {
+      "cluster_id": "c0000",
+      "row_count": 2,
+      "first_stage_coefficients": [
+        0.8,
+        0.35
+      ],
+      "direct_effect_coefficients": [
+        0.1,
+        -0.04
+      ],
+      "treatment_cluster_shock": 0.2903038253020712,
+      "outcome_cluster_shock": -0.4560775218123165,
+      "cluster_noise_multiplier": 1
+    },
+    {
+      "cluster_id": "c0001",
+      "row_count": 2,
+      "first_stage_coefficients": [
+        0.4,
+        0.175
+      ],
+      "direct_effect_coefficients": [
+        0.12,
+        -0.048
+      ],
+      "treatment_cluster_shock": -0.22014971434464234,
+      "outcome_cluster_shock": -0.00034742948862394703,
+      "cluster_noise_multiplier": 0.8
+    }
+  ],
+  "known_rows": [
+    {
+      "unit_id": "u00000000",
+      "cluster_id": "c0000",
+      "instruments": [
+        1.33731770252701,
+        -0.07086852162399182
+      ],
+      "treatment": -0.2656092771974454,
+      "outcome": -2.212120806447358,
+      "first_stage_instrument_component": 1.0450501794532108,
+      "direct_effect_component": 0.13656651111766066,
+      "treatment_disturbance": -1.3106594566506562,
+      "structural_error": -2.1494803596669345
+    },
+    {
+      "unit_id": "u00000001",
+      "cluster_id": "c0000",
+      "instruments": [
+        -1.7132714244512173,
+        -0.5755375975306714
+      ],
+      "treatment": -1.0434607660050843,
+      "outcome": -1.8429112178197284,
+      "first_stage_instrument_component": -1.572055298696709,
+      "direct_effect_component": -0.1483056385438949,
+      "treatment_disturbance": 0.5285945326916245,
+      "structural_error": -0.9120100047720203
+    },
+    {
+      "unit_id": "u00000002",
+      "cluster_id": "c0001",
+      "instruments": [
+        0.26089786650908364,
+        0.10272011641063844
+      ],
+      "treatment": -0.5958910868162074,
+      "outcome": -0.8175517123189254,
+      "first_stage_instrument_component": 0.12233516697549518,
+      "direct_effect_component": 0.02637717839337939,
+      "treatment_disturbance": -0.7182262537917026,
+      "structural_error": -0.3970105756001493
+    },
+    {
+      "unit_id": "u00000003",
+      "cluster_id": "c0001",
+      "instruments": [
+        0.8369707483640314,
+        0.5257970436949485
+      ],
+      "treatment": -0.07368117538998159,
+      "outcome": 0.7461369930168207,
+      "first_stage_instrument_component": 0.4268027819922286,
+      "direct_effect_component": 0.07519823170632624,
+      "treatment_disturbance": -0.5004839573822102,
+      "structural_error": 0.7261996428529807
+    }
+  ],
+  "summary": {
+    "observation_count": 4,
+    "cluster_count": 2,
+    "instrument_count": 2,
+    "structural_beta": 0.75,
+    "direct_effect_sample_rms": 0.10839223216462172,
+    "instrument_second_moment": 0.7644481460876965,
+    "registered_direct_effect_rms_bound": 0.2,
+    "direct_effect_support_status": "IN_BOUND"
+  },
+  "notes": "Synthetic DGP fixture only. Values are generated from the local SplitMix64 + Box-Muller algorithm; no inference result is asserted."
+}

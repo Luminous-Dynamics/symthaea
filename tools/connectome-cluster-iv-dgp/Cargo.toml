@@ -1,0 +1,15 @@
+[package]
+name = "connectome-cluster-iv-dgp"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Deterministic clustered instrumental-variable data-generating process and cross-language export"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "export-example"
+path = "src/bin/export_example.rs"
+
+[workspace]
