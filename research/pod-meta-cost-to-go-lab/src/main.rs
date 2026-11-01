@@ -372,7 +372,7 @@ fn main() {
         panic!("nine exchangeable completed cases support a finite 90% conformal rank");
     };
     let joint_fit = assess_joint_resource_fit(
-        joint_envelope,
+        &joint_envelope,
         tokens(5),
         &BudgetLedger::new(ResourceVector::new(1000, 1000, 1000, 1000, 1000, 1000)),
     );
