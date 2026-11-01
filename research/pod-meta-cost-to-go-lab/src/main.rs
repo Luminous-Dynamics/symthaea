@@ -165,8 +165,7 @@ fn main() {
         .unwrap(),
     ];
     let censoring_summary =
-        pod_meta_cost_to_go_lab::estimate_time_to_proof(&censoring_observations, Some(21))
-            .unwrap();
+        pod_meta_cost_to_go_lab::estimate_time_to_proof(&censoring_observations, Some(21)).unwrap();
     println!(
         "SURVIVAL_ROW\tbudget-censored-cohort\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}",
         censoring_summary.episodes,
@@ -209,8 +208,7 @@ fn main() {
         .unwrap(),
     ];
     let competing_summary =
-        pod_meta_cost_to_go_lab::estimate_time_to_proof(&competing_observations, Some(22))
-            .unwrap();
+        pod_meta_cost_to_go_lab::estimate_time_to_proof(&competing_observations, Some(22)).unwrap();
     println!(
         "SURVIVAL_ROW\tcompeting-terminal-cohort\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}",
         competing_summary.episodes,
