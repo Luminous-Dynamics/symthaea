@@ -383,6 +383,15 @@ fn refresh_policy_sha256(value: &mut Value) -> Result<()> {
     Ok(())
 }
 
+fn must_reject_calibration(label: &str, value: Value) -> Result<()> {
+    let bytes = serde_json::to_vec(&value)?;
+    if proof_search_calibration::verify_bytes(&bytes, None, true).is_ok() {
+        bail!("negative calibration control unexpectedly accepted: {label}");
+    }
+    println!("PITB_PROOF_SEARCH_CALIBRATION_NEGATIVE_PASS: {label}");
+    Ok(())
+}
+
 fn must_reject(label: &str, value: Value, calibration: &proof_search_calibration::CalibrationSummary) -> Result<()> {
     let bytes = serde_json::to_vec(&value)?;
     let digest = hex::encode(Sha256::digest(&bytes));
@@ -405,6 +414,27 @@ fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
     if calibration.evidence_class != "synthetic_contract_fixture" {
         bail!("self-test requires an explicitly synthetic calibration receipt");
     }
+    let calibration_bytes = fs::read(calibration_path)
+        .with_context(|| format!("read calibration fixture {}", calibration_path.display()))?;
+    let mut calibration_value: Value =
+        serde_json::from_slice(&calibration_bytes).context("parse calibration fixture for negative controls")?;
+    let summary = calibration.clone();
+    let mut bad_calibration = calibration_value.clone();
+    bad_calibration["worst_action_ece_ppm"] = json!(1);
+    must_reject_calibration("claimed worst-action ECE differs from bin statistics", bad_calibration)?;
+
+    let mut bad_calibration = calibration_value.clone();
+    bad_calibration["action_groups"][0]["bins"][0]["success_count"] = json!(2);
+    must_reject_calibration("success count mutation without statistic update", bad_calibration)?;
+
+    let mut bad_calibration = calibration_value.clone();
+    bad_calibration["action_groups"][1]["action_kind"] = json!("continue_current_target");
+    must_reject_calibration("duplicate action calibration group", bad_calibration)?;
+
+    let mut bad_calibration = calibration_value.clone();
+    bad_calibration["action_groups"][0]["bins"][0]["count"] = json!(19);
+    must_reject_calibration("calibration bin below minimum support", bad_calibration)?;
+    println!("PITB_PROOF_SEARCH_CALIBRATION_RECEIPT_PASS: exact-byte receipt; ECE/Brier recomputed per action");
     let digest = hex::encode(Sha256::digest(&bytes));
     let selected = choose(&value, &digest, &calibration)?;
     if selected["decision"] != "execute"
