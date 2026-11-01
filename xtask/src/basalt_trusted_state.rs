@@ -2554,6 +2554,14 @@ fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
     if expected_revision.checked_sub(1) != Some(state.revision) {
         anyhow::bail!("accepted receipt revision history does not close at state revision");
     }
+    if last_checkpoint_by_log.len() != state.log_cursors.len() {
+        anyhow::bail!("retained log cursor set does not match accepted checkpoint history");
+    }
+    for (log_id, latest_checkpoint) in &last_checkpoint_by_log {
+        if state.log_cursors.get(log_id) != Some(latest_checkpoint) {
+            anyhow::bail!("log cursor does not point to its latest accepted checkpoint");
+        }
+    }
     match (ordered.last(), state.policy_versions.as_ref()) {
         (None, None) => {}
         (Some(last), Some(current)) if &last.policy_versions == current => {}
