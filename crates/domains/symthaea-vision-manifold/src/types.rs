@@ -629,7 +629,17 @@ pub struct SurpriseMapState {
 }
 
 /// Current serialized delayed-horizon evaluator schema.
-pub const DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION: u32 = 3;
+pub const DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION: u32 = 4;
+
+pub const DEFAULT_MAX_HORIZON_FORECAST_RECEIPTS: usize = 4096;
+
+fn default_next_horizon_forecast_id() -> u64 {
+    1
+}
+
+fn default_max_horizon_forecast_receipts() -> usize {
+    DEFAULT_MAX_HORIZON_FORECAST_RECEIPTS
+}
 
 fn default_delayed_horizon_max_lateness_factor() -> f32 {
     4.0
@@ -642,6 +652,58 @@ pub struct PendingHorizonForecastState {
     pub due_time: f64,
     pub predicted: Vec<f32>,
     pub persistence: Vec<f32>,
+    /// Monotonic identity assigned when this forecast is issued.
+    #[serde(default)]
+    pub forecast_id: u64,
+    /// Source frame sequence. None only for pending work restored from legacy checkpoints.
+    #[serde(default)]
+    pub source_frame_sequence: Option<u64>,
+    /// Evaluator-clock time at issuance. Legacy checkpoints reconstruct this from due_time.
+    #[serde(default)]
+    pub issued_at_seconds: f64,
+    /// Fingerprint of the encoded source observation at issuance.
+    #[serde(default)]
+    pub source_observation_blake3: Option<String>,
+    /// Fingerprint of the visual manifold belief at issuance.
+    #[serde(default)]
+    pub source_belief_blake3: Option<String>,
+    /// Fingerprint of the transition parameters used to issue the forecast.
+    #[serde(default)]
+    pub predictor_parameter_blake3: Option<String>,
+    /// Fingerprints of the exact forecast and persistence vectors at issuance.
+    #[serde(default)]
+    pub prediction_blake3: Option<String>,
+    #[serde(default)]
+    pub persistence_blake3: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HorizonForecastReceiptStatus {
+    Scored,
+    Expired,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HorizonForecastReceiptState {
+    pub forecast_id: u64,
+    pub horizon_index: usize,
+    pub source_frame_sequence: Option<u64>,
+    pub target_frame_sequence: u64,
+    pub issued_at_seconds: f64,
+    pub due_at_seconds: f64,
+    pub observed_at_seconds: f64,
+    pub requested_horizon_seconds: f32,
+    pub lateness_seconds: f64,
+    pub status: HorizonForecastReceiptStatus,
+    pub source_observation_blake3: Option<String>,
+    pub source_belief_blake3: Option<String>,
+    pub predictor_parameter_blake3: Option<String>,
+    pub prediction_blake3: String,
+    pub persistence_blake3: String,
+    pub target_observation_blake3: String,
+    pub prediction_error: Option<f32>,
+    pub persistence_error: Option<f32>,
 }
 
 /// Serializable aggregate evidence for one delayed horizon.
@@ -679,6 +741,17 @@ pub struct DelayedHorizonEvaluatorState {
     /// Maximum accepted lateness as a multiple of each requested horizon.
     #[serde(default = "default_delayed_horizon_max_lateness_factor")]
     pub max_lateness_factor: f32,
+    /// Next monotonic identifier for a newly issued delayed forecast.
+    #[serde(default = "default_next_horizon_forecast_id")]
+    pub next_forecast_id: u64,
+    /// Bounded per-forecast outcomes, including expirations.
+    #[serde(default)]
+    pub score_receipts: Vec<HorizonForecastReceiptState>,
+    #[serde(default = "default_max_horizon_forecast_receipts")]
+    pub max_score_receipts: usize,
+    /// Number of oldest receipts evicted to maintain the configured bound.
+    #[serde(default)]
+    pub evicted_score_receipts: u64,
 }
 
 /// Serializable predictive-coding hierarchy state.
