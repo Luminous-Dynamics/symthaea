@@ -290,6 +290,38 @@ mod tests {
     }
 
     #[test]
+    fn counter_stream_empirical_correlations_track_the_declared_factor_model() {
+        let model = model();
+        let mut sums = [0.0_f64; 3];
+        let mut squares = [0.0_f64; 3];
+        let mut products = [[0.0_f64; 3]; 3];
+        let count = 4096.0_f64;
+        for seed in 0..4096_u64 {
+            let draw = model.observe(seed, "candidate-fixed", &format!("rep-{seed}"), &[0.0, 0.0, 0.0]).unwrap();
+            for i in 0..3 {
+                sums[i] += draw.noise_values[i];
+                squares[i] += draw.noise_values[i] * draw.noise_values[i];
+                for j in 0..3 {
+                    products[i][j] += draw.noise_values[i] * draw.noise_values[j];
+                }
+            }
+        }
+        for i in 0..3 {
+            for j in 0..3 {
+                let covariance = products[i][j] / count - (sums[i] / count) * (sums[j] / count);
+                let variance_i = squares[i] / count - (sums[i] / count).powi(2);
+                let variance_j = squares[j] / count - (sums[j] / count).powi(2);
+                let correlation = covariance / (variance_i * variance_j).sqrt();
+                let expected = if i == j { 1.0 } else {
+                    model.objectives[i].shared_loading * model.objectives[j].shared_loading
+                };
+                assert!((correlation - expected).abs() < 0.08,
+                    "correlation({i},{j})={correlation}, expected {expected}");
+            }
+        }
+    }
+
+    #[test]
     fn invalid_noise_contracts_fail_closed() {
         assert!(CorrelatedBoundedNoiseModel::new("bad", vec![]).is_err());
         assert!(CorrelatedBoundedNoiseModel::new("bad", vec![
