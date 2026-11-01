@@ -89,7 +89,7 @@ A declared ambiguity set can still omit the true mechanism. A separate held-out 
 
 A finite likelihood ambiguity set is not enough: it may still omit a mechanism. The first adequacy reference therefore calibrates a **session-level nonconformity score** using two disjoint cohorts:
 
-- In-scope calibration units: one preregistered independent animal/session aggregate per unit, used to estimate whether useful in-scope models are retained.
+- In-scope calibration units: one preregistered independent animal-level aggregate, or one independent animal/session cluster if independence is defensible, used to estimate whether useful in-scope models are retained. Multiple sessions from one animal must not be counted as independent without a clustered calibration method.
 - Omitted-mechanism calibration units: one aggregate score per independent mechanism family, used to calibrate false-adequacy risk for future omitted families.
 
 Higher nonconformity must mean worse predictive fit. The score, trajectory aggregation, observation model, and normalization must be frozen before calibration. Neurons, frames, and repeated recordings within one animal/session or omitted family must not be counted as independent calibration units.
