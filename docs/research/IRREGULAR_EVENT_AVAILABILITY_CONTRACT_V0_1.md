@@ -124,7 +124,7 @@ The current source contains 55 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
-- 9 train-only-scaler tests;
+- 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
