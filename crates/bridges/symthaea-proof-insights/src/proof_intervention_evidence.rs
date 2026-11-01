@@ -398,3 +398,210 @@ pub fn verify_successor_receipt(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const SHA_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const SHA_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const SHA_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const SHA_E: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const SHA_F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const TASK: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+    const COMMIT: &str = "2222222222222222222222222222222222222222";
+    const COMPONENT: &str = "project-test";
+
+    fn identity() -> ExpectedIdentity<'static> {
+        ExpectedIdentity {
+            trial_id: "trial-test",
+            pair_id: SHA_A,
+            arm_id: "arm-test",
+            run_id: "run-test",
+            task_id: TASK,
+            component_id: COMPONENT,
+            repository_commit: COMMIT,
+            lean_toolchain: "leanprover/lean4:v4.26.0",
+            environment_sha256: SHA_B,
+            initial_proof_state_sha256: SHA_C,
+            target_statement_sha256: SHA_D,
+            model_seed_sha256: SHA_E,
+            evaluation_horizon_id: "horizon-test",
+            continuation_policy_sha256: SHA_F,
+            execution_order_index: 1,
+        }
+    }
+
+    fn common(kind: &str) -> Value {
+        json!({
+            "evidence_class":"measured_evidence",
+            "evidence_kind":kind,
+            "trial_id":"trial-test",
+            "pair_id":SHA_A,
+            "arm_id":"arm-test",
+            "run_id":"run-test",
+            "task_id":TASK,
+            "component_id":COMPONENT,
+            "repository_commit":COMMIT,
+            "lean_toolchain":"leanprover/lean4:v4.26.0",
+            "environment_sha256":SHA_B,
+            "initial_proof_state_sha256":SHA_C,
+            "target_statement_sha256":SHA_D,
+            "model_seed_sha256":SHA_E
+        })
+    }
+
+    fn digest_value(value: &Value) -> String {
+        hex::encode(Sha256::digest(serde_json::to_vec(value).unwrap()))
+    }
+
+    fn checker_receipt() -> Value {
+        let mut receipt = common("checker");
+        receipt["schema_version"] = json!("pitb.proof-intervention-checker-receipt.v0");
+        receipt["checker_id"] = json!("lean-kernel");
+        receipt["checker_version"] = json!("4.26.0");
+        receipt["checker_binary_sha256"] = json!(SHA_F);
+        receipt["status"] = json!("passed");
+        receipt["kernel_passed"] = Value::Bool(true);
+        receipt["checked_target_statement_sha256"] = json!(SHA_D);
+        receipt["proof_sha256"] = json!(SHA_E);
+        receipt["proof_contains_sorry_ax"] = Value::Bool(false);
+        receipt["used_axioms"] = json!(["propext"]);
+        receipt["used_axioms_manifest_sha256"] = json!(digest_value(&json!(["propext"])));
+        receipt["allowed_axioms"] = json!(["propext"]);
+        receipt["allowlist_manifest_sha256"] = json!(digest_value(&json!(["propext"])));
+        receipt["unexpected_axioms"] = json!(0);
+        receipt
+    }
+
+    fn run_receipt(checker_sha: &str) -> Value {
+        let mut receipt = common("run");
+        receipt["schema_version"] = json!("pitb.proof-intervention-run-receipt.v0");
+        receipt["evaluation_horizon_id"] = json!("horizon-test");
+        receipt["continuation_policy_sha256"] = json!(SHA_F);
+        receipt["execution_order_index"] = json!(1);
+        receipt["status"] = json!("verified_success");
+        let resources = json!({
+            "tokens":1000,"model_calls":1,"tool_calls":2,
+            "wall_ms":1000,"lean_cpu_ms":500,"cost_microusd":200
+        });
+        receipt["actual_resources"] = resources.clone();
+        receipt["resource_budget"] = json!({
+            "tokens":40000,"model_calls":8,"tool_calls":40,
+            "wall_ms":300000,"lean_cpu_ms":180000,"cost_microusd":2000000
+        });
+        receipt["proof_sha256"] = json!(SHA_E);
+        receipt["checker_receipt_sha256"] = json!(checker_sha);
+        receipt["semantic_gate_receipt_sha256"] = json!(SHA_A);
+        receipt["successor_receipt_sha256"] = json!(SHA_B);
+        receipt["run_config_sha256"] = json!(SHA_C);
+        receipt["started_from_fresh_process"] = Value::Bool(true);
+        receipt["mutable_caches_isolated"] = Value::Bool(true);
+        receipt
+    }
+
+    fn successor_receipt() -> Value {
+        let mut receipt = common("successor");
+        receipt["schema_version"] = json!("pitb.proof-intervention-successor-receipt.v0");
+        receipt["status"] = json!("passed");
+        receipt["proof_sha256"] = json!(SHA_E);
+        receipt["successor_suite_id"] = json!("suite-v0");
+        receipt["successor_suite_sha256"] = json!(SHA_F);
+        receipt["passed_check_ids"] = json!(["downstream-lemma-a", "downstream-lemma-b"]);
+        receipt["failed_check_ids"] = json!([]);
+        receipt
+    }
+
+    #[test]
+    fn checker_run_and_successor_receipts_join_exact_pair_identity() {
+        let identity = identity();
+        let checker = checker_receipt();
+        let checker_bytes = serde_json::to_vec(&checker).unwrap();
+        let checker_sha = hex::encode(Sha256::digest(&checker_bytes));
+        verify_checker_receipt(
+            &checker_bytes,
+            &checker_sha,
+            identity,
+            "verified_success",
+            Some(SHA_E),
+            Some(SHA_D),
+        )
+        .unwrap();
+
+        let run = run_receipt(&checker_sha);
+        let run_bytes = serde_json::to_vec(&run).unwrap();
+        let run_sha = hex::encode(Sha256::digest(&run_bytes));
+        let outcome = json!({
+            "status":"verified_success",
+            "proof_sha256":SHA_E,
+            "checker_receipt_sha256":checker_sha,
+            "semantic_gate_receipt_sha256":SHA_A,
+            "successor_gate_receipt_sha256":SHA_B,
+            "actual_resources":run["actual_resources"]
+        });
+        let budget = json!({
+            "tokens":40000,"model_calls":8,"tool_calls":40,
+            "wall_ms":300000,"lean_cpu_ms":180000,"cost_microusd":2000000
+        });
+        verify_run_receipt(&run_bytes, &run_sha, identity, &outcome, &budget).unwrap();
+
+        let successor = successor_receipt();
+        let successor_bytes = serde_json::to_vec(&successor).unwrap();
+        let successor_sha = hex::encode(Sha256::digest(&successor_bytes));
+        verify_successor_receipt(&successor_bytes, &successor_sha, identity, SHA_E).unwrap();
+    }
+
+    #[test]
+    fn checker_receipt_rejects_proof_substitution_even_with_new_file_digest() {
+        let mut receipt = checker_receipt();
+        receipt["proof_sha256"] = json!(SHA_F);
+        let bytes = serde_json::to_vec(&receipt).unwrap();
+        let digest = hex::encode(Sha256::digest(&bytes));
+        assert!(verify_checker_receipt(
+            &bytes,
+            &digest,
+            identity(),
+            "verified_success",
+            Some(SHA_E),
+            Some(SHA_D),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn run_receipt_rejects_resource_accounting_drift() {
+        let checker = checker_receipt();
+        let checker_sha = digest_value(&checker);
+        let mut run = run_receipt(&checker_sha);
+        run["actual_resources"]["tokens"] = json!(999);
+        let bytes = serde_json::to_vec(&run).unwrap();
+        let digest = hex::encode(Sha256::digest(&bytes));
+        let outcome = json!({
+            "status":"verified_success",
+            "proof_sha256":SHA_E,
+            "checker_receipt_sha256":checker_sha,
+            "semantic_gate_receipt_sha256":SHA_A,
+            "successor_gate_receipt_sha256":SHA_B,
+            "actual_resources":{
+                "tokens":1000,"model_calls":1,"tool_calls":2,
+                "wall_ms":1000,"lean_cpu_ms":500,"cost_microusd":200
+            }
+        });
+        let budget = json!({
+            "tokens":40000,"model_calls":8,"tool_calls":40,
+            "wall_ms":300000,"lean_cpu_ms":180000,"cost_microusd":2000000
+        });
+        assert!(verify_run_receipt(&bytes, &digest, identity(), &outcome, &budget).is_err());
+    }
+
+    #[test]
+    fn successor_receipt_rejects_failed_downstream_checks() {
+        let mut receipt = successor_receipt();
+        receipt["failed_check_ids"] = json!(["downstream-lemma-c"]);
+        let bytes = serde_json::to_vec(&receipt).unwrap();
+        let digest = hex::encode(Sha256::digest(&bytes));
+        assert!(verify_successor_receipt(&bytes, &digest, identity(), SHA_E).is_err());
+    }
+}
