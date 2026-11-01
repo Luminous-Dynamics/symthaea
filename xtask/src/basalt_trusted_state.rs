@@ -774,7 +774,42 @@ pub fn run_conformance() -> ConformanceReport {
     let authorized_boot_passed = matches!(authorized_boot_result, Ok(TransitionDecision::Advance(_)));
     record_case(&mut cases, "TSTATE-MODEL-012", "authorized boot transition preserves successor generation", format!("{authorized_boot_result:?}"), authorized_boot_passed);
 
-    let mut policy_rollback = successor_candidate(&state, 3, 24);
+    let mut log_origin_change = successor_candidate(&state, 3, 24);
+    log_origin_change.checkpoint.log_id = "basalt-log-alt".to_string();
+    log_origin_change.checkpoint.tree_size = 5;
+    log_origin_change.checkpoint.root_digest = test_digest(30);
+    log_origin_change.checkpoint.checkpoint_digest = test_digest(31);
+    log_origin_change.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+        pinned_checkpoint_digest: test_digest(31),
+    };
+    let log_origin_result = state.preview(&log_origin_change);
+    let log_origin_rejected = matches!(
+        log_origin_result,
+        Err(TransitionError::UnauthorizedLogOriginTransition)
+    );
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-019",
+        "source cannot move to a new log origin without continuity evidence",
+        format!("{log_origin_result:?}"),
+        log_origin_rejected,
+    );
+
+    log_origin_change.log_origin_transition_evidence_digest = Some(test_digest(32));
+    let authorized_log_origin_result = state.preview(&log_origin_change);
+    let authorized_log_origin_passed = matches!(
+        authorized_log_origin_result,
+        Ok(TransitionDecision::Advance(_))
+    );
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-020",
+        "authorized log-origin transition advances the same source generation lineage",
+        format!("{authorized_log_origin_result:?}"),
+        authorized_log_origin_passed,
+    );
+
+    let mut policy_rollback = successor_candidate(&state, 3, 33);
     policy_rollback.policy_versions.signer = 1;
     let policy_result = state.preview(&policy_rollback);
     let policy_passed = matches!(policy_result, Err(TransitionError::PolicyRollback));
@@ -958,6 +993,35 @@ mod tests {
             state.preview(&original),
             Ok(TransitionDecision::AlreadyCommitted { revision: 2 })
         );
+    }
+
+    #[test]
+    fn source_log_origin_change_requires_explicit_continuity_evidence() {
+        let mut state = bootstrap();
+        let mut candidate = successor_candidate(&state, 2, 110);
+        candidate.checkpoint.log_id = "basalt-log-alt".to_string();
+        candidate.checkpoint.tree_size = 5;
+        candidate.checkpoint.root_digest = test_digest(111);
+        candidate.checkpoint.checkpoint_digest = test_digest(112);
+        candidate.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+            pinned_checkpoint_digest: test_digest(112),
+        };
+        assert_eq!(
+            state.preview(&candidate),
+            Err(TransitionError::UnauthorizedLogOriginTransition)
+        );
+
+        candidate.log_origin_transition_evidence_digest = Some(test_digest(113));
+        let plan = match state.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("new log-origin receipt"),
+        };
+        state.commit(plan).unwrap();
+        let cursor = state.source_cursor(&fixture_source_key()).unwrap();
+        assert_eq!(cursor.generation, 2);
+        assert_eq!(cursor.log_id, "basalt-log-alt");
+        assert!(state.log_cursor("basalt-log-prod").is_some());
+        assert!(state.log_cursor("basalt-log-alt").is_some());
     }
 
     #[test]
