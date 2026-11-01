@@ -19,6 +19,8 @@ pub const MAX_ITEMS_PER_PAIR_SCENARIOS: usize = 32;
 pub const MAX_ATTRITION_SCENARIOS: usize = 20;
 pub const MAX_INDEPENDENT_MODEL_PAIRS: u32 = 500;
 pub const MAX_CONTRASTS: u32 = 100;
+/// Bound output size and numerical integration work before starting the plan.
+pub const MAX_POWER_CURVE_POINTS: usize = 5_000;
 const NONCENTRAL_T_SIMPSON_STEPS: usize = 4_096;
 const BETA_MAX_ITERATIONS: usize = 256;
 const BETA_EPSILON: f64 = 3.0e-14;
@@ -515,6 +517,30 @@ fn validate_request(request: &CausalPowerPlanRequestV1) -> Result<(), String> {
     if request.effect_scenarios.is_empty() || request.effect_scenarios.len() > MAX_POWER_SCENARIOS {
         return Err("effect_scenarios must contain 1..=32 scenarios".to_owned());
     }
+    let curve_points = request
+        .effect_scenarios
+        .len()
+        .checked_mul(request.attrition_rates_permille.len())
+        .and_then(|count| count.checked_mul(request.items_per_pair_scenarios.len()))
+        .and_then(|count| {
+            count.checked_mul(request.max_gross_model_pair_replicates.saturating_sub(1) as usize)
+        })
+        .ok_or_else(|| "power-plan curve size overflows".to_owned())?;
+    if curve_points > MAX_POWER_CURVE_POINTS {
+        return Err(format!(
+            "power plan requests {curve_points} curve points, above the bounded maximum {MAX_POWER_CURVE_POINTS}"
+        ));
+    }
+    let unique_attrition: std::collections::BTreeSet<u16> =
+        request.attrition_rates_permille.iter().copied().collect();
+    if unique_attrition.len() != request.attrition_rates_permille.len() {
+        return Err("attrition-rate scenarios must be unique".to_owned());
+    }
+    let unique_items: std::collections::BTreeSet<u32> =
+        request.items_per_pair_scenarios.iter().copied().collect();
+    if unique_items.len() != request.items_per_pair_scenarios.len() {
+        return Err("items-per-pair scenarios must be unique".to_owned());
+    }
     let mut scenario_ids = std::collections::BTreeSet::new();
     for scenario in &request.effect_scenarios {
         if !valid_opaque_id(&scenario.scenario_id, 64)
@@ -535,6 +561,11 @@ fn validate_request(request: &CausalPowerPlanRequestV1) -> Result<(), String> {
                 && scenario.within_pair_item_sd_permille == 0.0)
         {
             return Err("scenario SD components must be non-negative and not both zero".to_owned());
+        }
+        if (request.test_tail == TestTailV1::Greater && scenario.true_effect_permille < 0.0)
+            || (request.test_tail == TestTailV1::Less && scenario.true_effect_permille > 0.0)
+        {
+            return Err("one-sided test direction must agree with the declared treatment-minus-placebo effect direction".to_owned());
         }
     }
     Ok(())
@@ -736,6 +767,41 @@ mod tests {
     fn no_multiplicity_policy_requires_one_primary_contrast() {
         let mut request = request();
         request.contrast_count = 6;
+        assert!(plan_causal_power(&request).is_err());
+    }
+
+    #[test]
+    fn excessive_power_grid_is_rejected_before_integration() {
+        let mut request = request();
+        request.max_gross_model_pair_replicates = MAX_INDEPENDENT_MODEL_PAIRS;
+        request.attrition_rates_permille = vec![0, 100, 200, 300, 400, 500, 600];
+        request.items_per_pair_scenarios = (1..=20).collect();
+        request.effect_scenarios = (0..32)
+            .map(|index| PowerScenarioV1 {
+                scenario_id: format!("scenario-{index}"),
+                true_effect_permille: 100.0,
+                between_pair_sd_permille: 180.0,
+                within_pair_item_sd_permille: 300.0,
+            })
+            .collect();
+        assert!(plan_causal_power(&request).is_err());
+    }
+
+    #[test]
+    fn duplicate_attrition_or_item_scenarios_are_rejected() {
+        let mut request = request();
+        request.attrition_rates_permille = vec![0, 0];
+        assert!(plan_causal_power(&request).is_err());
+        let mut request = request();
+        request.items_per_pair_scenarios = vec![10, 10];
+        assert!(plan_causal_power(&request).is_err());
+    }
+
+    #[test]
+    fn one_sided_test_direction_must_match_the_effect() {
+        let mut request = request();
+        request.test_tail = TestTailV1::Greater;
+        request.effect_scenarios[0].true_effect_permille = -100.0;
         assert!(plan_causal_power(&request).is_err());
     }
 
