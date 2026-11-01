@@ -96,22 +96,22 @@ class CountableGlobalProjectiveEclosureTests(unittest.TestCase):
                 {1: [1, 1], 2: [1, 2], 3: [1, 3]}, self.alpha,
             )
 
-    def test_nonmonotone_coordinate_path_only_withholds_supfdr_condition(self):
+    def test_nonmonotone_raw_path_does_not_claim_supfdr(self):
         nonmonotone = dict(self.paths)
         nonmonotone[1] = [Fraction(1), Fraction(8), Fraction(3), Fraction(16)]
         result = verify_countable_global_projective_path(
             self.active, self.rejections, self.truth, nonmonotone, self.alpha,
         )
         self.assertTrue(result["valid"], result)
-        self.assertFalse(result["coordinate_paths_monotone"])
-        self.assertFalse(result["supfdr_pathwise_condition_satisfied"])
+        self.assertFalse(result["raw_global_certificate_pathwise_monotone"])
+        self.assertIn("running-maximum adjuster", result["supfdr_certificate_contract"])
 
-    def test_monotone_coordinate_paths_support_supfdr_pathwise_condition(self):
+    def test_monotone_raw_paths_are_only_a_monotonicity_diagnostic(self):
         result = verify_countable_global_projective_path(
             self.active, self.rejections, self.truth, self.paths, self.alpha,
         )
-        self.assertTrue(result["coordinate_paths_monotone"])
-        self.assertTrue(result["supfdr_pathwise_condition_satisfied"])
+        self.assertTrue(result["raw_global_certificate_pathwise_monotone"])
+        self.assertIn("requires time-monotone", result["supfdr_certificate_contract"])
 
     def test_missing_or_negative_coordinate_data_fail_closed(self):
         missing = dict(self.paths)
