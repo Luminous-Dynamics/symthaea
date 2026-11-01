@@ -300,51 +300,35 @@ fn shared_shingle_count(left: &[String], right: &[String], width: usize) -> usiz
 fn extract_json_objects(input: &str) -> Vec<&str> {
     let bytes = input.as_bytes();
     let mut objects = Vec::new();
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] != b'{' {
-            index += 1;
+    let mut starts: Vec<usize> = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
             continue;
         }
-        let start = index;
-        let mut depth = 0_u32;
-        let mut in_string = false;
-        let mut escaped = false;
-        let mut cursor = index;
-        let mut end = None;
-        while cursor < bytes.len() {
-            let byte = bytes[cursor];
-            if in_string {
-                if escaped {
-                    escaped = false;
-                } else if byte == b'\\' {
-                    escaped = true;
-                } else if byte == b'"' {
-                    in_string = false;
-                }
-            } else {
-                match byte {
-                    b'"' => in_string = true,
-                    b'{' => depth += 1,
-                    b'}' => {
-                        depth = depth.saturating_sub(1);
-                        if depth == 0 {
-                            end = Some(cursor + 1);
-                            break;
+        match byte {
+            b'"' => in_string = true,
+            b'{' => starts.push(index),
+            b'}' => {
+                if let Some(start) = starts.pop() {
+                    // The target answer object is tiny. Skip large wrapper objects
+                    // while still inspecting nested objects independently.
+                    if index + 1 - start <= 256 {
+                        if let Some(object) = input.get(start..index + 1) {
+                            objects.push(object);
                         }
                     }
-                    _ => {}
                 }
             }
-            cursor += 1;
-        }
-        if let Some(end) = end {
-            if let Some(object) = input.get(start..end) {
-                objects.push(object);
-            }
-            index = end;
-        } else {
-            index = start + 1;
+            _ => {}
         }
     }
     objects
@@ -461,9 +445,12 @@ pub fn analyze_search_time_response_bodies(
     if !trace_audit.valid {
         return Err("search-time trace failed integrity audit".to_owned());
     }
-    if trace.challenge_packet_sha256 != bundle.public_packet.public_packet_sha256 {
-        return Err("search trace and fresh challenge packet are not bound".to_owned());
+    if trace.challenge_packet_sha256 != bundle.public_packet.public_packet_sha256
+        || trace.model_checkpoint_sha256 != bundle.public_packet.model_checkpoint_sha256
+    {
+        return Err("search trace and fresh challenge/checkpoint packet are not bound".to_owned());
     }
+    crate::fresh_scoring::validate_bundle(bundle)?;
     if response_bodies.len() > SEARCH_MAX_EVENTS
         || unavailable_body_event_sequences.len() > SEARCH_MAX_EVENTS
     {
@@ -1325,6 +1312,56 @@ mod tests {
             assert!(!public_output.contains("\"body_text\""));
             assert!(audit_search_time_findings(&trace, &findings).unwrap().valid);
         }
+    }
+
+    #[test]
+    fn nested_answer_objects_are_found_without_publishing_raw_content() {
+        let config = crate::fresh_instance::FreshChallengeConfigV1 {
+            schema: crate::fresh_instance::FRESH_CONFIG_SCHEMA.to_owned(),
+            batch_id: "fresh-search-nested".to_owned(),
+            benchmark_id: "nested-answer-benchmark".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            task_family: "linear-system-2x2".to_owned(),
+            requested_item_count: 2,
+            matrix_coefficient_min: -9,
+            matrix_coefficient_max: 9,
+            solution_component_min: -5,
+            solution_component_max: 5,
+            minimum_absolute_determinant: 1,
+            minimum_normalized_determinant_margin_permille: 50,
+            model_checkpoint_sha256: digest("nested-checkpoint"),
+            checkpoint_freeze_receipt_sha256: digest("nested-freeze"),
+            checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
+            challenge_generated_at_utc: "2026-10-31T18:01:00Z".to_owned(),
+            generator_source_sha256: digest("nested-source"),
+            generator_binary_sha256: digest("nested-binary"),
+            runtime_image_sha256: digest("nested-runtime"),
+            generator_config_sha256: String::new(),
+        };
+        let mut config = config;
+        config.generator_config_sha256 =
+            crate::fresh_instance::canonical_config_digest(&config).unwrap();
+        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
+            &config,
+            &[0x93; 32],
+        ).unwrap();
+        let solution = serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap();
+        let body = format!(r#"{{"tool_result":{{"answer":{solution}}},"other":"metadata"}}"#);
+        let mut trace = trace_fixture();
+        trace.challenge_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
+        trace.model_checkpoint_sha256 = bundle.public_packet.model_checkpoint_sha256.clone();
+        trace.events[0].response_sha256 = Some(search_response_body_digest(&body));
+        trace.events[0].response_bytes = body.len() as u64;
+        seal_search_time_trace(&mut trace).unwrap();
+        let evidence = SearchCapturedResponseBodyV1 {
+            event_sequence: 1,
+            content_type: "application/json".to_owned(),
+            response_sha256: search_response_body_digest(&body),
+            body_text: body.clone(),
+        };
+        let findings = analyze_search_time_response_bodies(&trace, &bundle, &[evidence], &[]).unwrap();
+        assert_eq!(findings.findings[0].exposure_class, SearchExposureClassV1::AnswerBearing);
+        assert!(!serde_json::to_string(&findings).unwrap().contains(&body));
     }
 
     #[test]
