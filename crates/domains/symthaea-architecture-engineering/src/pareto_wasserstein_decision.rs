@@ -485,6 +485,39 @@ mod tests {
     }
 
     #[test]
+    fn two_world_transport_matches_closed_form_over_probability_cost_and_radius_grid() {
+        for p0 in [0.0_f64, 0.1, 0.5, 0.9, 1.0] {
+            for distance in [0.25_f64, 1.0, 2.0, 5.0] {
+                for radius in [0.0_f64, 0.05, 0.2, 0.8, 10.0] {
+                    for (loss0, loss1) in [(0.0_f64, 10.0_f64), (10.0, 0.0), (4.0, 4.0)] {
+                        let p1 = 1.0 - p0;
+                        let transfer = (radius / distance).min(1.0);
+                        let expected_q1 = if loss1 > loss0 {
+                            (p1 + transfer).min(1.0)
+                        } else if loss1 < loss0 {
+                            (p1 - transfer).max(0.0)
+                        } else {
+                            p1
+                        };
+                        let p = [p0, p1];
+                        let losses = [loss0, loss1];
+                        let costs = vec![vec![0.0, distance], vec![distance, 0.0]];
+                        let ids = vec!["world-a".to_owned(), "world-b".to_owned()];
+                        let solution = solve_finite_transport(&p, &losses, &costs, radius, &ids).unwrap();
+                        let expected_risk = (1.0 - expected_q1) * loss0 + expected_q1 * loss1;
+                        let expected_cost = (expected_q1 - p1).abs() * distance;
+                        assert!((solution.distribution[1] - expected_q1).abs() < 1e-8);
+                        assert!((compensated_dot(&solution.distribution, &losses) - expected_risk).abs() < 1e-7);
+                        assert!((solution.transport_cost - expected_cost).abs() < 1e-7);
+                        assert!(solution.transport_cost <= radius + 1e-8);
+                        assert!((solution.dual_upper_bound - expected_risk).abs() < 1e-7);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn zero_radius_reproduces_nominal_bayes_decision_and_risk() {
         let p=problem(); let report=analyze_wasserstein_robust_decision(&p,&ambiguity(1.0,0.0)).unwrap();
         assert_eq!(report.nominal_optimal_decision_id,report.robust_optimal_decision_id);
