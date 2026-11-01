@@ -27,7 +27,7 @@ The predictor receipt separately binds model identity and the same frontier dige
 
 The first estimator is split conformal over independently verified **selected episodes** produced by one frozen selection policy / policy version and one declared selected-population cohort.
 
-For each selected calibration episode, the target label is total remaining resource use from the selected pre-action state until sufficient proof is independently verified. The nonconformity score is the maximum positive normalized residual over all six resource dimensions:
+For each selected calibration episode, the target label is total remaining resource use from the selected pre-action state until sufficient proof is independently verified. Each label also carries a nonzero independent resource-meter receipt digest; a completion-verifier digest alone is insufficient to establish the measured cost. The nonconformity score is the maximum positive normalized residual over all six resource dimensions:
 
 `A_i = max_j max(0, (observed_remaining[i,j] - predicted_point[i,j]) / predicted_scale[i,j])`
 
@@ -45,7 +45,7 @@ It does not provide:
 - a guarantee that all selected operations will complete proof;
 - a censoring-adjusted guarantee for selected episodes whose eventual proof cost is unobserved.
 
-The selected-cohort calibrator requires completed, independently verified proof outcomes. Censored selected episodes are excluded and must remain visible in the survival / IPCW datasets. Completed-case selection must not be generalized to all initiated episodes.
+The selected-cohort calibrator requires completed, independently verified proof outcomes and a separate meter-receipt digest for the resource label. Censored selected episodes are excluded and must remain visible in the survival / IPCW datasets. Completed-case selection must not be generalized to all initiated episodes.
 
 ## 5. CAP and online partial-feedback comparators
 
