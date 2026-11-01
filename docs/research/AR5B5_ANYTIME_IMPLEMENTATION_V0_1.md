@@ -209,3 +209,6 @@ SMS-EMOA also requires the history's objective specifications and hypervolume re
 Event start/completion timestamps and receipt elapsed time are optional. A run is consistently timed or consistently untimed; partial timestamps and clock-mode transitions are rejected. Synthetic optimizer traces use no timestamps, so target/run receipts report unknown elapsed wall time. They do not encode an artificial zero-latency claim.
 
 The synthetic cost model is no longer accepted by a substring in its human-readable name. \`AnytimeRecorder\` requires the exact versioned cost-model ID and the SHA-256 digest of its canonical formula (one normalized synthetic unit per objective-evaluation attempt). Physical meters remain unknown and are not estimated.
+## 10. Schema version note
+
+The expanded anytime event/header/receipt contract is `0.2.0` (nullable clock semantics, source commit and exact search configuration binding). The target-plan sub-schema remains `0.1.0`. Evidence manifests and byte receipts are `0.2.0`; noisy-observation plans/reports are `0.2.0`. Consumers must reject or explicitly migrate earlier schemas rather than silently deserialize under the expanded contract.
