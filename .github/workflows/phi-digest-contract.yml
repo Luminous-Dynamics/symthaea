@@ -196,7 +196,12 @@ jobs:
               encoded.extend(struct.pack("<Q", len(case["canonical_mapping"])))
               encoded.extend(bytes(case["canonical_mapping"]))
               assert hashlib.sha256(encoded).hexdigest() == case["mapping_sha256"]
-              spec = b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.1\0" + case["mapping_sha256"].encode("ascii") + bytes([int(case["complement_flipped"])])
+              spec = bytearray(b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.2\0")
+              spec.extend(case["mapping_sha256"].encode("ascii"))
+              spec.extend(bytes([int(case["complement_flipped"])]))
+              spec.extend(struct.pack("<Q", len(case["background_apportionment"])))
+              for unit in case["background_apportionment"]:
+                  spec.extend(struct.pack("<Q", unit))
               assert hashlib.sha256(spec).hexdigest() == case["spec_sha256"]
           print("PASS: six macro mapping cases / 112 truth-table entries; pinned PyPhi wheel")
           PY
