@@ -37,6 +37,13 @@ pub enum Measurement {
         upper_scaled: Option<i64>,
         decimal_scale: i8,
     },
+    /// Content-addressed nonnumeric modality (text/audio/image/embedding).
+    /// The bytes live in an external immutable object store.
+    OpaquePayload {
+        payload_sha256: [u8; 32],
+        payload_bytes: u64,
+        encoding_id: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,6 +98,7 @@ pub enum ContractError {
     InvalidDecimalScale { scale: i8 },
     EmptyCensoredInterval,
     InvertedCensoredInterval,
+    InvalidOpaquePayload,
     ZeroCovariateId,
     InvalidCovariateValidityInterval,
     DuplicateCovariateId { covariate_id: u64 },
@@ -113,6 +121,7 @@ impl fmt::Display for ContractError {
             Self::InvalidDecimalScale { scale } => write!(f, "decimal scale {scale} is outside the supported range [-9, 9]"),
             Self::EmptyCensoredInterval => write!(f, "censored interval must have at least one bound"),
             Self::InvertedCensoredInterval => write!(f, "censored interval lower bound exceeds upper bound"),
+            Self::InvalidOpaquePayload => write!(f, "opaque multimodal payload requires nonzero digest, byte length and encoding ID"),
             Self::ZeroCovariateId => write!(f, "covariate ID must be nonzero"),
             Self::InvalidCovariateValidityInterval => write!(f, "known-future covariate validity interval is inverted"),
             Self::DuplicateCovariateId { covariate_id } => write!(f, "duplicate future covariate ID {covariate_id}"),
@@ -159,6 +168,11 @@ impl EventRecord {
                 }
             }
             Measurement::Missing { .. } => {}
+        }
+        if let Measurement::OpaquePayload { payload_sha256, payload_bytes, encoding_id } = self.measurement {
+            if !nonzero_digest(&payload_sha256) || payload_bytes == 0 || encoding_id == 0 {
+                return Err(ContractError::InvalidOpaquePayload);
+            }
         }
         if let Measurement::Censored { lower_scaled, upper_scaled, .. } = self.measurement {
             if lower_scaled.is_none() && upper_scaled.is_none() {
@@ -342,6 +356,29 @@ mod tests {
         assert_eq!(item.validate(), Err(ContractError::InvertedCensoredInterval));
         item.measurement = Measurement::Censored { lower_scaled: None, upper_scaled: None, decimal_scale: 0 };
         assert_eq!(item.validate(), Err(ContractError::EmptyCensoredInterval));
+    }
+
+    #[test]
+    fn opaque_multimodal_payload_is_content_addressed_and_validated() {
+        let mut event = observed(1, 7, 10, 10, 0);
+        event.measurement = Measurement::OpaquePayload {
+            payload_sha256: digest(9),
+            payload_bytes: 128,
+            encoding_id: 3,
+        };
+        assert_eq!(event.validate(), Ok(()));
+        event.measurement = Measurement::OpaquePayload {
+            payload_sha256: [0; 32],
+            payload_bytes: 128,
+            encoding_id: 3,
+        };
+        assert_eq!(event.validate(), Err(ContractError::InvalidOpaquePayload));
+        event.measurement = Measurement::OpaquePayload {
+            payload_sha256: digest(9),
+            payload_bytes: 0,
+            encoding_id: 3,
+        };
+        assert_eq!(event.validate(), Err(ContractError::InvalidOpaquePayload));
     }
 
     #[test]
