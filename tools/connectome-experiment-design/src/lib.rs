@@ -751,10 +751,16 @@ pub fn evaluate_open_world_decision_value(
     let open_world_score = evaluate_open_world_candidate(priors, candidate)?;
     validate_decision_problem(problem, &candidate.hypothesis_ids)?;
 
+    let prior_mass: f64 = priors.iter().sum();
+    if !prior_mass.is_finite() || prior_mass <= 0.0 {
+        return Err(DesignError::NumericalInstability);
+    }
+    let normalized_priors: Vec<f64> = priors.iter().map(|prior| prior / prior_mass).collect();
+
     let mut current_best_action_id = String::new();
     let mut current_expected_utility = f64::NEG_INFINITY;
     for action in &problem.actions {
-        let expected_utility: f64 = priors
+        let expected_utility: f64 = normalized_priors
             .iter()
             .zip(&action.utility_by_hypothesis)
             .map(|(prior, utility)| prior * utility)
@@ -782,9 +788,14 @@ pub fn evaluate_open_world_decision_value(
             }
         }
 
+        let total_outcome_mass: f64 = outcome_marginals.iter().sum();
+        if !total_outcome_mass.is_finite() || total_outcome_mass <= 0.0 {
+            return Err(DesignError::NumericalInstability);
+        }
         let mut expected_post_experiment_utility = 0.0f64;
         let mut outcome_decisions = Vec::with_capacity(outcome_count);
-        for (outcome_index, outcome_probability) in outcome_marginals.iter().copied().enumerate() {
+        for (outcome_index, raw_outcome_probability) in outcome_marginals.iter().copied().enumerate() {
+            let outcome_probability = raw_outcome_probability / total_outcome_mass;
             if outcome_probability <= 0.0 {
                 continue;
             }
@@ -2314,6 +2325,25 @@ mod tests {
         assert_eq!(report.schema_version, "connectome-decision-value-v1");
         assert_eq!(report.decision_problem, problem);
         assert_eq!(report.ranked_experiments.len(), 1);
+    }
+
+    #[test]
+    fn evsi_is_zero_when_only_one_downstream_action_exists() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "candidate",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let mut problem = decision_problem_example();
+        problem.actions.truncate(1);
+        let score = evaluate_open_world_decision_value(&priors, &candidate, &problem).unwrap();
+        assert_eq!(score.worst_case_evsi, 0.0);
+        assert_eq!(score.worst_case_evsi_per_cost, 0.0);
     }
 
     #[test]
