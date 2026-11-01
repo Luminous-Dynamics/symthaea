@@ -14,9 +14,10 @@ use symthaea_muse_protocol::{
     CulturalReviewSummary, EvidenceBasis, EvidenceSource, EvidenceSourceEnvelope, EvidenceStatus,
     GrammarProvenance, ListenCompositionBundle, ListenPerformanceBundle,
     MotifEvidenceReconciliation, MotifEvidenceReconciliationEntry, MotifEvidenceRelationship,
-    MotifOccurrenceTrace, MotifRealizationAnalysis, ObligationState, ObligationTransitionTrace,
-    RequestedRealizedIntent, StructuralSpanTrace, TraceVerificationIssue, TraceVerificationReport,
-    VerificationStatus,
+    MotifOccurrenceTrace, MotifRealizationAnalysis, ObligationDefinitionV1, ObligationKindV1,
+    ObligationMotifTransformationV1, ObligationState, ObligationTransitionTrace,
+    RequestedRealizedIntent, StructuralSpanTrace, SymbolicNoteEvent, TraceVerificationIssue,
+    TraceVerificationReport, VerificationStatus,
 };
 use symthaea_music_theory::{
     AssertedObligationState, GrammarStructuralTrace, ScoreEventRef, VoiceRole,
@@ -420,6 +421,9 @@ pub fn composer_trace_from_theory(
                     score_event_ids: item.evidence.iter().copied().map(trace_event_id).collect(),
                     responsible_pass: item.responsible_pass.clone(),
                     transformation: item.transformation.clone(),
+                    // The current grammar trace carries lifecycle assertions but
+                    // not yet the typed ObligationKind. Do not invent a kind here.
+                    definition: None,
                     assertion: assertion_envelope(&record_id, score_sha256, created_at_unix_ms),
                 }
             })
@@ -829,6 +833,297 @@ pub fn analyze_audio_integrity(
                     .into(),
             ],
         },
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ObligationSemanticError {
+    Insufficient(&'static str, String),
+    Contradiction(&'static str, String),
+}
+
+fn ordered_obligation_events<'a>(
+    composition: &'a ListenCompositionBundle,
+    ids: &[String],
+    label: &str,
+) -> Result<Vec<&'a SymbolicNoteEvent>, ObligationSemanticError> {
+    if ids.len() < 2 {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-semantic-event-count",
+            format!("{label} must reference at least two score notes"),
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    let mut notes = Vec::with_capacity(ids.len());
+    for id in ids {
+        if !seen.insert(id.as_str()) {
+            return Err(ObligationSemanticError::Contradiction(
+                "obligation-semantic-duplicate-event",
+                format!("{label} repeats score event {id}"),
+            ));
+        }
+        let mut matches = composition.notes.iter().filter(|note| note.id == *id);
+        let Some(note) = matches.next() else {
+            return Err(ObligationSemanticError::Contradiction(
+                "obligation-semantic-event-missing",
+                format!("{label} references missing score event {id}"),
+            ));
+        };
+        if matches.next().is_some() {
+            return Err(ObligationSemanticError::Contradiction(
+                "obligation-semantic-event-ambiguous",
+                format!("{label} references non-unique score event ID {id}"),
+            ));
+        }
+        if !note.onset.beats.is_finite()
+            || !note.duration_beats.is_finite()
+            || note.duration_beats <= 0.0
+        {
+            return Err(ObligationSemanticError::Contradiction(
+                "obligation-semantic-invalid-timing",
+                format!("{label} contains non-finite or non-positive score timing"),
+            ));
+        }
+        notes.push(note);
+    }
+    notes.sort_by(|left, right| left.onset.beats.total_cmp(&right.onset.beats));
+    if notes.windows(2).any(|pair| {
+        pair[0].onset.beats >= pair[1].onset.beats
+            || pair[0].voice_role != pair[1].voice_role
+    }) {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-semantic-sequence-invalid",
+            format!("{label} must be strictly ordered within one score voice"),
+        ));
+    }
+    Ok(notes)
+}
+
+fn normalized_duration_similarity(left: &[f64], right: &[f64]) -> Option<f64> {
+    if left.is_empty() || left.len() != right.len() {
+        return None;
+    }
+    if left.iter().chain(right).any(|value| !value.is_finite() || *value <= 0.0) {
+        return None;
+    }
+    let left_total = left.iter().sum::<f64>();
+    let right_total = right.iter().sum::<f64>();
+    if !left_total.is_finite()
+        || !right_total.is_finite()
+        || left_total <= 0.0
+        || right_total <= 0.0
+    {
+        return None;
+    }
+    let distance = left
+        .iter()
+        .zip(right)
+        .map(|(a, b)| (a / left_total - b / right_total).abs())
+        .sum::<f64>()
+        / 2.0;
+    Some((1.0 - distance).clamp(0.0, 1.0))
+}
+
+fn note_intervals(notes: &[&SymbolicNoteEvent]) -> Vec<i32> {
+    notes
+        .windows(2)
+        .map(|pair| i32::from(pair[1].midi) - i32::from(pair[0].midi))
+        .collect()
+}
+
+fn durations(notes: &[&SymbolicNoteEvent]) -> Vec<f64> {
+    notes.iter().map(|note| note.duration_beats).collect()
+}
+
+fn verify_return_motif_obligation(
+    composition: &ListenCompositionBundle,
+    motif_id: &str,
+    source_event_ids: &[String],
+    target_event_ids: &[String],
+    expected: ObligationMotifTransformationV1,
+) -> Result<(), ObligationSemanticError> {
+    let definition = composition
+        .motif_definitions
+        .iter()
+        .find(|definition| definition.id == motif_id)
+        .ok_or_else(|| {
+            ObligationSemanticError::Insufficient(
+                "obligation-motif-definition-unavailable",
+                format!("score has no canonical motif definition named {motif_id}"),
+            )
+        })?;
+    let source = ordered_obligation_events(composition, source_event_ids, "motif source")?;
+    let target = ordered_obligation_events(composition, target_event_ids, "motif return")?;
+
+    if definition.degrees.len() != source.len()
+        || definition.durations_beats.len() != source.len()
+        || source.len() < 2
+    {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-motif-source-binding-invalid",
+            "source event count does not match the canonical motif definition".into(),
+        ));
+    }
+    if source
+        .windows(2)
+        .zip(definition.degrees.windows(2))
+        .any(|(notes, degrees)| {
+            (i32::from(notes[1].midi) - i32::from(notes[0].midi)).signum()
+                != (degrees[1] - degrees[0]).signum()
+        })
+        || normalized_duration_similarity(
+            &durations(&source),
+            &definition.durations_beats,
+        )
+        .is_none_or(|similarity| similarity < 0.90)
+    {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-motif-source-binding-invalid",
+            "source score events do not match the declared motif contour and rhythmic shape"
+                .into(),
+        ));
+    }
+    if target[0].onset.beats
+        <= source.last().expect("source has at least two notes").onset.beats
+    {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-motif-return-not-later",
+            "target motif occurrence does not follow its source occurrence".into(),
+        ));
+    }
+
+    let source_intervals = note_intervals(&source);
+    let target_intervals = note_intervals(&target);
+    let rhythm_similarity =
+        normalized_duration_similarity(&durations(&source), &durations(&target));
+    let interval_match = source_intervals == target_intervals;
+    let inverted_match = source_intervals
+        .iter()
+        .map(|interval| -*interval)
+        .eq(target_intervals.iter().copied());
+    let source_total = durations(&source).iter().sum::<f64>();
+    let target_total = durations(&target).iter().sum::<f64>();
+    let duration_scale = target_total / source_total;
+    let literal_match = source.len() == target.len()
+        && source
+            .iter()
+            .zip(&target)
+            .all(|(left, right)| left.midi == right.midi);
+    let transposed_match = source.len() == target.len() && interval_match;
+    let rhythm_ok = rhythm_similarity.is_some_and(|similarity| similarity >= 0.90);
+
+    let matched = match expected {
+        ObligationMotifTransformationV1::Literal => literal_match && rhythm_ok,
+        ObligationMotifTransformationV1::Transposed => transposed_match && rhythm_ok,
+        ObligationMotifTransformationV1::Inverted => {
+            source.len() == target.len() && inverted_match && rhythm_ok
+        }
+        ObligationMotifTransformationV1::Augmented => {
+            transposed_match && rhythm_ok && (1.80..=2.20).contains(&duration_scale)
+        }
+        ObligationMotifTransformationV1::Diminished => {
+            transposed_match && rhythm_ok && (0.45..=0.55).contains(&duration_scale)
+        }
+        ObligationMotifTransformationV1::Fragmented => {
+            if target.len() >= source.len() {
+                false
+            } else {
+                let fragment = target_intervals.len();
+                source_intervals
+                    .windows(fragment)
+                    .any(|window| window == target_intervals.as_slice())
+                    && (0.45..=1.0).contains(&duration_scale)
+            }
+        }
+        ObligationMotifTransformationV1::Restored => {
+            (literal_match || transposed_match) && rhythm_ok
+        }
+    };
+    if matched {
+        Ok(())
+    } else {
+        Err(ObligationSemanticError::Contradiction(
+            "obligation-motif-transformation-not-realized",
+            format!(
+                "target score events do not satisfy the declared {expected:?} relationship to motif {motif_id}"
+            ),
+        ))
+    }
+}
+
+fn verify_obligation_semantics(
+    definition: &ObligationDefinitionV1,
+    target_event_ids: &[String],
+    composition: &ListenCompositionBundle,
+) -> Result<(), ObligationSemanticError> {
+    if definition.schema_version != 1 {
+        return Err(ObligationSemanticError::Insufficient(
+            "obligation-definition-version-unsupported",
+            format!(
+                "obligation definition schema {} is not supported by this verifier",
+                definition.schema_version
+            ),
+        ));
+    }
+    match &definition.kind {
+        ObligationKindV1::ReturnMotif {
+            motif_id,
+            source_event_ids,
+            transformation,
+        } => verify_return_motif_obligation(
+            composition,
+            motif_id,
+            source_event_ids,
+            target_event_ids,
+            *transformation,
+        ),
+        ObligationKindV1::EnterVoice { voice_id } => {
+            if voice_id.trim().is_empty() {
+                return Err(ObligationSemanticError::Contradiction(
+                    "obligation-voice-definition-invalid",
+                    "voice ID is empty".into(),
+                ));
+            }
+            let notes = ordered_obligation_events(composition, target_event_ids, "voice entrance")?;
+            if notes
+                .iter()
+                .any(|note| note.voice_role.eq_ignore_ascii_case(voice_id))
+            {
+                Ok(())
+            } else {
+                Err(ObligationSemanticError::Contradiction(
+                    "obligation-voice-not-entered",
+                    format!("none of the cited notes belongs to voice {voice_id}"),
+                ))
+            }
+        }
+        ObligationKindV1::ReachClimax => {
+            let mut notes = Vec::new();
+            for id in target_event_ids {
+                if let Some(note) = composition.notes.iter().find(|note| note.id == *id) {
+                    notes.push(note);
+                }
+            }
+            if notes
+                .iter()
+                .any(|note| note.emphasis.eq_ignore_ascii_case("climax"))
+            {
+                Ok(())
+            } else {
+                Err(ObligationSemanticError::Contradiction(
+                    "obligation-climax-not-reached",
+                    "none of the cited score events is marked as the climax".into(),
+                ))
+            }
+        }
+        ObligationKindV1::ReachKey { .. }
+        | ObligationKindV1::Cadence { .. }
+        | ObligationKindV1::ResolveAlteredDegree { .. }
+        | ObligationKindV1::RestoreIdentity { .. }
+        | ObligationKindV1::Custom { .. } => Err(ObligationSemanticError::Insufficient(
+            "obligation-kind-not-yet-qualified",
+            "this typed obligation has no independent score-side oracle in Analyst v1".into(),
+        )),
     }
 }
 
