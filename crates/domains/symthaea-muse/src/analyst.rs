@@ -1854,6 +1854,12 @@ mod tests {
                     score_event_ids: vec!["n0".into()],
                     responsible_pass: "period-planner".into(),
                     transformation: None,
+                    definition: Some(ObligationDefinitionV1 {
+                        schema_version: 1,
+                        kind: ObligationKindV1::EnterVoice {
+                            voice_id: "Melody".into(),
+                        },
+                    }),
                     assertion: assertion("obligation-a-created"),
                 },
                 ObligationTransitionTrace {
@@ -1863,6 +1869,12 @@ mod tests {
                     score_event_ids: vec!["n1".into()],
                     responsible_pass: "cadence-realizer".into(),
                     transformation: None,
+                    definition: Some(ObligationDefinitionV1 {
+                        schema_version: 1,
+                        kind: ObligationKindV1::EnterVoice {
+                            voice_id: "Melody".into(),
+                        },
+                    }),
                     assertion: assertion("obligation-a-fulfilled"),
                 },
             ],
@@ -1878,6 +1890,79 @@ mod tests {
         assert_eq!(
             report.evidence.verification_status,
             VerificationStatus::Verified
+        );
+    }
+
+    #[test]
+    fn legacy_fulfilled_obligation_is_insufficient_not_verified() {
+        let (composition, mut trace) = trace_fixture();
+        trace.obligation_transitions[1].definition = None;
+        let report = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-definition-missing"));
+        assert_eq!(
+            report.evidence.verification_status,
+            VerificationStatus::InsufficientEvidence
+        );
+    }
+
+    #[test]
+    fn fulfilled_enter_voice_rejects_valid_notes_from_the_wrong_voice() {
+        let (mut composition, trace) = trace_fixture();
+        composition.notes[1].voice_role = "Bass".into();
+        let report = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-voice-not-entered"));
+        assert_eq!(
+            report.evidence.verification_status,
+            VerificationStatus::Discrepancy
+        );
+    }
+
+    #[test]
+    fn fulfilled_transposed_motif_requires_matching_score_intervals() {
+        let (mut composition, mut trace) = trace_fixture();
+        composition.notes.push(SymbolicNoteEvent {
+            id: "n3".into(),
+            midi: 63,
+            pitch_name: "D#4".into(),
+            onset: time(3.0),
+            duration_ticks: 480,
+            duration_beats: 1.0,
+            duration_seconds: 0.5,
+            velocity: 0.7,
+            voice_role: "Melody".into(),
+            emphasis: "normal".into(),
+            section_intensity: 1.0,
+        });
+        trace.obligation_transitions[1].definition = Some(ObligationDefinitionV1 {
+            schema_version: 1,
+            kind: ObligationKindV1::ReturnMotif {
+                motif_id: "motif-a".into(),
+                source_event_ids: vec!["n0".into(), "n1".into()],
+                transformation: ObligationMotifTransformationV1::Transposed,
+            },
+        });
+        trace.obligation_transitions[1].score_event_ids = vec!["n2".into(), "n3".into()];
+        let accepted = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(!accepted
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-motif-transformation-not-realized"));
+
+        composition.notes[3].midi = 67;
+        let rejected = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(rejected
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-motif-transformation-not-realized"));
+        assert_eq!(
+            rejected.evidence.verification_status,
+            VerificationStatus::Discrepancy
         );
     }
 
