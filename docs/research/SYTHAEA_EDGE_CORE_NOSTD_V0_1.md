@@ -32,6 +32,12 @@ The edge substrate tests a representation change: **small continuous liquid stat
 
 For 16,384 bits, `WORDS=256` and the exact vector payload is 2,048 bytes (2 KiB). The same number of f32 components needs 65,536 bytes (64 KiB), so the bit representation is 32× smaller at equal dimensionality. This is a storage comparison only; it does not claim 32× lower energy or equal downstream accuracy.
 
+### 2. Fixed-codebook scalar encoder
+
+`ScalarLevelEncoder<LEVELS,FEATURES,WORDS>` accepts a pinned value-level codebook, fixed per-feature cyclic rotation offsets and pre-quantized feature levels. Each selected level vector is position-permuted and the feature vectors are majority-bundled with ties resolving to zero.
+
+The encoder does not quantize raw sensor values or generate random level vectors. Quantizer thresholds, codebook bytes, rotations and their hashes must be included in the candidate configuration. This makes the feature path reproducible and avoids an unmeasured runtime random projection.
+
 ### 2. Fixed-capacity exemplar memory
 
 `PackedHdcMemory<CLASSES,SLOTS,WORDS>` keeps all class exemplars in statically sized arrays.
@@ -43,7 +49,7 @@ For 16,384 bits, `WORDS=256` and the exact vector payload is 2,048 bytes (2 KiB)
 
 For 4 classes × 16 exemplars × 2 KiB/vector, exemplar bits occupy 128 KiB. Two per-class usize arrays add target-dependent metadata: 32 bytes on 32-bit and 64 bytes on 64-bit. A 128D Q15 liquid state adds 256 bytes. This is one example configuration, not a recommended universal profile.
 
-### 3. Fixed-point liquid state and elapsed-time coefficient
+### 4. Fixed-point liquid state and elapsed-time coefficient
 
 `FixedPointLiquidState<DIM>` stores `[i16; DIM]` and applies a convex interpolation:
 
@@ -62,7 +68,7 @@ For non-negative ratios the conservative error budget is below 5 Q15 LSBs: at mo
 
 The liquid-state kernel still only applies the supplied coefficient; the lookup policy is separate. This is a scalar base-tau policy, not a complete state-dependent or learned CfC tau model. Its target-cycle cost, especially the u64 division convenience path on Cortex-M, must be measured; precompute ratios or use the direct Q16.16 API where appropriate. Calling the kernel a full CfC implementation would be inaccurate.
 
-### 4. Composition
+### 5. Composition
 
 `BoundedEdgeCore<DIM,CLASSES,SLOTS,WORDS>` composes the fixed Q15 state with the packed exemplar memory. Its state and memory capacities are statically bounded. Insert, replacement and liquid update errors are explicit.
 
