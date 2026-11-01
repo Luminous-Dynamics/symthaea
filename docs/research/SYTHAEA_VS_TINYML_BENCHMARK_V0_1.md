@@ -121,10 +121,10 @@ At 256 dimensions, the same default network has 137,216 bytes of persistent vect
 The new CLI provides a payload lower-bound preflight:
 
 ```bash
-cargo run -p symthaea-architecture-engineering --bin hdc_ltc_memory_budget -- --help
+cargo run -p symthaea-architecture-engineering --bin hdc_ltc_memory_budget -- 16384 4,8,4 1048576 131072
 ```
 
-Actual positional arguments:
+A compact profile can be checked separately:
 
 ```bash
 cargo run -p symthaea-architecture-engineering --bin hdc_ltc_memory_budget -- \
