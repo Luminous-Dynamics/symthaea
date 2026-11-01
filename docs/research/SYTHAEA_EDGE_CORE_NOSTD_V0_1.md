@@ -43,7 +43,7 @@ For 16,384 bits, `WORDS=256` and the exact vector payload is 2,048 bytes (2 KiB)
 
 For 4 classes × 16 exemplars × 2 KiB/vector, exemplar bits occupy 128 KiB. Two per-class usize arrays add target-dependent metadata: 32 bytes on 32-bit and 64 bytes on 64-bit. A 128D Q15 liquid state adds 256 bytes. This is one example configuration, not a recommended universal profile.
 
-### 3. Fixed-point liquid state
+### 3. Fixed-point liquid state and elapsed-time coefficient
 
 `FixedPointLiquidState<DIM>` stores `[i16; DIM]` and applies a convex interpolation:
 
@@ -53,7 +53,14 @@ x_next = round(((32768 - alpha_q15) * x + alpha_q15 * x_equilibrium) / 32768)
 
 where `alpha_q15` is an unsigned Q0.15 coefficient in [0, 32768].
 
-This kernel uses integer arithmetic and explicit symmetric rounding. It deliberately does not compute the coefficient `1 - exp(-dt/tau)`. The coefficient source, time-constant policy, quantization error, stability and irregular-timestamp behavior require a separate validated module. Calling the kernel a full CfC implementation would be inaccurate.
+The new `time_constant` module provides:
+- `alpha_from_ratio_q16`: direct Q16.16 dt/tau input, preferred for a time-critical embedded loop;
+- `alpha_from_dt_tau_us`: u32 microsecond durations, using u64 integer division before lookup;
+- a 385-entry Q15 table spanning [0,12] with 1/32 steps and integer linear interpolation.
+
+For non-negative ratios the conservative error budget is below 5 Q15 LSBs: at most 4 LSB for linear interpolation (second derivative magnitude ≤1 and grid spacing 1/32), 0.5 LSB table rounding, and less than 0.5 LSB from flooring the input ratio to Q16.16. Ratios at/above 12 saturate to one; the exact residual at 12 is below 0.21 Q15 LSB.
+
+The liquid-state kernel still only applies the supplied coefficient; the lookup policy is separate. This is a scalar base-tau policy, not a complete state-dependent or learned CfC tau model. Its target-cycle cost, especially the u64 division convenience path on Cortex-M, must be measured; precompute ratios or use the direct Q16.16 API where appropriate. Calling the kernel a full CfC implementation would be inaccurate.
 
 ### 4. Composition
 
