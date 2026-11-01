@@ -17,6 +17,9 @@ on:
       - "validation/generate_pyphi_macro_mapping_corpus.py"
       - "validation/test_pyphi_macro_mapping_corpus_contract.py"
       - "validation/fixtures/pyphi-macro-mapping-corpus-v0.1.schema.json"
+      - "validation/generate_pyphi_gid_operator_corpus.py"
+      - "validation/test_pyphi_gid_operator_corpus_contract.py"
+      - "validation/fixtures/pyphi-iit4-2023-gid-operator-v0.1.schema.json"
       - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
       - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
       - ".github/workflows/phi-digest-contract.yml"
@@ -46,7 +49,7 @@ jobs:
           python-version: "3.13.17"
 
       - name: Run dependency-free contract and fixture tests
-        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract -v
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract -v
 
   pyphi-reference:
     name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
@@ -209,6 +212,36 @@ jobs:
           assert any(case["background_apportionment"] for case in data["cases"])
           assert next(case for case in data["cases"] if case["case_id"] == "coarse-2-on-count-2")["background_apportionment"] == [3]
           print("PASS: six macro mapping cases / 112 truth-table entries; pinned PyPhi wheel; background apportionment bound")
+          PY
+
+      - name: Generate pinned PyPhi pointwise GID operator corpus
+        shell: bash
+        run: |
+          python validation/generate_pyphi_gid_operator_corpus.py \
+            --output target/pyphi-reference/PYPHI_IIT4_2023_GID_OPERATOR.json
+
+      - name: Verify pointwise GID operator corpus and provenance
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_IIT4_2023_GID_OPERATOR.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-2023-gid-operator-v0.1"
+          assert data["qualification_scope"] == "pinned_pyphi_gid_operator_reference_only"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["formalism"] == "IIT_4_0_2023"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          assert data["summary"]["computed_case_count"] == 5
+          assert data["summary"]["computed_state_count"] == 18
+          for case in data["cases"]:
+              assert len(case["forward"]) == len(case["partitioned_forward"]) == len(case["selectivity"])
+              assert len(case["gid_vector"]) == len(case["state_values"]) == len(case["expected_signs"])
+              for actual, selected in zip(case["gid_vector"], case["state_values"]):
+                  assert math.isclose(actual, selected, rel_tol=0.0, abs_tol=1e-14)
+          print("PASS: five pinned PyPhi GID operator cases / 18 state values")
           PY
 
       - name: Upload pinned PyPhi reference evidence
