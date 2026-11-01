@@ -1064,7 +1064,24 @@ pub fn validate_phase_energy_audit_receipt(
         {
             return Err(PhaseEnergyAuditError::new("receipt.events.identity", "event and segment IDs must be non-empty; event IDs must be unique"));
         }
+        let canonical_outcome = ApplicationEventOutcomeEvidence {
+            event_id: event.event_id.clone(),
+            outcome: event.outcome,
+            input_sha256: event.input_sha256.clone(),
+            output_sha256: event.output_sha256.clone(),
+            quality_metric_id: event.quality_metric_id.clone(),
+            quality_value: event.quality_value,
+            deadline_met: event.deadline_met,
+            retry_count: event.retry_count,
+        };
+        let canonical_outcome_bytes = serde_json::to_vec(&canonical_outcome).map_err(|error| {
+            PhaseEnergyAuditError::new(
+                format!("receipt.events.{}.outcome_evidence", event.event_id),
+                format!("cannot serialize outcome evidence: {error}"),
+            )
+        })?;
         if !is_sha256(&event.outcome_evidence_sha256)
+            || digest(OUTCOME_DOMAIN, &canonical_outcome_bytes) != event.outcome_evidence_sha256
             || !is_sha256(&event.input_sha256)
             || event.output_sha256.as_deref().is_some_and(|value| !is_sha256(value))
             || event.accepted_success_outcome && event.outcome.is_intrinsically_unsuccessful()
