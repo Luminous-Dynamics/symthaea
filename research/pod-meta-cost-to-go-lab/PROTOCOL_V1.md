@@ -197,9 +197,13 @@ The landmark proof-completion calibrator is separately specified in [LANDMARK_IP
 
 The selected-policy resource-vector calibrator is specified in [SELECTION_CONFORMAL_V1.md](SELECTION_CONFORMAL_V1.md). It binds the pre-action candidate pool, selected operation, selection policy version, model, frontier, and selected-population cohort, then calibrates only independently verified outcomes from a matching selected-policy cohort. This is a split-conformal baseline under a frozen selection mechanism and exchangeability of selected episodes; it is not CAP and does not control online FCR across repeated picks.
 
-## 17. Selection-conditioned calibration
+## 17. Online repeated-selection feedback accounting
 
-The selected-operation forecast calibrator is specified in [SELECTION_CONFORMAL_V1.md](SELECTION_CONFORMAL_V1.md). It binds the pre-action candidate pool, selected operation, policy version, frontier and selected-population identity, then calibrates only independently verified outcomes from the same frozen selected-policy cohort. It is a split-conformal baseline, not CAP and not an online FCR controller.
+The online replay ledger is specified in [ONLINE_SELECTION_V1.md](ONLINE_SELECTION_V1.md). It records one prediction statement after a selected operation, then accepts delayed append-only feedback. Feedback can be exact verified cost, a coverage bit without exact cost, a right-censored lower bound, an explicit competing terminal event, or an interim unknown action outcome that must later be reconciled. Statements and receipts use monotone global sequences, per-episode decision sequences, and logical receipt ticks.
+
+The reported observed FCR is the miss fraction among feedback-resolved selected statements at a chosen replay tick. It is descriptive complete-feedback accounting, not a selection-corrected estimator, not a CAP implementation, and not a finite-sample or long-run guarantee. Unresolved feedback, ambiguous censoring, and competing terminal events are counted separately. A right-censored lower bound contributes a definite miss only if it is strictly above the forecast interval's upper endpoint.
+
+V1 evaluates one declared scalar resource dimension per statement. The exact feedback receipt carries the full metered resource vector and projects the declared dimension, preventing unit substitution. A scalar coverage result does not imply joint simultaneous coverage of tokens, tool calls, CPU, GPU, wall time, and money. A multivariate guarantee requires its own construction and theory.
 
 ## 18. External comparators and claim limits
 
