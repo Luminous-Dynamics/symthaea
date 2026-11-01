@@ -8,14 +8,15 @@ Dynamic e-closure uses future-extension coherence to compare the true-null inter
 
 Let the global hypothesis universe be countable and indexed once and for all by positive integers. At each reporting time t, let I_t be a finite active family and R_t a reported subset of I_t. I_t need not be nested or predictable for the pathwise argument below. Under a fixed data-generating distribution P, let N(P) be the fixed set of true-null indices and B_t(P)=N(P) intersect I_t.
 
-For every deterministic finite nonempty S, assume a nonnegative process E_t^S adapted to one common filtration is an e-process under every P in the intersection null H_S. We use the maximal definition
+For every deterministic finite nonempty S, assume a nonnegative process E_t^S adapted to one common filtration is an e-process under every P in the intersection null H_S, in the standard stopping-time sense:
 
 \[
-  \mathbb E_P[\sup_{t\geq 0} E_t^S]\leq 1
-  \qquad\text{for every }P\in H_S.
+  \mathbb E_P[E_\tau^S]\leq 1
+  \qquad\text{for every }P\in H_S
+  \text{ and every a.s.-finite global stopping time }\tau.
 \]
 
-A test supermartingale is sufficient, but the proof does not require components to remain supermartingales after a running-maximum adjuster. For continuous time, assume separable/right-continuous versions so the supremum is measurable, or state the result on a countable monitoring grid.
+This is the e-process definition used in the dynamic e-closure literature. A test supermartingale is sufficient for this stopping-time property, but the stopping-time property alone does not imply E_P[sup_t E_t^S] <= 1.
 
 Choose deterministic prior masses pi_S > 0, fixed before observing data, over all finite nonempty intersections, with
 
@@ -41,45 +42,49 @@ These are pathwise decision constraints. They do not establish the stochastic va
 
 ## 2. Candidate countable-mixture theorem
 
-**Proposition (prior-weighted random-intersection domination).** If the assumptions above hold and every local closure inequality holds simultaneously for all reporting times and all nonempty S subset of I_t, then for every fixed P,
+**Stopped-FDR proposition.** Under the standard component e-process assumptions above, the mixture M(P) is itself an e-process. Indeed, for every a.s.-finite global stopping time tau, Tonelli's theorem gives
 
 \[
-  \operatorname{FDP}_{N(P)}(R_t)
-  \leq \alpha M_t(P)\quad\text{for every }t,
+  \mathbb E_P[M_\tau(P)]
+  =\sum_{S\subseteq_f N(P),\,S\ne\varnothing}
+    \pi_S\mathbb E_P[E_\tau^S]
+  \leq\sum_S\pi_S\leq1.
 \]
 
-where the FDP is zero when B_t(P) is empty. Consequently,
+At time tau, the realised true active set B_tau(P)=N(P) intersect I_tau is one of the nonempty subsets covered by the local constraints, when it is nonempty. Hence, pathwise,
+
+\[
+  \operatorname{FDP}_{N(P)}(R_\tau)
+  \leq\alpha\pi_{B_\tau(P)}E_\tau^{B_\tau(P)}
+  \leq\alpha M_\tau(P).
+\]
+
+If B_tau(P) is empty, FDP is zero. Taking expectations proves stopped-FDR control at level alpha. This argument does not require future-extension coherence, a deterministic finite horizon envelope, or predictability/nesting of I_t. It does require finite active families and the stated component e-process validity in one common filtration.
+
+**SupFDR strengthening.** If, in addition, every fixed-intersection component E^S is pathwise time-monotone and is an e-process, then M_t(P) is also pathwise time-monotone. On a discrete monitoring grid, monotone convergence and the deterministic-time e-process bounds imply
+
+\[
+  \mathbb E_P[\sup_t M_t(P)]
+  =\lim_{n\to\infty}\mathbb E_P[M_n(P)]
+  \leq1.
+\]
+
+Since the local constraints hold simultaneously at every reporting time,
 
 \[
   \mathbb E_P\left[\sup_t\operatorname{FDP}_{N(P)}(R_t)\right]
-  \leq \alpha.
+  \leq\alpha.
 \]
 
-In particular, FDR at every stopping time is at most alpha, since stopped FDP is bounded by the pathwise supremum. This is a candidate direct route to SupFDR without future-extension coherence or a deterministic finite horizon envelope.
+The same conclusion holds if each component is assumed to satisfy the stronger maximal property E_P[sup_t E_t^S] <= 1, but that property is not implied by the ordinary e-process definition or by the test-supermartingale property alone.
 
-**Proof.** If B_t(P) is empty, the loss is zero. Otherwise B_t(P) is one nonempty finite subset of I_t, so the local constraint for S=B_t(P) gives
+A valid route to the extra time-monotonicity is to apply a valid running-maximum adjuster to each component and use the adjusted certificates in the local constraints. For example, the dynamic e-closure literature describes a nondecreasing adjuster A satisfying the required integral budget and sets the adjusted process to A(1 vee sup_{u<=t} E_u^S). The adjuster changes the certificate and incurs a power cost; it cannot be silently omitted from the closure constraints. For continuous time, use separable/right-continuous versions or state the theorem on a countable monitoring grid.
 
-\[
-  \operatorname{FDP}_{N(P)}(R_t)
-  =\operatorname{FDP}_{B_t(P)}(R_t)
-  \leq \alpha\pi_{B_t(P)}E_t^{B_t(P)}
-  \leq \alpha M_t(P).
-\]
+**Proof of the SupFDR step.** The pathwise argument above gives FDP_t <= alpha M_t(P) simultaneously for all t. Since every component is time-monotone, so is their nonnegative weighted sum. For integer time, sup_t M_t is the monotone limit of M_n; each deterministic n is a stopping time and E_P[M_n] <= 1. Monotone convergence gives E_P[sup_t M_t] <= 1.
 
-The intersection B_t(P) may be random and may change with t; it is dominated pathwise by the same mixture containing every fixed finite true-null intersection. Since P belongs to H_S for every finite S subset of N(P), each E^S is an e-process under P. By nonnegativity and monotone convergence,
+No independence between component processes is used.
 
-\[
-\begin{aligned}
-  \mathbb E_P[\sup_t M_t(P)]
-  &\leq \mathbb E_P\left[\sum_{S\subseteq_f N(P)}\pi_S\sup_t E_t^S\right]\\
-  &=\sum_{S\subseteq_f N(P)}\pi_S\mathbb E_P[\sup_t E_t^S]\\
-  &\leq \sum_{S\subseteq_f N(P)}\pi_S\leq 1.
-\end{aligned}
-\]
-
-Combining the inequalities proves the claim. No independence between component processes is used.
-
-**Important correction to the initial issue sketch:** the mixture is an e-process in the maximal sense. It should not be described as a time-monotone supermartingale. A pathwise nondecreasing nonnegative supermartingale is generally constant; after a running-maximum adjuster, the maximal e-process property is the appropriate object.
+**Important correction to the initial issue sketch:** do not describe the mixture as a time-monotone supermartingale. A nonconstant pathwise time-monotone e-process generally cannot itself be a test supermartingale. The stopped-FDR result uses the standard e-process stopping-time property; the SupFDR strengthening requires time-monotone components or the stronger maximal property.
 
 ## 3. What this removes—and what it does not
 
