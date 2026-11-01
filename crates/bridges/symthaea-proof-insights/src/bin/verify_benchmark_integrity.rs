@@ -22,6 +22,7 @@ enum Mode {
     Verify {
         path: PathBuf,
         expected_sha256: Option<String>,
+        evidence_root: PathBuf,
     },
     SelfTest(PathBuf),
 }
@@ -182,7 +183,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
 fn parse_mode() -> Result<Mode> {
     let mut args = env::args().skip(1);
     let Some(action) = args.next() else {
-        bail!("expected --verify FILE [--expected-sha256 HEX], --self-test FILE, or --help");
+        bail!("expected --verify FILE --evidence-root DIR [--expected-sha256 HEX], --self-test FILE, or --help");
     };
     if matches!(action.as_str(), "--help" | "-h") {
         return Ok(Mode::Help);
@@ -197,13 +198,20 @@ fn parse_mode() -> Result<Mode> {
         }
         "--verify" => {
             let mut expected_sha256 = None;
+            let mut evidence_root = None;
             while let Some(flag) = args.next() {
-                if flag != "--expected-sha256" || expected_sha256.is_some() {
-                    bail!("unknown or duplicate argument {flag}");
+                match flag.as_str() {
+                    "--expected-sha256" if expected_sha256.is_none() => {
+                        expected_sha256 = Some(args.next().context("missing expected SHA-256")?);
+                    }
+                    "--evidence-root" if evidence_root.is_none() => {
+                        evidence_root = Some(PathBuf::from(args.next().context("missing evidence root")?));
+                    }
+                    _ => bail!("unknown or duplicate argument {flag}"),
                 }
-                expected_sha256 = Some(args.next().context("missing expected SHA-256")?);
             }
-            Ok(Mode::Verify { path, expected_sha256 })
+            let evidence_root = evidence_root.context("--evidence-root is required for verification")?;
+            Ok(Mode::Verify { path, expected_sha256, evidence_root })
         }
         _ => bail!("unknown action {action}"),
     }
@@ -212,12 +220,12 @@ fn parse_mode() -> Result<Mode> {
 fn run() -> Result<()> {
     match parse_mode()? {
         Mode::Help => {
-            println!("Usage: verify_benchmark_integrity --verify FILE [--expected-sha256 HEX] | --self-test FILE");
+            println!("Usage: verify_benchmark_integrity --verify FILE --evidence-root DIR [--expected-sha256 HEX] | --self-test FILE");
             Ok(())
         }
         Mode::SelfTest(path) => self_test(&path),
-        Mode::Verify { path, expected_sha256 } => {
-            let summary = benchmark_integrity::verify_file(&path, expected_sha256.as_deref())?;
+        Mode::Verify { path, expected_sha256, evidence_root } => {
+            let summary = benchmark_integrity::verify_file_with_evidence_root(&path, expected_sha256.as_deref(), &evidence_root)?;
             println!(
                 "PITB_BENCHMARK_INTEGRITY_PASS: task={} statement={} status={} used_axioms={} allowlisted_axioms={}",
                 summary.task_id,
@@ -227,6 +235,7 @@ fn run() -> Result<()> {
                 summary.allowed_axiom_count
             );
             println!("PITB_BENCHMARK_INTEGRITY_SHA256: {}", summary.receipt_sha256);
+            println!("PITB_BENCHMARK_INTEGRITY_EVIDENCE_ARTIFACTS_PASS: {}", summary.verified_evidence_artifact_count);
             Ok(())
         }
     }
