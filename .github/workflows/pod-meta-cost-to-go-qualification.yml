@@ -46,9 +46,10 @@ jobs:
           test "$(grep -c '^ONLINE_FCR_ROW' cost-to-go-ledger.tsv)" -eq 5
           test "$(grep -c '^CAP_DECISION_ROW' cost-to-go-ledger.tsv)" -eq 3
           test "$(grep -c '^PREFIX_REPLAY_ROW' cost-to-go-ledger.tsv)" -eq 5
+          test "$(grep -c '^HISTORICAL_BASELINE_ROW' cost-to-go-ledger.tsv)" -eq 3
           grep '^PREFIX_REPLAY_ROW' cost-to-go-ledger.tsv | awk -F '\\t' '$2 == "budget-feasibility" && $3 == 7 && $4 == 4 && $5 == 2 && $6 == 5 && $7 == 1 && $8 == 1 && $9 == 2 && $10 == 1 { found=1 } END { exit !found }'
-          if grep '^CASE' cost-to-go-ledger.tsv | awk -F '\t' '$7 != 0 && $2 != "hard-cap-overrun-visible" { bad=1 } END { exit bad }'; then
-            echo "Only the deliberate hard-cap negative control recorded a cap violation."
+          if grep '^CASE' cost-to-go-ledger.tsv | awk -F '\t' '$7 != 0 { if ($2 == "hard-cap-overrun-visible") { intentional++ } else { bad=1 } } END { if (intentional != 1) bad=1; exit bad }'; then
+            echo "Exactly one deliberate hard-cap negative control recorded a cap violation; all other cases remained within limits."
           else
             echo "Unexpected hard-budget violation." >&2
             exit 1
