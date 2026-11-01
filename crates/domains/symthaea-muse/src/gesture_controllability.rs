@@ -224,11 +224,6 @@ impl GestureCounterfactualReceiptV1 {
         if self.expected_effects.is_empty() {
             issues.push("at least one expected feature effect is required".to_string());
         }
-        let expected_ids: HashSet<&str> = self
-            .expected_effects
-            .iter()
-            .map(|effect| effect.feature_id.as_str())
-            .collect();
         if self.side_effect_budgets.iter().any(|budget| {
             self.expected_effects.iter().any(|effect| {
                 effect.feature_id == budget.feature_id && effect.target == budget.target
@@ -253,6 +248,14 @@ impl GestureCounterfactualReceiptV1 {
             };
             if baseline.unit != effect.unit || intervention.unit != effect.unit {
                 issues.push(format!("expected feature {} has a unit mismatch", effect.feature_id));
+                continue;
+            }
+            if baseline.target != effect.target || intervention.target != effect.target {
+                issues.push(format!("expected feature {} does not belong to its declared target", effect.feature_id));
+                continue;
+            }
+            if effect.target != self.target {
+                issues.push(format!("expected feature {} is not measured on the gesture target", effect.feature_id));
                 continue;
             }
             let delta = intervention.value - baseline.value;
@@ -441,6 +444,17 @@ fn validate_measurements(
     for measurement in measurements {
         if measurement.feature_id.trim().is_empty() || !measurement.value.is_finite() {
             issues.push(format!("{name} contains an empty feature ID or non-finite value"));
+        }
+        match &measurement.target {
+            GestureTarget::Part { part_id } if *part_id == u16::MAX => {
+                issues.push(format!("{name} contains an unassigned part target"));
+            }
+            GestureTarget::Note { part_id, note_id }
+                if *part_id == u16::MAX || note_id.trim().is_empty() =>
+            {
+                issues.push(format!("{name} contains an invalid note target"));
+            }
+            _ => {}
         }
         if previous.is_some_and(|prior| prior >= measurement.feature_id.as_str()) {
             issues.push(format!("{name} must be sorted by unique feature_id"));
@@ -635,11 +649,19 @@ mod tests {
             ],
             intervention_features: vec![
                 FeatureMeasurement {
+                    target: GestureTarget::Note {
+                        part_id: 4,
+                        note_id: "vln-note-1".to_string(),
+                    },
                     feature_id: "onset_latency_ms".to_string(),
                     value: 19.0,
                     unit: FeatureUnit::Milliseconds,
                 },
                 FeatureMeasurement {
+                    target: GestureTarget::Note {
+                        part_id: 4,
+                        note_id: "vln-note-1".to_string(),
+                    },
                     feature_id: "spectral_centroid_hz".to_string(),
                     value: 2050.0,
                     unit: FeatureUnit::Hertz,
