@@ -349,6 +349,25 @@ impl BinaryLogFactor {
 /// table and the largest planned bucket product table implied by induced width.
 /// It is an exact allocation bound for the planned order, not a probabilistic
 /// estimate; if it exceeds the caller's budget, planning fails before contraction.
+/// Deterministic work counters for the min-fill ordering planner.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MinFillPlannerWork {
+    /// Number of full fill-score calculations.
+    pub fill_score_evaluations: usize,
+    /// Adjacency entries visited while calculating fill scores.
+    pub fill_score_adjacency_visits: usize,
+    /// Adjacency entries visited while finding non-neighbour candidates affected by fill.
+    pub affected_adjacency_visits: usize,
+    /// Priority-queue entries discarded because their variable/version was stale.
+    pub stale_queue_entries_discarded: usize,
+    /// Number of candidates whose full fill score was refreshed after an elimination.
+    pub affected_candidates_refreshed: usize,
+    /// Number of exact degree-one updates that avoided a full fill-score recalculation.
+    pub leaf_fast_path_updates: usize,
+    /// Number of neighbour pairs examined while making an elimination clique.
+    pub clique_pair_checks: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FactorEliminationPlan {
     pub elimination_order: Vec<usize>,
@@ -356,6 +375,8 @@ pub struct FactorEliminationPlan {
     pub predicted_output_entries: usize,
     pub predicted_peak_factor_entries: usize,
     pub max_factor_entries: usize,
+    /// Exact counters describing planner-side graph and queue work.
+    pub planner_work: MinFillPlannerWork,
 }
 /// A preflight plan for exact cutset conditioning followed by min-fill.
 ///
@@ -475,7 +496,8 @@ pub fn plan_min_fill_elimination(
         largest_input_factor = largest_input_factor.max(entries);
     }
 
-    let (elimination_order, induced_width) = min_fill_order_scopes(factor_scopes, eliminate)?;
+    let (elimination_order, induced_width, planner_work) =
+        min_fill_order_scopes(factor_scopes, eliminate)?;
     let largest_bucket = if induced_width == 0 {
         // Unary input factors already account for any represented zero-width
         // elimination. Completely absent variables produce scalar factors.
@@ -504,6 +526,7 @@ pub fn plan_min_fill_elimination(
         predicted_output_entries,
         predicted_peak_factor_entries,
         max_factor_entries,
+        planner_work,
     })
 }
 
@@ -708,6 +731,8 @@ pub struct LogFactorEliminationReport {
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
     pub variables_summed_out: usize,
+    /// Planner work for the structural min-fill order reused by this contraction.
+    pub planner_work: MinFillPlannerWork,
 }
 
 /// Telemetry for exact log-domain cutset conditioning followed by min-fill.
@@ -764,6 +789,8 @@ pub struct FactorEliminationReport {
     pub factor_multiplications: usize,
     /// Number of variables summed out.
     pub variables_summed_out: usize,
+    /// Planner work for the structural min-fill order used by this contraction.
+    pub planner_work: MinFillPlannerWork,
 }
 
 /// Eliminate the requested variables using deterministic min-fill ordering.
@@ -868,6 +895,7 @@ pub fn min_fill_sum_product(
         peak_factor_entries,
         factor_multiplications,
         variables_summed_out,
+        planner_work: plan.planner_work,
     })
 }
 
@@ -976,6 +1004,7 @@ fn min_fill_log_sum_product_with_plan(
         peak_factor_entries,
         factor_multiplications,
         variables_summed_out,
+        planner_work: plan.planner_work,
     })
 }
 
@@ -1119,13 +1148,14 @@ fn min_fill_order(
         .iter()
         .map(|factor| factor.variables.clone())
         .collect::<Vec<_>>();
-    min_fill_order_scopes(&scopes, eliminate)
+    let (order, width, _) = min_fill_order_scopes(&scopes, eliminate)?;
+    Ok((order, width))
 }
 
 fn min_fill_order_scopes(
     factor_scopes: &[Vec<usize>],
     eliminate: &[usize],
-) -> Result<(Vec<usize>, usize), FactorGraphError> {
+) -> Result<(Vec<usize>, usize, MinFillPlannerWork), FactorGraphError> {
     let mut adjacency: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     for variable in eliminate.iter().copied() {
         adjacency.entry(variable).or_default();
@@ -1144,11 +1174,15 @@ fn min_fill_order_scopes(
 
     let mut active: BTreeSet<usize> = eliminate.iter().copied().collect();
     let mut versions = BTreeMap::<usize, u64>::new();
+    let mut scores = BTreeMap::<usize, (usize, usize)>::new();
     let mut queue = BinaryHeap::<Reverse<(usize, usize, usize, u64)>>::new();
+    let mut planner_work = MinFillPlannerWork::default();
+
     for variable in active.iter().copied() {
         versions.insert(variable, 0);
-        let (fill_edges, degree) = fill_score(variable, &adjacency);
-        queue.push(Reverse((fill_edges, degree, variable, 0)));
+        let score = fill_score(variable, &adjacency, &mut planner_work)?;
+        scores.insert(variable, score);
+        queue.push(Reverse((score.0, score.1, variable, 0)));
     }
 
     let mut order = Vec::with_capacity(active.len());
@@ -1164,6 +1198,7 @@ fn min_fill_order_scopes(
                 induced_width = induced_width.max(degree);
                 break variable;
             }
+            checked_increment(&mut planner_work.stale_queue_entries_discarded)?;
         };
 
         let neighbours = adjacency
@@ -1173,6 +1208,65 @@ fn min_fill_order_scopes(
             .into_iter()
             .filter(|neighbour| adjacency.contains_key(neighbour))
             .collect::<Vec<_>>();
+
+        // A degree-zero variable changes no other score.
+        if neighbours.is_empty() {
+            adjacency.remove(&variable);
+            active.remove(&variable);
+            order.push(variable);
+            continue;
+        }
+
+        // Exact leaf update: if v has only one neighbour u, eliminating v
+        // creates no fill edges. The only score that changes is u's degree,
+        // and its missing-neighbour-pair count decreases by old_degree - 1:
+        // v was not adjacent to any of u's other neighbours.
+        //
+        // This avoids repeatedly rescanning a high-degree hub when removing
+        // degree-one spokes. The update preserves the same (fill, degree, id)
+        // priority key as a full recomputation.
+        if neighbours.len() == 1 {
+            let neighbour = neighbours[0];
+            if let Some(edges) = adjacency.get_mut(&neighbour) {
+                edges.remove(&variable);
+            }
+            adjacency.remove(&variable);
+            active.remove(&variable);
+            order.push(variable);
+
+            if active.contains(&neighbour) {
+                let (old_fill, old_degree) = scores
+                    .get(&neighbour)
+                    .copied()
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+                let removed_missing_pairs = old_degree
+                    .checked_sub(1)
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+                let next_fill = old_fill
+                    .checked_sub(removed_missing_pairs)
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+                let next_degree = old_degree
+                    .checked_sub(1)
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+                let next_score = (next_fill, next_degree);
+                scores.insert(neighbour, next_score);
+                let version = versions
+                    .get(&neighbour)
+                    .copied()
+                    .unwrap_or(0)
+                    .checked_add(1)
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+                versions.insert(neighbour, version);
+                queue.push(Reverse((
+                    next_score.0,
+                    next_score.1,
+                    neighbour,
+                    version,
+                )));
+                checked_increment(&mut planner_work.leaf_fast_path_updates)?;
+            }
+            continue;
+        }
 
         // Fill edges among N(variable) can also change the fill score of a
         // non-neighbour that is adjacent to two or more members of N(variable).
@@ -1185,8 +1279,10 @@ fn min_fill_order_scopes(
             }
             if let Some(edges) = adjacency.get(neighbour) {
                 for candidate in edges.iter().copied() {
+                    checked_increment(&mut planner_work.affected_adjacency_visits)?;
                     if candidate != variable && active.contains(&candidate) {
-                        *neighbour_hits.entry(candidate).or_default() += 1;
+                        let hits = neighbour_hits.entry(candidate).or_default();
+                        *hits = hits.checked_add(1).ok_or(FactorGraphError::IndexOverflow)?;
                     }
                 }
             }
@@ -1200,6 +1296,7 @@ fn min_fill_order_scopes(
         // Elimination makes the active neighbours a clique.
         for (left_index, a) in neighbours.iter().copied().enumerate() {
             for b in neighbours.iter().copied().skip(left_index + 1) {
+                checked_increment(&mut planner_work.clique_pair_checks)?;
                 adjacency.entry(a).or_default().insert(b);
                 adjacency.entry(b).or_default().insert(a);
             }
@@ -1218,6 +1315,9 @@ fn min_fill_order_scopes(
             if !active.contains(&candidate) {
                 continue;
             }
+            let score = fill_score(candidate, &adjacency, &mut planner_work)?;
+            scores.insert(candidate, score);
+            checked_increment(&mut planner_work.affected_candidates_refreshed)?;
             let version = versions
                 .get(&candidate)
                 .copied()
@@ -1225,18 +1325,19 @@ fn min_fill_order_scopes(
                 .checked_add(1)
                 .ok_or(FactorGraphError::IndexOverflow)?;
             versions.insert(candidate, version);
-            let (fill_edges, degree) = fill_score(candidate, &adjacency);
-            queue.push(Reverse((fill_edges, degree, candidate, version)));
+            queue.push(Reverse((score.0, score.1, candidate, version)));
         }
     }
 
-    Ok((order, induced_width))
+    Ok((order, induced_width, planner_work))
 }
 
 fn fill_score(
     variable: usize,
     adjacency: &BTreeMap<usize, BTreeSet<usize>>,
-) -> (usize, usize) {
+    planner_work: &mut MinFillPlannerWork,
+) -> Result<(usize, usize), FactorGraphError> {
+    checked_increment(&mut planner_work.fill_score_evaluations)?;
     let neighbours = adjacency
         .get(&variable)
         .cloned()
@@ -1244,16 +1345,41 @@ fn fill_score(
         .into_iter()
         .filter(|neighbour| adjacency.contains_key(neighbour))
         .collect::<Vec<_>>();
-    let mut fill_edges = 0usize;
-    for (left_index, left) in neighbours.iter().copied().enumerate() {
-        for right in neighbours.iter().copied().skip(left_index + 1) {
-            if !adjacency[&left].contains(&right) {
-                fill_edges += 1;
+    let neighbour_set = neighbours.iter().copied().collect::<BTreeSet<_>>();
+    let degree = neighbours.len();
+    let possible_pairs = degree
+        .checked_mul(degree.saturating_sub(1))
+        .ok_or(FactorGraphError::IndexOverflow)?
+        / 2;
+
+    // Count existing edges by visiting adjacency lists of the neighbours rather
+    // than checking every possible neighbour pair. This is output-sensitive for
+    // sparse stars: each leaf has a one-element adjacency list even when the
+    // centre has thousands of neighbours.
+    let mut existing_pairs = 0usize;
+    for left in &neighbours {
+        if let Some(edges) = adjacency.get(left) {
+            for right in edges {
+                checked_increment(&mut planner_work.fill_score_adjacency_visits)?;
+                if left < right && neighbour_set.contains(right) {
+                    existing_pairs = existing_pairs
+                        .checked_add(1)
+                        .ok_or(FactorGraphError::IndexOverflow)?;
+                }
             }
         }
     }
-    (fill_edges, neighbours.len())
+    let fill_edges = possible_pairs
+        .checked_sub(existing_pairs)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    Ok((fill_edges, degree))
 }
+
+fn checked_increment(counter: &mut usize) -> Result<(), FactorGraphError> {
+    *counter = counter.checked_add(1).ok_or(FactorGraphError::IndexOverflow)?;
+    Ok(())
+}
+
 fn sorted_union(left: &[usize], right: &[usize]) -> Vec<usize> {
     let mut output = Vec::with_capacity(left.len() + right.len());
     let mut left_index = 0usize;
