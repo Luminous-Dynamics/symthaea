@@ -10,12 +10,12 @@
 //! self-reported unless a trusted signature verifier authenticates it.
 
 use crate::{
-    hash_domain,
     fresh_instance::{
-        normalized_determinant_margin_permille, parse_timestamp, task_text, ExactLinearSolutionV1, FreshChallengeBundleV1,
-        FreshChallengeManifestV1, FreshPublicChallengePacketV1,
-        LinearSystemParametersV1, SealedFreshOraclePacketV1,
+        ExactLinearSolutionV1, FreshChallengeBundleV1, FreshChallengeManifestV1,
+        FreshPublicChallengePacketV1, LinearSystemParametersV1, SealedFreshOraclePacketV1,
+        normalized_determinant_margin_permille, parse_timestamp, task_text,
     },
+    hash_domain,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -196,7 +196,9 @@ fn manifest_digest(manifest: &FreshChallengeManifestV1) -> Result<String, String
 }
 
 fn item_set_digest(packet: &FreshPublicChallengePacketV1) -> Result<String, String> {
-    let items: Vec<(&str, &str)> = packet.tasks.iter()
+    let items: Vec<(&str, &str)> = packet
+        .tasks
+        .iter()
         .map(|task| (task.item_id.as_str(), task.task_text_sha256.as_str()))
         .collect();
     let bytes = serde_json::to_vec(&items)
@@ -215,7 +217,8 @@ fn decode_seed_hex(value: &str) -> Result<Vec<u8>, String> {
             b'a'..=b'f' => Some(byte - b'a' + 10),
             _ => None,
         };
-        let high = digit(pair[0]).ok_or_else(|| "seed must use lowercase hexadecimal".to_owned())?;
+        let high =
+            digit(pair[0]).ok_or_else(|| "seed must use lowercase hexadecimal".to_owned())?;
         let low = digit(pair[1]).ok_or_else(|| "seed must use lowercase hexadecimal".to_owned())?;
         output.push((high << 4) | low);
     }
@@ -247,18 +250,45 @@ fn validate_bundle(
         (&public.generator_binary_sha256, "generator_binary_sha256"),
         (&public.runtime_image_sha256, "runtime_image_sha256"),
         (&public.generator_config_sha256, "generator_config_sha256"),
-        (&manifest.checkpoint_freeze_receipt_sha256, "checkpoint_freeze_receipt_sha256"),
-        (&manifest.model_checkpoint_sha256, "manifest.model_checkpoint_sha256"),
-        (&manifest.generator_source_sha256, "manifest.generator_source_sha256"),
-        (&manifest.generator_binary_sha256, "manifest.generator_binary_sha256"),
-        (&manifest.runtime_image_sha256, "manifest.runtime_image_sha256"),
-        (&manifest.generator_config_sha256, "manifest.generator_config_sha256"),
-        (&manifest.generation_seed_commitment_sha256, "generation_seed_commitment_sha256"),
+        (
+            &manifest.checkpoint_freeze_receipt_sha256,
+            "checkpoint_freeze_receipt_sha256",
+        ),
+        (
+            &manifest.model_checkpoint_sha256,
+            "manifest.model_checkpoint_sha256",
+        ),
+        (
+            &manifest.generator_source_sha256,
+            "manifest.generator_source_sha256",
+        ),
+        (
+            &manifest.generator_binary_sha256,
+            "manifest.generator_binary_sha256",
+        ),
+        (
+            &manifest.runtime_image_sha256,
+            "manifest.runtime_image_sha256",
+        ),
+        (
+            &manifest.generator_config_sha256,
+            "manifest.generator_config_sha256",
+        ),
+        (
+            &manifest.generation_seed_commitment_sha256,
+            "generation_seed_commitment_sha256",
+        ),
     ] {
         validate_digest(digest, label)?;
     }
-    parse_timestamp(&manifest.checkpoint_frozen_at_utc, "checkpoint_frozen_at_utc")?;
-    parse_timestamp(&manifest.challenge_generated_at_utc, "challenge_generated_at_utc")?;
+    parse_timestamp(
+        &manifest.checkpoint_frozen_at_utc,
+        "checkpoint_frozen_at_utc",
+    )?;
+    parse_timestamp(
+        &manifest.challenge_generated_at_utc,
+        "challenge_generated_at_utc",
+    )?;
     crate::fresh_instance::parse_timestamp(
         &manifest.checkpoint_frozen_at_utc,
         "checkpoint_frozen_at_utc",
@@ -267,7 +297,10 @@ fn validate_bundle(
         &manifest.challenge_generated_at_utc,
         "challenge_generated_at_utc",
     )?;
-    validate_digest(&manifest.checkpoint_freeze_receipt_sha256, "checkpoint_freeze_receipt_sha256")?;
+    validate_digest(
+        &manifest.checkpoint_freeze_receipt_sha256,
+        "checkpoint_freeze_receipt_sha256",
+    )?;
     if public_packet_digest(public)? != public.public_packet_sha256 {
         return Err("public packet digest does not match contents".to_owned());
     }
@@ -303,26 +336,38 @@ fn validate_bundle(
         return Err("checkpoint freeze timestamp must precede fresh generation".to_owned());
     }
     let seed = decode_seed_hex(&oracle.generation_seed_hex)?;
-    if hash_domain(b"fresh-instance-seed.v1", &seed)
-        != oracle.generation_seed_commitment_sha256
-        || oracle.generation_seed_commitment_sha256
-            != manifest.generation_seed_commitment_sha256
-        || u64::try_from(seed.len()).ok().and_then(|n| n.checked_mul(8))
+    if hash_domain(b"fresh-instance-seed.v1", &seed) != oracle.generation_seed_commitment_sha256
+        || oracle.generation_seed_commitment_sha256 != manifest.generation_seed_commitment_sha256
+        || u64::try_from(seed.len())
+            .ok()
+            .and_then(|n| n.checked_mul(8))
             != Some(manifest.seed_length_bits)
     {
         return Err("sealed oracle seed does not match committed generation seed".to_owned());
     }
 
-    let public_ids: BTreeSet<&str> = public.tasks.iter().map(|task| task.item_id.as_str()).collect();
-    let oracle_ids: BTreeSet<&str> = oracle.entries.iter().map(|entry| entry.item_id.as_str()).collect();
+    let public_ids: BTreeSet<&str> = public
+        .tasks
+        .iter()
+        .map(|task| task.item_id.as_str())
+        .collect();
+    let oracle_ids: BTreeSet<&str> = oracle
+        .entries
+        .iter()
+        .map(|entry| entry.item_id.as_str())
+        .collect();
     if public_ids.len() != public.tasks.len()
         || oracle_ids.len() != oracle.entries.len()
         || public_ids != oracle_ids
     {
-        return Err("public task and sealed oracle item IDs must be unique and identical".to_owned());
+        return Err(
+            "public task and sealed oracle item IDs must be unique and identical".to_owned(),
+        );
     }
     let mut answers = BTreeMap::new();
-    let public_task_by_id: BTreeMap<&str, &str> = public.tasks.iter()
+    let public_task_by_id: BTreeMap<&str, &str> = public
+        .tasks
+        .iter()
         .map(|task| (task.item_id.as_str(), task.task_text.as_str()))
         .collect();
     let mut task_text_digests = BTreeSet::new();
@@ -331,9 +376,7 @@ fn validate_bundle(
         if !task_text_digests.insert(task.task_text_sha256.as_str()) {
             return Err("public packet contains duplicate task text digests".to_owned());
         }
-        if hash_domain(b"fresh-task-text.v1", task.task_text.as_bytes())
-            != task.task_text_sha256
-        {
+        if hash_domain(b"fresh-task-text.v1", task.task_text.as_bytes()) != task.task_text_sha256 {
             return Err(format!("task {} text digest mismatch", task.item_id));
         }
     }
@@ -341,7 +384,10 @@ fn validate_bundle(
         validate_digest(&entry.parameter_sha256, "parameter_sha256")?;
         validate_digest(&entry.answer_sha256, "answer_sha256")?;
         if determinant(&entry.parameters) == 0 {
-            return Err(format!("oracle item {} has a singular matrix", entry.item_id));
+            return Err(format!(
+                "oracle item {} has a singular matrix",
+                entry.item_id
+            ));
         }
         if normalized_determinant_margin_permille(&entry.parameters)
             != entry.normalized_determinant_margin_permille
@@ -353,19 +399,26 @@ fn validate_bundle(
         }
         let parameter_bytes = serde_json::to_vec(&entry.parameters)
             .map_err(|error| format!("cannot serialize hidden parameters: {error}"))?;
-        if hash_domain(b"fresh-task-parameters.v1", &parameter_bytes)
-            != entry.parameter_sha256
-        {
-            return Err(format!("oracle parameters digest mismatch for {}", entry.item_id));
+        if hash_domain(b"fresh-task-parameters.v1", &parameter_bytes) != entry.parameter_sha256 {
+            return Err(format!(
+                "oracle parameters digest mismatch for {}",
+                entry.item_id
+            ));
         }
         let answer_bytes = serde_json::to_vec(&entry.solution)
             .map_err(|error| format!("cannot serialize oracle answer: {error}"))?;
         if hash_domain(b"fresh-task-answer.v1", &answer_bytes) != entry.answer_sha256 {
-            return Err(format!("oracle answer digest mismatch for {}", entry.item_id));
+            return Err(format!(
+                "oracle answer digest mismatch for {}",
+                entry.item_id
+            ));
         }
         let (b1, b2) = compute_rhs(&entry.parameters, &entry.solution)?;
         if b1 != entry.parameters.b1 || b2 != entry.parameters.b2 {
-            return Err(format!("oracle answer does not satisfy item {}", entry.item_id));
+            return Err(format!(
+                "oracle answer does not satisfy item {}",
+                entry.item_id
+            ));
         }
         let expected_public_task = task_text(&entry.parameters);
         if public_task_by_id.get(entry.item_id.as_str()).copied()
@@ -422,12 +475,14 @@ pub fn verify_fresh_score_report_integrity(report: &FreshScoreReportV1) -> Resul
             FreshItemScoreStatusV1::Abstained => abstained += 1,
         }
     }
-    let total = correct.checked_add(incorrect)
+    let total = correct
+        .checked_add(incorrect)
         .and_then(|value| value.checked_add(invalid))
         .and_then(|value| value.checked_add(abstained))
         .ok_or_else(|| "fresh score report count partition overflowed".to_owned())?;
     let answered = total.saturating_sub(abstained);
-    let valid_format = correct.checked_add(incorrect)
+    let valid_format = correct
+        .checked_add(incorrect)
         .ok_or_else(|| "fresh score report valid-format count overflowed".to_owned())?;
     let expected_accuracy = correct as f64 * 1_000.0 / total as f64;
     let expected_coverage = answered as f64 * 1_000.0 / total as f64;
@@ -448,8 +503,14 @@ pub fn verify_fresh_score_report_integrity(report: &FreshScoreReportV1) -> Resul
         || !report.coverage_permille.is_finite()
         || (report.accuracy_over_all_permille - expected_accuracy).abs() >= 1.0e-9
         || (report.coverage_permille - expected_coverage).abs() >= 1.0e-9
-        || !rate_matches(report.accuracy_when_answered_permille, optional_rate(correct, answered))
-        || !rate_matches(report.accuracy_when_valid_format_permille, optional_rate(correct, valid_format))
+        || !rate_matches(
+            report.accuracy_when_answered_permille,
+            optional_rate(correct, answered),
+        )
+        || !rate_matches(
+            report.accuracy_when_valid_format_permille,
+            optional_rate(correct, valid_format),
+        )
         || report.independently_verified
         || report.execution_receipt_verification
             != "digest_present_signature_not_cryptographically_verified"
@@ -480,7 +541,9 @@ pub fn score_fresh_submission(
     let submission: FreshAnswerSubmissionV1 = serde_json::from_slice(submission_bytes)
         .map_err(|error| format!("answer submission does not match strict v1 JSON: {error}"))?;
     if submission.schema != FRESH_SUBMISSION_SCHEMA {
-        return Err(format!("submission schema must be {FRESH_SUBMISSION_SCHEMA}"));
+        return Err(format!(
+            "submission schema must be {FRESH_SUBMISSION_SCHEMA}"
+        ));
     }
     if submission.run_id.trim().is_empty()
         || submission.run_id.len() > 256
@@ -492,12 +555,27 @@ pub fn score_fresh_submission(
         return Err("run/model identity fields must be nonempty".to_owned());
     }
     for (digest, label) in [
-        (&submission.model_checkpoint_sha256, "model_checkpoint_sha256"),
+        (
+            &submission.model_checkpoint_sha256,
+            "model_checkpoint_sha256",
+        ),
         (&submission.public_packet_sha256, "public_packet_sha256"),
-        (&submission.inference_harness_sha256, "inference_harness_sha256"),
-        (&submission.prompt_and_decoding_sha256, "prompt_and_decoding_sha256"),
-        (&submission.metric_definition_sha256, "metric_definition_sha256"),
-        (&submission.run_execution_receipt_sha256, "run_execution_receipt_sha256"),
+        (
+            &submission.inference_harness_sha256,
+            "inference_harness_sha256",
+        ),
+        (
+            &submission.prompt_and_decoding_sha256,
+            "prompt_and_decoding_sha256",
+        ),
+        (
+            &submission.metric_definition_sha256,
+            "metric_definition_sha256",
+        ),
+        (
+            &submission.run_execution_receipt_sha256,
+            "run_execution_receipt_sha256",
+        ),
         (&submission.submission_sha256, "submission_sha256"),
     ] {
         validate_digest(digest, label)?;
@@ -508,9 +586,15 @@ pub fn score_fresh_submission(
         return Err("submission model checkpoint/public packet binding mismatch".to_owned());
     }
     if submission.metric_definition_sha256
-        != hash_domain(b"fresh-metric-definition.v1", FRESH_EXACT_METRIC_ID.as_bytes())
+        != hash_domain(
+            b"fresh-metric-definition.v1",
+            FRESH_EXACT_METRIC_ID.as_bytes(),
+        )
     {
-        return Err("submission metric definition digest does not match fresh exact-match scorer".to_owned());
+        return Err(
+            "submission metric definition digest does not match fresh exact-match scorer"
+                .to_owned(),
+        );
     }
     if submission.model_call_count == 0 || submission.wall_clock_millis == 0 {
         return Err("model_call_count and wall_clock_millis must be positive".to_owned());
@@ -518,15 +602,21 @@ pub fn score_fresh_submission(
     if submission.responses.len() != bundle.public_packet.tasks.len()
         || submission.responses.len() != answers.len()
     {
-        return Err("submission must contain exactly one response record per public item".to_owned());
+        return Err(
+            "submission must contain exactly one response record per public item".to_owned(),
+        );
     }
-    let response_bytes_total = submission.responses.iter().try_fold(0_usize, |total, record| {
-        if record.response_text.len() > FRESH_MAX_RESPONSE_BYTES {
-            return Err("an individual response exceeds the 1 MiB safety bound".to_owned());
-        }
-        total.checked_add(record.response_text.len())
-            .ok_or_else(|| "total response bytes overflow usize".to_owned())
-    })?;
+    let response_bytes_total = submission
+        .responses
+        .iter()
+        .try_fold(0_usize, |total, record| {
+            if record.response_text.len() > FRESH_MAX_RESPONSE_BYTES {
+                return Err("an individual response exceeds the 1 MiB safety bound".to_owned());
+            }
+            total
+                .checked_add(record.response_text.len())
+                .ok_or_else(|| "total response bytes overflow usize".to_owned())
+        })?;
     if response_bytes_total > FRESH_MAX_TOTAL_RESPONSE_BYTES {
         return Err("total response text exceeds the 16 MiB safety bound".to_owned());
     }
@@ -541,30 +631,38 @@ pub fn score_fresh_submission(
         if record.item_id.trim().is_empty() || !item_ids.insert(record.item_id.as_str()) {
             return Err("response item IDs must be unique and nonempty".to_owned());
         }
-        let answer = answers.get(&record.item_id)
+        let answer = answers
+            .get(&record.item_id)
             .ok_or_else(|| format!("submission contains unknown item ID {}", record.item_id))?;
         validate_digest(&record.response_sha256, "response_sha256")?;
         if response_digest(&record.response_text) != record.response_sha256 {
-            return Err(format!("response {} digest does not match raw response text", record.item_id));
+            return Err(format!(
+                "response {} digest does not match raw response text",
+                record.item_id
+            ));
         }
         let status = if record.response_text.trim().is_empty() {
-            abstained_count = abstained_count.checked_add(1)
+            abstained_count = abstained_count
+                .checked_add(1)
                 .ok_or_else(|| "abstention count overflowed".to_owned())?;
             FreshItemScoreStatusV1::Abstained
         } else {
             match serde_json::from_str::<ExactLinearSolutionV1>(&record.response_text) {
                 Ok(parsed) if &parsed == answer => {
-                    correct_count = correct_count.checked_add(1)
+                    correct_count = correct_count
+                        .checked_add(1)
                         .ok_or_else(|| "correct count overflowed".to_owned())?;
                     FreshItemScoreStatusV1::Correct
                 }
                 Ok(_) => {
-                    incorrect_count = incorrect_count.checked_add(1)
+                    incorrect_count = incorrect_count
+                        .checked_add(1)
                         .ok_or_else(|| "incorrect count overflowed".to_owned())?;
                     FreshItemScoreStatusV1::Incorrect
                 }
                 Err(_) => {
-                    invalid_format_count = invalid_format_count.checked_add(1)
+                    invalid_format_count = invalid_format_count
+                        .checked_add(1)
                         .ok_or_else(|| "invalid format count overflowed".to_owned())?;
                     FreshItemScoreStatusV1::InvalidFormat
                 }
@@ -584,9 +682,11 @@ pub fn score_fresh_submission(
     }
 
     let item_count = u64::try_from(answers.len()).map_err(|_| "item count exceeds u64")?;
-    let answered_count = item_count.checked_sub(abstained_count)
+    let answered_count = item_count
+        .checked_sub(abstained_count)
         .ok_or_else(|| "abstention count exceeds item count".to_owned())?;
-    let valid_format_response_count = correct_count.checked_add(incorrect_count)
+    let valid_format_response_count = correct_count
+        .checked_add(incorrect_count)
         .ok_or_else(|| "valid response count overflowed".to_owned())?;
     let partitioned = correct_count
         .checked_add(incorrect_count)
@@ -594,7 +694,9 @@ pub fn score_fresh_submission(
         .and_then(|value| value.checked_add(abstained_count))
         .ok_or_else(|| "score outcome counts overflowed".to_owned())?;
     if partitioned != item_count {
-        return Err("correct/incorrect/invalid/abstained counts do not partition item set".to_owned());
+        return Err(
+            "correct/incorrect/invalid/abstained counts do not partition item set".to_owned(),
+        );
     }
     let mut report = FreshScoreReportV1 {
         schema: FRESH_SCORE_REPORT_SCHEMA.to_owned(),
@@ -651,7 +753,7 @@ pub fn score_fresh_submission(
 mod tests {
     use super::*;
     use crate::fresh_instance::{
-        generate_fresh_challenge_bundle, FreshChallengeConfigV1, FRESH_CONFIG_SCHEMA,
+        FRESH_CONFIG_SCHEMA, FreshChallengeConfigV1, generate_fresh_challenge_bundle,
     };
     use serde_json::Value;
 
@@ -730,14 +832,19 @@ mod tests {
     }
 
     fn exact_responses(bundle: &FreshChallengeBundleV1) -> Vec<FreshResponseRecordV1> {
-        bundle.sealed_oracle_packet.entries.iter().map(|entry| {
-            let response_text = solution_text(&entry.solution);
-            FreshResponseRecordV1 {
-                item_id: entry.item_id.clone(),
-                response_sha256: response_digest(&response_text),
-                response_text,
-            }
-        }).collect()
+        bundle
+            .sealed_oracle_packet
+            .entries
+            .iter()
+            .map(|entry| {
+                let response_text = solution_text(&entry.solution);
+                FreshResponseRecordV1 {
+                    item_id: entry.item_id.clone(),
+                    response_sha256: response_digest(&response_text),
+                    response_text,
+                }
+            })
+            .collect()
     }
 
     fn score(
@@ -752,40 +859,75 @@ mod tests {
     fn submission_and_score_report_schemas_match_rust_serialization() {
         let submission_schema: Value = serde_json::from_str(include_str!(
             "../schema/fresh-answer-submission.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let report_schema: Value = serde_json::from_str(include_str!(
             "../schema/fresh-instance-score-report.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         let submission = build_submission(&bundle, exact_responses(&bundle));
-        let report = score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&submission).unwrap(),
-        ).unwrap();
+        let report =
+            score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap()).unwrap();
         let submission_value = serde_json::to_value(&submission).unwrap();
         let report_value = serde_json::to_value(&report).unwrap();
         for (schema, value, version) in [
-            (&submission_schema, submission_value, FRESH_SUBMISSION_SCHEMA),
+            (
+                &submission_schema,
+                submission_value,
+                FRESH_SUBMISSION_SCHEMA,
+            ),
             (&report_schema, report_value, FRESH_SCORE_REPORT_SCHEMA),
         ] {
-            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
-            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
-                .iter().map(|item| item.as_str().unwrap().to_owned()).collect();
-            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
-                .keys().cloned().collect();
+            assert_eq!(
+                schema["properties"]["schema"]["const"].as_str(),
+                Some(version)
+            );
+            let required: BTreeSet<String> = schema["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| item.as_str().unwrap().to_owned())
+                .collect();
+            let properties: BTreeSet<String> = schema["properties"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
             let actual: BTreeSet<String> = value.as_object().unwrap().keys().cloned().collect();
             assert_eq!(required, properties);
             assert_eq!(actual, properties);
         }
-        let response_properties: BTreeSet<String> = submission_schema["properties"]["responses"]["items"]["properties"]
-            .as_object().unwrap().keys().cloned().collect();
+        let response_properties: BTreeSet<String> =
+            submission_schema["properties"]["responses"]["items"]["properties"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
         let actual_response: BTreeSet<String> = serde_json::to_value(&submission.responses[0])
-            .unwrap().as_object().unwrap().keys().cloned().collect();
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(response_properties, actual_response);
-        let report_item_properties: BTreeSet<String> = report_schema["properties"]["items"]["items"]["properties"]
-            .as_object().unwrap().keys().cloned().collect();
+        let report_item_properties: BTreeSet<String> =
+            report_schema["properties"]["items"]["items"]["properties"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
         let actual_report_item: BTreeSet<String> = serde_json::to_value(&report.items[0])
-            .unwrap().as_object().unwrap().keys().cloned().collect();
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(report_item_properties, actual_report_item);
         let public_report = serde_json::to_string(&report).unwrap();
         assert!(!public_report.contains("\"solution\""));
@@ -871,32 +1013,47 @@ mod tests {
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         let mut responses = exact_responses(&bundle);
         responses.pop();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
-        ).unwrap_err().contains("exactly one response"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
+            )
+            .unwrap_err()
+            .contains("exactly one response")
+        );
 
         let mut responses = exact_responses(&bundle);
         responses[1].item_id = responses[0].item_id.clone();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
-        ).unwrap_err().contains("unique and nonempty"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
+            )
+            .unwrap_err()
+            .contains("unique and nonempty")
+        );
 
         let mut responses = exact_responses(&bundle);
         responses[0].item_id = "unknown-item".to_owned();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
-        ).unwrap_err().contains("unknown item ID"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
+            )
+            .unwrap_err()
+            .contains("unknown item ID")
+        );
     }
 
     #[test]
     fn oversized_submission_payload_fails_before_parsing() {
         let oversized = vec![b' '; FRESH_MAX_SUBMISSION_BYTES + 1];
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
-        assert!(score_fresh_submission(&bundle, &oversized)
-            .unwrap_err().contains("32 MiB safety bound"));
+        assert!(
+            score_fresh_submission(&bundle, &oversized)
+                .unwrap_err()
+                .contains("32 MiB safety bound")
+        );
     }
 
     #[test]
@@ -904,12 +1061,18 @@ mod tests {
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         let mut submission = build_submission(&bundle, exact_responses(&bundle));
         submission.responses[0].response_text.push(' ');
-        assert!(score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
-            .unwrap_err().contains("response"));
+        assert!(
+            score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
+                .unwrap_err()
+                .contains("response")
+        );
         let mut submission = build_submission(&bundle, exact_responses(&bundle));
         submission.input_token_count += 1;
-        assert!(score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
-            .unwrap_err().contains("submission digest"));
+        assert!(
+            score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
+                .unwrap_err()
+                .contains("submission digest")
+        );
     }
 
     #[test]
@@ -917,24 +1080,33 @@ mod tests {
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         let mut submission = build_submission(&bundle, exact_responses(&bundle));
         submission.model_checkpoint_sha256 = digest("another-checkpoint");
-        assert!(score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
-            .unwrap_err().contains("checkpoint/public packet"));
+        assert!(
+            score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
+                .unwrap_err()
+                .contains("checkpoint/public packet")
+        );
     }
 
     #[test]
     fn scorer_rejects_rehashed_public_task_that_no_longer_matches_oracle_parameters() {
         let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         bundle.public_packet.tasks[0].task_text.push_str(" + 0");
-        bundle.public_packet.tasks[0].task_text_sha256 =
-            hash_domain(b"fresh-task-text.v1", bundle.public_packet.tasks[0].task_text.as_bytes());
+        bundle.public_packet.tasks[0].task_text_sha256 = hash_domain(
+            b"fresh-task-text.v1",
+            bundle.public_packet.tasks[0].task_text.as_bytes(),
+        );
         bundle.public_packet.public_packet_sha256 =
             public_packet_digest(&bundle.public_packet).unwrap();
         bundle.manifest.public_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
         bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
-        ).unwrap_err().contains("does not correspond to sealed oracle parameters"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+            )
+            .unwrap_err()
+            .contains("does not correspond to sealed oracle parameters")
+        );
     }
 
     #[test]
@@ -946,10 +1118,14 @@ mod tests {
         bundle.manifest.sealed_oracle_sha256 =
             bundle.sealed_oracle_packet.sealed_oracle_sha256.clone();
         bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
-        ).unwrap_err().contains("stability margin does not match matrix parameters"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+            )
+            .unwrap_err()
+            .contains("stability margin does not match matrix parameters")
+        );
     }
 
     #[test]
@@ -957,31 +1133,43 @@ mod tests {
         let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         bundle.manifest.checkpoint_frozen_at_utc = "2026-02-30T18:00:00Z".to_owned();
         bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
-        ).unwrap_err().contains("impossible date or clock"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+            )
+            .unwrap_err()
+            .contains("impossible date or clock")
+        );
 
         let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         bundle.public_packet.generator_binary_sha256 = "not-a-digest".to_owned();
-        bundle.public_packet.public_packet_sha256 = public_packet_digest(&bundle.public_packet).unwrap();
+        bundle.public_packet.public_packet_sha256 =
+            public_packet_digest(&bundle.public_packet).unwrap();
         bundle.manifest.generator_binary_sha256 = "not-a-digest".to_owned();
         bundle.manifest.public_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
         bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
-        ).unwrap_err().contains("generator_binary_sha256"));
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+            )
+            .unwrap_err()
+            .contains("generator_binary_sha256")
+        );
     }
 
     #[test]
     fn scorer_rejects_tampered_oracle_even_if_answers_are_changed() {
         let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         bundle.sealed_oracle_packet.entries[0].solution.x += 1;
-        assert!(score_fresh_submission(
-            &bundle,
-            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
-        ).is_err());
+        assert!(
+            score_fresh_submission(
+                &bundle,
+                &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -992,8 +1180,7 @@ mod tests {
         json["unexpected"] = serde_json::json!("not-allowed");
         assert!(serde_json::from_value::<FreshAnswerSubmissionV1>(json).is_err());
 
-        let mut response_json: Value =
-            serde_json::to_value(&submission.responses[0]).unwrap();
+        let mut response_json: Value = serde_json::to_value(&submission.responses[0]).unwrap();
         response_json["expected_answer"] = serde_json::json!({"x": 1, "y": 2});
         assert!(serde_json::from_value::<FreshResponseRecordV1>(response_json).is_err());
     }
@@ -1004,8 +1191,11 @@ mod tests {
         let mut report = score(&bundle, exact_responses(&bundle));
         assert!(verify_fresh_score_report_integrity(&report).is_ok());
         report.correct_count -= 1;
-        assert!(verify_fresh_score_report_integrity(&report)
-            .unwrap_err().contains("digest does not match"));
+        assert!(
+            verify_fresh_score_report_integrity(&report)
+                .unwrap_err()
+                .contains("digest does not match")
+        );
     }
 
     #[test]
@@ -1017,8 +1207,11 @@ mod tests {
         report.report_sha256.clear();
         let bytes = serde_json::to_vec(&report).unwrap();
         report.report_sha256 = hash_domain(b"fresh-instance-score-report.v1", &bytes);
-        assert!(verify_fresh_score_report_integrity(&report)
-            .unwrap_err().contains("item statuses, summary counts/rates"));
+        assert!(
+            verify_fresh_score_report_integrity(&report)
+                .unwrap_err()
+                .contains("item statuses, summary counts/rates")
+        );
     }
 
     #[test]
