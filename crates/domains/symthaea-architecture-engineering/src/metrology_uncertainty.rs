@@ -104,6 +104,55 @@ pub struct EnergyComparison {
     pub difference_candidate_minus_reference_uj: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplicationPlanKind {
+    CandidateOnly,
+    ReferenceOnly,
+    PairedCandidateAndReference,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplicationPlanningStatus {
+    AlreadyResolved,
+    MetrologyLimited,
+    AdditionalReplicatesRequired,
+    NoPlanWithinBudgetOrHorizon,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReplicationPlanningConfig {
+    pub candidate_cost_per_replicate_units: u64,
+    pub reference_cost_per_replicate_units: u64,
+    pub resource_budget_units: u64,
+    pub maximum_additional_replicates_per_side: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdditionalReplicationPlan {
+    pub kind: ReplicationPlanKind,
+    pub additional_candidate_replicates: usize,
+    pub additional_reference_replicates: usize,
+    pub incremental_resource_units: u64,
+    pub projected_candidate_expanded_uncertainty_uj: f64,
+    pub projected_reference_expanded_uncertainty_uj: f64,
+    pub projected_interval_gap_uj: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnergyReplicationPlanningResult {
+    pub status: ReplicationPlanningStatus,
+    pub current_decision: EnergyComparisonDecision,
+    pub mean_energy_gap_uj: f64,
+    pub irreducible_type_b_interval_floor_uj: f64,
+    pub plan: Option<AdditionalReplicationPlan>,
+}
+
+
 fn digest(domain: &[u8], bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(domain);
@@ -349,6 +398,198 @@ pub fn validate_energy_uncertainty_receipt(
     Ok(())
 }
 
+const MAX_REPLICATION_SEARCH: usize = 1_000_000;
+
+fn projected_expanded_uncertainty(
+    receipt: &EnergyUncertaintyReceipt,
+    total_replicates: usize,
+) -> f64 {
+    let type_a = receipt.sample_standard_deviation_uj / (total_replicates as f64).sqrt();
+    receipt.coverage_factor
+        * type_a.hypot(receipt.type_b_standard_uncertainty_uj)
+}
+
+fn checked_replication_cost(
+    count: usize,
+    cost_per_replicate: u64,
+) -> Result<u64, MetrologyUncertaintyError> {
+    let count = u64::try_from(count).map_err(|_| {
+        MetrologyUncertaintyError::new("replication_count", "does not fit in resource counter")
+    })?;
+    count.checked_mul(cost_per_replicate).ok_or_else(|| {
+        MetrologyUncertaintyError::new("replication_cost", "resource cost overflow")
+    })
+}
+
+/// Plan additional replicates only when they can theoretically resolve an overlapping
+/// energy comparison. Type B uncertainty is treated as an irreducible floor; repeated
+/// sampling reduces Type A as s/sqrt(n), but does not reduce the declared calibration term.
+///
+/// This is a deterministic planning heuristic with fixed observed means and sample standard
+/// deviations. It is not a posterior probability of a future result and must be integrated
+/// with the preregistered sequential stopping policy and vector-resource ledger.
+pub fn plan_additional_energy_replicates(
+    candidate: &EnergyUncertaintyReceipt,
+    reference: &EnergyUncertaintyReceipt,
+    config: ReplicationPlanningConfig,
+) -> Result<EnergyReplicationPlanningResult, MetrologyUncertaintyError> {
+    validate_energy_uncertainty_receipt(candidate)
+        .map_err(|error| MetrologyUncertaintyError::new("candidate", error.to_string()))?;
+    validate_energy_uncertainty_receipt(reference)
+        .map_err(|error| MetrologyUncertaintyError::new("reference", error.to_string()))?;
+
+    if config.candidate_cost_per_replicate_units == 0
+        || config.reference_cost_per_replicate_units == 0
+    {
+        return Err(MetrologyUncertaintyError::new(
+            "replication_cost",
+            "both per-replicate resource costs must be positive",
+        ));
+    }
+    if config.maximum_additional_replicates_per_side > MAX_REPLICATION_SEARCH {
+        return Err(MetrologyUncertaintyError::new(
+            "maximum_additional_replicates_per_side",
+            format!("must not exceed {MAX_REPLICATION_SEARCH}"),
+        ));
+    }
+
+    let current = compare_energy_uncertainty(candidate, reference)?;
+    let gap = (candidate.mean_energy_uj - reference.mean_energy_uj).abs();
+    if current.decision != EnergyComparisonDecision::IndeterminateIntervalsOverlap {
+        return Ok(EnergyReplicationPlanningResult {
+            status: ReplicationPlanningStatus::AlreadyResolved,
+            current_decision: current.decision,
+            mean_energy_gap_uj: gap,
+            irreducible_type_b_interval_floor_uj:
+                candidate.coverage_factor * candidate.type_b_standard_uncertainty_uj
+                    + reference.coverage_factor * reference.type_b_standard_uncertainty_uj,
+            plan: None,
+        });
+    }
+
+    let type_b_floor =
+        candidate.coverage_factor * candidate.type_b_standard_uncertainty_uj
+            + reference.coverage_factor * reference.type_b_standard_uncertainty_uj;
+    if gap <= type_b_floor {
+        return Ok(EnergyReplicationPlanningResult {
+            status: ReplicationPlanningStatus::MetrologyLimited,
+            current_decision: current.decision,
+            mean_energy_gap_uj: gap,
+            irreducible_type_b_interval_floor_uj: type_b_floor,
+            plan: None,
+        });
+    }
+
+    let mut plans = Vec::<AdditionalReplicationPlan>::new();
+    let limit = config.maximum_additional_replicates_per_side;
+    for additional in 1..=limit {
+        // Candidate-only plan.
+        let candidate_u = projected_expanded_uncertainty(
+            candidate,
+            candidate.replicate_count + additional,
+        );
+        let reference_u = reference.expanded_uncertainty_uj;
+        if gap > candidate_u + reference_u {
+            let cost = checked_replication_cost(
+                additional,
+                config.candidate_cost_per_replicate_units,
+            )?;
+            if cost <= config.resource_budget_units {
+                plans.push(AdditionalReplicationPlan {
+                    kind: ReplicationPlanKind::CandidateOnly,
+                    additional_candidate_replicates: additional,
+                    additional_reference_replicates: 0,
+                    incremental_resource_units: cost,
+                    projected_candidate_expanded_uncertainty_uj: candidate_u,
+                    projected_reference_expanded_uncertainty_uj: reference_u,
+                    projected_interval_gap_uj: gap - candidate_u - reference_u,
+                });
+            }
+            break;
+        }
+
+        // Reference-only plan.
+        let candidate_u = candidate.expanded_uncertainty_uj;
+        let reference_u = projected_expanded_uncertainty(
+            reference,
+            reference.replicate_count + additional,
+        );
+        if gap > candidate_u + reference_u {
+            let cost = checked_replication_cost(
+                additional,
+                config.reference_cost_per_replicate_units,
+            )?;
+            if cost <= config.resource_budget_units {
+                plans.push(AdditionalReplicationPlan {
+                    kind: ReplicationPlanKind::ReferenceOnly,
+                    additional_candidate_replicates: 0,
+                    additional_reference_replicates: additional,
+                    incremental_resource_units: cost,
+                    projected_candidate_expanded_uncertainty_uj: candidate_u,
+                    projected_reference_expanded_uncertainty_uj: reference_u,
+                    projected_interval_gap_uj: gap - candidate_u - reference_u,
+                });
+            }
+            break;
+        }
+
+        // Paired plan: acquire one additional replicate for each side per step.
+        let candidate_u = projected_expanded_uncertainty(
+            candidate,
+            candidate.replicate_count + additional,
+        );
+        let reference_u = projected_expanded_uncertainty(
+            reference,
+            reference.replicate_count + additional,
+        );
+        if gap > candidate_u + reference_u {
+            let per_pair = config.candidate_cost_per_replicate_units
+                .checked_add(config.reference_cost_per_replicate_units)
+                .ok_or_else(|| MetrologyUncertaintyError::new("replication_cost", "paired cost overflow"))?;
+            let cost = checked_replication_cost(additional, per_pair)?;
+            if cost <= config.resource_budget_units {
+                plans.push(AdditionalReplicationPlan {
+                    kind: ReplicationPlanKind::PairedCandidateAndReference,
+                    additional_candidate_replicates: additional,
+                    additional_reference_replicates: additional,
+                    incremental_resource_units: cost,
+                    projected_candidate_expanded_uncertainty_uj: candidate_u,
+                    projected_reference_expanded_uncertainty_uj: reference_u,
+                    projected_interval_gap_uj: gap - candidate_u - reference_u,
+                });
+            }
+            break;
+        }
+    }
+
+    plans.sort_by(|left, right| {
+        left.incremental_resource_units.cmp(&right.incremental_resource_units)
+            .then_with(|| {
+                (left.additional_candidate_replicates + left.additional_reference_replicates)
+                    .cmp(&(right.additional_candidate_replicates + right.additional_reference_replicates))
+            })
+            .then_with(|| (left.kind as u8).cmp(&(right.kind as u8)))
+    });
+
+    if let Some(plan) = plans.into_iter().next() {
+        Ok(EnergyReplicationPlanningResult {
+            status: ReplicationPlanningStatus::AdditionalReplicatesRequired,
+            current_decision: current.decision,
+            mean_energy_gap_uj: gap,
+            irreducible_type_b_interval_floor_uj: type_b_floor,
+            plan: Some(plan),
+        })
+    } else {
+        Ok(EnergyReplicationPlanningResult {
+            status: ReplicationPlanningStatus::NoPlanWithinBudgetOrHorizon,
+            current_decision: current.decision,
+            mean_energy_gap_uj: gap,
+            irreducible_type_b_interval_floor_uj: type_b_floor,
+            plan: None,
+        })
+    }
+}
+
 /// Only claim strict superiority when the expanded intervals do not overlap.
 /// Shared systematic errors are not assumed to cancel; paired-covariance modeling is a
 /// separate future extension and must be justified by the acquisition design.
@@ -532,6 +773,62 @@ mod tests {
         receipt.type_a_standard_uncertainty_uj = 0.0;
         receipt.receipt_sha256 = receipt_sha256(&receipt).unwrap();
         assert!(validate_energy_uncertainty_receipt(&receipt).is_err());
+    }
+
+    #[test]
+    fn replication_planner_finds_cheapest_candidate_only_action() {
+        let candidate = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 12.0]), &manifest()).unwrap();
+        let reference = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 10.0]), &manifest()).unwrap();
+        let plan = plan_additional_energy_replicates(
+            &candidate,
+            &reference,
+            ReplicationPlanningConfig {
+                candidate_cost_per_replicate_units: 1,
+                reference_cost_per_replicate_units: 3,
+                resource_budget_units: 100,
+                maximum_additional_replicates_per_side: 10_000,
+            },
+        ).unwrap();
+        assert_eq!(plan.status, ReplicationPlanningStatus::AdditionalReplicatesRequired);
+        assert_eq!(plan.plan.unwrap().kind, ReplicationPlanKind::CandidateOnly);
+    }
+
+    #[test]
+    fn replication_planner_stops_when_type_b_floor_exceeds_mean_gap() {
+        let mut m = manifest();
+        m.type_b_relative_standard_uncertainty = 0.10;
+        m.manifest_sha256 = compute_metrology_manifest_sha256(&m).unwrap();
+        let candidate = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 10.0, 10.0]), &m).unwrap();
+        let reference = evaluate_ppk2_energy_uncertainty(&trace(&[9.0, 9.0, 9.0]), &m).unwrap();
+        let plan = plan_additional_energy_replicates(
+            &candidate,
+            &reference,
+            ReplicationPlanningConfig {
+                candidate_cost_per_replicate_units: 1,
+                reference_cost_per_replicate_units: 1,
+                resource_budget_units: 10_000,
+                maximum_additional_replicates_per_side: 1_000,
+            },
+        ).unwrap();
+        assert_eq!(plan.status, ReplicationPlanningStatus::MetrologyLimited);
+        assert!(plan.plan.is_none());
+    }
+
+    #[test]
+    fn replication_planner_respects_resource_budget_and_horizon() {
+        let candidate = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 12.0]), &manifest()).unwrap();
+        let reference = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 10.0]), &manifest()).unwrap();
+        let plan = plan_additional_energy_replicates(
+            &candidate,
+            &reference,
+            ReplicationPlanningConfig {
+                candidate_cost_per_replicate_units: 100,
+                reference_cost_per_replicate_units: 100,
+                resource_budget_units: 1,
+                maximum_additional_replicates_per_side: 10,
+            },
+        ).unwrap();
+        assert_eq!(plan.status, ReplicationPlanningStatus::NoPlanWithinBudgetOrHorizon);
     }
 
     #[test]
