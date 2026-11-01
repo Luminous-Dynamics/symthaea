@@ -6,7 +6,8 @@
     "cohort_id": "synthetic-cohort",
     "snapshot_id": "synthetic-snapshot",
     "task_id": "1111111111111111111111111111111111111111111111111111111111111111",
-    "task_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    "task_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "source_task_id": "synthetic-task-not-real"
   },
   "target": {
     "repository_remote": "https://github.com/example/synthetic-lean-project",
