@@ -27,6 +27,13 @@ pub struct ActionConditionedForecastReceipt {
     pub predicted_future_hv: Vec<f32>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActionConditionedCandidateAction {
+    pub action_id: u64,
+    pub action_descriptor_sha256: String,
+    pub action_embedding: Vec<f32>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PendingActionConditionedForecastState {
     pub receipt: ActionConditionedForecastReceipt,
@@ -195,6 +202,105 @@ impl ActionConditionedVisualResidualPredictor {
         Ok(receipt)
     }
 
+    /// Issue a frozen candidate action set from one shared observed history,
+    /// autonomous baseline and model version. All rows are created atomically
+    /// and returned in ascending action-ID order.
+    pub fn issue_action_set(
+        &mut self,
+        history_sha256: &str,
+        source_frame_sequence: u64,
+        action_manifest_sha256: &str,
+        horizon_seconds: f32,
+        autonomous_base_prediction: &[f32],
+        candidates: &[ActionConditionedCandidateAction],
+    ) -> Result<Vec<ActionConditionedForecastReceipt>, ActionConditionedPredictorError> {
+        if !is_lower_hex_sha256(history_sha256) || !is_lower_hex_sha256(action_manifest_sha256) {
+            return Err(ActionConditionedPredictorError::InvalidDigest);
+        }
+        if !horizon_seconds.is_finite() || horizon_seconds <= 0.0 {
+            return Err(ActionConditionedPredictorError::InvalidHorizon);
+        }
+        if autonomous_base_prediction.len() != self.dim
+            || autonomous_base_prediction.iter().any(|v| !v.is_finite())
+        {
+            return Err(if autonomous_base_prediction.len() != self.dim {
+                ActionConditionedPredictorError::InvalidVectorDimension
+            } else {
+                ActionConditionedPredictorError::NonFiniteValue
+            });
+        }
+        if candidates.len() < 2 {
+            return Err(ActionConditionedPredictorError::InvalidConfiguration);
+        }
+        if self.pending.len().checked_add(candidates.len())
+            .is_none_or(|count| count > self.max_pending_forecasts)
+        {
+            return Err(ActionConditionedPredictorError::PendingQueueFull);
+        }
+        let next_forecast_id = self.next_forecast_id
+            .checked_add(candidates.len() as u64)
+            .ok_or(ActionConditionedPredictorError::ForecastIdExhausted)?;
+
+        let mut ordered: Vec<&ActionConditionedCandidateAction> = candidates.iter().collect();
+        ordered.sort_unstable_by_key(|candidate| candidate.action_id);
+        if ordered.windows(2).any(|pair| pair[0].action_id == pair[1].action_id) {
+            return Err(ActionConditionedPredictorError::InvalidConfiguration);
+        }
+        for candidate in &ordered {
+            if !is_lower_hex_sha256(&candidate.action_descriptor_sha256) {
+                return Err(ActionConditionedPredictorError::InvalidDigest);
+            }
+            if candidate.action_embedding.len() != self.dim {
+                return Err(ActionConditionedPredictorError::InvalidVectorDimension);
+            }
+            if candidate.action_embedding.iter().any(|v| !v.is_finite()) {
+                return Err(ActionConditionedPredictorError::NonFiniteValue);
+            }
+        }
+
+        let model_version = self.training_steps;
+        let mut receipts = Vec::with_capacity(ordered.len());
+        let mut pending_records = Vec::with_capacity(ordered.len());
+        for (offset, candidate) in ordered.iter().enumerate() {
+            let forecast_id = self.next_forecast_id + offset as u64;
+            let predicted_future_hv: Vec<f32> = autonomous_base_prediction
+                .iter()
+                .zip(&candidate.action_embedding)
+                .zip(&self.action_weights)
+                .map(|((&base, &action), &weight)| base + action * weight)
+                .collect();
+            if predicted_future_hv.iter().any(|v| !v.is_finite()) {
+                return Err(ActionConditionedPredictorError::NonFiniteValue);
+            }
+            let receipt = ActionConditionedForecastReceipt {
+                forecast_id,
+                history_sha256: history_sha256.to_owned(),
+                source_frame_sequence,
+                action_manifest_sha256: action_manifest_sha256.to_owned(),
+                action_descriptor_sha256: candidate.action_descriptor_sha256.clone(),
+                action_id: candidate.action_id,
+                horizon_seconds,
+                model_version,
+                predicted_future_hv,
+            };
+            pending_records.push((
+                forecast_id,
+                PendingActionConditionedForecastState {
+                    receipt: receipt.clone(),
+                    autonomous_base_prediction: autonomous_base_prediction.to_vec(),
+                    action_embedding: candidate.action_embedding.clone(),
+                },
+            ));
+            receipts.push(receipt);
+        }
+
+        for (forecast_id, pending) in pending_records {
+            self.pending.insert(forecast_id, pending);
+        }
+        self.next_forecast_id = next_forecast_id;
+        Ok(receipts)
+    }
+
     /// Score a previously sealed forecast against a later real encoded visual
     /// observation, then apply one online update. Each forecast ID is consumed
     /// at most once. An over-late target expires the forecast without training.
@@ -317,7 +423,9 @@ impl ActionConditionedVisualResidualPredictor {
         let mut pending = BTreeMap::new();
         for forecast in &state.pending {
             let receipt = &forecast.receipt;
-            if receipt.forecast_id >= state.next_forecast_id
+            if receipt.forecast_id == 0
+                || receipt.forecast_id >= state.next_forecast_id
+                || receipt.model_version > state.training_steps
                 || receipt.predicted_future_hv.len() != self.dim
                 || forecast.autonomous_base_prediction.len() != self.dim
                 || forecast.action_embedding.len() != self.dim
@@ -382,6 +490,74 @@ mod tests {
         assert_eq!(receipt.predicted_future_hv, base);
         assert_eq!(receipt.model_version, 0);
         assert_eq!(model.pending_forecast_count(), 1);
+    }
+
+
+    #[test]
+    fn action_set_issues_every_candidate_from_one_history_and_model_version() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 50, &digest('b'), 0.25, &[0.2, -0.1], &candidates
+        ).unwrap();
+        assert_eq!(receipts.len(), 2);
+        assert_eq!(receipts[0].action_id, 3);
+        assert_eq!(receipts[1].action_id, 17);
+        assert!(receipts.iter().all(|receipt| receipt.history_sha256 == digest('a')));
+        assert!(receipts.iter().all(|receipt| receipt.action_manifest_sha256 == digest('b')));
+        assert!(receipts.iter().all(|receipt| receipt.source_frame_sequence == 50));
+        assert!(receipts.iter().all(|receipt| receipt.model_version == 0));
+        assert_ne!(receipts[0].action_descriptor_sha256, receipts[1].action_descriptor_sha256);
+        assert_eq!(model.pending_forecast_count(), 2);
+    }
+
+    #[test]
+    fn action_set_issue_is_atomic_on_duplicate_ids_or_bad_action_embedding() {
+        let mut model = predictor();
+        let duplicate = vec![
+            ActionConditionedCandidateAction {
+                action_id: 7,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 7,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![0.0, 1.0],
+            },
+        ];
+        assert_eq!(
+            model.issue_action_set(&digest('a'), 1, &digest('b'), 1.0, &[0.0, 0.0], &duplicate),
+            Err(ActionConditionedPredictorError::InvalidConfiguration)
+        );
+        let malformed = vec![
+            ActionConditionedCandidateAction {
+                action_id: 7,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 8,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![0.0],
+            },
+        ];
+        assert_eq!(
+            model.issue_action_set(&digest('a'), 1, &digest('b'), 1.0, &[0.0, 0.0], &malformed),
+            Err(ActionConditionedPredictorError::InvalidVectorDimension)
+        );
+        assert_eq!(model.pending_forecast_count(), 0);
     }
 
     #[test]
