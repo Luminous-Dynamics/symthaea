@@ -48,6 +48,8 @@ Declaration values retain two roles:
 - transparent_value is a typing-visible dependency for ordinary transparent lets.
 - nondep_value_provenance records the assignment behind a nondependent have, but is not automatically a typing prerequisite.
 
+The synthetic fixture includes both an ordinary transparent let referencing an earlier local and a nondependent have whose assigned value references an earlier proof. The Rust verifier checks their separate edge counts (three typing edges versus one provenance edge) and rejects a declaration that mixes those two fields.
+
 The validator rejects a declaration that mixes those two fields. It derives separate direct-edge counts for typing dependencies and assigned-value provenance. It also rejects self/later telescope references, out-of-context FVars, out-of-scope De Bruijn indices, duplicate local-instance indices, unsafe source paths, unresolved metavariables, and digest mismatches.
 
 ## Canonical transcript and hash domains
