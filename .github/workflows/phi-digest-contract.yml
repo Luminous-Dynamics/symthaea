@@ -104,7 +104,7 @@ jobs:
       - name: Verify the generated reference artifact is fully qualified
         shell: bash
         run: |
-          python -c 'import json, pathlib; p=pathlib.Path("target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json"); d=json.loads(p.read_text()); assert d["status"] == "PASS", d["status"]; assert d["summary"]["passed_anchor_count"] == 6 and d["summary"]["failed_anchor_count"] == 0, d["summary"]; assert d["provenance"]["version"] == "2.0.0rc4"; assert d["provenance"]["formalism"] == "IIT_4_0_2023"; print("PASS: six pinned PyPhi anchors; upstream reference smoke test only")'
+          python -c 'import json, pathlib; p=pathlib.Path("target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json"); d=json.loads(p.read_text()); assert d["status"] == "PASS", d["status"]; assert d["summary"]["passed_anchor_count"] == 6 and d["summary"]["failed_anchor_count"] == 0, d["summary"]; assert d["provenance"]["version"] == "2.0.0rc4"; assert d["provenance"]["formalism"] == "IIT_4_0_2023"; assert d["provenance"]["pyphi_wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"; print("PASS: six pinned PyPhi anchors; verified wheel; upstream reference smoke test only")'
 
       - name: Upload pinned PyPhi reference evidence
         if: always()
