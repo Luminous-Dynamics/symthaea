@@ -22,9 +22,21 @@ const VERSION: &str = "pitb.benchmark-integrity-receipt.v0";
 #[derive(Debug, Clone)]
 pub struct IntegritySummary {
     pub receipt_sha256: String,
+    pub cohort_id: String,
+    pub snapshot_id: String,
     pub task_id: String,
+    pub source_task_id: String,
     pub statement_sha256: String,
     pub integrity_status: String,
+    pub repository_remote: String,
+    pub repository_commit: String,
+    pub source_path: String,
+    pub start_line: u64,
+    pub start_column: u64,
+    pub end_line: u64,
+    pub end_column: u64,
+    pub lean_toolchain: String,
+    pub lake_manifest_sha256: String,
     pub used_axiom_count: usize,
     pub allowed_axiom_count: usize,
 }
@@ -208,7 +220,16 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     }
 
     let task_id = string(value, "/dataset/task_id")?.to_owned();
+    let source_task_id = string(value, "/dataset/source_task_id")?.to_owned();
     let statement_sha256 = string(value, "/target/statement_sha256")?.to_owned();
+    if source_task_id.trim().is_empty() {
+        bail!("dataset.source_task_id cannot be empty");
+    }
+    if evidence_class == "measured_audit"
+        && hex::encode(Sha256::digest(source_task_id.as_bytes())) != task_id
+    {
+        bail!("dataset.task_id must be SHA-256(source_task_id) for measured receipts");
+    }
     if string(value, "/dataset/cohort_id")?.trim().is_empty()
         || string(value, "/dataset/snapshot_id")?.trim().is_empty()
         || string(value, "/target/repository_remote")?.trim().is_empty()
@@ -329,9 +350,21 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
 
     Ok(IntegritySummary {
         receipt_sha256,
+        cohort_id: string(value, "/dataset/cohort_id")?.to_owned(),
+        snapshot_id: string(value, "/dataset/snapshot_id")?.to_owned(),
         task_id,
+        source_task_id,
         statement_sha256,
         integrity_status: expected.to_owned(),
+        repository_remote: string(value, "/target/repository_remote")?.to_owned(),
+        repository_commit: repository_commit.to_owned(),
+        source_path: string(value, "/target/source_path")?.to_owned(),
+        start_line,
+        start_column,
+        end_line,
+        end_column,
+        lean_toolchain: string(value, "/environment/lean_toolchain")?.to_owned(),
+        lake_manifest_sha256: string(value, "/environment/lake_manifest_sha256")?.to_owned(),
         used_axiom_count: used_axioms.len(),
         allowed_axiom_count: allowed_axioms.len(),
     })
