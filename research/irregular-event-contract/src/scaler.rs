@@ -169,7 +169,7 @@ impl TrainOnlyStandardizer {
                 return Err(ScalerError::InvalidSplitPlan);
             }
         }
-        let entities: BTreeSet<u64> = window_by_id.values().copied().collect();
+        let entities: BTreeSet<u64> = window_by_id.values().map(|(entity_id, _, _)| *entity_id).collect();
         let boundary_entities: BTreeSet<u64> = boundaries.keys().copied().collect();
         if entities != boundary_entities {
             return Err(ScalerError::InvalidSplitPlan);
