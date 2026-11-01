@@ -29,6 +29,7 @@ pub mod metrology_uncertainty;
 pub mod phase_energy_audit;
 pub mod edge_intelligence_benchmark;
 pub mod application_event_uncertainty;
+pub mod edge_candidate_evidence;
 pub mod pareto_hypervolume_qmc;
 pub mod pareto_portfolio_voc;
 pub mod multi_resource_budget;
