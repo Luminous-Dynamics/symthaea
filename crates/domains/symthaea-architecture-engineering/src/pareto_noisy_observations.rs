@@ -181,6 +181,7 @@ pub struct NoisyReplicate {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CandidateSamples {
     decision_sha256: String,
     samples: BTreeMap<String, NoisyReplicate>,
