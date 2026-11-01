@@ -45,12 +45,13 @@ The command prints a JSON report. It exits successfully only for an aggregate va
 
 ## Current tests
 
-The Rust module contains 12 unit tests covering:
+The Rust module contains 14 unit tests covering:
 - all-required-valid admission;
 - missing-required unknown;
+- all nine pairings of the strong-Kleene AND truth table;
 - invalid-over-unknown reduction;
 - subject binding mismatch;
-- context re-verification;
+- context and policy re-verification;
 - duplicate and unexpected obligation IDs;
 - optional unknown preservation;
 - empty profile rejection;
