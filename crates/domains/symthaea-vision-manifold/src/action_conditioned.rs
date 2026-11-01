@@ -86,6 +86,14 @@ pub struct ActionConditionedForecastScore {
     pub model_version_after: u64,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActionConditionedObservedOutcome {
+    pub forecast_id: u64,
+    pub actual_future_hv: Vec<f32>,
+    pub observed_frame_sequence: u64,
+    pub observation_delay_seconds: f32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActionConditionedPredictorError {
     InvalidConfiguration,
@@ -101,6 +109,8 @@ pub enum ActionConditionedPredictorError {
     ForecastTooLate,
     InvalidCheckpointState,
     NonFiniteUpdate,
+    ActionSetMismatch,
+    DuplicateActionId,
 }
 
 /// A diagonal, action-conditioned residual head over an autonomous future HV.
@@ -354,6 +364,157 @@ impl ActionConditionedVisualResidualPredictor {
         }
         self.next_forecast_id = next_forecast_id;
         Ok(receipts)
+    }
+
+    /// Score and learn from a complete action set after every branch has
+    /// produced its later real visual observation. All forecasts must share
+    /// the exact history, action manifest, source frame, horizon, checkpoint
+    /// and model version. Scores are computed first; one averaged update is
+    /// applied only after the entire set validates.
+    pub fn score_action_set_and_learn(
+        &mut self,
+        outcomes: &[ActionConditionedObservedOutcome],
+    ) -> Result<Vec<ActionConditionedForecastScore>, ActionConditionedPredictorError> {
+        if outcomes.len() < 2 {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+        let mut forecast_ids = Vec::with_capacity(outcomes.len());
+        let mut pending_records = Vec::with_capacity(outcomes.len());
+        for outcome in outcomes {
+            if forecast_ids.contains(&outcome.forecast_id) {
+                return Err(ActionConditionedPredictorError::ActionSetMismatch);
+            }
+            forecast_ids.push(outcome.forecast_id);
+            let pending = self.pending.get(&outcome.forecast_id)
+                .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
+            pending_records.push(pending.clone());
+        }
+
+        let first = &pending_records[0].receipt;
+        let mut action_ids = Vec::with_capacity(pending_records.len());
+        for pending in &pending_records {
+            let receipt = &pending.receipt;
+            if receipt.history_sha256 != first.history_sha256
+                || receipt.action_manifest_sha256 != first.action_manifest_sha256
+                || receipt.source_frame_sequence != first.source_frame_sequence
+                || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
+                || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+                || receipt.model_version != first.model_version
+                || receipt.model_version != self.training_steps
+            {
+                return Err(ActionConditionedPredictorError::ActionSetMismatch);
+            }
+            action_ids.push(receipt.action_id);
+        }
+        action_ids.sort_unstable();
+        if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ActionConditionedPredictorError::DuplicateActionId);
+        }
+        let next_training_step = self.training_steps.checked_add(1)
+            .ok_or(ActionConditionedPredictorError::ForecastIdExhausted)?;
+
+        let mut all_late = false;
+        for (pending, outcome) in pending_records.iter().zip(outcomes) {
+            if outcome.actual_future_hv.len() != self.dim {
+                return Err(ActionConditionedPredictorError::InvalidVectorDimension);
+            }
+            if outcome.actual_future_hv.iter().any(|value| !value.is_finite()) {
+                return Err(ActionConditionedPredictorError::NonFiniteValue);
+            }
+            if outcome.observed_frame_sequence <= pending.receipt.source_frame_sequence {
+                return Err(ActionConditionedPredictorError::ObservationNotLater);
+            }
+            if !outcome.observation_delay_seconds.is_finite()
+                || outcome.observation_delay_seconds < 0.0
+            {
+                return Err(ActionConditionedPredictorError::NonFiniteValue);
+            }
+            if outcome.observation_delay_seconds < pending.receipt.horizon_seconds {
+                return Err(ActionConditionedPredictorError::ObservationBeforeTarget);
+            }
+            let lateness = outcome.observation_delay_seconds - pending.receipt.horizon_seconds;
+            all_late |= lateness > pending.receipt.horizon_seconds * self.max_lateness_factor;
+        }
+        if all_late {
+            for forecast_id in &forecast_ids {
+                self.pending.remove(forecast_id);
+            }
+            self.expired_forecasts = self.expired_forecasts
+                .saturating_add(forecast_ids.len() as u64);
+            return Err(ActionConditionedPredictorError::ForecastTooLate);
+        }
+
+        let mut updated_weights = self.action_weights.clone();
+        let mut scores = Vec::with_capacity(outcomes.len());
+        let set_count = outcomes.len() as f32;
+        for (pending, outcome) in pending_records.iter().zip(outcomes) {
+            let prediction = &pending.receipt.predicted_future_hv;
+            let base = &pending.autonomous_base_prediction;
+            let action = &pending.action_embedding;
+            let mut squared_error = 0.0f64;
+            for index in 0..self.dim {
+                let error = outcome.actual_future_hv[index] - prediction[index];
+                squared_error += f64::from(error) * f64::from(error);
+                let gradient = (error * action[index]).clamp(-1.0, 1.0);
+                updated_weights[index] += self.learning_rate * gradient / set_count;
+            }
+            if !squared_error.is_finite() {
+                return Err(ActionConditionedPredictorError::NonFiniteUpdate);
+            }
+            let actual = symthaea_core::hdc::ContinuousHV::from_vec(outcome.actual_future_hv.clone());
+            let predicted = symthaea_core::hdc::ContinuousHV::from_vec(prediction.clone());
+            let base_hv = symthaea_core::hdc::ContinuousHV::from_vec(base.clone());
+            let observation_delay_seconds = outcome.observation_delay_seconds;
+            let lateness_seconds = observation_delay_seconds - pending.receipt.horizon_seconds;
+            let mut score = ActionConditionedForecastScore {
+                schema_version: ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION,
+                forecast_id: pending.receipt.forecast_id,
+                history_sha256: pending.receipt.history_sha256.clone(),
+                action_manifest_sha256: pending.receipt.action_manifest_sha256.clone(),
+                action_descriptor_sha256: pending.receipt.action_descriptor_sha256.clone(),
+                model_checkpoint_sha256: pending.receipt.model_checkpoint_sha256.clone(),
+                forecast_sha256: pending.receipt.forecast_sha256.clone(),
+                observed_future_hv_sha256: hash_f32_vector(
+                    b"vis005-observed-future-visual-hv-v1",
+                    &outcome.actual_future_hv,
+                ),
+                score_sha256: String::new(),
+                action_id: pending.receipt.action_id,
+                source_frame_sequence: pending.receipt.source_frame_sequence,
+                observed_frame_sequence: outcome.observed_frame_sequence,
+                observation_delay_seconds,
+                lateness_seconds,
+                prediction_error: 1.0 - actual.similarity(&predicted).clamp(-1.0, 1.0),
+                autonomous_baseline_error: 1.0 - actual.similarity(&base_hv).clamp(-1.0, 1.0),
+                improvement_over_autonomous_baseline: 0.0,
+                mean_squared_error: (squared_error / self.dim as f64) as f32,
+                model_version_before: self.training_steps,
+                model_version_after: next_training_step,
+            };
+            score.improvement_over_autonomous_baseline =
+                score.autonomous_baseline_error - score.prediction_error;
+            score.score_sha256 = hash_forecast_score(&score);
+            if [
+                score.prediction_error,
+                score.autonomous_baseline_error,
+                score.improvement_over_autonomous_baseline,
+                score.mean_squared_error,
+            ].iter().any(|value| !value.is_finite())
+            {
+                return Err(ActionConditionedPredictorError::NonFiniteUpdate);
+            }
+            scores.push(score);
+        }
+        if updated_weights.iter().any(|value| !value.is_finite()) {
+            return Err(ActionConditionedPredictorError::NonFiniteUpdate);
+        }
+
+        for forecast_id in &forecast_ids {
+            self.pending.remove(forecast_id);
+        }
+        self.action_weights = updated_weights;
+        self.training_steps = next_training_step;
+        Ok(scores)
     }
 
     /// Score a previously sealed forecast against a later real encoded visual
@@ -719,6 +880,95 @@ mod tests {
             Err(ActionConditionedPredictorError::InvalidVectorDimension)
         );
         assert_eq!(model.pending_forecast_count(), 0);
+    }
+
+
+    #[test]
+    fn action_set_scores_all_branches_at_one_version_then_updates_once() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 1.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, -1.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 100, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let scores = model.score_action_set_and_learn(&[
+            ActionConditionedObservedOutcome {
+                forecast_id: receipts[0].forecast_id,
+                actual_future_hv: vec![-0.5, -0.25],
+                observed_frame_sequence: 101,
+                observation_delay_seconds: 1.0,
+            },
+            ActionConditionedObservedOutcome {
+                forecast_id: receipts[1].forecast_id,
+                actual_future_hv: vec![0.5, 0.25],
+                observed_frame_sequence: 101,
+                observation_delay_seconds: 1.0,
+            },
+        ]).unwrap();
+        assert_eq!(scores.len(), 2);
+        assert!(scores.iter().all(|score| score.model_version_before == 0));
+        assert!(scores.iter().all(|score| score.model_version_after == 1));
+        assert!(scores.iter().all(|score| score.history_sha256 == digest('a')));
+        assert!(scores.iter().all(|score| score.action_manifest_sha256 == digest('b')));
+        assert!(scores.iter().all(|score| score.score_sha256 == hash_forecast_score(score)));
+        assert_eq!(model.training_steps(), 1);
+        assert_eq!(model.pending_forecast_count(), 0);
+    }
+
+    #[test]
+    fn action_set_batch_rejects_missing_duplicate_or_mixed_history_without_partial_update() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 100, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let duplicate = [
+            ActionConditionedObservedOutcome {
+                forecast_id: receipts[0].forecast_id,
+                actual_future_hv: vec![0.1, 0.0],
+                observed_frame_sequence: 101,
+                observation_delay_seconds: 1.0,
+            },
+            ActionConditionedObservedOutcome {
+                forecast_id: receipts[0].forecast_id,
+                actual_future_hv: vec![0.1, 0.0],
+                observed_frame_sequence: 101,
+                observation_delay_seconds: 1.0,
+            },
+        ];
+        assert_eq!(
+            model.score_action_set_and_learn(&duplicate),
+            Err(ActionConditionedPredictorError::ActionSetMismatch)
+        );
+        assert_eq!(model.training_steps(), 0);
+        assert_eq!(model.pending_forecast_count(), 2);
+        let incomplete = [duplicate[0].clone()];
+        assert_eq!(
+            model.score_action_set_and_learn(&incomplete),
+            Err(ActionConditionedPredictorError::ActionSetMismatch)
+        );
+        assert_eq!(model.pending_forecast_count(), 2);
     }
 
     #[test]
