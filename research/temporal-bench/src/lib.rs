@@ -12,6 +12,7 @@ use digest::CanonicalHasher;
 
 pub mod digest;
 pub mod active_sensing;
+pub mod candidate_protocol;
 pub mod active_sensing_simulator;
 pub mod harth_stream;
 pub mod edge_adapter;
