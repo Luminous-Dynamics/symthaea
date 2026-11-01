@@ -114,8 +114,13 @@ fn authenticate_artifact(
     expected_sha256: Option<&str>,
     label: &str,
 ) -> Result<bool> {
+    if evidence_class == "synthetic_outcome_fixture" {
+        if path.is_some() {
+            bail!("synthetic outcome fixtures cannot claim measured evidence artifact files");
+        }
+        return Ok(false);
+    }
     match (path, expected_sha256) {
-        (None, None) if evidence_class == "synthetic_outcome_fixture" => Ok(false),
         (Some(_), None) | (None, Some(_)) => {
             bail!("{label} path and digest must either both be present or both be null")
         }
@@ -474,6 +479,7 @@ fn validate_and_analyze(
         let mut ties = 0_u64;
         let mut difference_sum = 0_i64;
         let mut by_component = BTreeMap::<String, Vec<i64>>::new();
+        let mut paired_cost_difference_microusd = 0_i128;
         for pair in &paired_outcomes {
             let treatment = i64::from(pair.successes[arm_id]);
             let control = i64::from(pair.successes[&control_id]);
@@ -486,12 +492,16 @@ fn validate_and_analyze(
             } else {
                 ties += 1;
             }
+            paired_cost_difference_microusd +=
+                i128::from(pair.costs_microusd[arm_id]) - i128::from(pair.costs_microusd[&control_id]);
             by_component
                 .entry(pair.component_id.clone())
                 .or_default()
                 .push(difference);
         }
         let paired_risk_difference = difference_sum as f64 / n as f64;
+        let paired_mean_cost_difference_microusd =
+            paired_cost_difference_microusd as f64 / n as f64;
         let (lower, upper) = cluster_bootstrap(
             &by_component,
             BOOTSTRAP_REPLICATES,
@@ -509,6 +519,7 @@ fn validate_and_analyze(
             "paired_ties":ties,
             "paired_itt_risk_difference":paired_risk_difference,
             "paired_itt_risk_difference_ppm":(paired_risk_difference * 1_000_000.0).round() as i64,
+            "paired_mean_cost_difference_microusd":paired_mean_cost_difference_microusd,
             "component_cluster_bootstrap_95_ci_ppm":[
                 (lower * 1_000_000.0).round() as i64,
                 (upper * 1_000_000.0).round() as i64
