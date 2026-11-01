@@ -884,6 +884,18 @@ mod tests {
     }
 
     #[test]
+    fn action_binding_digest_matches_canonical_known_answer() {
+        assert_eq!(
+            action_binding_sha256(&"d".repeat(64), 42, 2).unwrap(),
+            "7dcaef4622fc543531ab6970e802c4a1b271c8f16d1d4f5d65ec06f4a770f2fc"
+        );
+        assert_ne!(
+            action_binding_sha256(&"d".repeat(64), 42, 2).unwrap(),
+            action_binding_sha256(&"d".repeat(64), 43, 2).unwrap()
+        );
+    }
+
+    #[test]
     fn candidate_set_digest_is_row_order_invariant_and_binds_action_mapping() {
         let manifest = "b".repeat(64);
         let left = [
@@ -949,6 +961,10 @@ mod tests {
                 .map(|item| item.action_id)
                 .collect::<Vec<_>>(),
             vec![700, 300, 900]
+        );
+        assert_eq!(
+            result.predictor_parameters_sha256,
+            engine.predictor_parameters_sha256()
         );
         assert_eq!(
             result
