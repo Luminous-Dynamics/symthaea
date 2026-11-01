@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 
 enum Mode {
     Help,
-    Verify { run_path: PathBuf, integrity_path: PathBuf, evidence_root: PathBuf },
+    Verify { run_path: PathBuf, integrity_path: PathBuf, evidence_root: PathBuf, reviewer_registry_path: PathBuf, expected_registry_sha256: String },
     SelfTest { run_path: PathBuf, integrity_path: PathBuf },
 }
 
@@ -357,7 +357,7 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     let mut run_span_mutation: Value = serde_json::from_slice(&run_bytes)?;
     run_span_mutation["task_integrity"]["receipt_sha256"] = json!(sha256_hex(&span_mutation_bytes));
     let run_span_mutation_bytes = json_bytes(&run_span_mutation)?;
-    if verify_pair(&run_span_mutation_bytes, &span_mutation_bytes, &evidence_root).is_ok() {
+    if verify_pair(&run_span_mutation_bytes, &span_mutation_bytes, &evidence_root, &registry_bytes, &registry_sha256).is_ok() {
         bail!("source coordinate mutation did not invalidate the exact source-span digest");
     }
     println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: source coordinates must select exact recorded source-span bytes");
@@ -427,7 +427,7 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
 fn parse_mode() -> Result<Mode> {
     let mut args = env::args().skip(1);
     let Some(action) = args.next() else {
-        bail!("expected --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT, --self-test RUN_FIXTURE INTEGRITY_FIXTURE, or --help");
+        bail!("expected --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT REVIEWER_REGISTRY EXPECTED_REGISTRY_SHA256, --self-test RUN_FIXTURE INTEGRITY_FIXTURE, or --help");
     };
     if matches!(action.as_str(), "--help" | "-h") {
         return Ok(Mode::Help);
@@ -437,10 +437,12 @@ fn parse_mode() -> Result<Mode> {
     match action.as_str() {
         "--verify" => {
             let evidence_root = PathBuf::from(args.next().context("missing evidence root directory")?);
+            let reviewer_registry_path = PathBuf::from(args.next().context("missing reviewer registry path")?);
+            let expected_registry_sha256 = args.next().context("missing expected reviewer registry SHA-256")?;
             if args.next().is_some() {
                 bail!("too many --verify arguments");
             }
-            Ok(Mode::Verify { run_path, integrity_path, evidence_root })
+            Ok(Mode::Verify { run_path, integrity_path, evidence_root, reviewer_registry_path, expected_registry_sha256 })
         }
         "--self-test" => {
             if args.next().is_some() {
@@ -455,21 +457,28 @@ fn parse_mode() -> Result<Mode> {
 fn run() -> Result<()> {
     match parse_mode()? {
         Mode::Help => {
-            println!("Usage: verify_sorrydb_run_integrity --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT | --self-test RUN_FIXTURE INTEGRITY_FIXTURE");
+            println!("Usage: verify_sorrydb_run_integrity --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT REVIEWER_REGISTRY EXPECTED_REGISTRY_SHA256 | --self-test RUN_FIXTURE INTEGRITY_FIXTURE");
             Ok(())
         }
         Mode::SelfTest { run_path, integrity_path } => self_test(&run_path, &integrity_path),
-        Mode::Verify { run_path, integrity_path, evidence_root } => {
+        Mode::Verify { run_path, integrity_path, evidence_root, reviewer_registry_path, expected_registry_sha256 } => {
             let run_bytes = fs::read(&run_path).with_context(|| format!("read run receipt {}", run_path.display()))?;
             let integrity_bytes =
                 fs::read(&integrity_path).with_context(|| format!("read integrity receipt {}", integrity_path.display()))?;
-            let summary = verify_pair(&run_bytes, &integrity_bytes, &evidence_root)?;
+            let registry_bytes = fs::read(&reviewer_registry_path)
+                .with_context(|| format!("read reviewer registry {}", reviewer_registry_path.display()))?;
+            let actual_registry_sha256 = sha256_hex(&registry_bytes);
+            if actual_registry_sha256 != expected_registry_sha256 {
+                bail!("reviewer registry file does not match externally pinned SHA-256");
+            }
+            let summary = verify_pair(&run_bytes, &integrity_bytes, &evidence_root, &registry_bytes, &expected_registry_sha256)?;
             println!(
                 "PITB_SORRYDB_INTEGRITY_PASS: task={} snapshot={} commit={} status={}",
                 summary.source_task_id, summary.snapshot_id, summary.repository_commit, summary.integrity_status
             );
             println!("PITB_SORRYDB_INTEGRITY_SHA256: {}", summary.receipt_sha256);
             println!("PITB_SORRYDB_EVIDENCE_ARTIFACTS_PASS: {}", summary.verified_evidence_artifact_count);
+            println!("PITB_SORRYDB_REVIEWER_SIGNATURE_PASS: {}", summary.reviewer_signature_verified);
             Ok(())
         }
     }
