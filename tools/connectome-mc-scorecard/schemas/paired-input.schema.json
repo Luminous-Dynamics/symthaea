@@ -29,7 +29,9 @@
       "additionalProperties": false,
       "required": [
         "replicate_id",
-        "seed"
+        "seed",
+        "structural_beta",
+        "null_is_true"
       ],
       "properties": {
         "replicate_id": {
@@ -39,6 +41,12 @@
         "seed": {
           "type": "integer",
           "minimum": 0
+        },
+        "structural_beta": {
+          "type": "number"
+        },
+        "null_is_true": {
+          "type": "boolean"
         }
       }
     }
