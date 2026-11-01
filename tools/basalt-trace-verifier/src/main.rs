@@ -1,4 +1,4 @@
-use basalt_trace_verifier::{verify_reference, Trace};
+use basalt_trace_verifier::{Trace, verify_reference};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::env;
@@ -22,7 +22,9 @@ fn main() -> ExitCode {
         }
     }
     let Some(path) = trace_path else {
-        eprintln!("usage: basalt-trace-verifier --trace TRACE.json [--schema SCHEMA.json] [--out REPORT.json]");
+        eprintln!(
+            "usage: basalt-trace-verifier --trace TRACE.json [--schema SCHEMA.json] [--out REPORT.json]"
+        );
         return ExitCode::from(2);
     };
     let raw = match fs::read(&path) {
@@ -48,7 +50,12 @@ fn main() -> ExitCode {
     let mut report = verify_reference(&trace, &raw);
     if let Some(schema_path) = schema_path {
         match fs::read(&schema_path) {
-            Ok(schema_bytes) => report.schema_sha256 = Some(format!("sha256:{}", hex_lower(&Sha256::digest(&schema_bytes)))),
+            Ok(schema_bytes) => {
+                report.schema_sha256 = Some(format!(
+                    "sha256:{}",
+                    hex_lower(&Sha256::digest(&schema_bytes))
+                ))
+            }
             Err(error) => {
                 eprintln!("cannot read schema {schema_path}: {error}");
                 return ExitCode::from(2);
@@ -63,7 +70,12 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let code = match status.as_str() { "pass" => 0, "fail" => 1, "invalid_evidence" => 2, _ => 3 };
+    let code = match status.as_str() {
+        "pass" => 0,
+        "fail" => 1,
+        "invalid_evidence" => 2,
+        _ => 3,
+    };
     emit(output, report_path, code)
 }
 
@@ -84,7 +96,11 @@ fn emit(value: serde_json::Value, path: Option<String>, exit_code: u8) -> ExitCo
         }
         None => print!("{serialized}"),
     }
-    if exit_code == 0 { ExitCode::SUCCESS } else { ExitCode::from(exit_code) }
+    if exit_code == 0 {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(exit_code)
+    }
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
