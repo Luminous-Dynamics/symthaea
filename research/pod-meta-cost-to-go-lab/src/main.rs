@@ -7,7 +7,7 @@ use pod_meta_cost_to_go_lab::{
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
-use pod_meta_cost_to_go_lab::{extract_frontier_snapshot, FrontierAdapterContext};
+use pod_meta_cost_to_go_lab::{FrontierAdapterContext, extract_frontier_snapshot};
 use pod_meta_lab::graph::{
     ClaimNode, PlannerCase, Polarity, ProofAlternative, ProofRequirement, QueryProfile,
 };
@@ -586,12 +586,9 @@ fn main() {
 
     for node_count in [8_usize, 32, 64, 256, 1_000, 10_000, 100_000] {
         let (case, obligations) = frontier_chain_fixture(node_count);
-        let snapshot = extract_frontier_snapshot(
-            &case,
-            &obligations,
-            &FrontierAdapterContext::default(),
-        )
-        .unwrap();
+        let snapshot =
+            extract_frontier_snapshot(&case, &obligations, &FrontierAdapterContext::default())
+                .unwrap();
         let fingerprint = snapshot
             .fingerprint
             .iter()
