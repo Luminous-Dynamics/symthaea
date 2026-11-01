@@ -303,18 +303,18 @@ fn main() {
             .outcome(ForecastId(102))
             .is_some_and(|outcome| matches!(outcome.terminal, TerminalOutcome::RightCensored(_)))
     );
-    let unit_cost = tokens(3);
+    let unit_cost = ResourceVector::new(3, 3, 3, 3, 3, 3);
     let model_digest = [21; 32];
     let population_digest = [23; 32];
     let frontier_model = LinearProofFrontierCostModel {
         model_digest,
         point_cost: FrontierCostCoefficients {
-            intercept: tokens(10),
+            intercept: ResourceVector::new(10, 10, 10, 10, 10, 10),
             per_unresolved_obligation: unit_cost,
             ..FrontierCostCoefficients::default()
         },
         uncertainty_scale: FrontierCostCoefficients {
-            intercept: tokens(2),
+            intercept: ResourceVector::new(2, 2, 2, 2, 2, 2),
             ..FrontierCostCoefficients::default()
         },
     };
@@ -341,7 +341,14 @@ fn main() {
         .map(|score| {
             let point = frontier_prediction.point_cost;
             let scale = frontier_prediction.uncertainty_scale;
-            let residual = tokens(score * scale.tokens);
+            let residual = ResourceVector::new(
+                score * scale.tokens,
+                score * scale.tool_calls,
+                score * scale.cpu_ms,
+                score * scale.gpu_ms,
+                score * scale.wall_ms,
+                score * scale.micro_usd,
+            );
             CompletedCalibrationExample {
                 episode_id: score as u64,
                 prediction: frontier_prediction,
@@ -367,7 +374,7 @@ fn main() {
     let joint_fit = assess_joint_resource_fit(
         joint_envelope,
         tokens(5),
-        &BudgetLedger::new(tokens(1000)),
+        &BudgetLedger::new(ResourceVector::new(1000, 1000, 1000, 1000, 1000, 1000)),
     );
     assert_eq!(joint_fit, pod_meta_cost_to_go_lab::JointBudgetDecision::Fits);
     println!(
