@@ -600,8 +600,8 @@ impl BenchmarkRunManifest {
         hash_optional_digest(&mut h, self.preprocessing.scaler_state_sha256);
         hash_optional_digest(&mut h, self.preprocessing.scaler_fit_data_sha256);
         match self.preprocessing.missingness_policy {
-            MissingnessPolicy::PreserveMask => h.update([1]),
-            MissingnessPolicy::DropMissing => h.update([2]),
+            MissingnessPolicy::PreserveMask => { h.update([1]); }
+            MissingnessPolicy::DropMissing => { h.update([2]); }
             MissingnessPolicy::Impute { imputer_sha256 } => {
                 h.update([3]);
                 h.update(imputer_sha256);
@@ -628,7 +628,7 @@ impl BenchmarkRunManifest {
 
         hash_latency(&mut h, &self.latency)?;
         match &self.energy {
-            None => h.update([0]),
+            None => { h.update([0]); }
             Some(energy) => {
                 h.update([1]);
                 hash_boundary(&mut h, &energy.boundary)?;
@@ -658,7 +658,7 @@ fn hash_text(hasher: &mut Sha256, value: &str) -> Result<(), ManifestError> {
 
 fn hash_optional_text(hasher: &mut Sha256, value: Option<&str>) -> Result<(), ManifestError> {
     match value {
-        None => hasher.update([0]),
+        None => { hasher.update([0]); }
         Some(value) => {
             hasher.update([1]);
             hash_text(hasher, value)?;
@@ -669,7 +669,7 @@ fn hash_optional_text(hasher: &mut Sha256, value: Option<&str>) -> Result<(), Ma
 
 fn hash_optional_digest(hasher: &mut Sha256, value: Option<[u8; 32]>) {
     match value {
-        None => hasher.update([0]),
+        None => { hasher.update([0]); }
         Some(digest) => {
             hasher.update([1]);
             hasher.update(digest);
