@@ -222,6 +222,16 @@ measured, report that field as unavailable; do not silently substitute an
 estimate. Include host, memory, transfer fabric, preprocessing, idle listening
 and verification when they are required by the deployed path.
 
+### Direct irregular-forecasting challenge lane
+
+The companion NEURO-SILICON-011 track (#9700 / PR #9701) pins the real-data comparators that are closer to the temporal prediction core:
+- Time-IMM / IMM-TSF for cause-driven irregular multimodal data;
+- APN/TAPA (AAAI 2026) for adaptive time-aware patching;
+- KAFNet/CPA (AAAI 2026) for canonical pre-alignment and efficient cross-channel modeling;
+- GIFT-Eval for broad zero-shot forecasting.
+
+This lane matters because strong irregular baselines may regularize inputs or align modalities differently from Symthaea. Match actual available information, official preprocessing, training split and resource boundary. Do not treat paper-reported APN/KAFNet efficiency as reproduced. The current source audit notes an APN AdamW-vs-Adam paper/repository mismatch and that KAFNet's public README documents a HumanActivity reproduction script while the paper reports four datasets; reproduce the released code as pinned and report optimizer/script coverage explicitly. Time-IMM `date_time` fields must not be assumed to encode system availability time.
+
 ## 10. Industry comparison and stability/plasticity baselines
 
 - **Continual Learning Bench 1.0:** external stateful-agent validation. Its 2026
