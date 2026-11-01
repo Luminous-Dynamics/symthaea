@@ -568,12 +568,18 @@ mod tests {
     fn request(source: EntropySourceV1) -> SelfCritiqueScoringRequestV1 {
         let raw_partial_entropy = -(0.5_f64 * 0.5_f64.ln() + 0.3_f64 * 0.3_f64.ln());
         let topk_mode = matches!(source, EntropySourceV1::VllmTopKRawPartial);
+        let probabilities = vec![vec![0.5, 0.3]; 3];
+        let full_probabilities = vec![vec![0.5, 0.25, 0.125, 0.125]; 3];
+        let full_entropy = full_probabilities[0]
+            .iter()
+            .filter(|p| **p > 0.0)
+            .map(|p| -p * p.ln())
+            .sum::<f64>();
         let entropy = if topk_mode {
             vec![raw_partial_entropy; 3]
         } else {
-            vec![0.5, 1.0, 0.5]
+            vec![full_entropy; 3]
         };
-        let probabilities = vec![vec![0.5, 0.3]; 3];
         SelfCritiqueScoringRequestV1 {
             schema: SELF_CRITIQUE_REQUEST_SCHEMA.to_owned(),
             sample_id: "item-001".to_owned(),
@@ -587,7 +593,7 @@ mod tests {
             entropy_extractor_sha256: digest('2'),
             entropy_source: source,
             requested_top_k: topk_mode.then_some(2),
-            vocabulary_size: Some(if topk_mode { 4 } else { 151_936 }),
+            vocabulary_size: Some(4),
             initial_decode: GreedyDecodeEvidenceV1 {
                 greedy: true,
                 temperature: 0.0,
@@ -606,8 +612,8 @@ mod tests {
             critique_entropy_nats: entropy,
             initial_topk_probability_steps: topk_mode.then(|| probabilities.clone()),
             critique_topk_probability_steps: topk_mode.then_some(probabilities),
-            initial_full_vocab_probability_steps: None,
-            critique_full_vocab_probability_steps: None,
+            initial_full_vocab_probability_steps: (!topk_mode).then(|| full_probabilities.clone()),
+            critique_full_vocab_probability_steps: (!topk_mode).then_some(full_probabilities),
         }
     }
 
