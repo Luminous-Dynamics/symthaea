@@ -9,6 +9,8 @@ on:
       - "crates/bridges/symthaea-proof-insights/src/benchmark_integrity.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/verify_benchmark_integrity.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/verify_proof_intervention_trial.rs"
+      - "crates/bridges/symthaea-proof-insights/src/proof_intervention_trial.rs"
+      - "crates/bridges/symthaea-proof-insights/src/bin/analyze_proof_intervention_outcomes.rs"
       - "data/benchmarks/proof-insight-transfer-v0/intervention-trials/**"
       - "crates/bridges/symthaea-proof-insights/src/bin/verify_sorrydb_run_integrity.rs"
       - "crates/bridges/symthaea-proof-insights/src/proof_graph.rs"
@@ -630,6 +632,26 @@ jobs:
           assert fixture["analysis_policy"]["include_not_attempted_as_failure"] is True
           print("PITB_INTERVENTION_TRIAL_SCHEMA_PASS: four arms, eight pairs, four clusters; synthetic only")
           PY
+      - name: Validate paired intervention outcome schema and synthetic row
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-jsonschema/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/intervention-trials/proof-intervention-trial-outcome-v0.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/intervention-trials/fixtures/proof-intervention-outcome.synthetic.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+          schema_path, fixture_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          fixture = json.loads(fixture_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+          assert fixture["evidence_class"] == "synthetic_outcome_fixture"
+          assert fixture["status"] == "verified_success"
+          assert fixture["checked_target_statement_sha256"] == fixture["target_statement_sha256"]
+          assert fixture["proof_path"] is None and fixture["run_receipt_path"] is None
+          print("PITB_INTERVENTION_OUTCOME_SCHEMA_PASS: exact target binding; synthetic artifact paths absent")
+          PY
       - name: Run importer self-tests and hash the exact snapshot twice
         shell: bash
         run: |
@@ -646,6 +668,8 @@ jobs:
           cargo run --locked --bin verify_benchmark_integrity -- --self-test \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/fixtures/benchmark-integrity.synthetic.json"
           cargo run --locked --bin verify_proof_intervention_trial -- --self-test \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/intervention-trials/fixtures/support-antichain-intervention.synthetic.json"
+          cargo run --locked --bin analyze_proof_intervention_outcomes -- --self-test \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/intervention-trials/fixtures/support-antichain-intervention.synthetic.json"
           cargo run --locked --bin verify_sorrydb_run_integrity -- --self-test \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/run-receipt.synthetic.json" \
