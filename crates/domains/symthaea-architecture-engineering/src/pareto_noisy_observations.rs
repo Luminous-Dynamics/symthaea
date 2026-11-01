@@ -188,7 +188,7 @@ pub struct NoisyParetoReport {
     pub candidate_summaries: Vec<NoisyCandidateSummary>,
     /// Conditional family-wise confidence guarantee for the candidate/objective/prefix family.
     pub nominal_familywise_confidence: f64,
-    /// True only as a schema/provenance assertion; statistical independence is an experimental assumption.
+    /// Unique sample-seed values are enforced within each candidate. This does not prove independence.
     pub unique_replicate_seeds_enforced: bool,
     pub report_sha256: String,
 }
@@ -584,7 +584,8 @@ mod tests {
         let a = report.candidate_summaries.iter().find(|item| item.candidate_id == "candidate-a").unwrap();
         let b = report.candidate_summaries.iter().find(|item| item.candidate_id == "candidate-b").unwrap();
         assert_eq!(a.status, ConfidenceParetoStatus::CertainlyNondominatedAmongObserved);
-        assert_eq!(b.status, ConfidenceParetoStatus::CertainlyNondominatedAmongObserved);
+        assert_eq!(b.status, ConfidenceParetoStatus::CertainlyDominated);
+        assert_eq!(b.certainly_dominated_by, vec!["candidate-a".to_owned()]);
 
         let mut uncertain = NoisyParetoStudy::new(plan()).unwrap();
         uncertain.append("a", H1, sample(1, 1, [0.6, 0.4])).unwrap();
