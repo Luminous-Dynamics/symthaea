@@ -169,10 +169,7 @@ impl PrefixForecaster for HistoricalCostBaseline {
         self.model_digest
     }
 
-    fn predict(
-        &self,
-        prefix: &PrefixView,
-    ) -> Result<PrefixCostForecast, PrefixForecasterError> {
+    fn predict(&self, prefix: &PrefixView) -> Result<PrefixCostForecast, PrefixForecasterError> {
         let profile = HistoricalCostBaseline::predict(self, prefix.task_family).profile;
         let result = PrefixCostForecast {
             q50: profile.q50,
@@ -347,11 +344,7 @@ impl ActionTrajectory {
                 }
             }
             Some(_) => {
-                if self
-                    .terminal
-                    .evaluator_receipt_digest
-                    .is_none_or(is_zero)
-                {
+                if self.terminal.evaluator_receipt_digest.is_none_or(is_zero) {
                     return Err(TrajectoryReplayError::MissingTerminalEvidence);
                 }
                 if self.terminal.completion_verifier_digest.is_some() {
