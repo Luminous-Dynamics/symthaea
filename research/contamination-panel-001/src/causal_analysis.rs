@@ -266,7 +266,7 @@ fn t_critical_975(df: usize) -> f64 {
         .unwrap_or(1.96)
 }
 
-fn mean_interval(values: &[f64]) -> Result<MeanIntervalV1, String> {
+pub(crate) fn mean_interval(values: &[f64]) -> Result<MeanIntervalV1, String> {
     let mean = sample_mean(values)?;
     let sd = sample_sd(values, mean)?;
     let standard_error = sd / (values.len() as f64).sqrt();
