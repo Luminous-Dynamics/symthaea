@@ -130,6 +130,9 @@ fn optional_receipt_digest(value: &Value, pointer: &str, required: bool) -> Resu
 
 fn expected_status(value: &Value) -> Result<&'static str> {
     let elaboration_status = string(value, "/elaboration/status")?;
+    if !matches!(elaboration_status, "not_run" | "passed" | "failed" | "unknown") {
+        bail!("unknown target elaboration status");
+    }
     let checked_statement = string(value, "/elaboration/checked_statement_sha256")?;
     let statement = string(value, "/target/statement_sha256")?;
     let metavariables = integer(value, "/elaboration/metavariable_count")?;
@@ -137,7 +140,23 @@ fn expected_status(value: &Value) -> Result<&'static str> {
     let contains_sorry = boolean(value, "/elaboration/contains_sorry_ax")?;
     let unexpected_axioms = integer(value, "/axioms/unexpected_axioms")?;
     let counterexample = string(value, "/counterexample_audit/status")?;
+    if !matches!(counterexample, "not_run" | "not_found" | "counterexample_found" | "inconclusive" | "not_applicable") {
+        bail!("unknown counterexample audit status");
+    }
+    let vacuity = string(value, "/vacuity_audit/status")?;
+    if !matches!(vacuity, "not_run" | "no_counterexample_found" | "counterexample_found" | "inconclusive" | "not_applicable") {
+        bail!("unknown vacuity audit status");
+    }
     let semantic = string(value, "/semantic_review/status")?;
+    if !matches!(semantic, "not_reviewed" | "approved" | "rejected" | "needs_revision") {
+        bail!("unknown semantic review status");
+    }
+    if !matches!(
+        string(value, "/semantic_review/review_scope")?,
+        "statement_to_source" | "informal_to_formal" | "domain_expert_review" | "combined"
+    ) {
+        bail!("unknown semantic review scope");
+    }
 
     let hard_failure = elaboration_status == "failed"
         || (elaboration_status == "passed" && checked_statement != statement)
@@ -179,8 +198,20 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         bail!("unknown benchmark integrity evidence class");
     }
 
+    let evidence_class = string(value, "/evidence_class")?;
     let task_id = string(value, "/dataset/task_id")?.to_owned();
     let statement_sha256 = string(value, "/target/statement_sha256")?.to_owned();
+    if string(value, "/dataset/cohort_id")?.trim().is_empty()
+        || string(value, "/dataset/snapshot_id")?.trim().is_empty()
+        || string(value, "/target/repository_remote")?.trim().is_empty()
+    {
+        bail!("dataset cohort/snapshot and target repository remote cannot be empty");
+    }
+    if let Some(expected) = field(value, "/target/expected_informal_statement_sha256")?.as_str() {
+        check_digest(expected, "target.expected_informal_statement_sha256", 64)?;
+    } else if !field(value, "/target/expected_informal_statement_sha256")?.is_null() {
+        bail!("target.expected_informal_statement_sha256 must be a SHA-256 string or null");
+    }
     check_digest(&task_id, "dataset.task_id", 64)?;
     check_digest(&statement_sha256, "target.statement_sha256", 64)?;
     let task_manifest = string(value, "/dataset/task_manifest_sha256")?;
@@ -201,8 +232,12 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     ] {
         check_digest(string(value, pointer)?, pointer, 64)?;
     }
-    if integer(value, "/target/start_line")? > integer(value, "/target/end_line")? {
-        bail!("target source line range is reversed");
+    let start_line = integer(value, "/target/start_line")?;
+    let end_line = integer(value, "/target/end_line")?;
+    let start_column = integer(value, "/target/start_column")?;
+    let end_column = integer(value, "/target/end_column")?;
+    if start_line > end_line || (start_line == end_line && start_column > end_column) {
+        bail!("target source coordinate range is reversed");
     }
     if string(value, "/environment/lean_toolchain")?.trim().is_empty() {
         bail!("Lean toolchain cannot be empty");
