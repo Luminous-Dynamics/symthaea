@@ -188,6 +188,20 @@ pub struct PerformanceGestureEvent {
     pub interpolation: GestureInterpolation,
 }
 
+impl PerformanceGestureEvent {
+    /// Stable content digest over the versioned Serde representation. This is
+    /// a content commitment, not an author signature; the canonical JSON
+    /// serializer and schema version are part of the digest contract.
+    pub fn canonical_sha256(&self) -> Result<String, serde_json::Error> {
+        let bytes = serde_json::to_vec(self)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"symthaea:muse:performance-gesture-event:v1\n");
+        hasher.update((bytes.len() as u64).to_be_bytes());
+        hasher.update(bytes);
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+}
+
 /// Producer-assigned identity and instrument binding for one legacy score note.
 ///
 /// This sidecar avoids breaking ScoreNote literals/serialization while still
