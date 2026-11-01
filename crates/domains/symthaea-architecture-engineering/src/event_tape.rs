@@ -1506,11 +1506,36 @@ fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
             format!("expected {TAPE_SCHEMA:?}"),
         ));
     }
-    if header.version != TAPE_VERSION {
+    if header.version != LEGACY_TAPE_VERSION && header.version != TAPE_VERSION {
         return Err(EventTapeError::new(
             "header.version",
-            format!("expected {TAPE_VERSION:?}"),
+            format!("expected legacy {LEGACY_TAPE_VERSION:?} or current {TAPE_VERSION:?}"),
         ));
+    }
+    match (&header.objective_contract, &header.objective_contract_sha256) {
+        (Some(contract), Some(expected_digest)) => {
+            if header.version == LEGACY_TAPE_VERSION {
+                return Err(EventTapeError::new(
+                    "header.objective_contract",
+                    "legacy EventTape v0.1 records cannot contain v0.2 objective contracts",
+                ));
+            }
+            let actual_digest = contract.contract_sha256()?;
+            validate_sha256(expected_digest, "header.objective_contract_sha256")?;
+            if &actual_digest != expected_digest {
+                return Err(EventTapeError::new(
+                    "header.objective_contract_sha256",
+                    "objective-contract digest does not match the embedded contract",
+                ));
+            }
+        }
+        (None, None) => {}
+        _ => {
+            return Err(EventTapeError::new(
+                "header.objective_contract",
+                "objective contract and its digest must either both be present or both be absent",
+            ));
+        }
     }
     validate_non_empty(&header.campaign_id, "header.campaign_id")?;
     validate_git_commit(&header.source_commit, "header.source_commit")?;
