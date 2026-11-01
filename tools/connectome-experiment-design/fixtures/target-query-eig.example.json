@@ -1,0 +1,100 @@
+{
+  "$comment": "Synthetic known-answer fixture. The target query is whether output is positive, negative, or unresolved; within-positive mechanism distinctions are intentionally irrelevant.",
+  "priors": [
+    0.3,
+    0.3,
+    0.3,
+    0.1
+  ],
+  "query": {
+    "id": "increase-functional-output",
+    "hypothesis_ids": [
+      "mechanism_a",
+      "mechanism_b",
+      "mechanism_no_effect",
+      "OTHER_OR_UNRESOLVED"
+    ],
+    "answer_by_hypothesis": [
+      "positive",
+      "positive",
+      "negative",
+      "unresolved"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "mechanism-discriminator",
+      "cost": 1,
+      "outcomes": [
+        "response",
+        "no_response"
+      ],
+      "hypothesis_ids": [
+        "mechanism_a",
+        "mechanism_b",
+        "mechanism_no_effect",
+        "OTHER_OR_UNRESOLVED"
+      ],
+      "likelihood_scenarios": [
+        {
+          "id": "declared-likelihood",
+          "likelihoods_by_hypothesis": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0.5,
+              0.5
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outcome-discriminator",
+      "cost": 1,
+      "outcomes": [
+        "response",
+        "no_response"
+      ],
+      "hypothesis_ids": [
+        "mechanism_a",
+        "mechanism_b",
+        "mechanism_no_effect",
+        "OTHER_OR_UNRESOLVED"
+      ],
+      "likelihood_scenarios": [
+        {
+          "id": "declared-likelihood",
+          "likelihoods_by_hypothesis": [
+            [
+              0.9,
+              0.1
+            ],
+            [
+              0.9,
+              0.1
+            ],
+            [
+              0.1,
+              0.9
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
