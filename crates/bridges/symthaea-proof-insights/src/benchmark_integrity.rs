@@ -146,6 +146,7 @@ fn expected_status(value: &Value) -> Result<&'static str> {
         || contains_sorry
         || unexpected_axioms > 0
         || counterexample == "counterexample_found"
+        || string(value, "/vacuity_audit/status")? == "counterexample_found"
         || semantic == "rejected";
     if hard_failure {
         return Ok("ineligible");
