@@ -187,3 +187,50 @@ prior history. This supplements the existing day-granularity Broca bitemporal
 ledger and its alternative-proof runtime (PRs #9109 and #9292); it does not
 replace or yet compose with them. This distinction is important for irregular
 datasets where corrections and late arrivals may occur within the same day.
+
+
+## 10. Time-IMM/IMM-TSF loader leakage audit
+
+Pinned IMM-TSF parser commit:
+`2642b920fb231ef3df43ed85adc6bd003e7664d8`.
+
+Source review of `lib/parse_datasets.py` found two benchmark-harness conditions
+that must be reported explicitly:
+
+1. In `ChunkedTimeSeriesDataset.__init__`, each record's feature columns are
+   normalized with that entire record's mean and standard deviation before
+   chunk creation and before train/validation/test splitting (lines 95–111).
+   The public `load_data` path sets `normalize=True` unconditionally (lines
+   660–675). Under the default `split_method=sample`, this makes validation
+   and test distribution statistics available to training features. It is
+   unsupervised future-distribution leakage, not target-label leakage, but it
+   changes the information contract and must be disclosed.
+2. The sample split partitions chunk indices 60/20/20 after chunk generation
+   (lines 715–730). Each chunk spans history + prediction window and starts at
+   a stride; no purge/embargo is applied to ensure a training target interval
+   ends before the first validation forecast origin or a validation target
+   ends before the first test origin. With overlapping chunks, target intervals
+   can therefore overlap later partitions.
+
+The code also removes chunks without history-window text even when
+`enable_text=False` (lines 207–226). This affects sample selection and should
+be disclosed when comparing numeric-only and multimodal modes. The text loader
+sorts text.csv by `date_time` and filters text to the history window, but the
+CSV does not expose a separate availability/arrival timestamp in the documented
+schema; do not equate that field with actual system availability without
+dataset-level evidence.
+
+### Required dual reporting
+
+- **Official reproduction:** reproduce the pinned harness and split/normalizer
+  as released; label this result as the official-code path and record its
+  full-record normalization/overlap behavior.
+- **Leakage-controlled comparison:** fit all normalization statistics on the
+  training portion only, apply the fitted transform unchanged to validation
+  and test, and use the new purged chronological window splitter with
+  train-target and validation-target boundary checks. Apply the same clean
+  information contract to Symthaea and all comparators.
+
+Do not silently replace the official protocol or present clean-split numbers
+as official leaderboard results. The new splitter does not itself fix the
+full-record normalizer; train-only scaler fitting remains an adapter task.
