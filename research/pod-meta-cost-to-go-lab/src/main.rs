@@ -1404,16 +1404,25 @@ fn main() {
         frontier_digest: [41; 32],
         frontier_features: trajectory_features(2),
         candidate_pool_digest: [31; 32],
-        admissible_operation_families: vec![2, 3],
+        admissible_operation_families: vec![2, 3, 4],
         assignment: InterventionAssignmentEvidence::DeterministicSimulation {
             simulator_digest: [91; 32],
         },
         trials: vec![
             matched_intervention_trial(201, 2, 10),
             matched_intervention_trial(202, 3, 15),
+            matched_intervention_trial(203, 4, 30),
         ],
     };
     let matched_contrast = matched_interventions.verified_contrasts().unwrap()[0];
+    let pareto_summary = matched_interventions.pareto_summary().unwrap();
+    println!(
+        "INTERVENTION_SET_ROW\tpareto-frontier\t{}\t{}\t{}\t{}",
+        pareto_summary.alternatives.len(),
+        pareto_summary.frontier_operation_families.len(),
+        pareto_summary.frontier_operation_families[0],
+        pareto_summary.frontier_operation_families[1]
+    );
     println!(
         "INTERVENTION_SET_ROW\tmatched-simulation-contrast\t{}\t{}\t{}\t{}\t{}",
         matched_contrast.baseline_operation_family,
