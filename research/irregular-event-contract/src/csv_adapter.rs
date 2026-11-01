@@ -164,7 +164,7 @@ fn parse_csv<R: Read>(
     if let Some(index) = record_index { reserved.insert(index); }
     if let Some((_, index)) = &availability_column { reserved.insert(*index); }
 
-    let (feature_columns, modality_names) = match mode {
+    let (feature_columns, modality_names) = match &mode {
         PayloadMode::NumericColumns => {
             let mut names = BTreeMap::new();
             let mut columns = Vec::new();
@@ -188,12 +188,12 @@ fn parse_csv<R: Read>(
             (columns, names)
         }
         PayloadMode::OpaqueTextColumn(name) => {
-            let index = find_column(&name)?;
+            let index = find_column(name)?;
             if reserved.contains(&index) {
                 return Err(CsvAdapterError::InvalidConfiguration);
             }
             let id = modality_id_for(&name);
-            (vec![(index, name.clone(), id)], BTreeMap::from([(id, name)]))
+            (vec![(index, name.clone(), id)], BTreeMap::from([(id, name.clone())]))
         }
     };
 
