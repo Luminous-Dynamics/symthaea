@@ -1,0 +1,12 @@
+{
+  "action_count": 2,
+  "zero_action_prediction_mse": 0,
+  "mean_predicted_action_effect_norm": 0,
+  "mean_observed_action_effect_norm": 1,
+  "mean_action_effect_mse": 1,
+  "mean_action_response_cosine": 0,
+  "cosine_scored_action_count": 0,
+  "missed_action_effect_count": 2,
+  "false_positive_action_effect_count": 0,
+  "both_null_action_effect_count": 0
+}
