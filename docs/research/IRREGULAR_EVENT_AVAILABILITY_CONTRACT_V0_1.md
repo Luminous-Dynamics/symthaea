@@ -164,7 +164,7 @@ canonical parsed rows. Text is content-addressed without whitespace trimming.
 
 RFC3339 timestamps are unambiguous. Naive timestamps require an explicit fixed
 UTC offset or IANA timezone; DST-ambiguous/nonexistent local times are rejected
-rather than silently shifted. The timestamp-zone configuration is digest-bound.
+rather than silently shifted. The timestamp-zone configuration is digest-bound. A separate canonical adapter-config SHA-256 binds dataset/entity identity, availability policy, and a feature-sorted mapping of every numeric column to modality, unit and decimal scale; feature declaration order does not change this digest.
 
 The adapter also requires a caller-selected availability policy (synchronous
 at event time as an explicit assumption, or a fixed delay). Its digest is
@@ -181,3 +181,9 @@ performed.
 The parser is a dataset adapter, not a timezone/availability oracle. Dataset
 maintainers must verify the correct IANA timezone and the benchmark's intended
 availability semantics before using a configuration for claims.
+
+
+The parsed table returns dataset ID, record ID, stable entity ID, exact source
+file digest, timestamp-zone digest, availability-policy digest and the
+canonical adapter-configuration digest. These values should be copied into the
+benchmark run manifest alongside the split and train-only scaler digests.
