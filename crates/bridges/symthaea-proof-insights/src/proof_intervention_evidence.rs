@@ -612,6 +612,63 @@ mod tests {
     }
 
     #[test]
+    fn checker_receipt_rejects_model_arm_and_initial_state_substitution() {
+        let identity = identity();
+        let base = checker_receipt();
+        for (field, replacement) in [
+            ("model_id", "different-model"),
+            ("model_version", "different-version"),
+            ("arm_policy_sha256", SHA_G),
+            ("arm_config_sha256", SHA_G),
+            ("initial_state_receipt_sha256", SHA_G),
+        ] {
+            let mut altered = base.clone();
+            altered[field] = json!(replacement);
+            let bytes = serde_json::to_vec(&altered).unwrap();
+            let digest = hex::encode(Sha256::digest(&bytes));
+            assert!(
+                verify_checker_receipt(
+                    &bytes,
+                    &digest,
+                    identity,
+                    "verified_success",
+                    Some(SHA_E),
+                    Some(SHA_D),
+                )
+                .is_err(),
+                "accepted substituted {field}"
+            );
+        }
+    }
+
+    #[test]
+    fn run_receipt_config_must_match_frozen_arm_config() {
+        let identity = identity();
+        let checker = checker_receipt();
+        let checker_sha = digest_value(&checker);
+        let mut run = run_receipt(&checker_sha);
+        run["run_config_sha256"] = json!(SHA_G);
+        let bytes = serde_json::to_vec(&run).unwrap();
+        let digest = hex::encode(Sha256::digest(&bytes));
+        let outcome = json!({
+            "status":"verified_success",
+            "proof_sha256":SHA_E,
+            "checker_receipt_sha256":checker_sha,
+            "target_integrity_receipt_sha256":SHA_A,
+            "successor_gate_receipt_sha256":SHA_B,
+            "actual_resources":{
+                "tokens":1000,"model_calls":1,"tool_calls":2,
+                "wall_ms":1000,"lean_cpu_ms":500,"cost_microusd":200
+            }
+        });
+        let budget = json!({
+            "tokens":40000,"model_calls":8,"tool_calls":40,
+            "wall_ms":300000,"lean_cpu_ms":180000,"cost_microusd":2000000
+        });
+        assert!(verify_run_receipt(&bytes, &digest, identity, &outcome, &budget).is_err());
+    }
+
+    #[test]
     fn run_receipt_rejects_resource_accounting_drift() {
         let checker = checker_receipt();
         let checker_sha = digest_value(&checker);
