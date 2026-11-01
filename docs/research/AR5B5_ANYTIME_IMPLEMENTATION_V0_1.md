@@ -211,8 +211,8 @@ Event start/completion timestamps and receipt elapsed time are optional. A run i
 The synthetic cost model is no longer accepted by a substring in its human-readable name. \`AnytimeRecorder\` requires the exact versioned cost-model ID and the SHA-256 digest of its canonical formula (one normalized synthetic unit per objective-evaluation attempt). Physical meters remain unknown and are not estimated.
 ## 10. Schema version note
 
-The expanded anytime event/header/receipt contract is `0.2.0` (nullable clock semantics, source commit and exact search configuration binding). The target-plan sub-schema remains `0.1.0`. Evidence manifests and byte receipts are `0.2.0`; noisy-observation plans/reports are `0.2.0`. Consumers must reject or explicitly migrate earlier schemas rather than silently deserialize under the expanded contract.
-### Noisy-history preregistration and replay integration — schema 0.3.0
+The anytime event/header/receipt contract was first expanded to `0.2.0` for nullable clock semantics, source commit and exact search-configuration binding; it has since advanced to `0.4.0` as the noisy-history contract and mode-safe target applicability were added below. The target-plan sub-schema remains `0.1.0`. Evidence manifests and byte receipts are `0.2.0`; noisy-observation plans/reports are `0.2.0`. Consumers must reject or explicitly migrate earlier schemas rather than silently deserialize under the expanded contract.
+### Noisy-history preregistration and replay integration — first landed in schema 0.3.0 (superseded by 0.4.0)
 
 The anytime header now optionally binds `noisy_observation_plan_sha256` before any event is appended. A noisy event must match this exact digest; a deterministic evaluation cannot enter a history preregistered for noisy observations, and a noisy event cannot enter a deterministic history. The deterministic synthetic optimizer recorder refuses noisy-mode headers.
 
