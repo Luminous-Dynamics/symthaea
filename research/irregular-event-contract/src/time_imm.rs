@@ -683,6 +683,10 @@ mod tests {
         let parsed = adapter.parse_time_series(csv.as_bytes()).unwrap();
         assert_eq!(parsed.row_count, 2);
         assert_eq!(parsed.events.len(), 8);
+        assert_eq!(parsed.dataset_id, "EPA-Air");
+        assert_eq!(parsed.record_id, "Bexar");
+        assert_eq!(parsed.adapter_config_sha256, adapter.config_sha256());
+        assert_ne!(parsed.timestamp_zone_sha256, [0; 32]);
         let event = parsed.events.iter().find(|event| event.source_sequence == 1 && event.modality_id == 2).unwrap();
         assert_eq!(event.measurement, Measurement::Missing { reason: MissingReason::NotMeasured });
         assert_eq!(event.available_at_us, event.event_time_us);
