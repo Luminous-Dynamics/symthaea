@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # PRs test the exact contributor head, not GitHub's synthetic merge commit.
+  TESTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
 # Explicit bash enables pipefail so tee cannot mask Cargo/test failures.
 defaults:
   run:
@@ -27,6 +32,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TESTED_SOURCE_SHA }}
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@1.96.0
@@ -38,7 +45,9 @@ jobs:
         run: |
           mkdir -p target/iit-benchmark-evidence
           {
-            echo "git_commit=${GITHUB_SHA}"
+            echo "tested_source_sha=$(git rev-parse HEAD)"
+            echo "github_event_sha=${GITHUB_SHA}"
+            echo "pull_request_head_sha=${PULL_REQUEST_HEAD_SHA}"
             echo "git_ref=${GITHUB_REF}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "runner_os=${RUNNER_OS}"
@@ -144,7 +153,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: symthaea-iit-evidence-${{ github.sha }}
+          name: symthaea-iit-evidence-${{ env.TESTED_SOURCE_SHA }}
           path: target/iit-benchmark-evidence/
           if-no-files-found: warn
           retention-days: 30
