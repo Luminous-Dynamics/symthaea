@@ -14,7 +14,7 @@ use thiserror::Error;
 use crate::{
     enumerate_iit4_system_partitions_with_stats, min_fill_log_sum_product,
     BinaryCausalModel, BinaryLogFactor, CausalDirection, DirectedSystemPartition,
-    FactorGraphError, FormalismProfile, Iit4IntrinsicSpecificationResult,
+    FactorGraphError, FormalismProfile, Iit4IntrinsicSpecificationResult, MinFillPlannerWork,
     Iit4SystemIntrinsicSpecification, Iit4SystemPhiAnalysis,
     Iit4SystemPhiPartitionSummary, Iit4SystemPhiSearchConfig,
     Iit4SystemPhiStatePairResult, Iit4SystemPhiStatus,
@@ -25,15 +25,15 @@ use crate::{
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
 const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
-const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.3\0";
+const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.4\0";
 const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
 const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-SEARCH-REQUEST\0v0.1\0";
 pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-2023-system-search/0.4.0";
+    "symthaea-iit/sparse-iit4-2023-system-search/0.5.0";
 const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.2\0";
-pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.3.0";
+pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.4.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-partition-score/0.2.0";
+    "symthaea-iit/sparse-iit4-partition-score/0.3.0";
 
 pub const MAX_SPARSE_UNITS: usize = 1_000_000;
 pub const MAX_LOCAL_PARENTS: usize = 20;
@@ -195,6 +195,12 @@ pub struct SparseEq4Report {
     /// Largest table actually observed over all contractions in this request.
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
+    /// Work spent constructing the reusable uncut observed-state posterior.
+    pub posterior_planner_work: MinFillPlannerWork,
+    /// Sum of planner work across all target-wise Eq. 4 contractions.
+    pub target_planner_work: MinFillPlannerWork,
+    /// Planner work attributable to this report, respecting posterior reuse.
+    pub planner_work: MinFillPlannerWork,
 }
 
 impl SparseEq4Report {
@@ -222,6 +228,19 @@ impl SparseEq4Report {
         sparse_receipt_u64(&mut bytes, self.predicted_peak_factor_entries as u64);
         sparse_receipt_u64(&mut bytes, self.peak_factor_entries as u64);
         sparse_receipt_u64(&mut bytes, self.factor_multiplications as u64);
+        for work in [
+            self.posterior_planner_work,
+            self.target_planner_work,
+            self.planner_work,
+        ] {
+            sparse_receipt_u64(&mut bytes, work.fill_score_evaluations as u64);
+            sparse_receipt_u64(&mut bytes, work.fill_score_adjacency_visits as u64);
+            sparse_receipt_u64(&mut bytes, work.affected_adjacency_visits as u64);
+            sparse_receipt_u64(&mut bytes, work.stale_queue_entries_discarded as u64);
+            sparse_receipt_u64(&mut bytes, work.affected_candidates_refreshed as u64);
+            sparse_receipt_u64(&mut bytes, work.leaf_fast_path_updates as u64);
+            sparse_receipt_u64(&mut bytes, work.clique_pair_checks as u64);
+        }
         Ok(sparse_hex_digest(&bytes))
     }
 }
@@ -247,6 +266,7 @@ struct SparseEq4PosteriorContext {
     posterior_predicted_peak_factor_entries: usize,
     posterior_peak_factor_entries: usize,
     posterior_factor_multiplications: usize,
+    posterior_planner_work: MinFillPlannerWork,
 }
 
 /// Values independent of a particular partition or specified cause/effect state.
@@ -1528,6 +1548,7 @@ impl SparseBinaryCausalModel {
             posterior_predicted_peak_factor_entries: normalizer.predicted_peak_factor_entries,
             posterior_peak_factor_entries: normalizer.peak_factor_entries,
             posterior_factor_multiplications: normalizer.factor_multiplications,
+            posterior_planner_work: normalizer.planner_work,
         })
     }
 
@@ -1557,6 +1578,7 @@ impl SparseBinaryCausalModel {
         } else {
             posterior.posterior_factor_multiplications
         };
+        let mut target_planner_work = MinFillPlannerWork::default();
 
         for target in posterior.candidate_system.iter().copied() {
             let target_factor = target_model.observation_log_factor(
@@ -1610,6 +1632,18 @@ impl SparseBinaryCausalModel {
                 predicted_peak_factor_entries.max(report.predicted_peak_factor_entries);
             peak_factor_entries = peak_factor_entries.max(report.peak_factor_entries);
             factor_multiplications += report.factor_multiplications;
+            checked_accumulate_planner_work(
+                &mut target_planner_work,
+                report.planner_work,
+            )?;
+        }
+
+        let mut planner_work = target_planner_work;
+        if !posterior_contraction_reused {
+            checked_accumulate_planner_work(
+                &mut planner_work,
+                posterior.posterior_planner_work,
+            )?;
         }
 
         if forward.iter().any(|value| !value.is_finite()) {
@@ -1635,6 +1669,9 @@ impl SparseBinaryCausalModel {
             predicted_peak_factor_entries,
             peak_factor_entries,
             factor_multiplications,
+            posterior_planner_work: posterior.posterior_planner_work,
+            target_planner_work,
+            planner_work,
         })
     }
 
@@ -1849,6 +1886,34 @@ fn validate_sparse_candidate_system(
             return Err(SparseCausalError::DuplicateCandidateUnit { unit });
         }
     }
+    Ok(())
+}
+
+fn checked_accumulate_planner_work(
+    total: &mut MinFillPlannerWork,
+    additional: MinFillPlannerWork,
+) -> Result<(), FactorGraphError> {
+    total.fill_score_evaluations = total.fill_score_evaluations
+        .checked_add(additional.fill_score_evaluations)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    total.fill_score_adjacency_visits = total.fill_score_adjacency_visits
+        .checked_add(additional.fill_score_adjacency_visits)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    total.affected_adjacency_visits = total.affected_adjacency_visits
+        .checked_add(additional.affected_adjacency_visits)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    total.stale_queue_entries_discarded = total.stale_queue_entries_discarded
+        .checked_add(additional.stale_queue_entries_discarded)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    total.affected_candidates_refreshed = total.affected_candidates_refreshed
+        .checked_add(additional.affected_candidates_refreshed)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    total.leaf_fast_path_updates = total.leaf_fast_path_updates
+        .checked_add(additional.leaf_fast_path_updates)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    total.clique_pair_checks = total.clique_pair_checks
+        .checked_add(additional.clique_pair_checks)
+        .ok_or(FactorGraphError::IndexOverflow)?;
     Ok(())
 }
 
