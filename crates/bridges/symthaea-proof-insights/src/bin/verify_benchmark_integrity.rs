@@ -23,6 +23,8 @@ enum Mode {
         path: PathBuf,
         expected_sha256: Option<String>,
         evidence_root: PathBuf,
+        reviewer_registry_path: PathBuf,
+        expected_registry_sha256: String,
     },
     SelfTest(PathBuf),
 }
@@ -65,8 +67,9 @@ fn make_measured_eligible(mut value: Value) -> Result<Value> {
 
 fn must_reject(label: &str, value: Value) -> Result<()> {
     let bytes = serde_json::to_vec(&value)?;
-    if benchmark_integrity::verify_bytes(&bytes, None).is_ok() {
-        bail!("benchmark integrity verifier accepted negative control: {label}");
+    let digest = hex::encode(Sha256::digest(&bytes));
+    if benchmark_integrity::validate_value(&value, digest).is_ok() {
+        bail!("benchmark integrity metadata validator accepted negative control: {label}");
     }
     println!("PITB_BENCHMARK_INTEGRITY_NEGATIVE_PASS: {label}");
     Ok(())
@@ -83,7 +86,8 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let base: Value = serde_json::from_slice(&bytes)?;
     let eligible = make_measured_eligible(base.clone())?;
     let eligible_bytes = serde_json::to_vec(&eligible)?;
-    let eligible_summary = benchmark_integrity::verify_bytes(&eligible_bytes, None)?;
+    let eligible_digest = hex::encode(Sha256::digest(&eligible_bytes));
+    let eligible_summary = benchmark_integrity::validate_value(&eligible, eligible_digest)?;
     if eligible_summary.integrity_status != "eligible" {
         bail!("fully qualified synthetic semantic review did not derive eligible status");
     }
@@ -128,7 +132,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     pending_review["semantic_review"]["status"] = json!("needs_revision");
     pending_review["integrity_status"] = json!("pending");
     let pending_bytes = serde_json::to_vec(&pending_review)?;
-    let pending_summary = benchmark_integrity::verify_bytes(&pending_bytes, None)?;
+    let pending_summary = benchmark_integrity::validate_value(&pending_review, hex::encode(Sha256::digest(&pending_bytes)))?;
     if pending_summary.integrity_status != "pending" {
         bail!("target without semantic approval was not held pending");
     }
@@ -139,7 +143,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["semantic_review"]["review_scope"] = json!("statement_to_source");
     bad["integrity_status"] = json!("pending");
     let scope_bytes = serde_json::to_vec(&bad)?;
-    let scope_summary = benchmark_integrity::verify_bytes(&scope_bytes, None)?;
+    let scope_summary = benchmark_integrity::validate_value(&bad, hex::encode(Sha256::digest(&scope_bytes)))?;
     if scope_summary.integrity_status != "pending" {
         bail!("source-only review incorrectly approved semantic target meaning");
     }
@@ -149,7 +153,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["target"]["expected_informal_statement_sha256"] = Value::Null;
     bad["integrity_status"] = json!("pending");
     let mapping_bytes = serde_json::to_vec(&bad)?;
-    let mapping_summary = benchmark_integrity::verify_bytes(&mapping_bytes, None)?;
+    let mapping_summary = benchmark_integrity::validate_value(&bad, hex::encode(Sha256::digest(&mapping_bytes)))?;
     if mapping_summary.integrity_status != "pending" {
         bail!("combined semantic review without intended informal statement digest was approved");
     }
@@ -183,7 +187,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
 fn parse_mode() -> Result<Mode> {
     let mut args = env::args().skip(1);
     let Some(action) = args.next() else {
-        bail!("expected --verify FILE --evidence-root DIR [--expected-sha256 HEX], --self-test FILE, or --help");
+        bail!("expected --verify FILE --evidence-root DIR --reviewer-key-registry FILE --expected-registry-sha256 HEX [--expected-sha256 HEX], --self-test FILE, or --help");
     };
     if matches!(action.as_str(), "--help" | "-h") {
         return Ok(Mode::Help);
@@ -211,7 +215,14 @@ fn parse_mode() -> Result<Mode> {
                 }
             }
             let evidence_root = evidence_root.context("--evidence-root is required for verification")?;
-            Ok(Mode::Verify { path, expected_sha256, evidence_root })
+            let reviewer_registry_path = None;
+            let reviewer_registry_path = reviewer_registry_path;
+            // The reviewer registry is a required independent pin, not a field
+            // supplied by the benchmark receipt itself.
+            let reviewer_registry_path = args.next().map(PathBuf::from);
+            let reviewer_registry_path = reviewer_registry_path.context("--reviewer-key-registry is required")?;
+            let expected_registry_sha256 = args.next().context("--expected-registry-sha256 is required")?;
+            Ok(Mode::Verify { path, expected_sha256, evidence_root, reviewer_registry_path, expected_registry_sha256 })
         }
         _ => bail!("unknown action {action}"),
     }
@@ -220,12 +231,18 @@ fn parse_mode() -> Result<Mode> {
 fn run() -> Result<()> {
     match parse_mode()? {
         Mode::Help => {
-            println!("Usage: verify_benchmark_integrity --verify FILE --evidence-root DIR [--expected-sha256 HEX] | --self-test FILE");
+            println!("Usage: verify_benchmark_integrity --verify FILE --evidence-root DIR --reviewer-key-registry FILE --expected-registry-sha256 HEX [--expected-sha256 HEX] | --self-test FILE");
             Ok(())
         }
         Mode::SelfTest(path) => self_test(&path),
-        Mode::Verify { path, expected_sha256, evidence_root } => {
-            let summary = benchmark_integrity::verify_file_with_evidence_root(&path, expected_sha256.as_deref(), &evidence_root)?;
+        Mode::Verify { path, expected_sha256, evidence_root, reviewer_registry_path, expected_registry_sha256 } => {
+            let summary = benchmark_integrity::verify_file_with_evidence_root_and_reviewer_registry(
+                &path,
+                expected_sha256.as_deref(),
+                &evidence_root,
+                &reviewer_registry_path,
+                &expected_registry_sha256,
+            )?;
             println!(
                 "PITB_BENCHMARK_INTEGRITY_PASS: task={} statement={} status={} used_axioms={} allowlisted_axioms={}",
                 summary.task_id,
@@ -236,6 +253,7 @@ fn run() -> Result<()> {
             );
             println!("PITB_BENCHMARK_INTEGRITY_SHA256: {}", summary.receipt_sha256);
             println!("PITB_BENCHMARK_INTEGRITY_EVIDENCE_ARTIFACTS_PASS: {}", summary.verified_evidence_artifact_count);
+            println!("PITB_BENCHMARK_INTEGRITY_REVIEWER_SIGNATURE_PASS: {}", summary.reviewer_signature_verified);
             Ok(())
         }
     }
