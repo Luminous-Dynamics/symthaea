@@ -258,6 +258,109 @@ fn receipt_digest(r: &Ppk2TraceAuditReceipt) -> Result<String, Ppk2TraceAuditErr
     Ok(format!("{:x}", h.finalize()))
 }
 
+/// Revalidate a serialized trace receipt before downstream scoring or uncertainty analysis.
+/// This checks the receipt's canonical digest and all aggregate/segment consistency relations.
+/// It does not authenticate the original acquisition; source CSV/Parquet provenance is separate.
+pub fn validate_ppk2_trace_audit_receipt(
+    receipt: &Ppk2TraceAuditReceipt,
+) -> Result<(), Ppk2TraceAuditError> {
+    if receipt.schema != SCHEMA || receipt.version != VERSION {
+        return Err(Ppk2TraceAuditError::new("schema_version", "unsupported trace receipt schema/version"));
+    }
+    let is_digest = |value: &str| {
+        value.len() == 64
+            && value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    };
+    if !is_digest(&receipt.sample_csv_sha256) || !is_digest(&receipt.receipt_sha256) {
+        return Err(Ppk2TraceAuditError::new("receipt.digest", "source and receipt digests must be lowercase SHA-256 hex"));
+    }
+    if receipt.sample_csv_bytes == 0
+        || receipt.segment_count == 0
+        || receipt.segment_count != receipt.segments.len()
+        || receipt.total_sample_count == 0
+    {
+        return Err(Ppk2TraceAuditError::new("receipt.inventory", "invalid byte, segment, or sample inventory"));
+    }
+    validate_config(Ppk2TraceAuditConfig {
+        voltage_v: receipt.voltage_v,
+        expected_sample_rate_hz: receipt.expected_sample_rate_hz,
+        sample_rate_tolerance_fraction: receipt.sample_rate_tolerance_fraction,
+        maximum_gap_ratio: receipt.maximum_gap_ratio,
+    })?;
+
+    let mut ids = HashSet::with_capacity(receipt.segments.len());
+    let mut total_samples = 0usize;
+    for segment in &receipt.segments {
+        if segment.segment_id.trim().is_empty() || !ids.insert(segment.segment_id.as_str()) {
+            return Err(Ppk2TraceAuditError::new("receipt.segments.segment_id", "segment IDs must be non-empty and unique"));
+        }
+        if segment.sample_count < 2 {
+            return Err(Ppk2TraceAuditError::new(
+                format!("receipt.segments.{}.sample_count", segment.segment_id),
+                "each segment must contain at least two samples",
+            ));
+        }
+        total_samples += segment.sample_count;
+        for (field, value) in [
+            ("first_time_ms", segment.first_time_ms),
+            ("last_time_ms", segment.last_time_ms),
+            ("duration_ms", segment.duration_ms),
+            ("minimum_current_ua", segment.minimum_current_ua),
+            ("maximum_current_ua", segment.maximum_current_ua),
+            ("time_weighted_mean_current_ua", segment.time_weighted_mean_current_ua),
+            ("mean_power_uw", segment.mean_power_uw),
+            ("energy_uj", segment.energy_uj),
+            ("median_interval_ms", segment.median_interval_ms),
+            ("maximum_interval_ms", segment.maximum_interval_ms),
+            ("median_sample_rate_hz", segment.median_sample_rate_hz),
+            ("maximum_gap_ratio", segment.maximum_gap_ratio),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(Ppk2TraceAuditError::new(
+                    format!("receipt.segments.{}.{}", segment.segment_id, field),
+                    "must be finite and positive",
+                ));
+            }
+        }
+        if segment.last_time_ms <= segment.first_time_ms
+            || (segment.last_time_ms - segment.first_time_ms - segment.duration_ms).abs() > 1e-9
+            || segment.minimum_current_ua > segment.maximum_current_ua
+            || segment.maximum_gap_ratio > receipt.maximum_gap_ratio
+        {
+            return Err(Ppk2TraceAuditError::new(
+                format!("receipt.segments.{}.consistency", segment.segment_id),
+                "segment timing, current range, or gap ratio is inconsistent",
+            ));
+        }
+    }
+    if total_samples != receipt.total_sample_count {
+        return Err(Ppk2TraceAuditError::new("receipt.total_sample_count", "does not equal segment sample inventory"));
+    }
+
+    let approx_eq = |a: f64, b: f64| {
+        (a - b).abs() <= 1e-9 * a.abs().max(b.abs()).max(1.0)
+    };
+    let expected_current = mean(receipt.segments.iter().map(|m| m.time_weighted_mean_current_ua)).unwrap();
+    let expected_power = mean(receipt.segments.iter().map(|m| m.mean_power_uw)).unwrap();
+    let expected_energy = mean(receipt.segments.iter().map(|m| m.energy_uj)).unwrap();
+    let expected_duration = mean(receipt.segments.iter().map(|m| m.duration_ms)).unwrap();
+    let expected_min_energy = receipt.segments.iter().map(|m| m.energy_uj).min_by(f64::total_cmp).unwrap();
+    let expected_max_energy = receipt.segments.iter().map(|m| m.energy_uj).max_by(f64::total_cmp).unwrap();
+    if !approx_eq(receipt.mean_segment_current_ua, expected_current)
+        || !approx_eq(receipt.mean_segment_power_uw, expected_power)
+        || !approx_eq(receipt.mean_segment_energy_uj, expected_energy)
+        || !approx_eq(receipt.mean_segment_duration_ms, expected_duration)
+        || !approx_eq(receipt.minimum_segment_energy_uj, expected_min_energy)
+        || !approx_eq(receipt.maximum_segment_energy_uj, expected_max_energy)
+    {
+        return Err(Ppk2TraceAuditError::new("receipt.aggregates", "aggregate metrics do not match segment inventory"));
+    }
+    if receipt_digest(receipt)? != receipt.receipt_sha256 {
+        return Err(Ppk2TraceAuditError::new("receipt.receipt_sha256", "does not match canonical receipt"));
+    }
+    Ok(())
+}
+
 /// Audit a CSV exported from the raw PPK2 Parquet trace.
 /// Required columns: segment_id, time_ms, current_uA.
 pub fn audit_ppk2_trace_csv(
