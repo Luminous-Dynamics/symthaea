@@ -315,6 +315,12 @@ pub struct EventRevision {
 pub struct BitemporalEventLedger {
     /// Append order is transaction commit order and is digest-bound.
     revisions: Vec<EventRevision>,
+    revision_by_id: BTreeMap<u64, usize>,
+    revisions_by_event: BTreeMap<u64, Vec<usize>>,
+    latest_revision_by_event: BTreeMap<u64, usize>,
+    active_source_sequences: BTreeSet<(u64, u32, u64, u64)>,
+    entity_by_event: BTreeMap<u64, u64>,
+    events_by_entity: BTreeMap<u64, Vec<u64>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -326,6 +332,7 @@ pub enum BitemporalEventError {
     ZeroEventId,
     ZeroRevisionSequence,
     DuplicateRevisionId { revision_id: u64 },
+    DuplicateActiveSourceSequence { entity_id: u64, modality_id: u32, source_id: u64, source_sequence: u64 },
     AlreadyAsserted { event_id: u64 },
     UnknownTargetRevision { revision_id: u64 },
     TargetNotLatestActiveRevision { revision_id: u64 },
@@ -349,6 +356,7 @@ impl fmt::Display for BitemporalEventError {
             Self::ZeroEventId => write!(f, "event ID must be nonzero"),
             Self::ZeroRevisionSequence => write!(f, "revision sequence must be nonzero"),
             Self::DuplicateRevisionId { revision_id } => write!(f, "duplicate revision ID {revision_id}"),
+            Self::DuplicateActiveSourceSequence { entity_id, modality_id, source_id, source_sequence } => write!(f, "duplicate active source sequence {source_sequence} for entity {entity_id}, modality {modality_id}, source {source_id}"),
             Self::AlreadyAsserted { event_id } => write!(f, "event {event_id} already has an initial assertion"),
             Self::UnknownTargetRevision { revision_id } => write!(f, "unknown target revision {revision_id}"),
             Self::TargetNotLatestActiveRevision { revision_id } => write!(f, "target revision {revision_id} is not the latest active revision"),
@@ -389,11 +397,22 @@ impl BitemporalEventLedger {
     }
 
     pub fn append(&mut self, revision: EventRevision) -> Result<(), BitemporalEventError> {
-        self.append_batch([revision])
+        if let Some(previous) = self.revisions.last().map(|item| item.recorded_at_us) {
+            if revision.recorded_at_us <= previous {
+                return Err(BitemporalEventError::NonIncreasingTransactionTime {
+                    previous,
+                    actual: revision.recorded_at_us,
+                });
+            }
+        }
+        // A single-event append is preflighted and committed in O(log n),
+        // without cloning the complete append-only history.
+        self.append_unchecked(revision)
     }
 
     /// Append an atomic transaction. All entries share one knowledge-time
     /// timestamp; a new transaction must be strictly later than the previous.
+    /// The current ledger is cloned once per batch, never once per row.
     pub fn append_batch(
         &mut self,
         revisions: impl IntoIterator<Item = EventRevision>,
@@ -419,7 +438,6 @@ impl BitemporalEventLedger {
         for revision in incoming {
             candidate.append_unchecked(revision)?;
         }
-        candidate.verify_consistency()?;
         *self = candidate;
         Ok(())
     }
@@ -434,21 +452,16 @@ impl BitemporalEventLedger {
         if revision.revision_sequence == 0 {
             return Err(BitemporalEventError::ZeroRevisionSequence);
         }
-        if self.revisions.iter().any(|existing| existing.revision_id == revision.revision_id) {
+        if self.revision_by_id.contains_key(&revision.revision_id) {
             return Err(BitemporalEventError::DuplicateRevisionId {
                 revision_id: revision.revision_id,
             });
         }
 
-        let prior: Vec<&EventRevision> = self.revisions.iter()
-            .filter(|existing| existing.event_id == revision.event_id)
-            .collect();
-        let latest = prior.iter()
-            .max_by_key(|existing| existing.revision_sequence)
-            .copied();
-        let expected_sequence = match latest {
+        let latest_index = self.latest_revision_by_event.get(&revision.event_id).copied();
+        let expected_sequence = match latest_index {
             None => 1,
-            Some(existing) => existing.revision_sequence.checked_add(1)
+            Some(index) => self.revisions[index].revision_sequence.checked_add(1)
                 .ok_or(BitemporalEventError::RevisionSequenceOverflow { event_id: revision.event_id })?,
         };
         if revision.revision_sequence != expected_sequence {
@@ -458,26 +471,39 @@ impl BitemporalEventLedger {
             });
         }
 
+        let mut add_active_key = None;
+        let mut remove_active_key = None;
+        let mut new_entity_registration = None;
+
         match revision.operation {
             EventRevisionOperation::Assert { record } => {
-                if latest.is_some() {
+                if latest_index.is_some() {
                     return Err(BitemporalEventError::AlreadyAsserted { event_id: revision.event_id });
                 }
                 validate_revision_record(&revision, &record)?;
+                let key = source_sequence_key(&record);
+                if self.active_source_sequences.contains(&key) {
+                    return Err(BitemporalEventError::DuplicateActiveSourceSequence {
+                        entity_id: key.0,
+                        modality_id: key.1,
+                        source_id: key.2,
+                        source_sequence: key.3,
+                    });
+                }
+                add_active_key = Some(key);
+                new_entity_registration = Some(record.entity_id);
             }
             EventRevisionOperation::Supersede { target_revision_id, record } => {
                 validate_revision_record(&revision, &record)?;
-                let target = self.revisions.iter()
-                    .find(|existing| existing.revision_id == target_revision_id)
+                let target_index = self.revision_by_id.get(&target_revision_id).copied()
                     .ok_or(BitemporalEventError::UnknownTargetRevision {
                         revision_id: target_revision_id,
                     })?;
+                let target = &self.revisions[target_index];
                 if target.event_id != revision.event_id {
                     return Err(BitemporalEventError::TargetEventMismatch);
                 }
-                if latest.map(|existing| existing.revision_id) != Some(target_revision_id)
-                    || target.record().is_none()
-                {
+                if latest_index != Some(target_index) || target.record().is_none() {
                     return Err(BitemporalEventError::TargetNotLatestActiveRevision {
                         revision_id: target_revision_id,
                     });
@@ -492,30 +518,58 @@ impl BitemporalEventLedger {
                         event_id: revision.event_id,
                     });
                 }
+                let key = source_sequence_key(old_record);
+                if !self.active_source_sequences.contains(&key) {
+                    return Err(BitemporalEventError::InvalidHistory);
+                }
             }
             EventRevisionOperation::Retract { target_revision_id, reason_code } => {
                 if reason_code == 0 {
                     return Err(BitemporalEventError::ZeroRetractionReason);
                 }
-                let target = self.revisions.iter()
-                    .find(|existing| existing.revision_id == target_revision_id)
+                let target_index = self.revision_by_id.get(&target_revision_id).copied()
                     .ok_or(BitemporalEventError::UnknownTargetRevision {
                         revision_id: target_revision_id,
                     })?;
+                let target = &self.revisions[target_index];
                 if target.event_id != revision.event_id {
                     return Err(BitemporalEventError::TargetEventMismatch);
                 }
-                if latest.map(|existing| existing.revision_id) != Some(target_revision_id)
-                    || target.record().is_none()
-                {
+                if latest_index != Some(target_index) {
                     return Err(BitemporalEventError::TargetNotLatestActiveRevision {
                         revision_id: target_revision_id,
                     });
                 }
+                let record = target.record().ok_or(BitemporalEventError::TargetNotLatestActiveRevision {
+                    revision_id: target_revision_id,
+                })?;
+                remove_active_key = Some(source_sequence_key(record));
             }
         }
 
+        if let Some(key) = remove_active_key {
+            if !self.active_source_sequences.contains(&key) {
+                return Err(BitemporalEventError::InvalidHistory);
+            }
+        }
+        // All fallible semantic checks are complete. The following mutations
+        // preserve the index invariants established by the preflight above.
+        if let Some(key) = remove_active_key {
+            self.active_source_sequences.remove(&key);
+        }
+        if let Some(key) = add_active_key {
+            self.active_source_sequences.insert(key);
+        }
+
+        let index = self.revisions.len();
         self.revisions.push(revision);
+        self.revision_by_id.insert(revision.revision_id, index);
+        self.revisions_by_event.entry(revision.event_id).or_default().push(index);
+        self.latest_revision_by_event.insert(revision.event_id, index);
+        if let Some(entity_id) = new_entity_registration {
+            self.entity_by_event.insert(revision.event_id, entity_id);
+            self.events_by_entity.entry(entity_id).or_default().push(revision.event_id);
+        }
         Ok(())
     }
 
@@ -628,6 +682,10 @@ impl BitemporalEventLedger {
         }
         hasher.finalize().into()
     }
+}
+
+fn source_sequence_key(record: &EventRecord) -> (u64, u32, u64, u64) {
+    (record.entity_id, record.modality_id, record.source_id, record.source_sequence)
 }
 
 fn validate_revision_record(
