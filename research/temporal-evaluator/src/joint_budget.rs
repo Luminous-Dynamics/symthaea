@@ -7,6 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use sha2::{Digest, Sha256};
 
 pub const MAX_EXACT_JOINT_ACTIONS: usize = 16;
 
@@ -16,6 +17,38 @@ pub const MAX_EXACT_JOINT_ACTIONS: usize = 16;
 pub struct JointActionDefinition {
     pub action_id: u64,
     pub conflict_group: u64,
+}
+
+/// Canonical evaluator-side digest of the action ID and compatibility registry.
+pub fn action_registry_sha256(
+    registry: &[JointActionDefinition],
+) -> Result<[u8; 32], JointBudgetError> {
+    if registry.len() > MAX_EXACT_JOINT_ACTIONS {
+        return Err(JointBudgetError::TooManyActions {
+            requested: registry.len(),
+            maximum: MAX_EXACT_JOINT_ACTIONS,
+        });
+    }
+    let mut sorted = registry.to_vec();
+    sorted.sort_unstable_by_key(|item| item.action_id);
+    if sorted.iter().any(|item| item.action_id == 0) {
+        return Err(JointBudgetError::ZeroActionId);
+    }
+    if let Some(pair) = sorted.windows(2).find(|pair| pair[0].action_id == pair[1].action_id) {
+        return Err(JointBudgetError::DuplicateActionId {
+            action_id: pair[0].action_id,
+        });
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"SYMTHAEA-JOINT-ACTION-REGISTRY-V1\\0");
+    hasher.update(u32::try_from(sorted.len())
+        .map_err(|_| JointBudgetError::ArithmeticOverflow)?
+        .to_le_bytes());
+    for item in sorted {
+        hasher.update(item.action_id.to_le_bytes());
+        hasher.update(item.conflict_group.to_le_bytes());
+    }
+    Ok(hasher.finalize().into())
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -51,7 +84,7 @@ pub struct JointExposure {
 }
 
 impl JointExposure {
-    fn validate(self, total_exposure_us: u64) -> Result<(), JointBudgetError> {
+    pub(crate) fn validate(self, total_exposure_us: u64) -> Result<(), JointBudgetError> {
         let total = self.wrong_belief_us
             .checked_add(self.abstention_us)
             .and_then(|value| value.checked_add(self.missing_output_us))
@@ -81,7 +114,7 @@ pub struct JointBudgetContext {
 }
 
 impl JointBudgetContext {
-    fn validate(&self) -> Result<(), JointBudgetError> {
+    pub(crate) fn validate(&self) -> Result<(), JointBudgetError> {
         if self.episode_id == 0
             || self.task_sha256 == [0; 32]
             || self.future_stream_sha256 == [0; 32]
@@ -227,6 +260,7 @@ pub fn qualify_joint_subsets(
         .map(|(index, definition)| (definition.action_id, index))
         .collect();
     let conflict_groups: Vec<u64> = sorted_registry.iter().map(|definition| definition.conflict_group).collect();
+    let registry_digest = action_registry_sha256(&sorted_registry)?;
 
     let mut by_mask = BTreeMap::<u64, (JointSubsetSummary, bool)>::new();
     let mut context_reference: Option<&JointBudgetContext> = None;
@@ -234,6 +268,9 @@ pub fn qualify_joint_subsets(
 
     for run in runs {
         run.context.validate()?;
+        if run.context.action_registry_sha256 != registry_digest {
+            return Err(JointBudgetError::ContextMismatch);
+        }
         if run.run_id == 0 {
             return Err(JointBudgetError::DuplicateRunId { run_id: 0 });
         }
@@ -427,6 +464,7 @@ mod tests {
     }
 
     fn context() -> JointBudgetContext {
+        let action_registry_sha256 = action_registry_sha256(&registry(&[(10, 0), (20, 0)])).unwrap();
         JointBudgetContext {
             episode_id: 77,
             task_sha256: [1; 32],
@@ -434,7 +472,7 @@ mod tests {
             model_sha256: [3; 32],
             initial_state_sha256: [4; 32],
             candidate_feature_sha256: [5; 32],
-            action_registry_sha256: [6; 32],
+            action_registry_sha256,
             total_exposure_us: 100,
             resource_budget: JointResourceUse {
                 persistent_bytes: 100,
@@ -603,8 +641,12 @@ mod tests {
 
     #[test]
     fn mutually_exclusive_action_subsets_are_not_oracle_feasible() {
-        let runs = all_four_runs();
+        let mut runs = all_four_runs();
         let conflicting_registry = registry(&[(10, 9), (20, 9)]);
+        let digest = action_registry_sha256(&conflicting_registry).unwrap();
+        for run in &mut runs {
+            run.context.action_registry_sha256 = digest;
+        }
         let result = qualify_joint_subsets(&conflicting_registry, &runs, &[10]).unwrap();
         assert_eq!(result.evaluated_subset_count, 4);
         assert_eq!(result.feasible_subset_count, 3);
@@ -629,6 +671,15 @@ mod tests {
             qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
             Err(JointBudgetError::InvalidContextCommitment)
         );
+    }
+
+    #[test]
+    fn registry_digest_binds_ids_and_exclusivity_groups() {
+        let base = action_registry_sha256(&registry(&[(10, 0), (20, 0)])).unwrap();
+        let reordered = action_registry_sha256(&registry(&[(20, 0), (10, 0)])).unwrap();
+        let constrained = action_registry_sha256(&registry(&[(10, 9), (20, 9)])).unwrap();
+        assert_eq!(base, reordered);
+        assert_ne!(base, constrained);
     }
 
     #[test]
