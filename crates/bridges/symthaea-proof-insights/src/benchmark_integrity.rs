@@ -448,6 +448,17 @@ fn verify_axiom_artifact(bytes: &[u8], expected: &[String], label: &str) -> Resu
     Ok(())
 }
 
+fn optional_digest_field<'a>(value: &'a Value, pointer: &str) -> Result<Option<&'a str>> {
+    match field(value, pointer)? {
+        Value::Null => Ok(None),
+        Value::String(digest) => {
+            check_digest(digest, pointer, 64)?;
+            Ok(Some(digest))
+        }
+        _ => bail!("{pointer} must be a SHA-256 string or null"),
+    }
+}
+
 fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usize> {
     let evidence_class = string(value, "/evidence_class")?;
     if evidence_class == "synthetic_contract_fixture" {
@@ -492,17 +503,17 @@ fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usiz
         return Ok(0);
     }
 
-    let target_source_sha = string(value, "/target/source_file_sha256")?;
-    let informal_sha = string(value, "/target/expected_informal_statement_sha256")?;
-    let lean_sha = string(value, "/environment/lean_binary_sha256")?;
-    let lake_sha = string(value, "/environment/lake_manifest_sha256")?;
-    let root_sha = string(value, "/environment/root_module_sha256")?;
-    let elaboration_sha = string(value, "/elaboration/receipt_sha256")?;
-    let used_axioms_sha = string(value, "/axioms/used_axioms_manifest_sha256")?;
-    let allowlist_sha = string(value, "/axioms/allowlist_manifest_sha256")?;
-    let counterexample_sha = string(value, "/counterexample_audit/receipt_sha256")?;
-    let vacuity_sha = string(value, "/vacuity_audit/receipt_sha256")?;
-    let reviewer_sha = string(value, "/semantic_review/reviewer_attestation_sha256")?;
+    let target_source_sha = Some(string(value, "/target/source_file_sha256")?);
+    let informal_sha = optional_digest_field(value, "/target/expected_informal_statement_sha256")?;
+    let lean_sha = Some(string(value, "/environment/lean_binary_sha256")?);
+    let lake_sha = Some(string(value, "/environment/lake_manifest_sha256")?);
+    let root_sha = Some(string(value, "/environment/root_module_sha256")?);
+    let elaboration_sha = optional_digest_field(value, "/elaboration/receipt_sha256")?;
+    let used_axioms_sha = Some(string(value, "/axioms/used_axioms_manifest_sha256")?);
+    let allowlist_sha = Some(string(value, "/axioms/allowlist_manifest_sha256")?);
+    let counterexample_sha = optional_digest_field(value, "/counterexample_audit/receipt_sha256")?;
+    let vacuity_sha = optional_digest_field(value, "/vacuity_audit/receipt_sha256")?;
+    let reviewer_sha = optional_digest_field(value, "/semantic_review/reviewer_attestation_sha256")?;
 
     let expected = [
         ("source_file", target_source_sha),
@@ -525,6 +536,9 @@ fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usiz
                 bail!("eligible measured receipt is missing evidence artifact {name}");
             }
             continue;
+        };
+        let Some(expected_sha) = expected_sha else {
+            bail!("{name} artifact is present but its corresponding receipt digest is null");
         };
         let bytes = verify_artifact_bytes(
             evidence_root,
