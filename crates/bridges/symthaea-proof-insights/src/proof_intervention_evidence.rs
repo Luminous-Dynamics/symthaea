@@ -292,7 +292,7 @@ pub fn verify_run_receipt(
         "resource_budget",
         "proof_sha256",
         "checker_receipt_sha256",
-        "semantic_gate_receipt_sha256",
+        "target_integrity_receipt_sha256",
         "successor_receipt_sha256",
         "run_config_sha256",
         "started_from_fresh_process",
@@ -330,7 +330,7 @@ pub fn verify_run_receipt(
     for (receipt_key, outcome_pointer) in [
         ("proof_sha256", "/proof_sha256"),
         ("checker_receipt_sha256", "/checker_receipt_sha256"),
-        ("semantic_gate_receipt_sha256", "/semantic_gate_receipt_sha256"),
+        ("target_integrity_receipt_sha256", "/target_integrity_receipt_sha256"),
         ("successor_receipt_sha256", "/successor_gate_receipt_sha256"),
     ] {
         let receipt_value = value.get(receipt_key).context("run receipt reference missing")?;
@@ -494,7 +494,7 @@ mod tests {
         });
         receipt["proof_sha256"] = json!(SHA_E);
         receipt["checker_receipt_sha256"] = json!(checker_sha);
-        receipt["semantic_gate_receipt_sha256"] = json!(SHA_A);
+        receipt["target_integrity_receipt_sha256"] = json!(SHA_A);
         receipt["successor_receipt_sha256"] = json!(SHA_B);
         receipt["run_config_sha256"] = json!(SHA_C);
         receipt["started_from_fresh_process"] = Value::Bool(true);
@@ -537,7 +537,7 @@ mod tests {
             "status":"verified_success",
             "proof_sha256":SHA_E,
             "checker_receipt_sha256":checker_sha,
-            "semantic_gate_receipt_sha256":SHA_A,
+            "target_integrity_receipt_sha256":SHA_A,
             "successor_gate_receipt_sha256":SHA_B,
             "actual_resources":run["actual_resources"]
         });
@@ -582,7 +582,7 @@ mod tests {
             "status":"verified_success",
             "proof_sha256":SHA_E,
             "checker_receipt_sha256":checker_sha,
-            "semantic_gate_receipt_sha256":SHA_A,
+            "target_integrity_receipt_sha256":SHA_A,
             "successor_gate_receipt_sha256":SHA_B,
             "actual_resources":{
                 "tokens":1000,"model_calls":1,"tool_calls":2,
