@@ -27,7 +27,7 @@ The first artifact pair is:
 - `benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json`
 - `benchmarks/basalt/storage-conformance-trace.v1.json`
 
-The fixture is intentionally small and deterministic. It is a reference input, not an observed backend run. Its result fields describe the expected semantic outcome of the reference trace; they must not be presented as engine measurements.
+The fixture is intentionally small and deterministic. It is a reference input, not an observed backend run. Its result fields describe the expected semantic outcome of the reference trace; they must not be presented as engine measurements. The explicit `fixture_digest_catalog` gives each symbolic digest token's SHA-256 preimage so equality and witness-chain examples are reproducible.
 
 ### Trace structure
 
@@ -42,7 +42,7 @@ A trace binds:
 7. **Final observation:** complete cursor state, accepted receipt set, policy digest, current authority revision and canonical state digest.
 8. **Expected invariants and negative controls:** assertions the verifier must establish, plus seeded faulty implementations it must reject.
 
-All digests in the fixture are deterministic SHA-256 values for the named fixture inputs. A real run must compute digests from a documented canonical encoding of actual records; it must not reuse fixture constants.
+Fixture catalog digests are SHA-256 of the explicit domain-separated label preimages (for example, `basalt-fixture:receipt-a`). They are symbolic test tokens, **not** hashes of the JSON state objects, database pages, or real signed witness records. A real run must compute digests from a documented canonical encoding of actual records and cryptographically verify witness signatures under a separately configured trust root; it must never reuse fixture constants as production commitments.
 
 ### Time and ordering
 
