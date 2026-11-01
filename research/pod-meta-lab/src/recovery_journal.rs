@@ -35,9 +35,15 @@ impl RecoveryJournal {
         })
     }
 
-    pub fn run_id(&self) -> &str { &self.run_id }
-    pub fn actions(&self) -> &[ActionLifecycle] { &self.actions }
-    pub fn next_sequence(&self) -> u64 { self.next_sequence }
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
+    pub fn actions(&self) -> &[ActionLifecycle] {
+        &self.actions
+    }
+    pub fn next_sequence(&self) -> u64 {
+        self.next_sequence
+    }
 
     pub fn prepare_action(&mut self, intent: ActionIntent) -> Result<(), JournalError> {
         if intent.run_id != self.run_id {
@@ -52,7 +58,9 @@ impl RecoveryJournal {
         if self.action_ids.contains(&intent.action_id) {
             return Err(JournalError::DuplicateActionId);
         }
-        let next_sequence = self.next_sequence.checked_add(1)
+        let next_sequence = self
+            .next_sequence
+            .checked_add(1)
             .ok_or(JournalError::SequenceExhausted)?;
         let action = ActionLifecycle::new(intent).map_err(JournalError::InvalidAction)?;
         self.action_ids.insert(action.intent().action_id.clone());
@@ -62,11 +70,15 @@ impl RecoveryJournal {
     }
 
     pub fn action(&self, action_id: &str) -> Option<&ActionLifecycle> {
-        self.actions.iter().find(|action| action.intent().action_id == action_id)
+        self.actions
+            .iter()
+            .find(|action| action.intent().action_id == action_id)
     }
 
     pub fn action_mut(&mut self, action_id: &str) -> Option<&mut ActionLifecycle> {
-        self.actions.iter_mut().find(|action| action.intent().action_id == action_id)
+        self.actions
+            .iter_mut()
+            .find(|action| action.intent().action_id == action_id)
     }
 }
 
@@ -93,8 +105,12 @@ mod tests {
     #[test]
     fn journal_enforces_run_identity_monotonic_sequence_and_unique_action_ids() {
         let mut journal = RecoveryJournal::new("run-1").unwrap();
-        journal.prepare_action(intent("run-1", 1, "action-1")).unwrap();
-        journal.prepare_action(intent("run-1", 2, "action-2")).unwrap();
+        journal
+            .prepare_action(intent("run-1", 1, "action-1"))
+            .unwrap();
+        journal
+            .prepare_action(intent("run-1", 2, "action-2"))
+            .unwrap();
         assert_eq!(journal.next_sequence(), 3);
         assert_eq!(journal.actions().len(), 2);
         assert_eq!(
@@ -103,7 +119,10 @@ mod tests {
         );
         assert_eq!(
             journal.prepare_action(intent("run-1", 4, "action-3")),
-            Err(JournalError::SequenceMismatch { expected: 3, actual: 4 })
+            Err(JournalError::SequenceMismatch {
+                expected: 3,
+                actual: 4
+            })
         );
     }
 
@@ -121,15 +140,26 @@ mod tests {
     #[test]
     fn journal_preserves_action_event_history_without_reordering() {
         let mut journal = RecoveryJournal::new("run-1").unwrap();
-        journal.prepare_action(intent("run-1", 1, "action-1")).unwrap();
+        journal
+            .prepare_action(intent("run-1", 1, "action-1"))
+            .unwrap();
         let action = journal.action_mut("action-1").unwrap();
         action.dispatch().unwrap();
         action.acknowledgement_lost().unwrap();
         let entry = journal.action("action-1").unwrap();
         assert_eq!(entry.phase(), crate::recovery::ActionPhase::UnknownOutcome);
-        assert!(matches!(entry.events().first(), Some(crate::recovery::JournalEvent::Prepared { sequence: 1 })));
-        assert!(matches!(entry.events().get(1), Some(crate::recovery::JournalEvent::Dispatched { attempt: 1 })));
-        assert!(matches!(entry.events().get(2), Some(crate::recovery::JournalEvent::AcknowledgementLost)));
+        assert!(matches!(
+            entry.events().first(),
+            Some(crate::recovery::JournalEvent::Prepared { sequence: 1 })
+        ));
+        assert!(matches!(
+            entry.events().get(1),
+            Some(crate::recovery::JournalEvent::Dispatched { attempt: 1 })
+        ));
+        assert!(matches!(
+            entry.events().get(2),
+            Some(crate::recovery::JournalEvent::AcknowledgementLost)
+        ));
     }
 
     #[test]
@@ -137,7 +167,10 @@ mod tests {
         let mut journal = RecoveryJournal::new("run-1").unwrap();
         let mut invalid = intent("run-1", 1, "action-1");
         invalid.principal_id.clear();
-        assert!(matches!(journal.prepare_action(invalid), Err(JournalError::InvalidAction(_))));
+        assert!(matches!(
+            journal.prepare_action(invalid),
+            Err(JournalError::InvalidAction(_))
+        ));
         assert_eq!(journal.next_sequence(), 1);
         assert!(journal.actions().is_empty());
     }
