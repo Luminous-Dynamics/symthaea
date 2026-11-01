@@ -790,7 +790,7 @@ The analyzer reports:
 - exact cluster-level conformal p-values for every locked-test item, with cluster-max risk and calibration support;
 - per-detector, per-group confusion counts at 1%, 5% and 10% targets;
 - calibration resolution sufficiency, empirical held-out cluster FPR, TPR and exact one-sided upper FPR bound;
-- detector disagreement matrices on shared test clusters;
+- detector disagreement matrices on shared test clusters; pairs where either detector lacks calibration resolution have zero comparable support and no disagreement rate, rather than being counted as 'neither flagged';
 - runtime, call, token and peak-memory totals/quantiles;
 - equal-calibration-group macro summaries so large test groups do not dominate.
 
@@ -799,7 +799,7 @@ The analyzer reports:
     cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
       analyze-detector-calibration calibration-study.json calibration-report.json
 
-Study/report JSON Schemas are in schema/detector-calibration-study.schema.json and schema/detector-calibration-report.schema.json. The Rust analyzer refuses incomplete detector/sample grids, duplicated observations, split overlap, group identity mismatches, mixed-label clusters, unequal cluster sizes and undersized evidence for a requested alpha.
+Study/report JSON Schemas are in schema/detector-calibration-study.schema.json and schema/detector-calibration-report.schema.json. The Rust analyzer refuses incomplete detector/sample grids, duplicated observations, split overlap, group identity mismatches, mixed-label clusters and unequal cluster sizes. An under-resolved detector/alpha pair is not scored and is excluded from disagreement metrics rather than being treated as a negative prediction.
 
 ### What the calibration does not solve
 
