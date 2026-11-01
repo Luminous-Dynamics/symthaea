@@ -1363,6 +1363,6 @@ mod tests {
 pub mod training_receipt;
 
 pub mod causal_analysis;
+pub mod detector_calibration;
 pub mod exposure_transfer;
 pub mod self_critique;
-pub mod detector_calibration;
