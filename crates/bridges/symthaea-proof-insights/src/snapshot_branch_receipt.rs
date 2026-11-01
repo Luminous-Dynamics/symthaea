@@ -102,7 +102,7 @@ fn safe_relative_path(value: &str) -> Result<()> {
 
 pub fn compute_live_proof_state_sha256(value: &Value) -> Result<String> {
     let mut hasher = Sha256::new();
-    hasher.update(b"PITB-LIVE-PROOF-STATE-V0\\0");
+    hasher.update(b"PITB-LIVE-PROOF-STATE-V0\0");
     for path in [
         "/environment/environment_sha256",
         "/proof_state/goal_metadata_sha256",
