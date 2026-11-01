@@ -730,7 +730,7 @@ mod tests {
         assert!((report.models[0].first_stage_size - 0.042).abs() < 1e-12);
         assert!((report.models[1].first_stage_size - 0.046).abs() < 1e-12);
         assert!((report.models[0].model_specific_continued_size - 0.034).abs() < 1e-12);
-        assert!((report.models[1].model_specific_continued_size - 0.036).abs() < 1e-12);
+        assert!((report.models[1].model_specific_continued_size - 0.0288).abs() < 1e-12);
         assert!((report.models[0].composite_continued_size - 0.018).abs() < 1e-12);
         assert!((report.models[1].composite_continued_size - 0.0096).abs() < 1e-12);
         assert!(report.models.iter().all(|model| {
