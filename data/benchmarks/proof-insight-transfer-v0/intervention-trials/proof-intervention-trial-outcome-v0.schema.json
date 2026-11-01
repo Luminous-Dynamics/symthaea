@@ -39,7 +39,11 @@
     "checker_receipt_path",
     "target_integrity_receipt_path",
     "successor_gate_receipt_path",
-    "run_receipt_path"
+    "run_receipt_path",
+    "model_id",
+    "model_version",
+    "arm_policy_sha256",
+    "arm_config_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -245,6 +249,20 @@
           "type": "null"
         }
       ]
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arm_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "arm_config_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "allOf": [
