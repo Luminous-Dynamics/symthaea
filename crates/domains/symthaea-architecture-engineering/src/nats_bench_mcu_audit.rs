@@ -372,16 +372,31 @@ pub fn accuracy_cost_pareto_front(
         ));
     }
 
-    let mut points: Vec<(f64, f64, u32)> = candidates
-        .iter()
-        .map(|candidate| {
-            (
-                candidate_cost(candidate, cost_metric),
-                candidate_accuracy(candidate, dataset),
-                candidate.arch_idx,
-            )
-        })
-        .collect();
+    let mut seen_ids = HashSet::with_capacity(candidates.len());
+    let mut points = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !seen_ids.insert(candidate.arch_idx) {
+            return Err(NatsBenchMcuAuditError::new(
+                "pareto.arch_idx",
+                format!("duplicate architecture index {}", candidate.arch_idx),
+            ));
+        }
+        let cost = candidate_cost(candidate, cost_metric);
+        if !cost.is_finite() || cost <= 0.0 {
+            return Err(NatsBenchMcuAuditError::new(
+                format!("pareto.{}.{}", candidate.arch_idx, cost_metric.as_str()),
+                "cost must be finite and positive",
+            ));
+        }
+        let accuracy = candidate_accuracy(candidate, dataset);
+        if !accuracy.is_finite() || !(0.0..=100.0).contains(&accuracy) {
+            return Err(NatsBenchMcuAuditError::new(
+                format!("pareto.{}.{}", candidate.arch_idx, dataset),
+                "accuracy must be finite and in [0, 100]",
+            ));
+        }
+        points.push((cost, accuracy, candidate.arch_idx));
+    }
 
     points.sort_by(|left, right| {
         left.0
@@ -451,8 +466,9 @@ pub fn audit_nats_bench_mcu_export(
     contract: NatsBenchMcuContract,
 ) -> Result<NatsBenchMcuExportAuditResult, NatsBenchMcuAuditError> {
     if contract.expected_total_candidates == 0
-        || contract.expected_measured_candidates + contract.expected_infeasible_candidates
-            != contract.expected_total_candidates as usize
+        || contract.expected_measured_candidates
+            .checked_add(contract.expected_infeasible_candidates)
+            != Some(contract.expected_total_candidates as usize)
         || !contract.application_flash_kb.is_finite()
         || contract.application_flash_kb <= 0.0
         || !contract.fixed_firmware_overhead_kb.is_finite()
