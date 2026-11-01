@@ -83,8 +83,6 @@ impl MessageType {
 }
 
 struct Frame {
-    message_type: MessageType,
-    sequence: u64,
     payload: Vec<u8>,
 }
 
@@ -188,7 +186,7 @@ fn read_frame<R: Read>(
     if actual_digest != expected_digest {
         return Err(CandidateProtocolError::PayloadDigestMismatch);
     }
-    Ok(Frame { message_type, sequence, payload })
+    Ok(Frame { payload })
 }
 
 fn push_u64(output: &mut Vec<u8>, value: u64) {
