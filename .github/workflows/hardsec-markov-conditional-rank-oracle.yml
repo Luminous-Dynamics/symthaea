@@ -31,6 +31,32 @@ jobs:
         run: rustfmt --edition 2024 --check examples/hardsec_markov_conditional_rank_oracle.rs
       - name: Run exact rational path tests
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-conditional-rank-oracle --example hardsec_markov_conditional_rank_oracle
+      - name: Check transition CS example formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_markov_transition_cs_audit.rs
+      - name: Run transition CS finite-grid tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-transition-cs-audit --example hardsec_markov_transition_cs_audit
+      - name: Verify transition CS finite-grid receipt
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-transition-cs-audit --example hardsec_markov_transition_cs_audit > /tmp/markov-transition-cs.json
+          python3 - <<'PY'
+          import json
+          with open("/tmp/markov-transition-cs.json", "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "finite_grid_exact_path_audit_passed"
+          grid = receipt["enumeration"]
+          assert grid["transition_matrices_checked"] == 16
+          assert grid["initial_states_per_matrix"] == 2
+          assert grid["episodes"] == 32
+          assert grid["horizon"] == 8
+          assert grid["paths_per_episode"] == 256
+          assert grid["all_path_masses_sum_to_one"] is True
+          assert grid["grid_failure_probability_within_global_delta"] is True
+          assert receipt["guarantee"]["arbitrary_serial_pmu_pfa_claim"] is False
+          assert receipt["guarantee"]["floating_point_runtime_claim"] == "not_established_until_outward_interval_arithmetic_is_certified"
+          assert receipt["guarantee"]["effective_sample_size_estimate"] is None
+          print("HARDSEC-024 finite-grid transition CS audit qualified.")
+          PY
       - name: Verify emitted exact receipt
         run: |
           set -euo pipefail
