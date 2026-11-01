@@ -8,14 +8,14 @@ Measure how predictive statements behave after repeated adaptive operation selec
 
 ## Feedback state machine
 
-- **Exact verified cost:** final feedback contains the full six-dimensional measured remaining resource vector, a meter receipt digest, and an independent completion-verifier digest. The statement's declared resource dimension is projected from that vector.
-- **Coverage bit only:** final feedback reveals whether the interval covered the selected label, with independent evaluator and meter receipts, but does not reveal the exact cost. This models partial feedback without pretending the exact label is available.
-- **Right-censored:** final feedback contains a six-dimensional observed lower-bound vector and a meter receipt. It is counted as a definite miss only when the declared dimension's lower bound is strictly above the interval's upper endpoint. Otherwise coverage is unknown and reported separately.
-- **Competing terminal:** permission revocation, user abandonment, task abort, or external-input unavailability is recorded separately and is not converted into a proof-completion cost or ordinary miss.
-- **Action outcome unknown:** an interim receipt identifies the ambiguous action. At most one later final receipt may reconcile it. Unknown is never counted as covered.
+- **Exact verified cost:** final feedback contains the full six-dimensional measured remaining resource vector, the execution action digest, a meter receipt digest, and an independent completion-verifier digest. The statement's declared resource dimension is projected from that vector.
+- **Coverage bit only:** final feedback reveals whether the interval covered the selected label, with the execution action digest and independent evaluator and meter receipts, but does not reveal the exact cost. This models partial feedback without pretending the exact label is available.
+- **Right-censored:** final feedback contains a six-dimensional observed lower-bound vector, execution action digest, and meter receipt. It is counted as a definite miss only when the declared dimension's lower bound is strictly above the interval's upper endpoint. Otherwise coverage is unknown and reported separately.
+- **Competing terminal:** permission revocation, user abandonment, task abort, or external-input unavailability is recorded separately with the execution action digest and is not converted into a proof-completion cost or ordinary miss.
+- **Action outcome unknown:** an interim receipt identifies the ambiguous action. At most one later final receipt may reconcile it, and that final receipt must carry the exact same action digest. A different digest is rejected. Unknown is never counted as covered.
 - **Pending:** no feedback has yet arrived for a selected statement at the chosen replay tick.
 
-Receipt sequence is monotone across the full stream; selected decision sequence is strictly increasing within an episode; feedback cannot predate its statement or move backwards in logical receipt time; a final outcome is single-assignment. Late feedback is preserved and replay-prefix reports exclude it until its received tick.
+Receipt sequence is monotone across the full stream with checked overflow; selected decision sequence is strictly increasing within an episode; feedback cannot predate its statement or move backwards in logical receipt time; a final outcome is single-assignment. Every final receipt is action-bound, not merely statement-bound. Late feedback is preserved and replay-prefix reports exclude it until its received tick.
 
 ## Metric semantics
 
