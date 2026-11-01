@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 const SCHEMA: &str = "symthaea.architecture-engineering.evidence-artifact";
 const VERSION: &str = "0.2.0";
 const RECEIPT_SCHEMA: &str = "symthaea.architecture-engineering.evidence-artifact-byte-receipt";
-const RECEIPT_VERSION: &str = "0.1.0";
+const RECEIPT_VERSION: &str = "0.2.0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceArtifactError {
