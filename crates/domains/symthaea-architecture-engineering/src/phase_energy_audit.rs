@@ -1411,11 +1411,26 @@ mod tests {
         )
     }
 
+    fn outcomes(outcome: &str, deadline_met: bool) -> String {
+        let output_digest = if matches!(outcome, "correct" | "incorrect" | "fallback") {
+            sha('b')
+        } else {
+            String::new()
+        };
+        format!(
+            "event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n             e1,{outcome},{},{},accuracy,1.0,{},0\n",
+            sha('a'),
+            output_digest,
+            if deadline_met { "true" } else { "false" },
+        )
+    }
+
     #[test]
     fn integrates_complete_phase_windows_and_whole_event() {
         let result = audit_application_phase_energy(
             samples(),
             &markers(10_000, 10_000),
+            &outcomes("correct", true),
             trace_config(),
             &mapping(),
             &protocol(0.0),
@@ -1428,6 +1443,7 @@ mod tests {
         verify_phase_energy_receipt_against_sources(
             samples(),
             &markers(10_000, 10_000),
+            &outcomes("correct", true),
             trace_config(),
             &mapping(),
             &protocol(0.0),
@@ -1440,6 +1456,7 @@ mod tests {
         let result = audit_application_phase_energy(
             samples(),
             &markers(10_000, 20_000),
+            &outcomes("correct", true),
             trace_config(),
             &mapping(),
             &protocol(0.001),
@@ -1461,7 +1478,7 @@ mod tests {
             "e1,e1,postprocess,END,40000,3,logic-analyzer-clock,gpio-sync-1\n",
         );
         let result = audit_application_phase_energy(
-            samples(), csv, trace_config(), &mapping(), &protocol(1.0),
+            samples(), csv, &outcomes("correct", true), trace_config(), &mapping(), &protocol(1.0),
         ).unwrap();
         let event = &result.receipt.events[0];
         assert_eq!(event.status, PhaseEnergyEventStatus::MissingRequiredPhase);
@@ -1527,7 +1544,7 @@ mod tests {
             )
         );
         assert!(audit_application_phase_energy(
-            samples(), &marker, trace_config(), &mapping(), &protocol(0.0),
+            samples(), &marker, &outcomes("correct", true), trace_config(), &mapping(), &protocol(0.0),
         ).unwrap_err().to_string().contains("only one application event"));
     }
 
@@ -1536,6 +1553,7 @@ mod tests {
         let result = audit_application_phase_energy(
             samples(),
             &markers(20_000, 10_000),
+            &outcomes("correct", true),
             trace_config(),
             &mapping(),
             &protocol(1.0),
