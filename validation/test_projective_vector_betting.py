@@ -3,10 +3,13 @@ import unittest
 
 from projective_vector_betting import (
     CoordinateHistory,
+    ProjectiveEquicorrelationKernel,
     assert_symmetric_psd,
     coordinate_local_bets,
     equicorrelation_covariance,
     equicorrelation_envelope,
+    projective_equicorrelation_envelope,
+    projective_vector_log_factor,
     fixed_log_mixture,
     gaussian_log_factor_expectation,
     matrix_dominates,
@@ -23,6 +26,79 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
         for rho_step in range(21):
             rho = 0.2 + 0.03 * rho_step
             self.assertTrue(matrix_dominates(envelope, equicorrelation_covariance(d, rho)))
+
+    def test_global_envelope_is_projectively_consistent_across_dimensions(self):
+        for rho_min, rho_max in ((0.2, 0.8), (0.1, 0.6), (0.0, 1.0)):
+            matrices = {
+                d: projective_equicorrelation_envelope(d, rho_min, rho_max)
+                for d in (2, 3, 5, 8)
+            }
+            for small_d, large_d in ((2, 3), (2, 8), (3, 8), (5, 8)):
+                self.assertEqual(
+                    [row[:small_d] for row in matrices[large_d][:small_d]],
+                    matrices[small_d],
+                )
+            for d, envelope in matrices.items():
+                for rho in (rho_min, (rho_min + rho_max) / 2, rho_max):
+                    self.assertTrue(
+                        matrix_dominates(envelope, equicorrelation_covariance(d, rho))
+                    )
+
+    def test_low_rank_kernel_matches_dense_quadratic_and_matvec(self):
+        kernel = ProjectiveEquicorrelationKernel(7, 0.2, 0.8)
+        dense = kernel.dense()
+        values = [0.1, 0.2, 0.0, 0.7, 1.1, 0.0, 0.3]
+        active = [True, True, False, True, True, False, True]
+        masked = [value if on else 0.0 for value, on in zip(values, active)]
+        expected = sum(
+            masked[i] * dense[i][j] * masked[j]
+            for i in range(7) for j in range(7)
+        )
+        self.assertAlmostEqual(kernel.quadratic(values, active), expected)
+        expected_vec = [
+            sum(dense[i][j] * masked[j] for j in range(7)) if active[i] else 0.0
+            for i in range(7)
+        ]
+        for actual, expected_value in zip(kernel.matvec(values, active), expected_vec):
+            self.assertAlmostEqual(actual, expected_value)
+
+    def test_low_rank_operator_randomized_against_dense_reference(self):
+        rng = __import__("random").Random(69851)
+        for dimension in range(1, 26):
+            kernel = ProjectiveEquicorrelationKernel(dimension, 0.2, 0.8)
+            dense = kernel.dense()
+            values = [rng.uniform(0.0, 1.5) for _ in range(dimension)]
+            active = [rng.random() < 0.7 for _ in range(dimension)]
+            masked = [values[i] if active[i] else 0.0 for i in range(dimension)]
+            dense_q = sum(
+                masked[i] * dense[i][j] * masked[j]
+                for i in range(dimension) for j in range(dimension)
+            )
+            self.assertAlmostEqual(kernel.quadratic(values, active), dense_q, places=9)
+            dense_v = [
+                sum(dense[i][j] * masked[j] for j in range(dimension))
+                if active[i] else 0.0
+                for i in range(dimension)
+            ]
+            for actual, expected in zip(kernel.matvec(values, active), dense_v):
+                self.assertAlmostEqual(actual, expected, places=9)
+
+    def test_low_rank_factor_matches_dense_factor_and_prefix(self):
+        small = ProjectiveEquicorrelationKernel(3, 0.2, 0.8)
+        large = ProjectiveEquicorrelationKernel(8, 0.2, 0.8)
+        scores = [0.4, -0.1, 1.2]
+        bets = [0.3, 0.0, 0.5]
+        active = [True, True, True]
+        dense_factor = vector_log_factor(scores, bets, active, small.dense())
+        low_rank_factor = projective_vector_log_factor(scores, bets, active, small)
+        self.assertAlmostEqual(low_rank_factor, dense_factor)
+        extended_scores = scores + [999.0] * 5
+        extended_bets = bets + [100.0] * 5
+        extended_active = [True, True, True] + [False] * 5
+        extended_factor = projective_vector_log_factor(
+            extended_scores, extended_bets, extended_active, large
+        )
+        self.assertAlmostEqual(extended_factor, low_rank_factor)
 
     def test_gaussian_log_expectation_nonpositive_under_null(self):
         covariance = equicorrelation_covariance(3, 0.5)
