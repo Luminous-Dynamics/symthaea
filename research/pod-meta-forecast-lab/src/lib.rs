@@ -202,8 +202,7 @@ impl ForecastModel {
         for observation in training {
             model.global.observe(observation.success);
             model.by_family[observation.family as usize].observe(observation.success);
-            model.by_context_family[observation.regime as usize]
-                [observation.family as usize]
+            model.by_context_family[observation.regime as usize][observation.family as usize]
                 .observe(observation.success);
         }
         model
@@ -229,8 +228,7 @@ impl ForecastModel {
             ForecastMethod::FamilyBayes => self.family_rate(family),
             ForecastMethod::ContextFamilyShrinkage => {
                 let family_prior = self.family_rate(family);
-                self.by_context_family[regime as usize][family as usize]
-                    .rate(family_prior, 12.0)
+                self.by_context_family[regime as usize][family as usize].rate(family_prior, 12.0)
             }
         }
     }
@@ -302,7 +300,9 @@ impl SelectionPolicy {
             Self::GlobalBayes => Some(ForecastMethod::GlobalBayes),
             Self::FamilyBayes => Some(ForecastMethod::FamilyBayes),
             Self::ContextFamilyShrinkage => Some(ForecastMethod::ContextFamilyShrinkage),
-            Self::FixedOrder | Self::BudgetMatchedRandom | Self::OracleTrueProbabilityPerCost => None,
+            Self::FixedOrder | Self::BudgetMatchedRandom | Self::OracleTrueProbabilityPerCost => {
+                None
+            }
         }
     }
 }
@@ -331,8 +331,7 @@ impl SelectionMetrics {
     }
 
     pub fn work_units_per_verified_proof(self) -> Option<f64> {
-        (self.verified_proofs > 0)
-            .then(|| self.total_spent as f64 / self.verified_proofs as f64)
+        (self.verified_proofs > 0).then(|| self.total_spent as f64 / self.verified_proofs as f64)
     }
 
     pub fn average_work_units_per_episode(self) -> f64 {
@@ -407,11 +406,7 @@ fn true_success_probability(regime: EvidenceRegime, family: OperationFamily) -> 
     SUCCESS_PROBABILITIES[regime as usize][family as usize]
 }
 
-fn sample_observations(
-    seed: u64,
-    regimes: &[EvidenceRegime],
-    per_cell: usize,
-) -> Vec<Observation> {
+fn sample_observations(seed: u64, regimes: &[EvidenceRegime], per_cell: usize) -> Vec<Observation> {
     let mut rng = Rng::new(seed);
     let mut observations = Vec::with_capacity(regimes.len() * FAMILY_COUNT * per_cell);
     for regime in regimes {
@@ -455,11 +450,8 @@ fn evaluate_forecasts(
     let mut bin_success_sum = [0u64; RELIABILITY_BIN_COUNT];
 
     for observation in &selected {
-        let probability = clamp_probability(model.predict(
-            method,
-            observation.regime,
-            observation.family,
-        ));
+        let probability =
+            clamp_probability(model.predict(method, observation.regime, observation.family));
         let outcome = if observation.success { 1.0 } else { 0.0 };
         let error = probability - outcome;
         brier_sum += error * error;
@@ -485,8 +477,7 @@ fn evaluate_forecasts(
         if bin_n > 0 {
             let mean_probability = bin_probability_sum[bin] / bin_n as f64;
             let observed_rate = bin_success_sum[bin] as f64 / bin_n as f64;
-            ece += (bin_n as f64 / count.max(1) as f64)
-                * (mean_probability - observed_rate).abs();
+            ece += (bin_n as f64 / count.max(1) as f64) * (mean_probability - observed_rate).abs();
             bins.push(ReliabilityBin {
                 method,
                 partition,
@@ -562,10 +553,8 @@ fn policy_order(
         }
         SelectionPolicy::OracleTrueProbabilityPerCost => {
             order.sort_by(|a, b| {
-                let score_a = true_success_probability(episode.regime, *a)
-                    / f64::from(a.cost());
-                let score_b = true_success_probability(episode.regime, *b)
-                    / f64::from(b.cost());
+                let score_a = true_success_probability(episode.regime, *a) / f64::from(a.cost());
+                let score_b = true_success_probability(episode.regime, *b) / f64::from(b.cost());
                 score_b
                     .partial_cmp(&score_a)
                     .unwrap_or(Ordering::Equal)
@@ -573,12 +562,12 @@ fn policy_order(
             });
         }
         _ => {
-            let method = policy.forecast_method().unwrap_or(ForecastMethod::ConstantHalf);
+            let method = policy
+                .forecast_method()
+                .unwrap_or(ForecastMethod::ConstantHalf);
             order.sort_by(|a, b| {
-                let score_a = model.predict(method, episode.regime, *a)
-                    / f64::from(a.cost());
-                let score_b = model.predict(method, episode.regime, *b)
-                    / f64::from(b.cost());
+                let score_a = model.predict(method, episode.regime, *a) / f64::from(a.cost());
+                let score_b = model.predict(method, episode.regime, *b) / f64::from(b.cost());
                 score_b
                     .partial_cmp(&score_a)
                     .unwrap_or(Ordering::Equal)
@@ -606,7 +595,11 @@ fn evaluate_selection(
         let mut total_operations = 0u64;
         let mut count = 0usize;
 
-        for episode in episodes.iter().copied().filter(|episode| episode.regime == regime) {
+        for episode in episodes
+            .iter()
+            .copied()
+            .filter(|episode| episode.regime == regime)
+        {
             let order = policy_order(policy, model, episode, seed);
             let mut spent = 0u32;
             let mut succeeded = false;
@@ -665,11 +658,8 @@ pub fn run_benchmark(seed: u64) -> BenchmarkReport {
         &EvidenceRegime::TRAINING,
         DEFAULT_TRAIN_PER_CELL,
     );
-    let evaluation = sample_observations(
-        evaluation_seed,
-        &EvidenceRegime::ALL,
-        DEFAULT_TEST_PER_CELL,
-    );
+    let evaluation =
+        sample_observations(evaluation_seed, &EvidenceRegime::ALL, DEFAULT_TEST_PER_CELL);
     let model = ForecastModel::fit(&training);
 
     let mut forecast_metrics = Vec::new();
@@ -727,26 +717,32 @@ mod tests {
         let training = sample_observations(11, &EvidenceRegime::TRAINING, 16);
         let evaluation = sample_observations(22, &EvidenceRegime::ALL, 16);
         let model = ForecastModel::fit(&training);
-        let predictions_before: Vec<f64> = evaluation.iter().map(|observation| {
-            model.predict(
-                ForecastMethod::ContextFamilyShrinkage,
-                observation.regime,
-                observation.family,
-            )
-        }).collect();
+        let predictions_before: Vec<f64> = evaluation
+            .iter()
+            .map(|observation| {
+                model.predict(
+                    ForecastMethod::ContextFamilyShrinkage,
+                    observation.regime,
+                    observation.family,
+                )
+            })
+            .collect();
 
         let mut flipped = evaluation;
         for observation in &mut flipped {
             observation.success = !observation.success;
         }
 
-        let predictions_after: Vec<f64> = flipped.iter().map(|observation| {
-            model.predict(
-                ForecastMethod::ContextFamilyShrinkage,
-                observation.regime,
-                observation.family,
-            )
-        }).collect();
+        let predictions_after: Vec<f64> = flipped
+            .iter()
+            .map(|observation| {
+                model.predict(
+                    ForecastMethod::ContextFamilyShrinkage,
+                    observation.regime,
+                    observation.family,
+                )
+            })
+            .collect();
         assert_eq!(predictions_before, predictions_after);
     }
 
@@ -779,9 +775,20 @@ mod tests {
             report.reliability_bins.len(),
             ForecastMethod::ALL.len() * 3 * RELIABILITY_BIN_COUNT
         );
-        assert_eq!(report.training_observations, 4 * FAMILY_COUNT * DEFAULT_TRAIN_PER_CELL);
-        assert_eq!(report.evaluation_observations, CONTEXT_COUNT * FAMILY_COUNT * DEFAULT_TEST_PER_CELL);
-        assert!(report.forecast_metrics.iter().all(|metric| metric.observations > 0));
+        assert_eq!(
+            report.training_observations,
+            4 * FAMILY_COUNT * DEFAULT_TRAIN_PER_CELL
+        );
+        assert_eq!(
+            report.evaluation_observations,
+            CONTEXT_COUNT * FAMILY_COUNT * DEFAULT_TEST_PER_CELL
+        );
+        assert!(
+            report
+                .forecast_metrics
+                .iter()
+                .all(|metric| metric.observations > 0)
+        );
     }
 
     #[test]
@@ -794,7 +801,10 @@ mod tests {
         for metric in &report.selection_metrics {
             assert_eq!(metric.budget_violations, 0);
             assert!(metric.maximum_episode_spend <= EPISODE_BUDGET);
-            assert_eq!(metric.verified_proofs + metric.no_verified_proof, metric.episodes);
+            assert_eq!(
+                metric.verified_proofs + metric.no_verified_proof,
+                metric.episodes
+            );
         }
     }
 
@@ -823,12 +833,20 @@ mod tests {
     fn held_out_shift_is_reported_separately_from_seen_contexts() {
         let report = run_benchmark(1729);
         for method in ForecastMethod::ALL {
-            let seen = report.forecast_metrics.iter().find(|metric| {
-                metric.method == method && metric.partition == ForecastPartition::SeenContexts
-            }).unwrap();
-            let shifted = report.forecast_metrics.iter().find(|metric| {
-                metric.method == method && metric.partition == ForecastPartition::HeldOutContext
-            }).unwrap();
+            let seen = report
+                .forecast_metrics
+                .iter()
+                .find(|metric| {
+                    metric.method == method && metric.partition == ForecastPartition::SeenContexts
+                })
+                .unwrap();
+            let shifted = report
+                .forecast_metrics
+                .iter()
+                .find(|metric| {
+                    metric.method == method && metric.partition == ForecastPartition::HeldOutContext
+                })
+                .unwrap();
             assert_eq!(seen.observations, 4 * FAMILY_COUNT * DEFAULT_TEST_PER_CELL);
             assert_eq!(shifted.observations, FAMILY_COUNT * DEFAULT_TEST_PER_CELL);
         }
