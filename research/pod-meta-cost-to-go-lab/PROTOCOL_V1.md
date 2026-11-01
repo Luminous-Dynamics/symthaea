@@ -177,7 +177,11 @@ These are project targets, not industry standards or demonstrated results:
 - A Pareto improvement in verified proof completion versus all-in expenditure at matched actor, tools, permissions, context, and ceilings.
 - Exact-head Rust qualification, protected evaluator separation, and independent review before production integration.
 
-## 12. External comparators and claim limits
+## 12. Survival baseline
+
+The unconditional time-to-sufficient-proof estimator is separately specified in [SURVIVAL_V1.md](SURVIVAL_V1.md). It separates right-censored observations from competing terminal events and reports both cause-specific net survival and Aalen–Johansen completion cumulative incidence. Its independent-censoring assumption and lack of frontier conditioning are explicit; it is not a remaining-cost predictor.
+
+## 13. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.
