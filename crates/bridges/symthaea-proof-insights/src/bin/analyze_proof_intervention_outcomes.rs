@@ -175,6 +175,9 @@ fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
     let status = string(value, "/status")?;
     let checker = bool_value(value, "/checker_passed")?;
     let target_integrity_passed = bool_value(value, "/target_integrity_passed")?;
+    if !target_integrity_passed {
+        bail!("paired outcome refers to a target that is not benchmark-integrity eligible");
+    }
     let successor = string(value, "/successor_gate_status")?;
     let checked_statement = match field(value, "/checked_target_statement_sha256")? {
         Value::Null => None,
@@ -680,6 +683,8 @@ fn validate_and_analyze(
     let all_measured_rows_have_signed_target_integrity =
         !all_synthetic
             && signed_target_integrity_receipts_verified == measured_outcome_rows;
+    let all_measured_artifact_bytes_authenticated =
+        !all_synthetic && measured_artifacts_authenticated;
 
     Ok(json!({
         "schema_version":"pitb.proof-intervention-trial-analysis.v0",
@@ -692,7 +697,7 @@ fn validate_and_analyze(
         "all_pair_arm_rows_present":true,
         "resource_caps_respected":true,
         "non_attempts_and_unavailable_counted_as_failures":true,
-        "measured_artifact_bytes_authenticated":measured_artifacts_authenticated,
+        "all_measured_artifact_bytes_authenticated":all_measured_artifact_bytes_authenticated,
         "measured_outcome_rows":measured_outcome_rows,
         "signed_target_integrity_receipt_count":signed_target_integrity_receipts_verified,
         "all_measured_rows_have_signed_target_integrity":all_measured_rows_have_signed_target_integrity,
