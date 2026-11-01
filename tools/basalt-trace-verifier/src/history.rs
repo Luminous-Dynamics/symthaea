@@ -634,6 +634,16 @@ mod tests {
             operation.invoked_at_ns = 0;
             operation.completed_at_ns = 1;
         }
+        // Preserve the fault schedule's operation linkage while moving each runner.
+        for fault in &mut trace.faults {
+            let target = trace
+                .operations
+                .iter()
+                .find(|operation| operation.op_id == fault.target_op_id)
+                .unwrap();
+            fault.runner_id = target.runner_id.clone();
+            fault.at_ns = target.invoked_at_ns;
+        }
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert!(["pass", "fail", "inconclusive"].contains(&report.status.as_str()));
         assert_ne!(report.status, "invalid_evidence");
