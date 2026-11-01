@@ -1,0 +1,78 @@
+{
+  "schema": "symthaea.retrieval_decomposition.sealed_oracle.v1",
+  "task_id": "delta-inspection-total-001",
+  "expected_answer": {
+    "amount": 690,
+    "units": "USD",
+    "canonicalization": "exact_integer"
+  },
+  "required_claims": [
+    {
+      "claim_id": "labor-rate",
+      "claim_text": "Delta inspection labor costs 180 USD per billable working day.",
+      "supporting_spans": [
+        {
+          "document_id": "doc-delta-rate",
+          "start_byte": 0,
+          "end_byte": 62,
+          "span_sha256": "8bb7afe139d5627747043a2604e2f66d1d615fbe06246ff523dccf9a3abd7a39"
+        }
+      ],
+      "derived_from_claim_ids": []
+    },
+    {
+      "claim_id": "overnight-rate",
+      "claim_text": "Each overnight stay costs 75 USD.",
+      "supporting_spans": [
+        {
+          "document_id": "doc-lodging-rate",
+          "start_byte": 0,
+          "end_byte": 33,
+          "span_sha256": "ff362e740aeb03d3ee9712558663e84f84ab27fae187aad135b9f03edac93682"
+        }
+      ],
+      "derived_from_claim_ids": []
+    },
+    {
+      "claim_id": "delta-schedule",
+      "claim_text": "Delta uses 3 billable working days and 2 overnight stays.",
+      "supporting_spans": [
+        {
+          "document_id": "doc-delta-schedule",
+          "start_byte": 0,
+          "end_byte": 80,
+          "span_sha256": "830d670eb3888478acb7e48ddcbac41017c1e4a895f383dd353bcccab1424957"
+        }
+      ],
+      "derived_from_claim_ids": []
+    },
+    {
+      "claim_id": "total-cost",
+      "claim_text": "The total is 3 × 180 + 2 × 75 = 690 USD.",
+      "supporting_spans": [],
+      "derived_from_claim_ids": [
+        "labor-rate",
+        "overnight-rate",
+        "delta-schedule"
+      ]
+    }
+  ],
+  "distractor_scenarios": [
+    {
+      "document_id": "doc-echo-schedule",
+      "adjacent_query": "For the Echo inspection, calculate labor and lodging cost using the same rates.",
+      "distractor_answer": 765,
+      "confusion_mechanism": "The Echo schedule has three nights rather than Delta's two; adopting it answers the nearby question, not the original Delta question."
+    }
+  ],
+  "allowed_alternative_evidence_paths": [
+    [
+      "doc-delta-rate",
+      "doc-lodging-rate",
+      "doc-delta-schedule"
+    ]
+  ],
+  "answer_sha256": "f6103ca1e01bd200a9258a366b7e8c22a542e771bf11a0679967a5bb47ef3688",
+  "oracle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "claim_boundary": "sealed synthetic oracle; oracle_sha256 is a placeholder until canonical bundle digesting is implemented"
+}
