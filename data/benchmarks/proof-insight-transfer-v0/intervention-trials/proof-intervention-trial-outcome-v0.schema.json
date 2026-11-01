@@ -162,16 +162,6 @@
         }
       ]
     },
-    "semantic_gate_receipt_sha256": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/sha256"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "successor_gate_receipt_sha256": {
       "oneOf": [
         {
@@ -212,18 +202,6 @@
         }
       ]
     },
-    "semantic_gate_receipt_path": {
-      "oneOf": [
-        {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^(?!/)(?!.*(?:^|/)\\\\.\\\\.?(/|$))(?!.*\\\\\\\\)"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "successor_gate_receipt_path": {
       "oneOf": [
         {
@@ -242,6 +220,26 @@
           "type": "string",
           "minLength": 1,
           "pattern": "^(?!/)(?!.*(?:^|/)\\\\.\\\\.?(/|$))(?!.*\\\\\\\\)"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "target_integrity_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "target_integrity_receipt_path": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/relative_path"
         },
         {
           "type": "null"
