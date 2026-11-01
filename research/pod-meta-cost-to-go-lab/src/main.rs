@@ -4,8 +4,9 @@ use pod_meta_cost_to_go_lab::{
     JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
     LinearProofFrontierCostModel, ProofFrontierFeatures, ReconciliationOutcome,
     RemainingCostForecast, ReservationId, ResourceVector, ShiftStatus,
-    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
-    assess_joint_resource_fit, calibrate_landmark_ipcw,
+    SelectedProofCalibrationExample, SelectedProofEnvelope, SelectionConditionedConformalCalibrator,
+    SelectionReceipt, SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome,
+    assess_completion_feasibility, assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
 
 fn tokens(value: u128) -> ResourceVector {
@@ -531,4 +532,98 @@ fn main() {
         Err(pod_meta_cost_to_go_lab::LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator)
     );
     println!("LANDMARK_IPCW_ROW\tcompeting-terminal\trequires-separate-estimator");
+    let selected_policy_digest = [33; 32];
+    let selected_population_digest = [34; 32];
+    let selected_calibration_digest = [35; 32];
+    let mut selected_prediction = frontier_prediction;
+    selected_prediction.population_cohort_digest = selected_population_digest;
+    let selected_examples = (1..=9_u64)
+        .map(|episode_id| {
+            let score = episode_id as u128;
+            let residual = ResourceVector::new(
+                score * selected_prediction.uncertainty_scale.tokens,
+                score * selected_prediction.uncertainty_scale.tool_calls,
+                score * selected_prediction.uncertainty_scale.cpu_ms,
+                score * selected_prediction.uncertainty_scale.gpu_ms,
+                score * selected_prediction.uncertainty_scale.wall_ms,
+                score * selected_prediction.uncertainty_scale.micro_usd,
+            );
+            SelectedProofCalibrationExample {
+                selection: SelectionReceipt {
+                    episode_id,
+                    decision_sequence: 1,
+                    candidate_pool_digest: [episode_id as u8; 32],
+                    selection_policy_digest: selected_policy_digest,
+                    selected_population_digest,
+                    pre_state_digest: [36; 32],
+                    frontier_digest: selected_prediction.frontier_digest,
+                    selected_operation_id: format!("selected-operation-{episode_id}"),
+                    selected_operation_family: 7,
+                },
+                prediction: selected_prediction,
+                observed_remaining_to_verified_proof: selected_prediction
+                    .point_cost
+                    .checked_add(residual)
+                    .unwrap(),
+                completion_verifier_digest: [37; 32],
+            }
+        })
+        .collect::<Vec<_>>();
+    let selected_calibrator = SelectionConditionedConformalCalibrator::fit(
+        &selected_examples,
+        0.10,
+        model_digest,
+        selected_policy_digest,
+        selected_population_digest,
+        selected_calibration_digest,
+    )
+    .unwrap();
+    let selected_receipt = SelectionReceipt {
+        episode_id: 501,
+        decision_sequence: 1,
+        candidate_pool_digest: [38; 32],
+        selection_policy_digest: selected_policy_digest,
+        selected_population_digest,
+        pre_state_digest: [39; 32],
+        frontier_digest: selected_prediction.frontier_digest,
+        selected_operation_id: "selected-operation-501".to_owned(),
+        selected_operation_family: 7,
+    };
+    let selected_envelope = selected_calibrator
+        .predict_upper(&selected_receipt, selected_prediction)
+        .unwrap();
+    let SelectedProofEnvelope::Bounded(selected_bound) = selected_envelope else {
+        panic!("nine selected-policy examples support a finite 90% conformal rank");
+    };
+    println!(
+        "SELECTION_CONFORMAL_ROW\tselected-cohort-envelope\t{:.2}\t{}\t{}\t{}",
+        selected_bound.target_coverage,
+        selected_bound.calibration_count,
+        selected_bound.normalized_residual_threshold,
+        selected_bound.upper.tokens
+    );
+    let mut wrong_policy_receipt = selected_receipt.clone();
+    wrong_policy_receipt.selection_policy_digest = [99; 32];
+    assert!(matches!(
+        selected_calibrator.predict_upper(&wrong_policy_receipt, selected_prediction),
+        Err(pod_meta_cost_to_go_lab::SelectionCalibrationError::SelectionPolicyMismatch)
+    ));
+    println!("SELECTION_CONFORMAL_ROW\tpolicy-version-mismatch\trejected");
+    let small_selected_calibrator = SelectionConditionedConformalCalibrator::fit(
+        &selected_examples[..8],
+        0.10,
+        model_digest,
+        selected_policy_digest,
+        selected_population_digest,
+        [40; 32],
+    )
+    .unwrap();
+    assert!(matches!(
+        small_selected_calibrator
+            .predict_upper(&selected_receipt, selected_prediction)
+            .unwrap(),
+        SelectedProofEnvelope::Unbounded { .. }
+    ));
+    println!("SELECTION_CONFORMAL_ROW\tselected-sample-too-small\tunbounded");
+
 }
