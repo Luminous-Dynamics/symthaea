@@ -16,7 +16,7 @@
     103,
     104
   ],
-  "joint_draw_bank_sha256": "4c8f7c1de1ad1d886d873630a9e43c9f512d0a6665db7e4e610658d4cdd2de2b",
+  "joint_draw_bank_sha256": "9202be4068e45989a72461f350c6bcea5893d44fde1575df3d671c0dc107f468",
   "coupling": "shared_posterior_and_world_noise",
   "channels": [
     {
@@ -72,6 +72,34 @@
           28,
           38,
           48
+        ]
+      ]
+    },
+    {
+      "channel_id": "task.utility",
+      "kind": "task_utility",
+      "unit": "utility",
+      "outcome_samples": [
+        [
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        [
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        [
+          4,
+          4,
+          4,
+          4,
+          4
         ]
       ]
     }
