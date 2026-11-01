@@ -1063,6 +1063,87 @@ impl EventTape {
                     })?;
                 }
                 (
+                    ActionIntent::EvaluateCandidateVector {
+                        candidate_sha256,
+                        parent_candidate_sha256,
+                        semantic_delta_sha256,
+                        direction_id,
+                        objective_contract_sha256: intent_contract_sha256,
+                    },
+                    ActionOutcome::CandidateMultiObjectiveEvaluation {
+                        task_recipe_sha256,
+                        comparison_profile_sha256,
+                        evaluator_sha256,
+                        verifier_sha256,
+                        verifier_receipt_sha256,
+                        objective_contract_sha256: outcome_contract_sha256,
+                        disposition,
+                        objective_values,
+                        evidence_sha256,
+                        evidence_manifest_sha256,
+                        evidence_byte_receipt_sha256,
+                        failure_reason,
+                    },
+                ) => {
+                    multi_objective_evaluations += 1;
+                    validate_sha256(candidate_sha256, &format!("{path}.intent.candidate_sha256"))?;
+                    if let Some(parent) = parent_candidate_sha256 {
+                        validate_sha256(parent, &format!("{path}.intent.parent_candidate_sha256"))?;
+                    }
+                    validate_sha256(semantic_delta_sha256, &format!("{path}.intent.semantic_delta_sha256"))?;
+                    validate_registered_direction(direction_id, &registered, &path)?;
+                    if intent_contract_sha256 != outcome_contract_sha256 {
+                        return Err(EventTapeError::new(
+                            format!("{path}.outcome.objective_contract_sha256"),
+                            "intent and outcome objective-contract digests differ",
+                        ));
+                    }
+                    let contract = validate_objective_attempt_metadata(
+                        &self.header,
+                        intent_contract_sha256,
+                        EventTapeObjectiveMode::DeterministicVector,
+                        task_recipe_sha256,
+                        comparison_profile_sha256,
+                        evaluator_sha256,
+                        verifier_sha256,
+                        verifier_receipt_sha256,
+                        &payload.resources,
+                        &path,
+                    )?;
+                    match disposition {
+                        CandidateDisposition::Verified => {
+                            let values = objective_values.as_deref().ok_or_else(|| EventTapeError::new(
+                                format!("{path}.outcome.objective_values"),
+                                "verified vector evaluations require the complete objective vector",
+                            ))?;
+                            validate_objective_vector(values, contract, &format!("{path}.outcome.objective_values"))?;
+                            validate_successful_objective_evidence(
+                                evidence_sha256.as_deref(),
+                                evidence_manifest_sha256.as_deref(),
+                                evidence_byte_receipt_sha256.as_deref(),
+                                &format!("{path}.outcome"),
+                            )?;
+                            if failure_reason.is_some() {
+                                return Err(EventTapeError::new(format!("{path}.outcome.failure_reason"), "verified evaluations cannot have a failure reason"));
+                            }
+                        }
+                        _ => {
+                            if objective_values.is_some() || evidence_sha256.is_some()
+                                || evidence_manifest_sha256.is_some() || evidence_byte_receipt_sha256.is_some()
+                            {
+                                return Err(EventTapeError::new(format!("{path}.outcome"), "non-verified vector evaluations cannot publish objective values or successful evidence receipts"));
+                            }
+                            validate_non_empty(
+                                failure_reason.as_deref().unwrap_or(""),
+                                &format!("{path}.outcome.failure_reason"),
+                            )?;
+                        }
+                    }
+                    let key = (payload.round_id, direction_id.clone());
+                    let count = claims_per_round_direction.entry(key).or_default();
+                    *count = count.checked_add(1).ok_or_else(|| EventTapeError::new(&path, "direction claim count overflow"))?;
+                }
+                (
                     ActionIntent::ProposeDirection {
                         descriptor_sha256,
                         parent_direction_id,
