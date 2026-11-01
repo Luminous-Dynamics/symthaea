@@ -55,6 +55,8 @@ pub struct MetrologyUncertaintyManifest {
     pub type_b_relative_standard_uncertainty: f64,
     /// Explicitly describes how the Type B value was obtained.
     pub type_b_basis: String,
+    /// RSS combination is permitted only when the protocol supports uncorrelated Type A and Type B terms.
+    pub type_a_type_b_uncorrelated: bool,
     /// Coverage factor chosen from the declared uncertainty methodology.
     pub coverage_factor: f64,
     pub replicate_protocol_sha256: String,
@@ -219,6 +221,12 @@ pub fn validate_metrology_manifest(
         return Err(MetrologyUncertaintyError::new(
             "replicates_independent",
             "Type A standard error is not issued unless the preregistered replicate design supports independence",
+        ));
+    }
+    if !manifest.type_a_type_b_uncorrelated {
+        return Err(MetrologyUncertaintyError::new(
+            "type_a_type_b_uncorrelated",
+            "RSS combination requires a justified uncorrelated Type A/Type B model; covariance is not implemented in v0.1",
         ));
     }
     if compute_metrology_manifest_sha256(manifest)? != manifest.manifest_sha256 {
@@ -643,6 +651,7 @@ mod tests {
             calibration_certificate_sha256: sha('a'),
             type_b_relative_standard_uncertainty: 0.02,
             type_b_basis: "fixture calibration certificate; relative standard uncertainty".into(),
+            type_a_type_b_uncorrelated: true,
             coverage_factor: 2.0,
             replicate_protocol_sha256: sha('b'),
             replicates_independent: true,
@@ -727,6 +736,14 @@ mod tests {
         let mut t = trace(&[10.0, 11.0, 9.0]);
         t.mean_segment_energy_uj = 0.0;
         assert!(evaluate_ppk2_energy_uncertainty(&t, &manifest()).is_err());
+    }
+
+    #[test]
+    fn rejects_unjustified_type_a_type_b_rss_combination() {
+        let mut m = manifest();
+        m.type_a_type_b_uncorrelated = false;
+        m.manifest_sha256 = compute_metrology_manifest_sha256(&m).unwrap();
+        assert!(validate_metrology_manifest(&m).is_err());
     }
 
     #[test]
