@@ -32,9 +32,9 @@
 //!   evaluation state or an IIT formalism. The evaluation digest binds model bytes
 //!   to one state. Neither digest proves that the model is scientifically correct.
 //!
-//! This crate is intentionally small before implementing repertoire construction,
-//! partitions, minimum-information searches, or formal IIT quantities. Those stages
-//! need formalism-specific definitions and independent golden fixtures.
+//! The crate remains an isolated research/qualification component rather than a
+//! production runtime dependency. New formal quantities must arrive with an explicit
+//! formalism profile, independent reference fixtures, and fail-closed resource limits.
 
 use sha2::{Digest, Sha256};
 use thiserror::Error;
