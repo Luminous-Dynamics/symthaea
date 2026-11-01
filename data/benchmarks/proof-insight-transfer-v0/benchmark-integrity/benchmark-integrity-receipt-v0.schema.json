@@ -803,7 +803,8 @@
         "end_line",
         "end_column",
         "statement_sha256",
-        "expected_informal_statement_sha256"
+        "expected_informal_statement_sha256",
+        "source_span_sha256"
       ],
       "properties": {
         "repository_remote": {
@@ -852,6 +853,9 @@
         "repository_branch": {
           "type": "string",
           "minLength": 1
+        },
+        "source_span_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
