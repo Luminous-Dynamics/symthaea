@@ -38,7 +38,7 @@ and rounds the result **up** to the next tenth. The implementation evaluates the
 U=\begin{pmatrix}4/5&3/10\\3/5&3/5\end{pmatrix}.
 \]
 
-The deterministic tally is a synthetic arithmetic fixture, not a random calibration sample and not physical hardware evidence. The familywise \(1-\delta=0.9\) coverage statement applies only when each source row contributes the declared fixed number of independent transitions from the correctly specified time-homogeneous Markov process. No empirical coverage experiment is claimed here.
+The deterministic tally is a synthetic arithmetic fixture, not a random calibration sample and not physical hardware evidence. The familywise \(1-\delta=0.9\) coverage statement is intended for a correctly specified, fixed, first-order Markov transition row when exactly the preregistered number of **predictable visits** to each source state are used. At each selected pre-transition visit to state \(i\), the next-state indicator must have conditional mean \(p_{ij}\) given the full pre-transition filtration. The centered indicators are then bounded martingale differences, so a Hoeffding–Azuma argument (followed by a union bound over the four row/category coordinates) is the relevant justification; independent transition samples are not required. Outcome-dependent admission, stopping after observing the next state, hidden-state mixtures, row drift, or an incorrect Markov abstraction invalidate this claim. No empirical coverage experiment is claimed here.
 
 For a portfolio \(w=(w_{\rm cash},w_0,w_1)\) on the unit simplex and a transition from state \(i\) to state \(j\), the return is
 
@@ -112,7 +112,7 @@ It does not check:
 - unknown transition matrices, hidden states, order-2 dependence, regime switching, transition drift or adversarially controlled transitions;
 - physical hardware performance, false alarms per device-hour, detector superiority or SOTA.
 
-The next implementation must bind the fixed-count calibration tally to an independently audited trace receipt and run operating-characteristic experiments over random calibration samples, rare source states, imbalanced rows, and visit-count stopping. A time-uniform Markov transition confidence sequence is a separate candidate; it must be qualified under the actual row-visit filtration rather than borrowed from an unrelated MDP setting. The observation-admission decision must be predictable before the next-state outcome, or missingness must be modeled as an outcome.
+The next implementation must bind the fixed-count calibration tally to an independently audited trace receipt and run operating-characteristic experiments over random calibration samples, rare source states, imbalanced rows, and visit-count stopping. It must test the bounded-martingale-difference argument under predictable row visits and reject outcome-dependent admission. A time-uniform Markov transition confidence sequence is a separate candidate; it must be qualified under the actual row-visit filtration rather than borrowed from an unrelated MDP setting. The observation-admission decision must be predictable before the next-state outcome, or missingness must be modeled as an outcome.
 
 ## References
 
