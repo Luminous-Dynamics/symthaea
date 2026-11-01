@@ -51,6 +51,14 @@ impl TransferRelationV1 {
     ];
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RelationAdjudicationDecisionV1 {
+    Accepted,
+    Indeterminate,
+    Rejected,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransferStratumOutcomeV1 {
@@ -64,6 +72,9 @@ pub struct TransferStratumOutcomeV1 {
     pub source_lineage_manifest_sha256: String,
     pub recipe_lineage_manifest_sha256: String,
     pub adjudication_report_sha256: String,
+    pub adjudication_reviewer_ids: Vec<String>,
+    pub minimum_item_agreement_permille: u16,
+    pub adjudication_decision: RelationAdjudicationDecisionV1,
     pub base: ScoreCountV1,
     pub treatment: ScoreCountV1,
     pub placebo: ScoreCountV1,
@@ -186,6 +197,19 @@ struct FamilyRelationValues {
     item_count: u64,
     cluster_count: u64,
     difficulty_band_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CellBindingSignature {
+    item_set_sha256: String,
+    source_lineage_manifest_sha256: String,
+    recipe_lineage_manifest_sha256: String,
+    adjudication_report_sha256: String,
+    item_count: u64,
+    cluster_count: u64,
+    adjudication_reviewer_ids: Vec<String>,
+    minimum_item_agreement_permille: u16,
+    adjudication_decision: RelationAdjudicationDecisionV1,
 }
 
 #[derive(Debug, Clone)]
@@ -333,7 +357,7 @@ fn validate_replicate_matrix(
     expected_families: Option<&BTreeSet<String>>,
     expected_cells: &mut BTreeMap<
         (String, String, TransferRelationV1),
-        (String, String, String, String, u64, u64),
+        CellBindingSignature,
     >,
     expected_matrix_keys: &mut Option<BTreeSet<(String, String, TransferRelationV1)>>,
 ) -> Result<BTreeSet<String>, String> {
@@ -402,6 +426,41 @@ fn validate_replicate_matrix(
             &row.adjudication_report_sha256,
             "adjudication_report_sha256",
         )?;
+        if row.adjudication_reviewer_ids.len() < 3
+            || row.adjudication_reviewer_ids.len() > 20
+        {
+            return Err("each relation cell requires 3..=20 independent adjudication reviewers".to_owned());
+        }
+        let reviewer_ids: BTreeSet<&str> = row
+            .adjudication_reviewer_ids
+            .iter()
+            .map(String::as_str)
+            .collect();
+        if reviewer_ids.len() != row.adjudication_reviewer_ids.len()
+            || row.adjudication_reviewer_ids.iter().any(|reviewer| {
+                reviewer.trim().is_empty()
+                    || reviewer.len() > 64
+                    || !reviewer
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
+            })
+        {
+            return Err("adjudication reviewer IDs must be distinct opaque ASCII identifiers".to_owned());
+        }
+        if row.adjudication_decision != RelationAdjudicationDecisionV1::Accepted {
+            return Err("indeterminate or rejected relation adjudications cannot enter a scored stratum".to_owned());
+        }
+        if !(800..=1_000).contains(&row.minimum_item_agreement_permille) {
+            return Err("minimum_item_agreement_permille must be in [800, 1000]".to_owned());
+        }
+        if matches!(
+            row.relation,
+            TransferRelationV1::SemanticEquivalent
+                | TransferRelationV1::NovelRecipeSameSkill
+        ) && row.minimum_item_agreement_permille != 1_000
+        {
+            return Err("semantic-equivalence and same-skill strata require unanimous per-item adjudication".to_owned());
+        }
         let item_count = u64::try_from(row.item_ids.len())
             .map_err(|_| "item count exceeds u64".to_owned())?;
         score_rate(&row.base, item_count, "base score")?;
@@ -455,14 +514,18 @@ fn validate_replicate_matrix(
                 ));
             }
             let key = (family.clone(), band.clone(), row.relation);
-            let signature = (
-                row.item_set_sha256.clone(),
-                row.source_lineage_manifest_sha256.clone(),
-                row.recipe_lineage_manifest_sha256.clone(),
-                row.adjudication_report_sha256.clone(),
-                u64::try_from(row.item_ids.len()).map_err(|_| "item count exceeds u64".to_owned())?,
-                row.cluster_count,
-            );
+            let signature = CellBindingSignature {
+                item_set_sha256: row.item_set_sha256.clone(),
+                source_lineage_manifest_sha256: row.source_lineage_manifest_sha256.clone(),
+                recipe_lineage_manifest_sha256: row.recipe_lineage_manifest_sha256.clone(),
+                adjudication_report_sha256: row.adjudication_report_sha256.clone(),
+                item_count: u64::try_from(row.item_ids.len())
+                    .map_err(|_| "item count exceeds u64".to_owned())?,
+                cluster_count: row.cluster_count,
+                adjudication_reviewer_ids: row.adjudication_reviewer_ids.clone(),
+                minimum_item_agreement_permille: row.minimum_item_agreement_permille,
+                adjudication_decision: row.adjudication_decision,
+            };
             if let Some(previous) = expected_cells.get(&key) {
                 if previous != &signature {
                     return Err("item, lineage or adjudication bindings differ across model-pair replicates".to_owned());
@@ -938,6 +1001,13 @@ mod tests {
                     source_lineage_manifest_sha256: "a".repeat(64),
                     recipe_lineage_manifest_sha256: "b".repeat(64),
                     adjudication_report_sha256: "c".repeat(64),
+                    adjudication_reviewer_ids: vec![
+                        "rater-a".to_owned(),
+                        "rater-b".to_owned(),
+                        "rater-c".to_owned(),
+                    ],
+                    minimum_item_agreement_permille: 1_000,
+                    adjudication_decision: RelationAdjudicationDecisionV1::Accepted,
                     base: score.clone(),
                     treatment: score.clone(),
                     placebo: score,
