@@ -121,6 +121,9 @@ jobs:
       - name: Compare legacy and optimized min-fill planners on identical graphs
         run: /usr/bin/time -v -o target/iit-benchmark-evidence/min-fill-planner-comparison.time.txt target/release/examples/min_fill_planner_comparison_sweep 2>&1 | tee target/iit-benchmark-evidence/min-fill-planner-comparison.csv
 
+      - name: Benchmark bounded macro mapping-family enumeration
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/macro-mapping-families.time.txt target/release/examples/macro_mapping_family_sweep 2>&1 | tee target/iit-benchmark-evidence/macro-mapping-families.csv
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
 
@@ -143,6 +146,7 @@ jobs:
             sparse-partition-score \
             sparse-full-system-search \
             min-fill-planner-comparison
+            macro-mapping-families
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
             timing="target/iit-benchmark-evidence/${stem}.time.txt"
