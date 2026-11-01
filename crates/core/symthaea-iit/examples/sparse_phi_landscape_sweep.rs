@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let elapsed_ns = started.elapsed().as_nanos();
 
         println!(
-            "{},{},target0_parent_state_3_probability,{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
+            "{},{},target0_parent_state_3_probability,{:.8},{},{},{},{},{},{},{},{},{:?},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
             LANDSCAPE_ALGORITHM_ID,
             FORMALISM,
             theta,
