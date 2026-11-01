@@ -36,6 +36,7 @@ pub mod sequential_policy_event_tape;
 pub mod sequential_action_dispatch;
 pub mod anytime_test_induction;
 pub mod optional_continuation;
+pub mod composite_null_continuation;
 pub mod pareto_robust_decision;
 pub mod pareto_wasserstein_decision;
 pub mod correlated_noise_benchmark;
