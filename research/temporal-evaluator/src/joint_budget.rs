@@ -10,6 +10,14 @@ use std::fmt;
 
 pub const MAX_EXACT_JOINT_ACTIONS: usize = 16;
 
+/// Evaluator-owned action compatibility registry. Actions sharing a nonzero
+/// group are mutually exclusive; group zero means independent.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct JointActionDefinition {
+    pub action_id: u64,
+    pub conflict_group: u64,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct JointResourceUse {
     pub persistent_bytes: u64,
@@ -160,18 +168,19 @@ impl std::error::Error for JointBudgetError {}
 /// frontier and componentwise optimum. The candidate's own selected subset
 /// must be feasible or qualification returns an explicit error.
 pub fn qualify_joint_subsets(
-    action_ids: &[u64],
+    action_registry: &[JointActionDefinition],
     runs: &[JointSubsetRun],
     candidate_selected_action_ids: &[u64],
 ) -> Result<JointBudgetQualification, JointBudgetError> {
-    if action_ids.len() > MAX_EXACT_JOINT_ACTIONS {
+    if action_registry.len() > MAX_EXACT_JOINT_ACTIONS {
         return Err(JointBudgetError::TooManyActions {
-            requested: action_ids.len(),
+            requested: action_registry.len(),
             maximum: MAX_EXACT_JOINT_ACTIONS,
         });
     }
-    let mut sorted_action_ids = action_ids.to_vec();
-    sorted_action_ids.sort_unstable();
+    let mut sorted_registry = action_registry.to_vec();
+    sorted_registry.sort_unstable_by_key(|definition| definition.action_id);
+    let sorted_action_ids: Vec<u64> = sorted_registry.iter().map(|definition| definition.action_id).collect();
     if sorted_action_ids.contains(&0) {
         return Err(JointBudgetError::ZeroActionId);
     }
@@ -191,11 +200,12 @@ pub fn qualify_joint_subsets(
         });
     }
 
-    let item_index: BTreeMap<u64, usize> = sorted_action_ids
+    let item_index: BTreeMap<u64, usize> = sorted_registry
         .iter()
         .enumerate()
-        .map(|(index, action_id)| (*action_id, index))
+        .map(|(index, definition)| (definition.action_id, index))
         .collect();
+    let conflict_groups: Vec<u64> = sorted_registry.iter().map(|definition| definition.conflict_group).collect();
 
     let mut by_mask = BTreeMap::<u64, (JointSubsetSummary, bool)>::new();
     let mut context_reference: Option<&JointBudgetContext> = None;
@@ -235,7 +245,23 @@ pub fn qualify_joint_subsets(
             measured_resources: run.measured_resources,
             outcome: run.outcome,
         };
-        let feasible = run.measured_resources.fits_within(run.context.resource_budget);
+        let mut group_counts = BTreeMap::<u64, u8>::new();
+        let mut compatibility_valid = true;
+        for action_id in &run.selected_action_ids {
+            let index = *item_index
+                .get(action_id)
+                .ok_or(JointBudgetError::UnknownActionId { action_id: *action_id })?;
+            let group = conflict_groups[index];
+            if group != 0 {
+                let count = group_counts.entry(group).or_insert(0);
+                *count = count.checked_add(1).ok_or(JointBudgetError::ArithmeticOverflow)?;
+                if *count > 1 {
+                    compatibility_valid = false;
+                }
+            }
+        }
+        let feasible = compatibility_valid
+            && run.measured_resources.fits_within(run.context.resource_budget);
         if by_mask.insert(mask, (summary, feasible)).is_some() {
             return Err(JointBudgetError::DuplicateSubset { mask });
         }
@@ -368,6 +394,13 @@ fn dominates(left: &JointSubsetSummary, right: &JointSubsetSummary) -> bool {
 mod tests {
     use super::*;
 
+    fn registry(items: &[(u64, u64)]) -> Vec<JointActionDefinition> {
+        items.iter().map(|(action_id, conflict_group)| JointActionDefinition {
+            action_id: *action_id,
+            conflict_group: *conflict_group,
+        }).collect()
+    }
+
     fn context() -> JointBudgetContext {
         JointBudgetContext {
             episode_id: 77,
@@ -428,7 +461,7 @@ mod tests {
 
     #[test]
     fn exact_joint_oracle_keeps_componentwise_optima_and_regret_separate() {
-        let result = qualify_joint_subsets(&[20, 10], &all_four_runs(), &[10]).unwrap();
+        let result = qualify_joint_subsets(&registry(&[(20, 0), (10, 0)]), &all_four_runs(), &[10]).unwrap();
         assert_eq!(result.evaluated_subset_count, 4);
         assert_eq!(result.feasible_subset_count, 4);
         assert_eq!(result.best_wrong_belief.selected_action_ids, vec![10, 20]);
@@ -445,7 +478,7 @@ mod tests {
     fn infeasible_subsets_are_excluded_from_the_oracle_frontier() {
         let mut runs = all_four_runs();
         runs[3].measured_resources.observations = 101;
-        let result = qualify_joint_subsets(&[10, 20], &runs, &[10]).unwrap();
+        let result = qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]).unwrap();
         assert_eq!(result.evaluated_subset_count, 4);
         assert_eq!(result.feasible_subset_count, 3);
         assert!(!result.pareto_frontier.iter().any(|entry| entry.selected_action_ids == vec![10, 20]));
@@ -456,7 +489,7 @@ mod tests {
         let mut runs = all_four_runs();
         runs[3].measured_resources.observations = 101;
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[10, 20]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10, 20]),
             Err(JointBudgetError::CandidateSubsetInfeasible)
         );
     }
@@ -465,7 +498,7 @@ mod tests {
     fn incomplete_subset_enumeration_is_rejected() {
         let runs = vec![all_four_runs()[0].clone()];
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[]),
             Err(JointBudgetError::IncompleteEnumeration { expected: 4, actual: 1 })
         );
     }
@@ -475,7 +508,7 @@ mod tests {
         let mut runs = all_four_runs();
         runs[2].context.future_stream_sha256 = [9; 32];
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[10]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
             Err(JointBudgetError::ContextMismatch)
         );
     }
@@ -485,7 +518,7 @@ mod tests {
         let mut runs = all_four_runs();
         runs[1].run_id = runs[0].run_id;
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[10]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
             Err(JointBudgetError::DuplicateRunId { run_id: 1 })
         );
     }
@@ -495,14 +528,14 @@ mod tests {
         let mut runs = all_four_runs();
         runs[3].selected_action_ids = vec![20, 10];
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[10]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
             Err(JointBudgetError::UnsortedOrDuplicateSelection)
         );
 
         let mut runs = all_four_runs();
         runs[3].selected_action_ids = vec![10, 30];
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[10]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
             Err(JointBudgetError::UnknownActionId { action_id: 30 })
         );
     }
@@ -512,7 +545,7 @@ mod tests {
         let mut runs = all_four_runs();
         runs[0].outcome = JointExposure { wrong_belief_us: 80, abstention_us: 20, missing_output_us: 1 };
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[10]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
             Err(JointBudgetError::ExposureExceedsEpisode { measured_us: 101, total_us: 100 })
         );
     }
@@ -528,18 +561,32 @@ mod tests {
         runs[2].measured_resources = measured(6, 6);
         runs[3].outcome = JointExposure { wrong_belief_us: 1, abstention_us: 1, missing_output_us: 1 };
         runs[3].measured_resources = measured(10, 10);
-        let result = qualify_joint_subsets(&[10, 20], &runs, &[10]).unwrap();
+        let result = qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]).unwrap();
         assert!(result.pareto_frontier.len() >= 2);
     }
 
     #[test]
     fn zero_action_or_duplicate_registry_fails_closed() {
         let runs = vec![run(1, vec![], measured(0, 0), JointExposure::default())];
-        assert_eq!(qualify_joint_subsets(&[0], &runs, &[]), Err(JointBudgetError::ZeroActionId));
+        assert_eq!(qualify_joint_subsets(&registry(&[(0, 0)]), &runs, &[]), Err(JointBudgetError::ZeroActionId));
         assert!(matches!(
-            qualify_joint_subsets(&[1, 1], &runs, &[]),
+            qualify_joint_subsets(&[JointActionDefinition { action_id: 1, conflict_group: 0 }, JointActionDefinition { action_id: 1, conflict_group: 0 }], &runs, &[]),
             Err(JointBudgetError::DuplicateActionId { action_id: 1 })
         ));
+    }
+
+    #[test]
+    fn mutually_exclusive_action_subsets_are_not_oracle_feasible() {
+        let runs = all_four_runs();
+        let conflicting_registry = registry(&[(10, 9), (20, 9)]);
+        let result = qualify_joint_subsets(&conflicting_registry, &runs, &[10]).unwrap();
+        assert_eq!(result.evaluated_subset_count, 4);
+        assert_eq!(result.feasible_subset_count, 3);
+        assert!(!result.pareto_frontier.iter().any(|entry| entry.selected_action_ids == vec![10, 20]));
+        assert_eq!(
+            qualify_joint_subsets(&conflicting_registry, &runs, &[10, 20]),
+            Err(JointBudgetError::CandidateSubsetInfeasible)
+        );
     }
 
     #[test]
@@ -550,7 +597,7 @@ mod tests {
             run.measured_resources.observations = 1;
         }
         assert_eq!(
-            qualify_joint_subsets(&[10, 20], &runs, &[]),
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[]),
             Err(JointBudgetError::NoFeasibleSubset)
         );
     }
