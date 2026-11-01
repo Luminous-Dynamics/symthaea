@@ -522,6 +522,22 @@ mod tests {
     }
 
     #[test]
+    fn trace_receipt_roundtrips_and_recomputes_against_source_csv() {
+        let input = concat!(
+            "segment_id,time_ms,current_uA\n",
+            "0,0.00,1000\n",
+            "0,0.01,1000\n",
+            "0,0.02,1000\n",
+        );
+        let audit = audit_ppk2_trace_csv(input, Ppk2TraceAuditConfig::default()).unwrap();
+        let json = serde_json::to_string(&audit.receipt).unwrap();
+        let decoded: Ppk2TraceAuditReceipt = serde_json::from_str(&json).unwrap();
+        verify_ppk2_trace_audit_receipt_against_csv(input, &decoded).unwrap();
+        let with_unknown = json.trim_end_matches('}').to_owned() + ",\"unexpected\":true}";
+        assert!(serde_json::from_str::<Ppk2TraceAuditReceipt>(&with_unknown).is_err());
+    }
+
+    #[test]
     fn constant_current_energy_is_exact() {
         let input = concat!("segment_id,time_ms,current_uA\n","0,0.00,1000\n","0,0.01,1000\n","0,0.02,1000\n");
         let r = audit_ppk2_trace_csv(input, cfg()).unwrap();
