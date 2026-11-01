@@ -226,7 +226,6 @@ fn main() {
             .map(|value| value.to_string())
             .unwrap_or_else(|| "-".to_owned())
     );
-}
     let mut journal = ForecastJournal::default();
     let journal_forecast = RemainingCostForecast {
         pre_state_digest: [1; 32],
