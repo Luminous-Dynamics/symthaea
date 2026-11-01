@@ -119,7 +119,7 @@ def activation_state_digest(
             raise ValueError("evidence history contains an unknown id")
         evidence.append([int(r), hypothesis_id, fraction_pair(as_fraction(factor))])
     return _canonical_sha256({
-        "schema": "symthaea-pre-evidence-filtration-state-v1",
+        "schema": "symthaea-pre-evidence-recorded-state-v1",
         "catalogue_sha256": catalogue_sha256,
         "round": int(round_index),
         "active_before": active,
