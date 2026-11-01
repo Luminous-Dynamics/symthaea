@@ -34,6 +34,15 @@
 
 `HistoricalCostBaseline` also implements `PrefixForecaster`, allowing the disjoint task-family historical model from #9752 to run through exactly the same prefix interface.
 
+## Matched interventions and multi-objective selection
+
+`MatchedInterventionSet` requires one isolated trajectory for every operation family in a canonical admissible candidate pool. Each trial must share the exact task family, seed, initial budget, pre-state digest, frontier digest/features, candidate-pool digest, and candidate-family list. It rejects repeated run IDs, duplicated or missing candidate actions, invalid state chains, and outcomes without independent proof verification.
+
+Assignment provenance controls interpretation: deterministic simulation produces a simulated contrast; randomized live trials are labelled a randomized-assignment effect only when protocol and allocation-receipt digests are present; observational matched runs are always labelled association-only. The receipt digests are caller-supplied identities, not an audit of the randomization process itself.
+
+`verified_contrasts` reports alternative-minus-baseline six-dimensional resource deltas and immediate proof-progress deltas against the lowest-ID candidate. `pareto_summary` computes a non-dominated frontier using verified cost-to-proof in all six resource dimensions plus immediate proof progress. A candidate dominates another only if it is no worse in every resource and no worse in proof progress, and strictly better in at least one objective. No arbitrary weighted scalar score is used; cheaper/slower and costlier/faster options can coexist on the frontier.
+
+The deterministic CLI fixture contains two intervention rows: a simulated paired contrast and a pre-state mismatch negative control. The Pareto row adds three alternatives, of which the slower/higher-cost alternative is dominated while the cheaper/slower and costlier/faster trade-off remains non-dominated.
 ## Required leakage controls
 
 1. Change a suffix action cost while preserving the prefix pre-state; the earlier `PrefixView` and forecast must remain identical, while its offline label changes.
@@ -45,15 +54,15 @@ The deterministic CLI matrix emits three `TRAJECTORY_REPLAY_ROW` rows: verified 
 
 ## Scope limits
 
-This does not yet provide counterfactual estimates for alternative operations. It records the admissible candidate pool for each observed action, but V1 contains only the action actually taken. Causal operation-effect comparisons require matched pre-action states and either randomized assignment or a defensible conditional exchangeability design. Observational differences must not be described as causal.
+The matched-set layer now records simulator, randomized-live-trial, or observational assignment provenance and computes verified paired outcome contrasts. The current executable fixture is deterministic simulation only; it does not provide a real-world causal effect estimate or validate external randomization procedures. Observational differences remain association-only. A learned action-effect predictor, randomized live deployment, repeated seeds, and uncertainty intervals are still open.
 
 The first baseline's multipliers are engineering placeholders, not calibrated quantiles. The historical baseline's empirical quantiles remain descriptive. The feature branch's deterministic trace tests establish the interface invariants, not prediction performance.
 
 ## Next increments
 
 1. Add trajectory-level aggregates for cost-to-verified-proof, proof progress, censoring, and competing events.
-2. Add paired alternative-action simulator runs from identical pre-state digests.
-3. Add a frozen action-effect prediction interface and compare predicted resource/proof-progress deltas to paired outcomes.
+2. Add a frozen action-effect prediction interface and compare predicted resource/proof-progress deltas to paired outcomes.
+3. Add repeated-seed simulator runs, block-level uncertainty intervals, and sensitivity analysis for simulator mismatch.
 4. Add full rollout then prefix replay over multi-step, repeated-seed task families.
 5. Compare historical, last-observed-action, frontier-linear, split-vector conformal, selected-policy/CAP where valid, and oracle lower bound on identical prefixes.
 6. Add confidence intervals, worst-family reporting, forecast overhead, and APB-style broken-tool/extraneous-tool/unsolvable-task strata.
