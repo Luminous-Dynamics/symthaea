@@ -205,7 +205,15 @@ The reported observed FCR is the miss fraction among feedback-resolved selected 
 
 V1 evaluates one declared scalar resource dimension per statement. The exact feedback receipt carries the full metered resource vector and projects the declared dimension, preventing unit substitution. A scalar coverage result does not imply joint simultaneous coverage of tokens, tool calls, CPU, GPU, wall time, and money. A multivariate guarantee requires its own construction and theory.
 
-## 18. External comparators and claim limits
+## 18. Progressive rollout-prefix replay
+
+The first evaluator is specified in [PREFIX_REPLAY_V1.md](PREFIX_REPLAY_V1.md) and implemented in `prefix_replay.rs`. It consumes immutable pre-execution forecast receipts and separately appended outcome receipts from `ForecastJournal`, then emits rows in stable `(run_id, decision_sequence, forecast_id)` order and summaries partitioned by task family.
+
+Only `SufficientProof` outcomes with a non-empty independent verifier receipt enter exact point-error and exact-label q90/q95 coverage metrics. Right-censored outcomes contribute only definite upper-envelope exceedance diagnostics when their observed lower bound is already above q90/q95; they are not converted to exact labels. Competing terminals and missing outcomes remain distinct. The all-six-resource q90 coverage diagnostic is an empirical joint statistic, not evidence of simultaneous conformal validity.
+
+V1 does not yet score budget-feasibility classifications because the journal does not bind a remaining hard-budget vector to every forecast prefix. It also does not yet include forecast-query overhead, prefix-level action replay, baseline comparisons, or a BAGEN reproduction. Those are explicit next slices of issue #9752.
+
+## 19. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.
