@@ -79,6 +79,8 @@ def activation_state_digest(
     active_before: Sequence[str],
     activation_history: Sequence[Sequence[Any]],
     evidence_history: Sequence[Sequence[Any]],
+    *,
+    context_sha256: str | None = None,
 ) -> str:
     """Digest the *recorded* prefix state immediately before one round.
 
@@ -89,6 +91,12 @@ def activation_state_digest(
     omitted filtration information. It is a tamper-evident binding, not a
     digital signature or trusted timestamp.
     """
+    if context_sha256 is not None and (
+        not isinstance(context_sha256, str)
+        or len(context_sha256) != 64
+        or any(ch not in "0123456789abcdef" for ch in context_sha256)
+    ):
+        raise ValueError("context_sha256 must be a lowercase 64-character SHA-256 digest")
     rows, catalogue_sha256 = _catalogue(hypotheses)
     known = {row["id"] for row in rows}
     active = sorted(active_before)
@@ -117,6 +125,7 @@ def activation_state_digest(
         "active_before": active,
         "activation_history": activations,
         "evidence_history": evidence,
+        "external_context_sha256": context_sha256,
     })
 
 
@@ -164,14 +173,9 @@ def _replay_arrival_ledger(
     evidence_checks = 0
 
     for round_index, group in enumerate(groups):
-        state_sha256 = activation_state_digest(
-            hypotheses,
-            round_index,
-            sorted(active),
-            activation_history,
-            evidence_history,
-        )
         phase = "activation"
+        context_seen = False
+        round_context_sha256 = None
         pending: list[str] = []
         evidence_for_round: dict[str, Fraction] = {}
         last_activation_index = -1
@@ -187,8 +191,28 @@ def _replay_arrival_ledger(
                     raise ValueError("activation is outside the deterministic finite envelope")
                 if hypothesis_id in active or hypothesis_id in pending:
                     raise ValueError("hypothesis activation is duplicated")
-                if event.get("pre_state_sha256") != state_sha256:
-                    raise ValueError("activation commitment does not bind to the pre-evidence filtration state")
+                event_context = event.get("context_sha256")
+                if event_context is not None and (
+                    not isinstance(event_context, str)
+                    or len(event_context) != 64
+                    or any(ch not in "0123456789abcdef" for ch in event_context)
+                ):
+                    raise ValueError("activation context_sha256 must be a lowercase 64-character SHA-256 digest")
+                if context_seen and event_context != round_context_sha256:
+                    raise ValueError("same-round activation commitments must bind the same external context")
+                if not context_seen:
+                    context_seen = True
+                    round_context_sha256 = event_context
+                expected_state_sha256 = activation_state_digest(
+                    hypotheses,
+                    round_index,
+                    sorted(active),
+                    activation_history,
+                    evidence_history,
+                    context_sha256=event_context,
+                )
+                if event.get("pre_state_sha256") != expected_state_sha256:
+                    raise ValueError("activation commitment does not bind to the pre-evidence recorded prefix and context digest")
                 coordinate = index[hypothesis_id]
                 if coordinate <= last_activation_index:
                     raise ValueError("activation commits must use canonical catalogue order")
@@ -247,6 +271,8 @@ def _replay_arrival_ledger(
         }
         if item["kind"] == "activation_commit":
             item["pre_state_sha256"] = event["pre_state_sha256"]
+            if event.get("context_sha256") is not None:
+                item["context_sha256"] = event["context_sha256"]
         else:
             item["factor"] = fraction_pair(as_fraction(event["factor"]))
         canonical_events.append(item)
