@@ -1725,6 +1725,107 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_rejects_checkpoint_transition_history_tamper_with_recomputed_digest() {
+        let path = temporary_sqlite_path("checkpoint-proof-history");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let candidate = fixture_candidate();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(plan).unwrap();
+
+            let mut altered = store.read_state().unwrap();
+            altered
+                .accepted_receipts
+                .get_mut(&candidate.receipt_digest)
+                .unwrap()
+                .checkpoint_evidence = CheckpointEvidence::VerifiedSameTree;
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_accepted_receipts
+                     SET checkpoint_evidence_kind='same_tree',
+                         checkpoint_evidence_digest=NULL
+                     WHERE receipt_digest=?1",
+                    params![candidate.receipt_digest],
+                )
+                .unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                    params![trusted_state_digest(&altered)],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_log_cursor_rollback_with_recomputed_digest() {
+        let path = temporary_sqlite_path("log-cursor-history-rollback");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let first = fixture_candidate();
+            let first_plan = match store.preview(&first).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(first_plan).unwrap();
+
+            let mut next = successor_candidate(&store.read_state().unwrap(), 2, 119);
+            next.checkpoint.tree_size = 11;
+            next.checkpoint.root_digest = test_digest(120);
+            next.checkpoint.checkpoint_digest = test_digest(121);
+            next.checkpoint_evidence = CheckpointEvidence::VerifiedConsistentExtension {
+                consistency_proof_digest: test_digest(122),
+            };
+            let plan = match store.preview(&next).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("second receipt is new"),
+            };
+            store.commit_plan(plan).unwrap();
+
+            let mut altered = store.read_state().unwrap();
+            let prior_checkpoint = altered
+                .accepted_receipts
+                .get(&first.receipt_digest)
+                .unwrap()
+                .checkpoint
+                .clone();
+            altered
+                .log_cursors
+                .insert(prior_checkpoint.log_id.clone(), prior_checkpoint.clone());
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_log_cursors
+                     SET tree_size=?1, root_digest=?2, checkpoint_digest=?3
+                     WHERE log_id=?4",
+                    params![
+                        prior_checkpoint.tree_size.to_string(),
+                        prior_checkpoint.root_digest,
+                        prior_checkpoint.checkpoint_digest,
+                        prior_checkpoint.log_id,
+                    ],
+                )
+                .unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                    params![trusted_state_digest(&altered)],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
     fn sqlite_unkeyed_state_digest_detects_inconsistent_database_edits() {
         let path = temporary_sqlite_path("digest-corruption");
         let mut store = SqliteTrustedStateStore::open(&path).unwrap();
