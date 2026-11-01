@@ -197,7 +197,7 @@ impl fmt::Display for JointBudgetError {
             Self::DuplicateActionId { action_id } => write!(f, "duplicate joint action ID {action_id}"),
             Self::UnsortedOrDuplicateSelection => write!(f, "joint action IDs must be strictly ascending and unique"),
             Self::UnknownActionId { action_id } => write!(f, "unknown joint action ID {action_id}"),
-            Self::ContextMismatch => write!(f, "joint subset runs differ in task, future stream, model, initial state, feature snapshot, horizon or resource budget"),
+            Self::ContextMismatch => write!(f, "joint subset runs differ in task, future stream, model, initial state, feature snapshot, action registry, horizon or resource budget"),
             Self::DuplicateRunId { run_id } => write!(f, "duplicate joint subset run ID {run_id}"),
             Self::InvalidContextCommitment => write!(f, "joint oracle context contains a zero/missing identity or commitment"),
             Self::IncompleteEnumeration { expected, actual } => write!(f, "exact joint oracle requires {expected} subsets, received {actual}"),
