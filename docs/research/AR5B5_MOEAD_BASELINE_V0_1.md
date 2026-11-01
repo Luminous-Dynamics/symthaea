@@ -108,7 +108,7 @@ Use multiple problem instances and seeds. Compare fixed-target attainment curves
 
 ## Limitations and next steps
 
-- The implementation is a compact MOEA/D-DE variant, not yet cross-checked against a pinned PlatEMO 4.16 or another reference implementation.
+- The implementation is a compact MOEA/D-DE variant, not yet cross-checked against a pinned PlatEMO v4.17 or another reference implementation.
 - It covers two and three objectives only.
 - It has no constraints, uncertainty-aware scalarization, expensive-evaluation acquisition or parallel evaluation.
 - The 3D simplex-lattice design is capped by the current 2,048 population guard.
