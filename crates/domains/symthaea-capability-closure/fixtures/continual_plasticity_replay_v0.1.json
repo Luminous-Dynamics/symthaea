@@ -1,0 +1,77 @@
+{
+  "schema": "symthaea.continual_plasticity_replay.v0.1",
+  "tracking_issue": "NEURO-SILICON-010",
+  "candidate_package": "research/continual-plasticity",
+  "policies_implemented": [
+    "fifo",
+    "reservoir"
+  ],
+  "policies_comparison_only": [
+    "no_replay",
+    "context_only",
+    "task_balanced",
+    "random_replay",
+    "temporal_value_retention",
+    "active_refresh",
+    "joint_temporal_control"
+  ],
+  "admission": {
+    "sequence_index": "contiguous zero-based",
+    "timestamps": "monotonic microseconds",
+    "payload_digest_required_nonzero": true,
+    "payload_bytes_required_nonzero": true,
+    "duplicate_active_item_ids_rejected": true,
+    "reservoir_draw": "unbiased externally supplied integer in [0, seen_item_count)",
+    "modulo_reduction_used": false
+  },
+  "replay_sampling": {
+    "algorithm": "partial Fisher-Yates",
+    "without_replacement_per_call": true,
+    "draws": "one bounded unbiased integer per requested item",
+    "work_budget_checked_before_accounting_commit": true,
+    "cumulative_payload_byte_budget": true
+  },
+  "resources": [
+    {
+      "name": "retained_items",
+      "unit": "item",
+      "hard_cap": true
+    },
+    {
+      "name": "retained_bytes",
+      "unit": "byte",
+      "hard_cap": true
+    },
+    {
+      "name": "retained_byte_time_us",
+      "unit": "byte*microsecond",
+      "hard_cap": false
+    },
+    {
+      "name": "replay_selections",
+      "unit": "item",
+      "hard_cap": true
+    },
+    {
+      "name": "replay_payload_bytes",
+      "unit": "logical payload byte",
+      "hard_cap": true
+    },
+    {
+      "name": "replay_work_units",
+      "unit": "declared work unit",
+      "hard_cap": true
+    }
+  ],
+  "validation_status": {
+    "rust_test_functions_authored": 15,
+    "cargo_build_executed": false,
+    "rustfmt_executed": false,
+    "clippy_executed": false,
+    "rust_tests_executed": false,
+    "benchmark_executed": false,
+    "hardware_energy_measured": false,
+    "exhaustive_reservoir_draw_paths": 12,
+    "expected_two_of_four_subset_frequency": 2
+  }
+}
