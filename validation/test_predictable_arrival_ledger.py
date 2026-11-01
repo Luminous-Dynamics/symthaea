@@ -227,7 +227,7 @@ class PredictableArrivalLedgerTests(unittest.TestCase):
             scheme="geometric",
         )
         self.assertTrue(closure["valid"], closure["failures"])
-        self.assertTrue(all(row["projective_identity"] for row in closure["rows"]))
+        self.assertTrue(all(row["projective_identity"] for row in closure["path"]))
 
     def test_randomized_replay_is_deterministic_and_nested(self):
         rng = random.Random(980601)
