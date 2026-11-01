@@ -24,8 +24,9 @@ use contamination_panel_bench::{
         randomize_intervention,
     },
     search_time::{
-        SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES, SearchTimeExposureFindingsV1,
-        SearchTimeExposureTraceV1, audit_search_time_findings, audit_search_time_trace,
+        SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES, SEARCH_MAX_TOTAL_BODY_BYTES,
+        SearchCapturedResponseBodyV1, SearchTimeExposureFindingsV1, SearchTimeExposureTraceV1,
+        analyze_search_time_response_bodies, audit_search_time_findings, audit_search_time_trace,
     },
     training_receipt::validate_paired_training_execution_receipt,
 };
@@ -296,10 +297,7 @@ fn match_search_time_bodies_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    let trace_bytes = fs::read(&args[1])?;
-    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
-        return Err("search-time trace exceeds 256 MiB safety bound".into());
-    }
+    let trace_bytes = read_bounded(&args[1], SEARCH_MAX_TRACE_BYTES, "search-time trace")?;
     let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
     let trace_audit = audit_search_time_trace(&trace).map_err(io::Error::other)?;
     if !trace_audit.valid {
@@ -310,15 +308,17 @@ fn match_search_time_bodies_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[3])?)?,
         manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[4])?)?,
     };
-    let body_bytes = fs::read(&args[5])?;
-    if body_bytes.len() > SEARCH_MAX_TOTAL_BODY_BYTES + 32 * 1024 * 1024 {
-        return Err("response-body evidence file exceeds 160 MiB safety bound".into());
-    }
+    let body_bytes = read_bounded(
+        &args[5],
+        SEARCH_MAX_TOTAL_BODY_BYTES + 32 * 1024 * 1024,
+        "response-body evidence file",
+    )?;
     let response_bodies: Vec<SearchCapturedResponseBodyV1> = serde_json::from_slice(&body_bytes)?;
-    let unavailable_bytes = fs::read(&args[6])?;
-    if unavailable_bytes.len() > SEARCH_MAX_FINDINGS_BYTES {
-        return Err("unavailable event-sequence file exceeds 64 MiB safety bound".into());
-    }
+    let unavailable_bytes = read_bounded(
+        &args[6],
+        SEARCH_MAX_FINDINGS_BYTES,
+        "unavailable event-sequence file",
+    )?;
     let unavailable: Vec<u64> = serde_json::from_slice(&unavailable_bytes)?;
     let findings = analyze_search_time_response_bodies(
         &trace,
