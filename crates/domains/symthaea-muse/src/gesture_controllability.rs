@@ -252,6 +252,10 @@ impl GestureCounterfactualReceiptV1 {
                 continue;
             }
             let delta = intervention.value - baseline.value;
+            if !delta.is_finite() {
+                issues.push(format!("expected feature {} delta is non-finite", effect.feature_id));
+                continue;
+            }
             let magnitude = delta.abs();
             let direction_matches = match effect.direction {
                 ExpectedDirection::Increase => delta > 0.0,
@@ -281,7 +285,12 @@ impl GestureCounterfactualReceiptV1 {
                 issues.push(format!("side-effect feature {} has a unit mismatch", budget.feature_id));
                 continue;
             }
-            let delta = (intervention.value - baseline.value).abs();
+            let signed_delta = intervention.value - baseline.value;
+            if !signed_delta.is_finite() {
+                issues.push(format!("side-effect feature {} delta is non-finite", budget.feature_id));
+                continue;
+            }
+            let delta = signed_delta.abs();
             if delta > budget.maximum_abs_delta {
                 issues.push(format!(
                     "side-effect budget exceeded for {}: delta={delta}, maximum={}",
