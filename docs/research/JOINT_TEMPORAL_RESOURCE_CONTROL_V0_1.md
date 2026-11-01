@@ -78,18 +78,17 @@ The key quantity is not merely prediction accuracy. It is the *marginal reductio
 
 A future value estimator should predict three effects separately:
 
-[
-Delta V(a) =
-(Delta W(a),Delta A(a),Delta O(a))
-]
+$
+\\Delta V(a) = (\\Delta W(a),\\Delta A(a),\\Delta O(a))
+$
 
 where (W) is wrong-belief exposure, (A) is abstention exposure, and (O) is missing-output exposure. These are not interchangeable. A system must not mask a large regression in one axis with a gain in another.
 
 Resource costs remain a vector:
 
-[
+$
 C(a) = (M, M_t, R, W, C_t, F, N_s, T_s, L, E, V, B_r)
-]
+$
 
 with the twelve dimensions defined above. Feasibility is componentwise:
 
