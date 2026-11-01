@@ -215,7 +215,7 @@ fn matched_intervention_trial(run_id: u64, family: u32, first_cost: u128) -> Act
                 2,
                 ResourceVector::new(first_cost, 1, 2, 0, 3, 4),
                 trajectory_features(2),
-                vec![2, 3],
+                vec![2, 3, 4],
             ),
             trajectory_action(
                 2,
