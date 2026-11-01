@@ -1,8 +1,8 @@
 # Joint Temporal Resource Control (v0.1)
 
 This package contains the **candidate-side** deterministic baseline for jointly
-allocating temporal observations, memory retention, I/O, compute, measured
-energy, and verification work.
+allocating temporal observations, memory retention, I/O, serial critical-path
+latency, compute, measured energy and verification work.
 
 The controller is intentionally not an optimal solver. It:
 - discounts each action's predicted temporal-error-debt reduction by its
@@ -13,7 +13,7 @@ The controller is intentionally not an optimal solver. It:
 - supports mutually exclusive choices through conflict groups.
 
 A bundle may jointly describe a sample, memory retain/refresh operation,
-compute refinement, and verification action. All resource units are explicit.
+compute refinement, and verification action. All eight resource units are explicit. Latency is a conservative serial estimate charged against a hard deadline budget; it is not a substitute for measured p99 end-to-end latency.
 The current additive greedy baseline does not discover arbitrary complementarity;
 the evaluator measures that with paired joint-action experiments and an exact
 small-instance subset oracle.
