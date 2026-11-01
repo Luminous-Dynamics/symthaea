@@ -100,6 +100,7 @@ pub struct TrustedState {
 struct AcceptedReceipt {
     source: SourceKey,
     generation: u64,
+    previous_seal_digest: Option<String>,
     seal_digest: String,
     receipt_digest: String,
     observer_profile_digest: String,
@@ -112,6 +113,7 @@ impl AcceptedReceipt {
     fn matches(&self, candidate: &Candidate) -> bool {
         self.source == candidate.source
             && self.generation == candidate.generation
+            && self.previous_seal_digest == candidate.previous_seal_digest
             && self.seal_digest == candidate.seal_digest
             && self.receipt_digest == candidate.receipt_digest
             && self.observer_profile_digest == candidate.observer_profile_digest
@@ -246,6 +248,7 @@ impl TrustedState {
             candidate.source.clone(),
             SourceCursor {
                 generation: candidate.generation,
+                previous_seal_digest: candidate.previous_seal_digest.clone(),
                 seal_digest: candidate.seal_digest.clone(),
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
