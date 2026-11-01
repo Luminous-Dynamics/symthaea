@@ -125,7 +125,6 @@
   "x-rust-invariants": [
     "source_sequence < target_sequence",
     "source_observed_at_seconds <= forecast_issued_at_seconds <= action_started_at_seconds",
-    "action_ended_at_seconds >= action_started_at_seconds",
     "requested_target_time_seconds >= action_started_at_seconds",
     "target_observed_at_seconds >= requested_target_time_seconds",
     "target_observed_at_seconds - requested_target_time_seconds <= max_target_lateness_seconds",
@@ -133,6 +132,7 @@
     "episode_id, branch_id, forecast_id and observation IDs must be non-empty; source and target observation IDs must differ",
     "the action index must exist in the configured discrete action space",
     "source_embedding_sha256 and target_embedding_sha256 are recomputed from the exact supplied ContinuousHV values and must match",
-    "both embeddings must have configured input dimension and finite f32 values"
+    "both embeddings must have configured input dimension and finite f32 values",
+    "action_started_at_seconds <= action_ended_at_seconds <= requested_target_time_seconds"
   ]
 }
