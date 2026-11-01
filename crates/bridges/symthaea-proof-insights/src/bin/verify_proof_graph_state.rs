@@ -77,6 +77,8 @@ fn self_test(path: &PathBuf) -> Result<()> {
     stopped["resource_ledger"]["actual"]["model_calls"] = json!(0);
     stopped["resource_ledger"]["actual"]["router_cost_microusd"] = json!(0);
     stopped["resource_ledger"]["actual"]["specialist_cost_microusd"] = json!(0);
+    stopped["resource_ledger"]["actual"]["cost_microusd"] =
+        stopped["resource_ledger"]["actual"]["lean_cost_microusd"].clone();
     let stop_summary = proof_graph::validate_value(&stopped)?;
     if !stop_summary.ready_frontier_goal_ids.is_empty() || !stop_summary.selected_goal_ids.is_empty() {
         bail!("scheduler did not stop with an empty dependency-ready frontier");
