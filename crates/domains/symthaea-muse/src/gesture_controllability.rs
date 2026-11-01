@@ -1076,7 +1076,7 @@ mod tests {
         wrong_instrument.instrument_id = "flute".to_string();
         wrong_instrument.seal();
         assert!(wrong_instrument
-            .verify_against_identity_map(&"a".repeat(64), 1, &identity_map())
+            .verify_against_identity_map(&"a".repeat(64), 2, &identity_map())
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("instrument/model")));
