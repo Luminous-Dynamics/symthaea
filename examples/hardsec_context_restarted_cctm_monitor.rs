@@ -17,7 +17,7 @@
 //!     --stream stream.json --context-receipt context-receipt.json \
 //!     --receipt receipt.json
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -107,25 +107,34 @@ struct Args {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn nonempty(value: &str, context: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.chars().any(char::is_control) {
-        return Err(format!("{context} must be non-empty and contain no control characters"));
+        return Err(format!(
+            "{context} must be non-empty and contain no control characters"
+        ));
     }
     Ok(())
 }
 
 fn string_field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
-    let result = value.get(key).and_then(Value::as_str)
+    let result = value
+        .get(key)
+        .and_then(Value::as_str)
         .ok_or_else(|| format!("{context}.{key} must be a string"))?;
     nonempty(result, &format!("{context}.{key}"))?;
     Ok(result)
 }
 
 fn f64_field(value: &Value, key: &str, context: &str) -> Result<f64, String> {
-    let result = value.get(key).and_then(Value::as_f64)
+    let result = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("{context}.{key} must be numeric"))?;
     if !result.is_finite() {
         return Err(format!("{context}.{key} must be finite"));
@@ -134,31 +143,43 @@ fn f64_field(value: &Value, key: &str, context: &str) -> Result<f64, String> {
 }
 
 fn usize_field(value: &Value, key: &str, context: &str) -> Result<usize, String> {
-    let raw = value.get(key).and_then(Value::as_u64)
+    let raw = value
+        .get(key)
+        .and_then(Value::as_u64)
         .ok_or_else(|| format!("{context}.{key} must be a non-negative integer"))?;
     usize::try_from(raw).map_err(|_| format!("{context}.{key} is outside the supported range"))
 }
 
 fn count_field(value: &Value, key: &str, context: &str) -> Result<usize, String> {
-    let raw = value.get(key).and_then(Value::as_u64)
+    let raw = value
+        .get(key)
+        .and_then(Value::as_u64)
         .ok_or_else(|| format!("{context}.{key} must be a non-negative integer"))?;
     usize::try_from(raw).map_err(|_| format!("{context}.{key} is outside the supported range"))
 }
 
 fn valid_sha(value: &str, context: &str) -> Result<(), String> {
-    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
         return Err(format!("{context} must be a lowercase SHA-256 digest"));
     }
     Ok(())
 }
 
 fn string_array(value: &Value, key: &str, context: &str) -> Result<Vec<String>, String> {
-    let values = value.get(key).and_then(Value::as_array)
+    let values = value
+        .get(key)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{context}.{key} must be an array"))?;
     let mut seen = BTreeSet::new();
     let mut output = Vec::with_capacity(values.len());
     for (index, item) in values.iter().enumerate() {
-        let item = item.as_str().ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
+        let item = item
+            .as_str()
+            .ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
         nonempty(item, &format!("{context}.{key}[{index}]"))?;
         if !seen.insert(item.to_owned()) {
             return Err(format!("{context}.{key} contains duplicate entry {item}"));
@@ -174,20 +195,31 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     }
     let monitor_id = string_field(value, "monitor_id", "plan")?.to_owned();
     let evidence_domain = string_field(value, "evidence_domain", "plan")?.to_owned();
-    if !matches!(evidence_domain.as_str(), "synthetic_fixture" | "simulator" | "physical_hardware") {
+    if !matches!(
+        evidence_domain.as_str(),
+        "synthetic_fixture" | "simulator" | "physical_hardware"
+    ) {
         return Err(format!("unsupported evidence_domain {evidence_domain}"));
     }
     let stream_id = string_field(value, "stream_id", "plan")?.to_owned();
     if string_field(value, "evaluation_group_id", "plan")? != evaluation_group_id {
         return Err("stream evaluation_group_id does not match the preregistered plan".to_owned());
     }
-    let scoring_artifact_sha256 = string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
+    let scoring_artifact_sha256 =
+        string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
     valid_sha(&scoring_artifact_sha256, "plan.scoring_artifact_sha256")?;
-    let context_assignment_policy_id = string_field(value, "context_assignment_policy_id", "plan")?.to_owned();
-    let context_assignment_artifact_sha256 = string_field(value, "context_assignment_artifact_sha256", "plan")?.to_owned();
-    valid_sha(&context_assignment_artifact_sha256, "plan.context_assignment_artifact_sha256")?;
+    let context_assignment_policy_id =
+        string_field(value, "context_assignment_policy_id", "plan")?.to_owned();
+    let context_assignment_artifact_sha256 =
+        string_field(value, "context_assignment_artifact_sha256", "plan")?.to_owned();
+    valid_sha(
+        &context_assignment_artifact_sha256,
+        "plan.context_assignment_artifact_sha256",
+    )?;
     if scoring_artifact_sha256 == context_assignment_artifact_sha256 {
-        return Err("anomaly scoring and context assignment artifacts must be separately pinned".to_owned());
+        return Err(
+            "anomaly scoring and context assignment artifacts must be separately pinned".to_owned(),
+        );
     }
     if string_field(value, "anomaly_score_direction", "plan")? != "higher_is_more_anomalous" {
         return Err("anomaly_score_direction must be higher_is_more_anomalous".to_owned());
@@ -195,8 +227,13 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     if string_field(value, "reference_update_policy", "plan")? != "immutable_no_test_time_updates" {
         return Err("reference_update_policy must be immutable_no_test_time_updates".to_owned());
     }
-    if string_field(value, "context_assignment_policy", "plan")? != "external_workload_metadata_not_score_derived" {
-        return Err("context_assignment_policy must be external_workload_metadata_not_score_derived".to_owned());
+    if string_field(value, "context_assignment_policy", "plan")?
+        != "external_workload_metadata_not_score_derived"
+    {
+        return Err(
+            "context_assignment_policy must be external_workload_metadata_not_score_derived"
+                .to_owned(),
+        );
     }
     for key in [
         "null_stream_assumption_status",
@@ -211,9 +248,13 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
 
     let alpha_budget = f64_field(value, "alpha_budget", "plan")?;
     let delta_budget = f64_field(value, "delta_budget", "plan")?;
-    if !(0.0..1.0).contains(&alpha_budget) || !(0.0..1.0).contains(&delta_budget)
-        || alpha_budget + delta_budget >= 1.0 {
-        return Err("alpha_budget and delta_budget must be in (0,1) and sum to less than one".to_owned());
+    if !(0.0..1.0).contains(&alpha_budget)
+        || !(0.0..1.0).contains(&delta_budget)
+        || alpha_budget + delta_budget >= 1.0
+    {
+        return Err(
+            "alpha_budget and delta_budget must be in (0,1) and sum to less than one".to_owned(),
+        );
     }
     let minimum_reference_scores = usize_field(value, "minimum_reference_scores", "plan")?;
     if minimum_reference_scores < 2 {
@@ -227,7 +268,8 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         return Err("v1 implements the published ONS eta bound of 0.5".to_owned());
     }
     if string_field(value, "restart_weight_schedule", "plan")?
-        != "near_harmonic_c_over_k_log_e_plus_k_squared_v1" {
+        != "near_harmonic_c_over_k_log_e_plus_k_squared_v1"
+    {
         return Err("unsupported restart_weight_schedule".to_owned());
     }
     let restart_weight_scale = f64_field(value, "restart_weight_scale", "plan")?;
@@ -239,7 +281,9 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         return Err("maximum_restart_age must be positive".to_owned());
     }
 
-    let context_values = value.get("contexts").and_then(Value::as_array)
+    let context_values = value
+        .get("contexts")
+        .and_then(Value::as_array)
         .ok_or("plan.contexts must be an array")?;
     if context_values.is_empty() {
         return Err("plan.contexts must not be empty".to_owned());
@@ -255,39 +299,54 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         let context_id = string_field(item, "context_id", &context)?.to_owned();
         let reference_id = string_field(item, "reference_id", &context)?.to_owned();
         let reference_group_ids = string_array(item, "reference_group_ids", &context)?;
-        let score_values = item.get("reference_scores").and_then(Value::as_array)
+        let score_values = item
+            .get("reference_scores")
+            .and_then(Value::as_array)
             .ok_or_else(|| format!("{context}.reference_scores must be an array"))?;
         if score_values.len() < minimum_reference_scores {
-            return Err(format!("{context} has {} reference scores; at least {minimum_reference_scores} are required", score_values.len()));
+            return Err(format!(
+                "{context} has {} reference scores; at least {minimum_reference_scores} are required",
+                score_values.len()
+            ));
         }
         // The DKW construction assumes i.i.d. reference samples. v1 requires a
         // distinct declared group ID for each row, but cannot authenticate
         // that those IDs are genuinely independent executions/units.
         if reference_group_ids.len() != score_values.len() {
-            return Err(format!("{context} must provide one distinct reference_group_id per reference score"));
+            return Err(format!(
+                "{context} must provide one distinct reference_group_id per reference score"
+            ));
         }
         for group_id in &reference_group_ids {
             if group_id == evaluation_group_id {
-                return Err(format!("evaluation group {evaluation_group_id} overlaps a null-reference group"));
+                return Err(format!(
+                    "evaluation group {evaluation_group_id} overlaps a null-reference group"
+                ));
             }
             if !all_reference_groups.insert(group_id.clone()) {
-                return Err(format!("reference group {group_id} is reused across context references"));
+                return Err(format!(
+                    "reference group {group_id} is reused across context references"
+                ));
             }
         }
 
         let mut scores = Vec::with_capacity(score_values.len());
         for (score_index, score_value) in score_values.iter().enumerate() {
-            let score = score_value.as_f64()
-                .ok_or_else(|| format!("{context}.reference_scores[{score_index}] must be numeric"))?;
+            let score = score_value.as_f64().ok_or_else(|| {
+                format!("{context}.reference_scores[{score_index}] must be numeric")
+            })?;
             if !score.is_finite() {
-                return Err(format!("{context}.reference_scores[{score_index}] must be finite"));
+                return Err(format!(
+                    "{context}.reference_scores[{score_index}] must be finite"
+                ));
             }
             scores.push(score);
         }
         scores.sort_by(f64::total_cmp);
-        let epsilon = ( (2.0 / delta_per_context).ln() / (2.0 * scores.len() as f64) ).sqrt();
+        let epsilon = ((2.0 / delta_per_context).ln() / (2.0 * scores.len() as f64)).sqrt();
         let scale = 1.0 / (0.5 + (1.0 + smoothing_k * smoothing_k).sqrt() * epsilon);
-        let encoded = serde_json::to_vec(&scores).map_err(|e| format!("cannot encode reference scores: {e}"))?;
+        let encoded = serde_json::to_vec(&scores)
+            .map_err(|e| format!("cannot encode reference scores: {e}"))?;
         let state = ContextState {
             reference_id,
             reference_group_count: reference_group_ids.len(),
@@ -346,14 +405,20 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
     if string_field(value, "scoring_artifact_sha256", "stream")? != plan.scoring_artifact_sha256 {
         return Err("stream scoring_artifact_sha256 does not match the plan".to_owned());
     }
-    if string_field(value, "context_assignment_policy_id", "stream")? != plan.context_assignment_policy_id {
+    if string_field(value, "context_assignment_policy_id", "stream")?
+        != plan.context_assignment_policy_id
+    {
         return Err("stream context_assignment_policy_id does not match the plan".to_owned());
     }
-    if string_field(value, "context_assignment_artifact_sha256", "stream")? != plan.context_assignment_artifact_sha256 {
+    if string_field(value, "context_assignment_artifact_sha256", "stream")?
+        != plan.context_assignment_artifact_sha256
+    {
         return Err("stream context_assignment_artifact_sha256 does not match the plan".to_owned());
     }
 
-    let records = value.get("records").and_then(Value::as_array)
+    let records = value
+        .get("records")
+        .and_then(Value::as_array)
         .ok_or("stream.records must be an array")?;
     if records.is_empty() {
         return Err("stream.records must not be empty".to_owned());
@@ -364,7 +429,10 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
         let context = format!("stream.records[{index}]");
         let sequence_index = usize_field(item, "sequence_index", &context)?;
         if sequence_index != index + 1 {
-            return Err(format!("{context}.sequence_index must be contiguous from one; expected {}, got {sequence_index}", index + 1));
+            return Err(format!(
+                "{context}.sequence_index must be contiguous from one; expected {}, got {sequence_index}",
+                index + 1
+            ));
         }
         let window_id = string_field(item, "window_id", &context)?.to_owned();
         if !window_ids.insert(window_id.clone()) {
@@ -373,10 +441,16 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
         let context_id = string_field(item, "context_id", &context)?.to_owned();
         let anomaly_score = f64_field(item, "anomaly_score", &context)?;
         let sensor_state = string_field(item, "sensor_state", &context)?.to_owned();
-        if !matches!(sensor_state.as_str(), "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted") {
-            return Err(format!("{context}.sensor_state has unsupported state {sensor_state}"));
+        if !matches!(
+            sensor_state.as_str(),
+            "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted"
+        ) {
+            return Err(format!(
+                "{context}.sensor_state has unsupported state {sensor_state}"
+            ));
         }
-        let pmu_qualification_result = string_field(item, "pmu_qualification_result", &context)?.to_owned();
+        let pmu_qualification_result =
+            string_field(item, "pmu_qualification_result", &context)?.to_owned();
         output.push(StreamRecord {
             sequence_index,
             window_id,
@@ -394,14 +468,17 @@ fn parse_context_assignment_receipt(
     plan: &Plan,
     records: &[StreamRecord],
 ) -> Result<Vec<AssignmentDecision>, String> {
-    if string_field(value, "schema_version", "context_receipt")? != "hardsec-context-assignment-receipt-v1" {
+    if string_field(value, "schema_version", "context_receipt")?
+        != "hardsec-context-assignment-receipt-v1"
+    {
         return Err("unsupported context assignment receipt schema_version".to_owned());
     }
     if string_field(value, "result", "context_receipt")? != "audited" {
         return Err("context assignment receipt result must be audited".to_owned());
     }
     if string_field(value, "claim_scope", "context_receipt")?
-        != "declared_context_assignment_gate_and_heldout_label_evaluation_only" {
+        != "declared_context_assignment_gate_and_heldout_label_evaluation_only"
+    {
         return Err("unexpected context assignment receipt claim_scope".to_owned());
     }
     for (field, expected) in [
@@ -409,62 +486,137 @@ fn parse_context_assignment_receipt(
         ("stream_id", plan.stream_id.as_str()),
         ("evaluation_group_id", plan.evaluation_group_id.as_str()),
         ("evidence_domain", plan.evidence_domain.as_str()),
-        ("assignment_artifact_sha256", plan.context_assignment_artifact_sha256.as_str()),
-        ("anomaly_score_artifact_sha256", plan.scoring_artifact_sha256.as_str()),
+        (
+            "assignment_artifact_sha256",
+            plan.context_assignment_artifact_sha256.as_str(),
+        ),
+        (
+            "anomaly_score_artifact_sha256",
+            plan.scoring_artifact_sha256.as_str(),
+        ),
     ] {
         if string_field(value, field, "context_receipt")? != expected {
-            return Err(format!("context assignment receipt {field} does not match CCTM plan/stream"));
+            return Err(format!(
+                "context assignment receipt {field} does not match CCTM plan/stream"
+            ));
         }
     }
-    let inputs = value.get("inputs").ok_or("context assignment receipt inputs missing")?;
+    let inputs = value
+        .get("inputs")
+        .ok_or("context assignment receipt inputs missing")?;
     for field in ["policy_sha256", "assignments_sha256", "truth_oracle_sha256"] {
         let digest = string_field(inputs, field, "context_receipt.inputs")?;
         valid_sha(digest, &format!("context_receipt.inputs.{field}"))?;
     }
-    let mapping = value.get("runtime_mapping").ok_or("context assignment receipt runtime_mapping missing")?;
-    if string_field(mapping, "mapping_schema_version", "context_receipt.runtime_mapping")?
-        != "hardsec-context-assignment-runtime-map-v1" {
+    let mapping = value
+        .get("runtime_mapping")
+        .ok_or("context assignment receipt runtime_mapping missing")?;
+    if string_field(
+        mapping,
+        "mapping_schema_version",
+        "context_receipt.runtime_mapping",
+    )? != "hardsec-context-assignment-runtime-map-v1"
+    {
         return Err("unsupported context assignment runtime map schema".to_owned());
     }
-    if mapping.get("contains_truth_labels").and_then(Value::as_bool) != Some(false) {
+    if mapping
+        .get("contains_truth_labels")
+        .and_then(Value::as_bool)
+        != Some(false)
+    {
         return Err("runtime context assignment mapping must not contain truth labels".to_owned());
     }
-    if mapping.get("mapping_digest_bound_to_assignment_input").and_then(Value::as_bool) != Some(true) {
-        return Err("runtime context assignment mapping must be digest-bound to assignment input".to_owned());
+    if mapping
+        .get("mapping_digest_bound_to_assignment_input")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return Err(
+            "runtime context assignment mapping must be digest-bound to assignment input"
+                .to_owned(),
+        );
     }
-    let assignments = mapping.get("assignments").and_then(Value::as_array)
+    let assignments = mapping
+        .get("assignments")
+        .and_then(Value::as_array)
         .ok_or("context assignment receipt runtime_mapping.assignments must be an array")?;
     if assignments.len() != records.len() {
-        return Err("context assignment receipt must map every CCTM stream record exactly once".to_owned());
+        return Err(
+            "context assignment receipt must map every CCTM stream record exactly once".to_owned(),
+        );
     }
-    let integrity = value.get("assignment_integrity").ok_or("context assignment receipt assignment_integrity missing")?;
-    let accepted_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("accepted")).count();
-    let abstained_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("abstained")).count();
-    let reported_total = count_field(integrity, "assignment_record_count", "context_receipt.assignment_integrity")?;
-    let reported_accepted = count_field(integrity, "accepted_count", "context_receipt.assignment_integrity")?;
-    let reported_abstained = count_field(integrity, "abstained_count", "context_receipt.assignment_integrity")?;
-    let reported_accuracy_denominator = count_field(integrity, "accepted_accuracy_denominator", "context_receipt.assignment_integrity")
-        .or_else(|error| {
-            if accepted_count == 0
-                && integrity.get("accepted_accuracy_denominator").and_then(Value::as_u64) == Some(0) {
-                Ok(0)
-            } else { Err(error) }
-        })?;
-    let reported_coverage = f64_field(integrity, "accepted_coverage", "context_receipt.assignment_integrity")?;
-    let reported_end_to_end = f64_field(integrity, "end_to_end_correct_context_coverage", "context_receipt.assignment_integrity")?;
+    let integrity = value
+        .get("assignment_integrity")
+        .ok_or("context assignment receipt assignment_integrity missing")?;
+    let accepted_count = assignments
+        .iter()
+        .filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("accepted"))
+        .count();
+    let abstained_count = assignments
+        .iter()
+        .filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("abstained"))
+        .count();
+    let reported_total = count_field(
+        integrity,
+        "assignment_record_count",
+        "context_receipt.assignment_integrity",
+    )?;
+    let reported_accepted = count_field(
+        integrity,
+        "accepted_count",
+        "context_receipt.assignment_integrity",
+    )?;
+    let reported_abstained = count_field(
+        integrity,
+        "abstained_count",
+        "context_receipt.assignment_integrity",
+    )?;
+    let reported_accuracy_denominator = count_field(
+        integrity,
+        "accepted_accuracy_denominator",
+        "context_receipt.assignment_integrity",
+    )
+    .or_else(|error| {
+        if accepted_count == 0
+            && integrity
+                .get("accepted_accuracy_denominator")
+                .and_then(Value::as_u64)
+                == Some(0)
+        {
+            Ok(0)
+        } else {
+            Err(error)
+        }
+    })?;
+    let reported_coverage = f64_field(
+        integrity,
+        "accepted_coverage",
+        "context_receipt.assignment_integrity",
+    )?;
+    let reported_end_to_end = f64_field(
+        integrity,
+        "end_to_end_correct_context_coverage",
+        "context_receipt.assignment_integrity",
+    )?;
     if reported_total != assignments.len()
         || reported_accepted != accepted_count
         || reported_abstained != abstained_count
         || reported_accepted + reported_abstained != reported_total
         || reported_accuracy_denominator != accepted_count
         || (reported_coverage - accepted_count as f64 / assignments.len() as f64).abs() > 1e-9
-        || !(0.0..=1.0).contains(&reported_end_to_end) {
-        return Err("context assignment receipt aggregate counts/coverage do not match its runtime mapping".to_owned());
+        || !(0.0..=1.0).contains(&reported_end_to_end)
+    {
+        return Err(
+            "context assignment receipt aggregate counts/coverage do not match its runtime mapping"
+                .to_owned(),
+        );
     }
     match (integrity.get("accepted_accuracy"), accepted_count) {
         (Some(Value::Null), 0) => {}
         (Some(value), count) if count > 0 => {
-            let accuracy = value.as_f64().ok_or("accepted_accuracy must be numeric when accepted_count > 0")?;
+            let accuracy = value
+                .as_f64()
+                .ok_or("accepted_accuracy must be numeric when accepted_count > 0")?;
             if !(0.0..=1.0).contains(&accuracy) {
                 return Err("accepted_accuracy must be in [0,1]".to_owned());
             }
@@ -478,30 +630,50 @@ fn parse_context_assignment_receipt(
         let sequence_index = usize_field(assignment, "sequence_index", &context)?;
         let window_id = string_field(assignment, "window_id", &context)?.to_owned();
         if sequence_index != stream_record.sequence_index || window_id != stream_record.window_id {
-            return Err(format!("{context} sequence/window identity does not match the CCTM stream"));
+            return Err(format!(
+                "{context} sequence/window identity does not match the CCTM stream"
+            ));
         }
         let decision_status = string_field(assignment, "decision_status", &context)?.to_owned();
         if !matches!(decision_status.as_str(), "accepted" | "abstained") {
-            return Err(format!("{context}.decision_status must be accepted or abstained"));
+            return Err(format!(
+                "{context}.decision_status must be accepted or abstained"
+            ));
         }
         let decision_reason = string_field(assignment, "decision_reason", &context)?.to_owned();
-        if !matches!(decision_reason.as_str(), "accepted" | "invalid_sensor" | "unknown_context" | "ambiguous_assignment") {
+        if !matches!(
+            decision_reason.as_str(),
+            "accepted" | "invalid_sensor" | "unknown_context" | "ambiguous_assignment"
+        ) {
             return Err(format!("{context}.decision_reason is unsupported"));
         }
         let selected_context_id = match assignment.get("selected_context_id") {
             Some(Value::String(value)) => Some(value.clone()),
             Some(Value::Null) => None,
-            _ => return Err(format!("{context}.selected_context_id must be a string or null")),
+            _ => {
+                return Err(format!(
+                    "{context}.selected_context_id must be a string or null"
+                ));
+            }
         };
         if decision_status == "accepted" {
-            if decision_reason != "accepted" || selected_context_id.as_deref() != Some(stream_record.context_id.as_str()) {
-                return Err(format!("{context} accepted context does not match the CCTM stream's context"));
+            if decision_reason != "accepted"
+                || selected_context_id.as_deref() != Some(stream_record.context_id.as_str())
+            {
+                return Err(format!(
+                    "{context} accepted context does not match the CCTM stream's context"
+                ));
             }
-            if !plan.contexts.contains_key(stream_record.context_id.as_str()) {
+            if !plan
+                .contexts
+                .contains_key(stream_record.context_id.as_str())
+            {
                 return Err(format!("{context} accepted an undeclared CCTM context"));
             }
         } else if selected_context_id.is_some() {
-            return Err(format!("{context} abstained assignment must not select a context"));
+            return Err(format!(
+                "{context} abstained assignment must not select a context"
+            ));
         }
         output.push(AssignmentDecision {
             sequence_index,
@@ -573,11 +745,10 @@ fn restart_weight_sum_upper_bound(scale: f64) -> f64 {
     // sum f(k) <= integral_2^inf dx/[x ln(x)^2] = 1/ln(2).
     // Adding f(1) and f(2), the unscaled sum is <= 2.23025...;
     // c=1/3 therefore leaves a strictly positive reserve (<0.744).
-    scale * (
-        1.0 / (std::f64::consts::E + 1.0).ln().powi(2)
-        + 1.0 / (2.0 * (std::f64::consts::E + 2.0).ln().powi(2))
-        + 1.0 / 2.0_f64.ln()
-    )
+    scale
+        * (1.0 / (std::f64::consts::E + 1.0).ln().powi(2)
+            + 1.0 / (2.0 * (std::f64::consts::E + 2.0).ln().powi(2))
+            + 1.0 / 2.0_f64.ln())
 }
 
 fn log_sum_exp(values: &[f64]) -> Result<f64, String> {
@@ -588,7 +759,10 @@ fn log_sum_exp(values: &[f64]) -> Result<f64, String> {
     if !max_value.is_finite() {
         return Err("restart aggregate has no finite wealth terms".to_owned());
     }
-    let sum = values.iter().map(|value| (*value - max_value).exp()).sum::<f64>();
+    let sum = values
+        .iter()
+        .map(|value| (*value - max_value).exp())
+        .sum::<f64>();
     let result = max_value + sum.ln();
     if !result.is_finite() {
         return Err("restart aggregate log e-value became non-finite".to_owned());
@@ -626,7 +800,8 @@ fn update_restarted_processes(
     }
     context_state.restart_weight_sum += new_weight;
     if !context_state.restart_weight_sum.is_finite()
-        || context_state.restart_weight_sum > 1.0 + 1e-12 {
+        || context_state.restart_weight_sum > 1.0 + 1e-12
+    {
         return Err("near-harmonic restart weights exceed the unit capital budget".to_owned());
     }
     context_state.restart_states.push(RestartState {
@@ -639,9 +814,7 @@ fn update_restarted_processes(
     // Every live local process receives the current observation. Its ONS
     // parameter was fixed using only earlier observations in that local run.
     for local in context_state.restart_states.iter_mut() {
-        let (beta, _, g_prime) = cctm_bet(
-            p_value, local.eta, epsilon, smoothing_k, scale_c
-        )?;
+        let (beta, _, g_prime) = cctm_bet(p_value, local.eta, epsilon, smoothing_k, scale_c)?;
         if beta == 0.0 {
             local.log_wealth = None;
             continue;
@@ -678,23 +851,27 @@ fn update_restarted_processes(
     // Capture every candidate start before deterministic expiry so the receipt
     // carries per-start weight, age, current log wealth and kill disposition.
     let before_expiry = context_state.restart_states.len();
-    let candidate_starts: Vec<Value> = context_state.restart_states.iter().map(|local| {
-        let age = observation_index.saturating_sub(local.start_index) + 1;
-        let status = if local.log_wealth.is_none() {
-            "zero_wealth_killed"
-        } else if age >= maximum_restart_age {
-            "expires_after_current_update"
-        } else {
-            "active"
-        };
-        json!({
-            "start_index":local.start_index,
-            "weight":restart_weight(local.start_index, scale_c),
-            "age":age,
-            "local_log_wealth":local.log_wealth,
-            "status":status
+    let candidate_starts: Vec<Value> = context_state
+        .restart_states
+        .iter()
+        .map(|local| {
+            let age = observation_index.saturating_sub(local.start_index) + 1;
+            let status = if local.log_wealth.is_none() {
+                "zero_wealth_killed"
+            } else if age >= maximum_restart_age {
+                "expires_after_current_update"
+            } else {
+                "active"
+            };
+            json!({
+                "start_index":local.start_index,
+                "weight":restart_weight(local.start_index, scale_c),
+                "age":age,
+                "local_log_wealth":local.log_wealth,
+                "status":status
+            })
         })
-    }).collect();
+        .collect();
 
     // After its maximum_restart_age-th update, a local component is set to
     // zero on the next context observation. This predictable deterministic
@@ -704,7 +881,8 @@ fn update_restarted_processes(
         local.log_wealth.is_some()
             && observation_index.saturating_sub(local.start_index) + 1 < maximum_restart_age
     });
-    let expired = candidate_starts.iter()
+    let expired = candidate_starts
+        .iter()
         .filter(|state| state["status"] == "expires_after_current_update")
         .count();
     context_state.restart_expired_state_count += expired;
@@ -756,7 +934,8 @@ fn audit_values_with_context_receipt(
     let evaluation_group_id = string_field(stream_value, "evaluation_group_id", "stream")?;
     let mut plan = parse_plan(plan_value, evaluation_group_id)?;
     let records = parse_stream(stream_value, &plan)?;
-    let assignment_decisions = parse_context_assignment_receipt(context_receipt_value, &plan, &records)?;
+    let assignment_decisions =
+        parse_context_assignment_receipt(context_receipt_value, &plan, &records)?;
     let mut first_single_start_alarm_sequence_index: Option<usize> = None;
     let mut first_single_start_alarm_context_id: Option<String> = None;
     let mut first_restart_alarm_sequence_index: Option<usize> = None;
@@ -770,7 +949,10 @@ fn audit_values_with_context_receipt(
     for (record, assignment) in records.iter().zip(assignment_decisions.iter()) {
         if let Some(reason) = abstention_reason(record, assignment, &plan) {
             *abstention_counts.entry(reason.to_owned()).or_default() += 1;
-            let context_log_wealth = plan.contexts.get(&record.context_id).map(|state| state.log_wealth);
+            let context_log_wealth = plan
+                .contexts
+                .get(&record.context_id)
+                .map(|state| state.log_wealth);
             output_records.push(json!({
                 "sequence_index":record.sequence_index,
                 "window_id":record.window_id,
@@ -789,7 +971,10 @@ fn audit_values_with_context_receipt(
             continue;
         }
 
-        let state = plan.contexts.get_mut(&record.context_id).ok_or("context state invariant failed")?;
+        let state = plan
+            .contexts
+            .get_mut(&record.context_id)
+            .ok_or("context state invariant failed")?;
         let p_value = empirical_cdf(&state.scores, record.anomaly_score);
         let eta_used = state.eta;
         let epsilon = state.epsilon;
@@ -820,8 +1005,13 @@ fn audit_values_with_context_receipt(
         }
 
         let restarted = update_restarted_processes(
-            state, p_value, epsilon, smoothing_k, restart_weight_scale,
-            maximum_restart_age, record.sequence_index
+            state,
+            p_value,
+            epsilon,
+            smoothing_k,
+            restart_weight_scale,
+            maximum_restart_age,
+            record.sequence_index,
         )?;
         let restart_crossing_now = state.restart_first_alarm_sequence_index.is_none()
             && restarted.log_e_value >= threshold;
@@ -886,34 +1076,40 @@ fn audit_values_with_context_receipt(
         }));
     }
 
-    let context_reports: Vec<Value> = plan.contexts.iter().map(|(context_id, state)| json!({
-        "context_id":context_id,
-        "reference_id":state.reference_id,
-        "reference_digest":state.reference_digest,
-        "reference_score_count":state.scores.len(),
-        "declared_reference_independent_group_count":state.reference_group_count,
-        "alpha_allocation":state.alpha,
-        "delta_allocation":state.delta,
-        "dkw_epsilon":state.epsilon,
-        "betting_scale_C":state.scale,
-        "final_log_wealth":state.log_wealth,
-        "ons_eta_final":state.eta,
-        "single_start_log_wealth_final":state.log_wealth,
-        "single_start_first_alarm_sequence_index":state.first_alarm_sequence_index,
-        "restart_policy":{
-            "weight_schedule":"c/[k*ln(e+k)^2]",
-            "weight_scale_c":plan.restart_weight_scale,
-            "maximum_restart_age":plan.maximum_restart_age,
-            "restart_observation_count":state.restart_observation_count,
-            "restart_weight_sum":state.restart_weight_sum,
-            "unallocated_capital_reserve":1.0-state.restart_weight_sum,
-            "live_restart_state_count":state.restart_states.len(),
-            "expired_restart_state_count":state.restart_expired_state_count,
-            "restart_log_e_value_final":state.restart_log_e_value,
-            "first_alarm_sequence_index":state.restart_first_alarm_sequence_index
-        },
-        "threshold_log_wealth":-state.alpha.ln()
-    })).collect();
+    let context_reports: Vec<Value> = plan
+        .contexts
+        .iter()
+        .map(|(context_id, state)| {
+            json!({
+                "context_id":context_id,
+                "reference_id":state.reference_id,
+                "reference_digest":state.reference_digest,
+                "reference_score_count":state.scores.len(),
+                "declared_reference_independent_group_count":state.reference_group_count,
+                "alpha_allocation":state.alpha,
+                "delta_allocation":state.delta,
+                "dkw_epsilon":state.epsilon,
+                "betting_scale_C":state.scale,
+                "final_log_wealth":state.log_wealth,
+                "ons_eta_final":state.eta,
+                "single_start_log_wealth_final":state.log_wealth,
+                "single_start_first_alarm_sequence_index":state.first_alarm_sequence_index,
+                "restart_policy":{
+                    "weight_schedule":"c/[k*ln(e+k)^2]",
+                    "weight_scale_c":plan.restart_weight_scale,
+                    "maximum_restart_age":plan.maximum_restart_age,
+                    "restart_observation_count":state.restart_observation_count,
+                    "restart_weight_sum":state.restart_weight_sum,
+                    "unallocated_capital_reserve":1.0-state.restart_weight_sum,
+                    "live_restart_state_count":state.restart_states.len(),
+                    "expired_restart_state_count":state.restart_expired_state_count,
+                    "restart_log_e_value_final":state.restart_log_e_value,
+                    "first_alarm_sequence_index":state.restart_first_alarm_sequence_index
+                },
+                "threshold_log_wealth":-state.alpha.ln()
+            })
+        })
+        .collect();
 
     let result = if first_restart_alarm_sequence_index.is_some() {
         "restarted_alarm_threshold_crossed"
@@ -1022,10 +1218,18 @@ fn audit_values(
     plan_bytes: &[u8],
     stream_bytes: &[u8],
 ) -> Result<Value, String> {
-    let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+    let bytes =
+        include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
     let receipt: Value = serde_json::from_slice(bytes)
         .map_err(|e| format!("invalid bundled context receipt fixture: {e}"))?;
-    audit_values_with_context_receipt(plan_value, stream_value, &receipt, plan_bytes, stream_bytes, bytes)
+    audit_values_with_context_receipt(
+        plan_value,
+        stream_value,
+        &receipt,
+        plan_bytes,
+        stream_bytes,
+        bytes,
+    )
 }
 
 fn read_input(path: &Path, label: &str) -> Result<(Vec<u8>, Value), String> {
@@ -1053,29 +1257,40 @@ fn parse_args() -> Result<Args, String> {
             "--receipt" => &mut receipt,
             _ => return Err(format!("unknown argument {flag}")),
         };
-        let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
+        let path = args
+            .next()
+            .ok_or_else(|| format!("{flag} requires a path"))?;
         if target.replace(PathBuf::from(path)).is_some() {
             return Err(format!("duplicate argument {flag}"));
         }
     }
     Ok(Args {
-        plan:plan.ok_or("missing required argument --plan")?,
-        stream:stream.ok_or("missing required argument --stream")?,
-        context_receipt:context_receipt.ok_or("missing required argument --context-receipt")?,
-        receipt:receipt.ok_or("missing required argument --receipt")?,
+        plan: plan.ok_or("missing required argument --plan")?,
+        stream: stream.ok_or("missing required argument --stream")?,
+        context_receipt: context_receipt.ok_or("missing required argument --context-receipt")?,
+        receipt: receipt.ok_or("missing required argument --receipt")?,
     })
 }
 
 fn validate_receipt_location(receipt: &Path, inputs: &[&Path]) -> Result<(), String> {
     if receipt.exists() {
-        return Err(format!("refusing to overwrite receipt {}", receipt.display()));
+        return Err(format!(
+            "refusing to overwrite receipt {}",
+            receipt.display()
+        ));
     }
-    let parent = receipt.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    let canonical_parent = fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
+    let parent = receipt
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
     for input in inputs {
         let canonical_input = fs::canonicalize(input)
             .map_err(|e| format!("cannot canonicalize input {}: {e}", input.display()))?;
-        let input_parent = canonical_input.parent().ok_or("input has no parent directory")?;
+        let input_parent = canonical_input
+            .parent()
+            .ok_or("input has no parent directory")?;
         if canonical_parent.starts_with(input_parent) {
             return Err("receipt must be outside every input directory".to_owned());
         }
@@ -1087,19 +1302,35 @@ fn run() -> Result<(), String> {
     let args = parse_args()?;
     let (plan_bytes, plan) = read_input(&args.plan, "plan")?;
     let (stream_bytes, stream) = read_input(&args.stream, "stream")?;
-    let (context_receipt_bytes, context_receipt) = read_input(&args.context_receipt, "context assignment receipt")?;
-    validate_receipt_location(&args.receipt, &[
-        args.plan.as_path(), args.stream.as_path(), args.context_receipt.as_path()
-    ])?;
-    let receipt = audit_values_with_context_receipt(
-        &plan, &stream, &context_receipt,
-        &plan_bytes, &stream_bytes, &context_receipt_bytes
+    let (context_receipt_bytes, context_receipt) =
+        read_input(&args.context_receipt, "context assignment receipt")?;
+    validate_receipt_location(
+        &args.receipt,
+        &[
+            args.plan.as_path(),
+            args.stream.as_path(),
+            args.context_receipt.as_path(),
+        ],
     )?;
-    let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
+    let receipt = audit_values_with_context_receipt(
+        &plan,
+        &stream,
+        &context_receipt,
+        &plan_bytes,
+        &stream_bytes,
+        &context_receipt_bytes,
+    )?;
+    let encoded =
+        serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
-    file.write_all(&encoded).map_err(|e| format!("cannot write receipt: {e}"))?;
-    file.write_all(b"\n").map_err(|e| format!("cannot finish receipt: {e}"))?;
+    file.write_all(&encoded)
+        .map_err(|e| format!("cannot write receipt: {e}"))?;
+    file.write_all(b"\n")
+        .map_err(|e| format!("cannot finish receipt: {e}"))?;
     Ok(())
 }
 
@@ -1118,8 +1349,10 @@ mod tests {
     use super::*;
 
     fn fixture() -> (Value, Value, Vec<u8>, Vec<u8>) {
-        let plan_bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/plan.json").to_vec();
-        let stream_bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/stream.json").to_vec();
+        let plan_bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/plan.json").to_vec();
+        let stream_bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/stream.json").to_vec();
         let plan = serde_json::from_slice(&plan_bytes).unwrap();
         let stream = serde_json::from_slice(&stream_bytes).unwrap();
         (plan, stream, plan_bytes, stream_bytes)
@@ -1142,28 +1375,57 @@ mod tests {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
         assert_eq!(receipt["result"], "restarted_alarm_threshold_crossed");
-        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_sequence_index"], 22);
-        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_context_id"], "compute");
-        assert_eq!(receipt["sequential_monitor"]["single_start_reference"]["first_alarm_sequence_index"], 16);
+        assert_eq!(
+            receipt["sequential_monitor"]["overall_first_alarm_sequence_index"],
+            22
+        );
+        assert_eq!(
+            receipt["sequential_monitor"]["overall_first_alarm_context_id"],
+            "compute"
+        );
+        assert_eq!(
+            receipt["sequential_monitor"]["single_start_reference"]["first_alarm_sequence_index"],
+            16
+        );
         assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 23);
         assert_eq!(receipt["sequential_monitor"]["abstention_count"], 3);
-        assert_eq!(receipt["sequential_monitor"]["restart_guarantee_contract"]["weight_sum_at_most_one"], true);
+        assert_eq!(
+            receipt["sequential_monitor"]["restart_guarantee_contract"]["weight_sum_at_most_one"],
+            true
+        );
         assert!(receipt["sequential_monitor"]["restart_guarantee_contract"]["infinite_weight_sum_upper_bound"].as_f64().unwrap() < 0.744);
         assert_eq!(receipt["sequential_monitor"]["post_alarm_reset_count"], 0);
-        assert_eq!(receipt["statistical_guarantees"]["null_stream_iid_assumption_status"], "assumption_not_verified");
-        assert_eq!(receipt["statistical_guarantees"]["reference_sample_iid_assumption_status"], "assumption_not_verified");
-        assert_eq!(receipt["statistical_guarantees"]["theorem_guarantee_status"], "not_established_from_input_receipts");
-        assert_eq!(receipt["statistical_guarantees"]["accepted_observation_selection_status"], "assumption_not_verified");
+        assert_eq!(
+            receipt["statistical_guarantees"]["null_stream_iid_assumption_status"],
+            "assumption_not_verified"
+        );
+        assert_eq!(
+            receipt["statistical_guarantees"]["reference_sample_iid_assumption_status"],
+            "assumption_not_verified"
+        );
+        assert_eq!(
+            receipt["statistical_guarantees"]["theorem_guarantee_status"],
+            "not_established_from_input_receipts"
+        );
+        assert_eq!(
+            receipt["statistical_guarantees"]["accepted_observation_selection_status"],
+            "assumption_not_verified"
+        );
         let unconditional = receipt["statistical_guarantees"]["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"].as_f64().unwrap();
         assert!((unconditional - 0.05).abs() < 1e-12);
-        assert_eq!(receipt["statistical_guarantees"]["effective_sample_size_estimate"], Value::Null);
+        assert_eq!(
+            receipt["statistical_guarantees"]["effective_sample_size_estimate"],
+            Value::Null
+        );
     }
 
     #[test]
     fn dkw_epsilon_matches_preregistered_delta_and_reference_size() {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
-        let epsilon = receipt["reference_policy"]["contexts"][0]["dkw_epsilon"].as_f64().unwrap();
+        let epsilon = receipt["reference_policy"]["contexts"][0]["dkw_epsilon"]
+            .as_f64()
+            .unwrap();
         let expected = ((2.0_f64 / 0.005).ln() / (2.0 * 600.0)).sqrt();
         assert!((epsilon - expected).abs() < 1e-12);
     }
@@ -1172,17 +1434,32 @@ mod tests {
     fn alpha_and_delta_are_bonferroni_allocated_over_contexts() {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
-        assert_eq!(receipt["reference_policy"]["contexts"][0]["alpha_allocation"], 0.02);
-        assert_eq!(receipt["reference_policy"]["contexts"][1]["alpha_allocation"], 0.02);
-        assert_eq!(receipt["reference_policy"]["contexts"][0]["delta_allocation"], 0.005);
-        assert_eq!(receipt["reference_policy"]["contexts"][1]["delta_allocation"], 0.005);
+        assert_eq!(
+            receipt["reference_policy"]["contexts"][0]["alpha_allocation"],
+            0.02
+        );
+        assert_eq!(
+            receipt["reference_policy"]["contexts"][1]["alpha_allocation"],
+            0.02
+        );
+        assert_eq!(
+            receipt["reference_policy"]["contexts"][0]["delta_allocation"],
+            0.005
+        );
+        assert_eq!(
+            receipt["reference_policy"]["contexts"][1]["delta_allocation"],
+            0.005
+        );
     }
 
     #[test]
     fn dkw_corrected_betting_factor_stays_in_unit_interval() {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
-        for row in receipt["sequential_monitor"]["window_decisions"].as_array().unwrap() {
+        for row in receipt["sequential_monitor"]["window_decisions"]
+            .as_array()
+            .unwrap()
+        {
             if let Some(beta) = row["single_start"]["betting_factor"].as_f64() {
                 assert!((0.0..=2.0).contains(&beta));
             }
@@ -1195,22 +1472,38 @@ mod tests {
     #[test]
     fn rejects_reference_group_count_different_from_reference_sample_count() {
         let (mut p, s, _, _) = fixture();
-        p["contexts"][0]["reference_group_ids"].as_array_mut().unwrap().pop();
-        assert!(audit(&p, &s).unwrap_err().contains("one distinct reference_group_id per reference score"));
+        p["contexts"][0]["reference_group_ids"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("one distinct reference_group_id per reference score")
+        );
     }
 
     #[test]
     fn rejects_reference_evaluation_group_overlap() {
         let (mut p, s, _, _) = fixture();
         p["contexts"][0]["reference_group_ids"][0] = json!("heldout-execution-cctm-restart");
-        assert!(audit(&p, &s).unwrap_err().contains("overlaps a null-reference group"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("overlaps a null-reference group")
+        );
     }
 
     #[test]
     fn rejects_reference_group_reuse_across_contexts() {
         let (mut p, s, _, _) = fixture();
-        p["contexts"][1]["reference_group_ids"][0] = p["contexts"][0]["reference_group_ids"][0].clone();
-        assert!(audit(&p, &s).unwrap_err().contains("reused across context references"));
+        p["contexts"][1]["reference_group_ids"][0] =
+            p["contexts"][0]["reference_group_ids"][0].clone();
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("reused across context references")
+        );
     }
 
     #[test]
@@ -1218,29 +1511,46 @@ mod tests {
         let (p, mut s, _, _) = fixture();
         s["records"][0]["sensor_state"] = json!("stale");
         s["records"][1]["context_id"] = json!("new-regime");
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
-        assignment_receipt["runtime_mapping"]["assignments"][1]["decision_status"] = json!("abstained");
-        assignment_receipt["runtime_mapping"]["assignments"][1]["decision_reason"] = json!("unknown_context");
-        assignment_receipt["runtime_mapping"]["assignments"][1]["selected_context_id"] = Value::Null;
+        assignment_receipt["runtime_mapping"]["assignments"][1]["decision_status"] =
+            json!("abstained");
+        assignment_receipt["runtime_mapping"]["assignments"][1]["decision_reason"] =
+            json!("unknown_context");
+        assignment_receipt["runtime_mapping"]["assignments"][1]["selected_context_id"] =
+            Value::Null;
         assignment_receipt["assignment_integrity"]["accepted_count"] = json!(22);
         assignment_receipt["assignment_integrity"]["abstained_count"] = json!(4);
         assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(22);
-        assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(22.0/26.0);
-        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] = json!(22.0/26.0);
+        assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(22.0 / 26.0);
+        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] =
+            json!(22.0 / 26.0);
         let pb = encode(&p);
         let sb = encode(&s);
         let rb = encode(&assignment_receipt);
-        let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        let r =
+            audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 21);
         assert_eq!(r["sequential_monitor"]["abstention_count"], 5);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 3);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"], 2);
-        let decisions = r["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        assert_eq!(
+            r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"],
+            3
+        );
+        assert_eq!(
+            r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"],
+            2
+        );
+        let decisions = r["sequential_monitor"]["window_decisions"]
+            .as_array()
+            .unwrap();
         assert_eq!(decisions[0]["abstention_reason"], "invalid_sensor_state");
         assert_eq!(decisions[0]["single_start_log_wealth_context"], 0.0);
         assert_eq!(decisions[0]["restart_log_e_value_context"], 0.0);
-        assert_eq!(decisions[1]["abstention_reason"], "context_assignment_not_accepted");
+        assert_eq!(
+            decisions[1]["abstention_reason"],
+            "context_assignment_not_accepted"
+        );
         assert_eq!(decisions[1]["single_start_log_wealth_context"], 0.0);
         assert_eq!(decisions[1]["restart_log_e_value_context"], 0.0);
         assert_eq!(decisions[2]["abstention_reason"], Value::Null);
@@ -1252,7 +1562,10 @@ mod tests {
         s["records"][0]["pmu_qualification_result"] = json!("measurement_quality_gate_failed");
         let r = audit(&p, &s).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 22);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"], 1);
+        assert_eq!(
+            r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"],
+            1
+        );
     }
 
     #[test]
@@ -1266,31 +1579,46 @@ mod tests {
     fn rejects_non_contiguous_sequence_indices() {
         let (p, mut s, _, _) = fixture();
         s["records"][1]["sequence_index"] = json!(9);
-        assert!(audit(&p, &s).unwrap_err().contains("must be contiguous from one"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("must be contiguous from one")
+        );
     }
 
     #[test]
     fn score_artifact_digest_mismatch_is_rejected() {
         let (p, mut s, _, _) = fixture();
         s["scoring_artifact_sha256"] = json!("d".repeat(64));
-        assert!(audit(&p, &s).unwrap_err().contains("scoring_artifact_sha256 does not match"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("scoring_artifact_sha256 does not match")
+        );
     }
 
     #[test]
     fn rejects_too_few_reference_scores() {
         let (mut p, s, _, _) = fixture();
-        p["contexts"][0]["reference_scores"] = json!([0.1,0.2,0.3]);
-        p["contexts"][0]["reference_group_ids"] = json!(["a","b","c"]);
-        assert!(audit(&p, &s).unwrap_err().contains("reference scores; at least"));
+        p["contexts"][0]["reference_scores"] = json!([0.1, 0.2, 0.3]);
+        p["contexts"][0]["reference_group_ids"] = json!(["a", "b", "c"]);
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("reference scores; at least")
+        );
     }
 
     #[test]
     fn rejects_claims_that_assumptions_are_verified_by_metadata() {
         let (mut p, s, _, _) = fixture();
         p["null_stream_assumption_status"] = json!("verified");
-        assert!(audit(&p, &s).unwrap_err().contains("must remain assumption_not_verified"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("must remain assumption_not_verified")
+        );
     }
-
 
     #[test]
     fn refuses_to_claim_accepted_observation_selection_is_verified() {
@@ -1350,9 +1678,11 @@ mod tests {
         }
 
         let fraction = alarm_paths as f64 / 10_000.0;
-        assert!(fraction > 0.75 && fraction < 0.85, "dependent-null grid alarm fraction {fraction}");
+        assert!(
+            fraction > 0.75 && fraction < 0.85,
+            "dependent-null grid alarm fraction {fraction}"
+        );
     }
-
 
     #[test]
     fn rejects_context_assignment_receipt_with_mismatched_context_mapping() {
@@ -1365,50 +1695,66 @@ mod tests {
     #[test]
     fn rejects_context_assignment_receipt_with_wrong_policy_artifact() {
         let (p, s, _, _) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         assignment_receipt["assignment_artifact_sha256"] = json!("e".repeat(64));
         let pb = encode(&p);
         let sb = encode(&s);
         let rb = encode(&assignment_receipt);
-        assert!(audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
-            .unwrap_err().contains("assignment_artifact_sha256 does not match"));
+        assert!(
+            audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
+                .unwrap_err()
+                .contains("assignment_artifact_sha256 does not match")
+        );
     }
 
     #[test]
     fn abstained_context_assignment_never_updates_wealth() {
         let (p, s, pb, sb) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         let rb = bytes.to_vec();
-        let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
-        let rows = r["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        let r =
+            audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        let rows = r["sequential_monitor"]["window_decisions"]
+            .as_array()
+            .unwrap();
         assert_eq!(rows[16]["abstention_reason"], "invalid_sensor_state");
-        assert_eq!(rows[17]["abstention_reason"], "context_assignment_not_accepted");
+        assert_eq!(
+            rows[17]["abstention_reason"],
+            "context_assignment_not_accepted"
+        );
         assert_eq!(rows[18]["abstention_reason"], "invalid_sensor_state");
     }
-
 
     #[test]
     fn rejects_context_assignment_receipt_aggregate_count_mismatch() {
         let (p, s, _, _) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         assignment_receipt["assignment_integrity"]["accepted_count"] = json!(15);
         let pb = encode(&p);
         let sb = encode(&s);
         let rb = encode(&assignment_receipt);
-        assert!(audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
-            .unwrap_err().contains("aggregate counts/coverage do not match"));
+        assert!(
+            audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
+                .unwrap_err()
+                .contains("aggregate counts/coverage do not match")
+        );
     }
-
 
     #[test]
     fn fully_abstained_assignment_stream_is_valid_and_updates_no_wealth() {
         let (p, s, pb, sb) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
-        let mapping = assignment_receipt["runtime_mapping"]["assignments"].as_array_mut().unwrap();
+        let mapping = assignment_receipt["runtime_mapping"]["assignments"]
+            .as_array_mut()
+            .unwrap();
         for row in mapping.iter_mut() {
             row["decision_status"] = json!("abstained");
             row["decision_reason"] = json!("ambiguous_assignment");
@@ -1419,14 +1765,15 @@ mod tests {
         assignment_receipt["assignment_integrity"]["accepted_accuracy"] = Value::Null;
         assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(0);
         assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(0.0);
-        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] = json!(0.0);
+        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] =
+            json!(0.0);
         let rb = encode(&assignment_receipt);
-        let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        let r =
+            audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
         assert_eq!(r["sequential_monitor"]["abstention_count"], 26);
         assert_eq!(r["result"], "no_restarted_alarm_threshold_crossed");
     }
-
 
     #[test]
     fn near_harmonic_restart_weights_have_a_proved_unit_capital_bound() {
@@ -1455,10 +1802,22 @@ mod tests {
             assert!(restart["live_restart_state_count"].as_u64().unwrap() <= 2);
             assert!(restart["unallocated_capital_reserve"].as_f64().unwrap() > 0.25);
         }
-        let compute = receipt["reference_policy"]["contexts"].as_array().unwrap()
-            .iter().find(|context| context["context_id"] == "compute").unwrap();
-        assert!(compute["restart_policy"]["expired_restart_state_count"].as_u64().unwrap() > 0);
-        assert_eq!(receipt["sequential_monitor"]["restart_guarantee_contract"]["maximum_restart_age"], 2);
+        let compute = receipt["reference_policy"]["contexts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|context| context["context_id"] == "compute")
+            .unwrap();
+        assert!(
+            compute["restart_policy"]["expired_restart_state_count"]
+                .as_u64()
+                .unwrap()
+                > 0
+        );
+        assert_eq!(
+            receipt["sequential_monitor"]["restart_guarantee_contract"]["maximum_restart_age"],
+            2
+        );
     }
 
     #[test]
@@ -1510,10 +1869,8 @@ mod tests {
                 single_accumulator = accumulator_next;
             }
 
-            update_restarted_processes(
-                &mut context, p_value, epsilon, k, scale,
-                256, index
-            ).unwrap();
+            update_restarted_processes(&mut context, p_value, epsilon, k, scale, 256, index)
+                .unwrap();
         }
 
         let mut restarted_delay = None;
@@ -1527,10 +1884,8 @@ mod tests {
                 single_eta = eta_next;
                 single_accumulator = accumulator_next;
             }
-            update_restarted_processes(
-                &mut context, 1.0, epsilon, k, scale,
-                256, 10_000 + delay
-            ).unwrap();
+            update_restarted_processes(&mut context, 1.0, epsilon, k, scale, 256, 10_000 + delay)
+                .unwrap();
 
             if restarted_delay.is_none() && context.restart_log_e_value >= threshold {
                 restarted_delay = Some(delay);
@@ -1542,8 +1897,10 @@ mod tests {
                 break;
             }
         }
-        let restarted_delay = restarted_delay.expect("restarted detector should cross in the stress fixture");
-        let single_start_delay = single_start_delay.expect("single-start detector should eventually cross");
+        let restarted_delay =
+            restarted_delay.expect("restarted detector should cross in the stress fixture");
+        let single_start_delay =
+            single_start_delay.expect("single-start detector should eventually cross");
         assert_eq!(restarted_delay, 50);
         assert_eq!(single_start_delay, 200);
         assert!(restarted_delay < single_start_delay);
@@ -1553,38 +1910,58 @@ mod tests {
     fn restart_receipt_exposes_start_weight_age_wealth_and_expiry_status() {
         let (p, s, _, _) = fixture();
         let receipt = audit(&p, &s).unwrap();
-        let rows = receipt["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        let rows = receipt["sequential_monitor"]["window_decisions"]
+            .as_array()
+            .unwrap();
         let first_start = rows[0]["restarted"]["candidate_starts"].as_array().unwrap();
         assert_eq!(first_start.len(), 1);
         assert_eq!(first_start[0]["start_index"], 1);
         assert_eq!(first_start[0]["age"], 1);
         assert_eq!(first_start[0]["status"], "active");
-        let expected_weight = restart_weight(1, 1.0/3.0);
+        let expected_weight = restart_weight(1, 1.0 / 3.0);
         assert!((first_start[0]["weight"].as_f64().unwrap() - expected_weight).abs() < 1e-12);
         assert!(first_start[0]["local_log_wealth"].as_f64().is_some());
 
         let mut short_plan = p.clone();
         short_plan["maximum_restart_age"] = json!(2);
         let short_receipt = audit(&short_plan, &s).unwrap();
-        let short_rows = short_receipt["sequential_monitor"]["window_decisions"].as_array().unwrap();
-        let second_compute_obs = short_rows[2]["restarted"]["candidate_starts"].as_array().unwrap();
+        let short_rows = short_receipt["sequential_monitor"]["window_decisions"]
+            .as_array()
+            .unwrap();
+        let second_compute_obs = short_rows[2]["restarted"]["candidate_starts"]
+            .as_array()
+            .unwrap();
         assert!(second_compute_obs.iter().any(|entry| {
-            entry["start_index"] == 1 && entry["age"] == 2
+            entry["start_index"] == 1
+                && entry["age"] == 2
                 && entry["status"] == "expires_after_current_update"
         }));
-        assert!(short_rows[2]["restarted"]["live_state_count_after_expiry"].as_u64().unwrap() < 2);
+        assert!(
+            short_rows[2]["restarted"]["live_state_count_after_expiry"]
+                .as_u64()
+                .unwrap()
+                < 2
+        );
     }
 
     #[test]
     fn restart_processes_do_not_advance_on_context_assignment_abstentions() {
         let (p, s, pb, sb) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         let rb = bytes.to_vec();
-        let receipt = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        let receipt =
+            audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         let contexts = receipt["reference_policy"]["contexts"].as_array().unwrap();
-        let compute = contexts.iter().find(|v| v["context_id"] == "compute").unwrap();
-        let memory = contexts.iter().find(|v| v["context_id"] == "memory").unwrap();
+        let compute = contexts
+            .iter()
+            .find(|v| v["context_id"] == "compute")
+            .unwrap();
+        let memory = contexts
+            .iter()
+            .find(|v| v["context_id"] == "memory")
+            .unwrap();
         assert_eq!(compute["restart_policy"]["restart_observation_count"], 22);
         assert_eq!(memory["restart_policy"]["restart_observation_count"], 1);
     }
@@ -1593,6 +1970,10 @@ mod tests {
     fn rejects_context_selection_based_on_monitor_score() {
         let (mut p, s, _, _) = fixture();
         p["context_assignment_policy"] = json!("derived_from_anomaly_score");
-        assert!(audit(&p, &s).unwrap_err().contains("external_workload_metadata_not_score_derived"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("external_workload_metadata_not_score_derived")
+        );
     }
 }

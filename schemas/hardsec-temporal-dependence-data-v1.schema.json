@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-temporal-dependence-data-v1.schema.json",
+  "title": "HARDSEC temporal dependence calibration and evaluation scores v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_domain",
+    "stream_id",
+    "context_id",
+    "scoring_artifact_sha256",
+    "calibration_execution_group_id",
+    "evaluation_execution_group_id",
+    "calibration_device_boot_group_id",
+    "evaluation_device_boot_group_id",
+    "calibration_scores",
+    "evaluation_scores"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-temporal-dependence-data-v1"
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "calibration_execution_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_execution_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_device_boot_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_device_boot_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_scores": {
+      "type": "array",
+      "minItems": 20,
+      "items": {
+        "type": "number"
+      }
+    },
+    "evaluation_scores": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number"
+      }
+    }
+  }
+}
