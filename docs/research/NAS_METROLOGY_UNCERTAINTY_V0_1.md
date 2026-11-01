@@ -37,7 +37,7 @@ Type B is supplied as a calibration-derived relative standard uncertainty (u_{B,
 
 `u_B = |mean_energy| × u_{B,rel}`
 
-The v0.1 independent-term approximation combines them by root-sum-square:
+The v0.1 independent-term approximation combines them by root-sum-square. The manifest explicitly requires the protocol to justify that Type A and Type B terms are uncorrelated; the module rejects a manifest that does not make this declaration:
 
 `u_c = sqrt(u_A² + u_B²)`
 
@@ -83,7 +83,24 @@ Synthetic tests cover:
 
 Tests are authored but have not been compiled or executed in this environment. No actual PPK2 certificate, raw trace or physical replicate has been evaluated.
 
-## Search integration (next increment)
+## Replicate-planning heuristic
+
+The module includes a bounded next-replicate planner that evaluates three strategies independently:
+- repeat only the candidate artifact;
+- repeat only the reference artifact;
+- acquire blocked paired replicates for both.
+
+It calculates the projected Type A term as sample standard deviation divided by the square root of the projected replicate count; declared Type B uncertainty is held fixed. It finds the lowest-cost strategy that could make the expanded intervals disjoint within the frozen per-replicate resource costs, total budget and maximum additional-replicate horizon.
+
+The planner explicitly returns:
+- `ALREADY_RESOLVED`: no additional measurement is needed to establish strict ordering under the current rule;
+- `METROLOGY_LIMITED`: the mean difference is no larger than the sum of the irreducible expanded Type B terms; more repeats cannot resolve the comparison;
+- `ADDITIONAL_REPLICATES_REQUIRED`: a qualifying action fits the declared budget/horizon;
+- `NO_PLAN_WITHIN_BUDGET_OR_HORIZON`: no qualifying action was found inside the supplied limits.
+
+This is a deterministic planning heuristic with fixed observed means and sample standard deviations, not a posterior probability of future results. It does not replace a preregistered sequential stopping rule. Its output can be passed to the existing multi-resource budget and compare-and-swap reservation machinery; the final acquisition and analysis still require a run receipt.
+
+## Search integration
 
 Feed uncertainty receipts into Pareto-regret / value-of-information scheduling:
 - estimate the probability that another replicate changes candidate ordering or Pareto membership;
@@ -92,7 +109,7 @@ Feed uncertainty receipts into Pareto-regret / value-of-information scheduling:
 - never collect extra samples selectively after inspecting favourable interim values unless the sequential stopping rule was frozen first;
 - use blocked/randomized candidate order, reset boundaries and matched instrument/board conditions when a paired comparison is scientifically valid.
 
-The module currently provides uncertainty calculation and pairwise interval decisions; it does not yet schedule acquisitions or model paired covariance.
+The current module supplies uncertainty calculation, conservative pairwise comparison and a bounded replicate-count planning heuristic. It does not yet estimate a full Bayesian posterior over future measurement outcomes or model paired systematic covariance.
 
 ## Claim ceiling
 
