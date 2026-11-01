@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/exposure-transfer-report-v1.json",
+  "title": "Causal exposure transfer report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "primary_metric_id",
+    "base_causal_study_sha256",
+    "transfer_study_sha256",
+    "relation_protocol_sha256",
+    "evaluator_relation_manifest_sha256",
+    "independent_model_pair_replicate_count",
+    "replicate_count_meets_base_minimum",
+    "family_count",
+    "transfer_relation_effects",
+    "predeclared_contrasts",
+    "contrast_intervals_are_multiplicity_adjusted",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.exposure_transfer_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primary_metric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_causal_study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "transfer_study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relation_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluator_relation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "independent_model_pair_replicate_count": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 1000
+    },
+    "replicate_count_meets_base_minimum": {
+      "type": "boolean"
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "transfer_relation_effects": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/relation_effect"
+      }
+    },
+    "predeclared_contrasts": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/contrast"
+      }
+    },
+    "contrast_intervals_are_multiplicity_adjusted": {
+      "const": false
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "const": "exploratory_only_unqualified"
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "mean_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "replicate_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replicate_id",
+        "base_score_permille",
+        "treatment_score_permille",
+        "placebo_score_permille",
+        "treatment_minus_placebo_permille",
+        "treatment_minus_base_permille",
+        "placebo_minus_base_permille"
+      ],
+      "properties": {
+        "replicate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_score_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "treatment_score_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "placebo_score_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "treatment_minus_placebo_permille": {
+          "type": "number",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "treatment_minus_base_permille": {
+          "type": "number",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "placebo_minus_base_permille": {
+          "type": "number",
+          "minimum": -1000,
+          "maximum": 1000
+        }
+      }
+    },
+    "family_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_family",
+        "difficulty_band_count",
+        "item_count_per_replicate",
+        "cluster_count_per_replicate",
+        "base_score_permille",
+        "treatment_score_permille",
+        "placebo_score_permille",
+        "treatment_minus_placebo_permille"
+      ],
+      "properties": {
+        "task_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "difficulty_band_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "item_count_per_replicate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cluster_count_per_replicate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "base_score_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "treatment_score_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "placebo_score_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "treatment_minus_placebo_permille": {
+          "$ref": "#/$defs/mean_interval"
+        }
+      }
+    },
+    "relation_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "family_count",
+        "difficulty_band_count_per_replicate",
+        "item_count_per_replicate",
+        "cluster_count_per_replicate",
+        "base_score_permille",
+        "treatment_score_permille",
+        "placebo_score_permille",
+        "treatment_minus_placebo_permille",
+        "treatment_minus_base_permille",
+        "placebo_minus_base_permille",
+        "worst_family_treatment_minus_placebo_permille",
+        "family_effects",
+        "replicate_effects"
+      ],
+      "properties": {
+        "relation": {
+          "type": "string",
+          "enum": [
+            "exact_replay",
+            "surface_variant",
+            "semantic_equivalent",
+            "fresh_same_recipe",
+            "novel_recipe_same_skill",
+            "unrelated_control"
+          ]
+        },
+        "family_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "difficulty_band_count_per_replicate": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "item_count_per_replicate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cluster_count_per_replicate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "base_score_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "treatment_score_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "placebo_score_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "treatment_minus_placebo_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "treatment_minus_base_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "placebo_minus_base_permille": {
+          "$ref": "#/$defs/mean_interval"
+        },
+        "worst_family_treatment_minus_placebo_permille": {
+          "type": "number",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "family_effects": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/family_effect"
+          }
+        },
+        "replicate_effects": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/replicate_effect"
+          }
+        }
+      }
+    },
+    "contrast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contrast_id",
+        "positive_relation",
+        "reference_relation",
+        "treatment_minus_placebo_difference_permille"
+      ],
+      "properties": {
+        "contrast_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "positive_relation": {
+          "type": "string",
+          "enum": [
+            "exact_replay",
+            "surface_variant",
+            "semantic_equivalent",
+            "fresh_same_recipe",
+            "novel_recipe_same_skill",
+            "unrelated_control"
+          ]
+        },
+        "reference_relation": {
+          "type": "string",
+          "enum": [
+            "exact_replay",
+            "surface_variant",
+            "semantic_equivalent",
+            "fresh_same_recipe",
+            "novel_recipe_same_skill",
+            "unrelated_control"
+          ]
+        },
+        "treatment_minus_placebo_difference_permille": {
+          "$ref": "#/$defs/mean_interval"
+        }
+      }
+    }
+  }
+}
