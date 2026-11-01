@@ -743,3 +743,80 @@ The paper primarily reports AUC and F1 at a Youden threshold. Symthaea must repr
 
 Self-Critique measures similarity of two entropy trajectories under a declared self-critique intervention. It is evidence of response-path rigidity under that probe, not proof of training membership, proof of exposure causing an answer or universal contamination detection. The released top-K partial entropy and full-vocabulary entropy are separate extraction modes. The kernel does not itself run a model, authenticate a checkpoint, or qualify the clean/non-member distribution. No SOTA improvement is claimed by this implementation alone.
 
+## Cluster-level detector calibration and operating-point audit (SCI-CALIBRATED-EVIDENCE-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9795
+
+### Why AUC is not enough
+
+The detector panel includes output-level FTD/DVD/Self-Critique/Min-K features, white-box LaRA representation geometry, and text/structure baselines. Their scores have different directions, scales and failure modes. AUROC can rank examples while still giving a poor low-FPR decision threshold. The benchmark must determine whether a declared 1% false-positive operating point is statistically supportable, not interpolate an attractive ROC coordinate.
+
+### Distribution-free clean-reference calibration
+
+For each exact group (checkpoint, tokenizer, task family, language, exposure stage, detector/probe configuration and independent model-pair replicate), use an independent clean calibration split. Normalize each detector so larger always means higher contamination risk. For each test cluster, compute the upper-tail conformal p-value:
+
+    p = (1 + count(clean_calibration_cluster_max >= test_cluster_max))
+        / (number_of_clean_calibration_clusters + 1)
+
+Ties are included. The p-value is stored as an exact integer numerator/denominator; fixed-alpha decisions use integer cross-multiplication rather than floating-point threshold comparisons. This p-value is super-uniform for a clean test cluster only under exchangeability of clean calibration and clean test clusters inside the exact declared group.
+
+### Source-cluster contract
+
+Questions from the same source/recipe lineage or other dependence unit must not masquerade as independent calibration samples. The calibration procedure therefore takes the maximum normalized risk score within each source cluster, then calibrates test-cluster maxima against clean-cluster maxima. It evaluates and counts false-positive/true-positive outcomes at the cluster level.
+
+- Every source cluster must be entirely clean or entirely contaminated in the locked test split.
+- Calibration and locked-test source clusters must be disjoint.
+- Every cluster must contain the same number of items across both splits. Different cluster-size strata require separate calibration groups.
+- cluster_unit_definition_sha256 binds the registered meaning of a source cluster into the calibration-group identity.
+- Each item-level report row retains its own raw and normalized score but receives the conformal p-value derived from its cluster maximum. The report also exposes cluster_max_normalized_risk_score.
+
+This is conservative: a single high-risk item can flag its whole cluster. It controls the cluster-level false-positive probability under exchangeability; it does not claim item-level FPR control. The cluster definition and size restrictions are part of the statistical method, not just data plumbing.
+
+### Calibration resolution and held-out uncertainty
+
+Minimum clean calibration cluster counts for a conformal p-value at or below the target alpha are:
+
+| Target FPR | Minimum clean calibration clusters |
+| --- | ---: |
+| 1% | 99 |
+| 5% | 19 |
+| 10% | 9 |
+
+These counts provide p-value resolution only; they do not show that the selected operating point achieves the desired FPR. The separate locked-test split must report cluster FP/support and a one-sided exact 95% Clopper-Pearson upper bound. With zero false-positive clusters, 299 clean locked-test clusters are needed merely to make the one-sided 95% upper bound less than 1%; nonzero false positives require more. Every detector/group/target interval is per-cell and not multiplicity-adjusted.
+
+### Additional outputs
+
+The analyzer reports:
+- exact cluster-level conformal p-values for every locked-test item, with cluster-max risk and calibration support;
+- per-detector, per-group confusion counts at 1%, 5% and 10% targets;
+- calibration resolution sufficiency, empirical held-out cluster FPR, TPR and exact one-sided upper FPR bound;
+- detector disagreement matrices on shared test clusters; pairs where either detector lacks calibration resolution have zero comparable support and no disagreement rate, rather than being counted as 'neither flagged';
+- runtime, call, token and peak-memory totals/quantiles;
+- equal-calibration-group macro summaries so large test groups do not dominate.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-detector-calibration calibration-study.json calibration-report.json
+
+Study/report JSON Schemas are in schema/detector-calibration-study.schema.json and schema/detector-calibration-report.schema.json. The Rust analyzer refuses incomplete detector/sample grids, duplicated observations, split overlap, group identity mismatches, mixed-label clusters and unequal cluster sizes. An under-resolved detector/alpha pair is not scored and is excluded from disagreement metrics rather than being treated as a negative prediction.
+
+### What the calibration does not solve
+
+Conformal validity is conditional on exchangeability inside the declared calibration group. It does not survive arbitrary model/checkpoint drift, language/domain shift, changed detector prompts, altered generation settings or contaminated clean references. When transport is required, create a new calibration group or report not-calibrated and abstain; do not pool convenient cohorts.
+
+FTD's multiple-testing correction and per-detector conformal p-values solve different problems. Conformal calibration produces a marginal p-value for one detector under its own clean exchangeability assumption; it does not prove the feature is a valid contaminated-null test or repair invalid p-values from another detector. Applying BH/BY to a family of detector p-values requires an additional dependence/validity argument and a predeclared multiplicity family.
+
+### Qualification targets (not achieved results)
+
+- exact p-value math and tie behavior on hand fixtures;
+- cluster-level clean calibration and locked-test splits with no overlapping source clusters;
+- 100% detector × sample score coverage;
+- zero calibration groups with mixed-label or unequal-size clusters;
+- held-out 1% FPR upper 95% bound below 1% for each preregistered group with sufficient support;
+- report TPR@1%, 5%, 10%, AUROC/AUPRC secondary, disagreement, calibration support and runtime/token/memory cost;
+- independently trained model-pair replicates, distinct from source clusters and question/item counts;
+- stress tests for GRPO concealment, pretraining/SFT/RL/search-time contamination, dose, relation tier, clean policy rigidity, cross-family, cross-language and cross-checkpoint shift.
+
+No SOTA improvement or FDR guarantee follows from the calibration kernel or synthetic tests alone. The report hard-sets independently_authenticated=false, confirmatory_eligible=false and intervals_multiplicity_adjusted=false.
+

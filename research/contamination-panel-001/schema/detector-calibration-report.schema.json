@@ -1,0 +1,613 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/detector-calibration-report-v1.json",
+  "title": "Detector calibration report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "study_sha256",
+    "calibration_group_count",
+    "detector_count",
+    "observation_count",
+    "scored_locked_test_observation_count",
+    "group_cells",
+    "scored_test_p_values",
+    "disagreement_matrix",
+    "detector_costs",
+    "macro_cells",
+    "intervals_multiplicity_adjusted",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.detector_calibration_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_group_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "detector_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "observation_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000000
+    },
+    "scored_locked_test_observation_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000000
+    },
+    "group_cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_group_sha256",
+          "task_family",
+          "language",
+          "exposure_stage",
+          "training_replicate_id",
+          "detector_id",
+          "detector_version",
+          "calibration_clean_support",
+          "locked_test_support",
+          "operating_points"
+        ],
+        "properties": {
+          "calibration_group_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "exposure_stage": {
+            "type": "string",
+            "enum": [
+              "pretraining",
+              "supervised_fine_tuning",
+              "reinforcement_learning_verifiable_reward",
+              "reinforcement_learning_human_feedback",
+              "search_time",
+              "unknown"
+            ]
+          },
+          "training_replicate_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "calibration_clean_support": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "locked_test_support": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operating_points": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target_fpr_permille",
+                "calibration_clean_support",
+                "minimum_attainable_p_value",
+                "calibration_resolution_sufficient",
+                "test_clean_support",
+                "test_contaminated_support",
+                "false_positive",
+                "true_positive",
+                "false_negative",
+                "true_negative",
+                "false_positive_rate",
+                "false_positive_rate_upper_95_one_sided",
+                "true_positive_rate"
+              ],
+              "properties": {
+                "target_fpr_permille": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "calibration_clean_support": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "minimum_attainable_p_value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "numerator",
+                    "denominator",
+                    "ceiling_permille"
+                  ],
+                  "properties": {
+                    "numerator": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "denominator": {
+                      "type": "integer",
+                      "minimum": 2
+                    },
+                    "ceiling_permille": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    }
+                  }
+                },
+                "calibration_resolution_sufficient": {
+                  "type": "boolean"
+                },
+                "test_clean_support": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "test_contaminated_support": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "false_positive": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "true_positive": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "false_negative": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "true_negative": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "false_positive_rate": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "false_positive_rate_upper_95_one_sided": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "true_positive_rate": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "scored_test_p_values": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_group_sha256",
+          "sample_id",
+          "source_cluster_id",
+          "detector_id",
+          "detector_version",
+          "ground_truth",
+          "raw_score",
+          "normalized_risk_score",
+          "cluster_max_normalized_risk_score",
+          "calibration_clean_support",
+          "conformal_p_value"
+        ],
+        "properties": {
+          "calibration_group_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sample_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "source_cluster_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "ground_truth": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "contaminated"
+            ]
+          },
+          "raw_score": {
+            "type": "number"
+          },
+          "normalized_risk_score": {
+            "type": "number"
+          },
+          "calibration_clean_support": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "conformal_p_value": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "numerator",
+              "denominator",
+              "ceiling_permille"
+            ],
+            "properties": {
+              "numerator": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "denominator": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "ceiling_permille": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            }
+          },
+          "cluster_max_normalized_risk_score": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "disagreement_matrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_group_sha256",
+          "target_fpr_permille",
+          "detector_left",
+          "detector_right",
+          "calibration_resolution_sufficient",
+          "comparable_test_support",
+          "disagree_count",
+          "both_flag_contaminated",
+          "left_only_flag_contaminated",
+          "right_only_flag_contaminated",
+          "neither_flag_contaminated",
+          "disagreement_rate"
+        ],
+        "properties": {
+          "calibration_group_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "target_fpr_permille": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "detector_left": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_right": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "comparable_test_support": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "disagree_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "both_flag_contaminated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "left_only_flag_contaminated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "right_only_flag_contaminated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "neither_flag_contaminated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "disagreement_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "calibration_resolution_sufficient": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "detector_costs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_group_sha256",
+          "detector_id",
+          "detector_version",
+          "test_observation_count",
+          "total_inference_calls",
+          "total_input_tokens",
+          "total_output_tokens",
+          "mean_wall_time_micros",
+          "p50_wall_time_micros",
+          "p95_wall_time_micros",
+          "maximum_peak_memory_bytes"
+        ],
+        "properties": {
+          "calibration_group_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "test_observation_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total_inference_calls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_output_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mean_wall_time_micros": {
+            "type": "number",
+            "minimum": 0
+          },
+          "p50_wall_time_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "p95_wall_time_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "maximum_peak_memory_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "macro_cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2048,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detector_id",
+          "detector_version",
+          "target_fpr_permille",
+          "eligible_calibration_group_count",
+          "mean_test_false_positive_rate",
+          "worst_group_fpr_upper_95_one_sided",
+          "mean_test_true_positive_rate"
+        ],
+        "properties": {
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "detector_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:/-]+$"
+          },
+          "target_fpr_permille": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "eligible_calibration_group_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mean_test_false_positive_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "worst_group_fpr_upper_95_one_sided": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_test_true_positive_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "intervals_multiplicity_adjusted": {
+      "const": false
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "type": "string",
+      "enum": [
+        "exploratory_calibration_audit",
+        "exploratory_with_unestimable_operating_points"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

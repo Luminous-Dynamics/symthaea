@@ -2,6 +2,7 @@ use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    detector_calibration::{DetectorCalibrationStudyV1, analyze_detector_calibration},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
@@ -342,6 +343,33 @@ fn score_self_critique_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn analyze_detector_calibration_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-detector-calibration <calibration-study.json> <calibration-report.json>"
+                .into(),
+        );
+    }
+    const MAX_CALIBRATION_STUDY_BYTES: u64 = 512 * 1024 * 1024;
+    let study_bytes = read_file_bounded(&args[1], MAX_CALIBRATION_STUDY_BYTES)?;
+    let study: DetectorCalibrationStudyV1 = serde_json::from_slice(&study_bytes)?;
+    let report = analyze_detector_calibration(&study).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "groups={} detectors={} observations={} scored_test={} cells={} disagreements={} status={} confirmatory_eligible={}",
+        report.calibration_group_count,
+        report.detector_count,
+        report.observation_count,
+        report.scored_locked_test_observation_count,
+        report.group_cells.len(),
+        report.disagreement_matrix.len(),
+        report.analysis_status,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -428,10 +456,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
+        Some("analyze-detector-calibration") => analyze_detector_calibration_cli(&args),
         Some("score-self-critique") => score_self_critique_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | score-self-critique | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-detector-calibration | score-self-critique | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
