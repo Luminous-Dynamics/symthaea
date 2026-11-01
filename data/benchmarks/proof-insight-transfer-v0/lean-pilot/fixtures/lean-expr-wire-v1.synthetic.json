@@ -17,8 +17,32 @@
     "context_exporter_source_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
     "clean_checkout": true,
     "serializer_id": "pitb.lean-expr-wire.v1/binary-transcript-1",
-    "lean_runtime_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "imported_olean_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    "lean_runtime_manifest_sha256": "5aac18f1a18040079050003987912286e957d4ad5aabf1ce6d460136d5dde2f8",
+    "imported_olean_manifest_sha256": "fed1bc1c9207b48725f635a3b46d3750dcfb16c38ca80e572f3501c82d29babc",
+    "lean_runtime_artifacts": [
+      {
+        "path": "bin/lean",
+        "kind": "lean_executable",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      {
+        "path": "lib/lean/libLean.so",
+        "kind": "shared_library",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      }
+    ],
+    "imported_olean_artifacts": [
+      {
+        "module_name": "Init.Prelude",
+        "path": "lib/lean/Init/Prelude.olean",
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      {
+        "module_name": "Lean.Expr",
+        "path": "lib/lean/Lean/Expr.olean",
+        "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    ]
   },
   "target": {
     "tag": "app",
@@ -269,9 +293,9 @@
     ]
   },
   "digests": {
-    "environment_sha256": "1cecfc3beef332e2e04ca84419a0b85de2c0e02614e224929b4515495ee243d6",
-    "target_expr_sha256": "a4a58a4b669fe897c5a11cf692ac592c666abdf1058985160d263f0931645cbb",
-    "context_sha256": "e900ab2c1a4f7819ab626319bcb0288fc4f31a64f962e82006b68158eeca4730",
-    "proof_state_sha256": "9b48b38cc6c03a532f232f3be1774086dba083cf10d3239605d16e1c048d6e7d"
+    "environment_sha256": "0d6870797d7c28ecdc52bdeb5bd8618765a10e617e9787e27ecf936e6d950ab9",
+    "target_expr_sha256": "491df71b2665e65f05c98dc0a32d7918f033ee2f992f290cfe0c92eb4315d0fa",
+    "context_sha256": "ded9ef4aaf8586d75ddf112025d0c4bc43076a99a336491e890de1d8935d8b12",
+    "proof_state_sha256": "04bf10adb7cabdd4950560a13b1e68b12de287d51c16638b8ba94c54979ec855"
   }
 }
