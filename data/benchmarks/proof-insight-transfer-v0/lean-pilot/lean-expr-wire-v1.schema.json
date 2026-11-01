@@ -43,7 +43,9 @@
         "root_module_sha256",
         "context_exporter_source_sha256",
         "clean_checkout",
-        "serializer_id"
+        "serializer_id",
+        "lean_runtime_artifacts",
+        "imported_olean_artifacts"
       ],
       "properties": {
         "lean_toolchain": {
@@ -113,6 +115,66 @@
           "type": "string",
           "pattern": "^[a-f0-9]{64}$",
           "description": "SHA-256 of the exact imported OLean artifact manifest"
+        },
+        "lean_runtime_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "description": "Path-sorted runtime executable/shared-library artifacts used by the capture process.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "lean_executable",
+                  "shared_library"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "imported_olean_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 65536,
+          "description": "Module/path-sorted exact transitive OLean files imported by the capture process.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "module_name",
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "module_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
         }
       }
     },
