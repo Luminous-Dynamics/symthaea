@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const GRID_DENOMINATOR: u128 = 5;
 const GRID_NUMERATORS: [u128; 4] = [1, 2, 3, 4];
@@ -30,20 +30,25 @@ fn log_factorial(n: u32) -> f64 {
 }
 
 fn log_beta_mixture_ratio(successes: u32, failures: u32, p: f64) -> f64 {
-    let log_beta = log_factorial(successes)
-        + log_factorial(failures)
+    let log_beta = log_factorial(successes) + log_factorial(failures)
         - log_factorial(successes + failures + 1);
 
     if p <= 0.0 {
-        return if successes == 0 { log_beta } else { f64::INFINITY };
+        return if successes == 0 {
+            log_beta
+        } else {
+            f64::INFINITY
+        };
     }
     if p >= 1.0 {
-        return if failures == 0 { log_beta } else { f64::INFINITY };
+        return if failures == 0 {
+            log_beta
+        } else {
+            f64::INFINITY
+        };
     }
 
-    log_beta
-        - (successes as f64) * p.ln()
-        - (failures as f64) * (-p).ln_1p()
+    log_beta - (successes as f64) * p.ln() - (failures as f64) * (-p).ln_1p()
 }
 
 fn widen_down(value: f64) -> f64 {
@@ -68,14 +73,13 @@ fn widen_up(value: f64) -> f64 {
     f64::from_bits(bits).min(1.0)
 }
 
-fn beta_mixture_confidence_sequence(
-    successes: u32,
-    failures: u32,
-    delta: f64,
-) -> Interval {
+fn beta_mixture_confidence_sequence(successes: u32, failures: u32, delta: f64) -> Interval {
     assert!(delta > 0.0 && delta < 1.0);
     if successes == 0 && failures == 0 {
-        return Interval { lower: 0.0, upper: 1.0 };
+        return Interval {
+            lower: 0.0,
+            upper: 1.0,
+        };
     }
 
     let n = successes + failures;
@@ -122,7 +126,13 @@ fn beta_mixture_confidence_sequence(
 
 fn confidence_sequence_table(horizon: u32, delta: f64) -> Vec<Vec<Interval>> {
     let mut table = vec![
-        vec![Interval { lower: 0.0, upper: 1.0 }; (horizon + 1) as usize];
+        vec![
+            Interval {
+                lower: 0.0,
+                upper: 1.0
+            };
+            (horizon + 1) as usize
+        ];
         (horizon + 1) as usize
     ];
 
@@ -221,9 +231,7 @@ fn report() -> Value {
     let episodes = grid_episodes();
     let maximum_failure = episodes
         .iter()
-        .map(|episode| {
-            episode.failure_probability_numerator as f64 / episode.denominator as f64
-        })
+        .map(|episode| episode.failure_probability_numerator as f64 / episode.denominator as f64)
         .fold(0.0_f64, f64::max);
 
     json!({
@@ -306,7 +314,10 @@ fn report() -> Value {
 }
 
 fn main() {
-    println!("{}", serde_json::to_string_pretty(&report()).expect("JSON report serialization"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report()).expect("JSON report serialization")
+    );
 }
 
 #[cfg(test)]
@@ -396,8 +407,7 @@ mod tests {
                     }
                     let u_zero = 1.0 - interval.lower;
                     let u_one = interval.upper;
-                    let conditional_expectation =
-                        (1.0 - p) * q[0] / u_zero + p * q[1] / u_one;
+                    let conditional_expectation = (1.0 - p) * q[0] / u_zero + p * q[1] / u_one;
                     assert!(
                         conditional_expectation <= 1.0 + 1e-12,
                         "conditional expected factor {} exceeded one for p={}, counts=({}, {})",
@@ -416,7 +426,10 @@ mod tests {
         let value = report();
         assert_eq!(value["result"], "finite_grid_exact_path_audit_passed");
         assert_eq!(value["enumeration"]["all_path_masses_sum_to_one"], true);
-        assert_eq!(value["enumeration"]["grid_failure_probability_within_global_delta"], true);
+        assert_eq!(
+            value["enumeration"]["grid_failure_probability_within_global_delta"],
+            true
+        );
         assert_eq!(
             value["guarantee"]["ideal_arithmetic_detector_claim"],
             "marginal_anytime_pfa_at_most_alpha_plus_delta"
@@ -426,6 +439,9 @@ mod tests {
             "not_established_until_outward_interval_arithmetic_is_certified"
         );
         assert_eq!(value["guarantee"]["arbitrary_serial_pmu_pfa_claim"], false);
-        assert_eq!(value["guarantee"]["effective_sample_size_estimate"], Value::Null);
+        assert_eq!(
+            value["guarantee"]["effective_sample_size_estimate"],
+            Value::Null
+        );
     }
 }
