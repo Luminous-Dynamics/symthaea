@@ -9,7 +9,7 @@
 //!   hardsec_pmu_metrology_audit --plan plan.json \
 //!     --observations observations.json --receipt receipt.json
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -93,25 +93,34 @@ struct Args {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn nonempty(value: &str, context: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.chars().any(char::is_control) {
-        return Err(format!("{context} must be non-empty and contain no control characters"));
+        return Err(format!(
+            "{context} must be non-empty and contain no control characters"
+        ));
     }
     Ok(())
 }
 
 fn string_field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
-    let result = value.get(key).and_then(Value::as_str)
+    let result = value
+        .get(key)
+        .and_then(Value::as_str)
         .ok_or_else(|| format!("{context}.{key} must be a string"))?;
     nonempty(result, &format!("{context}.{key}"))?;
     Ok(result)
 }
 
 fn u64_field(value: &Value, key: &str, context: &str) -> Result<u64, String> {
-    value.get(key).and_then(Value::as_u64)
+    value
+        .get(key)
+        .and_then(Value::as_u64)
         .ok_or_else(|| format!("{context}.{key} must be a non-negative integer"))
 }
 
@@ -121,7 +130,9 @@ fn usize_field(value: &Value, key: &str, context: &str) -> Result<usize, String>
 }
 
 fn f64_field(value: &Value, key: &str, context: &str) -> Result<f64, String> {
-    let result = value.get(key).and_then(Value::as_f64)
+    let result = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("{context}.{key} must be numeric"))?;
     if !result.is_finite() {
         return Err(format!("{context}.{key} must be finite"));
@@ -137,12 +148,16 @@ fn bool_true(value: &Value, key: &str, context: &str) -> Result<(), String> {
 }
 
 fn string_array(value: &Value, key: &str, context: &str) -> Result<Vec<String>, String> {
-    let records = value.get(key).and_then(Value::as_array)
+    let records = value
+        .get(key)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{context}.{key} must be an array"))?;
     let mut seen = BTreeSet::new();
     let mut output = Vec::with_capacity(records.len());
     for (index, item) in records.iter().enumerate() {
-        let item = item.as_str().ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
+        let item = item
+            .as_str()
+            .ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
         nonempty(item, &format!("{context}.{key}[{index}]"))?;
         if !seen.insert(item.to_owned()) {
             return Err(format!("{context}.{key} contains duplicate entry {item}"));
@@ -158,13 +173,23 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
     }
     let protocol_id = string_field(value, "protocol_id", "plan")?.to_owned();
     let evidence_domain = string_field(value, "evidence_domain", "plan")?.to_owned();
-    if !matches!(evidence_domain.as_str(), "synthetic_fixture" | "simulator" | "physical_hardware") {
+    if !matches!(
+        evidence_domain.as_str(),
+        "synthetic_fixture" | "simulator" | "physical_hardware"
+    ) {
         return Err(format!("unsupported evidence_domain {evidence_domain}"));
     }
 
     let platform = value.get("platform").ok_or("plan.platform is required")?;
     let platform_id = string_field(platform, "platform_id", "plan.platform")?.to_owned();
-    for key in ["architecture", "cpu_model", "pmu_model", "firmware_id", "kernel_id", "perf_id"] {
+    for key in [
+        "architecture",
+        "cpu_model",
+        "pmu_model",
+        "firmware_id",
+        "kernel_id",
+        "perf_id",
+    ] {
         let _ = string_field(platform, key, "plan.platform")?;
     }
     let counter_capacity = usize_field(platform, "programmable_counter_capacity", "plan.platform")?;
@@ -175,7 +200,11 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
     let workload = value.get("workload").ok_or("plan.workload is required")?;
     let workload_id = string_field(workload, "workload_id", "plan.workload")?.to_owned();
     let binary_sha = string_field(workload, "binary_sha256", "plan.workload")?;
-    if binary_sha.len() != 64 || !binary_sha.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+    if binary_sha.len() != 64
+        || !binary_sha
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
         return Err("plan.workload.binary_sha256 must be a lowercase SHA-256 digest".to_owned());
     }
     let _ = string_field(workload, "work_unit", "plan.workload")?;
@@ -184,7 +213,9 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
         return Err("workload.fixed_work_units must be positive".to_owned());
     }
 
-    let event_values = value.get("events").and_then(Value::as_array)
+    let event_values = value
+        .get("events")
+        .and_then(Value::as_array)
         .ok_or("plan.events must be an array")?;
     if event_values.len() < 2 {
         return Err("plan.events must name at least two distinct PMU events".to_owned());
@@ -204,76 +235,185 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
             return Err(format!("duplicate event_id {}", event.id));
         }
         if !encodings.insert(event.encoding.clone()) {
-            return Err(format!("duplicate event encoding {}; aliases require explicit review and cannot be silently co-reported", event.encoding));
+            return Err(format!(
+                "duplicate event encoding {}; aliases require explicit review and cannot be silently co-reported",
+                event.encoding
+            ));
         }
         events.push(event);
     }
 
-    let conditions = value.get("acquisition_conditions").ok_or("plan.acquisition_conditions is required")?;
-    let baseline_condition = string_field(conditions, "baseline_condition", "plan.acquisition_conditions")?.to_owned();
-    let singleton_condition = string_field(conditions, "singleton_condition", "plan.acquisition_conditions")?.to_owned();
-    let co_condition = string_field(conditions, "co_scheduled_condition", "plan.acquisition_conditions")?.to_owned();
-    let over_condition = string_field(conditions, "overcommitted_condition", "plan.acquisition_conditions")?.to_owned();
-    if [baseline_condition.as_str(), singleton_condition.as_str(), co_condition.as_str(), over_condition.as_str()] != [
-        CONDITIONS[0], CONDITIONS[1], CONDITIONS[2], CONDITIONS[3]
-    ] {
-        return Err("acquisition_conditions must declare the four v1 conditions in their canonical roles".to_owned());
+    let conditions = value
+        .get("acquisition_conditions")
+        .ok_or("plan.acquisition_conditions is required")?;
+    let baseline_condition = string_field(
+        conditions,
+        "baseline_condition",
+        "plan.acquisition_conditions",
+    )?
+    .to_owned();
+    let singleton_condition = string_field(
+        conditions,
+        "singleton_condition",
+        "plan.acquisition_conditions",
+    )?
+    .to_owned();
+    let co_condition = string_field(
+        conditions,
+        "co_scheduled_condition",
+        "plan.acquisition_conditions",
+    )?
+    .to_owned();
+    let over_condition = string_field(
+        conditions,
+        "overcommitted_condition",
+        "plan.acquisition_conditions",
+    )?
+    .to_owned();
+    if [
+        baseline_condition.as_str(),
+        singleton_condition.as_str(),
+        co_condition.as_str(),
+        over_condition.as_str(),
+    ] != [CONDITIONS[0], CONDITIONS[1], CONDITIONS[2], CONDITIONS[3]]
+    {
+        return Err(
+            "acquisition_conditions must declare the four v1 conditions in their canonical roles"
+                .to_owned(),
+        );
     }
-    let co_event_ids = string_array(conditions, "co_scheduled_event_ids", "plan.acquisition_conditions")?;
-    let over_event_ids = string_array(conditions, "overcommitted_event_ids", "plan.acquisition_conditions")?;
+    let co_event_ids = string_array(
+        conditions,
+        "co_scheduled_event_ids",
+        "plan.acquisition_conditions",
+    )?;
+    let over_event_ids = string_array(
+        conditions,
+        "overcommitted_event_ids",
+        "plan.acquisition_conditions",
+    )?;
     let all_event_ids: BTreeSet<_> = events.iter().map(|e| e.id.as_str()).collect();
     if co_event_ids.len() < 2 || co_event_ids.len() > counter_capacity {
         return Err("co_scheduled_event_ids count must be at least two and no greater than programmable counter capacity".to_owned());
     }
     if over_event_ids.len() <= counter_capacity {
-        return Err("overcommitted_event_ids count must exceed programmable counter capacity".to_owned());
+        return Err(
+            "overcommitted_event_ids count must exceed programmable counter capacity".to_owned(),
+        );
     }
-    if co_event_ids.iter().any(|id| !all_event_ids.contains(id.as_str()))
-        || over_event_ids.iter().any(|id| !all_event_ids.contains(id.as_str())) {
+    if co_event_ids
+        .iter()
+        .any(|id| !all_event_ids.contains(id.as_str()))
+        || over_event_ids
+            .iter()
+            .any(|id| !all_event_ids.contains(id.as_str()))
+    {
         return Err("acquisition condition references an event absent from plan.events".to_owned());
     }
     let declared_over: BTreeSet<_> = over_event_ids.iter().map(String::as_str).collect();
     if declared_over != all_event_ids {
-        return Err("overcommitted_event_ids must contain every declared event exactly once".to_owned());
+        return Err(
+            "overcommitted_event_ids must contain every declared event exactly once".to_owned(),
+        );
     }
 
     let protocol = value.get("protocol").ok_or("plan.protocol is required")?;
     bool_true(protocol, "randomized_order_required", "plan.protocol")?;
     bool_true(protocol, "matched_blocks_required", "plan.protocol")?;
-    let randomization_seed = string_field(protocol, "randomization_seed", "plan.protocol")?.to_owned();
-    let minimum_blocks = usize_field(protocol, "minimum_blocks_for_descriptive_quantiles", "plan.protocol")?;
+    let randomization_seed =
+        string_field(protocol, "randomization_seed", "plan.protocol")?.to_owned();
+    let minimum_blocks = usize_field(
+        protocol,
+        "minimum_blocks_for_descriptive_quantiles",
+        "plan.protocol",
+    )?;
     if minimum_blocks < 2 {
         return Err("minimum_blocks_for_descriptive_quantiles must be at least 2".to_owned());
     }
-    let minimum_singleton_running_fraction = f64_field(protocol, "minimum_singleton_running_fraction", "plan.protocol")?;
-    let minimum_co_running_fraction = f64_field(protocol, "minimum_co_scheduled_running_fraction", "plan.protocol")?;
-    let maximum_co_deviation = f64_field(protocol, "maximum_co_scheduled_relative_deviation", "plan.protocol")?;
-    let maximum_throughput_degradation = f64_field(protocol, "maximum_instrumentation_throughput_degradation", "plan.protocol")?;
-    let maximum_sample_loss_fraction = f64_field(protocol, "maximum_sample_loss_fraction", "plan.protocol")?;
-    let maximum_pmu_read_overhead_fraction = f64_field(protocol, "maximum_pmu_read_overhead_fraction", "plan.protocol")?;
+    let minimum_singleton_running_fraction = f64_field(
+        protocol,
+        "minimum_singleton_running_fraction",
+        "plan.protocol",
+    )?;
+    let minimum_co_running_fraction = f64_field(
+        protocol,
+        "minimum_co_scheduled_running_fraction",
+        "plan.protocol",
+    )?;
+    let maximum_co_deviation = f64_field(
+        protocol,
+        "maximum_co_scheduled_relative_deviation",
+        "plan.protocol",
+    )?;
+    let maximum_throughput_degradation = f64_field(
+        protocol,
+        "maximum_instrumentation_throughput_degradation",
+        "plan.protocol",
+    )?;
+    let maximum_sample_loss_fraction =
+        f64_field(protocol, "maximum_sample_loss_fraction", "plan.protocol")?;
+    let maximum_pmu_read_overhead_fraction = f64_field(
+        protocol,
+        "maximum_pmu_read_overhead_fraction",
+        "plan.protocol",
+    )?;
     for (label, value) in [
-        ("minimum_singleton_running_fraction", minimum_singleton_running_fraction),
-        ("minimum_co_scheduled_running_fraction", minimum_co_running_fraction),
-        ("maximum_co_scheduled_relative_deviation", maximum_co_deviation),
-        ("maximum_instrumentation_throughput_degradation", maximum_throughput_degradation),
+        (
+            "minimum_singleton_running_fraction",
+            minimum_singleton_running_fraction,
+        ),
+        (
+            "minimum_co_scheduled_running_fraction",
+            minimum_co_running_fraction,
+        ),
+        (
+            "maximum_co_scheduled_relative_deviation",
+            maximum_co_deviation,
+        ),
+        (
+            "maximum_instrumentation_throughput_degradation",
+            maximum_throughput_degradation,
+        ),
         ("maximum_sample_loss_fraction", maximum_sample_loss_fraction),
-        ("maximum_pmu_read_overhead_fraction", maximum_pmu_read_overhead_fraction),
+        (
+            "maximum_pmu_read_overhead_fraction",
+            maximum_pmu_read_overhead_fraction,
+        ),
     ] {
         if !(0.0..=1.0).contains(&value) || (label.starts_with("minimum_") && value == 0.0) {
-            return Err(format!("protocol.{label} must be within the supported (0,1] or [0,1] range"));
+            return Err(format!(
+                "protocol.{label} must be within the supported (0,1] or [0,1] range"
+            ));
         }
     }
-    if string_field(value, "claim_scope", "plan")? != "measurement_configuration_and_declared_trial_record_qualification_only" {
+    if string_field(value, "claim_scope", "plan")?
+        != "measurement_configuration_and_declared_trial_record_qualification_only"
+    {
         return Err("unsupported plan.claim_scope".to_owned());
     }
 
     Ok(Plan {
-        protocol_id, evidence_domain, platform_id, workload_id, fixed_work_units, counter_capacity,
-        events, baseline_condition, singleton_condition, co_condition, over_condition,
-        co_event_ids, over_event_ids, randomization_seed, minimum_blocks,
-        minimum_singleton_running_fraction, minimum_co_running_fraction,
-        maximum_co_deviation, maximum_throughput_degradation,
-        maximum_sample_loss_fraction, maximum_pmu_read_overhead_fraction,
+        protocol_id,
+        evidence_domain,
+        platform_id,
+        workload_id,
+        fixed_work_units,
+        counter_capacity,
+        events,
+        baseline_condition,
+        singleton_condition,
+        co_condition,
+        over_condition,
+        co_event_ids,
+        over_event_ids,
+        randomization_seed,
+        minimum_blocks,
+        minimum_singleton_running_fraction,
+        minimum_co_running_fraction,
+        maximum_co_deviation,
+        maximum_throughput_degradation,
+        maximum_sample_loss_fraction,
+        maximum_pmu_read_overhead_fraction,
     })
 }
 
@@ -286,15 +426,27 @@ fn parse_event_observation(value: &Value, context: &str) -> Result<EventObservat
     let sample_count = u64_field(value, "sample_count", context)?;
     let lost_samples = u64_field(value, "lost_samples", context)?;
     if enabled_ns == 0 || running_ns == 0 {
-        return Err(format!("{context}: zero time_enabled/time_running is not a usable counter observation"));
+        return Err(format!(
+            "{context}: zero time_enabled/time_running is not a usable counter observation"
+        ));
     }
     if running_ns > enabled_ns {
-        return Err(format!("{context}: time_running_ns exceeds time_enabled_ns"));
+        return Err(format!(
+            "{context}: time_running_ns exceeds time_enabled_ns"
+        ));
     }
     if lost_samples > sample_count {
         return Err(format!("{context}: lost_samples exceeds sample_count"));
     }
-    Ok(EventObservation { id, encoding, raw_count, enabled_ns, running_ns, sample_count, lost_samples })
+    Ok(EventObservation {
+        id,
+        encoding,
+        raw_count,
+        enabled_ns,
+        running_ns,
+        sample_count,
+        lost_samples,
+    })
 }
 
 fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
@@ -307,7 +459,9 @@ fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
     if string_field(value, "evidence_domain", "observations")? != plan.evidence_domain {
         return Err("observations evidence_domain must match plan evidence_domain".to_owned());
     }
-    let records = value.get("trials").and_then(Value::as_array)
+    let records = value
+        .get("trials")
+        .and_then(Value::as_array)
         .ok_or("observations.trials must be an array")?;
     if records.is_empty() {
         return Err("observations.trials must not be empty".to_owned());
@@ -323,28 +477,40 @@ fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
         }
         if string_field(record, "protocol_id", &context)? != plan.protocol_id
             || string_field(record, "platform_id", &context)? != plan.platform_id
-            || string_field(record, "workload_id", &context)? != plan.workload_id {
-            return Err(format!("{context}: platform/workload/protocol identity mismatch"));
+            || string_field(record, "workload_id", &context)? != plan.workload_id
+        {
+            return Err(format!(
+                "{context}: platform/workload/protocol identity mismatch"
+            ));
         }
         let condition = string_field(record, "condition", &context)?.to_owned();
         if !CONDITIONS.contains(&condition.as_str()) {
-            return Err(format!("{context}: unsupported acquisition condition {condition}"));
+            return Err(format!(
+                "{context}: unsupported acquisition condition {condition}"
+            ));
         }
         let work_units = u64_field(record, "work_units", &context)?;
         if work_units != plan.fixed_work_units {
-            return Err(format!("{context}: work_units must equal plan.workload.fixed_work_units"));
+            return Err(format!(
+                "{context}: work_units must equal plan.workload.fixed_work_units"
+            ));
         }
-        let events_value = record.get("events").and_then(Value::as_array)
+        let events_value = record
+            .get("events")
+            .and_then(Value::as_array)
             .ok_or_else(|| format!("{context}.events must be an array"))?;
         let mut events = Vec::with_capacity(events_value.len());
         let mut seen_event_ids = BTreeSet::new();
         for (event_index, event_value) in events_value.iter().enumerate() {
             let event_context = format!("{context}.events[{event_index}]");
             let event = parse_event_observation(event_value, &event_context)?;
-            let spec = event_specs.get(event.id.as_str())
+            let spec = event_specs
+                .get(event.id.as_str())
                 .ok_or_else(|| format!("{event_context}: event_id is not present in plan"))?;
             if event.encoding != spec.encoding {
-                return Err(format!("{event_context}: event encoding does not match the plan's semantic event identity"));
+                return Err(format!(
+                    "{event_context}: event encoding does not match the plan's semantic event identity"
+                ));
             }
             if !seen_event_ids.insert(event.id.clone()) {
                 return Err(format!("{event_context}: duplicate event_id in trial"));
@@ -352,7 +518,8 @@ fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
             events.push(event);
         }
         let trial = Trial {
-            id, block_id: string_field(record, "block_id", &context)?.to_owned(),
+            id,
+            block_id: string_field(record, "block_id", &context)?.to_owned(),
             order_index: usize_field(record, "order_index", &context)?,
             seed: string_field(record, "randomization_seed", &context)?.to_owned(),
             condition,
@@ -365,7 +532,9 @@ fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
             return Err(format!("{context}.elapsed_ns must be positive"));
         }
         if trial.pmu_read_overhead_ns > trial.elapsed_ns {
-            return Err(format!("{context}.pmu_read_overhead_ns cannot exceed elapsed_ns"));
+            return Err(format!(
+                "{context}.pmu_read_overhead_ns cannot exceed elapsed_ns"
+            ));
         }
         trials.push(trial);
     }
@@ -373,7 +542,9 @@ fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
 }
 
 fn median(values: &[f64]) -> Option<f64> {
-    if values.is_empty() { return None; }
+    if values.is_empty() {
+        return None;
+    }
     let mut sorted = values.to_vec();
     sorted.sort_by(f64::total_cmp);
     let middle = sorted.len() / 2;
@@ -385,10 +556,14 @@ fn median(values: &[f64]) -> Option<f64> {
 }
 
 fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
-    if values.is_empty() { return None; }
+    if values.is_empty() {
+        return None;
+    }
     let mut sorted = values.to_vec();
     sorted.sort_by(f64::total_cmp);
-    let index = ((quantile * sorted.len() as f64).ceil() as usize).saturating_sub(1).min(sorted.len() - 1);
+    let index = ((quantile * sorted.len() as f64).ceil() as usize)
+        .saturating_sub(1)
+        .min(sorted.len() - 1);
     Some(sorted[index])
 }
 
@@ -396,104 +571,180 @@ fn value_or_null(value: Option<f64>) -> Value {
     value.map_or(Value::Null, |v| json!(v))
 }
 
-fn validate_blocks(trials: &[Trial], plan: &Plan) -> Result<BTreeMap<String, BTreeMap<String, Trial>>, String> {
+fn validate_blocks(
+    trials: &[Trial],
+    plan: &Plan,
+) -> Result<BTreeMap<String, BTreeMap<String, Trial>>, String> {
     let mut blocks: BTreeMap<String, Vec<&Trial>> = BTreeMap::new();
     for trial in trials {
         if trial.seed != plan.randomization_seed {
-            return Err(format!("trial {} randomization seed differs from the preregistered plan", trial.id));
+            return Err(format!(
+                "trial {} randomization seed differs from the preregistered plan",
+                trial.id
+            ));
         }
-        blocks.entry(trial.block_id.clone()).or_default().push(trial);
+        blocks
+            .entry(trial.block_id.clone())
+            .or_default()
+            .push(trial);
     }
     if blocks.len() < plan.minimum_blocks {
-        return Err(format!("{} matched blocks are present; at least {} are required for descriptive quantiles", blocks.len(), plan.minimum_blocks));
+        return Err(format!(
+            "{} matched blocks are present; at least {} are required for descriptive quantiles",
+            blocks.len(),
+            plan.minimum_blocks
+        ));
     }
     let mut output = BTreeMap::new();
     for (block_id, block_trials) in blocks {
         let work_units: BTreeSet<_> = block_trials.iter().map(|t| t.work_units).collect();
         if work_units.len() != 1 {
-            return Err(format!("block {block_id} does not use a matched fixed-work unit count"));
+            return Err(format!(
+                "block {block_id} does not use a matched fixed-work unit count"
+            ));
         }
         let mut order = BTreeSet::new();
         for trial in &block_trials {
             if !order.insert(trial.order_index) {
-                return Err(format!("block {block_id} contains duplicate randomized order_index"));
+                return Err(format!(
+                    "block {block_id} contains duplicate randomized order_index"
+                ));
             }
         }
         if order.len() != block_trials.len()
-            || order.iter().enumerate().any(|(idx, value)| *value != idx + 1) {
-            return Err(format!("block {block_id} randomized order_index values must be contiguous from 1"));
+            || order
+                .iter()
+                .enumerate()
+                .any(|(idx, value)| *value != idx + 1)
+        {
+            return Err(format!(
+                "block {block_id} randomized order_index values must be contiguous from 1"
+            ));
         }
 
         let mut by_condition: BTreeMap<String, Vec<&Trial>> = BTreeMap::new();
         for trial in &block_trials {
-            by_condition.entry(trial.condition.clone()).or_default().push(trial);
+            by_condition
+                .entry(trial.condition.clone())
+                .or_default()
+                .push(trial);
         }
         for condition in CONDITIONS {
-            let expected = if *condition == plan.singleton_condition.as_str() { plan.events.len() } else { 1 };
+            let expected = if *condition == plan.singleton_condition.as_str() {
+                plan.events.len()
+            } else {
+                1
+            };
             let actual = by_condition.get(*condition).map_or(0, Vec::len);
             if actual != expected {
-                return Err(format!("block {block_id} condition {condition} has {actual} trials; expected {expected}"));
+                return Err(format!(
+                    "block {block_id} condition {condition} has {actual} trials; expected {expected}"
+                ));
             }
         }
         if by_condition.len() != CONDITIONS.len() {
-            return Err(format!("block {block_id} has an unexpected or missing acquisition condition"));
+            return Err(format!(
+                "block {block_id} has an unexpected or missing acquisition condition"
+            ));
         }
 
         let baseline = by_condition[plan.baseline_condition.as_str()][0];
         if !baseline.events.is_empty() || baseline.pmu_read_overhead_ns != 0 {
-            return Err(format!("block {block_id} baseline_no_pmu must have no events and zero PMU read overhead"));
+            return Err(format!(
+                "block {block_id} baseline_no_pmu must have no events and zero PMU read overhead"
+            ));
         }
 
         let mut singleton_by_event: BTreeMap<String, Trial> = BTreeMap::new();
         for trial in &by_condition[plan.singleton_condition.as_str()] {
             if trial.events.len() != 1 {
-                return Err(format!("block {block_id} singleton trial {} must contain exactly one event", trial.id));
+                return Err(format!(
+                    "block {block_id} singleton trial {} must contain exactly one event",
+                    trial.id
+                ));
             }
             let event_id = trial.events[0].id.clone();
-            if singleton_by_event.insert(event_id.clone(), (**trial).clone()).is_some() {
-                return Err(format!("block {block_id} has duplicate singleton observation for event {event_id}"));
+            if singleton_by_event
+                .insert(event_id.clone(), (**trial).clone())
+                .is_some()
+            {
+                return Err(format!(
+                    "block {block_id} has duplicate singleton observation for event {event_id}"
+                ));
             }
-            if (trial.events[0].running_ns as f64 / trial.events[0].enabled_ns as f64) < plan.minimum_singleton_running_fraction {
-                return Err(format!("block {block_id} singleton event {event_id} falls below minimum running fraction"));
+            if (trial.events[0].running_ns as f64 / trial.events[0].enabled_ns as f64)
+                < plan.minimum_singleton_running_fraction
+            {
+                return Err(format!(
+                    "block {block_id} singleton event {event_id} falls below minimum running fraction"
+                ));
             }
         }
         if singleton_by_event.len() != plan.events.len()
-            || plan.events.iter().any(|event| !singleton_by_event.contains_key(&event.id)) {
-            return Err(format!("block {block_id} does not have exactly one singleton trial per planned event"));
+            || plan
+                .events
+                .iter()
+                .any(|event| !singleton_by_event.contains_key(&event.id))
+        {
+            return Err(format!(
+                "block {block_id} does not have exactly one singleton trial per planned event"
+            ));
         }
 
         let co_trial = by_condition[plan.co_condition.as_str()][0];
         let co_ids: BTreeSet<_> = co_trial.events.iter().map(|e| e.id.as_str()).collect();
         let expected_co: BTreeSet<_> = plan.co_event_ids.iter().map(String::as_str).collect();
         if co_ids != expected_co {
-            return Err(format!("block {block_id} co-scheduled event set differs from plan"));
+            return Err(format!(
+                "block {block_id} co-scheduled event set differs from plan"
+            ));
         }
-        if co_trial.events.iter().any(|event| (event.running_ns as f64 / event.enabled_ns as f64) < plan.minimum_co_running_fraction) {
-            return Err(format!("block {block_id} co-scheduled event falls below minimum running fraction; it is not a simultaneous observation"));
+        if co_trial.events.iter().any(|event| {
+            (event.running_ns as f64 / event.enabled_ns as f64) < plan.minimum_co_running_fraction
+        }) {
+            return Err(format!(
+                "block {block_id} co-scheduled event falls below minimum running fraction; it is not a simultaneous observation"
+            ));
         }
 
         let over_trial = by_condition[plan.over_condition.as_str()][0];
         let over_ids: BTreeSet<_> = over_trial.events.iter().map(|e| e.id.as_str()).collect();
         let expected_over: BTreeSet<_> = plan.over_event_ids.iter().map(String::as_str).collect();
         if over_ids != expected_over {
-            return Err(format!("block {block_id} overcommitted event set differs from plan"));
+            return Err(format!(
+                "block {block_id} overcommitted event set differs from plan"
+            ));
         }
-        if !over_trial.events.iter().any(|event| event.running_ns < event.enabled_ns) {
-            return Err(format!("block {block_id} overcommitted group records no multiplexing despite its declared overcommit"));
+        if !over_trial
+            .events
+            .iter()
+            .any(|event| event.running_ns < event.enabled_ns)
+        {
+            return Err(format!(
+                "block {block_id} overcommitted group records no multiplexing despite its declared overcommit"
+            ));
         }
         output.insert(block_id, singleton_by_event);
     }
     Ok(output)
 }
 
-fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8], observation_bytes: &[u8]) -> Result<Value, String> {
+fn audit_values(
+    plan_value: &Value,
+    observation_value: &Value,
+    plan_bytes: &[u8],
+    observation_bytes: &[u8],
+) -> Result<Value, String> {
     let plan = parse_plan(plan_value)?;
     let trials = parse_trials(observation_value, &plan)?;
     let blocks = validate_blocks(&trials, &plan)?;
 
     let mut grouped_by_block: BTreeMap<String, BTreeMap<String, &Trial>> = BTreeMap::new();
     for trial in &trials {
-        grouped_by_block.entry(trial.block_id.clone()).or_default().insert(trial.condition.clone(), trial);
+        grouped_by_block
+            .entry(trial.block_id.clone())
+            .or_default()
+            .insert(trial.condition.clone(), trial);
     }
 
     let mut event_reports = Vec::new();
@@ -505,10 +756,19 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
         let mut co_running = Vec::new();
         let mut over_running = Vec::new();
         for (block_id, singleton_map) in &blocks {
-            let singleton = singleton_map.get(&spec.id).ok_or("validated singleton invariant failed")?;
-            let singleton_obs = singleton.events.first().ok_or("singleton event invariant failed")?;
-            let grouped = grouped_by_block.get(block_id).ok_or("grouped block invariant failed")?;
-            let co_trial = grouped.get(&plan.co_condition).ok_or("co condition invariant failed")?;
+            let singleton = singleton_map
+                .get(&spec.id)
+                .ok_or("validated singleton invariant failed")?;
+            let singleton_obs = singleton
+                .events
+                .first()
+                .ok_or("singleton event invariant failed")?;
+            let grouped = grouped_by_block
+                .get(block_id)
+                .ok_or("grouped block invariant failed")?;
+            let co_trial = grouped
+                .get(&plan.co_condition)
+                .ok_or("co condition invariant failed")?;
             if let Some(co_obs) = co_trial.events.iter().find(|e| e.id == spec.id) {
                 let ratio = co_obs.running_ns as f64 / co_obs.enabled_ns as f64;
                 co_running.push(ratio);
@@ -517,29 +777,45 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
                     co_deviation.push(relative.abs());
                 }
             }
-            let over_trial = grouped.get(&plan.over_condition).ok_or("over condition invariant failed")?;
+            let over_trial = grouped
+                .get(&plan.over_condition)
+                .ok_or("over condition invariant failed")?;
             if let Some(over_obs) = over_trial.events.iter().find(|e| e.id == spec.id) {
                 let ratio = over_obs.running_ns as f64 / over_obs.enabled_ns as f64;
                 over_running.push(ratio);
                 if singleton_obs.raw_count > 0 {
-                    let scaled_estimate = over_obs.raw_count as f64 * over_obs.enabled_ns as f64 / over_obs.running_ns as f64;
+                    let scaled_estimate = over_obs.raw_count as f64 * over_obs.enabled_ns as f64
+                        / over_obs.running_ns as f64;
                     let relative = (scaled_estimate / singleton_obs.raw_count as f64) - 1.0;
                     over_deviation.push(relative.abs());
                 }
             }
-            singleton_running.push(singleton_obs.running_ns as f64 / singleton_obs.enabled_ns as f64);
+            singleton_running
+                .push(singleton_obs.running_ns as f64 / singleton_obs.enabled_ns as f64);
         }
         let co_p95 = percentile(&co_deviation, 0.95);
         let is_co_scheduled = plan.co_event_ids.contains(&spec.id);
-        let total_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
+        let total_samples: u64 = trials
+            .iter()
+            .flat_map(|trial| trial.events.iter())
             .filter(|event| event.id == spec.id)
-            .try_fold(0_u64, |sum, event| sum.checked_add(event.sample_count)
-                .ok_or_else(|| "sample_count total overflow".to_owned()))?;
-        let lost_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
+            .try_fold(0_u64, |sum, event| {
+                sum.checked_add(event.sample_count)
+                    .ok_or_else(|| "sample_count total overflow".to_owned())
+            })?;
+        let lost_samples: u64 = trials
+            .iter()
+            .flat_map(|trial| trial.events.iter())
             .filter(|event| event.id == spec.id)
-            .try_fold(0_u64, |sum, event| sum.checked_add(event.lost_samples)
-                .ok_or_else(|| "lost_samples total overflow".to_owned()))?;
-        let loss_fraction = if total_samples == 0 { None } else { Some(lost_samples as f64 / total_samples as f64) };
+            .try_fold(0_u64, |sum, event| {
+                sum.checked_add(event.lost_samples)
+                    .ok_or_else(|| "lost_samples total overflow".to_owned())
+            })?;
+        let loss_fraction = if total_samples == 0 {
+            None
+        } else {
+            Some(lost_samples as f64 / total_samples as f64)
+        };
         let loss_pass = loss_fraction.is_none_or(|v| v <= plan.maximum_sample_loss_fraction);
         let loss_status = if total_samples == 0 {
             "not_applicable_no_sampling_records"
@@ -548,11 +824,15 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
         } else {
             "exceeds_declared_loss_threshold"
         };
-        let co_pass = loss_pass && (!is_co_scheduled || (
-            co_p95.is_some_and(|v| v <= plan.maximum_co_deviation)
-                && co_running.iter().all(|v| *v >= plan.minimum_co_running_fraction)
-                && singleton_running.iter().all(|v| *v >= plan.minimum_singleton_running_fraction)
-        ));
+        let co_pass = loss_pass
+            && (!is_co_scheduled
+                || (co_p95.is_some_and(|v| v <= plan.maximum_co_deviation)
+                    && co_running
+                        .iter()
+                        .all(|v| *v >= plan.minimum_co_running_fraction)
+                    && singleton_running
+                        .iter()
+                        .all(|v| *v >= plan.minimum_singleton_running_fraction)));
         all_event_gates_pass &= co_pass;
         let co_status = if !is_co_scheduled {
             "not_in_co_scheduled_group_not_tested"
@@ -600,27 +880,49 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
     let mut read_overhead_by_condition: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut block_map: BTreeMap<String, BTreeMap<String, &Trial>> = BTreeMap::new();
     for trial in &trials {
-        block_map.entry(trial.block_id.clone()).or_default().insert(trial.condition.clone(), trial);
+        block_map
+            .entry(trial.block_id.clone())
+            .or_default()
+            .insert(trial.condition.clone(), trial);
     }
     for conditions in block_map.values() {
-        let baseline = conditions.get(&plan.baseline_condition).ok_or("missing baseline after block validation")?;
+        let baseline = conditions
+            .get(&plan.baseline_condition)
+            .ok_or("missing baseline after block validation")?;
         let baseline_rate = baseline.work_units as f64 / baseline.elapsed_ns as f64;
-        for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition.as_str()) {
-            let trial = conditions.get(*condition).ok_or("missing condition after block validation")?;
+        for condition in CONDITIONS
+            .iter()
+            .filter(|c| **c != plan.baseline_condition.as_str())
+        {
+            let trial = conditions
+                .get(*condition)
+                .ok_or("missing condition after block validation")?;
             let rate = trial.work_units as f64 / trial.elapsed_ns as f64;
             let degradation = 1.0 - (rate / baseline_rate);
-            observer_degradation_by_condition.entry((*condition).to_owned()).or_default().push(degradation);
-            read_overhead_by_condition.entry((*condition).to_owned()).or_default()
+            observer_degradation_by_condition
+                .entry((*condition).to_owned())
+                .or_default()
+                .push(degradation);
+            read_overhead_by_condition
+                .entry((*condition).to_owned())
+                .or_default()
                 .push(trial.pmu_read_overhead_ns as f64 / baseline.elapsed_ns as f64);
         }
     }
 
     let mut throughput_reports = Vec::new();
     let mut throughput_gate_pass = true;
-    for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition.as_str()) {
-        let degradations = observer_degradation_by_condition.get(*condition).ok_or("throughput condition invariant failed")?;
+    for condition in CONDITIONS
+        .iter()
+        .filter(|c| **c != plan.baseline_condition.as_str())
+    {
+        let degradations = observer_degradation_by_condition
+            .get(*condition)
+            .ok_or("throughput condition invariant failed")?;
         let p95 = percentile(degradations, 0.95).unwrap_or(f64::INFINITY);
-        let read_overheads = read_overhead_by_condition.get(*condition).ok_or("read overhead condition invariant failed")?;
+        let read_overheads = read_overhead_by_condition
+            .get(*condition)
+            .ok_or("read overhead condition invariant failed")?;
         let read_overhead_p95 = percentile(read_overheads, 0.95).unwrap_or(f64::INFINITY);
         let pass = p95 <= plan.maximum_throughput_degradation
             && read_overhead_p95 <= plan.maximum_pmu_read_overhead_fraction;
@@ -710,7 +1012,9 @@ fn parse_args() -> Result<Args, String> {
             "--receipt" => &mut receipt,
             _ => return Err(format!("unknown argument {flag}")),
         };
-        let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
+        let path = args
+            .next()
+            .ok_or_else(|| format!("{flag} requires a path"))?;
         if target.replace(PathBuf::from(path)).is_some() {
             return Err(format!("duplicate argument {flag}"));
         }
@@ -724,14 +1028,23 @@ fn parse_args() -> Result<Args, String> {
 
 fn validate_receipt_location(receipt: &Path, inputs: &[&Path]) -> Result<(), String> {
     if receipt.exists() {
-        return Err(format!("refusing to overwrite receipt {}", receipt.display()));
+        return Err(format!(
+            "refusing to overwrite receipt {}",
+            receipt.display()
+        ));
     }
-    let parent = receipt.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    let canonical_parent = fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
+    let parent = receipt
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
     for input in inputs {
         let canonical_input = fs::canonicalize(input)
             .map_err(|e| format!("cannot canonicalize input {}: {e}", input.display()))?;
-        let input_parent = canonical_input.parent().ok_or("input has no parent directory")?;
+        let input_parent = canonical_input
+            .parent()
+            .ok_or("input has no parent directory")?;
         if canonical_parent.starts_with(input_parent) {
             return Err("receipt must be outside every input directory".to_owned());
         }
@@ -743,13 +1056,22 @@ fn run() -> Result<(), String> {
     let args = parse_args()?;
     let (plan_bytes, plan) = read_input(&args.plan, "plan")?;
     let (observation_bytes, observations) = read_input(&args.observations, "observations")?;
-    validate_receipt_location(&args.receipt, &[args.plan.as_path(), args.observations.as_path()])?;
+    validate_receipt_location(
+        &args.receipt,
+        &[args.plan.as_path(), args.observations.as_path()],
+    )?;
     let receipt = audit_values(&plan, &observations, &plan_bytes, &observation_bytes)?;
-    let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
+    let encoded =
+        serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
-    file.write_all(&encoded).map_err(|e| format!("cannot write receipt: {e}"))?;
-    file.write_all(b"\n").map_err(|e| format!("cannot finish receipt: {e}"))?;
+    file.write_all(&encoded)
+        .map_err(|e| format!("cannot write receipt: {e}"))?;
+    file.write_all(b"\n")
+        .map_err(|e| format!("cannot finish receipt: {e}"))?;
     Ok(())
 }
 
@@ -768,8 +1090,10 @@ mod tests {
     use super::*;
 
     fn fixture() -> (Value, Value, Vec<u8>, Vec<u8>) {
-        let plan_bytes = include_bytes!("../tests/fixtures/hardsec/pmu-metrology-v1/plan.json").to_vec();
-        let observations_bytes = include_bytes!("../tests/fixtures/hardsec/pmu-metrology-v1/observations.json").to_vec();
+        let plan_bytes =
+            include_bytes!("../tests/fixtures/hardsec/pmu-metrology-v1/plan.json").to_vec();
+        let observations_bytes =
+            include_bytes!("../tests/fixtures/hardsec/pmu-metrology-v1/observations.json").to_vec();
         let plan = serde_json::from_slice(&plan_bytes).unwrap();
         let observations = serde_json::from_slice(&observations_bytes).unwrap();
         (plan, observations, plan_bytes, observations_bytes)
@@ -791,15 +1115,36 @@ mod tests {
     fn known_answer_qualifies_declared_simultaneous_events_and_preserves_estimate_semantics() {
         let (plan, obs, pb, ob) = fixture();
         let receipt = audit_values(&plan, &obs, &pb, &ob).unwrap();
-        assert_eq!(receipt["result"], "qualified_for_named_acquisition_conditions");
+        assert_eq!(
+            receipt["result"],
+            "qualified_for_named_acquisition_conditions"
+        );
         assert_eq!(receipt["support"]["matched_block_count"], 2);
         assert_eq!(receipt["support"]["trial_count"], 14);
-        assert_eq!(receipt["measurement_semantics"]["multiplex_scaled_values_confirmatory"], false);
-        assert_eq!(receipt["support"]["effective_sample_size_estimate"], Value::Null);
-        assert_eq!(receipt["event_qualification"][0]["co_scheduled"]["status"], "confirmatory_eligible_under_declared_thresholds");
-        assert_eq!(receipt["event_qualification"][0]["sampling"]["status"], "not_applicable_no_sampling_records");
-        assert_eq!(receipt["event_qualification"][0]["overcommitted"]["confirmatory_eligible"], false);
-        assert_eq!(receipt["observer_effect"]["overall_status"], "within_declared_thresholds");
+        assert_eq!(
+            receipt["measurement_semantics"]["multiplex_scaled_values_confirmatory"],
+            false
+        );
+        assert_eq!(
+            receipt["support"]["effective_sample_size_estimate"],
+            Value::Null
+        );
+        assert_eq!(
+            receipt["event_qualification"][0]["co_scheduled"]["status"],
+            "confirmatory_eligible_under_declared_thresholds"
+        );
+        assert_eq!(
+            receipt["event_qualification"][0]["sampling"]["status"],
+            "not_applicable_no_sampling_records"
+        );
+        assert_eq!(
+            receipt["event_qualification"][0]["overcommitted"]["confirmatory_eligible"],
+            false
+        );
+        assert_eq!(
+            receipt["observer_effect"]["overall_status"],
+            "within_declared_thresholds"
+        );
     }
 
     #[test]
@@ -821,7 +1166,11 @@ mod tests {
             "event_id":"instret","encoding":"0x00000002","raw_count":10,
             "time_enabled_ns":10,"time_running_ns":0,"sample_count":0,"lost_samples":0
         }]);
-        assert!(audit(&p, &o).unwrap_err().contains("zero time_enabled/time_running"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("zero time_enabled/time_running")
+        );
     }
 
     #[test]
@@ -831,7 +1180,11 @@ mod tests {
             "event_id":"instret","encoding":"0xdeadbeef","raw_count":10,
             "time_enabled_ns":10,"time_running_ns":10,"sample_count":0,"lost_samples":0
         }]);
-        assert!(audit(&p, &o).unwrap_err().contains("encoding does not match"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("encoding does not match")
+        );
     }
 
     #[test]
@@ -859,7 +1212,11 @@ mod tests {
     fn rejects_event_aliases_in_plan() {
         let (mut p, o, _, _) = fixture();
         p["events"][1]["encoding"] = p["events"][0]["encoding"].clone();
-        assert!(audit(&p, &o).unwrap_err().contains("duplicate event encoding"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("duplicate event encoding")
+        );
     }
 
     #[test]
@@ -872,14 +1229,22 @@ mod tests {
                 }
             }
         }
-        assert!(audit(&p, &o).unwrap_err().contains("records no multiplexing"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("records no multiplexing")
+        );
     }
 
     #[test]
     fn rejects_wrong_randomization_seed() {
         let (p, mut o, _, _) = fixture();
         o["trials"][0]["randomization_seed"] = json!("other-seed");
-        assert!(audit(&p, &o).unwrap_err().contains("randomization seed differs"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("randomization seed differs")
+        );
     }
 
     #[test]
@@ -896,9 +1261,12 @@ mod tests {
             "event_id":"instret","encoding":"0x00000002","raw_count":10,
             "time_enabled_ns":10,"time_running_ns":10,"sample_count":2,"lost_samples":3
         }]);
-        assert!(audit(&p, &o).unwrap_err().contains("lost_samples exceeds sample_count"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("lost_samples exceeds sample_count")
+        );
     }
-
 
     #[test]
     fn rejects_sample_loss_above_preregistered_fraction() {
@@ -907,7 +1275,10 @@ mod tests {
         o["trials"][0]["events"][0]["lost_samples"] = json!(1);
         let receipt = audit(&p, &o).unwrap();
         assert_eq!(receipt["result"], "measurement_quality_gate_failed");
-        assert_eq!(receipt["event_qualification"][0]["sampling"]["status"], "exceeds_declared_loss_threshold");
+        assert_eq!(
+            receipt["event_qualification"][0]["sampling"]["status"],
+            "exceeds_declared_loss_threshold"
+        );
     }
 
     #[test]
@@ -920,14 +1291,23 @@ mod tests {
         }
         let receipt = audit(&p, &o).unwrap();
         assert_eq!(receipt["result"], "measurement_quality_gate_failed");
-        assert!(receipt["observer_effect"]["condition_reports"].as_array().unwrap().iter()
-            .any(|entry| entry["status"] == "exceeds_declared_observer_effect_thresholds"));
+        assert!(
+            receipt["observer_effect"]["condition_reports"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["status"] == "exceeds_declared_observer_effect_thresholds")
+        );
     }
 
     #[test]
     fn rejects_plan_and_observations_evidence_domain_mismatch() {
         let (p, mut o, _, _) = fixture();
         o["evidence_domain"] = json!("physical_hardware");
-        assert!(audit(&p, &o).unwrap_err().contains("evidence_domain must match"));
+        assert!(
+            audit(&p, &o)
+                .unwrap_err()
+                .contains("evidence_domain must match")
+        );
     }
 }
