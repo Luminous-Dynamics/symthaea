@@ -3438,9 +3438,17 @@ mod artifact_evaluator_tests_v1 {
         let empty_truth_cases = suite
             .planner_cases()
             .iter()
-            .filter(|case| suite.oracle.get(&case.id).is_some_and(|labels| labels.is_empty()))
+            .filter(|case| {
+                suite
+                    .oracle
+                    .get(&case.id)
+                    .is_some_and(|labels| labels.is_empty())
+            })
             .count();
-        assert!(empty_truth_cases > 0, "fixture must include zero-evidence cases");
+        assert!(
+            empty_truth_cases > 0,
+            "fixture must include zero-evidence cases"
+        );
 
         let oracle = encode_oracle_artifact_v1(&suite, "test-generator-revision", DIGEST)
             .expect("oracle encode");
