@@ -23,6 +23,7 @@ pub struct ActionConditionedForecastReceipt {
     pub action_descriptor_sha256: String,
     pub model_checkpoint_sha256: String,
     pub action_id: u64,
+    pub action_set_id: u64,
     pub action_set_size: usize,
     pub action_set_sha256: String,
     pub model_weights_sha256: String,
@@ -224,6 +225,7 @@ impl ActionConditionedVisualResidualPredictor {
             action_descriptor_sha256: action_descriptor_sha256.to_owned(),
             model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
             action_id,
+            action_set_id: forecast_id,
             action_set_size: 1,
             action_set_sha256,
             model_weights_sha256: hash_f32_vector(
@@ -295,9 +297,12 @@ impl ActionConditionedVisualResidualPredictor {
         {
             return Err(ActionConditionedPredictorError::PendingQueueFull);
         }
+        let candidate_count = u64::try_from(candidates.len())
+            .map_err(|_| ActionConditionedPredictorError::ForecastIdExhausted)?;
         let next_forecast_id = self.next_forecast_id
-            .checked_add(candidates.len() as u64)
+            .checked_add(candidate_count)
             .ok_or(ActionConditionedPredictorError::ForecastIdExhausted)?;
+        let action_set_id = self.next_forecast_id;
 
         let mut ordered: Vec<&ActionConditionedCandidateAction> = candidates.iter().collect();
         ordered.sort_unstable_by_key(|candidate| candidate.action_id);
@@ -348,6 +353,7 @@ impl ActionConditionedVisualResidualPredictor {
                 action_descriptor_sha256: candidate.action_descriptor_sha256.clone(),
                 model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
                 action_id: candidate.action_id,
+                action_set_id,
                 action_set_size: candidates.len(),
                 action_set_sha256: action_set_sha256.clone(),
                 model_weights_sha256: model_weights_sha256.clone(),
@@ -421,6 +427,7 @@ impl ActionConditionedVisualResidualPredictor {
                 || receipt.source_frame_sequence != first.source_frame_sequence
                 || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
                 || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+                || receipt.action_set_id != first.action_set_id
                 || receipt.action_set_size != first.action_set_size
                 || receipt.action_set_sha256 != first.action_set_sha256
                 || receipt.model_weights_sha256 != first.model_weights_sha256
@@ -762,6 +769,36 @@ impl ActionConditionedVisualResidualPredictor {
             }
         }
 
+        let mut action_sets: BTreeMap<u64, Vec<&PendingActionConditionedForecastState>> = BTreeMap::new();
+        for forecast in pending.values() {
+            action_sets.entry(forecast.receipt.action_set_id).or_default().push(forecast);
+        }
+        for forecasts in action_sets.values() {
+            let first = &forecasts[0].receipt;
+            if forecasts.len() != first.action_set_size {
+                return Err(ActionConditionedPredictorError::InvalidCheckpointState);
+            }
+            let mut descriptors: Vec<(u64, String)> = forecasts.iter()
+                .map(|forecast| (
+                    forecast.receipt.action_id,
+                    forecast.receipt.action_descriptor_sha256.clone(),
+                ))
+                .collect();
+            descriptors.sort_unstable_by_key(|(action_id, _)| *action_id);
+            if forecasts.iter().any(|forecast| {
+                forecast.receipt.action_set_id != first.action_set_id
+                    || forecast.receipt.action_set_size != first.action_set_size
+                    || forecast.receipt.action_set_sha256 != first.action_set_sha256
+                    || forecast.receipt.history_sha256 != first.history_sha256
+                    || forecast.receipt.action_manifest_sha256 != first.action_manifest_sha256
+                    || forecast.receipt.model_version != first.model_version
+                    || forecast.receipt.source_frame_sequence != first.source_frame_sequence
+                    || forecast.receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
+            }) || hash_action_descriptors(&descriptors) != first.action_set_sha256 {
+                return Err(ActionConditionedPredictorError::InvalidCheckpointState);
+            }
+        }
+
         self.action_weights = state.action_weights.clone();
         self.learning_rate = state.learning_rate;
         self.max_pending_forecasts = state.max_pending_forecasts;
@@ -838,6 +875,7 @@ fn hash_forecast_receipt(receipt: &ActionConditionedForecastReceipt) -> String {
     hash_text(&mut hasher, &receipt.action_descriptor_sha256);
     hash_text(&mut hasher, &receipt.model_checkpoint_sha256);
     hasher.update(receipt.action_id.to_le_bytes());
+    hasher.update(receipt.action_set_id.to_le_bytes());
     hasher.update((receipt.action_set_size as u64).to_le_bytes());
     hash_text(&mut hasher, &receipt.action_set_sha256);
     hash_text(&mut hasher, &receipt.model_weights_sha256);
