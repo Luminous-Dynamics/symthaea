@@ -139,6 +139,7 @@ fn parse_csv<R: Read>(
         || config.event_time_column.trim().is_empty()
         || config.record_id_column.as_ref().is_some_and(|name| name.trim().is_empty())
         || config.expected_record_id.as_ref().is_some_and(|name| name.trim().is_empty())
+        || (config.expected_record_id.is_some() && config.record_id_column.is_none())
     {
         return Err(CsvAdapterError::InvalidConfiguration);
     }
