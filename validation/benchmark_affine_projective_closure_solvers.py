@@ -35,8 +35,8 @@ def make_instance(
 ) -> dict[str, Any]:
     """Build a reproducible, nontrivial knapsack/closure instance.
 
-    Evidence is constructed so d_i=w_i(M_i-1)=10/n for every coordinate.
-    For alpha=0.1 this makes the closure condition require at least 90% of
+    Evidence is constructed so d_i=w_i(M_i-1)=12/n for every coordinate.
+    For alpha=0.1 this makes the closure condition require at least 75% of
     the active family to be selected, while capacity and heterogeneous
     utility/cost determine which candidates are selected.
     """
@@ -53,7 +53,7 @@ def make_instance(
 
     rng = random.Random(seed)
     ids = tuple(range(1, n + 1))
-    d = Fraction(10, n)
+    d = Fraction(12, n)
     from countable_global_projective_eclosure import coordinate_weight
 
     weights = {i: coordinate_weight(i, scheme) for i in ids}
