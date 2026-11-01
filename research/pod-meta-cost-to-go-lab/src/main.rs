@@ -1,15 +1,18 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt,
-    CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState,
-    EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt,
-    FrontierCostCoefficients, HistoricalCostBaseline, JointCostEnvelope, LandmarkEpisode,
-    LandmarkIpcwConfig, LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal,
-    OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
-    OnlinePredictionStatement, OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEvaluator,
-    ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast, ReservationId,
-    ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
+    ActionTrajectory, BudgetLedger, CapCalibrationPoint, CapCurrentPrediction,
+    CensoringWeightReceipt, CompletedCalibrationExample, DecisionDrivenCapConfig,
+    DecisionDrivenCapState, EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt,
+    ForecastReceipt, FrontierCostCoefficients, HistoricalCostBaseline,
+    InterventionAssignmentEvidence, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
+    LandmarkTerminal, LastObservedActionForecaster, LinearProofFrontierCostModel,
+    MatchedInterventionSet, OnlineCompetingTerminal, OnlineCostDimension,
+    OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
+    OnlineSelectionLedger, PrefixBudgetReceipt, PrefixForecaster, PrefixReplayEngine,
+    PrefixReplayEvaluator, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
+    ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
     SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
-    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
+    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, TrajectoryActionKind,
+    TrajectoryActionReceipt, TrajectoryTerminalRecord, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
 
@@ -103,6 +106,145 @@ fn prefix_outcome(
         evidence_digest: [21; 32],
         meter_digest: [22; 32],
         verifier_digest: (terminal == TerminalOutcome::SufficientProof).then_some([23; 32]),
+    }
+}
+
+fn trajectory_features(unresolved: u64) -> ProofFrontierFeatures {
+    ProofFrontierFeatures {
+        unresolved_obligations: unresolved,
+        mandatory_obligations: unresolved,
+        maximum_dependency_depth: unresolved,
+        dependency_edges: unresolved.saturating_sub(1),
+        admissible_alternatives: 2,
+        missing_evidence_requirements: 0,
+        distinct_operation_families: 2,
+        distinct_evidence_families: 1,
+        mandatory_verifier_operations: 0,
+    }
+}
+
+struct TrajectoryActionSpec {
+    sequence: u64,
+    kind: TrajectoryActionKind,
+    family: u32,
+    pre: u8,
+    post: u8,
+    cost: ResourceVector,
+    features: ProofFrontierFeatures,
+    candidates: Vec<u32>,
+}
+
+fn trajectory_action(spec: TrajectoryActionSpec) -> TrajectoryActionReceipt {
+    TrajectoryActionReceipt {
+        decision_sequence: spec.sequence,
+        kind: spec.kind,
+        operation_id: format!("operation-{}", spec.sequence),
+        operation_family: spec.family,
+        candidate_pool_digest: [30 + spec.sequence as u8; 32],
+        admissible_operation_families: spec.candidates,
+        pre_state_digest: [spec.pre; 32],
+        post_state_digest: [spec.post; 32],
+        frontier_digest: [40 + spec.sequence as u8; 32],
+        frontier_features: spec.features,
+        measured_cost: spec.cost,
+        meter_receipt_digest: [50 + spec.sequence as u8; 32],
+    }
+}
+
+fn action_trajectory(terminal: Option<TerminalOutcome>) -> ActionTrajectory {
+    let success = terminal == Some(TerminalOutcome::SufficientProof);
+    let mut actions = vec![
+        trajectory_action(TrajectoryActionSpec {
+            sequence: 1,
+            kind: TrajectoryActionKind::ProofOperation,
+            family: 2,
+            pre: 1,
+            post: 2,
+            cost: ResourceVector::new(10, 1, 2, 0, 3, 4),
+            features: trajectory_features(2),
+            candidates: vec![2, 3],
+        }),
+        trajectory_action(TrajectoryActionSpec {
+            sequence: 2,
+            kind: TrajectoryActionKind::ProofOperation,
+            family: 3,
+            pre: 2,
+            post: 3,
+            cost: ResourceVector::new(20, 1, 4, 1, 5, 6),
+            features: trajectory_features(1),
+            candidates: vec![3, 4],
+        }),
+    ];
+    if success {
+        actions.push(trajectory_action(TrajectoryActionSpec {
+            sequence: 3,
+            kind: TrajectoryActionKind::IndependentVerifier,
+            family: 90,
+            pre: 3,
+            post: 4,
+            cost: ResourceVector::new(5, 1, 1, 0, 2, 3),
+            features: ProofFrontierFeatures::default(),
+            candidates: vec![90],
+        }));
+    }
+    ActionTrajectory {
+        run_id: 77,
+        task_family: 7,
+        seed: 42,
+        initial_budget: Some(ResourceVector::new(100, 10, 20, 10, 40, 50)),
+        actions,
+        terminal: TrajectoryTerminalRecord {
+            outcome: terminal,
+            evaluator_receipt_digest: terminal.map(|_| [60; 32]),
+            completion_verifier_digest: success.then_some([61; 32]),
+        },
+    }
+}
+
+fn matched_intervention_trial(run_id: u64, family: u32, first_cost: u128) -> ActionTrajectory {
+    let next_frontier = if family == 2 { 1 } else { 0 };
+    ActionTrajectory {
+        run_id,
+        task_family: 7,
+        seed: 88,
+        initial_budget: Some(ResourceVector::new(100, 10, 20, 10, 40, 50)),
+        actions: vec![
+            trajectory_action(TrajectoryActionSpec {
+                sequence: 1,
+                kind: TrajectoryActionKind::ProofOperation,
+                family,
+                pre: 1,
+                post: 2,
+                cost: ResourceVector::new(first_cost, 1, 2, 0, 3, 4),
+                features: trajectory_features(2),
+                candidates: vec![2, 3, 4],
+            }),
+            trajectory_action(TrajectoryActionSpec {
+                sequence: 2,
+                kind: TrajectoryActionKind::ProofOperation,
+                family: 8,
+                pre: 2,
+                post: 3,
+                cost: ResourceVector::new(5, 1, 1, 0, 2, 3),
+                features: trajectory_features(next_frontier),
+                candidates: vec![8, 9],
+            }),
+            trajectory_action(TrajectoryActionSpec {
+                sequence: 3,
+                kind: TrajectoryActionKind::IndependentVerifier,
+                family: 90,
+                pre: 3,
+                post: 4,
+                cost: ResourceVector::new(5, 1, 1, 0, 2, 3),
+                features: ProofFrontierFeatures::default(),
+                candidates: vec![90],
+            }),
+        ],
+        terminal: TrajectoryTerminalRecord {
+            outcome: Some(TerminalOutcome::SufficientProof),
+            evaluator_receipt_digest: Some([60; 32]),
+            completion_verifier_digest: Some([61; 32]),
+        },
     }
 }
 
@@ -1213,5 +1355,96 @@ fn main() {
         "HISTORICAL_BASELINE_ROW\tfallback-usage\t{}\t{}",
         historical_report.report.global_fallback_prefixes,
         historical_report.report.by_task_family.len()
+    );
+    let trajectory = action_trajectory(Some(TerminalOutcome::SufficientProof));
+    let trajectory_forecaster =
+        LastObservedActionForecaster::new([70; 32], ResourceVector::new(2, 1, 1, 0, 1, 1)).unwrap();
+    let trajectory_replay =
+        PrefixReplayEngine::replay(&trajectory, &trajectory_forecaster).unwrap();
+    let verified_cost = match trajectory_replay.rows[0].label {
+        pod_meta_cost_to_go_lab::PrefixOutcomeLabel::VerifiedRemainingCost { cost, .. } => cost,
+        _ => panic!("expected verified remaining-cost label"),
+    };
+    println!(
+        "TRAJECTORY_REPLAY_ROW\tverified-prefixes\t{}\t{}",
+        trajectory_replay.rows.len(),
+        verified_cost.tokens
+    );
+
+    let mut suffix_mutation = trajectory.clone();
+    suffix_mutation.actions[1].measured_cost = ResourceVector::new(200, 7, 9, 4, 12, 18);
+    let original_prefix = trajectory.prefix_view(1).unwrap();
+    let mutated_prefix = suffix_mutation.prefix_view(1).unwrap();
+    let prefix_unchanged = original_prefix == mutated_prefix;
+    let original_forecast = trajectory_forecaster.predict(&original_prefix).unwrap();
+    let mutated_forecast = trajectory_forecaster.predict(&mutated_prefix).unwrap();
+    let forecast_unchanged = original_forecast == mutated_forecast;
+    let suffix_label_changed =
+        trajectory.outcome_label(1).unwrap() != suffix_mutation.outcome_label(1).unwrap();
+    println!(
+        "TRAJECTORY_REPLAY_ROW\tsuffix-leakage-negative-control\t{}\t{}\t{}",
+        prefix_unchanged, forecast_unchanged, suffix_label_changed
+    );
+
+    let censored_trajectory = action_trajectory(Some(TerminalOutcome::RightCensored(
+        pod_meta_cost_to_go_lab::CensorReason::Timeout,
+    )));
+    let terminal_prefix_unchanged =
+        trajectory.prefix_view(0).unwrap() == censored_trajectory.prefix_view(0).unwrap();
+    let terminal_label_changed =
+        trajectory.outcome_label(0).unwrap() != censored_trajectory.outcome_label(0).unwrap();
+    println!(
+        "TRAJECTORY_REPLAY_ROW\tterminal-label-isolation\t{}\t{}",
+        terminal_prefix_unchanged, terminal_label_changed
+    );
+    let matched_interventions = MatchedInterventionSet {
+        experiment_digest: [90; 32],
+        task_family: 7,
+        seed: 88,
+        initial_budget: Some(ResourceVector::new(100, 10, 20, 10, 40, 50)),
+        pre_state_digest: [1; 32],
+        frontier_digest: [41; 32],
+        frontier_features: trajectory_features(2),
+        candidate_pool_digest: [31; 32],
+        admissible_operation_families: vec![2, 3, 4],
+        assignment: InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [91; 32],
+        },
+        trials: vec![
+            matched_intervention_trial(201, 2, 10),
+            matched_intervention_trial(202, 3, 15),
+            matched_intervention_trial(203, 4, 30),
+        ],
+    };
+    let matched_contrast = matched_interventions.verified_contrasts().unwrap()[0];
+    let pareto_summary = matched_interventions.pareto_summary().unwrap();
+    println!(
+        "INTERVENTION_SET_ROW\tpareto-frontier\t{}\t{}\t{}\t{}\t{}",
+        pareto_summary.alternatives.len(),
+        pareto_summary.frontier_operation_families.len(),
+        pareto_summary.frontier_operation_families[0],
+        pareto_summary.frontier_operation_families[1],
+        matches!(
+            pareto_summary.interpretation,
+            pod_meta_cost_to_go_lab::InterventionInterpretation::SimulatedContrast
+        )
+    );
+    println!(
+        "INTERVENTION_SET_ROW\tmatched-simulation-contrast\t{}\t{}\t{}\t{}\t{}",
+        matched_contrast.baseline_operation_family,
+        matched_contrast.alternative_operation_family,
+        matched_contrast.resource_cost_delta.tokens,
+        matched_contrast.proof_progress_delta,
+        matches!(
+            matched_contrast.interpretation,
+            pod_meta_cost_to_go_lab::InterventionInterpretation::SimulatedContrast
+        )
+    );
+    let mut mismatched_intervention = matched_interventions.clone();
+    mismatched_intervention.trials[1].actions[0].pre_state_digest = [99; 32];
+    println!(
+        "INTERVENTION_SET_ROW\tpre-state-negative-control\t{}",
+        mismatched_intervention.validate()
+            == Err(pod_meta_cost_to_go_lab::InterventionSetError::PreStateMismatch)
     );
 }
