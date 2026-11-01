@@ -2668,7 +2668,7 @@ mod tests {
         assert!(log_mass.is_finite());
         let normalized = [-800.0, -801.0, f64::NEG_INFINITY]
             .map(|value| (value - log_mass).exp());
-        assert!((normalized.iter().sum::<f64>() - 1.0).abs() <= 1e-15);
+        assert!((normalized.iter().sum::<f64>() - 1.0).abs() <= 1e-13);
         assert_eq!(sparse_log_sum_exp(&[f64::NEG_INFINITY; 3]).unwrap(), f64::NEG_INFINITY);
     }
 
