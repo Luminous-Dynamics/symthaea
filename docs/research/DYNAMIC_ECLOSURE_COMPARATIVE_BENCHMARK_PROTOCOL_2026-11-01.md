@@ -29,6 +29,7 @@ External methods must be assigned to the guarantee lane they actually prove. The
 | Tavyrikov, Goeman & de Heide (EJS 2026), carefree multiple testing with e-processes | SupFDR / FDR-sup with running suprema and adjusters under arbitrary dependence | Primary persistent-guarantee comparator. Do not use raw e-BH on unadjusted running suprema as a valid baseline. |
 | Ramdas, *Anchored multiple testing* (Oct 2026 preprint) | Uses slack in baseline FDR proofs to add valid local e-value mass while retaining baseline discoveries; includes anchored BH/BY/e-BH and ordered procedures | Static finite-family benchmark and template for new dynamic "supremum-anchored" closure. Do not assume its static coordinatewise bounds automatically imply a time-uniform/SupFDR result. |
 | #9777 supremum-anchored projective closure | Candidate: use a valid bound on the baseline path supremum as a local e-value budget, then add residual projective intersection evidence | Research hypothesis only. Requires subset-specific path budgets c_S; global SupFDR control alone may give c_S=1 and no residual power budget. |
+| #9780 additive supremum-anchored e-BH special case | Coordinate-local ever-rejected budgets plus coordinate auxiliary e-processes; local intersection e-values are additive, so all closure constraints reduce exactly to e-BH | Exact O(n log n) selector with exhaustive small-n parity; a restricted baseline-retaining special case, not a substitute for intersection-specific closure. |
 | CRAN eClosure 0.9.7 (published 2026-10-21) | Batch closed BH, closed e-BH, closed Su and closed BY | Batch-only baseline. It is useful for fixed-horizon final-set comparisons, not a direct online arrival or repeated-monitoring comparator. |
 | seqcomp 0.3.0 adaptive betting (fixed fraction, aGRAPA, ONS-m, quantile heuristic) | Bet-selection comparators for bounded score-difference martingales and sequential model comparison | Compare at the betting-strategy layer only after translating and proving the exact increment/null assumptions. Its own vignette shows no universal best rule across temporal regimes; do not call our diagonal-preconditioned projected update novel merely because it is vector-valued. |
 | Covariance-preconditioned projective bets (#9756 / PR #9758) | Model-assisted conditional-mgf intersection process with predictable vector bets | Benchmark against fixed vector/scalar bets, aGRAPA, ONS-m-like updates, fixed-prior eta mixtures and an oracle direction; retain #9695 arbitrary-dependence fallback. |
@@ -113,6 +114,8 @@ Within a matched stopped-FDR or SupFDR guarantee, optimize the same value, cost,
 ## 4. Scenario matrix
 
 ### Anchoring / baseline-retention layer
+
+For the additive #9780 special case, report e-BH selector latency and memory at n=10^2…10^6, independent O(n) closure feasibility checks, baseline retention (must be 100%), and exhaustive all-intersection parity at n<=16. Keep this separate from the general intersection-specific anchored method; the additive reduction only applies when each local intersection e-value is the sum of coordinate e-values.
 
 Add the Oct 2026 anchored-closure method as a distinct static comparator, then test the dynamic extension in #9777. Register:
 - baseline procedure and its exact FDR theorem;
