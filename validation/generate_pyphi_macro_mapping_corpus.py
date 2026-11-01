@@ -29,6 +29,7 @@ CASES = (
         "constituents": [0, 1],
         "update_grain": 1,
         "on_counts": [2],
+        "background_apportionment": [3],
     },
     {
         "case_id": "coarse-2-on-count-1",
@@ -100,7 +101,7 @@ def generate(output: Path) -> dict[str, Any]:
     if version != PINNED_PYPHI_VERSION:
         raise RuntimeError(f"expected pyphi=={PINNED_PYPHI_VERSION}, found {version}")
 
-    from pyphi.macro.units import blackbox, coarse_grain
+    from pyphi.macro.units import MacroUnit, blackbox, coarse_grain
 
     output_cases = []
     total_entries = 0
@@ -131,18 +132,28 @@ def generate(output: Path) -> dict[str, Any]:
         if any(value not in (0, 1) for value in mapping):
             raise RuntimeError(f"{case['case_id']}: PyPhi produced a non-binary mapping")
 
+        background_apportionment = case.get("background_apportionment", [])
+        pyphi_unit = MacroUnit(
+            constituents=tuple(constituents),
+            update_grain=case["update_grain"],
+            mapping=tuple(mapping),
+            background_apportionment=tuple(background_apportionment),
+        )
+        background_apportionment = list(pyphi_unit.background_apportionment)
         complement = [1 - value for value in mapping]
         complement_flipped = complement < mapping
         canonical_mapping = complement if complement_flipped else mapping
         mapping_sha256 = _macro_mapping_digest(
             constituents, case["update_grain"], canonical_mapping
         )
-        spec_sha256 = _spec_digest(mapping_sha256, complement_flipped, [])
+        spec_sha256 = _spec_digest(
+            mapping_sha256, complement_flipped, background_apportionment
+        )
         item = {
             **case,
             "mapping": mapping,
             "canonical_mapping": canonical_mapping,
-            "background_apportionment": [],
+            "background_apportionment": background_apportionment,
             "complement_flipped": complement_flipped,
             "mapping_sha256": mapping_sha256,
             "spec_sha256": spec_sha256,
