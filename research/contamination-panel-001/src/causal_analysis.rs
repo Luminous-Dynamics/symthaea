@@ -196,7 +196,7 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
 }
 
 fn decode_seed_hex(value: &str, label: &str) -> Result<Vec<u8>, String> {
-    if value.len() < 64 || value.len() % 2 != 0 {
+    if value.len() < 64 || !value.len().is_multiple_of(2) {
         return Err(format!("{label} must encode at least 32 bytes of hex"));
     }
     let mut output = Vec::with_capacity(value.len() / 2);
