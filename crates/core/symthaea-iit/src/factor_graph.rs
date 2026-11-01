@@ -929,10 +929,10 @@ fn min_fill_log_sum_product_with_plan(
                 continue;
             };
             for other_variable in factor.variables.iter().copied() {
-                if other_variable != variable {
-                    if let Some(bucket) = buckets.get_mut(&other_variable) {
-                        bucket.remove(&factor_id);
-                    }
+                if other_variable != variable
+                    && let Some(bucket) = buckets.get_mut(&other_variable)
+                {
+                    bucket.remove(&factor_id);
                 }
             }
 
@@ -2009,7 +2009,7 @@ mod tests {
                     panic!("cutset failed: n={variable_count}, seed={seed}, cutset={cutset:?}: {error}")
                 });
 
-                let mut expected = vec![f64::NEG_INFINITY; 2];
+                let mut expected = [f64::NEG_INFINITY; 2];
                 for assignment in 0..(1usize << variable_count) {
                     let mut log_weight = 0.0;
                     for factor in &factors {
