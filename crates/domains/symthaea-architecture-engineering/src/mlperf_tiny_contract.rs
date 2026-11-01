@@ -197,6 +197,8 @@ pub struct MlperfTinyStaticWorkloadContract {
     pub schema: String,
     pub version: String,
     pub suite_version: String,
+    /// Digest of the exact v1.4 results/task release artifact used to define this research run.
+    pub suite_release_sha256: String,
     /// Exact rule pack used. Do not assume the accessible v1.2 rules file is identical to v1.4.
     pub rules_version: String,
     pub rules_document_sha256: String,
@@ -213,6 +215,7 @@ pub struct MlperfTinyStaticWorkloadContract {
     pub reference_preprocessing_sha256: Option<String>,
     pub reference_postprocessing_sha256: Option<String>,
     pub candidate_model_sha256: String,
+    pub candidate_weights_sha256: String,
     pub candidate_training_recipe_sha256: Option<String>,
     pub candidate_quantization_recipe_sha256: Option<String>,
     pub preprocessing_sha256: String,
@@ -224,7 +227,13 @@ pub struct MlperfTinyStaticWorkloadContract {
     pub runtime: String,
     pub target_id: String,
     pub board_revision: String,
+    pub cpu_core: String,
+    pub accelerator_profile: String,
     pub hardware_tier: MlperfTinyHardwareTier,
+    pub sram_budget_bytes: u64,
+    pub protected_sram_reserve_bytes: u64,
+    pub flash_budget_bytes: u64,
+    pub p95_deadline_us: u64,
     pub measurement_scope: MlperfTinyMeasurementScope,
     pub contract_sha256: String,
 }
@@ -273,15 +282,19 @@ pub fn validate_mlperf_tiny_static_contract(
         ("runtime", contract.runtime.as_str()),
         ("target_id", contract.target_id.as_str()),
         ("board_revision", contract.board_revision.as_str()),
+        ("cpu_core", contract.cpu_core.as_str()),
+        ("accelerator_profile", contract.accelerator_profile.as_str()),
     ] {
         require_non_empty(field, value)?;
     }
     for (field, value) in [
+        ("suite_release_sha256", contract.suite_release_sha256.as_str()),
         ("rules_document_sha256", contract.rules_document_sha256.as_str()),
         ("dataset_sha256", contract.dataset_sha256.as_str()),
         ("accuracy_split_sha256", contract.accuracy_split_sha256.as_str()),
         ("performance_split_sha256", contract.performance_split_sha256.as_str()),
         ("candidate_model_sha256", contract.candidate_model_sha256.as_str()),
+        ("candidate_weights_sha256", contract.candidate_weights_sha256.as_str()),
         ("preprocessing_sha256", contract.preprocessing_sha256.as_str()),
         ("postprocessing_sha256", contract.postprocessing_sha256.as_str()),
         ("candidate_artifact_sha256", contract.candidate_artifact_sha256.as_str()),
@@ -296,6 +309,16 @@ pub fn validate_mlperf_tiny_static_contract(
         return Err(MlperfTinyContractError::new(
             "data_splits",
             "accuracy and performance splits must be distinct",
+        ));
+    }
+    if contract.sram_budget_bytes == 0
+        || contract.protected_sram_reserve_bytes >= contract.sram_budget_bytes
+        || contract.flash_budget_bytes == 0
+        || contract.p95_deadline_us == 0
+    {
+        return Err(MlperfTinyContractError::new(
+            "target_budgets",
+            "SRAM/flash budgets and p95 deadline must be positive; protected reserve must be less than SRAM",
         ));
     }
 
@@ -340,6 +363,14 @@ pub fn validate_mlperf_tiny_static_contract(
                 })?;
                 require_digest(field, value)?;
             }
+            if contract.candidate_model_sha256 != contract.reference_model_sha256.as_deref().unwrap_or("")
+                || contract.candidate_weights_sha256 != contract.reference_weights_sha256.as_deref().unwrap_or("")
+            {
+                return Err(MlperfTinyContractError::new(
+                    "reference_model",
+                    "Closed division must preserve the exact reference model and weights",
+                ));
+            }
             if contract.preprocessing_sha256 != contract.reference_preprocessing_sha256.as_deref().unwrap_or("")
                 || contract.postprocessing_sha256 != contract.reference_postprocessing_sha256.as_deref().unwrap_or("")
             {
@@ -356,6 +387,12 @@ pub fn validate_mlperf_tiny_static_contract(
             }
         }
         MlperfTinyDivision::Open => {
+            if contract.reference_model_sha256.is_some() || contract.reference_weights_sha256.is_some() {
+                return Err(MlperfTinyContractError::new(
+                    "reference_model",
+                    "Open division must describe its own candidate model/weights rather than pinning Closed reference weights",
+                ));
+            }
             if let Some(recipe) = &contract.candidate_training_recipe_sha256 {
                 require_digest("candidate_training_recipe_sha256", recipe)?;
             } else {
@@ -421,7 +458,12 @@ pub enum MlperfTinyQualityResult {
 #[serde(deny_unknown_fields)]
 pub struct MlperfTinyEnergyObservation {
     pub scope: MlperfTinyMeasurementScope,
+    /// Mean energy for the declared measurement scope.
     pub energy_uj: f64,
+    /// Expanded uncertainty for the same measurand and scope.
+    pub expanded_uncertainty_uj: f64,
+    pub replicate_count: usize,
+    pub uncertainty_receipt_sha256: String,
     pub measurement_receipt_sha256: String,
     pub raw_power_trace_sha256: String,
 }
@@ -437,7 +479,11 @@ pub struct MlperfTinyStaticRunReceipt {
     pub candidate_configuration_sha256: String,
     pub target_id: String,
     pub board_revision: String,
+    pub cpu_core: String,
+    pub accelerator_profile: String,
     pub hardware_tier: MlperfTinyHardwareTier,
+    pub device_session_sha256: String,
+    pub measurement_protocol_sha256: String,
     pub quality_result: MlperfTinyQualityResult,
     pub latency_samples_us: Vec<u64>,
     pub p50_latency_us: u64,
@@ -461,7 +507,13 @@ pub fn nearest_rank_percentile_u64(
     }
     let mut sorted = samples.to_vec();
     sorted.sort_unstable();
-    let rank = (numerator * sorted.len() + denominator - 1) / denominator;
+    let scaled = numerator.checked_mul(sorted.len()).ok_or_else(|| {
+        MlperfTinyContractError::new("percentile", "rank multiplication overflow")
+    })?;
+    let rounded = scaled.checked_add(denominator - 1).ok_or_else(|| {
+        MlperfTinyContractError::new("percentile", "rank rounding overflow")
+    })?;
+    let rank = rounded / denominator;
     Ok(sorted[rank.saturating_sub(1).min(sorted.len() - 1)])
 }
 
@@ -553,11 +605,19 @@ pub fn validate_mlperf_tiny_static_run(
     ] {
         require_digest(field, value)?;
     }
+    for (field, value) in [
+        ("device_session_sha256", receipt.device_session_sha256.as_str()),
+        ("measurement_protocol_sha256", receipt.measurement_protocol_sha256.as_str()),
+    ] {
+        require_digest(field, value)?;
+    }
     if receipt.contract_sha256 != contract.contract_sha256
         || receipt.candidate_artifact_sha256 != contract.candidate_artifact_sha256
         || receipt.candidate_configuration_sha256 != contract.candidate_configuration_sha256
         || receipt.target_id != contract.target_id
         || receipt.board_revision != contract.board_revision
+        || receipt.cpu_core != contract.cpu_core
+        || receipt.accelerator_profile != contract.accelerator_profile
         || receipt.hardware_tier != contract.hardware_tier
     {
         return Err(MlperfTinyContractError::new("run.identity", "run receipt is not bound to the exact contract, artifact, configuration or target"));
@@ -570,8 +630,24 @@ pub fn validate_mlperf_tiny_static_run(
     {
         return Err(MlperfTinyContractError::new("run.latency", "raw latency samples are missing/invalid or percentile summaries do not reproduce by nearest rank"));
     }
-    if receipt.peak_sram_bytes == 0 || receipt.flash_bytes == 0 {
-        return Err(MlperfTinyContractError::new("run.memory", "peak SRAM and flash values must be positive"));
+    let available_sram = contract.sram_budget_bytes
+        .checked_sub(contract.protected_sram_reserve_bytes)
+        .ok_or_else(|| MlperfTinyContractError::new("target_budgets", "protected SRAM reserve exceeds target budget"))?;
+    if receipt.peak_sram_bytes == 0
+        || receipt.flash_bytes == 0
+        || receipt.peak_sram_bytes > available_sram
+        || receipt.flash_bytes > contract.flash_budget_bytes
+    {
+        return Err(MlperfTinyContractError::new(
+            "run.memory",
+            "measured peak SRAM/flash is invalid or exceeds the target budget after protected reserve",
+        ));
+    }
+    if receipt.p95_latency_us > contract.p95_deadline_us {
+        return Err(MlperfTinyContractError::new(
+            "run.p95_latency_us",
+            "p95 latency exceeds the frozen target deadline",
+        ));
     }
     validate_quality_result(contract, &receipt.quality_result)?;
 
@@ -579,9 +655,16 @@ pub fn validate_mlperf_tiny_static_run(
         if energy.scope != contract.measurement_scope
             || !energy.energy_uj.is_finite()
             || energy.energy_uj <= 0.0
+            || !energy.expanded_uncertainty_uj.is_finite()
+            || energy.expanded_uncertainty_uj < 0.0
+            || energy.replicate_count < 2
         {
-            return Err(MlperfTinyContractError::new("run.energy", "energy scope must match the task and energy must be finite and positive"));
+            return Err(MlperfTinyContractError::new(
+                "run.energy",
+                "energy scope/mean/uncertainty is invalid or fewer than two energy replicates were supplied",
+            ));
         }
+        require_digest("run.energy.uncertainty_receipt_sha256", &energy.uncertainty_receipt_sha256)?;
         require_digest("run.energy.measurement_receipt_sha256", &energy.measurement_receipt_sha256)?;
         require_digest("run.energy.raw_power_trace_sha256", &energy.raw_power_trace_sha256)?;
     }
@@ -601,15 +684,21 @@ pub fn validate_mlperf_tiny_pairwise_comparability(
         return Err(MlperfTinyContractError::new("comparison", "candidate contracts must be distinct"));
     }
     if left.suite_version != right.suite_version
+        || left.suite_release_sha256 != right.suite_release_sha256
+        || left.rules_version != right.rules_version
         || left.rules_document_sha256 != right.rules_document_sha256
         || left.task != right.task
         || left.division != right.division
+        || left.quality_policy != right.quality_policy
         || left.dataset_sha256 != right.dataset_sha256
         || left.accuracy_split_sha256 != right.accuracy_split_sha256
         || left.performance_split_sha256 != right.performance_split_sha256
+        || left.calibration_split_sha256 != right.calibration_split_sha256
         || left.measurement_scope != right.measurement_scope
         || left.target_id != right.target_id
         || left.board_revision != right.board_revision
+        || left.cpu_core != right.cpu_core
+        || left.accelerator_profile != right.accelerator_profile
         || left.hardware_tier != right.hardware_tier
     {
         return Err(MlperfTinyContractError::new(
@@ -634,6 +723,7 @@ mod tests {
             schema: CONTRACT_SCHEMA.into(),
             version: VERSION.into(),
             suite_version: SUITE_VERSION.into(),
+            suite_release_sha256: sha('0'),
             rules_version: "pinned-rules-fixture-v1".into(),
             rules_document_sha256: sha('a'),
             task,
@@ -648,7 +738,8 @@ mod tests {
             reference_weights_sha256: Some(sha('1')),
             reference_preprocessing_sha256: Some(sha('2')),
             reference_postprocessing_sha256: Some(sha('3')),
-            candidate_model_sha256: sha('4'),
+            candidate_model_sha256: sha('f'),
+            candidate_weights_sha256: sha('1'),
             candidate_training_recipe_sha256: None,
             candidate_quantization_recipe_sha256: Some(sha('5')),
             preprocessing_sha256: sha('2'),
@@ -660,7 +751,13 @@ mod tests {
             runtime: "tflm-cmsis-nn-fixture".into(),
             target_id: "cortex-m55-fixture".into(),
             board_revision: "board-rev-a".into(),
+            cpu_core: "cortex-m55".into(),
+            accelerator_profile: "mve-cpu-only-npu-disabled".into(),
             hardware_tier: MlperfTinyHardwareTier::CortexMMveCpu,
+            sram_budget_bytes: 512 * 1024,
+            protected_sram_reserve_bytes: 64 * 1024,
+            flash_budget_bytes: 2 * 1024 * 1024,
+            p95_deadline_us: 100_000,
             measurement_scope: definition.measurement_scope,
             contract_sha256: String::new(),
         };
@@ -763,7 +860,11 @@ mod tests {
             candidate_configuration_sha256: contract.candidate_configuration_sha256.clone(),
             target_id: contract.target_id.clone(),
             board_revision: contract.board_revision.clone(),
+            cpu_core: contract.cpu_core.clone(),
+            accelerator_profile: contract.accelerator_profile.clone(),
             hardware_tier: contract.hardware_tier,
+            device_session_sha256: sha('e'),
+            measurement_protocol_sha256: sha('f'),
             quality_result: MlperfTinyQualityResult::Top1Accuracy {
                 score_ppm: 920_000,
                 sample_count: 1_000,
@@ -798,7 +899,11 @@ mod tests {
             candidate_configuration_sha256: contract.candidate_configuration_sha256.clone(),
             target_id: contract.target_id.clone(),
             board_revision: contract.board_revision.clone(),
+            cpu_core: contract.cpu_core.clone(),
+            accelerator_profile: contract.accelerator_profile.clone(),
             hardware_tier: contract.hardware_tier,
+            device_session_sha256: sha('e'),
+            measurement_protocol_sha256: sha('f'),
             quality_result: MlperfTinyQualityResult::Top1Accuracy {
                 score_ppm: 800_000,
                 sample_count: 1_000,
