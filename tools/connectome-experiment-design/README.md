@@ -109,3 +109,29 @@ A high score means the declared candidate set plus its observation model is inad
 Input: \`schemas/adequacy-calibration-input.schema.json\`. Output: \`schemas/adequacy-calibration-output.schema.json\` (versioned \`AdequacyCalibrationReport\`). Synthetic fixtures: \`fixtures/adequacy-calibration.example.json\` and \`fixtures/adequacy-calibration-known-answers.json\`.
 
 This is a first reference implementation, not a biological adequacy certificate. Its mechanism-family sampling frame, score construction, exchangeability scope, and train/calibration/test separation must be reviewed and frozen before any biological test.
+
+
+## Goal-oriented target-query EIG
+
+Global mechanism EIG answers: "Which experiment best distinguishes the full candidate mechanism identity?" That is not always the scientific question. A scientist may instead ask whether an intervention increases a target output, whether an effect persists, whether a dose threshold is crossed, or whether an action is worth taking.
+
+A \`TargetCausalQuery\` maps every candidate hypothesis—including \`OTHER_OR_UNRESOLVED\`—to an explicit answer class. For each outcome, the implementation marginalizes hypotheses within each answer class and calculates:
+
+\`I(Q;Y | e) = H(Q) - E_Y[H(Q | Y,e)]\`
+
+Experiments are then ranked by the worst-case target-query information gain per unit cost across the caller-declared likelihood scenarios. Global mechanism EIG remains available as a separate comparator. The query's hypothesis IDs must exactly match candidate ordering; missing or empty answer labels fail closed.
+
+### Why the objective changes the selected experiment
+
+The analytic fixture uses priors \`[0.3, 0.3, 0.3, 0.1]\` for two mechanisms that both imply a positive target effect, one no-effect mechanism, and \`OTHER_OR_UNRESOLVED\`.
+
+- \`mechanism-discriminator\` perfectly distinguishes the two positive mechanisms. It earns 0.600 bits of global mechanism EIG, but **0 bits about the target positive/negative/unresolved answer**.
+- \`outcome-discriminator\` distinguishes positive from negative outcomes and retains an unresolved state. It earns 0.435946 bits of global EIG and **0.435946 bits about the target query**.
+
+At equal cost, global EIG prefers the first experiment; the target-query objective correctly prefers the second for this declared question. The numbers are analytic synthetic fixture values, not biological likelihood calibration or experiment advice.
+
+Input: \`schemas/target-query-input.schema.json\`. Output: \`schemas/target-query-output.schema.json\`. Fixtures: \`fixtures/target-query-eig.example.json\` and \`fixtures/target-query-eig-known-answers.json\`.
+
+### Boundary
+
+Query entropy is still not decision utility. A decision-focused planner needs an explicit downstream action set and utility matrix and should calculate expected value of sample information. It must not call target-query EIG "expected treatment benefit". Sequential dynamic regimes additionally require an assignment/availability history, positivity/identifiability contract, and excursion-effect estimand; see #9831.
