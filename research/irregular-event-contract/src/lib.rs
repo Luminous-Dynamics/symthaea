@@ -11,6 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use sha2::{Digest, Sha256};
 
 pub mod splits;
+pub mod scaler;
+pub use scaler::{FeatureScale, TrainOnlyStandardizer, WindowFeatureValue, ScalerError};
 pub use splits::{purged_chronological_split, EntitySplitBoundaries, ForecastWindow, PurgedSplitPlan, SplitError};
 use std::fmt;
 
