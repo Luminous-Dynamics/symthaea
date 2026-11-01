@@ -249,6 +249,7 @@ def generate(output_path: Path) -> dict[str, Any]:
             per_partition_scores.append({
                 "partition_index": partition_index,
                 "cut_sha256": partition_cut_sha,
+                "lex_key_hex": partition.lex_key().hex(),
                 "removed_edges": partition_cut_edges,
                 "signed_phi": _json_value(partition_sia.signed_phi),
                 "phi": _json_value(partition_sia.phi),
@@ -273,15 +274,27 @@ def generate(output_path: Path) -> dict[str, Any]:
             tied_sha, tied_edges = _mip_cut_identity(tied_sia)
             if tied_sha is None or tied_edges is None:
                 raise RuntimeError("fixed-state PyPhi numerical MIP tie has no cut identity")
-            mip_tie_cuts.append((tied_sha, tied_edges))
-        mip_tie_cuts = sorted({sha: edges for sha, edges in mip_tie_cuts}.items())
+            mip_tie_cuts.append((
+                tied_sha,
+                tied_edges,
+                tied_sia.partition.lex_key().hex(),
+            ))
+        mip_tie_cuts = sorted(
+            {sha: (edges, lex_key) for sha, edges, lex_key in mip_tie_cuts}.items()
+        )
         mip_tie_cut_sha256s = [sha for sha, _ in mip_tie_cuts]
-        mip_tie_cut_removed_edges = [edges for _, edges in mip_tie_cuts]
+        mip_tie_cut_removed_edges = [payload[0] for _, payload in mip_tie_cuts]
+        mip_tie_lex_key_hexes = [payload[1] for _, payload in mip_tie_cuts]
         default_resolved_ties = list(fixed_state_sia.ties)
         default_resolved_cut_shas = sorted(
             sha for sha, _ in (_mip_cut_identity(tied_sia) for tied_sia in default_resolved_ties)
             if sha is not None
         )
+        default_resolved_lex_keys = [tied_sia.partition.lex_key().hex() for tied_sia in default_resolved_ties]
+        if default_resolved_lex_keys != [min(mip_tie_lex_key_hexes)]:
+            raise RuntimeError(
+                "PyPhi PARTITION_LEX representative is not the minimum lex_key in the numerical MIP tie family"
+            )
         mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(sia)
         if mip_cut_sha256 not in mip_tie_cut_sha256s:
             raise RuntimeError(
@@ -296,7 +309,9 @@ def generate(output_path: Path) -> dict[str, Any]:
             "mip_tie_count": len(mip_tie_cut_sha256s),
             "mip_tie_cut_sha256s": mip_tie_cut_sha256s,
             "mip_tie_cut_removed_edges": mip_tie_cut_removed_edges,
+            "mip_tie_lex_key_hexes": mip_tie_lex_key_hexes,
             "mip_default_resolved_tie_count": len(default_resolved_cut_shas),
+            "mip_default_resolved_lex_key_hex": default_resolved_lex_keys[0],
             "mip_default_resolved_cut_sha256s": default_resolved_cut_shas,
             "partition_scores": per_partition_scores,
             "phi": _json_value(raw.get("phi")),
