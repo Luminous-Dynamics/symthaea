@@ -40,7 +40,7 @@ def _trial(n: int, seed: int, delta: Fraction = Fraction(1, 10)) -> dict[str, An
     indexed_run_ms = (time.perf_counter_ns() - start) / 1e6
 
     # Measure one independent O(t) threshold scan at the final arrival.
-    next_weight = Fraction(1, n + 1) / Fraction(1, n + 2)
+    next_weight = Fraction(1, (n + 1) * (n + 2))
     rejected_ids = [
         i + 1 for i, rejected in enumerate(index.rejected) if rejected
     ]
