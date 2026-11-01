@@ -5,6 +5,7 @@ from countable_global_projective_eclosure import (
     coordinate_weight,
     finite_weight_mass,
     projective_certificate,
+    separate_local_closure,
     verify_countable_global_projective_path,
     verify_weight_scheme_prefix,
 )
@@ -56,7 +57,7 @@ class CountableGlobalProjectiveEclosureTests(unittest.TestCase):
         self.assertTrue(result["all_projective_identities_verified"])
         self.assertTrue(result["all_true_null_losses_dominated"])
         self.assertEqual(result["times_checked"], 4)
-        self.assertEqual(result["local_constraints_checked"], 1 + 3 + 7 + 15)
+        self.assertEqual(result["local_constraints_covered"], 1 + 3 + 7 + 15)
 
     def test_telescoping_scheme_has_same_projective_identity(self):
         result = verify_countable_global_projective_path(
@@ -125,6 +126,43 @@ class CountableGlobalProjectiveEclosureTests(unittest.TestCase):
             verify_countable_global_projective_path(
                 ((1,),), ((2,),), (1, 2), {1: [1], 2: [1]}, self.alpha,
             )
+
+    def test_linear_separator_matches_exhaustive_subset_enumeration(self):
+        from itertools import combinations, product
+
+        alpha = Fraction(1, 2)
+        value_grid = (Fraction(0), Fraction(1, 2), Fraction(1), Fraction(2), Fraction(5))
+        for n in range(1, 6):
+            active = tuple(range(1, n + 1))
+            subsets = tuple(
+                subset
+                for size in range(1, n + 1)
+                for subset in combinations(active, size)
+            )
+            for vals in product(value_grid, repeat=n):
+                values = dict(zip(active, vals))
+                for mask in range(1 << n):
+                    rejected = tuple(active[i] for i in range(n) if (mask >> i) & 1)
+                    brute_valid = True
+                    for subset in subsets:
+                        cert = projective_certificate(subset, values, scheme="geometric")
+                        loss = Fraction(len(set(rejected) & set(subset)), len(rejected)) if rejected else Fraction(0)
+                        if loss > alpha * cert:
+                            brute_valid = False
+                            break
+                    fast = separate_local_closure(active, rejected, values, alpha, scheme="geometric")
+                    self.assertEqual(fast["certified"], brute_valid, (n, values, rejected, fast))
+
+    def test_separator_returns_a_real_violating_intersection(self):
+        active = (1, 2, 3)
+        values = {1: Fraction(1), 2: Fraction(0), 3: Fraction(1)}
+        rejected = (1,)
+        result = separate_local_closure(active, rejected, values, Fraction(1, 2))
+        self.assertFalse(result["certified"], result)
+        witness = result["separating_subset"]
+        cert = projective_certificate(witness, values)
+        loss = Fraction(len(set(rejected) & set(witness)), len(rejected))
+        self.assertGreater(loss, Fraction(1, 2) * cert)
 
     def test_empty_true_set_still_has_unit_cash_certificate(self):
         result = verify_countable_global_projective_path(
