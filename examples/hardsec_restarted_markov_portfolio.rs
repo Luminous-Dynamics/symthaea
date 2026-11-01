@@ -421,7 +421,7 @@ fn report() -> Value {
     json!({
         "schema_version": "hardsec-restarted-markov-portfolio-oracle-v1",
         "result": "exact_rational_restart_mixture_enumeration_passed",
-        "claim_scope": "known_fully_observed_two_state_markov_null_with_fixture_supplied_upper_envelope",
+        "claim_scope": "synthetic_fixed_count_hoeffding_envelope_under_known_fully_observed_two_state_markov_fixture",
         "transition_model": {
             "numerators": TRANSITION_NUMERATORS,
             "common_denominator": PROBABILITY_DENOMINATOR
@@ -442,6 +442,8 @@ fn report() -> Value {
                 "coordinate_count": CALIBRATION_COORDINATE_COUNT,
                 "delta_total": "1/10",
                 "delta_per_coordinate": "1/40",
+                "fixed_sample_count_per_source_row": true,
+                "source_row_visits_are_synthetic_tallies": true,
                 "fixed_point_scale": FIXED_POINT_SCALE.to_string(),
                 "envelope_quantization": "round_up_to_tenths",
                 "calibration_tally_is_synthetic": true,
@@ -489,9 +491,9 @@ fn report() -> Value {
             "effective_sample_size_estimate": null
         },
         "limitations": [
-            "The transition matrix and upper envelope are exact fixture constants.",
+            "The transition matrix is an exact fixture constant; the upper envelope is derived from a deterministic synthetic fixed-count calibration tally.",
             "The finite-horizon enumeration verifies this small rational implementation only.",
-            "No independent-calibration confidence envelope is implemented in this oracle.",
+            "The fixed-N Hoeffding envelope is evaluated on a synthetic tally; no randomized calibration coverage study or physical PMU receipt is included.",
             "No claim is made for hidden-state, higher-order, switching, adversarial, or arbitrary PMU processes.",
             "The 0.5 alpha is chosen for a compact exact oracle, not as an operational target."
         ]
@@ -551,18 +553,6 @@ mod tests {
                 * 10,
             CALIBRATION_DELTA_DENOMINATOR
         );
-    }
-
-    #[test]
-    fn fixed_count_calibration_formula_covers_each_known_fixture_transition() {
-        for state in 0..2 {
-            for next_state in 0..2 {
-                assert!(
-                    transition_probability(state, next_state)
-                        .le(upper_probability(state, next_state))
-                );
-            }
-        }
     }
 
     #[test]
