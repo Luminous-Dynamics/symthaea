@@ -72,6 +72,7 @@ pub struct EdgeHardwareMeasurementReceipt {
     pub run_id: String,
     pub candidate_id: String,
     pub artifact_sha256: String,
+    pub configuration_sha256: String,
     pub target_id: String,
     pub board_revision: String,
     pub cpu_core: String,
@@ -109,6 +110,7 @@ pub fn validate_edge_hardware_measurement_receipt(
     }
     for (field, value) in [
         ("artifact_sha256", receipt.artifact_sha256.as_str()),
+        ("configuration_sha256", receipt.configuration_sha256.as_str()),
         ("compiler_sha256", receipt.compiler_sha256.as_str()),
         ("firmware_sha256", receipt.firmware_sha256.as_str()),
         ("linker_map_sha256", receipt.linker_map_sha256.as_str()),
@@ -273,6 +275,7 @@ fn validate_candidate_bundle(
     if hardware.run_id != run_id
         || hardware.candidate_id != definition.candidate_id
         || hardware.artifact_sha256 != definition.artifact_sha256
+        || hardware.configuration_sha256 != definition.configuration_sha256
         || hardware.latency_samples_us.len() != dataset.observations.len()
         || hardware.target_id != manifest.target.target_id
         || hardware.board_revision != manifest.target.board_revision
@@ -495,6 +498,7 @@ mod tests {
             run_id: "run-1".into(),
             candidate_id: "candidate-1".into(),
             artifact_sha256: std::iter::repeat_n('a', 64).collect(),
+            configuration_sha256: std::iter::repeat_n('1', 64).collect(),
             target_id: "target-1".into(),
             board_revision: "rev-a".into(),
             cpu_core: "cortex-m55".into(),
