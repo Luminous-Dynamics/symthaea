@@ -99,7 +99,9 @@ pub use spectrum::{
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
     AdamStateSnapshot, AttentionMap, DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION,
-    DelayedHorizonEvaluatorState, DilationEstimate, HorizonAccumulatorState, LearningConfig,
+    DelayedHorizonEvaluatorState, DilationEstimate, HorizonAccumulatorState,
+    HorizonForecastReceiptState, HorizonForecastReceiptStatus, DEFAULT_MAX_HORIZON_FORECAST_RECEIPTS,
+    LearningConfig,
     ManifoldHealth, ManifoldState, ModalityTemporalContextState, MultiScaleConfig,
     ObjectHypothesis, PatchGrid, PendingHorizonForecastState, SalientRegion, ScaleHealth,
     SceneFrameMetadata, SceneGraphEdge, SceneMatch, SceneMemoryState, SpatialRelation,
