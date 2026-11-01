@@ -432,7 +432,7 @@ pub fn validate_temporal_benchmark_manifest(
     {
         return Err(EdgeAdapterError::new("temporal_suite_commit", "must be a lowercase 40-character Git commit SHA"));
     }
-    if manifest.tasks != TemporalTaskId::ALL {
+    if manifest.tasks != TemporalTaskId::ALL.to_vec() {
         return Err(EdgeAdapterError::new("tasks", "must contain the complete T1..T10 suite in canonical order"));
     }
     if manifest.candidates.is_empty()
@@ -671,6 +671,16 @@ pub fn validate_evaluator_result_receipt(
 ) -> Result<(), EdgeAdapterError> {
     if receipt.schema != EVALUATOR_SCHEMA || receipt.version != VERSION {
         return Err(EdgeAdapterError::new("evaluator_receipt.schema_version", "unsupported schema/version"));
+    }
+    if candidate.schema != CANDIDATE_SCHEMA
+        || candidate.version != VERSION
+        || !digest_is_nonzero(&candidate.candidate_receipt_sha256)
+        || compute_candidate_output_receipt_sha256(candidate) != candidate.candidate_receipt_sha256
+    {
+        return Err(EdgeAdapterError::new(
+            "evaluator_receipt.candidate_receipt",
+            "candidate output receipt is invalid or has been modified",
+        ));
     }
     if receipt.candidate_receipt_sha256 != candidate.candidate_receipt_sha256
         || !digest_is_nonzero(&receipt.oracle_sha256)
@@ -1007,12 +1017,13 @@ mod tests {
         validate_temporal_benchmark_manifest(&manifest).unwrap();
 
         let mut leaked = manifest.clone();
+        let training_source_family_id = leaked.seed_assignments.iter().find(|assignment| {
+            assignment.task_id == TemporalTaskId::T4OnlineDrift && assignment.split == SplitRole::Training
+        }).unwrap().source_family_id;
         let confirmatory = leaked.seed_assignments.iter_mut().find(|assignment| {
             assignment.task_id == TemporalTaskId::T4OnlineDrift && assignment.split == SplitRole::Confirmatory
         }).unwrap();
-        confirmatory.source_family_id = leaked.seed_assignments.iter().find(|assignment| {
-            assignment.task_id == TemporalTaskId::T4OnlineDrift && assignment.split == SplitRole::Training
-        }).unwrap().source_family_id;
+        confirmatory.source_family_id = training_source_family_id;
         leaked.manifest_sha256 = compute_temporal_benchmark_manifest_sha256(&leaked);
         assert!(validate_temporal_benchmark_manifest(&leaked).is_err());
     }
