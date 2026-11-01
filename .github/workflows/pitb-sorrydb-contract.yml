@@ -597,7 +597,10 @@ jobs:
           assert all("helper-normalize" in next(row for row in fixture["declarations"] if row["declaration_id"] == root)["dependency_ids"] for root in roots)
           assert helper["lifecycle_state"] == "stable"
           assert fixture["scheduler_decision"]["ready_frontier_goal_ids"] == fixture["scheduler_decision"]["selected_goal_ids"]
-          print("PITB_PROOF_GRAPH_SCHEMA_PASS: two target roots share one stable helper and enter one batched ready frontier")
+          assert fixture["scheduler_decision"]["selection_policy_id"] == "pitb.shared-stable-helper-batch.v0"
+          assert fixture["scheduler_decision"]["max_selected_goals"] == 8
+          assert len(fixture["scheduler_decision"]["selected_goal_ids"]) <= fixture["scheduler_decision"]["max_selected_goals"]
+          print("PITB_PROOF_GRAPH_SCHEMA_PASS: shared-helper batch is policy-pinned and within its registered cap")
           PY
       - name: Run importer self-tests and hash the exact snapshot twice
         shell: bash
