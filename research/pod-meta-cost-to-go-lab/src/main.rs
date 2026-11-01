@@ -565,6 +565,7 @@ fn main() {
                     .point_cost
                     .checked_add(residual)
                     .unwrap(),
+                meter_receipt_digest: [41; 32],
                 completion_verifier_digest: [37; 32],
             }
         })
