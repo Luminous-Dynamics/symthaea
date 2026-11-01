@@ -963,7 +963,7 @@ mod tests {
                 rng ^= rng >> 27;
                 let bits = rng.wrapping_mul(0x2545_f491_4f6c_dd1d);
                 let observation = (bits >> 63) as f64;
-                let sample_seed = bits.max(1);
+                let sample_seed = rng.max(1);
 
                 study.append(
                     "candidate-a",
@@ -982,7 +982,7 @@ mod tests {
                     missed_any_prefix = true;
                 }
             }
-            paths_with_any_miss += usize::from(missed_any_prefix);
+            paths_with_any_miss += if missed_any_prefix { 1 } else { 0 };
         }
 
         // For the tested coordinate, the frozen alpha allocation is 0.05/(10 candidates * 2 objectives).
