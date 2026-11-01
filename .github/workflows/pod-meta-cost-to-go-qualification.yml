@@ -39,6 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo +1.96.0 run --locked --quiet --manifest-path research/pod-meta-cost-to-go-lab/Cargo.toml --bin pod-meta-cost-to-go > cost-to-go-ledger.tsv
+          cat cost-to-go-ledger.tsv
           test "$(grep -c '^CASE' cost-to-go-ledger.tsv)" -eq 8
           test "$(grep -c '^SURVIVAL_ROW' cost-to-go-ledger.tsv)" -eq 2
           test "$(grep -c '^FORECAST_JOURNAL_ROW' cost-to-go-ledger.tsv)" -eq 2
