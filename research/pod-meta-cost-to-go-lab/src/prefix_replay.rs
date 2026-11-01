@@ -86,6 +86,8 @@ pub struct FeasibilityReplayMetrics {
     pub budgeted_prefixes: usize,
     pub predicted_feasible: usize,
     pub predicted_infeasible: usize,
+    pub resolved_predicted_feasible: usize,
+    pub resolved_predicted_infeasible: usize,
     pub actual_feasibility_known: usize,
     pub actual_feasible: usize,
     pub false_feasible: usize,
@@ -342,6 +344,11 @@ fn update_feasibility(
         return Ok(());
     };
     increment(&mut metrics.actual_feasibility_known)?;
+    if predicted {
+        increment(&mut metrics.resolved_predicted_feasible)?;
+    } else {
+        increment(&mut metrics.resolved_predicted_infeasible)?;
+    }
     if actual {
         increment(&mut metrics.actual_feasible)?;
     }
@@ -355,11 +362,11 @@ fn update_feasibility(
 
     metrics.false_feasible_rate = ratio(
         metrics.false_feasible,
-        metrics.predicted_feasible,
+        metrics.resolved_predicted_feasible,
     );
     metrics.false_infeasible_rate = ratio(
         metrics.false_infeasible,
-        metrics.predicted_infeasible,
+        metrics.resolved_predicted_infeasible,
     );
     Ok(())
 }
@@ -707,7 +714,9 @@ mod tests {
         assert_eq!(report.feasibility.false_infeasible, 1);
         assert_eq!(report.feasibility.unknown_actual_outcomes, 1);
         assert_eq!(report.feasibility.false_feasible_rate, Some(0.5));
-        assert_eq!(report.feasibility.false_infeasible_rate, Some(0.5));
+        assert_eq!(report.feasibility.resolved_predicted_feasible, 2);
+        assert_eq!(report.feasibility.resolved_predicted_infeasible, 1);
+        assert_eq!(report.feasibility.false_infeasible_rate, Some(1.0));
     }
 
     #[test]
