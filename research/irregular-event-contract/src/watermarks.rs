@@ -162,6 +162,9 @@ pub enum WatermarkError {
         expected: u64,
         actual: u64,
     },
+    PolicyChangedWithinGeneration {
+        stream_generation: u64,
+    },
     ProgressSequenceMismatch {
         expected: u64,
         actual: u64,
@@ -204,6 +207,7 @@ impl fmt::Display for WatermarkError {
             Self::NonIncreasingTransactionTime { previous, actual } => write!(f, "source progress transaction time {actual} must be later than previous commit {previous}"),
             Self::UnknownSourceGeneration { source } => write!(f, "source {:?} has no prior generation", source),
             Self::StreamGenerationMismatch { expected, actual } => write!(f, "expected source stream generation {expected}, received {actual}"),
+            Self::PolicyChangedWithinGeneration { stream_generation } => write!(f, "source progress policy changed without advancing stream generation {stream_generation}"),
             Self::ProgressSequenceMismatch { expected, actual } => write!(f, "expected progress sequence {expected}, received {actual}"),
             Self::WatermarkRegression { previous, actual } => write!(f, "exclusive source watermark regressed from {previous} to {actual}"),
             Self::SourceAlreadyEnded { source } => write!(f, "source {:?} already declared end-of-stream", source),
@@ -341,6 +345,11 @@ impl SourceWatermarkLedger {
                     });
                 }
                 if revision.stream_generation == previous.stream_generation {
+                    if revision.policy_sha256 != previous.policy_sha256 {
+                        return Err(WatermarkError::PolicyChangedWithinGeneration {
+                            stream_generation: revision.stream_generation,
+                        });
+                    }
                     let expected = previous.progress_sequence.checked_add(1)
                         .ok_or(WatermarkError::ArithmeticOverflow)?;
                     if revision.progress_sequence != expected {
@@ -839,6 +848,22 @@ mod tests {
             Err(WatermarkError::WatermarkRegression { previous: 100, actual: 90 })
         );
         ledger.append(progress(3, 1, 2, 1, 21, 120, false)).unwrap();
+        assert_eq!(ledger.revisions().last().unwrap().stream_generation, 2);
+    }
+
+    #[test]
+    fn progress_policy_change_requires_new_stream_generation() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
+        let mut changed = progress(2, 1, 1, 2, 20, 110, false);
+        changed.policy_sha256 = [8; 32];
+        assert_eq!(
+            ledger.append(changed),
+            Err(WatermarkError::PolicyChangedWithinGeneration { stream_generation: 1 })
+        );
+        let mut new_generation = progress(3, 1, 2, 1, 21, 120, false);
+        new_generation.policy_sha256 = [8; 32];
+        ledger.append(new_generation).unwrap();
         assert_eq!(ledger.revisions().last().unwrap().stream_generation, 2);
     }
 
