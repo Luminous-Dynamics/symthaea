@@ -92,6 +92,8 @@
         "minimum_lcb_delta_ppm",
         "shadow_weights_ppm",
         "confidence_z_hundredths",
+        "prediction_model_id",
+        "prediction_model_version",
         "calibration_receipt_sha256"
       ],
       "properties": {
@@ -175,6 +177,14 @@
         },
         "calibration_receipt_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "prediction_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prediction_model_version": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
