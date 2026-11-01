@@ -240,6 +240,8 @@ pub struct MetricCalibrationObservation {
     pub seed: u64,
     pub uninformative_metric_value: f64,
     pub positive_control_metric_value: f64,
+    /// Metric value for a perfect predictor on the same known-answer case.
+    pub perfect_metric_value: f64,
 }
 
 /// Calibration requirements are declared before looking at model-comparison
@@ -280,6 +282,9 @@ pub struct MetricCalibrationBin {
     /// Positive means the known-positive predictor scores better than the
     /// uninformative predictor, after applying metric direction.
     pub mean_oriented_improvement: f64,
+    /// Mean fraction of the available uninformative-to-perfect metric range
+    /// captured by the positive-control predictor.
+    pub mean_dynamic_range_fraction: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -472,6 +477,7 @@ pub fn calibrate_predictive_metric(
         }
         if !observation.uninformative_metric_value.is_finite()
             || !observation.positive_control_metric_value.is_finite()
+            || !observation.perfect_metric_value.is_finite()
         {
             return Err(EvalError::NonFiniteMetricCalibrationValue);
         }
@@ -501,6 +507,7 @@ pub fn calibrate_predictive_metric(
         let mut ties = 0usize;
         let mut losses = 0usize;
         let mut improvement_sum = 0.0f64;
+        let mut dynamic_range_fraction_sum = 0.0f64;
 
         for observation in &group {
             if !replicate_ids.insert(observation.replicate_id.as_str()) {
@@ -527,6 +534,28 @@ pub fn calibrate_predictive_metric(
                 return Err(EvalError::NumericOverflow);
             }
 
+            let perfect_improvement = match direction {
+                MetricDirection::HigherIsBetter => {
+                    observation.perfect_metric_value - observation.uninformative_metric_value
+                }
+                MetricDirection::LowerIsBetter => {
+                    observation.uninformative_metric_value - observation.perfect_metric_value
+                }
+            };
+            if !perfect_improvement.is_finite()
+                || perfect_improvement <= config.tie_tolerance
+            {
+                return Err(EvalError::NonFiniteMetricCalibrationValue);
+            }
+            let dynamic_range_fraction = improvement / perfect_improvement;
+            if !dynamic_range_fraction.is_finite() {
+                return Err(EvalError::NumericOverflow);
+            }
+            dynamic_range_fraction_sum += dynamic_range_fraction;
+            if !dynamic_range_fraction_sum.is_finite() {
+                return Err(EvalError::NumericOverflow);
+            }
+
             if improvement > config.tie_tolerance {
                 wins += 1;
             } else if improvement < -config.tie_tolerance {
@@ -549,6 +578,7 @@ pub fn calibrate_predictive_metric(
             one_sided_wilson_lower_bound: interval.lower,
             one_sided_wilson_upper_bound: interval.upper,
             mean_oriented_improvement: improvement_sum / count as f64,
+            mean_dynamic_range_fraction: dynamic_range_fraction_sum / count as f64,
         });
     }
 
@@ -1325,6 +1355,7 @@ mod tests {
                 seed: index as u64 + 1,
                 uninformative_metric_value: 0.0,
                 positive_control_metric_value: *improvement,
+                perfect_metric_value: 1.0,
             })
             .collect()
     }
@@ -1356,6 +1387,7 @@ mod tests {
         let mut positive = metric_calibration_observations(1.0, &[0.0; 20]);
         for row in &mut positive {
             row.uninformative_metric_value = 1.0;
+            row.perfect_metric_value = 0.0;
         }
         observations.extend(positive);
         let report = calibrate_predictive_metric(
@@ -1396,6 +1428,22 @@ mod tests {
         ).unwrap();
         assert_eq!(report.monotonicity_violations, 1);
         assert!(!report.calibrated_for_declared_grid);
+    }
+
+    #[test]
+    fn metric_calibration_reports_scale_normalized_dynamic_range_fraction() {
+        let mut observations = metric_calibration_observations(0.0, &[0.0; 20]);
+        observations.extend(metric_calibration_observations(1.0, &[0.5; 20]));
+        observations.extend(metric_calibration_observations(2.0, &[1.0; 20]));
+        let report = calibrate_predictive_metric(
+            "drf-score",
+            MetricDirection::HigherIsBetter,
+            &observations,
+            MetricCalibrationConfig::default(),
+        ).unwrap();
+        assert_eq!(report.bins[0].mean_dynamic_range_fraction, 0.0);
+        assert_eq!(report.bins[1].mean_dynamic_range_fraction, 0.5);
+        assert_eq!(report.bins[2].mean_dynamic_range_fraction, 1.0);
     }
 
     #[test]
