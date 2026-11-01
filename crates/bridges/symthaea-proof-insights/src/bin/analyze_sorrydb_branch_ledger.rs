@@ -5,6 +5,9 @@
 //! A branch candidate is untrusted; promotion binds its exact bytes to a
 //! separate checker, an independent replay, and an unchanged target type.
 
+#[path = "../snapshot_branch_receipt.rs"]
+mod snapshot_branch_receipt;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
@@ -117,7 +120,10 @@ struct Promotion {
 
 enum Mode {
     Help,
-    Validate(PathBuf),
+    Validate {
+        ledger_path: PathBuf,
+        snapshot_receipt_path: Option<PathBuf>,
+    },
     SelfTest(PathBuf),
 }
 
@@ -437,21 +443,88 @@ fn validate(ledger: &Ledger) -> Result<()> {
     Ok(())
 }
 
+fn validate_snapshot_receipt_link(
+    ledger: &Ledger,
+    snapshot_receipt_path: Option<&std::path::Path>,
+) -> Result<()> {
+    match (ledger.arm_id.as_str(), ledger.evidence_class.as_str(), snapshot_receipt_path) {
+        ("R5", "measured_run", Some(path)) => {
+            let expected = ledger.snapshot_receipt_sha256
+                .as_deref()
+                .context("R5 measured ledger has no snapshot receipt digest")?;
+            let receipt = snapshot_branch_receipt::verify_file(path, Some(expected))?;
+            if receipt.run_status != "measured" {
+                bail!("R5 branch ledger links to a snapshot receipt that is not measured");
+            }
+            if receipt.task_id != ledger.task.task_id
+                || receipt.repository_commit != ledger.task.repository_commit
+                || receipt.proof_state_sha256 != ledger.task.proof_state_sha256
+            {
+                bail!("R5 snapshot receipt task, commit or proof-state identity differs from the branch ledger");
+            }
+            let started: BTreeSet<&str> = ledger.branches.iter()
+                .filter(|branch| branch.status != "planned")
+                .map(|branch| branch.branch_id.as_str())
+                .collect();
+            let receipt_ids: BTreeSet<&str> =
+                receipt.branch_ids.iter().map(String::as_str).collect();
+            if started != receipt_ids || receipt.branch_count as usize != started.len() {
+                bail!("R5 snapshot receipt branch IDs/count do not match the branch ledger's started branches");
+            }
+        }
+        ("R5", "measured_run", None) => {
+            bail!("R5 measured ledger must supply --snapshot-receipt for exact-byte verification");
+        }
+        ("R5", "synthetic_contract_fixture", None) => {}
+        ("R5", "synthetic_contract_fixture", Some(path)) => {
+            let expected = ledger.snapshot_receipt_sha256.as_deref()
+                .context("R5 synthetic ledger has no snapshot receipt digest")?;
+            let receipt = snapshot_branch_receipt::verify_file(path, Some(expected))?;
+            if receipt.run_status != "not_attempted" {
+                bail!("synthetic R5 ledger must link to a no-run snapshot receipt");
+            }
+        }
+        (_, _, Some(_)) => {
+            bail!("--snapshot-receipt is allowed only with arm R5");
+        }
+        (_, _, None) => {}
+    }
+    Ok(())
+}
+
 fn parse_mode() -> Result<Mode> {
     let mut args = env::args().skip(1);
     let Some(action) = args.next() else {
-        bail!("expected --validate FILE, --self-test FILE, or --help");
+        bail!("expected --validate FILE [--snapshot-receipt FILE], --self-test FILE, or --help");
     };
     if matches!(action.as_str(), "--help" | "-h") {
         return Ok(Mode::Help);
     }
-    let path = args.next().context("expected a ledger file path")?;
-    if args.next().is_some() {
-        bail!("too many arguments");
-    }
+    let path = PathBuf::from(args.next().context("expected a ledger file path")?);
     match action.as_str() {
-        "--validate" => Ok(Mode::Validate(PathBuf::from(path))),
-        "--self-test" => Ok(Mode::SelfTest(PathBuf::from(path))),
+        "--validate" => {
+            let mut snapshot_receipt_path = None;
+            while let Some(flag) = args.next() {
+                match flag.as_str() {
+                    "--snapshot-receipt" => {
+                        if snapshot_receipt_path.is_some() {
+                            bail!("--snapshot-receipt supplied more than once");
+                        }
+                        snapshot_receipt_path = Some(PathBuf::from(
+                            args.next().context("missing snapshot receipt path")?
+                        ));
+                    }
+                    _ => bail!("unknown argument: {flag}"),
+                }
+            }
+            Ok(Mode::Validate { ledger_path: path, snapshot_receipt_path })
+        }
+        "--self-test" => {
+            if args.next().is_some() {
+                bail!("--self-test accepts exactly one ledger path");
+            }
+            Ok(Mode::SelfTest(path))
+        }
         _ => bail!("unknown action {action}"),
     }
 }
@@ -600,12 +673,13 @@ fn self_test(path: &PathBuf) -> Result<()> {
 fn run() -> Result<()> {
     match parse_mode()? {
         Mode::Help => {
-            println!("Usage: analyze_sorrydb_branch_ledger --validate FILE | --self-test FILE");
+            println!("Usage: analyze_sorrydb_branch_ledger --validate FILE [--snapshot-receipt FILE] | --self-test FILE");
             Ok(())
         }
-        Mode::Validate(path) => {
-            let (_, ledger) = load(&path)?;
+        Mode::Validate { ledger_path, snapshot_receipt_path } => {
+            let (_, ledger) = load(&ledger_path)?;
             validate(&ledger)?;
+            validate_snapshot_receipt_link(&ledger, snapshot_receipt_path.as_deref())?;
             println!(
                 concat!(
                     "PITB_SPECULATIVE_BRANCH_LEDGER_PASS: branches={} started={} ",
