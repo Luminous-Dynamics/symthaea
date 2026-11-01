@@ -183,3 +183,18 @@ The schema and synthetic fixture are `structured-visual-action-bank.v0.1.schema.
 The metric layer now includes an EVSI evaluator for selecting a camera view, probe, exploratory action or other information-acquisition operation. It computes expected utility under the best action before information, expected utility after conditioning on each possible signal, and subtracts the full acquisition cost. It returns the highest-net-value query only when the expected gain is strictly positive; otherwise it abstains. Probabilities and conditional utilities must be calibrated on held-out data, and each query estimate is bound to a history digest, canonical action/query manifests and exact evidence values.
 
 It also includes a constrained structured-action selector. A caller declares separate channel constraints such as terminal-risk upper bound and contact-probability lower bound; the selector removes actions whose interval violates any constraint, then requires a unique utility-dominant action among the feasible set. If there is one feasible action it reports FeasibleOnly, not utility dominance; if none are feasible or no unique best action exists it abstains. The per-interval nominal level is Bonferroni-adjusted over all candidate actions and the utility/constraint channels. All such decisions remain conditional on valid interval coverage and independent authority checks.
+
+
+
+## Action-response and shortcut diagnostics
+
+The VIS-005 residual branch now provides evaluate_action_response_set for a complete same-history action bank that contains an explicit no-op action. It computes future-state differences relative to that no-op branch and reports predicted/observed effect norms, effect-vector MSE, mean cosine over non-null pairs, and separate counts for missed, false-positive and both-null effects. This is designed to detect the failure in which all candidate futures remain nearly identical even when the actual branch outcomes differ.
+
+The diagnostic is intentionally not labelled as CoCo's exact Action Response Consistency (ARC) or Drift Energy (DE), because the current deterministic one-step residual has a narrower protocol. The branch also tests two model-specific metamorphic properties: zero action leaves the autonomous baseline unchanged, and opposite action embeddings yield antisymmetric residuals for this diagonal head. Those tests prove algebraic properties of this head, not physical reversibility of a robot/world.
+
+External references now included in the benchmark matrix:
+- OpenWAM (2026-10-06): composable video/action and independent inverse/forward dynamics; 32,000 counterfactual LIBERO-Long segments and 16 same-state action outcomes per context.
+- CoCo (2026-08-05): zero-action, inverse-action and mirror-scene consistency; ARC and Drift Energy diagnostics.
+- WorldOracle, MiraBench, World-In-World, CaliBench and KineBench for paired execution, action-following/failure bias, closed-loop task value, stochastic calibration and kinematic grounding.
+
+These baselines motivate qualification design. Published scores are not combined across task suites, embodiments or metric definitions.
