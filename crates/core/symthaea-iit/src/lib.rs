@@ -4079,7 +4079,7 @@ mod tests {
             for b_from_a in probability_pairs {
                 let mut tpm = Vec::with_capacity(8);
                 for state_index in 0..4 {
-                    let a_on = ((state_index >> 0) & 1) != 0;
+                    let a_on = (state_index & 1) != 0;
                     let b_on = ((state_index >> 1) & 1) != 0;
                     tpm.push(a_from_b[usize::from(b_on)]);
                     tpm.push(b_from_a[usize::from(a_on)]);
