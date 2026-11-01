@@ -231,9 +231,9 @@ impl BudgetLedger {
         }
 
         match evidence.effect {
-            EffectDisposition::Applied { measured_usage } => {
-                self.settle(id, measured_usage).map(ReconciliationOutcome::Settled)
-            }
+            EffectDisposition::Applied { measured_usage } => self
+                .settle(id, measured_usage)
+                .map(ReconciliationOutcome::Settled),
             EffectDisposition::NotApplied => {
                 self.release(id)?;
                 Ok(ReconciliationOutcome::Released)
@@ -316,10 +316,7 @@ impl BudgetLedger {
         Ok(())
     }
 
-    pub fn reservation_status(
-        &self,
-        id: ReservationId,
-    ) -> Result<ReservationStatus, LedgerError> {
+    pub fn reservation_status(&self, id: ReservationId) -> Result<ReservationStatus, LedgerError> {
         self.reservations
             .get(&id)
             .map(|reservation| reservation.status)
@@ -327,7 +324,9 @@ impl BudgetLedger {
     }
 
     pub fn remaining_capacity(&self) -> ResourceVector {
-        self.cap.saturating_sub(self.spent).saturating_sub(self.reserved)
+        self.cap
+            .saturating_sub(self.spent)
+            .saturating_sub(self.reserved)
     }
 
     pub fn hard_budget_invariant_holds(&self) -> bool {
