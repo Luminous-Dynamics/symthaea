@@ -11,6 +11,7 @@ from history_dependent_projective_betting import (
     shared_control_covariance,
     variance_of_shared_sum,
     verify_history_dependent_projective_receipt,
+    verify_predictable_arrival_schedule,
     verify_local_projective_closure,
 )
 
@@ -22,10 +23,14 @@ class HistoryDependentProjectiveBettingTests(unittest.TestCase):
             {1: 0.20, 2: 0.10},
             {1: 0.40, 2: 0.40, 3: -0.20},
         ]
+        self.arrival_policy = {
+            "first_active": 1,
+            "second_active_threshold": 0.0,
+            "third_active_threshold": 0.05,
+        }
         self.active = build_predictable_arrivals_from_history(
             self.observations,
-            second_active_threshold=0.0,
-            third_active_threshold=0.05,
+            **self.arrival_policy,
         )
         self.assertEqual(self.active, ((1,), (1, 2), (1, 2, 3)))
 
@@ -88,10 +93,36 @@ class HistoryDependentProjectiveBettingTests(unittest.TestCase):
         self.assertEqual(altered_schedule[0], self.active[0])
         self.assertNotIn(2, altered_schedule[1])
 
+    def test_arrival_schedule_is_replayed_from_previous_round_only(self):
+        audit = verify_predictable_arrival_schedule(
+            self.active, self.observations, **self.arrival_policy
+        )
+        self.assertTrue(audit["valid"], audit)
+        self.assertEqual(
+            [row["decision_uses_observations_through"] for row in audit["arrival_decisions"]],
+            [-1, 0, 1],
+        )
+
+    def test_same_round_activation_is_rejected_as_lookahead(self):
+        active = ((1,), (1, 2))
+        observations = ({1: -0.1}, {1: 0.1, 2: 0.2})
+        audit = verify_predictable_arrival_schedule(
+            active, observations,
+            first_active=1,
+            second_active_threshold=0.0,
+            third_active_threshold=0.5,
+        )
+        self.assertFalse(audit["valid"])
+        self.assertIn(
+            "predictable_arrival_mismatch",
+            [failure[0] for failure in audit["failures"]],
+        )
+
     def test_intersection_processes_are_neutral_padding_projective(self):
         result = build_history_dependent_projective_paths(
             self.active, self.observations,
             base_lambda=0.05, gain=0.02, maximum_lambda=0.5,
+            arrival_policy=self.arrival_policy,
         )
         self.assertTrue(result["projective"], result["projectivity_failures"])
         self.assertGreater(result["projectivity_checks"], 0)
@@ -106,7 +137,7 @@ class HistoryDependentProjectiveBettingTests(unittest.TestCase):
 
     def test_independent_receipt_replay_checks_every_factor_and_prefix(self):
         result = build_history_dependent_projective_paths(
-            self.active, self.observations
+            self.active, self.observations, arrival_policy=self.arrival_policy
         )
         check = verify_history_dependent_projective_receipt(result)
         self.assertTrue(check["valid"], check)
