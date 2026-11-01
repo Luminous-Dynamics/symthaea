@@ -590,3 +590,73 @@ Initial replication gate: at least 300 independent clean negatives per preregist
 
 Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
 
+## Independent model-pair power and precision planning (SCI-CAUSAL-POWER-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9841
+
+The exposure-transfer experiment has a strict independent unit: an independently trained treatment/placebo model pair. Source clusters are randomized within the training intervention; tasks, difficulty bands, repeated generations and scoring examples are nested measurements. They do not increase the number of independent training replications.
+
+### Model
+
+For each declared scenario, the planner models the standard deviation of the pair-level treatment-minus-placebo effect as:
+
+    effective_pair_SD = sqrt(between_pair_SD^2 + within_pair_item_SD^2 / items_per_pair)
+
+It then computes the noncentrality parameter:
+
+    delta = true_pair_effect / (effective_pair_SD / sqrt(completed_model_pairs))
+
+The degrees of freedom are always:
+
+    df = expected_completed_independent_model_pairs - 1
+
+Expected completed pairs are the deterministic floor of gross planned pairs × (1 − declared attrition rate). If fewer than two pairs are expected, power and precision are non-estimable.
+
+### Numerical method
+
+- Central Student-t CDF uses regularized incomplete beta with a continued fraction.
+- Critical values use deterministic bisection.
+- Noncentral-t power integrates over the chi-square scale mixture using fixed-step Simpson quadrature and a normal CDF approximation.
+- Two-sided, upper-tail and lower-tail alternatives are distinct.
+- Bonferroni adjusts per-contrast alpha when more than one confirmatory relation contrast is declared.
+- The planner reports target-power and expected two-sided 95% confidence-interval half-width requirements separately.
+
+The planner places a hard limit of 5,000 curve points before numerical integration. It does not train models or run a stochastic Monte Carlo simulation.
+
+### Crucial distinction: more questions do not equal more training replicates
+
+Increasing items per pair reduces only the declared within-pair measurement-noise component. It does not change completed model-pair count, degrees of freedom or the independent sample size.
+
+The between-pair SD is the critical quantity for generalizing to another independently trained model pair. A large item count can make each pair's effect more precisely measured, but cannot eliminate variation in the training process itself.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      plan-causal-power causal-power-plan-request.json causal-power-plan-report.json
+
+### Required scenario design
+
+Use low, central and high assumptions for:
+- true treatment-minus-placebo effect;
+- between-pair SD estimated from pilot pairs;
+- within-pair item measurement SD;
+- independent-pair attrition (0%, 10%, 20% or other preregistered values);
+- items per model pair.
+
+Report both 80% and 90% desired power scenarios, as well as a maximum confidence-interval half-width. For six predeclared transfer relations, use a registered familywise strategy; v1 implements Bonferroni as a transparent conservative option, not Holm.
+
+### Qualification targets (not achieved results)
+
+- Central Student-t CDF and critical values pass analytic inversion tests.
+- Noncentral-t power increases with effect magnitude and independent pair count.
+- Large-df numerical power agrees with the normal approximation within preregistered tolerance.
+- Increasing item count may reduce the within-pair noise component, but never changes df or independent pair count.
+- Attrition reduces completed independent pairs and degrees of freedom.
+- Multiplicity adjustment reduces per-contrast alpha and power at fixed n.
+- Heavy-tail, outlier, family-mixture and heteroskedastic sensitivity must be added before confirmatory use.
+- Pilot-derived scenario assumptions remain visible in the hashed input and report.
+
+### Claim ceiling
+
+This is a design-stage sensitivity planner, not observed statistical power. Results assume the declared paired-effect distribution, variance decomposition, attrition and alternative. The deterministic floor for expected completed pairs does not model random or informative missing-pair mechanisms. It does not prove that model pairs are independent, validate the causal estimand, authenticate receipts or establish external validity. No experiment is confirmatory merely because its pre-study plan reports adequate simulated power.
+
