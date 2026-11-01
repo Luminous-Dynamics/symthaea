@@ -4,6 +4,21 @@ use crate::liquid_state::{FixedPointLiquidState, LiquidStateError};
 use crate::packed_hdc::{
     Classification, InsertOutcome, MemoryError, PackedHdcMemory, PackedHv,
 };
+use crate::time_constant::{alpha_from_dt_tau_us, TimeConstantError};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EdgeCoreUpdateError {
+    ZeroTau,
+    InvalidInterpolationCoefficient,
+}
+
+impl From<TimeConstantError> for EdgeCoreUpdateError {
+    fn from(error: TimeConstantError) -> Self {
+        match error {
+            TimeConstantError::ZeroTau => Self::ZeroTau,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BoundedEdgeCore<
@@ -44,6 +59,21 @@ impl<const DIM: usize, const CLASSES: usize, const SLOTS: usize, const WORDS: us
         alpha_q15: u16,
     ) -> Result<(), LiquidStateError> {
         self.liquid_state.evolve_q15(equilibrium, alpha_q15)
+    }
+
+    /// Advance the liquid state using an integer dt/tau lookup coefficient.
+    /// The coefficient policy is Q16.16 + table interpolation; no floating-point
+    /// exponential is evaluated at runtime.
+    pub fn update_liquid_state_from_dt_tau_us(
+        &mut self,
+        equilibrium: &[i16; DIM],
+        dt_us: u64,
+        tau_us: u64,
+    ) -> Result<(), EdgeCoreUpdateError> {
+        let alpha = alpha_from_dt_tau_us(dt_us, tau_us)?;
+        self.liquid_state
+            .evolve_q15(equilibrium, alpha)
+            .map_err(|_| EdgeCoreUpdateError::InvalidInterpolationCoefficient)
     }
 
     pub fn remember(
@@ -97,6 +127,17 @@ mod tests {
         assert_eq!(result.class_index, 1);
         assert_eq!(result.hamming_distance, 0);
         assert_eq!(result.similarity_q15, 32_767);
+    }
+
+    #[test]
+    fn composed_core_uses_elapsed_time_and_tau_without_float_math() {
+        let mut core = BoundedEdgeCore::<2, 1, 1, 1>::new().unwrap();
+        core.update_liquid_state_from_dt_tau_us(&[10_000, -10_000], 10, 10).unwrap();
+        assert_eq!(core.liquid_state().values(), &[6_323, -6_323]);
+        assert_eq!(
+            core.update_liquid_state_from_dt_tau_us(&[0, 0], 1, 0),
+            Err(EdgeCoreUpdateError::ZeroTau)
+        );
     }
 
     #[test]
