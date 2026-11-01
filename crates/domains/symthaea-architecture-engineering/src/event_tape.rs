@@ -975,6 +975,12 @@ impl EventTape {
                         evidence_sha256,
                     },
                 ) => {
+                    if self.header.objective_contract.is_some() {
+                        return Err(EventTapeError::new(
+                            format!("{path}.intent.kind"),
+                            "scalar CandidateEvaluation cannot be mixed into a typed multi-objective EventTape",
+                        ));
+                    }
                     candidate_evaluations += 1;
                     validate_sha256(candidate_sha256, &format!("{path}.intent.candidate_sha256"))?;
                     if let Some(parent) = parent_candidate_sha256 {
