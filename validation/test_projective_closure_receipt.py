@@ -92,6 +92,15 @@ class ProjectiveClosureReceiptTests(unittest.TestCase):
         ]
         self._round_trip(entries)
 
+    def test_rejects_nonportable_float_snapshot_configuration(self):
+        with self.assertRaises(TypeError):
+            build_snapshot(
+                [{"hypothesis_id": "h", "b": Fraction(1, 4), "selected": True}],
+                manifest_root=_manifest(),
+                sequence=1,
+                configuration={"alpha": 0.05},
+            )
+
     def test_rejects_duplicate_ids_and_float_evidence(self):
         with self.assertRaises(ValueError):
             build_snapshot(
