@@ -157,7 +157,7 @@ impl MacroUnitSpec {
         if update_grain == 0 {
             return Err(MacroUnitError::ZeroUpdateGrain);
         }
-        let (sequence_state_bits, mapping_entries) =
+        let (_, mapping_entries) =
             mapping_domain(constituents.len(), update_grain, limits.max_mapping_entries)?;
         let mut background_apportionment = background_apportionment;
         background_apportionment.sort_unstable();
@@ -314,7 +314,6 @@ impl MacroUnitSpec {
             report.candidate_upper_bound,
             report.generated_coarse_grain + report.generated_blackbox
         );
-        let _ = sequence_state_bits;
         Ok(report)
     }
 
@@ -789,6 +788,24 @@ mod tests {
         assert_eq!(grain_one.candidates.len(), 5);
         assert_eq!(grain_one.duplicates_removed, 4);
         assert_eq!(grain_one.total_mapping_entries, 20);
+        assert_eq!(
+            grain_one
+                .candidates
+                .iter()
+                .map(|candidate| candidate.canonical_mapping().to_vec())
+                .collect::<Vec<_>>(),
+            vec![
+                vec![false, true, true, true],
+                vec![false, true, true, false],
+                vec![false, false, false, true],
+                vec![false, true, false, true],
+                vec![false, false, true, true],
+            ]
+        );
+        assert_eq!(
+            grain_one.candidate_set_sha256,
+            "833482091ba3267e40b747c67b5c6a89f133a99a871846cadd75b338a6dfe8bb"
+        );
         assert!(grain_one.complete);
 
         let grain_two = MacroUnitSpec::enumerate_default_mapping_families(
@@ -807,6 +824,10 @@ mod tests {
         assert_eq!(grain_two.candidate_upper_bound, 3);
         assert_eq!(grain_two.candidates.len(), 3);
         assert_eq!(grain_two.total_mapping_entries, 48);
+        assert_eq!(
+            grain_two.candidate_set_sha256,
+            "ddc99e040f0f4cee463126406680b079a6420cd435f50d685cd634ca4338f879"
+        );
         assert!(grain_two.complete);
     }
 
