@@ -1266,6 +1266,156 @@ fn linear_quantile(sorted: &[f64], probability: f64) -> f64 {
 mod tests {
     use super::*;
 
+    fn structured_visual_bank_fixture() -> StructuredJointActionSetSamples {
+        let mut bank = StructuredJointActionSetSamples {
+            history_sha256: "a".repeat(64),
+            horizon_steps: 5,
+            action_manifest_sha256: "c".repeat(64),
+            action_ids: vec![17, 3, 9],
+            joint_draw_ids: vec![100, 101, 102, 103, 104],
+            joint_draw_bank_sha256: "d".repeat(64),
+            coupling: JointDrawCoupling::SharedPosteriorAndWorldNoise,
+            channels: vec![
+                VisualBeliefChannelSamples {
+                    channel_id: "gripper.contact_probability".into(),
+                    kind: VisualBeliefChannelKind::Contact,
+                    unit: "probability".into(),
+                    outcome_samples: vec![
+                        vec![0.9, 0.8, 0.95, 0.85, 0.9],
+                        vec![0.5, 0.4, 0.55, 0.45, 0.5],
+                        vec![0.2, 0.1, 0.25, 0.15, 0.2],
+                    ],
+                },
+                VisualBeliefChannelSamples {
+                    channel_id: "object_42.position.x".into(),
+                    kind: VisualBeliefChannelKind::Geometry,
+                    unit: "m".into(),
+                    outcome_samples: vec![
+                        vec![10.0, 20.0, 30.0, 40.0, 50.0],
+                        vec![9.0, 19.0, 29.0, 39.0, 49.0],
+                        vec![8.0, 18.0, 28.0, 38.0, 48.0],
+                    ],
+                },
+            ],
+        };
+        bank.joint_draw_bank_sha256 =
+            compute_structured_joint_draw_bank_sha256(&bank).unwrap();
+        bank
+    }
+
+    #[test]
+    fn structured_visual_action_bank_preserves_semantic_channels_and_paired_effects() {
+        let bank = structured_visual_bank_fixture();
+        assert_eq!(
+            bank.joint_draw_bank_sha256,
+            "4c8f7c1de1ad1d886d873630a9e43c9f512d0a6665db7e4e610658d4cdd2de2b"
+        );
+        validate_structured_joint_action_set(&bank).unwrap();
+
+        let geometry = structured_action_effect_interval(
+            &bank,
+            "object_42.position.x",
+            17,
+            3,
+            0.8,
+        )
+        .unwrap();
+        assert_eq!(geometry.kind, VisualBeliefChannelKind::Geometry);
+        assert_eq!(geometry.unit, "m");
+        assert_eq!(geometry.interval.lower, 1.0);
+        assert_eq!(geometry.interval.upper, 1.0);
+
+        let contact = structured_action_effect_interval(
+            &bank,
+            "gripper.contact_probability",
+            17,
+            3,
+            0.8,
+        )
+        .unwrap();
+        assert_eq!(contact.kind, VisualBeliefChannelKind::Contact);
+        assert_eq!(contact.unit, "probability");
+        assert!((contact.interval.lower - 0.4).abs() < 1e-12);
+        assert!((contact.interval.upper - 0.4).abs() < 1e-12);
+
+        let predictions = structured_action_prediction_intervals(&bank, 0.8).unwrap();
+        assert_eq!(predictions.len(), 6);
+        assert_eq!(predictions[0].channel_id, "gripper.contact_probability");
+        assert_eq!(predictions[0].action_id, 3);
+
+        let all_effects = all_structured_action_effect_intervals(&bank, 0.8).unwrap();
+        assert_eq!(all_effects.len(), 6);
+        assert_eq!(all_effects[0].channel_id, "gripper.contact_probability");
+        assert_eq!((all_effects[0].left_action_id, all_effects[0].right_action_id), (3, 9));
+    }
+
+    #[test]
+    fn structured_visual_action_bank_rejects_channel_and_draw_tampering() {
+        let mut changed = structured_visual_bank_fixture();
+        changed.channels[0].outcome_samples[0][0] += 0.01;
+        assert_eq!(
+            validate_structured_joint_action_set(&changed),
+            Err(IntervalError::JointDrawBankDigestMismatch)
+        );
+
+        let mut duplicate_channel = structured_visual_bank_fixture();
+        duplicate_channel.channels[1].channel_id = duplicate_channel.channels[0].channel_id.clone();
+        assert_eq!(
+            validate_structured_joint_action_set_shape(&duplicate_channel),
+            Err(IntervalError::DuplicateVisualChannelId)
+        );
+
+        let mut invalid_descriptor = structured_visual_bank_fixture();
+        invalid_descriptor.channels[0].unit = " ".into();
+        assert_eq!(
+            validate_structured_joint_action_set_shape(&invalid_descriptor),
+            Err(IntervalError::InvalidVisualChannelDescriptor)
+        );
+
+        let mut bad_shape = structured_visual_bank_fixture();
+        bad_shape.channels[0].outcome_samples[0].pop();
+        assert_eq!(
+            validate_structured_joint_action_set_shape(&bad_shape),
+            Err(IntervalError::StructuredChannelSampleCardinalityMismatch)
+        );
+    }
+
+    #[test]
+    fn structured_visual_action_effect_is_action_row_permutation_invariant() {
+        let original = structured_visual_bank_fixture();
+        let expected = structured_action_effect_interval(
+            &original,
+            "object_42.position.x",
+            17,
+            9,
+            0.8,
+        )
+        .unwrap();
+
+        let mut permuted = original.clone();
+        permuted.action_ids = vec![9, 17, 3];
+        for channel in &mut permuted.channels {
+            channel.outcome_samples = vec![
+                channel.outcome_samples[2].clone(),
+                channel.outcome_samples[0].clone(),
+                channel.outcome_samples[1].clone(),
+            ];
+        }
+        permuted.joint_draw_bank_sha256 =
+            compute_structured_joint_draw_bank_sha256(&permuted).unwrap();
+
+        let actual = structured_action_effect_interval(
+            &permuted,
+            "object_42.position.x",
+            17,
+            9,
+            0.8,
+        )
+        .unwrap();
+        assert_eq!(actual.interval, expected.interval);
+        assert_eq!(actual.paired_draw_count, expected.paired_draw_count);
+    }
+
     fn joint_bank_fixture() -> JointActionSetSamples {
         let mut bank = JointActionSetSamples {
             history_sha256: "a".repeat(64),
