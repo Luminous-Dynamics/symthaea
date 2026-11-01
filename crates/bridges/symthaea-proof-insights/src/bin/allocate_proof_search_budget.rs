@@ -371,6 +371,18 @@ fn select_file(input: &PathBuf, calibration_path: &PathBuf, output: &PathBuf) ->
     Ok(())
 }
 
+fn refresh_policy_sha256(value: &mut Value) -> Result<()> {
+    let mut policy = value
+        .get("policy")
+        .cloned()
+        .context("policy object missing")?;
+    let object = policy.as_object_mut().context("policy must be an object")?;
+    object.remove("policy_sha256");
+    let hash = hex::encode(Sha256::digest(serde_json::to_vec(&policy)?));
+    value["policy"]["policy_sha256"] = Value::String(hash);
+    Ok(())
+}
+
 fn must_reject(label: &str, value: Value, calibration: &proof_search_calibration::CalibrationSummary) -> Result<()> {
     let bytes = serde_json::to_vec(&value)?;
     let digest = hex::encode(Sha256::digest(&bytes));
@@ -424,7 +436,13 @@ fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
 
     let mut bad = value.clone();
     bad["policy"]["calibration_ece_ppm"] = json!(80_000);
-    must_reject("calibration ECE above preregistered maximum", bad, &calibration)?;
+    refresh_policy_sha256(&mut bad)?;
+    must_reject("calibration ECE differs from verified receipt", bad, &calibration)?;
+
+    let mut bad = value.clone();
+    bad["policy"]["prediction_model_version"] = json!("unmatched-model");
+    refresh_policy_sha256(&mut bad)?;
+    must_reject("prediction model version differs from calibration", bad, &calibration)?;
 
     let mut bad = value.clone();
     bad["actions"][0]["proof_state_sha256"] = json!("f".repeat(64));
@@ -436,6 +454,7 @@ fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
 
     let mut bad = value.clone();
     bad["policy"]["calibration_receipt_sha256"] = json!("f".repeat(64));
+    refresh_policy_sha256(&mut bad)?;
     must_reject("calibration receipt byte digest mismatch", bad, &calibration)?;
 
     let mut bad = value.clone();
@@ -445,6 +464,7 @@ fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
 
     let mut bad = value.clone();
     bad["policy"]["shadow_weights_ppm"]["tokens"] = json!(0);
+    refresh_policy_sha256(&mut bad)?;
     must_reject("shadow weights do not sum to one", bad, &calibration)?;
 
     let mut bad = value.clone();
