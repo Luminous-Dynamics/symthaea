@@ -88,8 +88,8 @@ impl FrontierCostCoefficients {
         ];
         let mut total = self.intercept;
         for (coefficient, count) in coefficients.into_iter().zip(counts) {
-            let contribution =
-                scale_resource_vector(coefficient, count).ok_or(FrontierModelError::ArithmeticOverflow)?;
+            let contribution = scale_resource_vector(coefficient, count)
+                .ok_or(FrontierModelError::ArithmeticOverflow)?;
             total = total
                 .checked_add(contribution)
                 .ok_or(FrontierModelError::ArithmeticOverflow)?;
@@ -285,7 +285,11 @@ impl SplitVectorConformalCalibrator {
             if !episode_ids.insert(example.episode_id) {
                 return Err(VectorConformalError::DuplicateEpisode);
             }
-            if example.completion_verifier_digest.iter().all(|byte| *byte == 0) {
+            if example
+                .completion_verifier_digest
+                .iter()
+                .all(|byte| *byte == 0)
+            {
                 return Err(VectorConformalError::MissingCompletionVerifier);
             }
             validate_prediction(example.prediction)?;
@@ -404,9 +408,7 @@ pub fn assess_joint_resource_fit(
     }
 }
 
-fn validate_prediction(
-    prediction: FrontierCostPrediction,
-) -> Result<(), VectorConformalError> {
+fn validate_prediction(prediction: FrontierCostPrediction) -> Result<(), VectorConformalError> {
     if prediction.frontier_digest.iter().all(|byte| *byte == 0) {
         return Err(VectorConformalError::MissingFrontierDigest);
     }
@@ -472,7 +474,9 @@ fn resource_components(vector: ResourceVector) -> [u128; 6] {
 }
 
 fn resource_vector_is_positive(vector: ResourceVector) -> bool {
-    resource_components(vector).into_iter().all(|value| value > 0)
+    resource_components(vector)
+        .into_iter()
+        .all(|value| value > 0)
 }
 
 fn scale_resource_vector(vector: ResourceVector, factor: u64) -> Option<ResourceVector> {
@@ -574,8 +578,7 @@ mod tests {
         let examples = (1..=count)
             .map(|id| example(id as u64, id as u128))
             .collect::<Vec<_>>();
-        SplitVectorConformalCalibrator::fit(&examples, alpha, MODEL, CALIBRATION, COHORT)
-            .unwrap()
+        SplitVectorConformalCalibrator::fit(&examples, alpha, MODEL, CALIBRATION, COHORT).unwrap()
     }
 
     #[test]
@@ -610,9 +613,11 @@ mod tests {
             mandatory_verifier_operations: 3,
             ..ProofFrontierFeatures::default()
         };
-        assert!(model()
-            .predict(feature_set, [4; 32], COHORT, ShiftStatus::InDomain)
-            .is_ok());
+        assert!(
+            model()
+                .predict(feature_set, [4; 32], COHORT, ShiftStatus::InDomain)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -711,13 +716,7 @@ mod tests {
             completion_verifier_digest: [9; 32],
         };
         assert_eq!(
-            SplitVectorConformalCalibrator::fit(
-                &[example],
-                0.10,
-                MODEL,
-                CALIBRATION,
-                COHORT
-            ),
+            SplitVectorConformalCalibrator::fit(&[example], 0.10, MODEL, CALIBRATION, COHORT),
             Err(VectorConformalError::DifferentCalibrationCohort)
         );
 
@@ -732,26 +731,14 @@ mod tests {
     fn duplicate_episodes_and_unverified_completed_cases_are_rejected() {
         let duplicate = [example(1, 1), example(1, 2)];
         assert_eq!(
-            SplitVectorConformalCalibrator::fit(
-                &duplicate,
-                0.10,
-                MODEL,
-                CALIBRATION,
-                COHORT
-            ),
+            SplitVectorConformalCalibrator::fit(&duplicate, 0.10, MODEL, CALIBRATION, COHORT),
             Err(VectorConformalError::DuplicateEpisode)
         );
 
         let mut unverified = example(2, 1);
         unverified.completion_verifier_digest = [0; 32];
         assert_eq!(
-            SplitVectorConformalCalibrator::fit(
-                &[unverified],
-                0.10,
-                MODEL,
-                CALIBRATION,
-                COHORT
-            ),
+            SplitVectorConformalCalibrator::fit(&[unverified], 0.10, MODEL, CALIBRATION, COHORT),
             Err(VectorConformalError::MissingCompletionVerifier)
         );
     }
