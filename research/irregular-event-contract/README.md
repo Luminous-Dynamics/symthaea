@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Seventy-two Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests, 16 source-watermark tests) for delayed-observation non-leakage,
+Seventy-three Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests, 17 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -167,7 +167,7 @@ remain unchanged. The caller must also append the raw event to the bitemporal
 event ledger; the watermark module records the breach receipt, not the
 authoritative event itself.
 
-Sixteen source-authored watermark tests cover empty progress, multi-source
+Seventeen source-authored watermark tests cover empty progress, multi-source
 minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
 idempotent event arrivals, and deterministic rebuild/digest parity. No Rust
