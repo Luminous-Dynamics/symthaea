@@ -214,7 +214,7 @@ cargo test -p xtask basalt_trusted_state
 ```
 
 The model uses a stable source cursor key across observer-profile and boot changes. It requires explicit transition evidence for either change while preserving the next generation and predecessor link. It also models:
-- revision-bound prepare/commit (CAS) semantics;
+- revision- and exact-snapshot-bound prepare/commit (CAS) semantics; same-revision but divergent local snapshots cannot consume each other's prepared plans;
 - exact-receipt idempotency and receipt-digest collision rejection;
 - source-generation gap, stale-generation, equivocation and overflow rejection;
 - pinned log bootstrap, same-size fork rejection, stale checkpoint rejection and consistency-proof reference requirements;
