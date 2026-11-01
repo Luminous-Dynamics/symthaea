@@ -8,13 +8,13 @@
 //! deterministic synthetic causal benchmark, not a production scheduler or
 //! a claim of state-of-the-art performance.
 
+use pod_meta_lab::{
+    CandidateOperation as PodCandidateOperation, Obligation as PodObligation, ObligationState,
+    OperationKind, SchedulingClass, Selection as PodSelection, SelectionContext,
+    choose_next as pod_meta_choose_next,
+};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
-use pod_meta_lab::{
-    choose_next as pod_meta_choose_next, CandidateOperation as PodCandidateOperation,
-    Obligation as PodObligation, ObligationState, OperationKind, SchedulingClass,
-    Selection as PodSelection, SelectionContext,
-};
 
 pub const TEMPORAL: u8 = 0b0001;
 pub const INDEPENDENCE: u8 = 0b0010;
@@ -201,7 +201,14 @@ pub fn build_cases() -> Vec<TaskCase> {
             id: "minimum_sufficient_combined_packet",
             required_mask: REQUIRED,
             operations: vec![
-                op("complete_verified_packet", REQUIRED, REQUIRED, 6, 70, REQUIRED_MANDATORY),
+                op(
+                    "complete_verified_packet",
+                    REQUIRED,
+                    REQUIRED,
+                    6,
+                    70,
+                    REQUIRED_MANDATORY,
+                ),
                 op("temporal_lookup", T, T, 3, 20, 0),
                 op("independent_source", I, I, 3, 20, 0),
                 op("authority_check", A, A, 1, 15, 0),
@@ -330,7 +337,10 @@ fn oracle_subset(case: &TaskCase) -> Option<(u64, u32)> {
     }
 
     let n = case.operations.len();
-    let mandatory_indices: Vec<usize> = case.operations.iter().enumerate()
+    let mandatory_indices: Vec<usize> = case
+        .operations
+        .iter()
+        .enumerate()
         .filter_map(|(i, op)| (op.public.mandatory_mask != 0).then_some(i))
         .collect();
     let mandatory_mask = case.mandatory_mask();
@@ -346,7 +356,8 @@ fn oracle_subset(case: &TaskCase) -> Option<(u64, u32)> {
         for (i, operation) in case.operations.iter().enumerate() {
             if subset & (1u64 << i) != 0 {
                 cost = cost.saturating_add(operation.public.cost);
-                covered |= operation.verified_mask & operation_admissible_mask(operation.public.advertised_mask);
+                covered |= operation.verified_mask
+                    & operation_admissible_mask(operation.public.advertised_mask);
                 count += 1;
             }
         }
@@ -389,8 +400,18 @@ fn choose_with_pod_meta_router(
     let obligation_rows = [
         (TEMPORAL, "temporal", ObligationState::StaleOrRetracted, 6),
         (INDEPENDENCE, "independence", ObligationState::Contested, 6),
-        (AUTHORITY, "authority", ObligationState::CandidateEvidenceAvailable, 8),
-        (PROOF_PATH, "proof_path", ObligationState::CandidateEvidenceAvailable, 8),
+        (
+            AUTHORITY,
+            "authority",
+            ObligationState::CandidateEvidenceAvailable,
+            8,
+        ),
+        (
+            PROOF_PATH,
+            "proof_path",
+            ObligationState::CandidateEvidenceAvailable,
+            8,
+        ),
     ];
 
     let obligations: Vec<PodObligation> = obligation_rows
@@ -402,8 +423,7 @@ fn choose_with_pod_meta_router(
             } else {
                 *initial_state
             };
-            PodObligation::new(*id, state, *priority)
-                .with_state_identity(progress_key.to_owned())
+            PodObligation::new(*id, state, *priority).with_state_identity(progress_key.to_owned())
         })
         .collect();
 
@@ -413,7 +433,8 @@ fn choose_with_pod_meta_router(
         "authority".to_owned(),
         "proof_path".to_owned(),
     ];
-    let operations: Vec<PodCandidateOperation> = case.operations
+    let operations: Vec<PodCandidateOperation> = case
+        .operations
         .iter()
         .map(|operation| {
             let mask = operation.public.advertised_mask & case.required_mask;
@@ -423,7 +444,11 @@ fn choose_with_pod_meta_router(
                 .filter(|(bit, _, _, _)| target_mask & *bit != 0)
                 .map(|(_, id, _, _)| (*id).to_owned())
                 .collect();
-            let targets = if targets.is_empty() { all_ids.clone() } else { targets };
+            let targets = if targets.is_empty() {
+                all_ids.clone()
+            } else {
+                targets
+            };
 
             // One typed operation family is used per candidate. For mixed
             // profiles the real POD-Meta scheduler chooses only compatible
@@ -442,7 +467,11 @@ fn choose_with_pod_meta_router(
                 u64::from(operation.public.cost),
                 progress_key.to_owned(),
             );
-            if target_mask == 0 { candidate.inapplicable() } else { candidate }
+            if target_mask == 0 {
+                candidate.inapplicable()
+            } else {
+                candidate
+            }
         })
         .collect();
 
@@ -456,7 +485,11 @@ fn choose_with_pod_meta_router(
     let rejection_count = decision.rejected.len() as u32;
 
     match decision.selection {
-        PodSelection::Run { operation_id, obligation_ids, .. } => {
+        PodSelection::Run {
+            operation_id,
+            obligation_ids,
+            ..
+        } => {
             let selected_mask = obligation_ids.iter().fold(0u8, |mask, id| {
                 mask | match id.as_str() {
                     "temporal" => TEMPORAL,
@@ -466,7 +499,9 @@ fn choose_with_pod_meta_router(
                     _ => 0,
                 }
             });
-            let selected_index = case.operations.iter()
+            let selected_index = case
+                .operations
+                .iter()
                 .position(|operation| operation.public.id == operation_id.as_str());
             (selected_index, selected_mask, rejection_count)
         }
@@ -484,7 +519,10 @@ fn choose_next(
     seed: u64,
 ) -> Option<usize> {
     let remaining = budget.saturating_sub(spent);
-    let affordable: Vec<usize> = case.operations.iter().enumerate()
+    let affordable: Vec<usize> = case
+        .operations
+        .iter()
+        .enumerate()
         .filter_map(|(i, op)| (!attempted[i] && op.public.cost <= remaining).then_some(i))
         .collect();
     if affordable.is_empty() {
@@ -497,8 +535,13 @@ fn choose_next(
             let candidates: Vec<usize> = if policy == Policy::UnverifiedConfidence {
                 affordable
             } else {
-                affordable.into_iter()
-                    .filter(|i| operation_admissible_mask(case.operations[*i].public.advertised_mask) & unresolved != 0)
+                affordable
+                    .into_iter()
+                    .filter(|i| {
+                        operation_admissible_mask(case.operations[*i].public.advertised_mask)
+                            & unresolved
+                            != 0
+                    })
                     .collect()
             };
             candidates.into_iter().max_by(|a, b| {
@@ -510,8 +553,13 @@ fn choose_next(
             })
         }
         Policy::BudgetMatchedRandom => {
-            let eligible: Vec<usize> = affordable.into_iter()
-                .filter(|i| operation_admissible_mask(case.operations[*i].public.advertised_mask) & unresolved != 0)
+            let eligible: Vec<usize> = affordable
+                .into_iter()
+                .filter(|i| {
+                    operation_admissible_mask(case.operations[*i].public.advertised_mask)
+                        & unresolved
+                        != 0
+                })
                 .collect();
             if eligible.is_empty() {
                 return None;
@@ -519,12 +567,17 @@ fn choose_next(
             let mut state = seed
                 .wrapping_add(u64::from(spent).wrapping_mul(6364136223846793005))
                 .wrapping_add(attempted.iter().filter(|x| **x).count() as u64);
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             Some(eligible[((state >> 32) as usize) % eligible.len()])
         }
         Policy::PodMetaRouter => None,
         Policy::MaskCoverageGreedy => {
-            let mandatory_remaining: Vec<usize> = case.operations.iter().enumerate()
+            let mandatory_remaining: Vec<usize> = case
+                .operations
+                .iter()
+                .enumerate()
                 .filter_map(|(i, operation)| {
                     (operation.public.mandatory_mask != 0 && !attempted[i]).then_some(i)
                 })
@@ -537,13 +590,26 @@ fn choose_next(
                     return None;
                 }
                 return mandatory_remaining.into_iter().min_by(|a, b| {
-                    case.operations[*a].public.cost.cmp(&case.operations[*b].public.cost)
-                        .then_with(|| case.operations[*a].public.id.cmp(case.operations[*b].public.id))
+                    case.operations[*a]
+                        .public
+                        .cost
+                        .cmp(&case.operations[*b].public.cost)
+                        .then_with(|| {
+                            case.operations[*a]
+                                .public
+                                .id
+                                .cmp(case.operations[*b].public.id)
+                        })
                 });
             }
 
-            affordable.into_iter()
-                .filter(|i| operation_admissible_mask(case.operations[*i].public.advertised_mask) & unresolved != 0)
+            affordable
+                .into_iter()
+                .filter(|i| {
+                    operation_admissible_mask(case.operations[*i].public.advertised_mask)
+                        & unresolved
+                        != 0
+                })
                 .max_by(|a, b| {
                     let oa = &case.operations[*a].public;
                     let ob = &case.operations[*b].public;
@@ -557,11 +623,20 @@ fn choose_next(
         }
         Policy::OracleMinimumCost => {
             let (subset, _) = oracle_subset(case)?;
-            affordable.into_iter()
+            affordable
+                .into_iter()
                 .filter(|i| subset & (1u64 << i) != 0)
                 .min_by(|a, b| {
-                    case.operations[*a].public.cost.cmp(&case.operations[*b].public.cost)
-                        .then_with(|| case.operations[*a].public.id.cmp(case.operations[*b].public.id))
+                    case.operations[*a]
+                        .public
+                        .cost
+                        .cmp(&case.operations[*b].public.cost)
+                        .then_with(|| {
+                            case.operations[*a]
+                                .public
+                                .id
+                                .cmp(case.operations[*b].public.id)
+                        })
                 })
         }
     }
@@ -595,10 +670,16 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         let progress_key = format!("proof-state-{progress_version}");
         let (next, selected_obligation_mask) = if policy == Policy::PodMetaRouter {
             let (selected, selected_mask, rejected) = choose_with_pod_meta_router(
-                case, &attempted, &attempted_without_progress, verified_mask,
-                &progress_key, spent, budget,
+                case,
+                &attempted,
+                &attempted_without_progress,
+                verified_mask,
+                &progress_key,
+                spent,
+                budget,
             );
-            scheduler_candidate_rejections = scheduler_candidate_rejections.saturating_add(rejected);
+            scheduler_candidate_rejections =
+                scheduler_candidate_rejections.saturating_add(rejected);
             (selected, selected_mask)
         } else {
             (
@@ -640,11 +721,13 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         }
 
         if newly_verified == 0 && operation.public.mandatory_mask == 0 {
-            if operation_admissible_mask(operation.public.advertised_mask) & unresolved_before != 0 {
+            if operation_admissible_mask(operation.public.advertised_mask) & unresolved_before != 0
+            {
                 // The attempted operation targeted an open obligation, but
                 // independent verification rejected its proposed support.
                 rejected_candidate_count += 1;
-                rejected_candidate_cost = rejected_candidate_cost.saturating_add(operation.public.cost);
+                rejected_candidate_cost =
+                    rejected_candidate_cost.saturating_add(operation.public.cost);
             } else {
                 // The operation could not address any currently open proof
                 // obligation, so its cost is redundant/irrelevant in this task.
@@ -663,7 +746,10 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
 
     let completion_verified = verified_mask & case.required_mask == case.required_mask
         && mandatory_verified_mask & case.mandatory_mask() == case.mandatory_mask();
-    let all_mandatory_attempted = case.operations.iter().enumerate()
+    let all_mandatory_attempted = case
+        .operations
+        .iter()
+        .enumerate()
         .all(|(i, op)| op.public.mandatory_mask == 0 || attempted[i]);
     let reported_complete = match policy {
         Policy::UnverifiedConfidence => {
@@ -734,8 +820,10 @@ mod tests {
 
     #[test]
     fn proof_guided_completes_minimum_sufficient_multi_obligation_packet() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "valid_multi_obligation_packet")
+            .unwrap();
         let result = run_trial(&case, Policy::MaskCoverageGreedy, 14, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.spent, 9);
@@ -745,8 +833,10 @@ mod tests {
 
     #[test]
     fn proof_guided_does_not_accept_stale_evidence_claim_as_temporal_support() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "attractive_but_stale_evidence").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "attractive_but_stale_evidence")
+            .unwrap();
         let result = run_trial(&case, Policy::MaskCoverageGreedy, 10, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.false_support_count, 0);
@@ -757,8 +847,10 @@ mod tests {
 
     #[test]
     fn unverified_confidence_control_exposes_false_support() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "attractive_but_stale_evidence").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "attractive_but_stale_evidence")
+            .unwrap();
         let result = run_trial(&case, Policy::UnverifiedConfidence, 10, 1729);
         assert!(result.false_support_count > 0 || result.false_completion);
         assert!(!result.correct_abstention);
@@ -766,8 +858,10 @@ mod tests {
 
     #[test]
     fn mandatory_work_is_not_displaced_by_nonmandatory_gain() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "minimum_sufficient_combined_packet").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "minimum_sufficient_combined_packet")
+            .unwrap();
         let result = run_trial(&case, Policy::MaskCoverageGreedy, 5, 1729);
         assert_eq!(result.spent, 0);
         assert!(!result.completion_verified);
@@ -776,8 +870,10 @@ mod tests {
 
     #[test]
     fn actual_pod_meta_router_completes_verified_workflow_under_matched_budget() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "valid_multi_obligation_packet")
+            .unwrap();
         let result = run_trial(&case, Policy::PodMetaRouter, 14, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.missed_mandatory_count, 0);
@@ -787,8 +883,10 @@ mod tests {
 
     #[test]
     fn actual_pod_meta_router_preserves_mandatory_budget_reserve() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "minimum_sufficient_combined_packet").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "minimum_sufficient_combined_packet")
+            .unwrap();
         let result = run_trial(&case, Policy::PodMetaRouter, 5, 1729);
         assert_eq!(result.spent, 0);
         assert!(!result.completion_verified);
@@ -797,8 +895,10 @@ mod tests {
 
     #[test]
     fn actual_pod_meta_router_never_credits_unselected_obligations() {
-        let case = build_cases().into_iter()
-            .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
+        let case = build_cases()
+            .into_iter()
+            .find(|c| c.id == "valid_multi_obligation_packet")
+            .unwrap();
         let result = run_trial(&case, Policy::PodMetaRouter, 14, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.verified_obligations, result.required_obligations);
@@ -818,10 +918,16 @@ mod tests {
 
     #[test]
     fn all_policy_arms_share_the_typed_operation_admissibility_contract() {
-        assert_eq!(operation_admissible_mask(TEMPORAL | INDEPENDENCE), INDEPENDENCE);
+        assert_eq!(
+            operation_admissible_mask(TEMPORAL | INDEPENDENCE),
+            INDEPENDENCE
+        );
         assert_eq!(operation_admissible_mask(TEMPORAL), TEMPORAL);
         assert_eq!(operation_admissible_mask(INDEPENDENCE), INDEPENDENCE);
-        assert_eq!(operation_admissible_mask(AUTHORITY | PROOF_PATH), AUTHORITY | PROOF_PATH);
+        assert_eq!(
+            operation_admissible_mask(AUTHORITY | PROOF_PATH),
+            AUTHORITY | PROOF_PATH
+        );
         assert_eq!(operation_admissible_mask(0), 0);
     }
 
@@ -894,7 +1000,10 @@ mod tests {
     #[test]
     fn rejected_evidence_and_irrelevant_computation_have_separate_costs() {
         let cases = build_cases();
-        let stale = cases.iter().find(|c| c.id == "attractive_but_stale_evidence").unwrap();
+        let stale = cases
+            .iter()
+            .find(|c| c.id == "attractive_but_stale_evidence")
+            .unwrap();
         let rejected = run_trial(stale, Policy::MaskCoverageGreedy, 10, 10);
         assert!(rejected.rejected_candidate_count > 0);
         assert!(rejected.rejected_candidate_cost > 0);
