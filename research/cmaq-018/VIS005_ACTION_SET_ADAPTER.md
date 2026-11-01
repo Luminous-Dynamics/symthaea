@@ -155,3 +155,20 @@ A synthetic 3-episode known-answer fixture checks the arithmetic: +2.333 gross b
 ## Existing architecture gap and future-observation target
 
 The source-backed audit in [VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md) documents the current vision manifold delayed-horizon evaluator, cross-manifold mapper and JEPA target semantics. The joint action bank is a future adapter/evaluator seam, not proof that the current CfC/JEPA path is action-conditioned on real future visual observations. The future adapter must predict from a frozen history plus hypothetical action, and the evaluator must score against later observations from exact cloned branches without exposing hidden outcomes to the predictor.
+
+
+## Structured visual-belief channels
+
+The scalar `JointActionSetSamples` is appropriate for one outcome channel, but a visual belief is not one scalar. A structured action bank now adds `StructuredJointActionSetSamples` with multiple named channels that share the same observed-history digest, action manifest, horizon, action IDs, joint draw IDs, draw coupling declaration and content digest.
+
+Each channel carries:
+- stable channel ID (for example `object_42.position.x` or `gripper.contact_probability`);
+- semantic kind (geometry, motion, contact, visibility, task utility, terminal risk or other);
+- physical unit (metres, metres/second, probability, normalized utility, etc.);
+- an action-by-joint-draw outcome matrix.
+
+The API rejects duplicate/noncanonical channel IDs, empty/noncanonical units, duplicate action/draw IDs, shape mismatches, non-finite values and stale content digests. It exposes per-channel action prediction intervals, channel-specific paired effect intervals and all channel/action-pair effects in deterministic semantic order.
+
+**Do not aggregate these channels into one unqualified scalar.** Geometry error, contact probability, visibility and terminal risk have different units and decision meanings. A downstream planner may combine them only through an explicitly declared task utility/constraint function whose version and weights are frozen in the episode manifest. Report every channel separately, including unsupported/missing channels.
+
+The schema and synthetic fixture are `structured-visual-action-bank.v0.1.schema.json` and `fixtures/structured-visual-action-bank.example.json`. The focused workflow independently recomputes the canonical bank digest and checks channel uniqueness, units, sample cardinality and finite values. The fixture produces a one-metre position difference and a 0.4 contact-probability difference between the same two action IDs, with one shared draw axis. This tests pairing and channel preservation only; no vision model is connected yet.
