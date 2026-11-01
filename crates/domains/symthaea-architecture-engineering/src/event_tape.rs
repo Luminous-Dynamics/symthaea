@@ -13,8 +13,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+use super::pareto_objectives::ObjectiveDirection;
+
 const TAPE_SCHEMA: &str = "symthaea.ar5b4.event-tape";
-const TAPE_VERSION: &str = "0.1.0";
+const LEGACY_TAPE_VERSION: &str = "0.1.0";
+const TAPE_VERSION: &str = "0.2.0";
+const OBJECTIVE_CONTRACT_SCHEMA: &str = "symthaea.ar5b4.event-tape-objective-contract";
+const OBJECTIVE_CONTRACT_VERSION: &str = "0.1.0";
+const MAX_OBJECTIVE_DIMENSIONS: usize = 16;
+const MAX_OBJECTIVE_CANDIDATES: usize = 1_024;
 
 /// Which comparison question this tape belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
