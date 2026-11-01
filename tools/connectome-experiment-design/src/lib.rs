@@ -249,6 +249,24 @@ pub struct RankedOpenWorldExperiment {
     pub score: OpenWorldInformationGainScore,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenWorldExperimentReport {
+    pub schema_version: &'static str,
+    pub unresolved_hypothesis_id: &'static str,
+    pub ranked_experiments: Vec<RankedOpenWorldExperiment>,
+}
+
+pub fn evaluate_open_world_report(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+) -> Result<OpenWorldExperimentReport, DesignError> {
+    Ok(OpenWorldExperimentReport {
+        schema_version: "connectome-open-world-eig-v1",
+        unresolved_hypothesis_id: UNRESOLVED_HYPOTHESIS_ID,
+        ranked_experiments: rank_open_world_candidates(priors, candidates)?,
+    })
+}
+
 /// Shannon entropy in bits. Input probabilities must be non-negative and sum
 /// to one; all production calls validate this before evaluating entropy.
 pub fn entropy_bits(probabilities: &[f64]) -> f64 {
@@ -1015,6 +1033,21 @@ mod tests {
             evaluate_open_world_candidate(&priors, &candidate),
             Err(DesignError::LikelihoodMassNotOne { hypothesis_index: 0, .. })
         ));
+    }
+
+    #[test]
+    fn open_world_report_wrapper_is_versioned() {
+        let candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+            vec![vec![0.7, 0.3], vec![0.3, 0.7], vec![0.5, 0.5]],
+        );
+        let priors = [0.45, 0.45, 0.10];
+        let report = evaluate_open_world_report(&priors, &[candidate]).unwrap();
+        assert_eq!(report.schema_version, "connectome-open-world-eig-v1");
+        assert_eq!(report.unresolved_hypothesis_id, UNRESOLVED_HYPOTHESIS_ID);
+        assert_eq!(report.ranked_experiments.len(), 1);
     }
 
     #[test]
