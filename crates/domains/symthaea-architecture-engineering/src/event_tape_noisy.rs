@@ -327,6 +327,7 @@ pub fn replay_noisy_event_tape(
                             || bundle.receipt.replicate_id != *replicate_id
                             || bundle.receipt.sample_seed != *sample_seed
                             || bundle.receipt.plan_sha256 != plan_sha256
+                            || bundle.receipt.verifier_build_sha256 != header.verifier_sha256
                         {
                             return Err(EventTapeNoisyError::new(format!("{path}.receipt.identity"), "receipt identity differs from the exact EventTape action"));
                         }
