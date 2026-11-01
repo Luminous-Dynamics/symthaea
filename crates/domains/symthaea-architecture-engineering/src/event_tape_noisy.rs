@@ -14,6 +14,7 @@ use super::event_tape::{
     ActionIntent, ActionOutcome, EventTape, EventTapeObjectiveContract, EventTapeObjectiveMode,
     NoisyObservationDisposition,
 };
+use super::evidence_artifact::{EvidenceArtifactResolvePolicy, EvidenceArtifactResolver};
 use super::noisy_replicate_evidence::{
     verify_noisy_replicate_artifact_receipt, NoisyReplicateEvidenceContext,
     NoisyReplicateEvidenceManifest, NoisyReplicateEvidenceReceipt,
@@ -280,7 +281,8 @@ pub fn replay_noisy_event_tape(
                 },
                 ActionOutcome::CandidateNoisyObservation {
                     objective_contract_sha256: outcome_contract, disposition, objective_values,
-                    evidence_sha256, evidence_manifest_sha256, evidence_byte_receipt_sha256, ..
+                    evidence_sha256, evidence_manifest_sha256, evidence_byte_receipt_sha256,
+                    evidence_artifact, ..
                 },
             ) => {
                 let path = format!("events[{index}]");
@@ -310,6 +312,12 @@ pub fn replay_noisy_event_tape(
                         }
                         if &bundle.manifest.artifact.sha256 != artifact_sha {
                             return Err(EventTapeNoisyError::new(format!("{path}.manifest.artifact.sha256"), "artifact digest differs from event record"));
+                        }
+                        if evidence_artifact.as_ref() != Some(&bundle.manifest.artifact) {
+                            return Err(EventTapeNoisyError::new(
+                                format!("{path}.outcome.evidence_artifact"),
+                                "manifest artifact reference differs from the exact EventTape event",
+                            ));
                         }
                         let context = NoisyReplicateEvidenceContext {
                             run_id: &header.campaign_id,
@@ -545,7 +553,7 @@ mod tests {
             objective_contract_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
             disposition: NoisyObservationDisposition::VerifierRejected,
             objective_values: None, evidence_sha256: None, evidence_manifest_sha256: None,
-            evidence_byte_receipt_sha256: None, failure_reason: Some("receipt mismatch".to_owned()),
+            evidence_byte_receipt_sha256: None, evidence_artifact: None, failure_reason: Some("receipt mismatch".to_owned()),
         };
         let row = fingerprint_from_tape(&intent, &outcome, "event").unwrap();
         assert_eq!(row.status, ObservationStatus::Invalid);
