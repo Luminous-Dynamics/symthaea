@@ -293,6 +293,28 @@ jobs:
           else:
               raise AssertionError("net decision-value schema admitted a win rate above 1")
 
+          information_schema = json.loads(
+              Path("information-acquisition.v0.1.schema.json").read_text()
+          )
+          Draft202012Validator.check_schema(information_schema)
+          information_fixture = json.loads(
+              Path("fixtures/information-acquisition.example.json").read_text()
+          )
+          validate(instance=information_fixture, schema=information_schema)
+          assert information_fixture["choice"] == "acquire_best_query"
+          assert information_fixture["selected_query_id"] == "camera_peek"
+          assert len(information_fixture["options"]) == 2
+          assert information_fixture["options"][0]["expected_value_of_sample_information"] == 1.5
+          assert information_fixture["options"][0]["net_information_value"] == 0.5
+          assert information_fixture["options"][1]["net_information_value"] == -0.5
+          hostile_information = json.loads(json.dumps(information_fixture))
+          hostile_information["options"][0]["net_information_value"] = -0.01
+          assert (
+              hostile_information["options"][0]["net_information_value"]
+              < hostile_information["options"][0]["expected_value_of_sample_information"]
+              - hostile_information["options"][0]["acquisition_cost"]
+          ), "hostile EVSI result must violate net-value accounting"
+
           uncertainty_sample = {
               "schema_version": "cmaq-018-uncertainty-contract-v0.1",
               "claim_ceiling": "design_contract_only_no_model_calibration_result",
