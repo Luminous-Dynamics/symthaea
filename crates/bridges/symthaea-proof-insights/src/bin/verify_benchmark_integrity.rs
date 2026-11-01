@@ -89,9 +89,12 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let eligible_digest = hex::encode(Sha256::digest(&eligible_bytes));
     let eligible_summary = benchmark_integrity::validate_value(&eligible, eligible_digest)?;
     if eligible_summary.integrity_status != "eligible" {
-        bail!("fully qualified synthetic semantic review did not derive eligible status");
+        bail!("fully specified synthetic metadata did not derive an eligible candidate status");
     }
-    println!("PITB_BENCHMARK_INTEGRITY_ELIGIBILITY_PASS: derived status from elaboration, axioms, probes and semantic review");
+    if benchmark_integrity::verify_bytes(&eligible_bytes, None).is_ok() {
+        bail!("unsigned measured receipt unexpectedly passed the exact-byte eligibility API");
+    }
+    println!("PITB_BENCHMARK_INTEGRITY_METADATA_PASS: candidate status derives from target metadata; unsigned measured receipt remains blocked");
 
     let mut bad = eligible.clone();
     bad["dataset"]["cohort_id"] = json!("OtherCohort");
