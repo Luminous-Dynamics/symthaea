@@ -235,7 +235,6 @@ impl TrainOnlyStandardizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::research_placeholder;
 
     fn windows() -> Vec<ForecastWindow> {
         (1..=10).map(|id| ForecastWindow {
