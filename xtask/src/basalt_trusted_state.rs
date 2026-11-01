@@ -128,6 +128,7 @@ impl AcceptedReceipt {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AdvancePlan {
     expected_revision: u64,
+    expected_state: TrustedState,
     next_state: TrustedState,
     receipt_digest: String,
 }
@@ -142,6 +143,7 @@ pub enum TransitionDecision {
 pub enum TransitionError {
     MalformedCandidate,
     CompareConflict { expected: u64, actual: u64 },
+    StateSnapshotMismatch { revision: u64 },
     RevisionOverflow,
     GenerationZero,
     GenerationBootstrapInvalid,
@@ -277,6 +279,7 @@ impl TrustedState {
 
         Ok(TransitionDecision::Advance(AdvancePlan {
             expected_revision: self.revision,
+            expected_state: self.clone(),
             next_state,
             receipt_digest: candidate.receipt_digest.clone(),
         }))
@@ -291,6 +294,11 @@ impl TrustedState {
             return Err(TransitionError::CompareConflict {
                 expected: plan.expected_revision,
                 actual: self.revision,
+            });
+        }
+        if self != &plan.expected_state {
+            return Err(TransitionError::StateSnapshotMismatch {
+                revision: self.revision,
             });
         }
 
@@ -836,6 +844,28 @@ pub fn run_conformance() -> ConformanceReport {
         thread_race_passed,
     );
 
+    let mut forked_snapshot = state.clone();
+    if let Some(checkpoint) = forked_snapshot.log_cursors.get_mut("basalt-log-prod") {
+        checkpoint.root_digest = test_digest(88);
+    }
+    let fork_candidate = successor_candidate(&state, 3, 29);
+    let fork_plan = state.preview(&fork_candidate);
+    let snapshot_fork_passed = match fork_plan {
+        Ok(TransitionDecision::Advance(plan)) => matches!(
+            forked_snapshot.commit(plan),
+            Err(TransitionError::StateSnapshotMismatch { revision })
+                if revision == state.revision()
+        ),
+        _ => false,
+    };
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-018",
+        "same revision but divergent state snapshot cannot accept a stale plan",
+        format!("{snapshot_fork_passed}"),
+        snapshot_fork_passed,
+    );
+
     let passed = cases.iter().all(|case| case.passed);
     let scenarios_run = cases.len();
     let scenarios_passed = cases.iter().filter(|case| case.passed).count();
@@ -1113,6 +1143,30 @@ mod tests {
         assert_eq!(state.source_cursor(&rebased.source).unwrap().generation, 1);
         assert_eq!(state.accepted_receipt_count(), 3);
         assert_eq!(state.revision(), 3);
+    }
+
+    #[test]
+    fn same_revision_divergent_snapshot_rejects_prepared_plan() {
+        let state = bootstrap();
+        let candidate = successor_candidate(&state, 2, 76);
+        let plan = match state.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("candidate is new"),
+        };
+
+        let mut divergent = state.clone();
+        divergent
+            .log_cursors
+            .get_mut("basalt-log-prod")
+            .unwrap()
+            .root_digest = test_digest(77);
+        let before = divergent.clone();
+
+        assert_eq!(
+            divergent.commit(plan),
+            Err(TransitionError::StateSnapshotMismatch { revision: state.revision() })
+        );
+        assert_eq!(divergent, before);
     }
 
     #[test]
