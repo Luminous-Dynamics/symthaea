@@ -579,6 +579,32 @@ mod tests {
     }
 
     #[test]
+    fn pareto_frontier_preserves_opposing_token_and_gpu_tradeoffs() {
+        let mut matched = set(InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [8; 32],
+        });
+        matched.trials[0].actions[1].frontier_features = features(1);
+        matched.trials[1].actions[1].frontier_features = features(1);
+        matched.trials[0].actions[0].measured_cost.gpu_ms = 100;
+        matched.trials[1].actions[0].measured_cost.gpu_ms = 0;
+
+        let summary = matched.pareto_summary().unwrap();
+        assert_eq!(summary.frontier_operation_families, vec![2, 3]);
+        let lower_token = summary.alternatives[0];
+        let lower_gpu = summary.alternatives[1];
+        assert!(lower_token.verified_remaining_cost.tokens
+            < lower_gpu.verified_remaining_cost.tokens);
+        assert!(
+            lower_token.verified_remaining_cost.gpu_ms
+                > lower_gpu.verified_remaining_cost.gpu_ms
+        );
+        assert_eq!(
+            lower_token.immediate_proof_progress,
+            lower_gpu.immediate_proof_progress
+        );
+    }
+
+    #[test]
     fn pareto_summary_rejects_censored_and_invalid_trials() {
         let mut matched = set(InterventionAssignmentEvidence::DeterministicSimulation {
             simulator_digest: [8; 32],
