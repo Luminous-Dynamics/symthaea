@@ -1,84 +1,278 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://luminousdynamics.io/schemas/pitb/proof-search-allocation-v0.schema.json",
-  "title":"PITB proof-search adaptive allocation decision v0",
-  "description":"One deterministic controller decision over candidate actions. The controller recommends work; Lean and independent verifiers determine success.",
-  "type":"object",
-  "additionalProperties":false,
-  "required":["schema_version","decision_id","evaluation_split","target","policy","remaining_budget","actions"],
-  "properties":{
-    "schema_version":{"const":"pitb.proof-search-allocation-decision.v0"},
-    "decision_id":{"type":"string","minLength":1,"maxLength":160},
-    "evaluation_split":{"enum":["validation","test","external_challenge"]},
-    "target":{"$ref":"#/$defs/target"},
-    "policy":{"$ref":"#/$defs/policy"},
-    "remaining_budget":{"$ref":"#/$defs/resources"},
-    "actions":{"type":"array","minItems":1,"maxItems":64,"items":{"$ref":"#/$defs/action"}}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-search-allocation-v0.schema.json",
+  "title": "PITB proof-search adaptive allocation decision v0",
+  "description": "One deterministic controller decision over candidate actions. The controller recommends work; Lean and independent verifiers determine success.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "evaluation_split",
+    "target",
+    "policy",
+    "remaining_budget",
+    "actions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-search-allocation-decision.v0"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "evaluation_split": {
+      "enum": [
+        "validation",
+        "test",
+        "external_challenge"
+      ]
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "remaining_budget": {
+      "$ref": "#/$defs/resources"
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    }
   },
-  "$defs":{
-    "sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-    "target":{
-      "type":"object","additionalProperties":false,
-      "required":["task_id","repository_commit","proof_state_sha256","statement_sha256"],
-      "properties":{
-        "task_id":{"$ref":"#/$defs/sha256"},
-        "repository_commit":{"type":"string","pattern":"^[a-f0-9]{40}$"},
-        "proof_state_sha256":{"$ref":"#/$defs/sha256"},
-        "statement_sha256":{"$ref":"#/$defs/sha256"}
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "repository_commit",
+        "proof_state_sha256",
+        "statement_sha256"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "repository_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "proof_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "statement_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
-    "policy":{
-      "type":"object","additionalProperties":false,
-      "required":["policy_id","policy_sha256","calibration_manifest_sha256","calibration_split","calibration_sample_count","calibration_ece_ppm","max_calibration_ece_ppm","minimum_lcb_delta_ppm","shadow_weights_ppm","confidence_z_hundredths"],
-      "properties":{
-        "policy_id":{"const":"pitb-lcb-shadow-price-v0"},
-        "policy_sha256":{"$ref":"#/$defs/sha256"},
-        "calibration_manifest_sha256":{"$ref":"#/$defs/sha256"},
-        "calibration_split":{"const":"validation"},
-        "calibration_sample_count":{"type":"integer","minimum":200},
-        "calibration_ece_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-        "max_calibration_ece_ppm":{"type":"integer","minimum":1,"maximum":1000000},
-        "minimum_lcb_delta_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-        "shadow_weights_ppm":{
-          "type":"object","additionalProperties":false,
-          "required":["tokens","model_calls","tool_calls","wall_ms","lean_cpu_ms","cost_microusd"],
-          "properties":{
-            "tokens":{"type":"integer","minimum":0,"maximum":1000000},
-            "model_calls":{"type":"integer","minimum":0,"maximum":1000000},
-            "tool_calls":{"type":"integer","minimum":0,"maximum":1000000},
-            "wall_ms":{"type":"integer","minimum":0,"maximum":1000000},
-            "lean_cpu_ms":{"type":"integer","minimum":0,"maximum":1000000},
-            "cost_microusd":{"type":"integer","minimum":0,"maximum":1000000}
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_sha256",
+        "calibration_manifest_sha256",
+        "calibration_split",
+        "calibration_sample_count",
+        "calibration_ece_ppm",
+        "max_calibration_ece_ppm",
+        "minimum_lcb_delta_ppm",
+        "shadow_weights_ppm",
+        "confidence_z_hundredths",
+        "calibration_receipt_sha256"
+      ],
+      "properties": {
+        "policy_id": {
+          "const": "pitb-lcb-shadow-price-v0"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_split": {
+          "const": "validation"
+        },
+        "calibration_sample_count": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "calibration_ece_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "max_calibration_ece_ppm": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "minimum_lcb_delta_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "shadow_weights_ppm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tokens",
+            "model_calls",
+            "tool_calls",
+            "wall_ms",
+            "lean_cpu_ms",
+            "cost_microusd"
+          ],
+          "properties": {
+            "tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "model_calls": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "tool_calls": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "wall_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "lean_cpu_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "cost_microusd": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
           }
         },
-        "confidence_z_hundredths":{"const":196}
+        "confidence_z_hundredths": {
+          "const": 196
+        },
+        "calibration_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
-    "resources":{
-      "type":"object","additionalProperties":false,
-      "required":["tokens","model_calls","tool_calls","wall_ms","lean_cpu_ms","cost_microusd"],
-      "properties":{
-        "tokens":{"type":"integer","minimum":0},
-        "model_calls":{"type":"integer","minimum":0},
-        "tool_calls":{"type":"integer","minimum":0},
-        "wall_ms":{"type":"integer","minimum":0},
-        "lean_cpu_ms":{"type":"integer","minimum":0},
-        "cost_microusd":{"type":"integer","minimum":0}
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokens",
+        "model_calls",
+        "tool_calls",
+        "wall_ms",
+        "lean_cpu_ms",
+        "cost_microusd"
+      ],
+      "properties": {
+        "tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lean_cpu_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
-    "action":{
-      "type":"object","additionalProperties":false,
-      "required":["action_id","kind","proof_state_sha256","predicted_incremental_success_ppm","standard_error_ppm","prediction_evidence_sha256","calibration_receipt_sha256","preconditions_met","expected_resources"],
-      "properties":{
-        "action_id":{"type":"string","minLength":1,"maxLength":128},
-        "kind":{"enum":["continue_current_target","retrieve_context","change_decomposition","typed_repair","tactic_probe","spawn_snapshot_branch","semantic_check","restart_search"]},
-        "proof_state_sha256":{"$ref":"#/$defs/sha256"},
-        "predicted_incremental_success_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-        "standard_error_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-        "prediction_evidence_sha256":{"$ref":"#/$defs/sha256"},
-        "calibration_receipt_sha256":{"$ref":"#/$defs/sha256"},
-        "preconditions_met":{"const":true},
-        "expected_resources":{"$ref":"#/$defs/resources"}
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "kind",
+        "proof_state_sha256",
+        "predicted_incremental_success_ppm",
+        "standard_error_ppm",
+        "prediction_evidence_sha256",
+        "calibration_receipt_sha256",
+        "preconditions_met",
+        "expected_resources"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "enum": [
+            "continue_current_target",
+            "retrieve_context",
+            "change_decomposition",
+            "typed_repair",
+            "tactic_probe",
+            "spawn_snapshot_branch",
+            "semantic_check",
+            "restart_search"
+          ]
+        },
+        "proof_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "predicted_incremental_success_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "standard_error_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "prediction_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "preconditions_met": {
+          "const": true
+        },
+        "expected_resources": {
+          "$ref": "#/$defs/resources"
+        }
       }
     }
   }
