@@ -47,6 +47,14 @@ jobs:
           validator.validate(fixture)
           if fixture["evidence_class"] != "synthetic_contract_fixture":
               raise SystemExit("checked-in example must remain explicitly synthetic")
+          runtime = fixture["environment"]["lean_runtime_artifacts"]
+          olean = fixture["environment"]["imported_olean_artifacts"]
+          if len(runtime) < 1 or sum(row["kind"] == "lean_executable" for row in runtime) != 1:
+              raise SystemExit("fixture runtime manifest must contain exactly one Lean executable")
+          if [row["path"] for row in runtime] != sorted(row["path"] for row in runtime):
+              raise SystemExit("fixture runtime artifacts are not path-sorted")
+          if [row["module_name"] for row in olean] != sorted(row["module_name"] for row in olean):
+              raise SystemExit("fixture imported OLean artifacts are not module-sorted")
 
           def reject(label, document):
               try:
