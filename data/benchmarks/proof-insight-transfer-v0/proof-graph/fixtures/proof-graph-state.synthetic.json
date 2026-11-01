@@ -114,7 +114,9 @@
     "reasoning_effort": "medium",
     "max_specialist_calls": 1,
     "routing_policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-    "decision_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    "decision_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "selection_policy_id": "pitb.shared-stable-helper-batch.v0",
+    "max_selected_goals": 8
   },
   "resource_ledger": {
     "budget": {
