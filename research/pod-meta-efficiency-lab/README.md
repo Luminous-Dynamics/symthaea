@@ -59,3 +59,7 @@ A failed operation that targeted an open obligation is reported as a rejected ev
 Before any superiority claim, qualify the exact-head Rust crate, add generator/operator-family held-out splits and protected oracle execution, then run matched checkpoints with actual measured all-in resource budgets. Use official external evaluators independently for TEMPO, Vera-Life-Eval, LitTraceQA, GRACE, FaithCoT-Bench and ParaRecover.
 
 The promotion objective is a Pareto frontier over proof correctness, mandatory safety verification, abstention quality and measured resource cost—not a single intelligence number.
+
+## Qualification ordering
+
+The dedicated workflow qualifies the shared proof-obligation dependency before it qualifies this benchmark adapter: formatting, tests, and Clippy must all pass for both crates before the frozen 280-row policy-budget matrix is emitted. A dependency failure intentionally prevents the efficiency matrix from being treated as qualified.
