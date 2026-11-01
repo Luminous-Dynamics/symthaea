@@ -62,6 +62,11 @@ pub enum DesignError {
     DuplicateDecisionActionId { action_id: String },
     DecisionUtilityCountMismatch { action_id: String, expected: usize, actual: usize },
     NonFiniteDecisionUtility { action_id: String, hypothesis_index: usize },
+    EmptyHitObjectiveId,
+    HitOutcomeCountMismatch { expected: usize, actual: usize },
+    InconsistentHitOutcomeOrder,
+    NonFiniteHitOutcomeValue { outcome_index: usize },
+    NonFiniteHitThreshold,
     EmptyLikelihoodScenarioSet,
     EmptyLikelihoodScenarioId,
     DuplicateLikelihoodScenarioId { scenario_id: String },
@@ -164,6 +169,17 @@ impl fmt::Display for DesignError {
             Self::NonFiniteDecisionUtility { action_id, hypothesis_index } => {
                 write!(f, "decision action {action_id:?} has non-finite utility at hypothesis {hypothesis_index}")
             }
+            Self::EmptyHitObjectiveId => write!(f, "threshold-hit objective identifier must not be empty"),
+            Self::HitOutcomeCountMismatch { expected, actual } => {
+                write!(f, "threshold-hit objective has {actual} outcome values; expected {expected}")
+            }
+            Self::InconsistentHitOutcomeOrder => {
+                write!(f, "threshold-hit outcome IDs must exactly match candidate outcome ordering")
+            }
+            Self::NonFiniteHitOutcomeValue { outcome_index } => {
+                write!(f, "threshold-hit outcome value at index {outcome_index} must be finite")
+            }
+            Self::NonFiniteHitThreshold => write!(f, "threshold-hit value must be finite"),
             Self::EmptyLikelihoodScenarioSet => {
                 write!(f, "open-world candidate must declare at least one likelihood scenario")
             }
@@ -938,6 +954,205 @@ pub fn evaluate_decision_value_report(
     Ok(DecisionValueExperimentReport {
         schema_version: "connectome-decision-value-v1",
         decision_problem,
+        ranked_experiments,
+    })
+}
+
+/// Which side of a registered numeric threshold counts as a hit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HitDirection {
+    AtLeast,
+    AtMost,
+}
+
+/// A preregistered threshold-hit target for the discrete outcomes of an
+/// experiment. Outcome values are aligned with outcome_ids, which must exactly
+/// match the candidate's outcome ordering.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThresholdHitObjective {
+    pub id: String,
+    pub outcome_ids: Vec<String>,
+    pub outcome_values: Vec<f64>,
+    pub threshold: f64,
+    pub direction: HitDirection,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScenarioHitProbability {
+    pub scenario_id: String,
+    pub probability_of_hit: f64,
+    pub probability_of_hit_per_cost: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenWorldHitProbabilityScore {
+    pub experiment_id: String,
+    pub objective_id: String,
+    pub cost: f64,
+    pub unresolved_prior_mass: f64,
+    pub worst_case_scenario_id: String,
+    pub best_case_scenario_id: String,
+    pub worst_case_probability_of_hit: f64,
+    pub best_case_probability_of_hit: f64,
+    pub worst_case_probability_of_hit_per_cost: f64,
+    pub best_case_probability_of_hit_per_cost: f64,
+    pub scenario_probabilities: Vec<ScenarioHitProbability>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedHitExperiment {
+    pub experiment_id: String,
+    pub score: OpenWorldHitProbabilityScore,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HitProbabilityReport {
+    pub schema_version: &'static str,
+    pub objective: ThresholdHitObjective,
+    pub ranked_experiments: Vec<RankedHitExperiment>,
+}
+
+/// Evaluate the probability that an experiment outcome crosses a declared
+/// threshold. The mixture probability averages over the caller's open-world
+/// prior and each likelihood scenario. This is a hit-acquisition objective,
+/// not model EIG, EVSI, or a biological utility guarantee.
+pub fn evaluate_open_world_hit_probability(
+    priors: &[f64],
+    candidate: &OpenWorldCandidateExperiment,
+    objective: &ThresholdHitObjective,
+) -> Result<OpenWorldHitProbabilityScore, DesignError> {
+    if objective.id.trim().is_empty() {
+        return Err(DesignError::EmptyHitObjectiveId);
+    }
+    if !objective.threshold.is_finite() {
+        return Err(DesignError::NonFiniteHitThreshold);
+    }
+    if objective.outcome_ids != candidate.outcomes {
+        return Err(DesignError::InconsistentHitOutcomeOrder);
+    }
+    if objective.outcome_values.len() != candidate.outcomes.len() {
+        return Err(DesignError::HitOutcomeCountMismatch {
+            expected: candidate.outcomes.len(),
+            actual: objective.outcome_values.len(),
+        });
+    }
+    for (outcome_index, value) in objective.outcome_values.iter().enumerate() {
+        if !value.is_finite() {
+            return Err(DesignError::NonFiniteHitOutcomeValue { outcome_index });
+        }
+    }
+    let open_world_score = evaluate_open_world_candidate(priors, candidate)?;
+
+    let hit_indices: Vec<usize> = objective
+        .outcome_values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| {
+            let is_hit = match objective.direction {
+                HitDirection::AtLeast => *value >= objective.threshold,
+                HitDirection::AtMost => *value <= objective.threshold,
+            };
+            is_hit.then_some(index)
+        })
+        .collect();
+
+    let mut scenario_probabilities = Vec::with_capacity(candidate.likelihood_scenarios.len());
+    for scenario in &candidate.likelihood_scenarios {
+        let mut probability_of_hit = 0.0f64;
+        for (hypothesis_index, prior) in priors.iter().enumerate() {
+            for outcome_index in &hit_indices {
+                probability_of_hit +=
+                    prior * scenario.likelihoods_by_hypothesis[hypothesis_index][*outcome_index];
+            }
+        }
+        if !probability_of_hit.is_finite()
+            || probability_of_hit < -ROUND_OFF_TOLERANCE
+            || probability_of_hit > 1.0 + PROBABILITY_TOLERANCE
+        {
+            return Err(DesignError::NumericalInstability);
+        }
+        let probability_of_hit = probability_of_hit.clamp(0.0, 1.0);
+        scenario_probabilities.push(ScenarioHitProbability {
+            scenario_id: scenario.id.clone(),
+            probability_of_hit,
+            probability_of_hit_per_cost: probability_of_hit / candidate.cost,
+        });
+    }
+    scenario_probabilities.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+
+    let mut worst = &scenario_probabilities[0];
+    let mut best = &scenario_probabilities[0];
+    for score in &scenario_probabilities[1..] {
+        if score.probability_of_hit_per_cost < worst.probability_of_hit_per_cost {
+            worst = score;
+        }
+        if score.probability_of_hit_per_cost > best.probability_of_hit_per_cost {
+            best = score;
+        }
+    }
+
+    Ok(OpenWorldHitProbabilityScore {
+        experiment_id: candidate.id.clone(),
+        objective_id: objective.id.clone(),
+        cost: candidate.cost,
+        unresolved_prior_mass: open_world_score.unresolved_prior_mass,
+        worst_case_scenario_id: worst.scenario_id.clone(),
+        best_case_scenario_id: best.scenario_id.clone(),
+        worst_case_probability_of_hit: worst.probability_of_hit,
+        best_case_probability_of_hit: best.probability_of_hit,
+        worst_case_probability_of_hit_per_cost: worst.probability_of_hit_per_cost,
+        best_case_probability_of_hit_per_cost: best.probability_of_hit_per_cost,
+        scenario_probabilities,
+    })
+}
+
+/// Rank experiments by worst-case threshold-hit probability per unit cost.
+/// Candidate outcome IDs must share the exact registered objective ordering.
+pub fn rank_open_world_candidates_for_hit(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+    objective: &ThresholdHitObjective,
+) -> Result<Vec<RankedHitExperiment>, DesignError> {
+    validate_priors(priors)?;
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !ids.insert(candidate.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: candidate.id.clone(),
+            });
+        }
+        ranked.push(RankedHitExperiment {
+            experiment_id: candidate.id.clone(),
+            score: evaluate_open_world_hit_probability(priors, candidate, objective)?,
+        });
+    }
+    ranked.sort_by(|left, right| {
+        right.score.worst_case_probability_of_hit_per_cost
+            .total_cmp(&left.score.worst_case_probability_of_hit_per_cost)
+            .then_with(|| {
+                right.score.worst_case_probability_of_hit
+                    .total_cmp(&left.score.worst_case_probability_of_hit)
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+    Ok(ranked)
+}
+
+/// Build a versioned threshold-hit report.
+pub fn evaluate_hit_probability_report(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+    objective: ThresholdHitObjective,
+) -> Result<HitProbabilityReport, DesignError> {
+    let ranked_experiments =
+        rank_open_world_candidates_for_hit(priors, candidates, &objective)?;
+    Ok(HitProbabilityReport {
+        schema_version: "connectome-hit-probability-v1",
+        objective,
         ranked_experiments,
     })
 }
@@ -2403,6 +2618,147 @@ mod tests {
             evaluate_open_world_decision_value(&priors, &candidate, &problem),
             Err(DesignError::EmptyDecisionActionId)
         );
+    }
+
+    fn hit_objective_example() -> ThresholdHitObjective {
+        ThresholdHitObjective {
+            id: "functional-output-at-least-0.8".to_owned(),
+            outcome_ids: vec!["subthreshold".to_owned(), "hit".to_owned()],
+            outcome_values: vec![0.0, 1.0],
+            threshold: 0.8,
+            direction: HitDirection::AtLeast,
+        }
+    }
+
+    fn hit_candidate(
+        id: &str,
+        likelihoods: Vec<Vec<f64>>,
+    ) -> OpenWorldCandidateExperiment {
+        OpenWorldCandidateExperiment {
+            id: id.to_owned(),
+            cost: 1.0,
+            outcomes: vec!["subthreshold".to_owned(), "hit".to_owned()],
+            hypothesis_ids: vec![
+                "mechanism_a".to_owned(),
+                "mechanism_b".to_owned(),
+                "mechanism_no_effect".to_owned(),
+                UNRESOLVED_HYPOTHESIS_ID.to_owned(),
+            ],
+            likelihood_scenarios: vec![LikelihoodScenario {
+                id: "known-answer".to_owned(),
+                likelihoods_by_hypothesis: likelihoods,
+            }],
+        }
+    }
+
+    #[test]
+    fn threshold_hit_probability_finds_likely_target_crossing() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let mechanism_discriminator = hit_candidate(
+            "mechanism-discriminator",
+            vec![
+                vec![0.0, 1.0],
+                vec![1.0, 0.0],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+            ],
+        );
+        let hit_discriminator = hit_candidate(
+            "hit-discriminator",
+            vec![
+                vec![0.2, 0.8],
+                vec![0.2, 0.8],
+                vec![0.9, 0.1],
+                vec![0.5, 0.5],
+            ],
+        );
+        let objective = hit_objective_example();
+        let ranked = rank_open_world_candidates_for_hit(
+            &priors,
+            &[mechanism_discriminator, hit_discriminator],
+            &objective,
+        ).unwrap();
+        assert_eq!(ranked[0].experiment_id, "hit-discriminator");
+        assert!((ranked[0].score.worst_case_probability_of_hit - 0.56).abs() < 1.0e-12);
+        assert!((ranked[1].score.worst_case_probability_of_hit - 0.50).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn threshold_hit_uses_worst_case_likelihood_scenario() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let mut candidate = hit_candidate(
+            "candidate",
+            vec![
+                vec![0.2, 0.8],
+                vec![0.2, 0.8],
+                vec![0.9, 0.1],
+                vec![0.5, 0.5],
+            ],
+        );
+        candidate.likelihood_scenarios.push(LikelihoodScenario {
+            id: "pessimistic".to_owned(),
+            likelihoods_by_hypothesis: vec![
+                vec![0.8, 0.2],
+                vec![0.8, 0.2],
+                vec![0.9, 0.1],
+                vec![0.5, 0.5],
+            ],
+        });
+        let score = evaluate_open_world_hit_probability(
+            &priors,
+            &candidate,
+            &hit_objective_example(),
+        ).unwrap();
+        assert!(score.best_case_probability_of_hit > score.worst_case_probability_of_hit);
+        assert_eq!(score.worst_case_scenario_id, "pessimistic");
+    }
+
+    #[test]
+    fn threshold_hit_rejects_outcome_order_mismatch_and_invalid_values() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = hit_candidate(
+            "candidate",
+            vec![
+                vec![0.2, 0.8],
+                vec![0.2, 0.8],
+                vec![0.9, 0.1],
+                vec![0.5, 0.5],
+            ],
+        );
+        let mut objective = hit_objective_example();
+        objective.outcome_ids.swap(0, 1);
+        assert_eq!(
+            evaluate_open_world_hit_probability(&priors, &candidate, &objective),
+            Err(DesignError::InconsistentHitOutcomeOrder)
+        );
+
+        let mut objective = hit_objective_example();
+        objective.outcome_values[1] = f64::NAN;
+        assert_eq!(
+            evaluate_open_world_hit_probability(&priors, &candidate, &objective),
+            Err(DesignError::NonFiniteHitOutcomeValue { outcome_index: 1 })
+        );
+    }
+
+    #[test]
+    fn threshold_hit_report_is_versioned() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = hit_candidate(
+            "candidate",
+            vec![
+                vec![0.2, 0.8],
+                vec![0.2, 0.8],
+                vec![0.9, 0.1],
+                vec![0.5, 0.5],
+            ],
+        );
+        let report = evaluate_hit_probability_report(
+            &priors,
+            &[candidate],
+            hit_objective_example(),
+        ).unwrap();
+        assert_eq!(report.schema_version, "connectome-hit-probability-v1");
+        assert_eq!(report.ranked_experiments.len(), 1);
     }
 
     fn calibration_unit(
