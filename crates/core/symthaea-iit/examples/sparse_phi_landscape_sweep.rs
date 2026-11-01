@@ -78,9 +78,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     println!(
-        "landscape_algorithm_id,formalism,parameter_name,theta,grid_index,sparse_model_sha256,sparse_evaluation_sha256,sparse_request_sha256,canonical_dense_model_sha256,canonical_dense_evaluation_sha256,canonical_dense_analysis_request_sha256,complete,status,phi_s,selected_state_pair_index,tied_state_pair_indices,cause_state_family,effect_state_family,cause_selection_margin,effect_selection_margin,winning_mip_cut_sha256,winning_mip_parts,winning_mip_directions,partition_margin,partition_score_evaluations,receipt_sha256,elapsed_ns,qualification"
+        "landscape_algorithm_id,formalism,parameter_name,theta,grid_index,sparse_model_sha256,sparse_evaluation_sha256,sparse_request_sha256,canonical_dense_model_sha256,canonical_dense_evaluation_sha256,canonical_dense_analysis_request_sha256,complete,status,phi_s,signed_phi,normalized_phi,signed_normalized_phi,selected_state_pair_index,tied_state_pair_indices,cause_state_family,effect_state_family,cause_selection_margin,effect_selection_margin,selected_cause_state,selected_effect_state,winning_mip_cut_sha256,winning_mip_parts,winning_mip_directions,partition_margin,partition_score_evaluations,receipt_sha256,elapsed_ns,selection_regime,qualification"
     );
 
+    let mut previous_selection_identity: Option<String> = None;
+    let mut selection_regime = 0usize;
     for (grid_index, theta) in grid.iter().copied().enumerate() {
         let started = Instant::now();
         let causal_model = model(theta)?;
@@ -127,12 +129,33 @@ fn main() -> Result<(), Box<dyn Error>> {
             .unwrap_or_else(|| "NA".to_owned());
         let partition_margin = selected
             .and_then(|result| result.partition_margin);
+        let signed_phi = selected.map(|result| result.score.signed_phi);
+        let normalized_phi = selected.map(|result| result.score.normalized_phi);
+        let signed_normalized_phi = selected.map(|result| result.score.signed_normalized_phi);
+        let selected_cause_state = selected
+            .map(|result| bit_string(&result.system_state.cause_specified_state))
+            .unwrap_or_else(|| "NA".to_owned());
+        let selected_effect_state = selected
+            .map(|result| bit_string(&result.system_state.effect_specified_state))
+            .unwrap_or_else(|| "NA".to_owned());
+        let current_selection_identity = selected.map(|_| format!(
+            "{}|{}|{}",
+            winning_cut_sha256,
+            selected_cause_state,
+            selected_effect_state,
+        ));
+        if let Some(identity) = &current_selection_identity {
+            if previous_selection_identity.as_ref().is_some_and(|previous| previous != identity) {
+                selection_regime += 1;
+            }
+            previous_selection_identity = Some(identity.clone());
+        }
         let tied_indices = analysis.tied_state_pair_indices.iter()
             .map(usize::to_string).collect::<Vec<_>>().join(";");
         let elapsed_ns = started.elapsed().as_nanos();
 
         println!(
-            "{},{},{},{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
+            "{},{},{},{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
             LANDSCAPE_ALGORITHM_ID,
             FORMALISM,
             "target0_parent_state_3_probability",
@@ -147,12 +170,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             analysis.complete,
             format!("{:?}", analysis.status),
             optional_float(analysis.phi_s),
+            optional_float(signed_phi),
+            optional_float(normalized_phi),
+            optional_float(signed_normalized_phi),
             optional_usize(selected_index),
             if tied_indices.is_empty() { "none" } else { &tied_indices },
             state_family(&intrinsic.cause.specified_states),
             state_family(&intrinsic.effect.specified_states),
             optional_float(intrinsic.cause.selection_margin),
             optional_float(intrinsic.effect.selection_margin),
+            selected_cause_state,
+            selected_effect_state,
             winning_cut_sha256,
             winning_parts,
             winning_directions,
@@ -160,6 +188,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             analysis.partition_score_evaluations,
             receipt_sha256,
             elapsed_ns,
+            selection_regime,
         );
     }
 
