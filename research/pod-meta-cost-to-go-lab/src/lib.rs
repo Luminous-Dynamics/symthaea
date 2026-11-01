@@ -1,3 +1,6 @@
+pub mod frontier_adapter;
+pub use frontier_adapter::*;
+
 pub mod landmark_ipcw;
 pub use landmark_ipcw::*;
 
