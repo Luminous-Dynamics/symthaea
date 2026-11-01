@@ -4,6 +4,8 @@ This package contains the **candidate-side** deterministic baseline for jointly
 allocating temporal observations, memory retention, I/O, serial critical-path
 latency, compute, measured energy and verification work.
 
+Latency is a conservative serial critical-path estimate and is charged against its own deadline ceiling; it is not a replacement for measured end-to-end p99 latency.
+
 The controller is intentionally not an optimal solver. It:
 - discounts each action's predicted temporal-error-debt reduction by its
   uncertainty radius;
