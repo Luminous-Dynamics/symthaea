@@ -13,6 +13,7 @@ on:
       - "tests/fixtures/hardsec/mobile-device-v1/**"
       - "docs/research/HARDSEC_027_MOBILE_DEVICE_SECURITY.md"
       - "docs/research/HARDSEC_028_ANDROID_READONLY_INVENTORY.md"
+      - "docs/research/HARDSEC_029_MOBILE_POLICY_OBLIGATIONS.md"
       - "tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-mobile-device-profile-audit.yml"
   workflow_dispatch:
