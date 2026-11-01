@@ -145,7 +145,7 @@ jobs:
             sparse-eq4-topologies \
             sparse-partition-score \
             sparse-full-system-search \
-            min-fill-planner-comparison
+            min-fill-planner-comparison \
             macro-mapping-families
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
