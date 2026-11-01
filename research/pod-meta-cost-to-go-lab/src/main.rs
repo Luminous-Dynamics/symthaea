@@ -7,6 +7,58 @@ use pod_meta_cost_to_go_lab::{
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
+use pod_meta_cost_to_go_lab::{extract_frontier_snapshot, FrontierAdapterContext};
+use pod_meta_lab::graph::{
+    ClaimNode, PlannerCase, Polarity, ProofAlternative, ProofRequirement, QueryProfile,
+};
+use pod_meta_lab::{Obligation, ObligationState};
+
+fn frontier_chain_fixture(nodes: usize) -> (PlannerCase, Vec<Obligation>) {
+    let claims = (0..nodes)
+        .map(|index| {
+            let claim_id = format!("scale-{index:06}");
+            let requirements = if index + 1 < nodes {
+                vec![ProofRequirement::Claim {
+                    claim_id: format!("scale-{:06}", index + 1),
+                    polarity: Polarity::Supports,
+                }]
+            } else {
+                Vec::new()
+            };
+            ClaimNode {
+                id: claim_id,
+                alternatives: vec![ProofAlternative {
+                    id: format!("path-{index:06}"),
+                    conclusion: Polarity::Supports,
+                    requirements,
+                    min_independent_groups: 0,
+                }],
+            }
+        })
+        .collect::<Vec<_>>();
+    let obligations = (0..nodes)
+        .map(|index| {
+            let id = format!("scale-{index:06}");
+            Obligation::new(id.clone(), ObligationState::Open, 1)
+                .with_state_identity(format!("state-{id}"))
+        })
+        .collect::<Vec<_>>();
+    (
+        PlannerCase {
+            id: format!("frontier-chain-{nodes}"),
+            query: QueryProfile {
+                valid_at: 1,
+                known_at: 1,
+                required_scope: "benchmark-scope".into(),
+                required_authority: "benchmark-authority".into(),
+            },
+            target_claim_ids: vec!["scale-000000".into()],
+            claims,
+            evidence: Vec::new(),
+        },
+        obligations,
+    )
+}
 
 fn tokens(value: u128) -> ResourceVector {
     ResourceVector::new(value, 0, 0, 0, 0, 0)
@@ -531,4 +583,27 @@ fn main() {
         Err(pod_meta_cost_to_go_lab::LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator)
     );
     println!("LANDMARK_IPCW_ROW\tcompeting-terminal\trequires-separate-estimator");
+
+    for node_count in [8_usize, 32, 64, 256, 1_000, 10_000, 100_000] {
+        let (case, obligations) = frontier_chain_fixture(node_count);
+        let snapshot = extract_frontier_snapshot(
+            &case,
+            &obligations,
+            &FrontierAdapterContext::default(),
+        )
+        .unwrap();
+        let fingerprint = snapshot
+            .fingerprint
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        println!(
+            "FRONTIER_ADAPTER_ROW\\t{}\\t{}\\t{}\\t{}\\t{}",
+            node_count,
+            snapshot.features.dependency_edges,
+            snapshot.features.maximum_dependency_depth,
+            snapshot.features.admissible_alternatives,
+            fingerprint
+        );
+    }
 }
