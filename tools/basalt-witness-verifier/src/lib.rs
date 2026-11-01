@@ -1,5 +1,7 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use dsse::{verify, Ed25519Verifier, Envelope, Signature, Verifier, VerifiedPayload, MAX_SIGNATURES};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+use dsse::{
+    Ed25519Verifier, Envelope, MAX_SIGNATURES, Signature, VerifiedPayload, Verifier, verify,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -185,24 +187,41 @@ fn prepare_trust_store(
 
     for member in &trust.members {
         if member.member_id.is_empty() || !seen_member_ids.insert(member.member_id.as_str()) {
-            return Err(format!("empty or duplicate witness member_id: {}", member.member_id));
+            return Err(format!(
+                "empty or duplicate witness member_id: {}",
+                member.member_id
+            ));
         }
         if !is_lower_hex_64(&member.keyid) || !seen_key_ids.insert(member.keyid.as_str()) {
-            return Err(format!("malformed or duplicate witness keyid: {}", member.keyid));
+            return Err(format!(
+                "malformed or duplicate witness keyid: {}",
+                member.keyid
+            ));
         }
         if member.algorithm != "ed25519" {
-            return Err(format!("unsupported witness key algorithm: {}", member.algorithm));
+            return Err(format!(
+                "unsupported witness key algorithm: {}",
+                member.algorithm
+            ));
         }
         let public_bytes = decode_canonical_base64(&member.public_key, "witness public_key")?;
         if public_bytes.len() != 32 {
-            return Err(format!("witness public key {} is not 32 bytes", member.member_id));
+            return Err(format!(
+                "witness public key {} is not 32 bytes",
+                member.member_id
+            ));
         }
         if !seen_public_keys.insert(public_bytes.clone()) {
-            return Err("the same Ed25519 public key appears under multiple member identities".to_string());
+            return Err(
+                "the same Ed25519 public key appears under multiple member identities".to_string(),
+            );
         }
         let computed_key_id = canonical_key_id(&member.public_key)?;
         if member.keyid != computed_key_id {
-            return Err(format!("keyid does not match the public key for {}", member.member_id));
+            return Err(format!(
+                "keyid does not match the public key for {}",
+                member.member_id
+            ));
         }
 
         match member.status.as_str() {
@@ -216,7 +235,9 @@ fn prepare_trust_store(
                     ));
                 }
                 let verifier = Ed25519Verifier::from_bytes(&public_bytes)
-                    .map_err(|error| format!("invalid Ed25519 public key {}: {error}", member.member_id))?
+                    .map_err(|error| {
+                        format!("invalid Ed25519 public key {}: {error}", member.member_id)
+                    })?
                     .with_key_id(member.keyid.clone());
                 verifiers.push(verifier);
             }
@@ -260,10 +281,13 @@ pub fn load_pinned_trust_store(
     }
     let actual = sha256_prefixed(trust_bytes);
     if actual != expected_sha256 {
-        return Err(format!("pinned trust-store digest mismatch: expected {expected_sha256}, got {actual}"));
+        return Err(format!(
+            "pinned trust-store digest mismatch: expected {expected_sha256}, got {actual}"
+        ));
     }
-    let trust: TrustStore = serde_json::from_slice(trust_bytes)
-        .map_err(|error| format!("trust store is invalid or contains duplicate/unknown fields: {error}"))?;
+    let trust: TrustStore = serde_json::from_slice(trust_bytes).map_err(|error| {
+        format!("trust store is invalid or contains duplicate/unknown fields: {error}")
+    })?;
     // Validate immediately so malformed key material cannot be reused by later calls.
     prepare_trust_store(&trust, actual)?;
     Ok(trust)
@@ -305,7 +329,9 @@ pub fn verify_witness_envelope(
     }
     for signature in &strict.signatures {
         if !is_lower_hex_64(&signature.keyid) {
-            return Err("DSSE signature keyid must be 64 lowercase hexadecimal characters".to_string());
+            return Err(
+                "DSSE signature keyid must be 64 lowercase hexadecimal characters".to_string(),
+            );
         }
         if signature.sig.is_empty() {
             return Err("DSSE signature bytes must not be empty".to_string());
@@ -339,8 +365,9 @@ pub fn verify_witness_envelope(
 
     let json: Value = serde_json::from_slice(&verified.payload)
         .map_err(|error| format!("verified payload is not strict JSON: {error}"))?;
-    let canonical = serde_json_canonicalizer::to_vec(&json)
-        .map_err(|error| format!("verified payload cannot be canonicalized as RFC 8785 JCS: {error}"))?;
+    let canonical = serde_json_canonicalizer::to_vec(&json).map_err(|error| {
+        format!("verified payload cannot be canonicalized as RFC 8785 JCS: {error}")
+    })?;
     if canonical != verified.payload {
         return Err("signed payload is not byte-for-byte RFC 8785 canonical JSON".to_string());
     }
@@ -358,7 +385,7 @@ pub fn verify_witness_envelope(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dsse::{sign, sign_with, Ed25519Signer};
+    use dsse::{Ed25519Signer, sign, sign_with};
     use ed25519_dalek::SigningKey;
 
     const TEST_PAYLOAD_TYPE: &str = CHECKPOINT_PAYLOAD_TYPE;
@@ -419,8 +446,10 @@ mod tests {
                 Ed25519Signer::from_bytes(seed).unwrap().with_key_id(keyid)
             })
             .collect::<Vec<_>>();
-        let signer_refs: Vec<&dyn dsse::Signer> =
-            signers.iter().map(|signer| signer as &dyn dsse::Signer).collect();
+        let signer_refs: Vec<&dyn dsse::Signer> = signers
+            .iter()
+            .map(|signer| signer as &dyn dsse::Signer)
+            .collect();
         let envelope = sign_with(payload_type, payload, &signer_refs).unwrap();
         envelope.to_json().unwrap()
     }
@@ -428,11 +457,14 @@ mod tests {
     #[test]
     fn pae_matches_independent_checked_in_vector() {
         let payload_type = TEST_PAYLOAD_TYPE;
-        let payload = br#"{"record_type":"basalt.authority.witness-checkpoint","schema_version":1}"#;
+        let payload =
+            br#"{"record_type":"basalt.authority.witness-checkpoint","schema_version":1}"#;
         let pae_bytes = dsse::pae(payload_type, payload);
         assert_eq!(pae_bytes.len(), 144);
-        assert_eq!(String::from_utf8(pae_bytes).unwrap(),
-            "DSSEv1 58 application/vnd.luminous.basalt.witness-checkpoint.v1+json 72 {\"record_type\":\"basalt.authority.witness-checkpoint\",\"schema_version\":1}");
+        assert_eq!(
+            String::from_utf8(pae_bytes).unwrap(),
+            "DSSEv1 58 application/vnd.luminous.basalt.witness-checkpoint.v1+json 72 {\"record_type\":\"basalt.authority.witness-checkpoint\",\"schema_version\":1}"
+        );
     }
 
     #[test]
@@ -443,8 +475,14 @@ mod tests {
         let pin = sha256_prefixed(&trust_bytes);
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
         let verified = verify_witness_envelope(
-            &envelope, &trust, &trust_bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write,
-        ).unwrap();
+            &envelope,
+            &trust,
+            &trust_bytes,
+            &pin,
+            TEST_PAYLOAD_TYPE,
+            QuorumKind::Write,
+        )
+        .unwrap();
         assert_eq!(verified.payload, TEST_PAYLOAD);
         assert_eq!(verified.accepted_key_ids.len(), 3);
     }
@@ -456,9 +494,17 @@ mod tests {
         let bytes = trust_bytes(&trust);
         let pin = sha256_prefixed(&bytes);
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..2]);
-        assert!(verify_witness_envelope(
-            &envelope, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        assert!(
+            verify_witness_envelope(
+                &envelope,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -467,13 +513,28 @@ mod tests {
         let trust = build_trust(&seeds);
         let bytes = trust_bytes(&trust);
         let pin = sha256_prefixed(&bytes);
-        let mut envelope = sign(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &Ed25519Signer::from_bytes(&seeds[0]).unwrap().with_key_id(trust.members[0].keyid.clone())).unwrap();
+        let mut envelope = sign(
+            TEST_PAYLOAD_TYPE,
+            TEST_PAYLOAD,
+            &Ed25519Signer::from_bytes(&seeds[0])
+                .unwrap()
+                .with_key_id(trust.members[0].keyid.clone()),
+        )
+        .unwrap();
         let duplicate = envelope.signatures[0].clone();
         envelope.signatures = vec![duplicate.clone(), duplicate.clone(), duplicate];
         let raw = envelope.to_json().unwrap();
-        assert!(verify_witness_envelope(
-            &raw, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        assert!(
+            verify_witness_envelope(
+                &raw,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -483,9 +544,17 @@ mod tests {
         let bytes = trust_bytes(&trust);
         let pin = sha256_prefixed(&bytes);
         let envelope = sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
-        assert!(verify_witness_envelope(
-            &envelope, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        assert!(
+            verify_witness_envelope(
+                &envelope,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -494,15 +563,25 @@ mod tests {
         let trust = build_trust(&seeds);
         let bytes = trust_bytes(&trust);
         let pin = sha256_prefixed(&bytes);
-        let mut envelope: StrictEnvelope = serde_json::from_slice(&sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3])).unwrap();
+        let mut envelope: StrictEnvelope =
+            serde_json::from_slice(&sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]))
+                .unwrap();
         envelope.payload = STANDARD.encode(br#"{"authority_revision":"8"}"#);
         let raw = serde_json::to_vec(&serde_json::json!({
             "payloadType": envelope.payload_type, "payload": envelope.payload,
             "signatures": envelope.signatures.iter().map(|x| serde_json::json!({"keyid":x.keyid,"sig":x.sig})).collect::<Vec<_>>()
         })).unwrap();
-        assert!(verify_witness_envelope(
-            &raw, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        assert!(
+            verify_witness_envelope(
+                &raw,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -513,9 +592,17 @@ mod tests {
         let pin = sha256_prefixed(&bytes);
         let noncanonical = br#"{ "schema_version": 1, "record_type": "basalt.authority.witness-checkpoint", "authority_id": "basalt-test", "authority_revision": "7" }"#;
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, noncanonical, &seeds[..3]);
-        assert!(verify_witness_envelope(
-            &envelope, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        assert!(
+            verify_witness_envelope(
+                &envelope,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -526,10 +613,22 @@ mod tests {
         let pin = sha256_prefixed(&bytes);
         let good = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
         let good = String::from_utf8(good).unwrap();
-        let duplicate = good.replacen("\"payloadType\":", "\"payloadType\":\"attacker-type\",\"payloadType\":", 1);
-        assert!(verify_witness_envelope(
-            duplicate.as_bytes(), &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        let duplicate = good.replacen(
+            "\"payloadType\":",
+            "\"payloadType\":\"attacker-type\",\"payloadType\":",
+            1,
+        );
+        assert!(
+            verify_witness_envelope(
+                duplicate.as_bytes(),
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -540,9 +639,17 @@ mod tests {
         let pin = sha256_prefixed(&bytes);
         let payload = br#"{"authority_revision":"7","authority_revision":"8"}"#;
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, payload, &seeds[..3]);
-        assert!(verify_witness_envelope(
-            &envelope, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        assert!(
+            verify_witness_envelope(
+                &envelope,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -566,16 +673,35 @@ mod tests {
         let bytes = trust_bytes(&trust);
         let pin = sha256_prefixed(&bytes);
         let signers = [
-            Ed25519Signer::from_bytes(&seeds[0]).unwrap().with_key_id(trust.members[0].keyid.clone()),
-            Ed25519Signer::from_bytes(&seeds[1]).unwrap().with_key_id(trust.members[1].keyid.clone()),
-            Ed25519Signer::from_bytes(&seeds[3]).unwrap().with_key_id(trust.members[3].keyid.clone()),
+            Ed25519Signer::from_bytes(&seeds[0])
+                .unwrap()
+                .with_key_id(trust.members[0].keyid.clone()),
+            Ed25519Signer::from_bytes(&seeds[1])
+                .unwrap()
+                .with_key_id(trust.members[1].keyid.clone()),
+            Ed25519Signer::from_bytes(&seeds[3])
+                .unwrap()
+                .with_key_id(trust.members[3].keyid.clone()),
         ];
-        let signer_refs: Vec<&dyn dsse::Signer> =
-            signers.iter().map(|signer| signer as &dyn dsse::Signer).collect();
-        let envelope = sign_with(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &signer_refs).unwrap().to_json().unwrap();
-        assert!(verify_witness_envelope(
-            &envelope, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
-        ).is_err());
+        let signer_refs: Vec<&dyn dsse::Signer> = signers
+            .iter()
+            .map(|signer| signer as &dyn dsse::Signer)
+            .collect();
+        let envelope = sign_with(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &signer_refs)
+            .unwrap()
+            .to_json()
+            .unwrap();
+        assert!(
+            verify_witness_envelope(
+                &envelope,
+                &trust,
+                &bytes,
+                &pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -604,6 +730,12 @@ mod tests {
         let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
         let trust = build_trust(&seeds);
         let bytes = trust_bytes(&trust);
-        assert!(load_pinned_trust_store(&bytes, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").is_err());
+        assert!(
+            load_pinned_trust_store(
+                &bytes,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+            .is_err()
+        );
     }
 }
