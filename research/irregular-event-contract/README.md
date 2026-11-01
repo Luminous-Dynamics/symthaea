@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Fifty-six Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests) for delayed-observation non-leakage,
+Seventy Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests, 14 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -137,3 +137,35 @@ fixed-point quantization, file/row provenance, record identity and schema
 failures. The crate now has 54 source-authored test functions total. No build or
 test has run.
 
+
+
+## Source progress watermarks and qualified completeness
+
+The `watermarks` module keeps source completeness distinct from event arrival
+and sensor missingness. Each source progress revision carries entity/modality/
+source identity, explicit stream generation and progress sequence, an exclusive
+event-time watermark, transaction time and a nonzero policy digest. The
+watermark is supplied by the source or named adapter policy; it is never
+inferred from the maximum event timestamp observed.
+
+Completeness over a half-open interval is Complete only when every required
+source has advanced its visible watermark to the exclusive interval end, or
+has explicitly declared end-of-stream. Missing progress remains Incomplete.
+A query uses a knowledge-time cutoff, so later source progress cannot leak
+backward into historical completeness decisions.
+
+An event with event_time strictly below a previously recorded exclusive
+watermark is preserved as a late-arrival breach, not silently dropped. An
+event exactly at the watermark is not late. The module records all event
+arrival classifications idempotently, so an event first accepted as on-time
+cannot be reclassified after a later watermark. A late breach contests only
+new completeness queries after its receipt time; earlier as-known results
+remain unchanged. The caller must also append the raw event to the bitemporal
+event ledger; the watermark module records the breach receipt, not the
+authoritative event itself.
+
+Fourteen source-authored watermark tests cover empty progress, multi-source
+minimum progress, exclusive boundaries, as-known progress, late-breach
+reopening, terminal streams, generation and monotonicity, atomic batches,
+idempotent event arrivals, and deterministic rebuild/digest parity. No Rust
+build or test has run.
