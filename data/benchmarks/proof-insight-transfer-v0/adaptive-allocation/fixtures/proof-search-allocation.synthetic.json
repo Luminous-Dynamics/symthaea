@@ -1,53 +1,95 @@
 {
-  "schema_version":"pitb.proof-search-allocation-decision.v0",
-  "decision_id":"synthetic-adaptive-allocation-001",
-  "evaluation_split":"test",
-  "target":{
-    "task_id":"1111111111111111111111111111111111111111111111111111111111111111",
-    "repository_commit":"2222222222222222222222222222222222222222",
-    "proof_state_sha256":"3333333333333333333333333333333333333333333333333333333333333333",
-    "statement_sha256":"4444444444444444444444444444444444444444444444444444444444444444"
+  "schema_version": "pitb.proof-search-allocation-decision.v0",
+  "decision_id": "synthetic-adaptive-allocation-001",
+  "evaluation_split": "test",
+  "target": {
+    "task_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "repository_commit": "2222222222222222222222222222222222222222",
+    "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "statement_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
   },
-  "policy":{
-    "policy_id":"pitb-lcb-shadow-price-v0",
-    "policy_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-    "calibration_manifest_sha256":"6666666666666666666666666666666666666666666666666666666666666666",
-    "calibration_split":"validation",
-    "calibration_sample_count":1000,
-    "calibration_ece_ppm":20000,
-    "max_calibration_ece_ppm":50000,
-    "minimum_lcb_delta_ppm":10000,
-    "shadow_weights_ppm":{"tokens":150000,"model_calls":100000,"tool_calls":100000,"wall_ms":200000,"lean_cpu_ms":250000,"cost_microusd":200000},
-    "confidence_z_hundredths":196
+  "policy": {
+    "policy_id": "pitb-lcb-shadow-price-v0",
+    "policy_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "calibration_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "calibration_split": "validation",
+    "calibration_sample_count": 1000,
+    "calibration_ece_ppm": 20000,
+    "max_calibration_ece_ppm": 50000,
+    "minimum_lcb_delta_ppm": 10000,
+    "shadow_weights_ppm": {
+      "tokens": 150000,
+      "model_calls": 100000,
+      "tool_calls": 100000,
+      "wall_ms": 200000,
+      "lean_cpu_ms": 250000,
+      "cost_microusd": 200000
+    },
+    "confidence_z_hundredths": 196,
+    "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761"
   },
-  "remaining_budget":{"tokens":100000,"model_calls":20,"tool_calls":100,"wall_ms":120000,"lean_cpu_ms":100000,"cost_microusd":5000000},
-  "actions":[
+  "remaining_budget": {
+    "tokens": 100000,
+    "model_calls": 20,
+    "tool_calls": 100,
+    "wall_ms": 120000,
+    "lean_cpu_ms": 100000,
+    "cost_microusd": 5000000
+  },
+  "actions": [
     {
-      "action_id":"continue-01","kind":"continue_current_target",
-      "proof_state_sha256":"3333333333333333333333333333333333333333333333333333333333333333",
-      "predicted_incremental_success_ppm":420000,"standard_error_ppm":50000,
-      "prediction_evidence_sha256":"7777777777777777777777777777777777777777777777777777777777777777",
-      "calibration_receipt_sha256":"8888888888888888888888888888888888888888888888888888888888888888",
-      "preconditions_met":true,
-      "expected_resources":{"tokens":20000,"model_calls":2,"tool_calls":8,"wall_ms":18000,"lean_cpu_ms":12000,"cost_microusd":700000}
+      "action_id": "continue-01",
+      "kind": "continue_current_target",
+      "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "predicted_incremental_success_ppm": 420000,
+      "standard_error_ppm": 50000,
+      "prediction_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+      "preconditions_met": true,
+      "expected_resources": {
+        "tokens": 20000,
+        "model_calls": 2,
+        "tool_calls": 8,
+        "wall_ms": 18000,
+        "lean_cpu_ms": 12000,
+        "cost_microusd": 700000
+      }
     },
     {
-      "action_id":"retrieve-01","kind":"retrieve_context",
-      "proof_state_sha256":"3333333333333333333333333333333333333333333333333333333333333333",
-      "predicted_incremental_success_ppm":250000,"standard_error_ppm":20000,
-      "prediction_evidence_sha256":"9999999999999999999999999999999999999999999999999999999999999999",
-      "calibration_receipt_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "preconditions_met":true,
-      "expected_resources":{"tokens":10000,"model_calls":1,"tool_calls":4,"wall_ms":8000,"lean_cpu_ms":4000,"cost_microusd":300000}
+      "action_id": "retrieve-01",
+      "kind": "retrieve_context",
+      "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "predicted_incremental_success_ppm": 250000,
+      "standard_error_ppm": 20000,
+      "prediction_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+      "preconditions_met": true,
+      "expected_resources": {
+        "tokens": 10000,
+        "model_calls": 1,
+        "tool_calls": 4,
+        "wall_ms": 8000,
+        "lean_cpu_ms": 4000,
+        "cost_microusd": 300000
+      }
     },
     {
-      "action_id":"snapshot-branch-01","kind":"spawn_snapshot_branch",
-      "proof_state_sha256":"3333333333333333333333333333333333333333333333333333333333333333",
-      "predicted_incremental_success_ppm":300000,"standard_error_ppm":25000,
-      "prediction_evidence_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "calibration_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "preconditions_met":true,
-      "expected_resources":{"tokens":40000,"model_calls":4,"tool_calls":15,"wall_ms":12000,"lean_cpu_ms":25000,"cost_microusd":1000000}
+      "action_id": "snapshot-branch-01",
+      "kind": "spawn_snapshot_branch",
+      "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "predicted_incremental_success_ppm": 300000,
+      "standard_error_ppm": 25000,
+      "prediction_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+      "preconditions_met": true,
+      "expected_resources": {
+        "tokens": 40000,
+        "model_calls": 4,
+        "tool_calls": 15,
+        "wall_ms": 12000,
+        "lean_cpu_ms": 25000,
+        "cost_microusd": 1000000
+      }
     }
   ]
 }
