@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-jepa-observed-transition-evidence-v0.1.json",
+  "title": "JEPA observation-grounded transition evidence",
+  "description": "Evidence contract for training a one-step JEPA action predictor against a later observed embedding. The Rust API recomputes embedding digests; raw observation, history and action-manifest digests must be authenticated by the upstream adapter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_history_sha256",
+    "source_observation_sha256",
+    "source_embedding_sha256",
+    "target_observation_sha256",
+    "target_embedding_sha256",
+    "action_manifest_sha256",
+    "source_observation_id",
+    "target_observation_id",
+    "source_sequence",
+    "target_sequence",
+    "action_id",
+    "action_index",
+    "source_observed_at_seconds",
+    "action_started_at_seconds",
+    "action_ended_at_seconds",
+    "target_observed_at_seconds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea-jepa-observed-transition-evidence-v0.1"
+    },
+    "source_history_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_observation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Upstream digest of the observed source frame/event bytes; not recomputed from the HDC embedding."
+    },
+    "source_embedding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Recomputed by the JEPA crate over the canonical HDC f32 bit representation."
+    },
+    "target_observation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Upstream digest of the later acquired target observation bytes; not a model-generated target."
+    },
+    "target_embedding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Recomputed by the JEPA crate over the canonical target HDC f32 bit representation."
+    },
+    "action_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "action_index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "source_observed_at_seconds": {
+      "type": "number"
+    },
+    "action_started_at_seconds": {
+      "type": "number"
+    },
+    "action_ended_at_seconds": {
+      "type": "number"
+    },
+    "target_observed_at_seconds": {
+      "type": "number"
+    }
+  },
+  "x-rust-invariants": [
+    "source_sequence < target_sequence",
+    "source_observed_at_seconds <= action_started_at_seconds <= action_ended_at_seconds < target_observed_at_seconds",
+    "all timestamps must be finite",
+    "the action index must exist in the configured discrete action space",
+    "source_embedding_sha256 and target_embedding_sha256 are recomputed from the exact supplied ContinuousHV values and must match",
+    "both embeddings must have the configured input dimension and finite f32 values"
+  ]
+}
