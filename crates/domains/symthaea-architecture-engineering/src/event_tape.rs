@@ -666,6 +666,10 @@ pub struct EventTape {
 pub struct EventTapeSummary {
     pub event_count: usize,
     pub candidate_evaluations: usize,
+    pub multi_objective_evaluations: usize,
+    pub noisy_observation_attempts: usize,
+    pub successful_noisy_observations: usize,
+    pub failed_noisy_observations: usize,
     pub direction_proposals: usize,
     pub admitted_directions: usize,
     pub duplicate_proposals: usize,
