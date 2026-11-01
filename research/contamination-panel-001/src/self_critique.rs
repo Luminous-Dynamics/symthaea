@@ -632,6 +632,19 @@ mod tests {
     }
 
     #[test]
+    fn full_vocabulary_json_fixture_recomputes_exact_entropy() {
+        let request: SelfCritiqueScoringRequestV1 = serde_json::from_str(include_str!(
+            "../fixtures/self-critique-full-vocab-scoring-request.hand.v1.json"
+        ))
+        .unwrap();
+        let report = score_self_critique_request(&request).unwrap();
+        assert_eq!(report.sample_id, "self-critique-full-vocab-fixture-001");
+        assert_eq!(report.contamination_score, 1.0);
+        assert!(!report.released_topk_entropy_reproduction);
+        assert!(report.initial_topk_diagnostics.is_none());
+    }
+
+    #[test]
     fn identical_sequences_score_one() {
         let (cosine, penalty, score) =
             penalized_entropy_cosine(&[0.5, 1.0, 0.5], &[0.5, 1.0, 0.5]).unwrap();
