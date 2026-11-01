@@ -223,25 +223,32 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
         Ok(report) => report,
         Err(SparseCausalError::FactorGraph(FactorGraphError::IntermediateTooLarge { entries, limit })) => {
             let evidence = format!("required_entries={entries};limit={limit}");
-            println!(
-                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-                fixture.topology.label(),
-                fixture.substrate_units,
-                candidate.len(),
-                repeats,
-                model_build_ns,
-                FACTOR_ENTRY_BUDGET,
-                "budget_rejected",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
+            let fields = vec![
+                fixture.topology.label().to_string(),
+                fixture.substrate_units.to_string(),
+                candidate.len().to_string(),
+                repeats.to_string(),
+                model_build_ns.to_string(),
+                FACTOR_ENTRY_BUDGET.to_string(),
+                "budget_rejected".to_string(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
                 evidence,
-            );
+            ];
+            println!("{}", fields.join(","));
             return Ok(());
         }
         Err(error) => return Err(format!(
@@ -278,25 +285,33 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
     let finite = warmup.forward_likelihood.iter().all(|value| value.is_finite());
     let evidence = format!("receipt={receipt};forward_sum={forward_sum:.17};finite={finite}");
 
-    println!(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-        fixture.topology.label(),
-        fixture.substrate_units,
-        candidate.len(),
-        repeats,
-        model_build_ns,
-        FACTOR_ENTRY_BUDGET,
-        "exact",
-        warmup.posterior_induced_width,
-        warmup.maximum_target_induced_width,
-        warmup.predicted_peak_factor_entries,
-        warmup.peak_factor_entries,
-        warmup.factor_multiplications,
-        p50_ns,
-        p95_ns,
-        min_ns,
+    let work = warmup.planner_work;
+    let fields = vec![
+        fixture.topology.label().to_string(),
+        fixture.substrate_units.to_string(),
+        candidate.len().to_string(),
+        repeats.to_string(),
+        model_build_ns.to_string(),
+        FACTOR_ENTRY_BUDGET.to_string(),
+        "exact".to_string(),
+        warmup.posterior_induced_width.to_string(),
+        warmup.maximum_target_induced_width.to_string(),
+        work.fill_score_evaluations.to_string(),
+        work.fill_score_adjacency_visits.to_string(),
+        work.affected_adjacency_visits.to_string(),
+        work.stale_queue_entries_discarded.to_string(),
+        work.affected_candidates_refreshed.to_string(),
+        work.leaf_fast_path_updates.to_string(),
+        work.clique_pair_checks.to_string(),
+        warmup.predicted_peak_factor_entries.to_string(),
+        warmup.peak_factor_entries.to_string(),
+        warmup.factor_multiplications.to_string(),
+        p50_ns.to_string(),
+        p95_ns.to_string(),
+        min_ns.to_string(),
         evidence,
-    );
+    ];
+    println!("{}", fields.join(","));
     if !finite || !forward_sum.is_finite() {
         return Err(format!("non-finite Eq. 4 output for {} n={}", fixture.topology.label(), fixture.substrate_units));
     }
@@ -309,7 +324,7 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "topology,substrate_units,candidate_units,repeats,model_build_ns,max_factor_entries,status,posterior_induced_width,target_induced_width,predicted_peak_entries,observed_peak_entries,factor_multiplications,p50_ns,p95_ns,min_ns,evidence"
+        "topology,substrate_units,candidate_units,repeats,model_build_ns,max_factor_entries,status,posterior_induced_width,target_induced_width,planner_fill_score_evaluations,planner_fill_score_adjacency_visits,planner_affected_adjacency_visits,planner_stale_queue_entries_discarded,planner_affected_candidates_refreshed,planner_leaf_fast_path_updates,planner_clique_pair_checks,predicted_peak_entries,observed_peak_entries,factor_multiplications,p50_ns,p95_ns,min_ns,evidence"
     );
     for fixture in fixture_set() {
         run_fixture(&fixture, repeats)?;
