@@ -226,3 +226,8 @@ The anytime header now optionally binds `noisy_observation_plan_sha256` before a
 - emits a joint digest binding the noisy report, anytime resource receipt, run ID and history tip.
 
 The generic anytime attempt counter includes both deterministic and noisy objective attempts. Artifact byte resolution is still a separate step: event evidence digests are retained, but this adapter does not claim to have fetched or independently verified the external raw artifact bytes. Noisy replicate-specific verifier promotion is also still outstanding.
+
+
+### Noisy-mode target applicability correction — schema 0.4.0
+
+The generic anytime receipt's target list is defined over the deterministic verified Pareto archive. In noisy mode, successful replicates are not inserted into that deterministic archive. Reporting those targets as \`NotReachedByBudget\` would therefore be misleading. The status enum now includes \`NotApplicableInNoisyMode\`; noisy-mode receipts return that status and no final deterministic metric value. Noisy Pareto confidence classifications remain in the separate joint noisy report.
