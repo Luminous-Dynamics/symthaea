@@ -66,6 +66,20 @@ These are single-environment prototype timings, not Rust production measurements
 - validation/projective_closure_index.py: augmented AVL and exact query.
 - validation/test_projective_closure_index.py: rational differential and structural tests.
 
+## Reproducible event benchmark
+
+Run:
+
+```bash
+python validation/benchmark_projective_closure_index.py --seed 9746 --repeats 3 --output closure-index-results.json
+```
+
+The runner reports index build cost separately, then measures k exact-rational evidence updates plus one query against k updates plus the independent O(n) scan. It reports median latencies and exact score equality. It deliberately includes the dense-update regime where the index is expected to lose.
+
+Files:
+- `validation/benchmark_projective_closure_index.py`
+- `validation/test_benchmark_projective_closure_index.py`
+
 ## Next research
 
 1. Integrate the index as a candidate-feasibility accelerator in the #9695 optimizer without removing the independent scan.
