@@ -64,12 +64,14 @@
     }
   ],
   "validation_status": {
-    "rust_test_functions_authored": 14,
+    "rust_test_functions_authored": 15,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
     "rust_tests_executed": false,
     "benchmark_executed": false,
-    "hardware_energy_measured": false
+    "hardware_energy_measured": false,
+    "exhaustive_reservoir_draw_paths": 12,
+    "expected_two_of_four_subset_frequency": 2
   }
 }
