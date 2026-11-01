@@ -44,9 +44,7 @@ pub struct CandidateOperationForecast {
 pub enum CandidateDisposition {
     /// q90 plus mandatory verification reserve fits the remaining hard budget
     /// in every dimension. This is a budget gate, not a joint probability claim.
-    Feasible {
-        reserved_q90: ResourceVector,
-    },
+    Feasible { reserved_q90: ResourceVector },
     /// At least one q90-plus-reserve resource component exceeds the hard budget.
     BudgetInfeasible,
     /// The shift detector does not support a forecast-based decision.
@@ -227,7 +225,12 @@ pub fn select_budget_feasible_pareto(
 
     let feasible = assessments
         .iter()
-        .filter(|assessment| matches!(assessment.disposition, CandidateDisposition::Feasible { .. }))
+        .filter(|assessment| {
+            matches!(
+                assessment.disposition,
+                CandidateDisposition::Feasible { .. }
+            )
+        })
         .collect::<Vec<_>>();
     let mut pareto_operation_families = Vec::new();
 
