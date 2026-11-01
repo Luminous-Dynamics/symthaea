@@ -5221,10 +5221,11 @@ impl DelayedHorizonEvaluator {
                 if due_error > tolerance || lateness_error > tolerance || receipt.observed_at_seconds < receipt.due_at_seconds {
                     return Err(format!("score receipt {index} has inconsistent forecast timing"));
                 }
-                if let Some(source) = receipt.source_frame_sequence {
-                    if receipt.target_frame_sequence <= source {
-                        return Err(format!("score receipt {index} target frame does not follow its source frame"));
-                    }
+                let Some(source_frame_sequence) = receipt.source_frame_sequence else {
+                    return Err(format!("score receipt {index} is missing its source frame sequence"));
+                };
+                if receipt.target_frame_sequence <= source_frame_sequence {
+                    return Err(format!("score receipt {index} target frame does not follow its source frame"));
                 }
                 for (name, digest) in [
                     ("prediction", receipt.prediction_blake3.as_str()),
