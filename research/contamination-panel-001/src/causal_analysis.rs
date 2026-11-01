@@ -455,7 +455,6 @@ fn validate_replicate(
         .training_rng_seed_commitment_sha256
         != replicate.design.training_rng_seed_commitment_sha256
         || replicate.training_receipt_audit.design_sha256 != replicate.manifest.design_sha256
-        || replicate.training_receipt_audit.manifest_sha256 != replicate.manifest.manifest_sha256
         || replicate
             .training_receipt_audit
             .intervention_manifest_sha256
@@ -635,7 +634,6 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
     let mut base_rates = Vec::new();
     let mut treatment_rates = Vec::new();
     let mut placebo_rates = Vec::new();
-    let mut item_base_success = 0_u64;
     let mut item_treatment_success = 0_u64;
     let mut item_placebo_success = 0_u64;
     let mut item_total = 0_u64;
@@ -650,9 +648,6 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
         base_rates.push(base);
         treatment_rates.push(treatment);
         placebo_rates.push(placebo);
-        item_base_success = item_base_success
-            .checked_add(outcome.base.success_count)
-            .ok_or_else(|| "base item success count overflows".to_owned())?;
         item_treatment_success = item_treatment_success
             .checked_add(outcome.treatment.success_count)
             .ok_or_else(|| "treatment item success count overflows".to_owned())?;
@@ -685,7 +680,6 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
     let exposed_mean = sample_mean(&exposed_advantages)?;
     let unexposed_mean = sample_mean(&unexposed_advantages)?;
     let stratified_localization = stratum_localization(&replicate.cluster_outcomes, None)?;
-    let item_base = item_base_success as f64 * 1_000.0 / item_total as f64;
     let item_treatment = item_treatment_success as f64 * 1_000.0 / item_total as f64;
     let item_placebo = item_placebo_success as f64 * 1_000.0 / item_total as f64;
 
@@ -1209,8 +1203,7 @@ mod tests {
             experiment_id: design.experiment_id.clone(),
             replicate_id: suffix.clone(),
             design_sha256: manifest.design_sha256.clone(),
-            manifest_sha256: manifest.manifest_sha256.clone(),
-            seed_commitment_sha256: manifest.randomization_seed_commitment_sha256.clone(),
+            intervention_manifest_sha256: manifest.manifest_sha256.clone(),
             training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             treatment_run_id: format!("treatment-run-{index}"),
             placebo_run_id: format!("placebo-run-{index}"),
