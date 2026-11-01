@@ -98,7 +98,7 @@ A single higher-epoch or conflicting response cannot override a three-of-four qu
 
 ## 7. Tests authored (not executed)
 
-Ten source-level test functions cover:
+Eleven source-level test functions cover:
 1. three-of-four confirmation of an exact current checkpoint;
 2. stale witness reporting while a current quorum succeeds;
 3. rollback detection when a witness quorum has a newer epoch;
@@ -106,9 +106,10 @@ Ten source-level test functions cover:
 5. insufficient quorum and weak-policy rejection;
 6. replay of old attestations yields no quorum under a fresh challenge;
 7. one stale-challenge response cannot block a valid current quorum;
-8. forged invalid-signature response under an honest witness ID, unknown identity, and valid equivocation handling cannot poison a valid quorum;
-9. one Byzantine higher-epoch response cannot override a current quorum;
-10. one Byzantine conflicting-head response cannot deny a current quorum.
+8. a forged invalid-signature response under an honest witness ID and an unknown identity cannot poison a valid quorum;
+9. a repeated attestation for the same checkpoint and challenge with a new observation timestamp is counted once, not treated as equivocation;
+10. a validly signed conflicting checkpoint from one witness is excluded without denying a remaining current quorum;
+11. one Byzantine higher-epoch response cannot override a current quorum and one Byzantine conflicting-head response cannot deny a current quorum.
 
 No Cargo compilation, rustfmt, Clippy, Rust test execution, remote witness experiment or snapshot/restore campaign has run.
 
