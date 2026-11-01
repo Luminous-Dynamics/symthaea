@@ -130,6 +130,7 @@ pub struct TopKTailSummaryV1 {
 fn summarize_topk_tail(
     steps: &[Vec<f64>],
     supplied_entropy: &[f64],
+    requested_top_k: u32,
     vocabulary_size: u32,
     label: &str,
 ) -> Result<TopKTailSummaryV1, String> {
@@ -143,7 +144,7 @@ fn summarize_topk_tail(
     let mut raw_entropy = 0.0;
     for (index, probabilities) in steps.iter().enumerate() {
         if probabilities.is_empty()
-            || probabilities.len() > 10_000
+            || probabilities.len() > requested_top_k as usize + 1
             || probabilities.len() >= vocabulary_size as usize
         {
             return Err(format!("{label} top-K step {index} has invalid returned probability count"));
@@ -395,6 +396,8 @@ pub fn score_self_critique_request(
     let (initial_topk_diagnostics, critique_topk_diagnostics) =
         match request.entropy_source {
             EntropySourceV1::VllmTopKRawPartial => {
+                let top_k = request.requested_top_k
+                    .ok_or_else(|| "top-K request metadata missing".to_owned())?;
                 let vocabulary = request.vocabulary_size
                     .ok_or_else(|| "top-K vocabulary size missing".to_owned())?;
                 let initial_steps = request.initial_topk_probability_steps.as_ref()
@@ -403,10 +406,10 @@ pub fn score_self_critique_request(
                     .ok_or_else(|| "critique top-K probability steps missing".to_owned())?;
                 (
                     Some(summarize_topk_tail(
-                        initial_steps, &request.initial_entropy_nats, vocabulary, "initial",
+                        initial_steps, &request.initial_entropy_nats, top_k, vocabulary, "initial",
                     )?),
                     Some(summarize_topk_tail(
-                        critique_steps, &request.critique_entropy_nats, vocabulary, "critique",
+                        critique_steps, &request.critique_entropy_nats, top_k, vocabulary, "critique",
                     )?),
                 )
             }
