@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 56,
+    "rust_test_functions_authored": 70,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -48,7 +48,8 @@
     "bitemporal_test_functions_authored": 12,
     "purged_split_test_functions_authored": 8,
     "train_only_scaler_test_functions_authored": 10,
-    "time_imm_adapter_test_functions_authored": 10
+    "time_imm_adapter_test_functions_authored": 10,
+    "source_watermark_test_functions_authored": 14
   },
   "opaque_payload_contract": {
     "fields": [
@@ -239,5 +240,43 @@
     "as_known_query": "binary search transaction-time-ordered per-event revision chain",
     "consistency_audit": "rebuild indexes from append-only log and compare",
     "test_functions_authored": 12
+  },
+  "source_watermark_contract": {
+    "module": "research/irregular-event-contract/src/watermarks.rs",
+    "source_progress_fields": [
+      "entity_id",
+      "modality_id",
+      "source_id",
+      "stream_generation",
+      "progress_sequence",
+      "exclusive_event_time_us",
+      "recorded_at_us",
+      "policy_sha256"
+    ],
+    "operations": [
+      "advance",
+      "end_of_stream"
+    ],
+    "inferred_from_max_seen_event_time": false,
+    "completeness_query_coordinates": [
+      "entity_id",
+      "required_sources",
+      "interval_start_us",
+      "interval_end_exclusive_us",
+      "known_at_us"
+    ],
+    "verdicts": [
+      "complete",
+      "incomplete",
+      "contested"
+    ],
+    "required_source_rule": "every required source watermark >= exclusive interval end or explicit end-of-stream",
+    "late_event_rule": "event_time_us < already visible exclusive watermark is a breach; equality is on-time",
+    "preserves_historical_as_known_answers": true,
+    "records_all_event_arrival_classifications_idempotently": true,
+    "caller_must_append_authoritative_event_to_bitemporal_ledger": true,
+    "durable_persistence_implemented": false,
+    "source_authentication_implemented": false,
+    "test_functions_authored": 14
   }
 }
