@@ -248,7 +248,6 @@ impl TrustedState {
             candidate.source.clone(),
             SourceCursor {
                 generation: candidate.generation,
-                previous_seal_digest: candidate.previous_seal_digest.clone(),
                 seal_digest: candidate.seal_digest.clone(),
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
@@ -262,6 +261,7 @@ impl TrustedState {
             AcceptedReceipt {
                 source: candidate.source.clone(),
                 generation: candidate.generation,
+                previous_seal_digest: candidate.previous_seal_digest.clone(),
                 seal_digest: candidate.seal_digest.clone(),
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
