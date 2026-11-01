@@ -590,3 +590,79 @@ Initial replication gate: at least 300 independent clean negatives per preregist
 
 Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
 
+## Self-Critique / RL-MIA entropy path-dependence detector (SCI-SELF-CRITIQUE-REPLICATION-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9767
+
+Paper: Detecting Data Contamination from Reinforcement Learning Post-training for Large Language Models, ICLR 2026: https://openreview.net/pdf?id=EjiJmiA6ea
+
+Official code: https://github.com/yongding-tao/RL-Data-Contamination
+
+### Paper scoring formula
+
+The paper's probe uses:
+1. Generate an initial deterministic (greedy) response to the task and record the token-level entropy sequence E1.
+2. Append the self-critique instruction and the initial response to the original prompt, asking the same model to take a different reasoning path. Generate greedily and record E2.
+3. Zero-pad the shorter entropy vector to the longer length; compute cosine similarity; multiply by min(lengths)/max(lengths).
+
+Higher scores mean more similar entropy trajectories and are interpreted by the paper as stronger RL path-dependence / potential membership. This is not a text-only API detector: the scoring backend must provide per-token entropy or log-probability distributions.
+
+### Released implementation audit: top-K entropy is a truncated feature
+
+The official generate_full_data.py sets K=50 by default, requests vLLM per-step log-probabilities, then computes each entropy as -sum(p * ln(p)) over the returned dictionary. It does not reconstruct the omitted vocabulary tail. approx_mode is passed to process_single_output, but the current function does not use that argument.
+
+The faithful released-code reproduction therefore uses vllm_top_k_raw_partial: it sums the returned probabilities exactly as released, without renormalizing them. The Rust scorer requires the actual returned probability vectors, verifies their raw partial entropy against the supplied entropy sequence, and reports returned probability mass plus lower/upper bounds on the omitted tail entropy. Those tail bounds are diagnostics; they are not silently substituted into the detector score.
+
+A separate full_vocab_softmax_exact mode is available when a model backend can provide the complete vocabulary softmax distribution. It is a measurement variant, not the released-code baseline. Report the two modes in separate rows. Never label the exact-full-vocabulary result as a byte-for-byte reproduction of the released top-K experiment.
+
+For a returned top-K probability mass m, vocabulary size V and n returned token entries, omitted tail mass q=1-m. Its entropy contribution lies at least at -q*ln(q) and at most at -q*ln(q/(V-n)), given only the remaining mass and number of possible tokens. The code reports the mean of these bounds for each generation. These are per-token entropy bounds, not a direct interval on the nonlinear cosine score.
+
+### Rust implementation
+
+src/self_critique.rs contains:
+- penalized_entropy_cosine: the paper's zero-padded cosine × length-ratio formula.
+- score_self_critique_request: strict per-item score and evidence validation.
+- vllm_top_k_raw_partial and full_vocab_softmax_exact extraction modes.
+- Prompt, model, tokenizer, instruction, initial response, critique prompt, generation configuration and entropy extractor digests.
+- Greedy / temperature=0 checks for both responses.
+- Generated-token count, observed entropy-step count, missing-step count and coverage permille.
+- Per-step top-K probability/entropy consistency and omitted tail-mass diagnostics.
+- Domain-separated request and entropy-sequence digests.
+- 17 authored tests, including formula fixtures, zero norm, empty/malformed sequences, exact-vs-topK mode separation, partial-entropy mismatch and tail-mass bounds.
+
+CLI:
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      score-self-critique self-critique-scoring-request.json self-critique-score-report.json
+
+The report hard-sets independently_authenticated=false and confirmatory_eligible=false.
+
+### RL-MIA reproduction protocol
+
+The paper's primary RL-MIA suite comprises AIME24, AIME25, Knights & Knaves and SAT. AIME24 may contain pretraining exposure; AIME25 is post-cutoff in the paper's framing; K&K and SAT provide synthetic logical reasoning controls. For AIME24/AIME25 the authors use OpenR1-Math-46K as the base RL corpus and inject 50% of the benchmark items; K&K and SAT use their own training portions plus additional held-out clean items. The paper evaluates Qwen2.5-7B-Instruct and DeepSeek-Math-7B-Instruct primarily, with additional sizes/families and a Qwen2.5-3B comparison across PPO, GRPO and DAPO.
+
+Faithful reproduction must pin: exact source splits and item identities, contamination injection rate and occurrences, training algorithm/checkpoint, reward/verifier implementation, prompt template, exact initial and critique prompts, generation limits, entropy extractor and top-K K. The official prompt asks the model for an alternative path conditioned on its initial answer; a “use an unusual method” prompt without that initial-response anchor is a different ablation and the paper reports much weaker results.
+
+### Published results: comparator values, not Symthaea results
+
+In the paper's Table 2, Self-Critique reports mean AUC 0.70 on Qwen2.5-7B-Instruct and 0.64 on DeepSeek-Math-7B-Instruct over AIME24, AIME25, K&K and SAT. The Qwen baselines in the same experiment have mean AUC 0.51 (PPL), 0.49 (Min-K%), 0.44 (Min-K%++), 0.59 (Recall), 0.51 (CDD), 0.56 (Entropy-Temp) and 0.62 (Entropy-Noise). The DeepSeek result is also model-specific; do not infer the headline AUC gap generalizes to other checkpoints or contamination regimes.
+
+The paper's K&K Qwen2.5-3B RL-algorithm experiment reports mean AUC 0.60 for Self-Critique across PPO/GRPO/DAPO, versus 0.58 for Entropy-Temp and 0.53 for Entropy-Noise. Its Llama-3.1-8B-Instruct K&K/SAT average AUC is 0.62. The dual-stage low-pretraining-contamination subset result reaches 0.88 AUC, but this is conditioned on a PPL-selected subset and must be separated from the primary RL-MIA averages.
+
+The paper primarily reports AUC and F1 at a Youden threshold. Symthaea must reproduce those historical metrics but add a separate calibration cohort, held-out test cohort, exact low-FPR operating points, FPR confidence bounds, AUPRC and per-model/pair uncertainty. Threshold selection on the same evaluation cohort must not be presented as confirmatory performance.
+
+### New qualification grid
+
+- Extraction modes: official raw top-K K=5/10/20/50/100 and full-vocabulary exact; compare scores and rankings on the exact same prompts.
+- Policy regimes: PPO, GRPO, DAPO, and RLHF-family algorithms (PPO, DPO, TDPO, RTO) kept as distinct strata.
+- Contamination dose: faithful 50% injection plus preregistered 0/1/5/10/25/50/75/100% dose-response extensions.
+- Source/task strata: AIME24 vs post-cutoff AIME25, K&K, SAT, GSM8K, then code/science/tool-use and other domains.
+- Confounders: pretraining contamination, answer correctness, natural single-path tasks, inherently deterministic clean reasoning, initial answer truncation, reasoning length, tokenization, model family, checkpoint age, verifier/reward changes and prompt-template variations.
+- Fixed operating points: TPR@FPR=1%, 5%, 10%, exact FPR confidence intervals, AUPRC, coverage and selective risk.
+- Independent model-pair replications remain the training-level uncertainty units; many test items from one trained pair do not create independent RL experiments.
+- Cost reports: two generations, generated tokens, prompt/critique token counts, logprob requests, top-K width, full-logit extraction cost, latency and GPU memory.
+
+### Claim ceiling
+
+Self-Critique measures similarity of two entropy trajectories under a declared self-critique intervention. It is evidence of response-path rigidity under that probe, not proof of training membership, proof of exposure causing an answer or universal contamination detection. The released top-K partial entropy and full-vocabulary entropy are separate extraction modes. The kernel does not itself run a model, authenticate a checkpoint, or qualify the clean/non-member distribution. No SOTA improvement is claimed by this implementation alone.
+
