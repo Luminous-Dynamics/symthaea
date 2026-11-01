@@ -23,7 +23,7 @@ use super::pareto_objectives::{
 };
 
 const SCHEMA: &str = "symthaea.architecture-engineering.pareto-anytime";
-const VERSION: &str = "0.2.0";
+const VERSION: &str = "0.3.0";
 const TARGET_PLAN_SCHEMA: &str = "symthaea.architecture-engineering.anytime-target-plan";
 const TARGET_PLAN_VERSION: &str = "0.1.0";
 
@@ -348,6 +348,8 @@ pub struct AnytimeHistoryHeader {
     pub objective_specs: Vec<ParetoObjectiveSpec>,
     pub reference_point_utility: Vec<f64>,
     pub target_plan: AnytimeTargetPlan,
+    /// Optional preregistered noisy-observation plan digest. None means deterministic mode only.
+    pub noisy_observation_plan_sha256: Option<String>,
     pub cost_model_id: String,
     pub cost_model_sha256: String,
     pub max_objective_evaluation_attempts: u64,
@@ -395,6 +397,7 @@ impl AnytimeHistoryHeader {
             objective_specs,
             reference_point_utility,
             target_plan,
+            noisy_observation_plan_sha256: None,
             cost_model_id: cost_model_id.into(),
             cost_model_sha256: cost_model_sha256.into(),
             max_objective_evaluation_attempts,
@@ -402,6 +405,18 @@ impl AnytimeHistoryHeader {
         };
         header.validate()?;
         Ok(header)
+    }
+
+    /// Freeze a noisy-observation plan before any outcome is appended.
+    pub fn with_noisy_observation_plan(
+        mut self,
+        plan_sha256: impl Into<String>,
+    ) -> Result<Self, AnytimeError> {
+        let digest = plan_sha256.into();
+        validate_sha256(&digest, "header.noisy_observation_plan_sha256")?;
+        self.noisy_observation_plan_sha256 = Some(digest);
+        self.validate()?;
+        Ok(self)
     }
 
     pub fn validate(&self) -> Result<(), AnytimeError> {
@@ -427,6 +442,9 @@ impl AnytimeHistoryHeader {
         validate_sha256(&self.verifier_build_sha256, "header.verifier_build_sha256")?;
         validate_sha256(&self.execution_environment_sha256, "header.execution_environment_sha256")?;
         validate_sha256(&self.cost_model_sha256, "header.cost_model_sha256")?;
+        if let Some(plan_sha256) = &self.noisy_observation_plan_sha256 {
+            validate_sha256(plan_sha256, "header.noisy_observation_plan_sha256")?;
+        }
         let dimensions = self.objective_specs.len();
         if !(2..=4).contains(&dimensions) {
             return Err(AnytimeError::new("header.objective_specs", "v0.1 exact-HV history supports two through four objectives"));
@@ -797,6 +815,12 @@ fn validate_and_apply_event(
             evidence_sha256,
             failure_reason,
         } => {
+            if header.noisy_observation_plan_sha256.is_some() {
+                return Err(AnytimeError::new(
+                    format!("{path}.kind"),
+                    "a history frozen for noisy observations cannot accept deterministic candidate evaluations",
+                ));
+            }
             if state.history_mode == Some(HistoryMode::Noisy) {
                 return Err(AnytimeError::new(
                     format!("{path}.kind"),
@@ -977,6 +1001,12 @@ fn validate_and_apply_event(
             evidence_sha256,
             failure_reason,
         } => {
+            if header.noisy_observation_plan_sha256.as_deref() != Some(observation_plan_sha256.as_str()) {
+                return Err(AnytimeError::new(
+                    format!("{path}.observation_plan_sha256"),
+                    "noisy observation plan must match the digest preregistered in the frozen history header",
+                ));
+            }
             if state.history_mode == Some(HistoryMode::Deterministic) {
                 return Err(AnytimeError::new(
                     format!("{path}.kind"),
@@ -1368,6 +1398,12 @@ impl<'a> AnytimeRecorder<'a> {
                 "deterministic optimizer recorder requires the exact versioned one-unit-per-objective-evaluation cost model and digest",
             ));
         }
+        if history.header.noisy_observation_plan_sha256.is_some() {
+            return Err(AnytimeError::new(
+                "recorder.history_mode",
+                "deterministic optimizer recorder cannot attach to a noisy-observation history",
+            ));
+        }
         if !history.events.is_empty() {
             return Err(AnytimeError::new(
                 "recorder.history",
@@ -1644,7 +1680,11 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
 
     for event in &history.events {
         totals.add_event(&event.resources, "receipt.total_resources")?;
-        if matches!(&event.action, AnytimeAction::CandidateEvaluation { .. }) {
+        if matches!(
+            &event.action,
+            AnytimeAction::CandidateEvaluation { .. }
+                | AnytimeAction::CandidateNoisyObservation { .. }
+        ) {
             objective_attempts = objective_attempts.checked_add(1)
                 .ok_or_else(|| AnytimeError::new("receipt.objective_evaluation_attempt_count", "counter overflow"))?;
         }
