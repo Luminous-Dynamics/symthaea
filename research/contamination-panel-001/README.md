@@ -820,3 +820,139 @@ FTD's multiple-testing correction and per-detector conformal p-values solve diff
 
 No SOTA improvement or FDR guarantee follows from the calibration kernel or synthetic tests alone. The report hard-sets independently_authenticated=false, confirmatory_eligible=false and intervals_multiplicity_adjusted=false.
 
+## Arbitrary-dependence BY adjustment for calibrated detector evidence (SCI-CONFORMAL-BY-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9805
+
+### Statistical layering
+
+This module consumes cluster-level conformal p-values from SCI-CALIBRATED-EVIDENCE-001. It adds a multiple-testing policy; it does not produce or validate the input p-values.
+
+There are three distinct requirements:
+1. A detector must produce a meaningful feature under the declared contamination/null setting.
+2. Its clean-cluster calibration must yield super-uniform p-values under the exact group's exchangeability assumptions.
+3. A predeclared discovery-family correction must control the multiplicity created by testing many clusters and/or selecting among detectors.
+
+Benjamini-Yekutieli (BY) controls FDR under arbitrary dependence **if every true-null input p-value is super-uniform**. That condition remains conditional on the source calibration report's clean-cluster exchangeability. BY cannot repair contaminated reference banks, broken score direction, invalid detector features or distribution shift.
+
+### Two explicit discovery families
+
+- per_detector_per_group: one family of source-cluster hypotheses for each detector/version and calibration group. This is useful for detector-specific diagnostic reporting, but it does not justify selecting the best detector and claiming global FDR.
+- all_detectors_per_group: one joint family containing every detector × source-cluster hypothesis inside a calibration group. This protects against searching across detectors on the same test set and is the stronger default for a benchmark-wide discovery claim.
+
+The family scope and q-levels are explicit configuration fields and are digest-bound. Choose the primary family before inspecting locked-test labels.
+
+### Exact conservative BY step-up
+
+Within a family of m hypotheses, sort exact rational p-values with deterministic tie-breaking. BY rejects through the largest rank k satisfying:
+
+    p_(k) <= q * k / (m * H_m)
+
+where H_m is the m-th harmonic number. The implementation computes an upper bound:
+
+    H_m_upper = sum(i=1..m) ceil(1,000,000 / i) / 1,000,000
+
+Since this bound is at least H_m, using it makes the rejection threshold conservative. The step-up inequality is evaluated with integer arithmetic over p-value numerator/denominator; no floating-point threshold comparison is used. Adjusted-p ceilings are reported in permille.
+
+Repeated item-level rows are deduplicated to one hypothesis per (calibration group, detector/version, source cluster). Repeated rows must agree on conformal p-value, ground-truth label and cluster maximum; detectors within a group must have the same source-cluster set, labels and item IDs for the joint family.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      adjust-conformal-by \
+      detector-calibration-report.json \
+      conformal-by-config.json \
+      conformal-by-report.json
+
+Strict schemas:
+- schema/conformal-by-config.schema.json
+- schema/conformal-by-report.schema.json
+
+### What the report shows
+
+- source calibration study digest and source-report digest;
+- per-family scope, detector count, hypothesis count and conservative harmonic upper bound;
+- exact input p-value numerator/denominator, deterministic rank and conservative adjusted-p ceiling for each cluster hypothesis;
+- q-level discovery cutoff, total discoveries, clean/contaminated discoveries, empirical FDP and empirical power on supplied locked-test truth;
+- whether the family is per-detector or joint all-detector.
+
+Empirical FDP/power against the benchmark's test labels are descriptive evaluation diagnostics. The guarantee is the statistical BY procedure conditional on valid true-null p-values; an observed benchmark FDP does not prove population FDR control.
+
+### Qualification tests and target grid
+
+The Rust kernel includes hand-computable tests for harmonic upper bounds, exact rational comparison, BY step-up, adjusted-p monotonicity, item-to-cluster deduplication, per-detector vs joint family membership, detector cluster-set mismatch, inconsistent repeated p-values/cluster maxima, source-report binding and detector-selection protection.
+
+Evaluate q/FDR levels 1%, 5% and 10%; keep them distinct from the single-hypothesis FPR alpha levels used in conformal calibration. Report family size, harmonic factor, discoveries and empirical FDP separately for both family scopes. Compare BH as a less conservative diagnostic only; BY is the arbitrary-dependence primary.
+
+### Claim ceiling
+
+The BY correction assumes each true-null conformal p-value is super-uniform. It does not establish that premise, repair non-exchangeable clusters or make an invalid detector p-value valid. Per-detector and joint all-detector families support different multiplicity claims. Reports hard-set independently_authenticated=false and confirmatory_eligible=false. No causal exposure, universal validity or SOTA claim follows from this module alone.
+
+## Arbitrary-dependence BY adjustment for calibrated detector evidence (SCI-CONFORMAL-BY-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9805
+
+### Statistical layering
+
+This module consumes cluster-level conformal p-values from SCI-CALIBRATED-EVIDENCE-001. It adds a multiple-testing policy; it does not produce or validate the input p-values.
+
+There are three distinct requirements:
+1. A detector must produce a meaningful feature under the declared contamination/null setting.
+2. Its clean-cluster calibration must yield super-uniform p-values under the exact group's exchangeability assumptions.
+3. A predeclared discovery-family correction must control the multiplicity created by testing many clusters and/or selecting among detectors.
+
+Benjamini-Yekutieli (BY) controls FDR under arbitrary dependence **if every true-null input p-value is super-uniform**. That condition remains conditional on the source calibration report's clean-cluster exchangeability. BY cannot repair contaminated reference banks, broken score direction, invalid detector features or distribution shift.
+
+### Two explicit discovery families
+
+- per_detector_per_group: one family of source-cluster hypotheses for each detector/version and calibration group. This is useful for detector-specific diagnostic reporting, but it does not justify selecting the best detector and claiming global FDR.
+- all_detectors_per_group: one joint family containing every detector × source-cluster hypothesis inside a calibration group. This protects against searching across detectors on the same test set and is the stronger default for a benchmark-wide discovery claim.
+
+The family scope and q-levels are explicit configuration fields and are digest-bound. Choose the primary family before inspecting locked-test labels.
+
+### Exact conservative BY step-up
+
+Within a family of m hypotheses, sort exact rational p-values with deterministic tie-breaking. BY rejects through the largest rank k satisfying:
+
+    p_(k) <= q * k / (m * H_m)
+
+where H_m is the m-th harmonic number. The implementation computes an upper bound:
+
+    H_m_upper = sum(i=1..m) ceil(1,000,000 / i) / 1,000,000
+
+Since this bound is at least H_m, using it makes the rejection threshold conservative. The step-up inequality is evaluated with integer arithmetic over p-value numerator/denominator; no floating-point threshold comparison is used. Adjusted-p ceilings are reported in permille using a conservative ceiling of the upper-bound calculation.
+
+Repeated item-level rows are deduplicated to one hypothesis per (calibration group, detector/version, source cluster). Repeated rows must agree on conformal p-value, ground-truth label and cluster maximum; detectors within a group must have the same source-cluster set, labels and item IDs for the joint family.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      adjust-conformal-by \
+      detector-calibration-report.json \
+      conformal-by-config.json \
+      conformal-by-report.json
+
+Strict schemas:
+- schema/conformal-by-config.schema.json
+- schema/conformal-by-report.schema.json
+
+### What the report shows
+
+- source calibration study digest and source-report digest;
+- per-family scope, detector count, hypothesis count and conservative harmonic upper bound;
+- exact input p-value numerator/denominator, deterministic rank and conservative adjusted-p ceiling for each cluster hypothesis;
+- q-level discovery cutoff, total discoveries, clean/contaminated discoveries, empirical FDP and empirical power on supplied locked-test truth;
+- whether the family is per-detector or joint all-detector.
+
+Empirical FDP/power against benchmark test labels are descriptive evaluation diagnostics. The guarantee is the statistical BY procedure conditional on valid true-null p-values; an observed benchmark FDP does not prove population FDR control.
+
+### Qualification tests and target grid
+
+The Rust kernel includes hand-computable tests for harmonic upper bounds, exact rational comparison, BY step-up, adjusted-p monotonicity, item-to-cluster deduplication, per-detector vs joint family membership, detector cluster-set mismatch, inconsistent repeated p-values/cluster maxima, source-report binding and detector-selection protection.
+
+It also rejects unsorted inputs to the public step-up and adjusted-p helpers. Configuration q/FDR levels 1%, 5% and 10% are distinct from the single-hypothesis FPR alpha levels used in conformal calibration. Report family size, harmonic factor, discoveries and empirical FDP separately for both family scopes. Compare BH as a less conservative diagnostic only; BY is the arbitrary-dependence primary.
+
+### Claim ceiling
+
+The BY correction assumes each true-null conformal p-value is super-uniform. It does not establish that premise, repair non-exchangeable clusters or make an invalid detector p-value valid. Per-detector and joint all-detector families support different multiplicity claims. Reports hard-set independently_authenticated=false and confirmatory_eligible=false. No causal exposure, universal validity or SOTA claim follows from this module alone.
+

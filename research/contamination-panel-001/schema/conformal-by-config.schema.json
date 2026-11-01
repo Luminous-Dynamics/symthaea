@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/conformal-by-config-v1.json",
+  "title": "Conformal Benjamini-Yekutieli config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "adjustment_id",
+    "source_calibration_study_sha256",
+    "source_calibration_report_sha256",
+    "family_scopes",
+    "target_fdr_permille"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.conformal_by_config.v1"
+    },
+    "adjustment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "source_calibration_study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "family_scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "per_detector_per_group",
+          "all_detectors_per_group"
+        ]
+      }
+    },
+    "target_fdr_permille": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      }
+    },
+    "source_calibration_report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
