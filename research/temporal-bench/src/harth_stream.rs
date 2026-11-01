@@ -518,8 +518,12 @@ where
     Ok(HarthStreamSummary {
         source_family_sha256,
         row_count,
-        first_timestamp_ns: first_timestamp_ns.expect("non-empty recording has first timestamp"),
-        last_timestamp_ns: last_timestamp_ns.expect("non-empty recording has last timestamp"),
+        first_timestamp_ns: first_timestamp_ns.ok_or_else(|| {
+            HarthCsvError::new(1, "timestamp", "missing first timestamp after non-empty row validation")
+        })?,
+        last_timestamp_ns: last_timestamp_ns.ok_or_else(|| {
+            HarthCsvError::new(1, "timestamp", "missing last timestamp after non-empty row validation")
+        })?,
         minimum_delta_ns,
         maximum_delta_ns,
         gap_count,
