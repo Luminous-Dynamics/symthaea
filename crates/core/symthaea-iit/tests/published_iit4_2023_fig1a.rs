@@ -23,9 +23,9 @@ use symthaea_iit::{
 const FIG1A_TPM: [f64; 24] = [
     0.11920292202211757, 0.7685247834990178, 0.16798161486607552, // 000
     0.026596993576865863, 0.9988874639671398, 0.5, // 100
-    0.973403006423134, 0.40131233988754805, 0.16798161486607552, // 010
+    0.973403006423134, 0.40131233988754816, 0.16798161486607552, // 010
     0.8807970779778823, 0.9945137011005495, 0.5, // 110
-    0.11920292202211757, 0.005486298899450404, 0.5, // 001
+    0.11920292202211757, 0.0054862988994504045, 0.5, // 001
     0.026596993576865863, 0.5986876601124519, 0.8320183851339245, // 101
     0.973403006423134, 0.0011125360328603216, 0.5, // 011
     0.8807970779778823, 0.23147521650098227, 0.8320183851339245, // 111
@@ -54,6 +54,16 @@ fn published_fig1a_tpm_matches_pinned_logistic_fixture() {
     assert_eq!(model.n_units(), 3);
     assert_eq!(model.n_states(), 8);
     assert_eq!(model.transition_probabilities().len(), FIG1A_TPM.len());
+    // These identities come from the executed PyPhi 2.0.0rc4 / IIT_4_0_2023
+    // reference artifact, not merely from the rounded published display values.
+    assert_eq!(
+        model.model_sha256(),
+        "6d67ba617b5d2ccbba711cb44f4753286a45ae6ded16fc1a544a77dc8e931ac1"
+    );
+    assert_eq!(
+        model.evaluation_sha256(&[false, true, true]).unwrap(),
+        "1442d185bc5d2c23e3c6fc92e94f21d1c492cbe41a451cebd1d51fa36e862744"
+    );
 
     for (index, (actual, expected)) in model
         .transition_probabilities()
@@ -166,6 +176,10 @@ fn published_fig1a_a_unit_phi_s_matches_pinned_iit4_2023_anchor() {
         )
         .expect("the published single-unit self-loop system must complete");
 
+    assert_eq!(
+        result.request_sha256,
+        "9b98c27017572e39052d64f69c82369a1d682efa0ad7823359c256faf2cc53eb"
+    );
     assert_eq!(result.formalism.id(), "IIT_4_0_2023");
     assert!(result.complete);
     assert!(result.partition_summary.total_cut_included);
@@ -174,8 +188,8 @@ fn published_fig1a_a_unit_phi_s_matches_pinned_iit4_2023_anchor() {
 
     let phi_s = result.phi_s.expect("qualified A system must expose phi_s");
     assert!(
-        (phi_s - 0.0396).abs() <= 0.001,
-        "Fig. 1A {{A}} phi_s mismatch: computed={phi_s:.8}, expected=0.0396 ± 0.001"
+        (phi_s - 0.039590997724974646).abs() <= 1e-9,
+        "Fig. 1A {{A}} phi_s mismatch: computed={phi_s:.12}, PyPhi 2.0.0rc4=0.039590997724974646 ± 1e-9"
     );
 }
 
@@ -190,6 +204,10 @@ fn published_fig1a_ab_proper_subsystem_phi_s_matches_pinned_iit4_2023_anchor() {
         )
         .expect("the published embedded {A,B} IIT 4.0 (2023) search must complete");
 
+    assert_eq!(
+        result.request_sha256,
+        "83e7343053f4747a1cea57749b9a94f46baa2617bf31add6f4a94b8578a2468f"
+    );
     assert_eq!(result.formalism.id(), "IIT_4_0_2023");
     assert!(result.complete);
     assert_eq!(result.partition_summary.unique_non_total_cuts, 3);
@@ -197,8 +215,8 @@ fn published_fig1a_ab_proper_subsystem_phi_s_matches_pinned_iit4_2023_anchor() {
 
     let phi_s = result.phi_s.expect("unique {A,B} state pair must expose phi_s");
     assert!(
-        (phi_s - 0.1719).abs() <= 0.001,
-        "Fig. 1A {{A,B}} phi_s mismatch: computed={phi_s:.8}, expected=0.1719 ± 0.001"
+        (phi_s - 0.1718628889918045).abs() <= 1e-9,
+        "Fig. 1A {{A,B}} phi_s mismatch: computed={phi_s:.12}, PyPhi 2.0.0rc4=0.1718628889918045 ± 1e-9"
     );
 }
 
@@ -213,6 +231,10 @@ fn published_fig1a_full_system_phi_s_matches_pinned_iit4_2023_anchor() {
         )
         .expect("the published full-system IIT 4.0 (2023) search must complete");
 
+    assert_eq!(
+        result.request_sha256,
+        "ea88d7dc1612dc72bd51d999cf582199ad76e0fd8fb90dfcd65f4788aa16fbfa"
+    );
     assert_eq!(result.formalism.id(), "IIT_4_0_2023");
     assert!(result.complete);
     assert_eq!(result.status, Iit4SystemPhiStatus::ExactUniqueStatePair);
@@ -223,7 +245,7 @@ fn published_fig1a_full_system_phi_s_matches_pinned_iit4_2023_anchor() {
 
     let phi_s = result.phi_s.expect("unique state-pair result must expose phi_s");
     assert!(
-        (phi_s - 0.1339).abs() <= 0.001,
-        "Fig. 1A full-system phi_s mismatch: computed={phi_s:.8}, expected=0.1339 ± 0.001"
+        (phi_s - 0.13387310087987658).abs() <= 1e-9,
+        "Fig. 1A full-system phi_s mismatch: computed={phi_s:.12}, PyPhi 2.0.0rc4=0.13387310087987658 ± 1e-9"
     );
 }
