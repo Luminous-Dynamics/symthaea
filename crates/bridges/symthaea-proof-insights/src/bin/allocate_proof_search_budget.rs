@@ -19,6 +19,9 @@ use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+#[path = "../proof_search_calibration.rs"]
+mod proof_search_calibration;
+
 const SCHEMA_VERSION: &str = "pitb.proof-search-allocation-decision.v0";
 const POLICY_ID: &str = "pitb-lcb-shadow-price-v0";
 const CONFIDENCE_Z_HUNDREDTHS: u64 = 196;
@@ -48,8 +51,8 @@ struct Candidate {
 #[derive(Debug)]
 enum Mode {
     Help,
-    Select { input: PathBuf, output: PathBuf },
-    SelfTest(PathBuf),
+    Select { input: PathBuf, calibration: PathBuf, output: PathBuf },
+    SelfTest { input: PathBuf, calibration: PathBuf },
 }
 
 fn string<'a>(value: &'a Value, path: &str) -> Result<&'a str> {
@@ -101,7 +104,7 @@ fn lcb_ppm(predicted: u64, standard_error: u64) -> u64 {
     predicted.saturating_sub(penalty)
 }
 
-fn validate_input(value: &Value) -> Result<()> {
+fn validate_input(value: &Value, calibration: &proof_search_calibration::CalibrationSummary) -> Result<()> {
     if string(value, "/schema_version")? != SCHEMA_VERSION {
         bail!("unsupported proof-search allocation schema version");
     }
@@ -122,7 +125,19 @@ fn validate_input(value: &Value) -> Result<()> {
         bail!("unsupported allocation policy");
     }
     let _ = digest(value, "/policy/policy_sha256")?;
-    let _ = digest(value, "/policy/calibration_manifest_sha256")?;
+    let expected_receipt = digest(value, "/policy/calibration_receipt_sha256")?;
+    if expected_receipt != calibration.receipt_sha256 {
+        bail!("policy calibration receipt SHA-256 differs from the exact supplied receipt bytes");
+    }
+    let manifest_sha = digest(value, "/policy/calibration_manifest_sha256")?;
+    if manifest_sha != calibration.dataset_manifest_sha256 {
+        bail!("calibration dataset manifest differs from the preregistered policy");
+    }
+    if integer(value, "/policy/calibration_sample_count")? != calibration.total_sample_count
+        || integer(value, "/policy/calibration_ece_ppm")? != calibration.worst_action_ece_ppm
+    {
+        bail!("caller-supplied calibration sample count/ECE differs from the verified receipt");
+    }
     if string(value, "/policy/calibration_split")? != "validation" {
         bail!("calibration data must come from the validation split");
     }
@@ -163,7 +178,14 @@ fn validate_input(value: &Value) -> Result<()> {
         if action_id.trim().is_empty() || !ids.insert(action_id) {
             bail!("action IDs must be nonempty and unique");
         }
-        let _ = string(action, &format!("{prefix}/kind"))?;
+        let kind = string(action, &format!("{prefix}/kind"))?;
+        if !calibration.action_kinds.contains(kind) {
+            bail!("action {action_id} has no matching per-action calibration group");
+        }
+        let action_receipt = digest(action, &format!("{prefix}/calibration_receipt_sha256"))?;
+        if action_receipt != calibration.receipt_sha256 {
+            bail!("action {action_id} calibration receipt digest differs from exact verified receipt bytes");
+        }
         if digest(action, &format!("{prefix}/proof_state_sha256"))? != proof_state {
             bail!("action {action_id} is based on a different proof-state identity");
         }
@@ -234,8 +256,8 @@ fn build_candidate(value: &Value, index: usize) -> Result<Option<Candidate>> {
     }))
 }
 
-fn choose(value: &Value, input_sha256: &str) -> Result<Value> {
-    validate_input(value)?;
+fn choose(value: &Value, input_sha256: &str, calibration: &proof_search_calibration::CalibrationSummary) -> Result<Value> {
+    validate_input(value, calibration)?;
     let actions = value["actions"]
         .as_array()
         .context("actions must be an array")?;
@@ -267,6 +289,10 @@ fn choose(value: &Value, input_sha256: &str) -> Result<Value> {
             "policy_id":POLICY_ID,
             "policy_sha256":value["policy"]["policy_sha256"],
             "calibration_manifest_sha256":value["policy"]["calibration_manifest_sha256"],
+            "calibration_receipt_sha256":calibration.receipt_sha256,
+            "calibration_total_sample_count":calibration.total_sample_count,
+            "calibration_worst_action_ece_ppm":calibration.worst_action_ece_ppm,
+            "calibration_mean_action_brier_score_ppm":calibration.mean_action_brier_score_ppm,
             "shadow_weights_sha256":weights_sha256,
             "decision":"execute",
             "selected_action":{
@@ -303,11 +329,20 @@ fn choose(value: &Value, input_sha256: &str) -> Result<Value> {
     Ok(decision)
 }
 
-fn select_file(input: &PathBuf, output: &PathBuf) -> Result<()> {
+fn select_file(input: &PathBuf, calibration_path: &PathBuf, output: &PathBuf) -> Result<()> {
     let bytes = fs::read(input).with_context(|| format!("read input {}", input.display()))?;
     let input_sha256 = hex::encode(Sha256::digest(&bytes));
     let value: Value = serde_json::from_slice(&bytes).context("parse allocation decision JSON")?;
-    let decision = choose(&value, &input_sha256)?;
+    if string(&value, "/evaluation_split")? == "validation" {
+        bail!("production selection cannot evaluate on the calibration split");
+    }
+    let expected_calibration_sha = digest(&value, "/policy/calibration_receipt_sha256")?;
+    let calibration = proof_search_calibration::verify_file(
+        calibration_path,
+        Some(expected_calibration_sha),
+        false,
+    )?;
+    let decision = choose(&value, &input_sha256, &calibration)?;
     fs::write(output, serde_json::to_vec_pretty(&decision)?)
         .with_context(|| format!("write decision {}", output.display()))?;
     println!(
@@ -319,21 +354,30 @@ fn select_file(input: &PathBuf, output: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn must_reject(label: &str, value: Value) -> Result<()> {
+fn must_reject(label: &str, value: Value, calibration: &proof_search_calibration::CalibrationSummary) -> Result<()> {
     let bytes = serde_json::to_vec(&value)?;
     let digest = hex::encode(Sha256::digest(&bytes));
-    if choose(&value, &digest).is_ok() {
+    if choose(&value, &digest, calibration).is_ok() {
         bail!("negative allocation control unexpectedly accepted: {label}");
     }
     println!("PITB_PROOF_SEARCH_ALLOCATION_NEGATIVE_PASS: {label}");
     Ok(())
 }
 
-fn self_test(path: &PathBuf) -> Result<()> {
+fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
     let bytes = fs::read(path).with_context(|| format!("read fixture {}", path.display()))?;
     let mut value: Value = serde_json::from_slice(&bytes).context("parse synthetic fixture")?;
+    let expected_calibration_sha = digest(&value, "/policy/calibration_receipt_sha256")?.to_owned();
+    let calibration = proof_search_calibration::verify_file(
+        calibration_path,
+        Some(&expected_calibration_sha),
+        true,
+    )?;
+    if calibration.evidence_class != "synthetic_contract_fixture" {
+        bail!("self-test requires an explicitly synthetic calibration receipt");
+    }
     let digest = hex::encode(Sha256::digest(&bytes));
-    let selected = choose(&value, &digest)?;
+    let selected = choose(&value, &digest, &calibration)?;
     if selected["decision"] != "execute"
         || selected["selected_action"]["action_id"] != "retrieve-01"
     {
@@ -345,7 +389,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let mut bad = value.clone();
     bad["actions"][1]["standard_error_ppm"] = json!(120_000);
     let altered = serde_json::to_vec(&bad)?;
-    let decision = choose(&bad, &hex::encode(Sha256::digest(altered)))?;
+    let decision = choose(&bad, &hex::encode(Sha256::digest(altered)), &calibration)?;
     if decision["selected_action"]["action_id"] == "retrieve-01" {
         bail!("high-uncertainty action retained the winning rank");
     }
@@ -355,7 +399,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let mut bad = value.clone();
     bad["actions"][1]["expected_resources"]["tool_calls"] = json!(9);
     bad["remaining_budget"]["tool_calls"] = json!(8);
-    let decision = choose(&bad, &hex::encode(Sha256::digest(serde_json::to_vec(&bad)?)))?;
+    let decision = choose(&bad, &hex::encode(Sha256::digest(serde_json::to_vec(&bad)?)), &calibration)?;
     if decision["selected_action"]["action_id"] != "continue-01" {
         bail!("action exceeding one remaining resource cap was not excluded before ranking");
     }
@@ -363,33 +407,42 @@ fn self_test(path: &PathBuf) -> Result<()> {
 
     let mut bad = value.clone();
     bad["policy"]["calibration_ece_ppm"] = json!(80_000);
-    must_reject("calibration error above preregistered maximum", bad)?;
+    must_reject("calibration ECE above preregistered maximum", bad, &calibration)?;
 
     let mut bad = value.clone();
     bad["actions"][0]["proof_state_sha256"] = json!("f".repeat(64));
-    must_reject("proof-state identity drift", bad)?;
+    must_reject("proof-state identity drift", bad, &calibration)?;
 
     let mut bad = value.clone();
     bad["actions"][1]["action_id"] = json!("continue-01");
-    must_reject("duplicate action ID", bad)?;
+    must_reject("duplicate action ID", bad, &calibration)?;
+
+    let mut bad = value.clone();
+    bad["policy"]["calibration_receipt_sha256"] = json!("f".repeat(64));
+    must_reject("calibration receipt byte digest mismatch", bad, &calibration)?;
+
+    let mut bad = value.clone();
+    bad["actions"][0]["kind"] = json!("semantic_check");
+    bad["actions"][0]["calibration_receipt_sha256"] = json!("f".repeat(64));
+    must_reject("action calibration receipt substitution", bad, &calibration)?;
 
     let mut bad = value.clone();
     bad["policy"]["shadow_weights_ppm"]["tokens"] = json!(0);
-    must_reject("shadow weights do not sum to one", bad)?;
+    must_reject("shadow weights do not sum to one", bad, &calibration)?;
 
     let mut bad = value.clone();
     for action in bad["actions"].as_array_mut().context("actions array")? {
         action["predicted_incremental_success_ppm"] = json!(10_000);
         action["standard_error_ppm"] = json!(10_000);
     }
-    let stopped = choose(&bad, &hex::encode(Sha256::digest(serde_json::to_vec(&bad)?)))?;
+    let stopped = choose(&bad, &hex::encode(Sha256::digest(serde_json::to_vec(&bad)?)), &calibration)?;
     if stopped["decision"] != "stop" || !stopped["selected_action"].is_null() {
         bail!("controller did not stop when every action's lower bound fell below threshold");
     }
     println!("PITB_PROOF_SEARCH_ALLOCATION_PASS: conservative stop rule");
 
     value["remaining_budget"]["tokens"] = json!(0);
-    let no_tokens = choose(&value, &hex::encode(Sha256::digest(serde_json::to_vec(&value)?)))?;
+    let no_tokens = choose(&value, &hex::encode(Sha256::digest(serde_json::to_vec(&value)?)), &calibration)?;
     if no_tokens["decision"] != "stop" {
         bail!("controller did not stop after all actions became resource-infeasible");
     }
@@ -400,7 +453,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
 fn parse_mode() -> Result<Mode> {
     let mut args = env::args().skip(1);
     let Some(action) = args.next() else {
-        bail!("expected --select INPUT OUTPUT, --self-test INPUT, or --help");
+        bail!("expected --select INPUT CALIBRATION OUTPUT, --self-test INPUT CALIBRATION, or --help");
     };
     if matches!(action.as_str(), "--help" | "-h") {
         return Ok(Mode::Help);
@@ -408,18 +461,20 @@ fn parse_mode() -> Result<Mode> {
     match action.as_str() {
         "--select" => {
             let input = PathBuf::from(args.next().context("missing input path")?);
+            let calibration = PathBuf::from(args.next().context("missing calibration receipt path")?);
             let output = PathBuf::from(args.next().context("missing output path")?);
             if args.next().is_some() {
                 bail!("too many --select arguments");
             }
-            Ok(Mode::Select { input, output })
+            Ok(Mode::Select { input, calibration, output })
         }
         "--self-test" => {
             let input = PathBuf::from(args.next().context("missing fixture path")?);
+            let calibration = PathBuf::from(args.next().context("missing calibration receipt path")?);
             if args.next().is_some() {
                 bail!("too many --self-test arguments");
             }
-            Ok(Mode::SelfTest(input))
+            Ok(Mode::SelfTest { input, calibration })
         }
         _ => bail!("unknown action {action}"),
     }
@@ -428,11 +483,11 @@ fn parse_mode() -> Result<Mode> {
 fn run() -> Result<()> {
     match parse_mode()? {
         Mode::Help => {
-            println!("Usage: allocate_proof_search_budget --select INPUT OUTPUT | --self-test INPUT");
+            println!("Usage: allocate_proof_search_budget --select INPUT CALIBRATION_RECEIPT OUTPUT | --self-test INPUT CALIBRATION_RECEIPT");
             Ok(())
         }
-        Mode::Select { input, output } => select_file(&input, &output),
-        Mode::SelfTest(path) => self_test(&path),
+        Mode::Select { input, calibration, output } => select_file(&input, &calibration, &output),
+        Mode::SelfTest { input, calibration } => self_test(&input, &calibration),
     }
 }
 
