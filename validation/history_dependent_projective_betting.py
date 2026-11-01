@@ -176,6 +176,48 @@ def _normalize_stream(
     return active, normalized_rows, tuple(sorted(universe))
 
 
+def verify_predictable_arrival_schedule(
+    active_by_time: Sequence[Iterable[int]],
+    observations_by_time: Sequence[Mapping[int, float]],
+    *,
+    first_active: int = 1,
+    second_active_threshold: float = 0.0,
+    third_active_threshold: float = 0.5,
+) -> dict:
+    """Replay a nested arrival policy using only observations through t-1."""
+    active, observations, _universe = _normalize_stream(
+        active_by_time, observations_by_time
+    )
+    expected = build_predictable_arrivals_from_history(
+        observations,
+        first_active=first_active,
+        second_active_threshold=second_active_threshold,
+        third_active_threshold=third_active_threshold,
+    )
+    failures = []
+    if tuple(active) != tuple(expected):
+        for t, (actual, wanted) in enumerate(zip(active, expected)):
+            if actual != wanted:
+                failures.append(("predictable_arrival_mismatch", t, actual, wanted))
+        if len(active) != len(expected):
+            failures.append(("arrival_horizon_mismatch", len(active), len(expected)))
+    return {
+        "valid": not failures,
+        "failures": failures,
+        "active_by_time": tuple(active),
+        "replayed_active_by_time": tuple(expected),
+        "arrival_decisions": [
+            {
+                "time": t,
+                "decision_uses_observations_through": t - 1,
+                "active": expected[t],
+            }
+            for t in range(len(expected))
+        ],
+        "scope": "deterministic policy replay only; real-world filtration completeness is external",
+    }
+
+
 def build_history_dependent_projective_paths(
     active_by_time: Sequence[Iterable[int]],
     observations_by_time: Sequence[Mapping[int, float]],
@@ -183,11 +225,23 @@ def build_history_dependent_projective_paths(
     base_lambda: float = 0.05,
     gain: float = 0.02,
     maximum_lambda: float = 0.5,
+    arrival_policy: Mapping[str, float | int] | None = None,
 ) -> dict:
     """Build all finite-intersection log-e-process paths for a small family."""
     active, observations, universe = _normalize_stream(
         active_by_time, observations_by_time
     )
+    arrival_audit = None
+    if arrival_policy is not None:
+        arrival_audit = verify_predictable_arrival_schedule(
+            active,
+            observations,
+            first_active=int(arrival_policy.get("first_active", 1)),
+            second_active_threshold=float(arrival_policy.get("second_active_threshold", 0.0)),
+            third_active_threshold=float(arrival_policy.get("third_active_threshold", 0.5)),
+        )
+        if not arrival_audit["valid"]:
+            raise ValueError(f"active schedule is not the declared predictable arrival policy: {arrival_audit}")
     intersections = ((),) + nonempty_subsets(universe)
     paths: dict[tuple[int, ...], list[float]] = {}
     factor_receipts: dict[tuple[int, ...], list[dict]] = {}
@@ -259,6 +313,8 @@ def build_history_dependent_projective_paths(
         "active_by_time": active,
         "observations_by_time": observations,
         "universe": universe,
+        "arrival_policy": None if arrival_policy is None else dict(arrival_policy),
+        "arrival_schedule_audit": arrival_audit,
         "log_e_process_paths": paths,
         "factor_receipts": factor_receipts,
         "projectivity_checks": projectivity_checks,
@@ -269,6 +325,7 @@ def build_history_dependent_projective_paths(
             "gain": gain,
             "maximum_lambda": maximum_lambda,
             "uses_only_pre_update_history": True,
+            "arrival_schedule_replayed": arrival_audit is not None,
         },
         "covariance": "Sigma_m = 0.5 I_m + 0.5 1_m 1_m^T",
         "conditional_validity_contract": (
@@ -321,12 +378,33 @@ def verify_history_dependent_projective_receipt(result: dict) -> dict:
         result.get("active_by_time", ()),
         result.get("observations_by_time", ()),
     )
+    arrival_audit = result.get("arrival_schedule_audit")
+    arrival_policy = result.get("arrival_policy")
+    if arrival_policy is not None:
+        replayed_arrival = verify_predictable_arrival_schedule(
+            active, observations,
+            first_active=int(arrival_policy.get("first_active", 1)),
+            second_active_threshold=float(arrival_policy.get("second_active_threshold", 0.0)),
+            third_active_threshold=float(arrival_policy.get("third_active_threshold", 0.5)),
+        )
+        if not replayed_arrival["valid"]:
+            # Accumulate this failure with the factor/receipt checks below.
+            arrival_audit = replayed_arrival
+        elif not isinstance(arrival_audit, dict) or arrival_audit.get("active_by_time") != tuple(active):
+            arrival_audit = {
+                "valid": False,
+                "failures": [("arrival_audit_receipt_mismatch",)],
+            }
+        else:
+            arrival_audit = replayed_arrival
     policy = result.get("policy", {})
     base_lambda = float(policy.get("base_lambda"))
     gain = float(policy.get("gain"))
     maximum_lambda = float(policy.get("maximum_lambda"))
     intersections = ((),) + nonempty_subsets(universe)
     failures = []
+    if arrival_audit is not None and not arrival_audit.get("valid", False):
+        failures.append(("predictable_arrival_replay_failed", arrival_audit.get("failures", [])))
     paths = result.get("log_e_process_paths", {})
     receipts = result.get("factor_receipts", {})
 
@@ -403,6 +481,7 @@ def verify_history_dependent_projective_receipt(result: dict) -> dict:
         "valid": not failures,
         "failures": failures,
         "intersections_checked": len(intersections),
+        "arrival_schedule_verified": bool(arrival_audit and arrival_audit.get("valid")),
         "predictable_factors_replayed": sum(len(receipts.get(s, ())) for s in intersections),
         "historical_projectivity_checks": projectivity_checks,
         "scope": "independent finite path replay; conditional Gaussian model validity remains external",
