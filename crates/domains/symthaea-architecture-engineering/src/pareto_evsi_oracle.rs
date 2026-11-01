@@ -264,7 +264,6 @@ impl ExactEvsiProblem {
 
         let mut posterior_total = 0.0;
         let mut posterior_compensation = 0.0;
-        let mut world_ids = Vec::with_capacity(self.worlds.len());
         let mut previous_world: Option<&str> = None;
         for (index, world) in self.worlds.iter().enumerate() {
             if world.world_id.trim().is_empty() {
@@ -293,7 +292,6 @@ impl ExactEvsiProblem {
                 &mut posterior_compensation,
                 world.posterior_probability,
             );
-            world_ids.push(world.world_id.as_str());
         }
         if (posterior_total - 1.0).abs() > PROBABILITY_TOLERANCE {
             return Err(ExactEvsiError::new(
@@ -426,14 +424,13 @@ impl ExactEvsiProblem {
                 }
             }
         }
-        let _ = world_ids;
         Ok(())
     }
 
     fn validate_world_rows<T>(
         &self,
         rows: &[T],
-        world_id: impl Fn(&T) -> &str,
+        world_id: impl for<'a> Fn(&'a T) -> &'a str,
         row_kind: &str,
         parent_index: usize,
         parent_name: &str,
