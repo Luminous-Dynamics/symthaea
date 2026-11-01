@@ -237,7 +237,7 @@ fn build_candidate(value: &Value, index: usize) -> Result<Option<Candidate>> {
     let action = &value["actions"][index];
     let action_id = string(action, "/action_id")?.to_owned();
     let kind = string(action, "/kind")?.to_owned();
-    let predicted = integer(action, "/predicted_incremental_success_ppm")?;
+    let predicted = integer(action, "/predicted_verified_success_probability_ppm")?;
     let standard_error = integer(action, "/standard_error_ppm")?;
     let lcb = lcb_ppm(predicted, standard_error);
     let minimum_lcb = integer(value, "/policy/minimum_lcb_delta_ppm")?;
@@ -503,7 +503,7 @@ fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
 
     let mut bad = value.clone();
     for action in bad["actions"].as_array_mut().context("actions array")? {
-        action["predicted_incremental_success_ppm"] = json!(10_000);
+        action["predicted_verified_success_probability_ppm"] = json!(10_000);
         action["standard_error_ppm"] = json!(10_000);
     }
     let stopped = choose(&bad, &hex::encode(Sha256::digest(serde_json::to_vec(&bad)?)), &calibration)?;
