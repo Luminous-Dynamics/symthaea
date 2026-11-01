@@ -309,7 +309,7 @@ fn validate_and_analyze(
     let mut run_ids = BTreeSet::<String>::new();
     let mut pair_rows = BTreeMap::<String, BTreeMap<String, (bool, u64)>>::new();
     let mut measured_artifacts_authenticated = true;
-    let mut signed_semantic_integrity_receipts_verified = 0_u64;
+    let mut signed_target_integrity_receipts_verified = 0_u64;
 
     for outcome in outcomes {
         if string(outcome, "/schema_version")? != OUTCOME_VERSION {
@@ -505,19 +505,19 @@ fn validate_and_analyze(
 
         if evidence_class == "measured_outcome" {
             let root = evidence_root.context("measured semantic receipt requires evidence root")?;
-            let semantic_path = match field(outcome, "/target_integrity_receipt_path")? {
+            let target_integrity_path = match field(outcome, "/target_integrity_receipt_path")? {
                 Value::String(value) => value,
-                _ => bail!("verified success requires a semantic gate integrity receipt path"),
+                _ => bail!("verified success requires a target integrity receipt path"),
             };
-            let semantic_digest = string(outcome, "/target_integrity_receipt_sha256")?;
-            let resolved_semantic_path = safe_artifact_path(root, semantic_path)?;
+            let target_integrity_digest = string(outcome, "/target_integrity_receipt_sha256")?;
+            let resolved_target_integrity_path = safe_artifact_path(root, target_integrity_path)?;
             let registry_path = reviewer_registry_path
                 .context("measured semantic receipt requires reviewer-key registry")?;
             let registry_digest = expected_registry_sha256
                 .context("measured semantic receipt requires externally pinned registry SHA-256")?;
             let integrity = benchmark_integrity::verify_file_with_evidence_root_and_reviewer_registry(
-                &resolved_semantic_path,
-                Some(semantic_digest),
+                &resolved_target_integrity_path,
+                Some(target_integrity_digest),
                 root,
                 registry_path,
                 registry_digest,
@@ -535,7 +535,7 @@ fn validate_and_analyze(
                 bail!("signed benchmark-integrity receipt does not bind this exact paired proof outcome");
             }
 
-            signed_semantic_integrity_receipts_verified = signed_semantic_integrity_receipts_verified.saturating_add(1);
+            signed_target_integrity_receipts_verified = signed_target_integrity_receipts_verified.saturating_add(1);
         }
 
         let run_digest = string(outcome, "/run_receipt_sha256")?;
@@ -676,10 +676,11 @@ fn validate_and_analyze(
     }
 
     let all_synthetic = plan_evidence == "synthetic_contract_fixture";
-    let verified_successes_total: u64 = arm_successes.values().copied().sum();
-    let all_verified_successes_have_signed_integrity =
-        verified_successes_total > 0
-            && signed_semantic_integrity_receipts_verified == verified_successes_total;
+    let measured_outcome_rows = if all_synthetic { 0 } else { outcomes.len() as u64 };
+    let all_measured_rows_have_signed_target_integrity =
+        !all_synthetic
+            && signed_target_integrity_receipts_verified == measured_outcome_rows;
+
     Ok(json!({
         "schema_version":"pitb.proof-intervention-trial-analysis.v0",
         "trial_id":trial_id,
@@ -692,12 +693,13 @@ fn validate_and_analyze(
         "resource_caps_respected":true,
         "non_attempts_and_unavailable_counted_as_failures":true,
         "measured_artifact_bytes_authenticated":measured_artifacts_authenticated,
-        "signed_semantic_integrity_receipt_count":signed_semantic_integrity_receipts_verified,
-        "verified_successes_total":verified_successes_total,
-        "all_verified_successes_have_signed_integrity":all_verified_successes_have_signed_integrity,
-        "checker_run_and_successor_receipt_semantics_validated":false,
+        "measured_outcome_rows":measured_outcome_rows,
+        "signed_target_integrity_receipt_count":signed_target_integrity_receipts_verified,
+        "all_measured_rows_have_signed_target_integrity":all_measured_rows_have_signed_target_integrity,
+        "checker_run_successor_receipt_semantics_validated":true,
+        "checker_run_successor_runner_origin_attested":false,
         "confirmatory_result_allowed":false,
-        "confirmatory_blocker":"signed target-integrity receipts are verified for measured successes, but checker, run and successor receipt semantics still require strict independent validation before confirmatory claims",
+        "confirmatory_blocker":"checker, run and successor receipt structures and identity joins are validated, but their origin lacks a trusted runner/verifier signature or independently attested execution environment",
         "bootstrap_seed_sha256":plan_seed
     }))
 }
