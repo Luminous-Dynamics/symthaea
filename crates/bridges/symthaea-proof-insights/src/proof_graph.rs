@@ -16,6 +16,98 @@ use serde_json::Value;
 const VERSION: &str = "pitb.proof-graph-state.v0";
 const MAX_GOAL_GROUP: usize = 32;
 
+const BATCH_POLICY: &str = "pitb.shared-stable-helper-batch.v0";
+
+fn collect_stable_helpers(
+    declaration_id: &str,
+    declarations: &BTreeMap<String, Value>,
+    declaration_graph: &BTreeMap<String, Vec<String>>,
+    visited: &mut BTreeSet<String>,
+    helpers: &mut BTreeSet<String>,
+) -> Result<()> {
+    if !visited.insert(declaration_id.to_owned()) {
+        return Ok(());
+    }
+    let dependencies = declaration_graph
+        .get(declaration_id)
+        .with_context(|| format!("missing dependency list for {declaration_id}"))?;
+    for dependency in dependencies {
+        let node = declarations
+            .get(dependency)
+            .with_context(|| format!("missing dependency declaration {dependency}"))?;
+        if string(node, "/kind")? == "helper"
+            && string(node, "/lifecycle_state")? == "stable"
+        {
+            helpers.insert(dependency.clone());
+        }
+        collect_stable_helpers(
+            dependency,
+            declarations,
+            declaration_graph,
+            visited,
+            helpers,
+        )?;
+    }
+    Ok(())
+}
+
+fn derive_selected_goal_ids(
+    ready_frontier: &[String],
+    goals: &BTreeMap<String, Value>,
+    declarations: &BTreeMap<String, Value>,
+    declaration_graph: &BTreeMap<String, Vec<String>>,
+    max_selected: usize,
+) -> Result<Vec<String>> {
+    if max_selected == 0 || max_selected > MAX_GOAL_GROUP {
+        bail!("max_selected_goals must be in 1..={MAX_GOAL_GROUP}");
+    }
+    let mut candidate_groups = BTreeMap::<String, Vec<String>>::new();
+    for goal_id in ready_frontier {
+        let goal = goals
+            .get(goal_id)
+            .with_context(|| format!("ready goal {goal_id} disappeared from the graph"))?;
+        let declaration_id = string(goal, "/declaration_id")?;
+        let mut helpers = BTreeSet::new();
+        collect_stable_helpers(
+            declaration_id,
+            declarations,
+            declaration_graph,
+            &mut BTreeSet::new(),
+            &mut helpers,
+        )?;
+        if helpers.is_empty() {
+            // Goals in the same declaration still share one local proof context.
+            candidate_groups
+                .entry(format!("declaration:{declaration_id}"))
+                .or_default()
+                .push(goal_id.clone());
+        } else {
+            // A goal can participate in several candidate batches when it reuses
+            // several stable helpers. The largest helper-sharing group wins.
+            for helper in helpers {
+                candidate_groups
+                    .entry(format!("shared-helper:{helper}"))
+                    .or_default()
+                    .push(goal_id.clone());
+            }
+        }
+    }
+    let Some((_, mut selected)) = candidate_groups.into_iter().max_by(
+        |(left_key, left_goals), (right_key, right_goals)| {
+            left_goals
+                .len()
+                .cmp(&right_goals.len())
+                .then_with(|| right_key.cmp(left_key))
+        },
+    ) else {
+        return Ok(Vec::new());
+    };
+    selected.sort();
+    selected.dedup();
+    selected.truncate(max_selected);
+    Ok(selected)
+}
+
 #[derive(Debug, Clone)]
 pub struct ProofGraphSummary {
     pub task_id: String,
@@ -510,14 +602,28 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
     if declared_frontier != ready_frontier {
         bail!("declared ready frontier differs from the independently recomputed dependency-ready frontier");
     }
+    if string(value, "/scheduler_decision/selection_policy_id")? != BATCH_POLICY {
+        bail!("unsupported deterministic proof-graph goal-batching policy");
+    }
+    let max_selected = integer(value, "/scheduler_decision/max_selected_goals")? as usize;
+    if max_selected == 0 || max_selected > MAX_GOAL_GROUP {
+        bail!("max_selected_goals must be in 1..={MAX_GOAL_GROUP}");
+    }
     let selected = string_array(value, "/scheduler_decision/selected_goal_ids")?;
     require_sorted(&selected, "/scheduler_decision/selected_goal_ids")?;
-    if selected.is_empty() || selected.len() > MAX_GOAL_GROUP {
-        bail!("selected goal group must contain 1..={MAX_GOAL_GROUP} goals");
-    }
-    let ready: BTreeSet<&str> = ready_frontier.iter().map(String::as_str).collect();
-    if selected.iter().any(|goal| !ready.contains(goal.as_str())) {
-        bail!("scheduler selected a goal outside the dependency-ready frontier");
+    let expected_selected = derive_selected_goal_ids(
+        &ready_frontier,
+        &goals,
+        &declarations,
+        &declaration_graph,
+        max_selected,
+    )?;
+    if selected != expected_selected {
+        bail!(
+            "selected goal batch differs from deterministic shared-helper scheduler: expected {:?}, received {:?}",
+            expected_selected,
+            selected
+        );
     }
 
     let specialist = string(value, "/scheduler_decision/specialist")?;
