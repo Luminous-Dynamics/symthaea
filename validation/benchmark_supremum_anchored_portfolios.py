@@ -240,9 +240,9 @@ def run_benchmark(
             p0=0.001,
             p_alt=p_alt,
             nonnull_fraction=fraction,
-            q_total=0.10,
-            v_total=0.90,
-            baseline_p1=0.20,
+            q_total=0.02,
+            v_total=0.98,
+            baseline_p1=0.05,
         )
         for index, (_, fraction, p_alt) in enumerate(scenarios)
     ]
