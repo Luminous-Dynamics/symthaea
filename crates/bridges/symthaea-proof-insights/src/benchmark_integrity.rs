@@ -654,6 +654,16 @@ fn verify_reviewer_signature(
 
     let registry: Value =
         serde_json::from_slice(registry_bytes).context("parse reviewer key registry JSON")?;
+    let registry_object = registry
+        .as_object()
+        .context("reviewer key registry must be a JSON object")?;
+    let registry_fields: BTreeSet<&str> =
+        ["schema_version", "registry_id", "keys"].into_iter().collect();
+    if registry_object.len() != registry_fields.len()
+        || registry_object.keys().any(|key| !registry_fields.contains(key.as_str()))
+    {
+        bail!("reviewer key registry contains missing or unknown fields");
+    }
     if string(&registry, "/schema_version")? != "pitb.reviewer-key-registry.v0"
         || string(&registry, "/registry_id")?.trim().is_empty()
     {
@@ -723,6 +733,16 @@ fn verify_reviewer_signature(
     let mut last_key_id: Option<&str> = None;
     let mut matching_key: Option<&Value> = None;
     for key in registry_keys {
+        let key_object = key.as_object().context("reviewer registry key entry must be an object")?;
+        let key_fields: BTreeSet<&str> =
+            ["key_id", "reviewer_identity", "public_key_ed25519_hex", "status"]
+                .into_iter()
+                .collect();
+        if key_object.len() != key_fields.len()
+            || key_object.keys().any(|field| !key_fields.contains(field.as_str()))
+        {
+            bail!("reviewer registry key entry contains missing or unknown fields");
+        }
         let current_id = string(key, "/key_id")?;
         if last_key_id.is_some_and(|previous| previous >= current_id) {
             bail!("reviewer registry keys must be sorted and unique by key_id");
@@ -744,14 +764,14 @@ fn verify_reviewer_signature(
         bail!("registry reviewer identity differs from the signed attestation");
     }
 
-    let public_key = decode_hex_array::<32>(
-        string(key, "/public_key_ed25519_hex")?,
-        "Ed25519 public key",
-    )?;
-    let signature_bytes = decode_hex_array::<64>(
-        string(&attestation, "/signature_ed25519_hex")?,
-        "Ed25519 reviewer signature",
-    )?;
+    let public_key_hex = string(key, "/public_key_ed25519_hex")?;
+    check_digest(public_key_hex, "Ed25519 public key", 64)?;
+    let public_key = decode_hex_array::<32>(public_key_hex, "Ed25519 public key")?;
+    let signature_hex = string(&attestation, "/signature_ed25519_hex")?;
+    if !lower_hex(signature_hex, 128) {
+        bail!("Ed25519 reviewer signature must be 128 lowercase hexadecimal characters");
+    }
+    let signature_bytes = decode_hex_array::<64>(signature_hex, "Ed25519 reviewer signature")?;
     let verifying_key =
         VerifyingKey::from_bytes(&public_key).context("parse reviewer Ed25519 public key")?;
     let signature = Signature::from_bytes(&signature_bytes);
