@@ -639,7 +639,7 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
         "/scheduler_decision/decision_receipt_sha256",
         64,
     )?;
-    if !matches!(specialist, "deterministic_automation" | "proof_writer" | "lemma_planner" | "recovery") {
+    if !matches!(specialist, "stop" | "deterministic_automation" | "proof_writer" | "lemma_planner" | "recovery") {
         bail!("unsupported specialist choice");
     }
     if !matches!(reasoning_effort, "none" | "low" | "medium" | "high") {
@@ -653,7 +653,19 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
     if router_calls.checked_add(specialist_calls) != Some(model_calls) {
         bail!("router and specialist model-call counts do not reconcile");
     }
-    if specialist == "deterministic_automation" {
+    if specialist == "stop" {
+        if !selected.is_empty()
+            || !ready_frontier.is_empty()
+            || router_calls != 0
+            || specialist_calls != 0
+            || reasoning_effort != "none"
+            || max_specialist_calls != 0
+        {
+            bail!("stop is valid only with an empty ready frontier and no model-call budget");
+        }
+    } else if selected.is_empty() || ready_frontier.is_empty() {
+        bail!("a non-stop scheduler action requires at least one dependency-ready selected goal");
+    } else if specialist == "deterministic_automation" {
         if router_calls != 0
             || specialist_calls != 0
             || reasoning_effort != "none"
