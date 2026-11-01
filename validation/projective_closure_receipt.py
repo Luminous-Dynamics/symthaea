@@ -16,9 +16,30 @@ EMPTY_HASH = hashlib.sha256(b"projective-closure-empty-node-v1").hexdigest()
 EMPTY_SELECTION_DIGEST = hashlib.sha256(b"projective-closure-empty-selection-v1").hexdigest()
 
 
+def _validate_canonical_value(value: Any, path: str = "$") -> None:
+    """Restrict commitments to portable JSON values; floats are forbidden."""
+    if value is None or isinstance(value, (bool, int, str)):
+        return
+    if isinstance(value, float):
+        raise TypeError(f"floating-point value is forbidden in commitment at {path}")
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_canonical_value(item, f"{path}[{index}]")
+        return
+    if isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise TypeError(f"commitment object keys must be strings at {path}")
+        for key, item in value.items():
+            _validate_canonical_value(item, f"{path}.{key}")
+        return
+    raise TypeError(f"unsupported commitment value {type(value).__name__} at {path}")
+
+
 def _canonical(value: Any) -> bytes:
+    _validate_canonical_value(value)
     return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        allow_nan=False,
     ).encode("utf-8")
 
 
@@ -429,22 +450,21 @@ def make_score_receipt(
     p_threshold = _make_prefix_proof(snapshot.tree_root, threshold)
     p_zero = _make_prefix_proof(snapshot.tree_root, Fraction(0))
     # The exact score is redundantly computed here; verifier reconstructs it.
-    prefix_count = verify_prefix_proof(
+    _, threshold_prefix = verify_prefix_proof(
         p_threshold,
         expected_tree_root_hash=snapshot.tree_root_hash,
         expected_threshold=threshold,
-    )[1].selected_count
-    prefix_sum = verify_prefix_proof(
-        p_threshold,
-        expected_tree_root_hash=snapshot.tree_root_hash,
-        expected_threshold=threshold,
-    )[1].selected_sum
-    negative_sum = verify_prefix_proof(
+    )
+    _, zero_prefix = verify_prefix_proof(
         p_zero,
         expected_tree_root_hash=snapshot.tree_root_hash,
         expected_threshold=Fraction(0),
-    )[1].selected_sum
-    score = agg.baseline + Fraction(prefix_count, r) - (prefix_sum - negative_sum)
+    )
+    score = (
+        agg.baseline
+        + Fraction(threshold_prefix.selected_count, r)
+        - (threshold_prefix.selected_sum - zero_prefix.selected_sum)
+    )
 
     return {
         "version": 1,
