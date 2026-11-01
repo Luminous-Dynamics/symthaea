@@ -1673,6 +1673,8 @@ mod tests {
     #[test]
     fn escalates_culturally_qualified_work_even_when_symbolically_valid() {
         let definition_basis = basis(EvidenceStatus::Observed, "test", &[]);
+        let mut bass_entrance = note("n3", 3.0, "normal");
+        bass_entrance.voice_role = "Bass".into();
         let composition = ListenCompositionBundle {
             ticks_per_beat: 480,
             duration_ticks: 1920,
@@ -1814,6 +1816,7 @@ mod tests {
                 note("n0", 0.0, "phrase-start"),
                 note("n1", 1.0, "cadential"),
                 note("n2", 2.0, "normal"),
+                bass_entrance,
             ],
             motif_definitions: vec![MotifDefinition {
                 id: "motif-a".into(),
@@ -1886,8 +1889,8 @@ mod tests {
                     obligation_id: "obligation-a".into(),
                     from: Some(ObligationState::Created),
                     to: ObligationState::Fulfilled,
-                    score_event_ids: vec!["n1".into()],
-                    responsible_pass: "cadence-realizer".into(),
+                    score_event_ids: vec!["n3".into()],
+                    responsible_pass: "voice-entry-realizer".into(),
                     transformation: None,
                     definition: Some(ObligationDefinitionV1 {
                         schema_version: 1,
@@ -1931,8 +1934,7 @@ mod tests {
     #[test]
     fn fulfilled_enter_voice_requires_a_new_voice_role_entry() {
         let (mut composition, trace) = trace_fixture();
-        composition.notes[0].voice_role = "Melody".into();
-        composition.notes[1].voice_role = "Harmony".into();
+        composition.notes[2].voice_role = "Bass".into();
         let report = verify_composer_trace(&trace, &composition, "score", 0);
         assert!(report
             .issues
@@ -1990,11 +1992,14 @@ mod tests {
     #[test]
     fn fulfilled_transposed_motif_requires_matching_score_intervals() {
         let (mut composition, mut trace) = trace_fixture();
+        composition.duration_ticks = 2400;
+        composition.duration_beats = 5.0;
+        composition.duration_seconds = 2.5;
         composition.notes.push(SymbolicNoteEvent {
-            id: "n3".into(),
+            id: "n4".into(),
             midi: 63,
             pitch_name: "D#4".into(),
-            onset: time(3.0),
+            onset: time(4.0),
             duration_ticks: 480,
             duration_beats: 1.0,
             duration_seconds: 0.5,
@@ -2013,7 +2018,7 @@ mod tests {
         });
         trace.obligation_transitions[0].definition = definition.clone();
         trace.obligation_transitions[1].definition = definition;
-        trace.obligation_transitions[1].score_event_ids = vec!["n2".into(), "n3".into()];
+        trace.obligation_transitions[1].score_event_ids = vec!["n2".into(), "n4".into()];
         let accepted = verify_composer_trace(&trace, &composition, "score", 0);
         assert!(!accepted
             .issues
@@ -2024,7 +2029,7 @@ mod tests {
             VerificationStatus::Verified
         );
 
-        composition.notes[3].midi = 67;
+        composition.notes[4].midi = 67;
         let rejected = verify_composer_trace(&trace, &composition, "score", 0);
         assert!(rejected
             .issues
