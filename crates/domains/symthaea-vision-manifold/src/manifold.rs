@@ -10766,6 +10766,28 @@ mod tests {
     }
 
     #[test]
+    fn autonomous_horizon_prediction_is_read_only_and_requires_a_real_frame() {
+        let empty = VisionManifold::new(VisionConfig::default(), 32, 32);
+        assert!(empty.predict_autonomous_horizon_checked(0.1).is_err());
+        assert!(empty.predict_autonomous_horizon_checked(0.0).is_err());
+
+        let mut manifold = VisionManifold::new(VisionConfig::default(), 32, 32);
+        manifold
+            .observe_frame_checked(&vec![17; 32 * 32], 32, 32, 1, 0.033)
+            .unwrap();
+        let before = serde_json::to_vec(&manifold.save_state()).unwrap();
+        let frame_sequence = manifold.observed_frame_sequence();
+        let first = manifold.predict_autonomous_horizon_checked(0.1).unwrap();
+        let second = manifold.predict_autonomous_horizon_checked(0.1).unwrap();
+        let after = serde_json::to_vec(&manifold.save_state()).unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.dim(), manifold.state.dim());
+        assert_eq!(frame_sequence, manifold.observed_frame_sequence());
+        assert_eq!(before, after);
+    }
+
+    #[test]
     fn checkpoint_validation_isolated_from_live_state() {
         let cfg = VisionConfig::default();
         let mut manifold = VisionManifold::new(cfg, 32, 32);
