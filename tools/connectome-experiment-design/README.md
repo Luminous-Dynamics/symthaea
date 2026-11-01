@@ -135,3 +135,30 @@ Input: \`schemas/target-query-input.schema.json\`. Output: \`schemas/target-quer
 ### Boundary
 
 Query entropy is still not decision utility. A decision-focused planner needs an explicit downstream action set and utility matrix and should calculate expected value of sample information. It must not call target-query EIG "expected treatment benefit". Sequential dynamic regimes additionally require an assignment/availability history, positivity/identifiability contract, and excursion-effect estimand; see #9831.
+
+
+## Decision-focused expected value of sample information (EVSI)
+
+Target-query EIG asks how much an experiment teaches about a declared causal answer. It is still not a decision objective. A downstream decision requires an explicit action set and utility for each action under each candidate hypothesis, including OTHER_OR_UNRESOLVED.
+
+The \`DecisionProblem\` API takes:
+- ordered hypothesis IDs, exactly matching the open-world candidate;
+- one or more downstream actions;
+- a finite utility for each action × hypothesis pair.
+
+For each likelihood scenario, the implementation computes current best expected utility, expected post-experiment utility after selecting the best action for each observed outcome, and their difference (EVSI). Candidates are ranked by worst-case EVSI per unit cost over the declared finite likelihood ambiguity set. It includes a no-action/control alternative when the caller declares one.
+
+### Synthetic known-answer example
+
+Priors are [0.3, 0.3, 0.3, 0.1] over two mechanisms that imply a positive functional-output effect, one no-effect mechanism and OTHER_OR_UNRESOLVED. The utility matrix assigns utility 2 to intervention under either positive mechanism, -2 under no-effect and -1 under unresolved; no-intervention has utility 0 in all cases. Current best expected utility is 0.5.
+
+- The mechanism-discriminating experiment separates the two positive mechanisms, but both imply the same optimal action. EVSI = 0.
+- The outcome-discriminating experiment distinguishes positive from negative evidence. After response, intervene; after no response, do not intervene. Expected post-experiment utility is 0.97, so EVSI = 0.47 at unit cost.
+
+The EVSI objective therefore ranks the outcome-discriminating experiment above the mechanism discriminator. This is a decision-specific result under the supplied synthetic utility matrix and likelihoods, not an empirical treatment recommendation.
+
+Input: \`schemas/decision-value-input.schema.json\`. Output: \`schemas/decision-value-output.schema.json\`. Fixtures: \`fixtures/decision-value.example.json\` and \`fixtures/decision-value-known-answers.json\`.
+
+### Boundary
+
+EVSI values depend on the utility matrix, target population and downstream actions. They are not the expected benefit of administering the experimental perturbation, and they do not justify unsafe actions. Experimental costs and biological safety must remain separate hard constraints. The worst-case EVSI guarantee is only over the caller-specified finite ambiguity set; the model-adequacy gate and held-out mechanism calibration remain required.
