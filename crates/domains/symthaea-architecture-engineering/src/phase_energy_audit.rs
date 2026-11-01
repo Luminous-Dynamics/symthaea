@@ -107,7 +107,9 @@ pub struct PhaseEnergyWindowMetrics {
     pub energy_uj: f64,
     pub time_weighted_mean_current_ua: f64,
     pub mean_power_uw: f64,
+    pub maximum_observed_current_ua: f64,
     pub boundary_alignment_error_bound_ms: f64,
+    pub boundary_alignment_energy_uncertainty_uj: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -124,6 +126,7 @@ pub struct PhaseEnergyEventMetrics {
     pub total_event_duration_ms: Option<f64>,
     /// Full envelope integral, including any gaps between declared phases.
     pub total_event_energy_uj: Option<f64>,
+    pub total_event_boundary_alignment_uncertainty_uj: Option<f64>,
     pub declared_phase_energy_sum_uj: f64,
     pub unattributed_duration_ms: Option<f64>,
     pub unattributed_energy_uj: Option<f64>,
@@ -145,6 +148,7 @@ pub struct PhaseEnergyAuditReceipt {
     pub expected_sample_rate_hz: f64,
     pub sample_rate_tolerance_fraction: f64,
     pub maximum_sample_gap_ratio: f64,
+    pub maximum_unattributed_gap_ms: f64,
     pub event_count: usize,
     pub complete_phase_coverage_events: usize,
     pub unattributed_interval_events: usize,
@@ -269,10 +273,12 @@ pub fn validate_application_phase_protocol(
     }
     if protocol.phases.is_empty()
         || !protocol.phases.iter().any(|phase| phase.required)
+        || !protocol.phases.first().is_some_and(|phase| phase.required)
+        || !protocol.phases.last().is_some_and(|phase| phase.required)
         || !protocol.maximum_unattributed_gap_ms.is_finite()
         || protocol.maximum_unattributed_gap_ms < 0.0
     {
-        return Err(PhaseEnergyAuditError::new("phase_protocol.phases", "at least one required phase and a finite non-negative gap tolerance are required"));
+        return Err(PhaseEnergyAuditError::new("phase_protocol.phases", "at least one required phase, required first/last boundary phases, and a finite non-negative gap tolerance are required"));
     }
     let mut ids = HashSet::with_capacity(protocol.phases.len());
     for (index, phase) in protocol.phases.iter().enumerate() {
@@ -493,7 +499,7 @@ fn integrate_window(
     end_ms: f64,
     voltage_v: f64,
     segment_id: &str,
-) -> Result<(f64, f64, f64), PhaseEnergyAuditError> {
+) -> Result<(f64, f64, f64, f64), PhaseEnergyAuditError> {
     if !start_ms.is_finite() || !end_ms.is_finite() || end_ms <= start_ms {
         return Err(PhaseEnergyAuditError::new(format!("segments.{segment_id}.window"), "window must have finite positive duration"));
     }
@@ -506,6 +512,10 @@ fn integrate_window(
         .map(|sample| (sample.time_ms, sample.current_ua)));
     points.push((end_ms, end_current));
 
+    let maximum_current_ua = points.iter()
+        .map(|point| point.1)
+        .max_by(f64::total_cmp)
+        .unwrap_or(0.0);
     let mut integral_ua_ms = 0.0;
     for pair in points.windows(2) {
         let dt = pair[1].0 - pair[0].0;
@@ -520,7 +530,7 @@ fn integrate_window(
     if !mean_current_ua.is_finite() || !energy_uj.is_finite() || energy_uj < 0.0 {
         return Err(PhaseEnergyAuditError::new(format!("segments.{segment_id}.window"), "integrated current or energy is invalid"));
     }
-    Ok((energy_uj, mean_current_ua, mean_current_ua * voltage_v))
+    Ok((energy_uj, mean_current_ua, mean_current_ua * voltage_v, maximum_current_ua))
 }
 
 fn compute_receipt_sha256(
@@ -549,13 +559,24 @@ pub fn audit_application_phase_energy(
 
     let (segments, trace_receipt_sha256) = parse_samples(sample_csv, trace_config)?;
     let events = parse_markers(marker_csv, mapping, protocol)?;
-    if segments.len() != events.values().filter_map(|event| event.segment_id.as_ref()).collect::<HashSet<_>>().len() {
-        // The raw trace may include segments not represented by this application event set,
-        // but a marker event may never point to an absent trace segment.
+    let mut event_segments = HashSet::with_capacity(events.len());
+    for (event_id, event) in &events {
+        let segment_id = event.segment_id.as_deref().ok_or_else(|| {
+            PhaseEnergyAuditError::new(format!("markers.{event_id}.segment_id"), "event has no segment identity")
+        })?;
+        if !segments.contains_key(segment_id) {
+            return Err(PhaseEnergyAuditError::new(
+                format!("markers.{event_id}.segment_id"),
+                "referenced PPK2 sample segment is absent",
+            ));
+        }
+        if !event_segments.insert(segment_id) {
+            return Err(PhaseEnergyAuditError::new(
+                format!("markers.{event_id}.segment_id"),
+                "a PPK2 segment may be assigned to only one application event",
+            ));
+        }
     }
-
-    let protocol_order: BTreeMap<&str, &ApplicationPhaseDefinition> =
-        protocol.phases.iter().map(|phase| (phase.phase_id.as_str(), phase)).collect();
     let mut event_metrics = Vec::with_capacity(events.len());
 
     for (event_id, parsed) in &events {
@@ -606,7 +627,7 @@ pub fn audit_application_phase_energy(
         let mut declared_phase_energy_sum_uj = 0.0;
         let mut declared_duration_sum_ms = 0.0;
         for (phase, start, end) in &windows {
-            let (energy, mean_current, mean_power) = integrate_window(
+            let (energy, mean_current, mean_power, maximum_current) = integrate_window(
                 samples,
                 *start,
                 *end,
@@ -625,7 +646,11 @@ pub fn audit_application_phase_energy(
                 energy_uj: energy,
                 time_weighted_mean_current_ua: mean_current,
                 mean_power_uw: mean_power,
+                maximum_observed_current_ua: maximum_current,
                 boundary_alignment_error_bound_ms: mapping.maximum_alignment_error_ms,
+                boundary_alignment_energy_uncertainty_uj:
+                    2.0 * maximum_current * trace_config.voltage_v
+                        * mapping.maximum_alignment_error_ms / 1_000.0,
             });
         }
 
@@ -641,6 +666,7 @@ pub fn audit_application_phase_energy(
                 event_end_ppk2_time_ms: None,
                 total_event_duration_ms: None,
                 total_event_energy_uj: None,
+                total_event_boundary_alignment_uncertainty_uj: None,
                 declared_phase_energy_sum_uj,
                 unattributed_duration_ms: None,
                 unattributed_energy_uj: None,
@@ -650,7 +676,7 @@ pub fn audit_application_phase_energy(
 
         let event_start = windows.first().expect("non-empty phase windows").1;
         let event_end = windows.last().expect("non-empty phase windows").2;
-        let (total_energy, _, _) = integrate_window(
+        let (total_energy, _, _, maximum_event_current) = integrate_window(
             samples,
             event_start,
             event_end,
@@ -669,10 +695,12 @@ pub fn audit_application_phase_energy(
         }
         let unattributed_duration = unattributed_duration.max(0.0);
         let unattributed_energy = unattributed_energy.max(0.0);
-        let status = if unattributed_duration <= protocol.maximum_unattributed_gap_ms {
-            PhaseEnergyEventStatus::CompletePhaseCoverage
-        } else {
+        let status = if !missing_phase_ids.is_empty()
+            || unattributed_duration > protocol.maximum_unattributed_gap_ms
+        {
             PhaseEnergyEventStatus::UnattributedIntervalsPresent
+        } else {
+            PhaseEnergyEventStatus::CompletePhaseCoverage
         };
 
         event_metrics.push(PhaseEnergyEventMetrics {
@@ -686,6 +714,10 @@ pub fn audit_application_phase_energy(
             event_end_ppk2_time_ms: Some(event_end),
             total_event_duration_ms: Some(total_duration),
             total_event_energy_uj: Some(total_energy),
+            total_event_boundary_alignment_uncertainty_uj: Some(
+                2.0 * maximum_event_current * trace_config.voltage_v
+                    * mapping.maximum_alignment_error_ms / 1_000.0,
+            ),
             declared_phase_energy_sum_uj,
             unattributed_duration_ms: Some(unattributed_duration),
             unattributed_energy_uj: Some(unattributed_energy),
@@ -710,6 +742,7 @@ pub fn audit_application_phase_energy(
         expected_sample_rate_hz: trace_config.expected_sample_rate_hz,
         sample_rate_tolerance_fraction: trace_config.sample_rate_tolerance_fraction,
         maximum_sample_gap_ratio: trace_config.maximum_gap_ratio,
+        maximum_unattributed_gap_ms: protocol.maximum_unattributed_gap_ms,
         event_count: event_metrics.len(),
         complete_phase_coverage_events: complete_count,
         unattributed_interval_events: unattributed_count,
