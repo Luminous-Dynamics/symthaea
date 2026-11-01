@@ -950,7 +950,23 @@ fn self_test(path: &PathBuf) -> Result<()> {
         .position(|row| row["status"] == "verified_success")
         .context("synthetic fixture has no success row")?;
     false_success[successful_index]["target_integrity_receipt_sha256"] = Value::Null;
-    must_reject_outcomes("verified-success claim without semantic receipt", &plan, &false_success)?;
+    must_reject_outcomes("verified-success claim without target-integrity receipt", &plan, &false_success)?;
+
+    let mut model_drift = outcomes.clone();
+    model_drift[0]["model_version"] = json!("substituted-model-version");
+    must_reject_outcomes("model version differs from frozen plan", &plan, &model_drift)?;
+
+    let mut policy_drift = outcomes.clone();
+    policy_drift[0]["arm_policy_sha256"] = json!("f".repeat(64));
+    must_reject_outcomes("arm policy digest differs from frozen plan", &plan, &policy_drift)?;
+
+    let mut config_drift = outcomes.clone();
+    config_drift[0]["arm_config_sha256"] = json!("f".repeat(64));
+    must_reject_outcomes("arm config digest differs from frozen plan", &plan, &config_drift)?;
+
+    let mut state_receipt_drift = outcomes.clone();
+    state_receipt_drift[0]["initial_state_receipt_sha256"] = json!("f".repeat(64));
+    must_reject_outcomes("initial-state receipt digest differs from paired assignment", &plan, &state_receipt_drift)?;
 
     let mut order_drift = outcomes.clone();
     order_drift[0]["execution_order_index"] = json!(3);
