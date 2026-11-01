@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Thirty-five Rust test functions are authored (16 event contract, 11 bitemporal revision, 8 purged-split tests) for delayed-observation non-leakage,
+Forty-four Rust test functions are authored (16 event contract, 11 bitemporal revision, 8 purged-split, 9 train-only-scaler tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -73,3 +73,25 @@ This is intended to complement, not silently replace, the official benchmark
 split during reproduction. Report both official-path results and the
 leakage-controlled split when the official harness normalizes using full-record
 statistics or has overlapping forecast targets across split boundaries.
+
+
+## Train-only standardization for clean comparisons
+
+The `scaler` module fits per-entity/per-feature means and sample standard
+deviations from values attached only to the generated split plan's training
+windows. It uses deterministic Welford moments. Raw observation IDs deduplicate
+observations reused by overlapping training histories; conflicting values for
+the same identity fail closed. Validation, test and purged-window numeric
+values are skipped before the scaler reads them. The scaler also revalidates
+the plan's per-entity boundaries and target-purge assignments, so a caller
+cannot simply relabel a later window as training.
+
+Missing values must be omitted by the adapter (or represented separately); no
+imputation is performed. A zero or one-sample standard deviation is treated as
+zero and transform subtracts the mean without division. Fitted counts, means
+and standard deviations are available for audit.
+
+This clean scaler is for the leakage-controlled comparison. The official
+IMM-TSF reproduction must preserve and disclose the released full-record
+normalization path; do not call clean-split results official leaderboard
+reproductions.
