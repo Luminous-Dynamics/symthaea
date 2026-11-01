@@ -910,5 +910,21 @@ mod tests {
             "unknown",
             ParetoCostMetric::Latency,
         ).is_err());
+
+        let mut invalid = audit.candidates.clone();
+        invalid[0].inference_latency_s = f64::NAN;
+        assert!(accuracy_cost_pareto_front(
+            &invalid,
+            "cifar10",
+            ParetoCostMetric::Latency,
+        ).is_err());
+
+        let mut duplicate = audit.candidates.clone();
+        duplicate[1].arch_idx = duplicate[0].arch_idx;
+        assert!(accuracy_cost_pareto_front(
+            &duplicate,
+            "cifar10",
+            ParetoCostMetric::Latency,
+        ).is_err());
     }
 }
