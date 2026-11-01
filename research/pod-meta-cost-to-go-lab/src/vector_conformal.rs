@@ -770,12 +770,12 @@ mod tests {
         let envelope = calibrator.predict_upper(prediction(4)).unwrap();
         let ledger = BudgetLedger::new(vector(10_000));
         assert_eq!(
-            assess_joint_resource_fit(envelope, vector(1), &ledger),
+            assess_joint_resource_fit(&envelope, vector(1), &ledger),
             JointBudgetDecision::Fits
         );
         let tight = BudgetLedger::new(vector(1));
         assert_eq!(
-            assess_joint_resource_fit(envelope, vector(1), &tight),
+            assess_joint_resource_fit(&envelope, vector(1), &tight),
             JointBudgetDecision::DoesNotFit
         );
     }
