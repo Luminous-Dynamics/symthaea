@@ -129,3 +129,25 @@ Eight source-authored tests cover overlapping forecast windows, exact boundary
 semantics, embargoes, tied origins, input-order invariance, per-entity
 boundaries, invalid intervals/ratios, duplicate IDs and insufficient/empty
 partitions. The package now has 35 source-authored test functions total.
+
+
+## 9. Train-only feature standardization
+
+The `scaler` module binds standardization to a `PurgedSplitPlan`. Only raw
+observations attached to eligible training windows contribute to the moments.
+Validation, test and purged-window values are not read. Repeated observations
+from overlapping training windows are deduplicated by entity/feature/raw
+observation ID; conflicting duplicate values are rejected.
+
+Statistics use deterministic Welford accumulation and sample standard
+deviation (ddof=1). A zero standard deviation is handled by mean subtraction
+without division. Fitted observation counts, means and standard deviations
+are queryable for provenance. The scaler validates that each window is in the
+partition required by the split boundaries and the target-horizon purge; it
+rejects forged or inconsistent split plans.
+
+The scaler does not impute missing data or compute a physical arrival time.
+Adapters must supply only legitimate training observations and preserve
+missingness separately. This is the clean comparison path; the official
+benchmark code path must be separately reproduced and labeled when it uses
+different normalization.
