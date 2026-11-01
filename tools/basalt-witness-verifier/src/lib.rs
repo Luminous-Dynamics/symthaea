@@ -702,6 +702,29 @@ mod tests {
     }
 
     #[test]
+    fn envelope_verification_is_bound_to_the_exact_pinned_trust_store_bytes() {
+        let signing_seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let unrelated_seeds = [test_seed(17), test_seed(18), test_seed(19), test_seed(20)];
+        let signing_trust = build_trust(&signing_seeds);
+        let unrelated_trust = build_trust(&unrelated_seeds);
+        let signing_trust_bytes = trust_bytes(&signing_trust);
+        let unrelated_trust_bytes = trust_bytes(&unrelated_trust);
+        let signing_trust_pin = sha256_prefixed(&signing_trust_bytes);
+        let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &signing_seeds[..3]);
+
+        assert!(
+            verify_witness_envelope(
+                &envelope,
+                &unrelated_trust_bytes,
+                &signing_trust_pin,
+                TEST_PAYLOAD_TYPE,
+                QuorumKind::Write,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn wrong_out_of_band_pin_is_rejected_before_parsing() {
         let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
         let trust = build_trust(&seeds);
