@@ -590,3 +590,69 @@ Initial replication gate: at least 300 independent clean negatives per preregist
 
 Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
 
+## Paper-faithful LaRA / SLaRA representation detector (SCI-LARA-REPLICATION-001)
+
+Tracking: Issue #9738.
+
+LaRA is a required white-box comparator for RL-post-training contamination. Unlike output-only FTD/DVD/Min-K%++ features, it probes hidden-state geometry under controlled information removal and blank-preserving paraphrases.
+
+### Pinned research source
+
+- Paper: LaRA: Layer-wise Representation Analysis for Detecting Data Contamination in RL Post-Training, Findings of EMNLP 2026, pp. 14462–14487: https://aclanthology.org/2026.findings-emnlp.690/
+- Official implementation: https://github.com/talzoomanzoo/lara, inspected main commit 81c2f2c6032e8fbfe89687c5a0cb6d216a9aea94.
+- The paper-faithful numeric kernel is kept separate from released-code trend-weighted RepStiffDetector variants v1–v4. Do not report a trend-v1/v2/v3/v4 result as an exact reproduction of the paper's SLaRA equation.
+
+### Exact numerical contract
+
+For original question q0 and K semantically similar questions, all representations are mean-pooled hidden states from the same pinned model, tokenizer, layer and extraction method.
+
+1. Representation Shift Magnitude (RSM). For each question, calculate delta_i = h(q_i) - h(blank(q_i)) and S_i = ||delta_i||_2. RSM is (S_0 - mean(S_1..S_K)) / (sample_std(S_1..S_K) + epsilon). The sample standard deviation uses denominator K-1.
+2. Directional Collapse (DC). Calculate the mean neighbour shift vector mean(delta_1..delta_K) and its smoothed cosine with the original shift: dot(delta_0, mean_delta) / ((||delta_0|| + epsilon) * (||mean_delta|| + epsilon)).
+3. Representation Stability Index (RSI). For the blanked original and each blanked semantic neighbour, calculate the centroid of M meaning-preserving paraphrase representations and the mean Euclidean distance to that centroid. RSI is the original local dispersion standardized against the K neighbour dispersions using sample standard deviation (denominator K-1).
+4. SLaRA clean-reference aggregation. Apply sign-preserving sign(x) * ln(1 + abs(x)) independently to each metric/layer. For every metric/layer, robust-standardize against the clean validation cohort with its median and 1.4826 * MAD, with epsilon in the denominator. Preserve RSM and DC signs; invert standardized RSI only. The final score is the arithmetic mean over all three metrics and all probed layers. Larger values mean larger deviation from the declared clean geometric profile.
+
+No learned weights or trend-weighted aggregation is used in this paper-faithful path. A zero clean-reference MAD is reported in degenerate_clean_scales; epsilon prevents division by zero but does not make that calibration reliable.
+
+### Rust implementation
+
+src/lara_metrics.rs contains:
+- compute_layer_metrics: hand-testable RSM/DC/RSI formula implementation.
+- compute_lara_metrics: validates and processes one model-adapter representation bundle.
+- score_lara_request: validates a candidate plus the clean-reference metric cohort and produces a paper-faithful SLaRA report.
+- Exact model-checkpoint, tokenizer, perturbation-protocol and representation-extractor identity matching.
+- Matched layer IDs, hidden dimensions, neighbour counts and paraphrase counts. K and M must be at least 2; mismatched/non-finite values fail closed.
+- Domain-separated candidate-input, candidate-metric-vector and clean-reference-manifest SHA-256 commitments.
+- Strict input/report schemas and tests for the equations, zero shifts, dimension mismatch, non-finite inputs, clean-reference identity and zero-MAD warnings.
+
+CLI:
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      score-lara-paper lara-scoring-request.json slara-report.json
+
+The CLI accepts a bounded JSON request (512 MiB limit). The request contains the candidate's per-layer complete/blanked hidden states, matched semantic-neighbour states and blank-preserving paraphrase states. Clean-reference records contain precomputed layer metrics; callers can generate each record with compute_lara_metrics using the same crate version. The clean-reference metric manifest binds those summaries and their declared model/protocol identities. It does not prove how those summaries were extracted.
+
+### Reproduction and data-egress controls
+
+The official repository's current runner exposes additional trend-weighted aggregation variants and the public instructions require an OpenRouter API key for similar-question / perturbation-generation flows. That creates a benchmark confidentiality boundary: sending a sealed evaluation question to an external perturbation-generation provider is data egress, even if no answer is returned. For sealed evaluation, use an approved local perturbation generator or explicitly record destination/provider/model/request digest and mark the run externally exposed and ineligible for a sealed/confirmatory claim. Pin the perturbation generator and prompt template; the model/tokenizer/extractor identities alone do not bind generated neighbours.
+
+The default released settings inspected include five similar questions, five RSI variants, a mid-layer preset, one important blank, and an OpenRouter worker pool. These are configuration values, not universal constants; pin the exact paper-reproduction settings, then vary K/M/layers/blanking only in preregistered sensitivity experiments.
+
+### Published baseline and its limits
+
+The paper evaluates three open-source RL-trained mathematical-reasoning model families. For each model, it samples 30 member tasks from that model's RL training corpus and pairs them with 30 AIME 2026 non-members; the non-member split is shared across the three models. The paper reports SLaRA AUC / TPR@FPR=5% of 0.63 / 0.19 for Eurus, 0.80 / 0.46 for LIMR and 0.54 / 0.04 for OLMo at initial checkpoints. This spread is a reason to report per-model results rather than a pooled success claim. See Table 1 in the paper.
+
+With 30 clean examples, the empirical FPR step is 1/30 = 3.33 percentage points. Even with zero false positives, the one-sided exact 95% binomial upper bound is approximately 9.50%. Three hundred independent clean negatives with zero false positives reduce that upper bound to approximately 0.994%, but 300 is only an FPR-resolution floor; power, family heterogeneity, multiplicity and any nonzero false positives require a larger design. Report exact FPR bounds, TPR@1%, TPR@5%, AUROC, AUPRC, family-level uncertainty, selective risk/coverage and per-layer results. Do not infer a 1%-FPR guarantee from interpolated ROC points.
+
+### Qualification targets (not achieved results)
+
+- Paper-equation fixtures reproduce hand-calculated RSM, DC, RSI, signed-log/MAD alignment and SLaRA arithmetic.
+- Exact checkpoint/tokenizer/extractor/perturbation identity matches across candidate and clean reference.
+- At least 300 independent clean negatives per preregistered model/family/threshold stratum as an initial zero-FP 1%-FPR resolution target; determine final sample size with a power/precision design.
+- Randomized model-pair replicates, distinct from task-item counts; multi-family coverage across math, code, science, factual QA, tool use and multimodal tasks.
+- LaRA, FTD, DVD, Min-K%++, likelihood/perplexity, lexical/structural and embedding baselines measured on the same held-out examples and at fixed operating FPR.
+- White-box representation access, runtime, GPU memory, layer count, perturbation calls, provider egress and tokens reported as separate cost measures.
+
+### Claim ceiling
+
+This implementation computes LaRA's published equations from supplied representations and clean-reference metrics. The metric rows and representations are caller-supplied. It does not authenticate a model, checkpoint, clean cohort, generation provider or training corpus; prove membership; prove an exposure caused an answer; or establish a universal detector. The report hard-sets independently_authenticated=false and confirmatory_eligible=false. No SOTA improvement is claimed by this kernel alone.
+

@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/lara-scoring-request-v1.json",
+  "title": "Paper-faithful LaRA scoring request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidate",
+    "clean_reference"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.slara_scoring_request.v1"
+    },
+    "candidate": {
+      "$ref": "#/$defs/lara_metric_input"
+    },
+    "clean_reference": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/clean_reference_item"
+      }
+    }
+  },
+  "$defs": {
+    "vector": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 65536,
+      "items": {
+        "type": "number"
+      }
+    },
+    "layer_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_id",
+        "original_complete",
+        "original_incomplete",
+        "neighbor_complete",
+        "neighbor_incomplete",
+        "original_paraphrase_representations",
+        "neighbor_paraphrase_representations"
+      ],
+      "properties": {
+        "layer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "original_complete": {
+          "$ref": "#/$defs/vector"
+        },
+        "original_incomplete": {
+          "$ref": "#/$defs/vector"
+        },
+        "neighbor_complete": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/vector"
+          }
+        },
+        "neighbor_incomplete": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/vector"
+          }
+        },
+        "original_paraphrase_representations": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/vector"
+          }
+        },
+        "neighbor_paraphrase_representations": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 1024,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 256,
+            "items": {
+              "$ref": "#/$defs/vector"
+            }
+          }
+        }
+      }
+    },
+    "layer_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_id",
+        "rsm",
+        "dc",
+        "rsi",
+        "semantic_neighbor_count",
+        "original_paraphrase_count"
+      ],
+      "properties": {
+        "layer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "rsm": {
+          "type": "number"
+        },
+        "dc": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "rsi": {
+          "type": "number"
+        },
+        "semantic_neighbor_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1024
+        },
+        "original_paraphrase_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 256
+        }
+      }
+    },
+    "lara_metric_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "sample_id",
+        "model_checkpoint_sha256",
+        "tokenizer_sha256",
+        "perturbation_protocol_sha256",
+        "representation_extractor_sha256",
+        "layers"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.lara_metric_input.v1"
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "model_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tokenizer_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "perturbation_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "representation_extractor_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "layers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": {
+            "$ref": "#/$defs/layer_probe"
+          }
+        }
+      }
+    },
+    "clean_reference_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "model_checkpoint_sha256",
+        "tokenizer_sha256",
+        "perturbation_protocol_sha256",
+        "representation_extractor_sha256",
+        "layer_metrics"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "model_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tokenizer_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "perturbation_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "representation_extractor_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "layer_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": {
+            "$ref": "#/$defs/layer_metrics"
+          }
+        }
+      }
+    }
+  }
+}

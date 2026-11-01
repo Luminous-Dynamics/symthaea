@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/slara-report-v1.json",
+  "title": "Paper-faithful SLaRA report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sample_id",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "perturbation_protocol_sha256",
+    "representation_extractor_sha256",
+    "clean_reference_count",
+    "implementation_id",
+    "candidate_input_sha256",
+    "candidate_metric_vector_sha256",
+    "clean_reference_metric_manifest_sha256",
+    "layer_count",
+    "metric_layer_contribution_count",
+    "slara_score",
+    "layer_contributions",
+    "degenerate_clean_scales",
+    "paper_faithful_aggregation",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.slara_report.v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "perturbation_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "representation_extractor_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "clean_reference_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "candidate_metric_vector_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "clean_reference_metric_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "layer_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 512
+    },
+    "metric_layer_contribution_count": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "slara_score": {
+      "type": "number"
+    },
+    "layer_contributions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "layer_id",
+          "rsm_signed_log",
+          "dc_signed_log",
+          "rsi_signed_log",
+          "rsm_clean_center",
+          "dc_clean_center",
+          "rsi_clean_center",
+          "rsm_clean_scale",
+          "dc_clean_scale",
+          "rsi_clean_scale",
+          "rsm_aligned_z",
+          "dc_aligned_z",
+          "rsi_aligned_z",
+          "layer_mean"
+        ],
+        "properties": {
+          "layer_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "rsm_signed_log": {
+            "type": "number"
+          },
+          "dc_signed_log": {
+            "type": "number"
+          },
+          "rsi_signed_log": {
+            "type": "number"
+          },
+          "rsm_clean_center": {
+            "type": "number"
+          },
+          "dc_clean_center": {
+            "type": "number"
+          },
+          "rsi_clean_center": {
+            "type": "number"
+          },
+          "rsm_clean_scale": {
+            "type": "number",
+            "minimum": 0
+          },
+          "dc_clean_scale": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rsi_clean_scale": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rsm_aligned_z": {
+            "type": "number"
+          },
+          "dc_aligned_z": {
+            "type": "number"
+          },
+          "rsi_aligned_z": {
+            "type": "number"
+          },
+          "layer_mean": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "degenerate_clean_scales": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "paper_faithful_aggregation": {
+      "const": true
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_id": {
+      "const": "symthaea.lara.paper_faithful.v1"
+    },
+    "candidate_input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
