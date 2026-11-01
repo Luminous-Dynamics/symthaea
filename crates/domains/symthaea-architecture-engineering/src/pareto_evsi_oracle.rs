@@ -693,14 +693,11 @@ mod tests {
     const H3: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const H4: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
-    fn world_rows(values: [(f64, f64); 2]) -> Vec<EvsiWorldLoss> {
+    fn world_rows(values: [f64; 2]) -> Vec<EvsiWorldLoss> {
         vec![
-            EvsiWorldLoss { world_id: "world-a".to_owned(), loss: values[0].0 },
-            EvsiWorldLoss { world_id: "world-b".to_owned(), loss: values[1].0 },
+            EvsiWorldLoss { world_id: "world-a".to_owned(), loss: values[0] },
+            EvsiWorldLoss { world_id: "world-b".to_owned(), loss: values[1] },
         ]
-        .into_iter()
-        .map(|row| row)
-        .collect()
     }
 
     fn likelihoods(a: f64, b: f64) -> Vec<EvsiWorldLikelihood> {
@@ -749,7 +746,7 @@ mod tests {
             decisions: vec![
                 EvsiDecision {
                     decision_id: "retain-a".to_owned(),
-                    losses_by_world: world_rows([(0.0, 10.0), (0.0, 10.0)]),
+                    losses_by_world: world_rows([0.0, 10.0]),
                 },
                 EvsiDecision {
                     decision_id: "retain-b".to_owned(),
