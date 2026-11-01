@@ -302,6 +302,7 @@ fn validate_candidate_bundle(
     if trace.run_id != run_id
         || trace.candidate_id != definition.candidate_id
         || trace.candidate_artifact_sha256 != definition.artifact_sha256
+        || trace.candidate_configuration_sha256 != definition.configuration_sha256
         || trace.dataset_sha256 != dataset.dataset_sha256
         || trace.energy_receipt_sha256 != bundle.phase_energy_receipt.receipt_sha256
         || trace.metrology_receipt_sha256 != bundle.event_energy_uncertainty_receipt.receipt_sha256
@@ -331,7 +332,10 @@ fn validate_candidate_bundle(
         return Err(EdgeEvidenceError::new("event_energy_uncertainty_receipt", "supplied uncertainty receipt differs from independent recomputation"));
     }
     if bundle.event_energy_uncertainty_receipt.candidate_artifact_sha256 != definition.artifact_sha256
+        || bundle.event_energy_uncertainty_receipt.candidate_configuration_sha256 != definition.configuration_sha256
         || bundle.event_energy_uncertainty_receipt.device_session_sha256 != hardware.device_session_sha256
+        || bundle.event_energy_uncertainty_receipt.target_id != manifest.target.target_id
+        || bundle.event_energy_uncertainty_receipt.board_revision != manifest.target.board_revision
     {
         return Err(EdgeEvidenceError::new("event_energy_uncertainty.identity", "event energy evidence is for a different artifact or physical device session"));
     }
