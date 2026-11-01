@@ -236,10 +236,10 @@ impl PerformanceGestureTrackV1 {
                     "{prefix}: value kind/unit does not match parameter {:?}",
                     event.parameter
                 ));
-            } else if let GestureValue::Scalar { amount, unit } = event.value {
+            } else if let GestureValue::Scalar { amount, unit } = &event.value {
                 if !amount.is_finite() {
                     issues.push(format!("{prefix}: scalar value is not finite"));
-                } else if !scalar_domain_is_valid(event.parameter, amount, unit) {
+                } else if !scalar_domain_is_valid(event.parameter, *amount, *unit) {
                     issues.push(format!(
                         "{prefix}: scalar value is outside the declared domain for {:?}",
                         event.parameter
@@ -248,7 +248,7 @@ impl PerformanceGestureTrackV1 {
             }
 
             if event.interpolation == GestureInterpolation::Linear
-                && !matches!(event.value, GestureValue::Scalar { .. })
+                && !matches!(&event.value, GestureValue::Scalar { .. })
             {
                 issues.push(format!(
                     "{prefix}: categorical and boolean gestures require step interpolation"
