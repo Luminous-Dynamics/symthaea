@@ -140,6 +140,9 @@ pub struct CalibratedTestScoreV1 {
     pub ground_truth: GroundTruthV1,
     pub raw_score: f64,
     pub normalized_risk_score: f64,
+    /// Maximum normalized risk across all test items in this source cluster.
+    pub cluster_max_normalized_risk_score: f64,
+    /// Number of independent clean source clusters in the calibration split.
     pub calibration_clean_support: u64,
     pub conformal_p_value: ConformalPValueV1,
 }
@@ -164,9 +167,11 @@ pub struct DetectorCostSummaryV1 {
 #[serde(deny_unknown_fields)]
 pub struct OperatingPointMetricsV1 {
     pub target_fpr_permille: u16,
+    /// Independent source clusters, not question/item count.
     pub calibration_clean_support: u64,
     pub minimum_attainable_p_value: ConformalPValueV1,
     pub calibration_resolution_sufficient: bool,
+    /// Locked-test source clusters, with one terminal ground-truth label per cluster.
     pub test_clean_support: u64,
     pub test_contaminated_support: u64,
     pub false_positive: Option<u64>,
@@ -618,9 +623,21 @@ fn analyze_group(
     let mut test_ids = BTreeSet::<&str>::new();
     let mut calibration_clusters = BTreeSet::<&str>::new();
     let mut test_clusters = BTreeSet::<&str>::new();
+    let mut test_cluster_truth = BTreeMap::<&str, GroundTruthV1>::new();
+    let mut test_cluster_representative = BTreeMap::<&str, &str>::new();
+    let mut cluster_truth_by_split = BTreeMap::<
+        (ObservationSplitV1, &str),
+        GroundTruthV1,
+    >::new();
     for ((split, sample_id), (truth, cluster_id)) in &sample_metadata {
         valid_id(sample_id, "sample_id")?;
         valid_id(cluster_id, "source_cluster_id")?;
+        let cluster_key = (*split, *cluster_id);
+        if let Some(previous) = cluster_truth_by_split.insert(cluster_key, *truth)
+            && previous != *truth
+        {
+            return Err("all observations within one source cluster and split must have the same ground-truth label".to_owned());
+        }
         match split {
             ObservationSplitV1::CleanCalibration => {
                 if *truth != GroundTruthV1::Clean {
@@ -632,6 +649,10 @@ fn analyze_group(
             ObservationSplitV1::LockedTest => {
                 test_ids.insert(*sample_id);
                 test_clusters.insert(*cluster_id);
+                test_cluster_truth.insert(*cluster_id, *truth);
+                test_cluster_representative
+                    .entry(*cluster_id)
+                    .or_insert(*sample_id);
             }
         }
     }
@@ -679,31 +700,69 @@ fn analyze_group(
 
     let mut sorted_clean_by_detector =
         BTreeMap::<(&str, &str), Vec<f64>>::new();
+    let mut cluster_pvalues_by_detector =
+        BTreeMap::<(&str, &str), BTreeMap<&str, ConformalPValueV1>>::new();
     for detector in definitions {
-        let clean = sorted_clean_by_detector
-            .entry((detector.detector_id.as_str(), detector.detector_version.as_str()))
-            .or_default();
+        let mut clean_max_by_cluster = BTreeMap::<&str, f64>::new();
         let mut costs = Vec::with_capacity(test_ids.len());
         for sample_id in &calibration_ids {
             let observation = observations_by_key[&(
                 ObservationSplitV1::CleanCalibration,
-                sample_id,
+                *sample_id,
                 detector.detector_id.as_str(),
                 detector.detector_version.as_str(),
             )];
-            clean.push(normalize_risk(observation.raw_score, detector.score_direction)?);
+            let risk = normalize_risk(observation.raw_score, detector.score_direction)?;
+            clean_max_by_cluster
+                .entry(observation.source_cluster_id.as_str())
+                .and_modify(|maximum| *maximum = maximum.max(risk))
+                .or_insert(risk);
         }
-        clean.sort_by(f64::total_cmp);
+        let mut clean_scores: Vec<f64> = clean_max_by_cluster.values().copied().collect();
+        clean_scores.sort_by(f64::total_cmp);
+        sorted_clean_by_detector.insert(
+            (detector.detector_id.as_str(), detector.detector_version.as_str()),
+            clean_scores.clone(),
+        );
+
+        let mut test_max_by_cluster = BTreeMap::<&str, f64>::new();
         for sample_id in &test_ids {
             let observation = observations_by_key[&(
                 ObservationSplitV1::LockedTest,
-                sample_id,
+                *sample_id,
                 detector.detector_id.as_str(),
                 detector.detector_version.as_str(),
             )];
             costs.push(observation);
-            let normalized = normalize_risk(observation.raw_score, detector.score_direction)?;
-            let p_value = conformal_p_value(clean, normalized)?;
+            let risk = normalize_risk(observation.raw_score, detector.score_direction)?;
+            test_max_by_cluster
+                .entry(observation.source_cluster_id.as_str())
+                .and_modify(|maximum| *maximum = maximum.max(risk))
+                .or_insert(risk);
+        }
+
+        let mut cluster_pvalues = BTreeMap::<&str, ConformalPValueV1>::new();
+        for (cluster_id, cluster_max_risk) in &test_max_by_cluster {
+            cluster_pvalues.insert(
+                cluster_id,
+                conformal_p_value(&clean_scores, *cluster_max_risk)?,
+            );
+        }
+
+        for sample_id in &test_ids {
+            let observation = observations_by_key[&(
+                ObservationSplitV1::LockedTest,
+                *sample_id,
+                detector.detector_id.as_str(),
+                detector.detector_version.as_str(),
+            )];
+            let cluster_max = *test_max_by_cluster
+                .get(observation.source_cluster_id.as_str())
+                .ok_or_else(|| "test source-cluster maximum is missing".to_owned())?;
+            let p_value = cluster_pvalues
+                .get(observation.source_cluster_id.as_str())
+                .ok_or_else(|| "test source-cluster conformal p-value is missing".to_owned())?
+                .clone();
             pvalue_output.push(CalibratedTestScoreV1 {
                 calibration_group_sha256: group.group_sha256.clone(),
                 sample_id: observation.sample_id.clone(),
@@ -712,29 +771,21 @@ fn analyze_group(
                 detector_version: detector.detector_version.clone(),
                 ground_truth: observation.ground_truth,
                 raw_score: observation.raw_score,
-                normalized_risk_score: normalized,
-                calibration_clean_support: clean.len() as u64,
+                normalized_risk_score: normalize_risk(
+                    observation.raw_score,
+                    detector.score_direction,
+                )?,
+                cluster_max_normalized_risk_score: cluster_max,
+                calibration_clean_support: clean_scores.len() as u64,
                 conformal_p_value: p_value,
             });
         }
+        cluster_pvalues_by_detector.insert(
+            (detector.detector_id.as_str(), detector.detector_version.as_str()),
+            cluster_pvalues,
+        );
         cost_output.push(make_cost_summary(&group.group_sha256, detector, &costs)?);
     }
-
-    let test_pvalues_by_detector: BTreeMap<(&str, &str, &str), &CalibratedTestScoreV1> =
-        pvalue_output
-            .iter()
-            .filter(|value| value.calibration_group_sha256 == group.group_sha256)
-            .map(|value| {
-                (
-                    (
-                        value.detector_id.as_str(),
-                        value.detector_version.as_str(),
-                        value.sample_id.as_str(),
-                    ),
-                    value,
-                )
-            })
-            .collect();
 
     let mut cells = Vec::with_capacity(definitions.len() * targets.len());
     let mut predictions = BTreeMap::<(u16, &str, &str, &str), bool>::new();
@@ -743,6 +794,9 @@ fn analyze_group(
             .get(&(detector.detector_id.as_str(), detector.detector_version.as_str()))
             .map(Vec::len)
             .unwrap_or(0) as u64;
+        let cluster_pvalues = cluster_pvalues_by_detector
+            .get(&(detector.detector_id.as_str(), detector.detector_version.as_str()))
+            .ok_or_else(|| "detector cluster p-value map is missing".to_owned())?;
         for target in targets {
             let target_supported = clean_support >= minimum_calibration_support(*target)?;
             let mut test_clean = 0_u64;
@@ -751,26 +805,24 @@ fn analyze_group(
             let mut true_positive = 0_u64;
             let mut false_negative = 0_u64;
             let mut true_negative = 0_u64;
-            for sample_id in &test_ids {
-                let scored = test_pvalues_by_detector
-                    .get(&(
-                        detector.detector_id.as_str(),
-                        detector.detector_version.as_str(),
-                        *sample_id,
-                    ))
-                    .ok_or_else(|| "calibrated test p-value is missing".to_owned())?;
-                let predicted = target_supported
-                    && conformal_rejects(&scored.conformal_p_value, *target);
+            for cluster_id in &test_clusters {
+                let p_value = cluster_pvalues
+                    .get(cluster_id)
+                    .ok_or_else(|| "test cluster conformal p-value is missing".to_owned())?;
+                let predicted = target_supported && conformal_rejects(p_value, *target);
                 predictions.insert(
                     (
                         *target,
                         group.group_sha256.as_str(),
                         detector.detector_id.as_str(),
-                        *sample_id,
+                        *cluster_id,
                     ),
                     predicted,
                 );
-                match scored.ground_truth {
+                match test_cluster_truth
+                    .get(cluster_id)
+                    .ok_or_else(|| "test cluster ground truth is missing".to_owned())?
+                {
                     GroundTruthV1::Clean => {
                         test_clean += 1;
                         if predicted {
@@ -829,7 +881,7 @@ fn analyze_group(
                 detector_id: detector.detector_id.clone(),
                 detector_version: detector.detector_version.clone(),
                 calibration_clean_support: clean_support,
-                locked_test_support: test_ids.len() as u64,
+                locked_test_support: test_clusters.len() as u64,
                 operating_points: vec![metrics],
             });
         }
@@ -845,7 +897,7 @@ fn analyze_group(
                     target_fpr_permille: *target,
                     detector_left: left.detector_id.clone(),
                     detector_right: right.detector_id.clone(),
-                    comparable_test_support: test_ids.len() as u64,
+                    comparable_test_support: test_clusters.len() as u64,
                     disagree_count: 0,
                     both_flag_contaminated: 0,
                     left_only_flag_contaminated: 0,
@@ -853,18 +905,18 @@ fn analyze_group(
                     neither_flag_contaminated: 0,
                     disagreement_rate: None,
                 };
-                for sample_id in &test_ids {
+                for cluster_id in &test_clusters {
                     let left_flag = predictions[&(
                         *target,
                         group.group_sha256.as_str(),
                         left.detector_id.as_str(),
-                        sample_id,
+                        cluster_id,
                     )];
                     let right_flag = predictions[&(
                         *target,
                         group.group_sha256.as_str(),
                         right.detector_id.as_str(),
-                        sample_id,
+                        cluster_id,
                     )];
                     match (left_flag, right_flag) {
                         (true, true) => disagreement.both_flag_contaminated += 1,
