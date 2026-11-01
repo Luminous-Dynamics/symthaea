@@ -57,6 +57,33 @@ fn self_test(path: &PathBuf) -> Result<()> {
     }
     println!("PITB_PROOF_GRAPH_BATCH_CAP_PASS: lexical deterministic truncation under a one-goal cap");
 
+    let mut provisional = value.clone();
+    for declaration in provisional["declarations"].as_array_mut().context("declarations array")? {
+        if declaration["declaration_id"] == "helper-normalize" {
+            declaration["lifecycle_state"] = json!("provisional");
+            declaration["proof_receipt_sha256"] = Value::Null;
+            declaration["kernel_verified"] = Value::Bool(false);
+        }
+    }
+    for goal in provisional["goal_nodes"].as_array_mut().context("goal nodes array")? {
+        if goal["goal_id"] == "goal-helper-root" {
+            goal["status"] = json!("open");
+            goal["closure_proof_sha256"] = Value::Null;
+            goal["closure_receipt_sha256"] = Value::Null;
+            goal["closure_kernel_verified"] = Value::Bool(false);
+            goal["closure_contains_sorry_ax"] = Value::Bool(false);
+        }
+    }
+    provisional["scheduler_decision"]["ready_frontier_goal_ids"] = json!(["goal-helper-root"]);
+    provisional["scheduler_decision"]["selected_goal_ids"] = json!(["goal-helper-root"]);
+    let provisional_summary = proof_graph::validate_value(&provisional)?;
+    if provisional_summary.ready_frontier_goal_ids != vec!["goal-helper-root".to_owned()]
+        || provisional_summary.selected_goal_ids != vec!["goal-helper-root".to_owned()]
+    {
+        bail!("goals depending on a provisional helper entered the ready frontier");
+    }
+    println!("PITB_PROOF_GRAPH_PREREQUISITE_PASS: provisional helper is scheduled before its dependents");
+
     let mut stopped = value.clone();
     for goal in stopped["goal_nodes"].as_array_mut().context("goal nodes array")? {
         if goal["status"] == "open" {
