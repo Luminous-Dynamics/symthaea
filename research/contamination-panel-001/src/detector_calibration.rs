@@ -624,7 +624,6 @@ fn analyze_group(
     let mut calibration_clusters = BTreeSet::<&str>::new();
     let mut test_clusters = BTreeSet::<&str>::new();
     let mut test_cluster_truth = BTreeMap::<&str, GroundTruthV1>::new();
-    let mut test_cluster_representative = BTreeMap::<&str, &str>::new();
     let mut cluster_truth_by_split = BTreeMap::<
         (ObservationSplitV1, &str),
         GroundTruthV1,
@@ -650,9 +649,6 @@ fn analyze_group(
                 test_ids.insert(*sample_id);
                 test_clusters.insert(*cluster_id);
                 test_cluster_truth.insert(*cluster_id, *truth);
-                test_cluster_representative
-                    .entry(*cluster_id)
-                    .or_insert(*sample_id);
             }
         }
     }
@@ -1379,6 +1375,63 @@ mod tests {
             calibration_groups: vec![group],
             observations,
         }
+    }
+
+    #[test]
+    fn calibration_support_counts_independent_clusters_not_questions() {
+        let mut study = minimal_study();
+        for observation in &mut study.observations {
+            if observation.split == ObservationSplitV1::CleanCalibration
+                && (observation.sample_id == "cal-000" || observation.sample_id == "cal-001")
+            {
+                observation.source_cluster_id = "cal-block-000".to_owned();
+            }
+        }
+        let report = analyze_detector_calibration(&study).unwrap();
+        assert!(
+            report
+                .group_cells
+                .iter()
+                .all(|cell| cell.calibration_clean_support == 99)
+        );
+    }
+
+    #[test]
+    fn test_cluster_uses_max_risk_and_counts_once_for_fpr() {
+        let mut study = minimal_study();
+        for observation in &mut study.observations {
+            if observation.split == ObservationSplitV1::LockedTest
+                && (observation.sample_id == "test-000" || observation.sample_id == "test-001")
+            {
+                observation.source_cluster_id = "test-clean-block".to_owned();
+            }
+        }
+        let report = analyze_detector_calibration(&study).unwrap();
+        let first = report
+            .scored_test_p_values
+            .iter()
+            .find(|value| value.detector_id == "det-a" && value.sample_id == "test-000")
+            .unwrap();
+        let second = report
+            .scored_test_p_values
+            .iter()
+            .find(|value| value.detector_id == "det-a" && value.sample_id == "test-001")
+            .unwrap();
+        assert_eq!(
+            first.cluster_max_normalized_risk_score,
+            second.cluster_max_normalized_risk_score
+        );
+        assert_eq!(first.cluster_max_normalized_risk_score, 0.8);
+        assert_eq!(first.conformal_p_value, second.conformal_p_value);
+        let cell = report
+            .group_cells
+            .iter()
+            .find(|cell| cell.detector_id == "det-a")
+            .unwrap();
+        assert_eq!(cell.locked_test_support, 3);
+        let point = &cell.operating_points[0];
+        assert_eq!(point.test_clean_support, 1);
+        assert_eq!(point.test_contaminated_support, 2);
     }
 
     #[test]
