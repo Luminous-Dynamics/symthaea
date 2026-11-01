@@ -13,8 +13,8 @@
     "policy_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
     "calibration_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
     "calibration_split": "validation",
-    "calibration_sample_count": 1000,
-    "calibration_ece_ppm": 20000,
+    "calibration_sample_count": 1600,
+    "calibration_ece_ppm": 0,
     "max_calibration_ece_ppm": 50000,
     "minimum_lcb_delta_ppm": 10000,
     "shadow_weights_ppm": {
@@ -26,7 +26,9 @@
       "cost_microusd": 200000
     },
     "confidence_z_hundredths": 196,
-    "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761"
+    "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+    "prediction_model_id": "synthetic-action-outcome-estimator",
+    "prediction_model_version": "fixture-only"
   },
   "remaining_budget": {
     "tokens": 100000,
