@@ -51,20 +51,24 @@ pub enum OnlineFeedbackDisposition {
         action_id_digest: [u8; 32],
     },
     ExactVerifiedCost {
+        action_id_digest: [u8; 32],
         observed_remaining_to_verified_proof: ResourceVector,
         meter_receipt_digest: [u8; 32],
         completion_verifier_digest: [u8; 32],
     },
     CoverageBitOnly {
+        action_id_digest: [u8; 32],
         covered: bool,
         meter_receipt_digest: [u8; 32],
         evaluator_receipt_digest: [u8; 32],
     },
     RightCensored {
+        action_id_digest: [u8; 32],
         observed_resource_lower_bound: ResourceVector,
         meter_receipt_digest: [u8; 32],
     },
     CompetingTerminal {
+        action_id_digest: [u8; 32],
         terminal: OnlineCompetingTerminal,
         evaluator_receipt_digest: [u8; 32],
     },
@@ -83,10 +87,14 @@ impl OnlineFeedbackDisposition {
                 }
             }
             Self::ExactVerifiedCost {
+                action_id_digest,
                 meter_receipt_digest,
                 completion_verifier_digest,
                 ..
             } => {
+                if is_zero(action_id_digest) {
+                    return Err(OnlineSelectionError::MissingActionIdentity);
+                }
                 if is_zero(meter_receipt_digest) {
                     return Err(OnlineSelectionError::MissingMeterReceipt);
                 }
@@ -95,10 +103,14 @@ impl OnlineFeedbackDisposition {
                 }
             }
             Self::CoverageBitOnly {
+                action_id_digest,
                 meter_receipt_digest,
                 evaluator_receipt_digest,
                 ..
             } => {
+                if is_zero(action_id_digest) {
+                    return Err(OnlineSelectionError::MissingActionIdentity);
+                }
                 if is_zero(meter_receipt_digest) {
                     return Err(OnlineSelectionError::MissingMeterReceipt);
                 }
@@ -107,17 +119,25 @@ impl OnlineFeedbackDisposition {
                 }
             }
             Self::RightCensored {
+                action_id_digest,
                 meter_receipt_digest,
                 ..
             } => {
+                if is_zero(action_id_digest) {
+                    return Err(OnlineSelectionError::MissingActionIdentity);
+                }
                 if is_zero(meter_receipt_digest) {
                     return Err(OnlineSelectionError::MissingMeterReceipt);
                 }
             }
             Self::CompetingTerminal {
+                action_id_digest,
                 evaluator_receipt_digest,
                 ..
             } => {
+                if is_zero(action_id_digest) {
+                    return Err(OnlineSelectionError::MissingActionIdentity);
+                }
                 if is_zero(evaluator_receipt_digest) {
                     return Err(OnlineSelectionError::MissingEvaluatorReceipt);
                 }
@@ -156,6 +176,8 @@ pub enum OnlineSelectionError {
     DuplicateFinalFeedback,
     RepeatedUnknownFeedback,
     MissingActionIdentity,
+    ActionIdentityMismatch,
+    FeedbackSequenceOverflow,
     MissingMeterReceipt,
     MissingCompletionVerifier,
     MissingEvaluatorReceipt,
