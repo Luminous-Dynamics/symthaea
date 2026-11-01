@@ -25,15 +25,15 @@ use crate::{
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
 const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
-const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.4\0";
+const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.5\0";
 const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
 const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-SEARCH-REQUEST\0v0.1\0";
 pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-2023-system-search/0.5.0";
-const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.2\0";
+    "symthaea-iit/sparse-iit4-2023-system-search/0.6.0";
+const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.3\0";
 pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.4.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-partition-score/0.3.0";
+    "symthaea-iit/sparse-iit4-partition-score/0.4.0";
 
 pub const MAX_SPARSE_UNITS: usize = 1_000_000;
 pub const MAX_LOCAL_PARENTS: usize = 20;
@@ -137,6 +137,10 @@ pub enum SparseCausalError {
     UndefinedBackgroundPosterior,
     #[error("sparse Eq4 report entry {index} is not finite and nonnegative: {value}")]
     InvalidReportValue { index: usize, value: f64 },
+    #[error("sparse Eq4 log report entry {index} is invalid: {value}")]
+    InvalidLogReportValue { index: usize, value: f64 },
+    #[error("sparse score log field {field} is invalid: {value}")]
+    InvalidLogScoreReportValue { field: &'static str, value: f64 },
     #[error("partition score report field {field} is not finite: {value}")]
     InvalidScoreReportValue { field: &'static str, value: f64 },
     #[error("cannot convert {units} sparse units to dense; maximum is {maximum}")]
@@ -175,7 +179,10 @@ pub struct SparseEq4Report {
     pub request_sha256: String,
     pub max_factor_entries: usize,
     /// Unnormalized forward cause likelihood. First candidate unit is the low bit.
+    /// This probability-space view may underflow even when the log value is finite.
     pub forward_likelihood: Vec<f64>,
+    /// Log of the unnormalized forward cause likelihood; structural zero is -infinity.
+    pub forward_log_likelihood: Vec<f64>,
     pub posterior_induced_width: usize,
     pub maximum_target_induced_width: usize,
     /// True when this report reused the original model/state posterior prepared by
@@ -218,6 +225,13 @@ impl SparseEq4Report {
             }
             let canonical = if value == 0.0 { 0.0 } else { value };
             bytes.extend_from_slice(&canonical.to_bits().to_le_bytes());
+        }
+        sparse_receipt_u64(&mut bytes, self.forward_log_likelihood.len() as u64);
+        for (index, value) in self.forward_log_likelihood.iter().copied().enumerate() {
+            if value.is_nan() || value == f64::INFINITY {
+                return Err(SparseCausalError::InvalidLogReportValue { index, value });
+            }
+            bytes.extend_from_slice(&value.to_bits().to_le_bytes());
         }
         sparse_receipt_u64(&mut bytes, self.posterior_induced_width as u64);
         sparse_receipt_u64(&mut bytes, self.maximum_target_induced_width as u64);
@@ -276,6 +290,7 @@ struct SparseIit4ScoringBaseline {
     cause_forward: SparseEq4Report,
     cause_forward_receipt_sha256: String,
     cause_selectivity: Vec<f64>,
+    cause_log_selectivity: Vec<f64>,
     effect_selectivity: Vec<f64>,
 }
 
@@ -299,6 +314,10 @@ pub struct SparsePartitionScoreReport {
     pub max_factor_entries: usize,
     pub uncut_cause_receipt_sha256: String,
     pub partitioned_cause_receipt_sha256: String,
+    /// Log-domain cause quantities used to distinguish finite underflow from structural zero.
+    pub cause_log_selectivity: f64,
+    pub cause_log_forward: f64,
+    pub cause_log_partitioned_forward: f64,
     pub score: SystemPhiPartitionScore,
 }
 
@@ -313,6 +332,13 @@ impl SparsePartitionScoreReport {
         sparse_receipt_string(&mut bytes, &self.uncut_cause_receipt_sha256);
         sparse_receipt_string(&mut bytes, &self.partitioned_cause_receipt_sha256);
         sparse_score_f64(&mut bytes, "cause.selectivity", self.score.cause.selectivity)?;
+        sparse_score_log_f64(&mut bytes, "cause.log_selectivity", self.cause_log_selectivity)?;
+        sparse_score_log_f64(&mut bytes, "cause.log_forward", self.cause_log_forward)?;
+        sparse_score_log_f64(
+            &mut bytes,
+            "cause.log_partitioned_forward",
+            self.cause_log_partitioned_forward,
+        )?;
         sparse_score_f64(&mut bytes, "cause.forward", self.score.cause.forward_probability)?;
         sparse_score_f64(
             &mut bytes,
@@ -360,6 +386,18 @@ fn sparse_score_f64(
     }
     let canonical = if value == 0.0 { 0.0 } else { value };
     bytes.extend_from_slice(&canonical.to_bits().to_le_bytes());
+    Ok(())
+}
+
+fn sparse_score_log_f64(
+    bytes: &mut Vec<u8>,
+    field: &'static str,
+    value: f64,
+) -> Result<(), SparseCausalError> {
+    if value.is_nan() || value == f64::INFINITY {
+        return Err(SparseCausalError::InvalidLogScoreReportValue { field, value });
+    }
+    bytes.extend_from_slice(&value.to_bits().to_le_bytes());
     Ok(())
 }
 
@@ -669,14 +707,24 @@ impl SparseBinaryCausalModel {
             false,
         )?;
         let cause_forward_receipt_sha256 = cause_forward.receipt_sha256()?;
-        let cause_mass = cause_forward.forward_likelihood.iter().sum::<f64>();
-        if !cause_mass.is_finite() || cause_mass <= 0.0 {
+        let cause_log_mass = sparse_log_sum_exp(&cause_forward.forward_log_likelihood)?;
+        if !cause_log_mass.is_finite() {
             return Err(SparseCausalError::UndefinedBackgroundPosterior);
         }
-        let cause_selectivity = cause_forward
-            .forward_likelihood
+        let cause_log_selectivity = cause_forward
+            .forward_log_likelihood
             .iter()
-            .map(|value| value / cause_mass)
+            .map(|value| {
+                if *value == f64::NEG_INFINITY {
+                    f64::NEG_INFINITY
+                } else {
+                    *value - cause_log_mass
+                }
+            })
+            .collect::<Vec<_>>();
+        let cause_selectivity = cause_log_selectivity
+            .iter()
+            .map(|value| value.exp())
             .collect::<Vec<_>>();
         let effect_selectivity = self.effect_repertoire_iit4(
             candidate_system,
@@ -690,6 +738,7 @@ impl SparseBinaryCausalModel {
             cause_forward,
             cause_forward_receipt_sha256,
             cause_selectivity,
+            cause_log_selectivity,
             effect_selectivity,
         })
     }
@@ -761,11 +810,16 @@ impl SparseBinaryCausalModel {
                 if *on { index | (1usize << unit) } else { index }
             });
 
-        let cause = sparse_direction_score(
+        let cause_log_selectivity = baseline.cause_log_selectivity[cause_state_index];
+        let cause_log_forward =
+            baseline.cause_forward.forward_log_likelihood[cause_state_index];
+        let cause_log_partitioned_forward =
+            terms.partitioned_cause.forward_log_likelihood[cause_state_index];
+        let cause = sparse_direction_score_from_logs(
             CausalDirection::Cause,
-            baseline.cause_selectivity[cause_state_index],
-            baseline.cause_forward.forward_likelihood[cause_state_index],
-            terms.partitioned_cause.forward_likelihood[cause_state_index],
+            cause_log_selectivity,
+            cause_log_forward,
+            cause_log_partitioned_forward,
         );
         let effect = sparse_direction_score(
             CausalDirection::Effect,
@@ -798,6 +852,9 @@ impl SparseBinaryCausalModel {
             max_factor_entries: baseline.posterior.max_factor_entries,
             uncut_cause_receipt_sha256: baseline.cause_forward_receipt_sha256.clone(),
             partitioned_cause_receipt_sha256: terms.partitioned_cause_receipt_sha256.clone(),
+            cause_log_selectivity,
+            cause_log_forward,
+            cause_log_partitioned_forward,
             score,
         })
     }
@@ -1567,7 +1624,7 @@ impl SparseBinaryCausalModel {
             });
         }
 
-        let mut forward = vec![1.0; posterior.candidate_state_count];
+        let mut forward_log_likelihood = vec![0.0; posterior.candidate_state_count];
         let mut maximum_target_induced_width = 0usize;
         let mut maximum_target_predicted_peak_factor_entries = 0usize;
         let mut predicted_peak_factor_entries =
@@ -1601,27 +1658,36 @@ impl SparseBinaryCausalModel {
                 return Err(SparseCausalError::UndefinedBackgroundPosterior);
             }
 
-            let mut cause_factor = vec![0.0; posterior.candidate_state_count];
-            for (candidate_state, value) in cause_factor.iter_mut().enumerate() {
+            for (candidate_state, joint_log) in
+                forward_log_likelihood.iter_mut().enumerate()
+            {
                 let local_index = report.factor.variables().iter().enumerate().fold(
                     0usize,
                     |index, (factor_slot, variable)| {
                         let candidate_slot = variable - posterior.y_base;
                         if ((candidate_state >> candidate_slot) & 1) != 0 {
                             index | (1usize << factor_slot)
-                        } else { index }
+                        } else {
+                            index
+                        }
                     },
                 );
-                *value = (report.factor.log_values()[local_index]
-                    - posterior.posterior_log_normalizer).exp();
-            }
-            if cause_factor.iter().any(|value| {
-                !value.is_finite() || *value < 0.0 || *value > 1.0 + 1e-12
-            }) {
-                return Err(SparseCausalError::UndefinedBackgroundPosterior);
-            }
-            for (joint, factor_value) in forward.iter_mut().zip(cause_factor) {
-                *joint *= factor_value;
+                let target_log_probability = report.factor.log_values()[local_index]
+                    - posterior.posterior_log_normalizer;
+                if target_log_probability.is_nan()
+                    || target_log_probability == f64::INFINITY
+                    || target_log_probability > 1e-12
+                {
+                    return Err(SparseCausalError::UndefinedBackgroundPosterior);
+                }
+                if target_log_probability == f64::NEG_INFINITY {
+                    *joint_log = f64::NEG_INFINITY;
+                } else if *joint_log != f64::NEG_INFINITY {
+                    *joint_log += target_log_probability;
+                    if !joint_log.is_finite() {
+                        return Err(SparseCausalError::UndefinedBackgroundPosterior);
+                    }
+                }
             }
             maximum_target_induced_width =
                 maximum_target_induced_width.max(report.induced_width);
@@ -1646,9 +1712,19 @@ impl SparseBinaryCausalModel {
             )?;
         }
 
-        if forward.iter().any(|value| !value.is_finite()) {
+        if forward_log_likelihood
+            .iter()
+            .any(|value| value.is_nan() || *value == f64::INFINITY)
+        {
             return Err(SparseCausalError::UndefinedBackgroundPosterior);
         }
+        // Retain the probability-space view for presentation. Scoring uses the
+        // log vector so finite values below exp()'s range remain distinguishable
+        // from structural zeros.
+        let forward = forward_log_likelihood
+            .iter()
+            .map(|value| value.exp())
+            .collect::<Vec<_>>();
         let request_sha256 = self.eq4_request_sha256(
             target_model,
             &posterior.candidate_system,
@@ -1659,6 +1735,7 @@ impl SparseBinaryCausalModel {
             request_sha256,
             max_factor_entries: posterior.max_factor_entries,
             forward_likelihood: forward,
+            forward_log_likelihood,
             posterior_induced_width: posterior.posterior_induced_width,
             maximum_target_induced_width,
             posterior_contraction_reused,
@@ -1915,6 +1992,67 @@ fn checked_accumulate_planner_work(
         .checked_add(additional.clique_pair_checks)
         .ok_or(FactorGraphError::IndexOverflow)?;
     Ok(())
+}
+
+fn sparse_log_sum_exp(values: &[f64]) -> Result<f64, SparseCausalError> {
+    let mut maximum = f64::NEG_INFINITY;
+    for (index, value) in values.iter().copied().enumerate() {
+        if value.is_nan() || value == f64::INFINITY {
+            return Err(SparseCausalError::InvalidLogReportValue { index, value });
+        }
+        maximum = maximum.max(value);
+    }
+    if maximum == f64::NEG_INFINITY {
+        return Ok(f64::NEG_INFINITY);
+    }
+    let scaled_sum = values
+        .iter()
+        .filter(|value| **value != f64::NEG_INFINITY)
+        .map(|value| (*value - maximum).exp())
+        .sum::<f64>();
+    Ok(maximum + scaled_sum.ln())
+}
+
+fn sparse_direction_score_from_logs(
+    direction: CausalDirection,
+    log_selectivity: f64,
+    log_forward: f64,
+    log_partitioned_forward: f64,
+) -> SystemPhiDirectionScore {
+    let selectivity = log_selectivity.exp();
+    let forward_probability = log_forward.exp();
+    let partitioned_forward_probability = log_partitioned_forward.exp();
+
+    // Preserve the established zero policy for a true structural zero, but do
+    // not infer structural zero from an underflowed probability-space view.
+    let signed_phi = if log_selectivity == f64::NEG_INFINITY
+        || log_forward == f64::NEG_INFINITY
+        || log_partitioned_forward == f64::NEG_INFINITY
+    {
+        0.0
+    } else {
+        let log_ratio = log_forward - log_partitioned_forward;
+        if log_ratio == 0.0 {
+            0.0
+        } else {
+            let log_magnitude =
+                log_selectivity + (log_ratio.abs() / std::f64::consts::LN_2).ln();
+            let magnitude = log_magnitude.exp();
+            if log_ratio.is_sign_negative() {
+                -magnitude
+            } else {
+                magnitude
+            }
+        }
+    };
+
+    SystemPhiDirectionScore {
+        direction,
+        selectivity,
+        forward_probability,
+        partitioned_forward_probability,
+        signed_phi,
+    }
 }
 
 fn sparse_direction_score(
