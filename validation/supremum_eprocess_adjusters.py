@@ -40,6 +40,91 @@ def _normalize_prior(
     return beta_values, weight_values
 
 
+def log_admissible_power_adjuster_from_log_max(
+    log_running_max: float, beta: float
+) -> float:
+    """Return log(A_beta(M)) from log(M), avoiding exponentiating large M."""
+    log_m = float(log_running_max)
+    b = float(beta)
+    if math.isnan(log_m) or log_m < 0.0:
+        raise ValueError("log running maximum must be nonnegative")
+    if not math.isfinite(b) or b < 0.0 or b >= 1.0:
+        raise ValueError("beta must lie in [0,1)")
+    if log_m == 0.0:
+        return -math.inf
+    if b == 0.0:
+        return math.log(log_m)
+    x = b * log_m
+    if x < 50.0:
+        log_expm1 = math.log(math.expm1(x))
+    else:
+        log_expm1 = x + math.log1p(-math.exp(-x))
+    return math.log((1.0 - b) / b) + log_expm1
+
+
+def adjusted_running_maximum_log_path(
+    log_e_process: Sequence[float], beta: float
+) -> tuple[float, ...]:
+    """Log adjusted path from log E_t values; accepts -inf for E_t=0."""
+    raw = [float(value) for value in log_e_process]
+    if not raw or raw[0] != 0.0:
+        raise ValueError("log e-process path must be nonempty and start at log(1)=0")
+    if any(math.isnan(value) or value == math.inf for value in raw):
+        raise ValueError("log e-process values must not be NaN or +infinity")
+    running = 0.0
+    result: list[float] = []
+    for value in raw:
+        running = max(running, value)
+        result.append(log_admissible_power_adjuster_from_log_max(running, beta))
+    return tuple(result)
+
+
+def _logsumexp(values: Sequence[float]) -> float:
+    top = max(values)
+    if top == -math.inf:
+        return -math.inf
+    return top + math.log(math.fsum(math.exp(value - top) for value in values))
+
+
+def fixed_prior_adjuster_portfolio_log(
+    log_e_process: Sequence[float],
+    *,
+    betas: Sequence[float] = (0.0, 0.25, 0.5, 0.75),
+    weights: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
+) -> tuple[float, ...]:
+    """Log path for a fixed-prior mixture over admissible adjusted maxima."""
+    beta_values, prior = _normalize_prior(betas, weights)
+    log_prior = [math.log(weight) if weight > 0 else -math.inf for weight in prior]
+    components = [
+        adjusted_running_maximum_log_path(log_e_process, beta)
+        for beta in beta_values
+    ]
+    return tuple(
+        _logsumexp([
+            log_prior[j] + components[j][t]
+            for j in range(len(prior))
+            if prior[j] > 0
+        ])
+        for t in range(len(log_e_process))
+    )
+
+
+def adjusted_intersection_log_paths(
+    raw_intersection_log_e_paths: Mapping[frozenset[str], Sequence[float]],
+    *,
+    betas: Sequence[float] = (0.0, 0.25, 0.5, 0.75),
+    weights: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
+) -> dict[frozenset[str], tuple[float, ...]]:
+    """Log-domain adjustment for raw intersection e-processes."""
+    beta_values, _ = _normalize_prior(betas, weights)
+    return {
+        intersection: fixed_prior_adjuster_portfolio_log(
+            path, betas=beta_values, weights=weights
+        )
+        for intersection, path in raw_intersection_log_e_paths.items()
+    }
+
+
 def admissible_power_adjuster(value: float, beta: float) -> float:
     """Evaluate A_beta(x); beta=0 is the continuous log(x) limit."""
     x = float(value)
@@ -48,9 +133,10 @@ def admissible_power_adjuster(value: float, beta: float) -> float:
         raise ValueError("running maximum must be finite and at least one")
     if not math.isfinite(b) or b < 0.0 or b >= 1.0:
         raise ValueError("beta must lie in [0,1)")
-    if b == 0.0:
-        return math.log(x)
-    return ((1.0 - b) / b) * math.expm1(b * math.log(x))
+    log_value = log_admissible_power_adjuster_from_log_max(math.log(x), b)
+    if log_value > math.log(float.fromhex("0x1.fffffffffffffp+1023")):
+        raise OverflowError("adjusted e-value exceeds float range; use log-domain output")
+    return math.exp(log_value)
 
 
 def admissible_power_adjuster_area(beta: float) -> float:
