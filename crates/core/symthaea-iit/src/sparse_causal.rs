@@ -2727,6 +2727,33 @@ mod tests {
         assert!(score.signed_phi > 0.0);
         assert!(score.signed_phi.is_finite());
 
+        // The selectivity probability-space view may itself underflow while
+        // the weighted log-domain GID remains representable.
+        let underflowed_selectivity = sparse_direction_score_from_logs(
+            CausalDirection::Cause,
+            -760.0,
+            -800.0,
+            -1.0e30,
+        );
+        assert_eq!(underflowed_selectivity.selectivity, 0.0);
+        assert_eq!(underflowed_selectivity.forward_probability, 0.0);
+        assert_eq!(underflowed_selectivity.partitioned_forward_probability, 0.0);
+        let expected_log_magnitude = -760.0 + ((1.0e30 - 800.0) / std::f64::consts::LN_2).ln();
+        let expected = expected_log_magnitude.exp();
+        assert!(underflowed_selectivity.signed_phi > 0.0);
+        assert!(underflowed_selectivity.signed_phi.is_finite());
+        assert!((underflowed_selectivity.signed_phi - expected).abs() <= expected * 1e-14);
+
+        let negative_underflowed_selectivity = sparse_direction_score_from_logs(
+            CausalDirection::Cause,
+            -760.0,
+            -1.0e30,
+            -800.0,
+        );
+        assert_eq!(negative_underflowed_selectivity.selectivity, 0.0);
+        assert!(negative_underflowed_selectivity.signed_phi < 0.0);
+        assert!(negative_underflowed_selectivity.signed_phi.is_finite());
+
         // PyPhi's IIT 4.0 GID convention sets an undefined pointwise
         // ratio to zero when either repertoire entry has zero support.
         let zero_unpartitioned = sparse_direction_score_from_logs(
