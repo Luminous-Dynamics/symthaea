@@ -21,11 +21,17 @@ fn main() -> ExitCode {
     let mut args = env::args_os().skip(1);
     let Some(samples_path) = args.next() else {
         return fail(
-            "usage: phase_energy_audit <samples.csv> <markers.csv> <voltage_v> <clock-mapping.json> <phase-protocol.json> <receipt.json>",
+            "usage: phase_energy_audit <samples.csv> <markers.csv> <outcomes.csv> <voltage_v> <clock-mapping.json> <phase-protocol.json> <receipt.json>",
         );
     };
     let Some(markers_path) = args.next() else {
         return fail("missing markers.csv argument");
+    };
+    let Some(outcomes_path) = args.next() else {
+        return fail("missing outcomes.csv argument");
+    };
+    let Some(voltage_arg) = args.next() else {
+        return fail("missing outcomes.csv argument");
     };
     let Some(voltage_arg) = args.next() else {
         return fail("missing voltage_v argument");
@@ -60,6 +66,10 @@ fn main() -> ExitCode {
         Ok(value) => value,
         Err(error) => return fail(error),
     };
+    let outcomes = match read_text(&outcomes_path, "application outcomes CSV") {
+        Ok(value) => value,
+        Err(error) => return fail(error),
+    };
     let mapping_json = match read_text(&mapping_path, "clock mapping JSON") {
         Ok(value) => value,
         Err(error) => return fail(error),
@@ -85,6 +95,7 @@ fn main() -> ExitCode {
     let audit = match audit_application_phase_energy(
         &samples,
         &markers,
+        &outcomes,
         trace_config,
         &mapping,
         &protocol,
