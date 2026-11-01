@@ -291,12 +291,17 @@ fn validate_manifest_fields(
     if !is_git_sha1(&m.source_commit) {
         return Err(NatsBenchMcuV2ImportError::new("source_commit", "must be a lowercase 40-character Git SHA-1"));
     }
-    if m.candidate_count == 0 || m.measured_count + m.infeasible_count != m.candidate_count {
+    let partition_total = m.measured_count.checked_add(m.infeasible_count).ok_or_else(|| {
+        NatsBenchMcuV2ImportError::new("population_counts", "measured + infeasible count overflow")
+    })?;
+    if m.candidate_count == 0 || partition_total != m.candidate_count {
         return Err(NatsBenchMcuV2ImportError::new("population_counts", "measured + infeasible must equal candidate_count"));
     }
     if !m.flash_capacity_kb.is_finite() || !m.firmware_overhead_kb.is_finite()
         || !m.int8_limit_kb.is_finite() || m.flash_capacity_kb <= m.firmware_overhead_kb
-        || (m.flash_capacity_kb - m.firmware_overhead_kb - m.int8_limit_kb).abs() > 0.11
+        // The public export records the deployable flatbuffer limit as an integer KB value
+        // while the fixed firmware overhead is rounded to one decimal KB.
+        || (m.flash_capacity_kb - m.firmware_overhead_kb - m.int8_limit_kb).abs() > 0.51
     {
         return Err(NatsBenchMcuV2ImportError::new("flash_budget", "flash capacity, firmware overhead and INT8 budget are inconsistent"));
     }
