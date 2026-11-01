@@ -36,7 +36,7 @@ Prediction uses nearest Hamming exemplar. Equal-distance ties retain the first e
 state_next = round(((32768 - alpha) * state + alpha * equilibrium) / 32768)
 ```
 
-The caller passes `alpha_q15` as unsigned Q0.15 in [0, 32768]. This crate does **not** yet calculate `1 - exp(-dt/tau)`; selecting or approximating that coefficient, defining tau dynamics, and proving the error bound are separate work.
+The caller can pass `alpha_q15` directly or use `alpha_from_ratio_q16` / `alpha_from_dt_tau_us` from the fixed-point time-constant module. The Q16.16 ratio table spans [0,12] at 1/32 intervals and linearly interpolates precomputed Q15 samples; ratios above 12 saturate to one. Its conservative approximation budget is below 5 Q15 LSBs (4 interpolation + 0.5 table rounding + less than 0.5 ratio quantization). The microsecond convenience API uses u32 inputs and u64 integer division; the preferred tight-loop path is to supply a precomputed Q16.16 ratio. This is a base scalar tau policy, not a complete state-dependent or learned CfC tau model.
 
 ## Example composition
 
@@ -49,7 +49,7 @@ type EdgeCore = BoundedEdgeCore<128, 4, 16, 256>;
 
 let mut core = EdgeCore::new().expect("non-zero fixed capacity");
 let sensory_equilibrium = [0i16; 128];
-core.update_liquid_state(&sensory_equilibrium, Q15_ONE).unwrap();
+core.update_liquid_state_from_dt_tau_us(&sensory_equilibrium, 10, 10).unwrap();
 let exemplar = PackedHv::<256>::zero();
 core.remember(0, exemplar).unwrap();
 let result = core.classify(&exemplar);
