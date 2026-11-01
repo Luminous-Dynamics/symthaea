@@ -1674,7 +1674,7 @@ mod tests {
             .map(|leaf| vec![0, leaf])
             .collect::<Vec<_>>();
         let eliminate = (1..=leaves).collect::<Vec<_>>();
-        let plan = plan_min_fill_elimination(&scopes, &eliminate, 2).unwrap();
+        let plan = plan_min_fill_elimination(&scopes, &eliminate, 4).unwrap();
 
         assert_eq!(plan.elimination_order, eliminate);
         assert_eq!(plan.induced_width, 1);
@@ -1695,7 +1695,10 @@ mod tests {
         assert_eq!(chain_plan.planner_work.leaf_fast_path_updates, 0);
 
         let ring = (0..64)
-            .map(|unit| vec![unit, (unit + 1) % 64])
+            .map(|unit| {
+                let next = (unit + 1) % 64;
+                vec![unit.min(next), unit.max(next)]
+            })
             .collect::<Vec<_>>();
         let ring_plan =
             plan_min_fill_elimination(&ring, &(0..64).collect::<Vec<_>>(), 8).unwrap();
