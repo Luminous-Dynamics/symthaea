@@ -12,7 +12,8 @@
     "scenarios",
     "metrics",
     "fault_model",
-    "benchmark_rules"
+    "benchmark_rules",
+    "workload_matrix"
   ],
   "properties": {
     "suite_id": {
@@ -228,6 +229,68 @@
         },
         "no_migration_until_safety_gates_pass": {
           "const": true
+        }
+      }
+    },
+    "workload_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clients",
+        "receipts",
+        "source_lineages",
+        "log_origins",
+        "distributions",
+        "fault_modes"
+      ],
+      "properties": {
+        "clients": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "source_lineages": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "log_origins": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "distributions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fault_modes": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }
