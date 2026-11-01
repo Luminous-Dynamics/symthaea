@@ -524,6 +524,10 @@ The new module is src/exposure_transfer.rs, exported from lib.rs.
 
 The CLI first revalidates the existing replicated causal study. It then checks the transfer-study model-pair identities, exact evaluation-evidence digest and training-receipt digest, matched relation matrix, item-set commitments and lineage/adjudication bindings. The report contains six relation effects, per-family effects, pair-level effects and six predeclared contrasts.
 
+The package-wide formatting gate is the same command used by the dedicated qualification workflow:
+
+    cargo fmt --manifest-path research/contamination-panel-001/Cargo.toml -- --check
+
 The evaluator-side study input is defined by:
 - schema/exposure-transfer-study.schema.json
 - schema/exposure-transfer-report.schema.json
