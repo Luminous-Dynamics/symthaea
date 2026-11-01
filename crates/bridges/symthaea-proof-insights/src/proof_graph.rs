@@ -548,11 +548,19 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
         bail!("router and specialist model-call counts do not reconcile");
     }
     if specialist == "deterministic_automation" {
-        if specialist_calls != 0 || reasoning_effort != "none" || max_specialist_calls != 0 {
-            bail!("deterministic automation must use no specialist model calls, no reasoning effort and zero specialist-call budget");
+        if router_calls != 0
+            || specialist_calls != 0
+            || reasoning_effort != "none"
+            || max_specialist_calls != 0
+        {
+            bail!("deterministic automation must be selected without router/specialist model calls or reasoning budget");
         }
-    } else if specialist_calls == 0 || reasoning_effort == "none" || max_specialist_calls == 0 {
-        bail!("model specialist requires positive call budget, calls and reasoning effort");
+    } else if specialist_calls == 0
+        || specialist_calls > max_specialist_calls
+        || reasoning_effort == "none"
+        || max_specialist_calls == 0
+    {
+        bail!("model specialist calls must be positive and stay within the registered call budget");
     }
     let router_cost = integer(actual, "/router_cost_microusd")?;
     let specialist_cost = integer(actual, "/specialist_cost_microusd")?;
