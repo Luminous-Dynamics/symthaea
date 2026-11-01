@@ -464,6 +464,90 @@ mod tests {
         serde_json::from_slice(raw).expect("reference fixture must deserialize")
     }
 
+    fn exhaustive_count(
+        trace: &Trace,
+        predecessors: &[u64],
+        remaining: u64,
+        state: ModelState,
+    ) -> usize {
+        if remaining == 0 {
+            return usize::from(final_state_matches(&state, trace));
+        }
+        let mut total = 0usize;
+        for index in 0..trace.operations.len() {
+            let bit = 1_u64 << index;
+            if remaining & bit == 0 || predecessors[index] & remaining != 0 {
+                continue;
+            }
+            let operation = &trace.operations[index];
+            let mut next = state.clone();
+            let mut errors = Vec::new();
+            let result = apply_operation(&mut next, trace, operation, &mut errors);
+            if errors.is_empty() && observed_result_matches(&operation.expected_result, &result) {
+                total += exhaustive_count(trace, predecessors, remaining & !bit, next);
+            }
+        }
+        total
+    }
+
+    fn three_overlapping_restore_reads() -> Trace {
+        let mut trace = fixture();
+        let witness = trace.witness_observations.last().unwrap().clone();
+        let template = trace
+            .operations
+            .iter()
+            .find(|operation| operation.kind == "restore_verify")
+            .unwrap()
+            .clone();
+
+        let mut operations = Vec::new();
+        for (index, (client, start, end)) in [
+            ("client-A", 10, 100),
+            ("client-B", 20, 90),
+            ("client-C", 30, 80),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut operation = template.clone();
+            operation.op_id = format!("restore-{index}");
+            operation.client_id = client.to_string();
+            operation.client_sequence = 0;
+            operation.runner_id = "runner-overlap".to_string();
+            operation.invoked_at_ns = start;
+            operation.completed_at_ns = end;
+            operation.happens_after.clear();
+            operation.request.restored_incarnation_id = Some(witness.incarnation_id.clone());
+            operation.request.restored_authority_revision = Some(witness.authority_revision.clone());
+            operation.request.restored_state_digest = Some(witness.state_digest.clone());
+            operation.request.witness_sequence_seen = Some(witness.sequence);
+            operation.expected_result = ExpectedResult {
+                outcome: "restore_verified".to_string(),
+                receipt_id: None,
+                receipt_acceptance_revision: None,
+                current_authority_revision: Some(witness.authority_revision.clone()),
+                observed_store_revision: Some(witness.authority_revision.clone()),
+                reason: None,
+            };
+            operations.push(operation);
+        }
+
+        trace.initial_state = InitialState {
+            authority_revision: trace.final_observation.authority_revision.clone(),
+            state_digest: trace.final_observation.state_digest.clone(),
+            policy_digest: trace.final_observation.policy_digest.clone(),
+            source_cursors: trace.final_observation.source_cursors.clone(),
+            log_cursors: trace.final_observation.log_cursors.clone(),
+        };
+        trace.final_observation.accepted_receipts.clear();
+        trace.operations = operations;
+        trace.reference_linearization_order.clear();
+        trace.faults.clear();
+        trace.negative_controls.clear();
+        trace.invariant_expectations.clear();
+        trace
+    }
+
     #[test]
     fn finds_a_legal_order_without_using_the_reference_tie_break() {
         let mut trace = fixture();
@@ -488,6 +572,33 @@ mod tests {
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert_eq!(report.status, "fail");
         assert!(report.search_budget_exhausted == false);
+    }
+
+    #[test]
+    fn memoized_search_matches_unoptimized_exhaustive_oracle_on_overlapping_reads() {
+        let mut trace = three_overlapping_restore_reads();
+        let (predecessors, _) = build_partial_order(&trace).unwrap();
+        let all = (1_u64 << trace.operations.len()) - 1;
+        let oracle_count = exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
+        assert_eq!(oracle_count, 6, "all six read-only orderings should be legal");
+
+        trace.operations.reverse();
+        let report = verify_observed_history(&trace, &HistorySearchConfig::default());
+        assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
+        assert_eq!(report.linearization.len(), 3);
+    }
+
+    #[test]
+    fn memoized_search_agrees_with_exhaustive_oracle_on_reference_trace() {
+        let mut trace = fixture();
+        trace.operations.reverse();
+        let (predecessors, _) = build_partial_order(&trace).unwrap();
+        let all = (1_u64 << trace.operations.len()) - 1;
+        let oracle_count = exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
+        assert_eq!(oracle_count, 1, "the shared-predecessor race has one legal winner order");
+
+        let report = verify_observed_history(&trace, &HistorySearchConfig::default());
+        assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
     }
 
     #[test]
