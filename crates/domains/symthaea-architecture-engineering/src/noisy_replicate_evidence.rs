@@ -716,8 +716,11 @@ mod tests {
         let (manifest, mut bytes) = manifest_and_bytes(&replicate("0".repeat(64)));
         let mut sample = replicate("0".repeat(64));
         sample.evidence_sha256 = manifest.artifact.sha256.clone();
-        let last = bytes.len() - 2;
-        bytes[last] = if bytes[last] == b'9' { b'8' } else { b'9' };
+        let position = bytes
+            .windows(3)
+            .position(|window| window == b"0.8")
+            .expect("fixture contains the first objective value");
+        bytes[position + 2] = b'9';
         assert!(verify_noisy_replicate_artifact_bytes(
             &manifest, &plan, context(), &sample, &bytes, "verifier", BUILD,
         ).is_err());
