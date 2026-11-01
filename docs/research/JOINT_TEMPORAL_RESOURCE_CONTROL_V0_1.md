@@ -170,6 +170,28 @@ All baselines receive the same information and resource ceilings. Report tuning
 budget, training data, compute, seeds, and whether thresholds were selected on
 development or confirmatory data.
 
+## 8.1 Stability/plasticity crossover sweep
+
+Vary retained-memory capacity and replay budget independently. Compare
+no-memory/context-only, random replay, reservoir replay, balanced replay,
+temporal-value retention, active refresh, and joint sensing/memory/compute
+control. Where compatible, include a weight-consolidation neural reference as
+a separate architecture family.
+
+For each sequence report:
+- forward transfer to later tasks;
+- backward transfer and old-task retention after new learning;
+- forgetting after distraction and memory/replay pressure;
+- adaptation samples and compute/energy per new task;
+- retained byte-time and replay I/O/compute;
+- time to recover after abrupt regime changes;
+- results when memory is abundant but update compute is tight, and when memory
+  is constrained but compute is abundant.
+
+This crossover distinguishes a storage bottleneck from a plasticity bottleneck.
+A policy that only wins when memory is scarce has not established a general
+continual-learning advantage.
+
 ## 9. Metrics
 
 ### Outcome (non-compensatory)
@@ -200,24 +222,46 @@ measured, report that field as unavailable; do not silently substitute an
 estimate. Include host, memory, transfer fabric, preprocessing, idle listening
 and verification when they are required by the deployed path.
 
-## 10. Industry comparison
+## 10. Industry comparison and stability/plasticity baselines
 
 - **Continual Learning Bench 1.0:** external stateful-agent validation. Its 2026
-  release uses expert-validated sequential tasks across domains and measures
-  learning from prior task experience. Its paper reports that naïve in-context
-  learning can outperform dedicated memory systems, which makes a memory-only
-  advantage an insufficient claim. Use official tasks and permitted harnesses
-  when accessible; never claim a CL-Bench score from a synthetic substitute.
-  References: https://sky.cs.berkeley.edu/project/continual-learning-bench/
-  and https://arxiv.org/abs/2606.05661
-- **NeuroBench:** map compatible tasks to the algorithm track for correctness
-  and complexity, then to the system track for end-to-end timing/energy. Keep
-  algorithm and system claims separate. References:
-  https://neurobench.ai/ and https://www.nature.com/articles/s41467-025-56739-4
+  release uses expert-validated sequential task sequences across domains and
+  asks whether systems improve from earlier task experience. Its paper reports
+  that naive in-context learning can outperform dedicated memory systems.
+  The live benchmark site currently displays ICL baselines ahead of a Mem0
+  configuration on aggregate reward, a warning that a dedicated memory manager
+  is not automatically better. These are LLM-agent results, not a direct
+  Symthaea score; use official tasks/harnesses or a declared adapter, and never
+  claim a CL-Bench score from synthetic substitutes.
+  References: https://sky.cs.berkeley.edu/project/continual-learning-bench/,
+  https://arxiv.org/abs/2606.05661 and https://continual-learning-bench.com/
+- **MemoryBench (ICML/PMLR 2026):** a complementary user-feedback simulation
+  benchmark covering multiple domains, languages and task types. Use its
+  sequential feedback / learning-from-practice framing to design compatible
+  adapter tasks; do not equate its LLM-system scores with HDC/LTC scores.
+  Reference: https://proceedings.mlr.press/v306/ai26e.html
+- **Stability versus plasticity / replay:** the ICLR 2026 paper *Forget
+  Forgetting: Continual Learning in a World of Abundant Memory* argues that
+  with sufficient memory, the bottleneck can shift from storage/stability to
+  plasticity, and reports simple replay baselines beating stronger methods in
+  some tested regimes. Add random replay, reservoir replay, balanced replay
+  and no-memory/context-only baselines where semantics permit. Sweep memory
+  abundance against adaptation compute and measure forward transfer, backward
+  transfer, forgetting, adaptation speed and consolidation cost. Its Weight
+  Space Consolidation method is a reference for compatible neural-weight arms,
+  not a presumed plug-in for HDC.
+  Reference: https://proceedings.iclr.cc/paper_files/paper/2026/hash/17fc58b1ba92abbb72c5f457e140d851-Abstract-Conference.html
+- **NeuroBench:** map compatible tasks to its algorithm track for correctness
+  and complexity, then to its system track for end-to-end timing/energy. Its
+  v1.0 algorithm track excludes preprocessing/postprocessing costs, so system
+  efficiency claims must use the system track or separately measure the full
+  deployed path. References: https://neurobench.ai/ and
+  https://www.nature.com/articles/s41467-025-56739-4
 - **MLPerf Tiny v1.4:** use only for compatible edge inference workloads with
-  the official workload, quality and energy methodology. It is not a proxy for
-  general temporal learning. Reference:
-  https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
+  official workload, quality and energy methodology. The 2026 result round
+  emphasizes matched tasks, quality targets and energy reporting. It is not a
+  proxy for general temporal learning.
+  Reference: https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
 
 These are complementary comparison standards, not interchangeable leaderboard
 scores. Do not compare unlike task laws, information exposure or measurement
