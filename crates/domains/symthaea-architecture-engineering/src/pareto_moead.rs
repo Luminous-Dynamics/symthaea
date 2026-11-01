@@ -328,7 +328,8 @@ pub fn run_moead_zdt1_with_history(
     let population_size = config.weight_mode.population_size()?;
     let budget = population_size.checked_mul(config.generations.saturating_add(1))
         .ok_or_else(|| MoeadError::new("config", "evaluation budget overflows usize"))?;
-    let mut recorder = make_anytime_recorder(history, "zdt1", config.seed, 2, budget)?;
+    let config_sha256 = config.config_sha256()?;
+    let mut recorder = make_anytime_recorder(history, "zdt1", config.seed, &config_sha256, 2, budget)?;
     run_moead("zdt1", config, decision_dimensions, 2, |decision| {
         zdt1_objectives(decision).map(|values| values.to_vec())
             .map_err(|error| MoeadError::new("zdt1", error.to_string()))
@@ -370,7 +371,8 @@ pub fn run_moead_dtlz2_with_history(
     let population_size = config.weight_mode.population_size()?;
     let budget = population_size.checked_mul(config.generations.saturating_add(1))
         .ok_or_else(|| MoeadError::new("config", "evaluation budget overflows usize"))?;
-    let mut recorder = make_anytime_recorder(history, "dtlz2-3obj", config.seed, 3, budget)?;
+    let config_sha256 = config.config_sha256()?;
+    let mut recorder = make_anytime_recorder(history, "dtlz2-3obj", config.seed, &config_sha256, 3, budget)?;
     run_moead("dtlz2-3obj", config, decision_dimensions, 3, |decision| {
         dtlz2_three_objectives(decision).map(|values| values.to_vec())
             .map_err(|error| MoeadError::new("dtlz2", error.to_string()))
@@ -614,12 +616,15 @@ fn make_anytime_recorder<'a>(
     history: &'a mut AnytimeHistory,
     problem_id: &str,
     seed: u64,
+    expected_config_sha256: &str,
     objective_dimensions: usize,
     expected_attempts: usize,
 ) -> Result<AnytimeRecorder<'a>, MoeadError> {
     let header = history.header();
-    if header.algorithm_id != ALGORITHM_ID || header.problem_id != problem_id || header.seed != seed {
-        return Err(MoeadError::new("anytime.header", "history algorithm, problem, or seed differs from this MOEA/D run"));
+    if header.algorithm_id != ALGORITHM_ID || header.problem_id != problem_id || header.seed != seed
+        || header.search_config_sha256 != expected_config_sha256
+    {
+        return Err(MoeadError::new("anytime.header", "history algorithm, problem, seed, or exact search configuration differs from this MOEA/D run"));
     }
     if header.objective_specs.len() != objective_dimensions
         || header.objective_specs.iter().any(|spec| spec.direction != ObjectiveDirection::Minimize)
@@ -895,7 +900,7 @@ mod tests {
         }
     }
 
-    fn anytime_history(problem_id: &str, seed: u64, dimensions: usize, budget: usize) -> AnytimeHistory {
+    fn anytime_history(problem_id: &str, seed: u64, dimensions: usize, budget: usize, config_sha256: &str) -> AnytimeHistory {
         let objective_specs = (0..dimensions).map(|index| ParetoObjectiveSpec {
             objective_id: format!("f{}", index + 1),
             direction: ObjectiveDirection::Minimize,
@@ -920,6 +925,7 @@ mod tests {
             "0123456789abcdef0123456789abcdef01234567",
             ALGORITHM_ID,
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            config_sha256,
             "test-evaluator",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "test-independent-verifier",
@@ -947,7 +953,7 @@ mod tests {
         let expected = run_moead_zdt1(&config, 10).unwrap();
         let population_size = config.weight_mode.population_size().unwrap();
         let budget = population_size * (config.generations + 1);
-        let mut history = anytime_history("zdt1", config.seed, 2, budget);
+        let mut history = anytime_history("zdt1", config.seed, 2, budget, &config.config_sha256().unwrap());
         let captured = run_moead_zdt1_with_history(&config, 10, &mut history).unwrap();
         assert_eq!(captured, expected);
         assert_eq!(history.events().len(), expected.objective_evaluations);
