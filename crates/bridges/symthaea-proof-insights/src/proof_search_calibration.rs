@@ -137,12 +137,23 @@ fn recompute_group(group: &ActionGroup) -> Result<(u64, u64)> {
             bail!("calibration bin {} prediction sum conflicts with min/max bounds", bin.bin_id);
         }
         let max_square_sum = count * 1_000_000_000_000_u128;
-        if bin.sum_probability_squared_ppm2 as u128 > max_square_sum {
-            bail!("calibration bin {} squared-probability sum exceeds its maximum", bin.bin_id);
+        let min_square_sum = bin.min_predicted_ppm as u128
+            * bin.min_predicted_ppm as u128
+            * count;
+        let max_square_bound = bin.max_predicted_ppm as u128
+            * bin.max_predicted_ppm as u128
+            * count;
+        if (bin.sum_probability_squared_ppm2 as u128) < min_square_sum
+            || (bin.sum_probability_squared_ppm2 as u128) > max_square_sum
+            || (bin.sum_probability_squared_ppm2 as u128) > max_square_bound
+        {
+            bail!("calibration bin {} squared-probability sum conflicts with its min/max bounds", bin.bin_id);
         }
         let success_count = bin.success_count as u128;
         let probability_on_success = bin.sum_probability_on_success_ppm as u128;
-        if probability_on_success > success_count * 1_000_000_u128
+        if probability_on_success < success_count * bin.min_predicted_ppm as u128
+            || probability_on_success > success_count * bin.max_predicted_ppm as u128
+            || probability_on_success > success_count * 1_000_000_u128
             || probability_on_success > sum_pred
         {
             bail!("calibration bin {} success-probability sum is impossible", bin.bin_id);
