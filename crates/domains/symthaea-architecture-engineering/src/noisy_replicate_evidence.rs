@@ -810,6 +810,10 @@ mod tests {
             &manifest, &plan, context(), &sample, &bytes, &receipt,
         ).is_err());
 
+        let mut empty_artifact_id = manifest.clone();
+        empty_artifact_id.artifact.artifact_id.clear();
+        assert!(empty_artifact_id.validate().is_err());
+
         let mut wrong_media = manifest.clone();
         wrong_media.artifact.media_type = "application/octet-stream".to_owned();
         assert!(wrong_media.validate().is_err());
