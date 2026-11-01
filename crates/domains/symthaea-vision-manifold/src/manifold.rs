@@ -4772,10 +4772,8 @@ impl DelayedHorizonEvaluator {
             let max_lateness =
                 self.horizons[forecast.horizon_index] as f64 * max_lateness_factor_used as f64;
             if lateness > max_lateness {
-                self.accumulators[forecast.horizon_index].expired_forecasts = self.accumulators
-                    [forecast.horizon_index]
-                    .expired_forecasts
-                    .saturating_add(1);
+                let accumulator = &mut self.accumulators[forecast.horizon_index];
+                accumulator.expired_forecasts = accumulator.expired_forecasts.saturating_add(1);
                 self.push_score_receipt(HorizonForecastReceiptState {
                     forecast_id: forecast.forecast_id,
                     horizon_index: forecast.horizon_index,
@@ -4977,6 +4975,10 @@ impl DelayedHorizonEvaluator {
         for forecast in &mut self.pending {
             forecast.predicted = forecast.predicted.dilate(target_dim);
             forecast.persistence = forecast.persistence.dilate(target_dim);
+            // Receipts fingerprint the exact latent vectors used by the scorer,
+            // including this deterministic representation migration.
+            forecast.prediction_blake3 = visual_hv_blake3(&forecast.predicted);
+            forecast.persistence_blake3 = visual_hv_blake3(&forecast.persistence);
         }
         if self.hdc_dim.is_some() {
             self.hdc_dim = Some(target_dim);
