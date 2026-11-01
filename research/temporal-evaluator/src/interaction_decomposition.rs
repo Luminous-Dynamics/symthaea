@@ -168,12 +168,90 @@ pub fn decompose_higher_order_interactions(
         .collect::<Result<Vec<_>, _>>()?;
 
     let baseline = runs_by_mask[0].outcome;
-    let mut terms = Vec::with_capacity(expected.saturating_sub(1));
+    let mut feasible = vec![false; expected];
+    let mut incompatible_counts = vec![0_usize; expected];
+    let mut over_budget_counts = vec![0_usize; expected];
 
+    for mask in 0..expected {
+        let compatible_mask = compatible(
+            u64::try_from(mask).map_err(|_| JointBudgetError::ArithmeticOverflow)?,
+            &groups,
+        );
+        let within_budget = runs_by_mask[mask]
+            .measured_resources
+            .fits_within(context.resource_budget);
+        if !compatible_mask {
+            incompatible_counts[mask] = 1;
+        } else if !within_budget {
+            over_budget_counts[mask] = 1;
+        } else {
+            feasible[mask] = true;
+        }
+    }
+
+    // Subset zeta transforms count incompatible and over-budget submasks.
+    // The classification is mutually exclusive: incompatibility takes
+    // precedence over resource feasibility for the same subset.
+    let mut all_subsets_feasible = feasible.clone();
+    for bit in 0..ids.len() {
+        let bit_mask = 1_usize << bit;
+        for mask in 0..expected {
+            if mask & bit_mask == 0 {
+                continue;
+            }
+            let without_bit = mask ^ bit_mask;
+            incompatible_counts[mask] = incompatible_counts[mask]
+                .checked_add(incompatible_counts[without_bit])
+                .ok_or(JointBudgetError::ArithmeticOverflow)?;
+            over_budget_counts[mask] = over_budget_counts[mask]
+                .checked_add(over_budget_counts[without_bit])
+                .ok_or(JointBudgetError::ArithmeticOverflow)?;
+            all_subsets_feasible[mask] &=
+                all_subsets_feasible[without_bit];
+        }
+    }
+
+    // Subset Möbius inversion. Starting from v(S)=E(empty)-E(S), the in-place
+    // transform yields the exact pure interaction dividend for every mask in
+    // O(n * 2^n), rather than independently enumerating all 2^|T| submasks for
+    // each T (O(3^n)).
+    let mut wrong_belief_dividends = runs_by_mask.iter()
+        .map(|run| i128::from(baseline.wrong_belief_us)
+            - i128::from(run.outcome.wrong_belief_us))
+        .collect::<Vec<_>>();
+    let mut abstention_dividends = runs_by_mask.iter()
+        .map(|run| i128::from(baseline.abstention_us)
+            - i128::from(run.outcome.abstention_us))
+        .collect::<Vec<_>>();
+    let mut missing_output_dividends = runs_by_mask.iter()
+        .map(|run| i128::from(baseline.missing_output_us)
+            - i128::from(run.outcome.missing_output_us))
+        .collect::<Vec<_>>();
+
+    for bit in 0..ids.len() {
+        let bit_mask = 1_usize << bit;
+        for mask in 0..expected {
+            if mask & bit_mask == 0 {
+                continue;
+            }
+            let without_bit = mask ^ bit_mask;
+            wrong_belief_dividends[mask] = wrong_belief_dividends[mask]
+                .checked_sub(wrong_belief_dividends[without_bit])
+                .ok_or(JointBudgetError::ArithmeticOverflow)?;
+            abstention_dividends[mask] = abstention_dividends[mask]
+                .checked_sub(abstention_dividends[without_bit])
+                .ok_or(JointBudgetError::ArithmeticOverflow)?;
+            missing_output_dividends[mask] = missing_output_dividends[mask]
+                .checked_sub(missing_output_dividends[without_bit])
+                .ok_or(JointBudgetError::ArithmeticOverflow)?;
+        }
+    }
+
+    let mut terms = Vec::with_capacity(expected.saturating_sub(1));
     for mask in 1..expected {
-        let mask_u64 = u64::try_from(mask).map_err(|_| JointBudgetError::ArithmeticOverflow)?;
-        let action_ids = ids
-            .iter()
+        let mask_u64 = u64::try_from(mask)
+            .map_err(|_| JointBudgetError::ArithmeticOverflow)?;
+        let action_ids = ids.iter()
             .enumerate()
             .filter_map(|(index, action_id)| {
                 (mask_u64 & (1_u64 << index) != 0).then_some(*action_id)
@@ -184,63 +262,21 @@ pub fn decompose_higher_order_interactions(
         let required = 1_usize
             .checked_shl(order)
             .ok_or(JointBudgetError::ArithmeticOverflow)?;
+        let excluded_incompatible = incompatible_counts[mask];
+        let excluded_over_budget = over_budget_counts[mask];
+        let excluded_total = excluded_incompatible
+            .checked_add(excluded_over_budget)
+            .ok_or(JointBudgetError::ArithmeticOverflow)?;
+        let eligible = required
+            .checked_sub(excluded_total)
+            .ok_or(JointBudgetError::ArithmeticOverflow)?;
 
-        let mut eligible = 0_usize;
-        let mut excluded_incompatible = 0_usize;
-        let mut excluded_over_budget = 0_usize;
-        let mut dividend = ExposureDividend {
-            wrong_belief_us: 0,
-            abstention_us: 0,
-            missing_output_us: 0,
-        };
-
-        let mut subset = mask;
-        loop {
-            let subset_u64 =
-                u64::try_from(subset).map_err(|_| JointBudgetError::ArithmeticOverflow)?;
-            let is_compatible = compatible(subset_u64, &groups);
-            let is_within_budget = runs_by_mask[subset]
-                .measured_resources
-                .fits_within(context.resource_budget);
-
-            if !is_compatible {
-                excluded_incompatible = excluded_incompatible
-                    .checked_add(1)
-                    .ok_or(JointBudgetError::ArithmeticOverflow)?;
-            } else if !is_within_budget {
-                excluded_over_budget = excluded_over_budget
-                    .checked_add(1)
-                    .ok_or(JointBudgetError::ArithmeticOverflow)?;
-            } else {
-                eligible = eligible
-                    .checked_add(1)
-                    .ok_or(JointBudgetError::ArithmeticOverflow)?;
-
-                let outcome = runs_by_mask[subset].outcome;
-                let sign_is_positive = ((order - subset.count_ones()) % 2) == 0;
-                let sign = if sign_is_positive { 1_i128 } else { -1_i128 };
-                dividend.wrong_belief_us = dividend.wrong_belief_us
-                    .checked_add(sign * (i128::from(baseline.wrong_belief_us)
-                        - i128::from(outcome.wrong_belief_us)))
-                    .ok_or(JointBudgetError::ArithmeticOverflow)?;
-                dividend.abstention_us = dividend.abstention_us
-                    .checked_add(sign * (i128::from(baseline.abstention_us)
-                        - i128::from(outcome.abstention_us)))
-                    .ok_or(JointBudgetError::ArithmeticOverflow)?;
-                dividend.missing_output_us = dividend.missing_output_us
-                    .checked_add(sign * (i128::from(baseline.missing_output_us)
-                        - i128::from(outcome.missing_output_us)))
-                    .ok_or(JointBudgetError::ArithmeticOverflow)?;
-            }
-
-            if subset == 0 {
-                break;
-            }
-            subset = (subset - 1) & mask;
-        }
-
-        let dividend = if eligible == required {
-            Some(dividend)
+        let dividend = if all_subsets_feasible[mask] {
+            Some(ExposureDividend {
+                wrong_belief_us: wrong_belief_dividends[mask],
+                abstention_us: abstention_dividends[mask],
+                missing_output_us: missing_output_dividends[mask],
+            })
         } else {
             None
         };
