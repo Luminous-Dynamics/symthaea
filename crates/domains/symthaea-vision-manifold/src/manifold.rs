@@ -7397,6 +7397,25 @@ mod tests {
     }
 
     #[test]
+    fn test_forecast_id_exhaustion_rejects_observation_without_partial_mutation() {
+        let config = VisionConfig {
+            hdc_dim: 256,
+            ..VisionConfig::default()
+        };
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        manifold
+            .observe_frame_checked(&vec![10; 64], 8, 8, 1, 0.01)
+            .unwrap();
+        let mut evaluator =
+            DelayedHorizonEvaluator::new(vec![(0.1, "near".into())]).unwrap();
+        evaluator.next_forecast_id = u64::MAX;
+        let before = evaluator.save_state();
+
+        assert!(evaluator.observe(&manifold, 0.01).is_err());
+        assert_eq!(evaluator.save_state(), before);
+    }
+
+    #[test]
     fn test_visual_forecast_fingerprints_are_deterministic_and_dimension_bound() {
         let first = ContinuousHV::from_vec(vec![0.1, 0.2, 0.3]);
         let same = ContinuousHV::from_vec(vec![0.1, 0.2, 0.3]);
