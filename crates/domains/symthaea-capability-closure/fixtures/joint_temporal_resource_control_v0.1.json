@@ -141,7 +141,8 @@
       "missing_or_infeasible_counterfactuals_imputed_as_zero": false,
       "reports_incompatible_and_over_budget_exclusions": true,
       "maximum_action_factors": 16,
-      "worst_case_subsubset_enumeration_complexity": "O(3^n)",
+      "algorithm": "subset_mobius_and_zeta_transforms",
+    "complexity": "O(n*2^n)",
       "shapley_or_population_causal_claim": false,
       "test_functions_authored": 8
     }
