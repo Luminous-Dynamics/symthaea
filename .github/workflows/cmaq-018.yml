@@ -315,6 +315,28 @@ jobs:
               - hostile_information["options"][0]["acquisition_cost"]
           ), "hostile EVSI result must violate net-value accounting"
 
+          information_metrics_schema = json.loads(
+              Path("information-probability-metrics.v0.1.schema.json").read_text()
+          )
+          Draft202012Validator.check_schema(information_metrics_schema)
+          information_metrics_fixture = json.loads(
+              Path("fixtures/information-probability-metrics.example.json").read_text()
+          )
+          validate(instance=information_metrics_fixture, schema=information_metrics_schema)
+          assert information_metrics_fixture["sample_count"] == 2
+          assert abs(information_metrics_fixture["mean_multiclass_brier_score"] - 0.1025) < 1e-12
+          assert abs(information_metrics_fixture["mean_log_loss"] - 0.25541281188299536) < 1e-12
+          assert information_metrics_fixture["zero_probability_events"] == 0
+          assert information_metrics_fixture["top_outcome_accuracy"] == 1.0
+          hostile_probability_metrics = json.loads(json.dumps(information_metrics_fixture))
+          hostile_probability_metrics["top_outcome_accuracy"] = 1.01
+          try:
+              validate(instance=hostile_probability_metrics, schema=information_metrics_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("information probability schema admitted accuracy above 1")
+
           uncertainty_sample = {
               "schema_version": "cmaq-018-uncertainty-contract-v0.1",
               "claim_ceiling": "design_contract_only_no_model_calibration_result",
