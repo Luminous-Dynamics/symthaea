@@ -573,7 +573,7 @@ pub fn audit_search_time_trace(
         network_disabled_policy_respected: network_disabled_respected,
         allowlist_policy_respected: allowlist_respected,
         all_event_channels_declared_instrumented: channels_instrumented,
-        all_known_channel_types_accounted_for,
+        all_known_channel_types_accounted_for: all_channel_types_accounted_for,
         no_unobserved_channels_declared: no_unobserved_channels,
         complete_mediation_verified: false,
         independently_verified: false,
@@ -735,7 +735,7 @@ mod tests {
         }
     }
 
-    fn trace() -> SearchTimeExposureTraceV1 {
+    fn trace_fixture() -> SearchTimeExposureTraceV1 {
         let mut trace = SearchTimeExposureTraceV1 {
             schema: SEARCH_TRACE_SCHEMA.to_owned(),
             run_id: "run-001".to_owned(),
@@ -782,7 +782,7 @@ mod tests {
         trace
     }
 
-    fn findings(trace: &SearchTimeExposureTraceV1) -> SearchTimeExposureFindingsV1 {
+    fn findings_for_trace(trace: &SearchTimeExposureTraceV1) -> SearchTimeExposureFindingsV1 {
         let mut findings = SearchTimeExposureFindingsV1 {
             schema: SEARCH_FINDINGS_SCHEMA.to_owned(),
             run_id: trace.run_id.clone(),
@@ -821,9 +821,9 @@ mod tests {
         ))
         .unwrap();
 
-        let trace = trace();
+        let trace = trace_fixture();
         let trace_audit = audit_search_time_trace(&trace).unwrap();
-        let findings = findings(&trace);
+        let findings = findings_for_trace(&trace);
         let findings_audit = audit_search_time_findings(&trace, &findings).unwrap();
         for (schema, value, version) in [
             (
@@ -902,7 +902,7 @@ mod tests {
 
     #[test]
     fn exact_hash_chain_replays_for_valid_trace() {
-        let trace = trace();
+        let trace = trace_fixture();
         let audit = audit_search_time_trace(&trace).unwrap();
         assert!(audit.valid);
         assert!(audit.hash_chain_replayed);
@@ -915,14 +915,14 @@ mod tests {
 
     #[test]
     fn tampered_event_or_root_fails_chain_replay() {
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace.events[0].request_sha256 = digest("tampered-request");
         trace.trace_root_sha256 = trace_digest(&trace).unwrap();
         let audit = audit_search_time_trace(&trace).unwrap();
         assert!(!audit.valid);
         assert!(!audit.hash_chain_replayed);
 
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace.trace_root_sha256 = digest("wrong-root");
         assert!(!audit_search_time_trace(&trace).unwrap().trace_root_matches);
     }
@@ -935,7 +935,7 @@ mod tests {
             SearchInformationChannelV1::HttpApi,
             SearchInformationChannelV1::RemoteMcp,
         ] {
-            let mut trace = trace();
+            let mut trace = trace_fixture();
             trace.events[0] = event(
                 1,
                 channel,
@@ -951,7 +951,7 @@ mod tests {
 
     #[test]
     fn allowlisted_mode_accepts_only_declared_destination_digests() {
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace.access_mode = SearchAccessModeV1::Allowlisted;
         trace.allowlisted_destination_sha256s = vec![digest("allowed-search-destination")];
         trace.events[0] = event(
@@ -976,7 +976,7 @@ mod tests {
 
     #[test]
     fn blocked_event_must_not_claim_response_bytes() {
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace.events[1].response_sha256 = Some(digest("impossible-response"));
         trace.events[1].response_bytes = 10;
         assert!(seal_search_time_trace(&mut trace).is_err());
@@ -984,7 +984,7 @@ mod tests {
 
     #[test]
     fn unobserved_or_undeclared_channels_prevent_validity() {
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace
             .instrumented_channels
             .retain(|channel| *channel != SearchInformationChannelV1::AgentMemory);
@@ -997,7 +997,7 @@ mod tests {
         assert!(!audit.no_unobserved_channels_declared);
         assert!(audit.all_known_channel_types_accounted_for);
 
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace
             .instrumented_channels
             .retain(|channel| *channel != SearchInformationChannelV1::LocalCache);
@@ -1011,25 +1011,25 @@ mod tests {
 
     #[test]
     fn non_monotonic_and_impossible_event_times_fail_closed() {
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace.events[1].occurred_at_utc = "2026-02-30T18:00:01Z".to_owned();
         seal_search_time_events(&mut trace.events).unwrap_err();
 
-        let mut trace = trace();
+        let mut trace = trace_fixture();
         trace.events[1].occurred_at_utc = "2026-10-31T17:59:59Z".to_owned();
         assert!(seal_search_time_events(&mut trace.events).is_err());
     }
 
     #[test]
     fn findings_bind_to_trace_and_only_allowed_events() {
-        let trace = trace();
-        let findings = findings(&trace);
+        let trace = trace_fixture();
+        let findings = findings_for_trace(&trace);
         let audit = audit_search_time_findings(&trace, &findings).unwrap();
         assert!(audit.valid);
         assert_eq!(audit.metadata_only_count, 1);
         assert_eq!(audit.answer_bearing_count, 0);
 
-        let mut blocked = findings(&trace);
+        let mut blocked = findings_for_trace(&trace);
         blocked.findings[0].event_sequence = 2;
         blocked.findings_sha256 = findings_digest(&blocked).unwrap();
         assert!(audit_search_time_findings(&trace, &blocked).is_err());
@@ -1037,12 +1037,12 @@ mod tests {
 
     #[test]
     fn findings_tampering_and_duplicate_event_sequences_fail() {
-        let trace = trace();
-        let mut findings = findings(&trace);
+        let trace = trace_fixture();
+        let mut findings = findings_for_trace(&trace);
         findings.findings[0].confidence_permille = 900;
         assert!(audit_search_time_findings(&trace, &findings).is_err());
 
-        let mut findings = findings(&trace);
+        let mut findings = findings_for_trace(&trace);
         findings.findings.push(findings.findings[0].clone());
         findings.findings_sha256 = findings_digest(&findings).unwrap();
         assert!(audit_search_time_findings(&trace, &findings).is_err());
