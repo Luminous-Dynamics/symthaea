@@ -776,21 +776,21 @@ mod tests {
     fn invalid_unknown_and_equivocating_responses_cannot_poison_valid_quorum() {
         let evaluator_key = SigningKey::from_bytes(&[31; 32]);
         let witness_keys = witness_keys(32);
-        let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
+        let current_checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
         let challenge = [99; 32];
-        let mut invalid_signature = attest(&checkpoint, &witness_keys[2], 62, challenge);
+        let mut invalid_signature = attest(&current_checkpoint, &witness_keys[2], 62, challenge);
         invalid_signature.signature[0] ^= 0x80;
         let unknown_key = SigningKey::from_bytes(&[36; 32]);
         let responses = vec![
-            attest(&checkpoint, &witness_keys[0], 60, challenge),
-            attest(&checkpoint, &witness_keys[0], 60, challenge),
-            attest(&checkpoint, &witness_keys[1], 61, challenge),
-            attest(&checkpoint, &witness_keys[2], 62, challenge),
+            attest(&current_checkpoint, &witness_keys[0], 60, challenge),
+            attest(&current_checkpoint, &witness_keys[0], 60, challenge),
+            attest(&current_checkpoint, &witness_keys[1], 61, challenge),
+            attest(&current_checkpoint, &witness_keys[2], 62, challenge),
             invalid_signature,
-            attest(&checkpoint, &unknown_key, 63, challenge),
+            attest(&current_checkpoint, &unknown_key, 63, challenge),
         ];
         let result = verify_checkpoint_quorum(
-            &checkpoint,
+            &current_checkpoint,
             &evaluator_key.verifying_key(),
             challenge,
             &responses,
@@ -802,14 +802,14 @@ mod tests {
 
         let conflicting = checkpoint(&evaluator_key, 2, [10; 32]);
         let equivocal = vec![
-            attest(&checkpoint, &witness_keys[0], 70, challenge),
-            attest(&checkpoint, &witness_keys[1], 71, challenge),
-            attest(&checkpoint, &witness_keys[2], 72, challenge),
-            attest(&checkpoint, &witness_keys[3], 73, challenge),
+            attest(&current_checkpoint, &witness_keys[0], 70, challenge),
+            attest(&current_checkpoint, &witness_keys[1], 71, challenge),
+            attest(&current_checkpoint, &witness_keys[2], 72, challenge),
+            attest(&current_checkpoint, &witness_keys[3], 73, challenge),
             attest(&conflicting, &witness_keys[3], 74, challenge),
         ];
         let result = verify_checkpoint_quorum(
-            &checkpoint,
+            &current_checkpoint,
             &evaluator_key.verifying_key(),
             challenge,
             &equivocal,
