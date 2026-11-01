@@ -433,7 +433,10 @@ fn validate_and_analyze(
                 Value::String(value) => Some(value.as_str()),
                 _ => bail!("{digest_pointer} must be a SHA-256 digest or null"),
             };
-            if required && (path.is_none() || expected.is_none()) {
+            if evidence_class == "measured_outcome"
+                && required
+                && (path.is_none() || expected.is_none())
+            {
                 bail!("outcome {run_id} is missing required {label} path/digest");
             }
             let authenticated =
