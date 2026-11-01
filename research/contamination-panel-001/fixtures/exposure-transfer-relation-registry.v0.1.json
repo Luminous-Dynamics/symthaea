@@ -131,7 +131,6 @@
       "likelihood/perplexity and gradient-based methods where model access permits",
       "exact/normalized/n-gram, MinHash/SimHash, structural/AST, embedding and cross-encoder baselines",
       "Syntax-aware contamination detection for code LLMs (EMNLP 2026 Findings), stratified by language and code transformation",
-      "LaRA (layer-wise RSM/DC/RSI representation geometry; RL post-training white-box track)",
       "LaRA (paper-faithful SLaRA RSM/DC/RSI; white-box RL post-training track)",
       "Self-Critique (ICLR 2026; black-box entropy-path penalized cosine under RL post-training probe)",
       "Entropy-Temp and Entropy-Noise (Self-Critique paper ablations; separate probe variants)"
