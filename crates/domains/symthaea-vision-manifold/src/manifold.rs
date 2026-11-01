@@ -7315,8 +7315,12 @@ mod tests {
 
         let saved = evaluator.save_state();
         assert!(DelayedHorizonEvaluator::validate_state(&saved).is_ok());
+        let encoded = serde_json::to_vec(&saved).unwrap();
+        let decoded: DelayedHorizonEvaluatorState = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, saved);
+
         let mut restored = DelayedHorizonEvaluator::default();
-        restored.load_state(&saved).unwrap();
+        restored.load_state(&decoded).unwrap();
         assert_eq!(restored.save_state(), saved);
 
         let mut over_capacity = saved.clone();
