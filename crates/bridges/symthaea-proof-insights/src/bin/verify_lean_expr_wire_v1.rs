@@ -855,12 +855,7 @@ fn validate_evidence(evidence: &Evidence) -> Result<DigestsComputed> {
     Ok(actual)
 }
 
-fn load(path: &PathBuf) -> Result<(Value, Evidence)> {
-    let bytes = fs::read(path).with_context(|| format!("read {}", path.display()))?;
-    if bytes.len() > MAX_EVIDENCE_BYTES {
-        bail!("evidence exceeds the 64 MiB input cap");
-    }
-    let value: Value = serde_json::from_slice(&bytes).context("parse evidence JSON")?;
+fn validate_explicit_nullable_fields(value: &Value) -> Result<()> {
     let declarations = value
         .pointer("/local_context/declarations")
         .and_then(Value::as_array)
@@ -875,6 +870,16 @@ fn load(path: &PathBuf) -> Result<(Value, Evidence)> {
             }
         }
     }
+    Ok(())
+}
+
+fn load(path: &PathBuf) -> Result<(Value, Evidence)> {
+    let bytes = fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    if bytes.len() > MAX_EVIDENCE_BYTES {
+        bail!("evidence exceeds the 64 MiB input cap");
+    }
+    let value: Value = serde_json::from_slice(&bytes).context("parse evidence JSON")?;
+    validate_explicit_nullable_fields(&value)?;
     let evidence: Evidence = serde_json::from_value(value.clone())
         .context("decode typed evidence")?;
     Ok((value, evidence))
@@ -942,6 +947,16 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let mut bad = fixture.clone();
     bad["unreviewed_extra_field"] = Value::Bool(true);
     reject_value("unknown top-level field", bad)?;
+
+    let mut missing_nullable = fixture.clone();
+    missing_nullable["local_context"]["declarations"][0]
+        .as_object_mut()
+        .context("synthetic declaration must be an object")?
+        .remove("transparent_value");
+    if validate_explicit_nullable_fields(&missing_nullable).is_ok() {
+        bail!("missing explicit nullable field was accepted");
+    }
+    println!("PITB_LEAN_EXPR_WIRE_NEGATIVE_PASS: omitted nullable field");
     Ok(())
 }
 
