@@ -28,6 +28,9 @@ External methods must be assigned to the guarantee lane they actually prove. The
 | Bioconductor onlineFDR 2.18.0 and Python online-fdr parity suite | Reference implementations for online procedures and asynchronous lifecycles | Pin package versions and parity-test method adapters. The current Python package describes sequential, asynchronous and batch APIs plus e-BH/e-LOND, and reports parity checks against onlineFDR 2.18.0. |
 | Tavyrikov, Goeman & de Heide (EJS 2026), carefree multiple testing with e-processes | SupFDR / FDR-sup with running suprema and adjusters under arbitrary dependence | Primary persistent-guarantee comparator. Do not use raw e-BH on unadjusted running suprema as a valid baseline. |
 | CRAN eClosure 0.9.7 (published 2026-10-21) | Batch closed BH, closed e-BH, closed Su and closed BY | Batch-only baseline. It is useful for fixed-horizon final-set comparisons, not a direct online arrival or repeated-monitoring comparator. |
+| seqcomp 0.3.0 adaptive betting (fixed fraction, aGRAPA, ONS-m, quantile heuristic) | Bet-selection comparators for bounded score-difference martingales and sequential model comparison | Compare at the betting-strategy layer only after translating and proving the exact increment/null assumptions. Its own vignette shows no universal best rule across temporal regimes; do not call our diagonal-preconditioned projected update novel merely because it is vector-valued. |
+| Covariance-preconditioned projective bets (#9756 / PR #9758) | Model-assisted conditional-mgf intersection process with predictable vector bets | Benchmark against fixed vector/scalar bets, aGRAPA, ONS-m-like updates, fixed-prior eta mixtures and an oracle direction; retain #9695 arbitrary-dependence fallback. |
+| Authenticated score receipts (#9759 / PR #9763) | Independently verifiable computation of the raw affine closure separator relative to a committed snapshot | Score verifier, proof size, snapshot build, proof generation and verification latency are operational/correctness metrics, not statistical power. |
 | #9538 / #9695 global-projective affine mergers | Dynamic two-axis setting: new hypotheses arrive while existing evidence evolves | Main internal arbitrary-dependence projective baseline; include exact verifier and solver/optimization cost. |
 | #9712 scalar and #9751 vector predictable betting | Structured shared-filtration conditional-mgf setting | Model-assisted power lane only; compare against the affine fallback under exactly the same null law and active-set policy. |
 
@@ -94,6 +97,20 @@ It can evaluate joint betting, covariance calibration, and time-to-threshold. It
 Within a matched stopped-FDR or SupFDR guarantee, optimize the same value, cost, capacity, persistence, and queue rules. Report utility regret and false investigations as well as statistical metrics.
 
 ## 4. Scenario matrix
+
+### Bet-selection layer
+
+For every structured conditional-mgf intersection process, benchmark the predictable bet-selection rule separately from the closure/multiple-testing layer:
+- fixed conservative bet;
+- coordinate-local empirical mean;
+- shared scalar bet;
+- diagonal covariance-preconditioned projected-gradient update;
+- aGRAPA-style regularized plug-in estimate;
+- ONS-m-style online Newton update;
+- fixed ex-ante mixtures over bet strategies/learning rates;
+- oracle bet direction using true simulation parameters, marked as an unattainable ceiling only.
+
+Sweep stationary, autocorrelated, periodic, abrupt-shift and time-varying covariance regimes. Report time-to-threshold, terminal log wealth, maximum drawdown, null crossing, and sensitivity to learning-rate/cap tuning. Tuning and confirmatory seeds must be disjoint. The seqcomp vignette documents aGRAPA/ONS-m and shows that strategy ranking depends on temporal structure; reproduce those baselines under their supported assumptions before adapting them to our vector conditional-mgf setting.
 
 ### Dependence
 - independent coordinate increments;
