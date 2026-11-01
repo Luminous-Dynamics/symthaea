@@ -247,6 +247,33 @@ and Eq. 4 proper-subsystem repertoire behavior against PyPhi reference values.
 The upstream example source is pinned at:
 https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/pyphi/examples.py.
 
+## Macro-unit identity foundation
+
+The first macro-grain research increment adds a bounded, canonical
+`MacroUnitSpec` representation. It binds an ordered micro-constituent set,
+temporal update grain, truth-table size, canonical mapping digest, and the
+original mapping's complement orientation. Complementary mappings share the
+same unoriented mapping digest while retaining distinct state-label
+orientations in the full spec digest. The sequence-state bit order is explicit:
+oldest micro time first, with the first listed constituent as the least-
+significant bit.
+
+Construction rejects unsorted/duplicate constituents, zero temporal grain,
+overflowing sequence-state domains, constant mappings, incorrect truth-table
+lengths, and mappings above a caller-supplied entry budget. The current code
+does **not** derive macro TPMs, decide whether units satisfy the intrinsic-unit
+criteria, or search across grains. Those stages need separate PyPhi 2.0
+differential fixtures and resource-bound proofs before they can be described as
+implemented. The macro-unit issue is
+https://github.com/Luminous-Dynamics/symthaea/issues/9750.
+
+PyPhi 2.0 already implements the macro-unit and grain-search framework; the
+Symthaea target is a Rust-native, sparse/factorized construction path with
+content-addressed receipts and an independently testable verifier, not a claim
+of inventing macro-grain IIT. Reference documentation:
+https://pyphi.readthedocs.io/en/latest/theory/macro-units.html and
+https://pyphi.readthedocs.io/en/latest/howto/grain-search.html.
+
 ## Development gates
 
 1. **Input and primitive parity:** compare forward cause likelihoods, cause/effect
