@@ -29,7 +29,7 @@ This package does not implement a remote witness service, durable anti-equivocat
 ## Joint temporal resource-control attribution
 
 The evaluator-only `joint_budget` module enumerates complete action subsets
-(up to 16) using a canonical digest of the evaluator-owned action registry.
+(up to 16) using a canonical digest of the evaluator-owned action registry (action IDs, mutual-exclusion groups, and per-action semantic-contract digests).
 It validates eight hard resource dimensions and excludes incompatible
 conflict-group combinations from the feasible frontier.
 
