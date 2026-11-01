@@ -5,7 +5,6 @@
 //! phase-energy receipt, validates target hardware measurements, checks hard constraints,
 //! and returns a non-dominated frontier across quality, reliability, latency, energy and memory.
 
-use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 
@@ -242,10 +241,6 @@ pub struct EdgeCandidateParetoEvaluation {
     pub evaluation_sha256: String,
 }
 
-fn close(left: f64, right: f64) -> bool {
-    (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
-}
-
 fn quality_score(
     quality_metric_id: &str,
     prequential: &PrequentialAuditReceipt,
@@ -278,6 +273,7 @@ fn validate_candidate_bundle(
     if hardware.run_id != run_id
         || hardware.candidate_id != definition.candidate_id
         || hardware.artifact_sha256 != definition.artifact_sha256
+        || hardware.latency_samples_us.len() != dataset.observations.len()
         || hardware.target_id != manifest.target.target_id
         || hardware.board_revision != manifest.target.board_revision
         || hardware.cpu_core != manifest.target.cpu_core
