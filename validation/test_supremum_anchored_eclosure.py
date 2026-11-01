@@ -212,6 +212,15 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
                     ),
                 )
 
+    def test_additive_auxiliary_rejects_empty_horizon(self):
+        with self.assertRaises(ValueError):
+            build_additive_anchored_auxiliary(
+                universe=("a",),
+                coordinate_budgets={"a": Fraction(1, 2)},
+                auxiliary_budgets={"a": Fraction(1, 2)},
+                coordinate_auxiliary_paths={"a": []},
+            )
+
     def test_additive_budget_residual_zero_and_fail_closed(self):
         universe = ("a", "b")
         zero_aux = {"a": [Fraction(0)], "b": [Fraction(0)]}
