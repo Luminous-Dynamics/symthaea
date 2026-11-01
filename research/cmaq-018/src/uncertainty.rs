@@ -466,7 +466,11 @@ fn validate_structured_joint_action_set_shape(
 
     let mut channel_ids: Vec<&str> = Vec::with_capacity(bank.channels.len());
     for channel in &bank.channels {
-        if channel.channel_id.trim().is_empty() || channel.unit.trim().is_empty() {
+        if channel.channel_id.trim().is_empty()
+            || channel.channel_id.trim() != channel.channel_id
+            || channel.unit.trim().is_empty()
+            || channel.unit.trim() != channel.unit
+        {
             return Err(IntervalError::InvalidVisualChannelDescriptor);
         }
         channel_ids.push(channel.channel_id.as_str());
@@ -1375,6 +1379,13 @@ mod tests {
         invalid_descriptor.channels[0].unit = " ".into();
         assert_eq!(
             validate_structured_joint_action_set_shape(&invalid_descriptor),
+            Err(IntervalError::InvalidVisualChannelDescriptor)
+        );
+
+        let mut noncanonical_id = structured_visual_bank_fixture();
+        noncanonical_id.channels[0].channel_id = " gripper.contact_probability".into();
+        assert_eq!(
+            validate_structured_joint_action_set_shape(&noncanonical_id),
             Err(IntervalError::InvalidVisualChannelDescriptor)
         );
 
