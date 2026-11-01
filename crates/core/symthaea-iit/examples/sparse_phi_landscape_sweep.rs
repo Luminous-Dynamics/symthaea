@@ -155,10 +155,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let elapsed_ns = started.elapsed().as_nanos();
 
         println!(
-            "{},{},{},{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
+            "{},{},target0_parent_state_3_probability,{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
             LANDSCAPE_ALGORITHM_ID,
             FORMALISM,
-            "target0_parent_state_3_probability",
             theta,
             grid_index,
             sparse_model_sha256,
@@ -168,7 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             canonical_dense_evaluation_sha256,
             canonical_dense_analysis_request_sha256,
             analysis.complete,
-            format!("{:?}", analysis.status),
+            analysis.status,
             optional_float(analysis.phi_s),
             optional_float(signed_phi),
             optional_float(normalized_phi),
