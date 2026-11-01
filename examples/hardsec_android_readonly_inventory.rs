@@ -407,21 +407,28 @@ fn run_adb(adb_path: &str, shell_args: &[&str]) -> Result<String, String> {
         .map_err(|_| "ADB command returned non-UTF-8 output".to_owned())
 }
 
-fn collect_from_adb(adb_path: &str) -> Result<Value, String> {
+fn collect_from_runner<F>(mut runner: F) -> Result<Value, String>
+where
+    F: FnMut(&[&str]) -> Result<String, String>,
+{
     let mut properties = Properties::new();
     for key in PROPERTY_KEYS {
-        let value = run_adb(adb_path, &["getprop", key])?;
+        let value = runner(&["getprop", key])?;
         properties.insert(key, value.trim().to_owned());
     }
 
-    let cpuinfo = run_adb(adb_path, &["cat", "/proc/cpuinfo"]).ok();
-    let simpleperf = run_adb(adb_path, &["simpleperf", "list"]).ok();
+    let cpuinfo = runner(&["cat", "/proc/cpuinfo"]).ok();
+    let simpleperf = runner(&["simpleperf", "list"]).ok();
 
     Ok(capture_profile(
         &properties,
         cpuinfo.as_deref(),
         simpleperf.as_deref(),
     ))
+}
+
+fn collect_from_adb(adb_path: &str) -> Result<Value, String> {
+    collect_from_runner(|shell_args| run_adb(adb_path, shell_args))
 }
 
 fn main() {
@@ -459,6 +466,48 @@ mod tests {
         values.insert("ro.boot.verifiedbootstate", "green".to_owned());
         values.insert("ro.build.fingerprint", "google/husky/husky:16/fixture/123:user/release-keys".to_owned());
         values
+    }
+
+    #[test]
+    fn injected_runner_sees_only_fixed_read_only_adb_commands() {
+        let properties = fixture_properties();
+        let mut calls: Vec<Vec<String>> = Vec::new();
+        let profile = collect_from_runner(|arguments| {
+            calls.push(arguments.iter().map(|argument| (*argument).to_owned()).collect());
+            if arguments.len() == 2 && arguments[0] == "getprop" {
+                Ok(properties
+                    .get(arguments[1])
+                    .cloned()
+                    .unwrap_or_default())
+            } else if arguments == ["cat", "/proc/cpuinfo"] {
+                Ok("Features : fp asimd mte paca pacg bti\\n".to_owned())
+            } else if arguments == ["simpleperf", "list"] {
+                Ok("List of hardware events:\\ncpu-cycles\\ninstructions\\n".to_owned())
+            } else {
+                Err("unexpected ADB command".to_owned())
+            }
+        })
+        .unwrap();
+
+        assert_eq!(calls.len(), PROPERTY_KEYS.len() + 2);
+        assert!(calls.iter().all(|call| call.first().is_some_and(|command| {
+            command == "getprop" || (command == "cat" && call.get(1).is_some_and(|value| value == "/proc/cpuinfo"))
+                || (command == "simpleperf" && call.get(1).is_some_and(|value| value == "list"))
+        })));
+        assert!(!calls.iter().any(|call| call.join(" ").contains("serial")));
+        assert!(!calls.iter().any(|call| call.join(" ").contains("devices")));
+        assert_eq!(profile["boot_integrity"]["bootloader_locked"], "not_measured");
+        assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
+    }
+
+    #[test]
+    fn ambiguous_device_selection_failure_does_not_echo_raw_adb_error() {
+        let result = collect_from_runner(|_| {
+            Err("more than one device/emulator: SERIAL-PRIVATE-123".to_owned())
+        });
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(!error.to_ascii_lowercase().contains("serial-private"));
     }
 
     #[test]
