@@ -504,9 +504,10 @@ pub enum AnytimeAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnytimeEventDraft {
-    /// Monotonic milliseconds relative to run start, not wall-clock timestamps.
-    pub started_elapsed_millis: u64,
-    pub completed_elapsed_millis: u64,
+    /// Optional measured monotonic milliseconds relative to run start. Both fields must be
+    /// present for every event in a timed run, or absent for every event in an untimed run.
+    pub started_elapsed_millis: Option<u64>,
+    pub completed_elapsed_millis: Option<u64>,
     pub resources: ResourceCost,
     pub action: AnytimeAction,
 }
@@ -515,8 +516,8 @@ pub struct AnytimeEventDraft {
 #[serde(deny_unknown_fields)]
 pub struct AnytimeEvent {
     pub ordinal: u64,
-    pub started_elapsed_millis: u64,
-    pub completed_elapsed_millis: u64,
+    pub started_elapsed_millis: Option<u64>,
+    pub completed_elapsed_millis: Option<u64>,
     pub resources: ResourceCost,
     pub action: AnytimeAction,
     pub previous_event_sha256: String,
@@ -527,8 +528,8 @@ pub struct AnytimeEvent {
 struct EventDigestPayload<'a> {
     header_sha256: &'a str,
     ordinal: u64,
-    started_elapsed_millis: u64,
-    completed_elapsed_millis: u64,
+    started_elapsed_millis: Option<u64>,
+    completed_elapsed_millis: Option<u64>,
     resources: &'a ResourceCost,
     action: &'a AnytimeAction,
     previous_event_sha256: &'a str,
@@ -585,9 +586,6 @@ impl AnytimeHistory {
             // A deserialized history has no trusted incremental cache. Rebuild it with a full
             // replay once; new histories already carry state from validated construction.
             self.validation_state = Some(self.replay_state()?);
-        }
-        if draft.completed_elapsed_millis < draft.started_elapsed_millis {
-            return Err(AnytimeError::new("event.time", "completion precedes event start"));
         }
 
         let ordinal = u64::try_from(self.events.len())
@@ -663,7 +661,8 @@ impl AnytimeHistory {
 #[derive(Debug, Clone)]
 struct HistoryValidationState {
     previous_digest: String,
-    previous_completion: u64,
+    previous_completion: Option<u64>,
+    clock_mode: Option<bool>,
     evaluation_ids: BTreeSet<String>,
     auxiliary_ids: BTreeSet<String>,
     attempts: BTreeMap<String, u32>,
@@ -677,7 +676,8 @@ impl HistoryValidationState {
     fn new(header_sha256: String) -> Self {
         Self {
             previous_digest: header_sha256,
-            previous_completion: 0,
+            previous_completion: None,
+            clock_mode: None,
             evaluation_ids: BTreeSet::new(),
             auxiliary_ids: BTreeSet::new(),
             attempts: BTreeMap::new(),
@@ -705,15 +705,34 @@ fn validate_and_apply_event(
             "event ordinals must be contiguous and one-based",
         ));
     }
-    if (expected_ordinal == 1 && event.started_elapsed_millis != 0)
-        || event.started_elapsed_millis < state.previous_completion
-        || event.completed_elapsed_millis < event.started_elapsed_millis
-    {
-        return Err(AnytimeError::new(
+    let next_clock_mode = match (event.started_elapsed_millis, event.completed_elapsed_millis) {
+        (Some(start), Some(completion)) => {
+            if completion < start
+                || (expected_ordinal == 1 && start != 0)
+                || state.previous_completion.is_some_and(|previous| start < previous)
+                || state.clock_mode == Some(false)
+            {
+                return Err(AnytimeError::new(
+                    format!("{path}.time"),
+                    "timed v0.1 events must start at zero and remain monotonic/non-overlapping; clock mode cannot change",
+                ));
+            }
+            Some(true)
+        }
+        (None, None) => {
+            if state.clock_mode == Some(true) {
+                return Err(AnytimeError::new(
+                    format!("{path}.time"),
+                    "elapsed-time measurements cannot disappear within a timed run",
+                ));
+            }
+            Some(false)
+        }
+        _ => return Err(AnytimeError::new(
             format!("{path}.time"),
-            "v0.1 sequential events must start at zero and remain monotonic/non-overlapping",
-        ));
-    }
+            "start and completion timestamps must either both be measured or both be unknown",
+        )),
+    };
     if event.previous_event_sha256 != state.previous_digest {
         return Err(AnytimeError::new(
             format!("{path}.previous_event_sha256"),
@@ -1021,6 +1040,7 @@ fn validate_and_apply_event(
     }
 
     state.previous_completion = event.completed_elapsed_millis;
+    state.clock_mode = next_clock_mode;
     state.previous_digest = event.event_sha256.clone();
     Ok(())
 }
@@ -1033,8 +1053,8 @@ pub fn append_artifact_verified_promotion(
     resolved_artifacts: &[ResolvedEvidenceArtifact],
     byte_receipt: &EvidenceArtifactByteReceipt,
     verification_resources: ResourceCost,
-    started_elapsed_millis: u64,
-    completed_elapsed_millis: u64,
+    started_elapsed_millis: Option<u64>,
+    completed_elapsed_millis: Option<u64>,
 ) -> Result<String, AnytimeError> {
     history.validate()?;
     manifest.validate().map_err(|error| AnytimeError::new(
@@ -1112,8 +1132,8 @@ pub fn resolve_and_append_artifact_verified_promotion<R: EvidenceArtifactResolve
     policy: &EvidenceArtifactResolvePolicy,
     resolver: &R,
     verification_resources: ResourceCost,
-    started_elapsed_millis: u64,
-    completed_elapsed_millis: u64,
+    started_elapsed_millis: Option<u64>,
+    completed_elapsed_millis: Option<u64>,
 ) -> Result<(String, EvidenceArtifactByteReceipt), AnytimeError> {
     let (resolved, receipt) = resolve_and_verify_evidence_artifact_bytes(
         manifest,
@@ -1276,8 +1296,8 @@ impl<'a> AnytimeRecorder<'a> {
         // Synthetic deterministic benchmarks have no measured wall-clock duration.
         // Zero-length monotonic intervals preserve ordering without claiming latency.
         let event_sha256 = self.history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 0,
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
             resources,
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id,
@@ -1337,8 +1357,8 @@ struct CandidateState {
 }
 
 fn event_digest(
-    header_sha256: &str, ordinal: u64, started_elapsed_millis: u64,
-    completed_elapsed_millis: u64, resources: &ResourceCost, action: &AnytimeAction,
+    header_sha256: &str, ordinal: u64, started_elapsed_millis: Option<u64>,
+    completed_elapsed_millis: Option<u64>, resources: &ResourceCost, action: &AnytimeAction,
     previous_event_sha256: &str,
 ) -> Result<String, AnytimeError> {
     digest_serializable(&EventDigestPayload {
@@ -1372,7 +1392,7 @@ pub struct AnytimeTargetResult {
     pub final_metric_value: Option<f64>,
     pub final_archive_sha256: String,
     pub final_resources: ResourceCost,
-    pub final_elapsed_wall_millis: u64,
+    pub final_elapsed_wall_millis: Option<u64>,
     pub final_resource_qualified: bool,
 }
 
@@ -1391,7 +1411,7 @@ pub struct AnytimeRunReceipt {
     pub objective_evaluation_attempt_count: u64,
     pub successful_candidate_count: usize,
     pub total_resources: ResourceCost,
-    pub elapsed_wall_millis: u64,
+    pub elapsed_wall_millis: Option<u64>,
     pub required_resource_meters_satisfied: bool,
     pub target_results: Vec<AnytimeTargetResult>,
     pub receipt_sha256: String,
@@ -1410,7 +1430,7 @@ struct ReceiptPayload<'a> {
     objective_evaluation_attempt_count: u64,
     successful_candidate_count: usize,
     total_resources: &'a ResourceCost,
-    elapsed_wall_millis: u64,
+    elapsed_wall_millis: Option<u64>,
     required_resource_meters_satisfied: bool,
     target_results: &'a [AnytimeTargetResult],
 }
@@ -1426,14 +1446,14 @@ struct TargetProgress {
     first: Option<TargetCrossing>,
     final_snapshot: MetricSnapshot,
     final_resources: ResourceCost,
-    final_elapsed_wall_millis: u64,
+    final_elapsed_wall_millis: Option<u64>,
     final_resource_qualified: bool,
 }
 
 struct TargetCrossing {
     event_ordinal: u64,
     objective_evaluation_attempt_count: u64,
-    elapsed_wall_millis: u64,
+    elapsed_wall_millis: Option<u64>,
     metric_value: f64,
     archive_sha256: String,
     resources: ResourceCost,
@@ -1459,7 +1479,7 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
         },
         // No event means no measured resource baseline; do not report an unexecuted run as free.
         final_resources: ResourceCost::unknown(),
-        final_elapsed_wall_millis: 0,
+        final_elapsed_wall_millis: None,
         final_resource_qualified: false,
     }).collect::<Vec<_>>();
 
@@ -1547,7 +1567,7 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
         }
     }
 
-    let last_elapsed = history.events.last().map_or(0, |event| event.completed_elapsed_millis);
+    let last_elapsed = history.events.last().and_then(|event| event.completed_elapsed_millis);
     let final_resource_qualified = !history.events.is_empty()
         && header.required_resource_meters.iter().all(|meter| totals.meter_is_known(*meter));
     if history.events.is_empty() {
@@ -1565,7 +1585,7 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                 status: TargetAttainmentStatus::Reached,
                 first_event_ordinal: Some(first.event_ordinal),
                 first_objective_evaluation_attempt_count: Some(first.objective_evaluation_attempt_count),
-                first_elapsed_wall_millis: Some(first.elapsed_wall_millis),
+                first_elapsed_wall_millis: first.elapsed_wall_millis,
                 first_metric_value: Some(first.metric_value),
                 first_archive_sha256: Some(first.archive_sha256),
                 first_resources: Some(first.resources),
@@ -1818,8 +1838,8 @@ mod tests {
             _ => H2,
         };
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: start,
-            completed_elapsed_millis: start + 1,
+            started_elapsed_millis: Some(start),
+            completed_elapsed_millis: Some(start + 1),
             resources: known_cost(5, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: evaluation_id.to_owned(),
@@ -1881,8 +1901,8 @@ mod tests {
         assert_eq!(heldout.status, TargetAttainmentStatus::NotReachedByBudget);
 
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 21,
-            completed_elapsed_millis: 22,
+            started_elapsed_millis: Some(21),
+            completed_elapsed_millis: Some(22),
             resources: known_cost(2, 2048),
             action: AnytimeAction::CandidateVerification {
                 candidate_id: "candidate-a".to_owned(),
@@ -1892,8 +1912,8 @@ mod tests {
             },
         }).unwrap();
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 22,
-            completed_elapsed_millis: 23,
+            started_elapsed_millis: Some(22),
+            completed_elapsed_millis: Some(23),
             resources: known_cost(2, 4096),
             action: AnytimeAction::CandidateVerification {
                 candidate_id: "candidate-b".to_owned(),
@@ -1912,7 +1932,7 @@ mod tests {
         assert_eq!(heldout.first_resources.as_ref().unwrap().host_cpu_millis, Some(14));
         assert_eq!(heldout.first_resources.as_ref().unwrap().peak_host_memory_bytes, Some(4096));
         assert_eq!(receipt.total_resources.host_cpu_millis, Some(14));
-        assert_eq!(receipt.elapsed_wall_millis, 23);
+        assert_eq!(receipt.elapsed_wall_millis, Some(23));
         assert!(receipt.required_resource_meters_satisfied);
         verify_anytime_run_receipt(&history, &receipt).unwrap();
 
@@ -1925,8 +1945,8 @@ mod tests {
     fn rejected_duplicate_evaluation_does_not_mutate_incremental_state() {
         let mut history = AnytimeHistory::new(header()).unwrap();
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 0,
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(0),
             resources: known_cost(1, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "candidate-a:1".to_owned(),
@@ -1943,8 +1963,8 @@ mod tests {
         }).unwrap();
 
         let rejected = history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 0,
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(0),
             resources: known_cost(1, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "candidate-a:2".to_owned(),
@@ -1963,8 +1983,8 @@ mod tests {
         assert_eq!(history.events().len(), 1);
 
         let valid_repeat = history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 0,
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(0),
             resources: known_cost(1, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "candidate-a:2".to_owned(),
@@ -1988,8 +2008,8 @@ mod tests {
     fn failed_attempts_are_charged_and_unknown_required_meters_disqualify() {
         let mut history = AnytimeHistory::new(header()).unwrap();
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 1,
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(1),
             resources: known_cost(7, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "failed-attempt".to_owned(),
@@ -2007,8 +2027,8 @@ mod tests {
         let mut unknown = known_cost(5, 2048);
         unknown.energy_millijoules = None;
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 1,
-            completed_elapsed_millis: 2,
+            started_elapsed_millis: Some(1),
+            completed_elapsed_millis: Some(2),
             resources: unknown,
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "successful-attempt".to_owned(),
@@ -2049,8 +2069,8 @@ mod tests {
         let mut history = AnytimeHistory::new(header()).unwrap();
         append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
         let duplicate = history.append(AnytimeEventDraft {
-            started_elapsed_millis: 1,
-            completed_elapsed_millis: 2,
+            started_elapsed_millis: Some(1),
+            completed_elapsed_millis: Some(2),
             resources: known_cost(1, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "eval-b".to_owned(),
@@ -2087,8 +2107,8 @@ mod tests {
         let mut verifier_cost = known_cost(3, 2048);
         verifier_cost.verifier_calls = Some(1);
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 1,
-            completed_elapsed_millis: 2,
+            started_elapsed_millis: Some(1),
+            completed_elapsed_millis: Some(2),
             resources: verifier_cost,
             action: AnytimeAction::CandidateVerificationRejected {
                 candidate_id: "candidate-a".to_owned(),
@@ -2110,8 +2130,8 @@ mod tests {
         let mut history = AnytimeHistory::new(header()).unwrap();
         append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 1,
-            completed_elapsed_millis: 2,
+            started_elapsed_millis: Some(1),
+            completed_elapsed_millis: Some(2),
             resources: known_cost(1, 1024),
             action: AnytimeAction::CandidateVerificationRejected {
                 candidate_id: "candidate-a".to_owned(),
@@ -2121,8 +2141,8 @@ mod tests {
             },
         }).unwrap();
         let promotion = history.append(AnytimeEventDraft {
-            started_elapsed_millis: 2,
-            completed_elapsed_millis: 3,
+            started_elapsed_millis: Some(2),
+            completed_elapsed_millis: Some(3),
             resources: known_cost(1, 1024),
             action: AnytimeAction::CandidateVerification {
                 candidate_id: "candidate-a".to_owned(),
@@ -2144,8 +2164,8 @@ mod tests {
 
         let mut history = AnytimeHistory::new(header()).unwrap();
         history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 1,
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(1),
             resources: known_cost(2, 1024),
             action: AnytimeAction::CandidateEvaluation {
                 evaluation_id: "candidate-a:1".to_owned(),
@@ -2199,8 +2219,8 @@ mod tests {
             &resolved,
             &byte_receipt,
             verifier_cost.clone(),
-            1,
-            2,
+            Some(1),
+            Some(2),
         ).unwrap();
         assert!(matches!(
             history.events().last().map(|event| &event.action),
@@ -2219,8 +2239,8 @@ mod tests {
             &tampered_bytes,
             &byte_receipt,
             verifier_cost,
-            2,
-            3,
+            Some(2),
+            Some(3),
         ).is_err());
         assert_eq!(history.events().len(), event_count);
     }
@@ -2230,8 +2250,8 @@ mod tests {
         let mut history = AnytimeHistory::new(header()).unwrap();
         append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
         let overlap = history.append(AnytimeEventDraft {
-            started_elapsed_millis: 0,
-            completed_elapsed_millis: 20,
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(20),
             resources: known_cost(1, 1),
             action: AnytimeAction::AuxiliaryAction {
                 action_id: "parallel".to_owned(),
@@ -2240,8 +2260,8 @@ mod tests {
         });
         assert!(overlap.is_err());
         let mismatch = history.append(AnytimeEventDraft {
-            started_elapsed_millis: 1,
-            completed_elapsed_millis: 2,
+            started_elapsed_millis: Some(1),
+            completed_elapsed_millis: Some(2),
             resources: known_cost(1, 1),
             action: AnytimeAction::CandidateVerification {
                 candidate_id: "candidate-a".to_owned(),
