@@ -275,6 +275,158 @@ pub fn certified_iit4_2023_system_phi_upper_bound(
     }
     candidate_units.checked_mul(candidate_units - 1)
 }
+/// Theorem identifier for the binary-system upper bound in Zaeemzadeh & Tononi (2024), Table 2.
+pub const IIT4_2023_SYSTEM_PHI_BOUND_THEOREM_ID: &str =
+    "zaeemzadeh-tononi-2024-table2-system-phi";
+/// Partition family covered by the bound: directed set partitions without TotalCut.
+pub const IIT4_2023_SYSTEM_PHI_BOUND_PARTITION_FAMILY_ID: &str =
+    "iit4-2023-directed-set-partitions-no-total-cut/0.1.0";
+
+/// Integrity-bound instantiation of the published IIT 4.0 (2023) system-phi upper bound.
+///
+/// This certificate attests that the input belongs to the theorem's declared
+/// domain and that the Table 2 value was computed for the exact model and
+/// candidate system. It does not constitute a machine-checked proof of the
+/// published theorem itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Iit4SystemPhiBoundCertificate {
+    pub theorem_id: String,
+    pub formalism_id: String,
+    pub partition_family_id: String,
+    pub model_sha256: String,
+    pub candidate_system: Vec<usize>,
+    pub upper_bound: usize,
+    pub binary_units: bool,
+    pub conditionally_independent_tpm: bool,
+    pub self_connections_preserved: bool,
+    pub total_cut_included: bool,
+    pub certificate_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum Iit4SystemPhiBoundCertificateError {
+    #[error("certificate theorem identifier is unsupported")]
+    UnsupportedTheorem,
+    #[error("certificate formalism or partition family is unsupported")]
+    UnsupportedFormalismOrPartitionFamily,
+    #[error("certificate assumptions do not satisfy the theorem domain")]
+    AssumptionMismatch,
+    #[error("certificate candidate system does not match the supplied model/request")]
+    InputMismatch,
+    #[error("certificate upper bound is {actual}, expected {expected}")]
+    UpperBoundMismatch { actual: usize, expected: usize },
+    #[error("certificate digest does not match its contents")]
+    DigestMismatch,
+    #[error("candidate-unit upper-bound arithmetic overflow")]
+    ArithmeticOverflow,
+}
+
+impl Iit4SystemPhiBoundCertificate {
+    fn canonical_digest(&self) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"SYMTHAEA-IIT4-2023-SYSTEM-PHI-BOUND-CERTIFICATE\\0v0.1\\0");
+        receipt_string(&mut bytes, &self.theorem_id);
+        receipt_string(&mut bytes, &self.formalism_id);
+        receipt_string(&mut bytes, &self.partition_family_id);
+        receipt_string(&mut bytes, &self.model_sha256);
+        receipt_usize(&mut bytes, self.candidate_system.len());
+        for unit in &self.candidate_system {
+            receipt_usize(&mut bytes, *unit);
+        }
+        receipt_usize(&mut bytes, self.upper_bound);
+        bytes.push(u8::from(self.binary_units));
+        bytes.push(u8::from(self.conditionally_independent_tpm));
+        bytes.push(u8::from(self.self_connections_preserved));
+        bytes.push(u8::from(self.total_cut_included));
+        hex_digest(&bytes)
+    }
+
+    /// Independently verify the certificate against the exact model and request.
+    ///
+    /// The verifier recomputes the theorem's closed-form ceiling and the
+    /// canonical certificate digest. It deliberately does not call the
+    /// certificate producer or the legacy upper-bound helper.
+    pub fn verify(
+        &self,
+        model: &BinaryCausalModel,
+        candidate_system: &[usize],
+        include_total_cut: bool,
+    ) -> Result<(), Iit4SystemPhiBoundCertificateError> {
+        if self.theorem_id != IIT4_2023_SYSTEM_PHI_BOUND_THEOREM_ID {
+            return Err(Iit4SystemPhiBoundCertificateError::UnsupportedTheorem);
+        }
+        if self.formalism_id != FormalismProfile::Iit4_0_2023.id()
+            || self.partition_family_id != IIT4_2023_SYSTEM_PHI_BOUND_PARTITION_FAMILY_ID
+        {
+            return Err(
+                Iit4SystemPhiBoundCertificateError::UnsupportedFormalismOrPartitionFamily,
+            );
+        }
+        if !self.binary_units
+            || !self.conditionally_independent_tpm
+            || !self.self_connections_preserved
+            || self.total_cut_included
+            || include_total_cut
+        {
+            return Err(Iit4SystemPhiBoundCertificateError::AssumptionMismatch);
+        }
+        if self.model_sha256 != model.model_sha256()
+            || self.candidate_system != candidate_system
+            || candidate_system.len() <= 1
+            || candidate_system.windows(2).any(|pair| pair[0] >= pair[1])
+            || model.validate_subset(candidate_system, "candidate_system").is_err()
+        {
+            return Err(Iit4SystemPhiBoundCertificateError::InputMismatch);
+        }
+        let units = candidate_system.len();
+        let expected = units
+            .checked_mul(units - 1)
+            .ok_or(Iit4SystemPhiBoundCertificateError::ArithmeticOverflow)?;
+        if self.upper_bound != expected {
+            return Err(Iit4SystemPhiBoundCertificateError::UpperBoundMismatch {
+                actual: self.upper_bound,
+                expected,
+            });
+        }
+        if self.certificate_sha256 != self.canonical_digest() {
+            return Err(Iit4SystemPhiBoundCertificateError::DigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// Produce an integrity-bound theorem instantiation when every applicability
+/// assumption is satisfied. None means that no certificate is permitted.
+pub fn certify_iit4_2023_system_phi_upper_bound(
+    model: &BinaryCausalModel,
+    candidate_system: &[usize],
+    include_total_cut: bool,
+) -> Option<Iit4SystemPhiBoundCertificate> {
+    if include_total_cut
+        || candidate_system.len() <= 1
+        || candidate_system.windows(2).any(|pair| pair[0] >= pair[1])
+        || model.validate_subset(candidate_system, "candidate_system").is_err()
+    {
+        return None;
+    }
+    let upper_bound = candidate_system.len().checked_mul(candidate_system.len() - 1)?;
+    let mut certificate = Iit4SystemPhiBoundCertificate {
+        theorem_id: IIT4_2023_SYSTEM_PHI_BOUND_THEOREM_ID.to_string(),
+        formalism_id: FormalismProfile::Iit4_0_2023.id().to_string(),
+        partition_family_id: IIT4_2023_SYSTEM_PHI_BOUND_PARTITION_FAMILY_ID.to_string(),
+        model_sha256: model.model_sha256(),
+        candidate_system: candidate_system.to_vec(),
+        upper_bound,
+        binary_units: true,
+        conditionally_independent_tpm: true,
+        self_connections_preserved: true,
+        total_cut_included: false,
+        certificate_sha256: String::new(),
+    };
+    certificate.certificate_sha256 = certificate.canonical_digest();
+    Some(certificate)
+}
+
 impl Default for Iit4SystemPhiSearchConfig {
     fn default() -> Self {
         Self {
@@ -3793,6 +3945,67 @@ mod tests {
             }) if candidate_evaluations == baseline.partition_score_evaluations
                 && max_evaluations == budget
         ));
+    }
+
+    #[test]
+    fn theorem_bound_certificate_verifies_exact_model_and_request() {
+        let model = two_unit_model();
+        let certificate = certify_iit4_2023_system_phi_upper_bound(
+            &model,
+            &[0, 1],
+            false,
+        )
+        .expect("two-unit directed-set partition search is inside the theorem domain");
+        assert_eq!(certificate.upper_bound, 2);
+        assert!(certificate.verify(&model, &[0, 1], false).is_ok());
+
+        let mut tampered_bound = certificate.clone();
+        tampered_bound.upper_bound = 3;
+        assert!(matches!(
+            tampered_bound.verify(&model, &[0, 1], false),
+            Err(Iit4SystemPhiBoundCertificateError::UpperBoundMismatch {
+                actual: 3,
+                expected: 2
+            })
+        ));
+
+        let mut tampered_digest = certificate.clone();
+        tampered_digest.certificate_sha256 = "00".repeat(32);
+        assert_eq!(
+            tampered_digest.verify(&model, &[0, 1], false),
+            Err(Iit4SystemPhiBoundCertificateError::DigestMismatch)
+        );
+
+        assert!(matches!(
+            certificate.verify(&model, &[0, 1], true),
+            Err(Iit4SystemPhiBoundCertificateError::AssumptionMismatch)
+        ));
+        assert!(certify_iit4_2023_system_phi_upper_bound(&model, &[0, 1], true).is_none());
+    }
+
+    #[test]
+    fn theorem_bound_certificate_rejects_model_and_candidate_mismatch() {
+        let model = two_unit_model();
+        let certificate = certify_iit4_2023_system_phi_upper_bound(
+            &model,
+            &[0, 1],
+            false,
+        )
+        .unwrap();
+        let different_model = BinaryCausalModel::new(
+            2,
+            vec![0.2, 0.2, 0.1, 0.8, 0.9, 0.2, 0.9, 0.8],
+            vec![true, true, true, true],
+        )
+        .unwrap();
+        assert_eq!(
+            certificate.verify(&different_model, &[0, 1], false),
+            Err(Iit4SystemPhiBoundCertificateError::InputMismatch)
+        );
+        assert_eq!(
+            certificate.verify(&model, &[1, 0], false),
+            Err(Iit4SystemPhiBoundCertificateError::InputMismatch)
+        );
     }
 
     #[test]
