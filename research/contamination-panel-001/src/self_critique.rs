@@ -534,6 +534,20 @@ mod tests {
     }
 
     #[test]
+    fn hand_computable_json_fixture_round_trips_and_scores() {
+        let request: SelfCritiqueScoringRequestV1 = serde_json::from_str(include_str!(
+            "../fixtures/self-critique-scoring-request.hand.v1.json"
+        ))
+        .unwrap();
+        let report = score_self_critique_request(&request).unwrap();
+        assert_eq!(report.sample_id, "self-critique-fixture-001");
+        assert_eq!(report.contamination_score, 1.0);
+        assert!(report.released_topk_entropy_reproduction);
+        assert_eq!(report.initial_topk_diagnostics.unwrap().observed_token_steps, 3);
+        assert!(!report.confirmatory_eligible);
+    }
+
+    #[test]
     fn identical_sequences_score_one() {
         let (cosine, penalty, score) =
             penalized_entropy_cosine(&[0.5, 1.0, 0.5], &[0.5, 1.0, 0.5]).unwrap();
