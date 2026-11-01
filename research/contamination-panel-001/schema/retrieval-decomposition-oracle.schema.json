@@ -8,6 +8,7 @@
     "schema",
     "task_id",
     "expected_answer",
+    "calculation",
     "required_claims",
     "distractor_scenarios",
     "allowed_alternative_evidence_paths",
@@ -157,6 +158,38 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "labor_rate_per_day",
+        "billable_days",
+        "overnight_rate",
+        "overnight_stays",
+        "expected_total"
+      ],
+      "properties": {
+        "labor_rate_per_day": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "billable_days": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overnight_rate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overnight_stays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_total": {
+          "type": "integer"
+        }
+      }
     }
   }
 }
