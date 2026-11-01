@@ -1,19 +1,20 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
 //! A causal-model substrate, bounded IIT 4.0 (2023) system-search core, and exact factor-graph kernel.
 //!
 //! # Scope
 //!
-//! The crate validates a dense binary factored TPM; implements repertoire/GID
-//! primitives, directed system cuts, specified-state selection, and bounded
-//! Integration-level system \u{03c6}s searches under IIT 4.0 (2023), including
-//! embedded proper subsystems with Eq. 3/Eq. 4 background handling. Composition-level
-//! big-Phi tie resolution, the complete cause-effect structure, and the IIT 4.0
-//! (2026) intrinsic-information cap remain unimplemented. A separate sparse
-//! local-CPT model now uses the exact log-domain min-fill kernel for Eq. 4 cause
-//! likelihoods without allocating a global dense TPM. The full system scorer
-//! still uses the dense reference representation. No output is a consciousness
-//! determination.
+//! The crate provides a dense binary factored-TPM reference model and a sparse
+//! binary local-CPT model. Both expose bounded Integration-level IIT 4.0 (2023)
+//! system-`phi_s` analysis for the declared binary profile, including proper
+//! subsystems and Eq. 3/Eq. 4 background handling. The sparse path uses exact
+//! log-domain min-fill inference, with bounded cutset conditioning where an
+//! explicit separator plan is supplied; it does not construct a global dense TPM.
+//!
+//! Exactness is conditional on the declared model, formalism, partition family,
+//! numeric policy, and caller-supplied work/resource budgets. A budget failure
+//! is not an exact result. Composition-level tie escalation, the complete
+//! cause-effect structure and relations, and the separate IIT 4.0 (2026)
+//! intrinsic-information requirement are not implemented. No output is a
+//! consciousness determination.
 //!
 //! # Model contract
 //!
