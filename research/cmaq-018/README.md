@@ -165,3 +165,10 @@ A new matched-episode evaluator charges inference, information acquisition and f
 ### VIS-005 source-backed architecture gap
 
 See [VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md). The current vision manifold delayed evaluator measures autonomous future-frame prediction against later observations, but it is not action-conditioned. The cross-manifold predictor maps vision to cognition. The current JEPA path uses the previous FEP action but its target is the CfC prediction approximation, not an independently encoded future frame. This distinction is now explicit in the benchmark claims and next-step plan.
+
+
+### Structured visual-belief action banks
+
+The scalar action bank is retained for a single declared outcome channel. The new `StructuredJointActionSetSamples` API carries multiple independent channels—such as object geometry, motion, gripper contact probability, visibility, terminal risk and task utility—under one history digest, action manifest and shared joint-draw axis. It computes a canonical SHA-256 over each channel's semantic tag, unit and exact f64 sample bits, and returns per-channel prediction/effect intervals without scalarizing heterogeneous quantities.
+
+See `structured-visual-action-bank.v0.1.schema.json` and `fixtures/structured-visual-action-bank.example.json`. The synthetic known-answer bank keeps object x-position (metres) and contact probability on one shared draw axis. A one-unit paired position effect and a 0.4 paired contact-probability effect are tested independently. These are metric/contract tests, not predictions from a real visual model.
