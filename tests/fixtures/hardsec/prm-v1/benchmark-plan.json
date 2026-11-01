@@ -35,7 +35,9 @@
     "ar1_negative_control",
     "block_dependence_negative_control",
     "overlapping_pmu_window_negative_control",
-    "long_memory_negative_control"
+    "long_memory_negative_control",
+    "exact_small_n_polya_rank_tree_anytime_false_alarm",
+    "dependent_shared_latent_rank_sequence_negative_control"
   ],
   "holdout_axes": [
     "execution_group",
@@ -59,7 +61,9 @@
     "cpu_cycles_per_observation",
     "p95_latency",
     "energy_per_device_hour",
-    "calibration_size_power_ceiling"
+    "calibration_size_power_ceiling",
+    "exact_polya_tree_null_crossing_probability",
+    "predictive_rank_probability_normalization_error"
   ],
   "claim_rules": {
     "calibration_and_online_iid_required": true,
@@ -68,7 +72,9 @@
     "no_sequential_guarantee_for_serial_pmu_without_separate_proof": true,
     "marginal_validity_not_calibration_conditional": true,
     "context_and_admission_exogeneity_unverified_until_proven": true,
-    "feature_portfolio_weights_sum_to_one": true
+    "feature_portfolio_weights_sum_to_one": true,
+    "exact_small_n_null_tree_required_before_anytime_claim": true,
+    "dependent_rank_sequences_are_negative_controls_not_theorem_valid": true
   },
   "reference_paper": {
     "id": "kuang_xia_2026_predictive_rank_martingales",

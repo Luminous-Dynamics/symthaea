@@ -159,6 +159,29 @@ fn valid_sha(value: &str, context: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_ons_contract(value: &Value) -> Result<(), String> {
+    let context = "plan.ons";
+    if string_field(value, "update", context)?
+        != "lambda_next=project(lambda+(9/2)*g/(1+sum_g_squared),[-b_next,b_next])" {
+        return Err("plan.ons.update does not match the implemented ONS update".to_owned());
+    }
+    if string_field(value, "projection_radius", context)?
+        != "min(1,3/(4*max_abs_centered_feature))" {
+        return Err("plan.ons.projection_radius does not match the implemented factor bound".to_owned());
+    }
+    for (field, expected) in [
+        ("initial_lambda", 0.0),
+        ("initial_accumulator", 1.0),
+        ("minimum_betting_factor", MIN_FACTOR),
+    ] {
+        let actual = f64_field(value, field, context)?;
+        if (actual - expected).abs() > EPS {
+            return Err(format!("plan.ons.{field} does not match the implemented PRM contract"));
+        }
+    }
+    Ok(())
+}
+
 fn parse_plan(value: &Value) -> Result<Plan, String> {
     if string_field(value, "schema_version", "plan")? != PLAN_SCHEMA {
         return Err("unsupported PRM plan schema_version".to_owned());
@@ -248,9 +271,8 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
     if (weight_sum - 1.0).abs() > EPS {
         return Err(format!("PRM portfolio weights must sum to one; observed {weight_sum}"));
     }
-    if value.get("ons").is_none() {
-        return Err("plan.ons missing".to_owned());
-    }
+    let ons = value.get("ons").ok_or("plan.ons missing")?;
+    validate_ons_contract(ons)?;
     Ok(Plan {
         monitor_id, evidence_domain, stream_id, evaluation_group_id, context_id,
         calibration_execution_group_id, evaluation_execution_group_id,
@@ -971,6 +993,104 @@ mod tests {
         let (mut p,d,c)=fixture();
         p["features"][0]["portfolio_weight"]=json!(0.2);
         assert!(audit(&p,&d,&c).unwrap_err().contains("weights must sum to one"));
+    }
+
+    #[test]
+    fn rejects_ons_update_formula_mismatch(){
+        let (mut p,_,_)=fixture();
+        p["ons"]["update"]=json!("lambda_next=lambda+g");
+        assert!(parse_plan(&p).unwrap_err().contains("ONS update"));
+    }
+
+    #[test]
+    fn rejects_ons_projection_radius_mismatch(){
+        let (mut p,_,_)=fixture();
+        p["ons"]["projection_radius"]=json!("unbounded");
+        assert!(parse_plan(&p).unwrap_err().contains("projection_radius"));
+    }
+
+    #[test]
+    fn rejects_ons_initialization_and_factor_mismatches(){
+        for (field,value) in [
+            ("initial_lambda",json!(0.1)),
+            ("initial_accumulator",json!(2.0)),
+            ("minimum_betting_factor",json!(0.0)),
+        ] {
+            let (mut p,_,_)=fixture();
+            p["ons"][field]=value;
+            assert!(parse_plan(&p).unwrap_err().contains(field));
+        }
+    }
+
+    #[test]
+    fn exact_polya_tree_anytime_false_alarm_mass_is_bounded(){
+        fn walk(
+            n: usize, horizon: usize, alpha: f64, time: usize, counts: &[u64],
+            values: &[Vec<f64>], lambdas: &[f64], accumulators: &[f64],
+            wealths: &[f64], path_probability: f64, total_mass: &mut f64,
+            crossing_mass: &mut f64,
+        ) {
+            if time > horizon {
+                *total_mass += path_probability;
+                return;
+            }
+            let pi = predictive_law(counts, n, time);
+            for rank_index in 0..=n {
+                let transition_probability = pi[rank_index];
+                let mut next_lambdas = Vec::with_capacity(values.len());
+                let mut next_accumulators = Vec::with_capacity(values.len());
+                let mut next_wealths = Vec::with_capacity(values.len());
+                for feature_index in 0..values.len() {
+                    let h = &values[feature_index];
+                    let mean = h.iter().zip(pi.iter())
+                        .map(|(value, probability)| value * probability).sum::<f64>();
+                    let z = h[rank_index] - mean;
+                    let radius = projection_radius(max_abs_centered(h, &pi));
+                    let factor = 1.0 + lambdas[feature_index] * z;
+                    assert!(factor >= MIN_FACTOR - EPS);
+                    let gradient = z / factor;
+                    let accumulator = accumulators[feature_index] + gradient * gradient;
+                    let lambda = lambdas[feature_index] + ONS_STEP * gradient / accumulator;
+                    next_lambdas.push(lambda);
+                    next_accumulators.push(accumulator);
+                    next_wealths.push(wealths[feature_index] * factor);
+                    assert!(radius > 0.0);
+                }
+                let mut next_counts = counts.to_vec();
+                next_counts[rank_index] += 1;
+                let next_pi = predictive_law(&next_counts, n, time + 1);
+                for feature_index in 0..values.len() {
+                    let radius = projection_radius(max_abs_centered(&values[feature_index], &next_pi));
+                    next_lambdas[feature_index] =
+                        next_lambdas[feature_index].clamp(-radius, radius);
+                }
+                let portfolio_wealth = 0.5 * next_wealths[0] + 0.5 * next_wealths[1];
+                let child_probability = path_probability * transition_probability;
+                if portfolio_wealth >= 1.0 / alpha {
+                    *crossing_mass += child_probability;
+                    *total_mass += child_probability;
+                } else {
+                    walk(
+                        n, horizon, alpha, time + 1, &next_counts, values,
+                        &next_lambdas, &next_accumulators, &next_wealths,
+                        child_probability, total_mass, crossing_mass,
+                    );
+                }
+            }
+        }
+
+        let n = 2;
+        let alpha = 0.5;
+        let values = vec![feature_values("order", n), feature_values("dispersion", n)];
+        let mut total_mass = 0.0;
+        let mut crossing_mass = 0.0;
+        walk(
+            n, 8, alpha, 1, &vec![0; n + 1], &values, &[0.0, 0.0],
+            &[1.0, 1.0], &[1.0, 1.0], 1.0, &mut total_mass, &mut crossing_mass,
+        );
+        assert!((total_mass - 1.0).abs() < 1e-10);
+        assert!(crossing_mass > 0.0);
+        assert!(crossing_mass <= alpha + 1e-12);
     }
 
     #[test]
