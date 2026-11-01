@@ -1428,6 +1428,32 @@ mod tests {
     }
 
     #[test]
+    fn source_cluster_rejects_mixed_clean_and_contaminated_truth() {
+        let mut study = minimal_study();
+        for observation in &mut study.observations {
+            if observation.split == ObservationSplitV1::LockedTest
+                && (observation.sample_id == "test-000" || observation.sample_id == "test-002")
+            {
+                observation.source_cluster_id = "mixed-truth-cluster".to_owned();
+            }
+        }
+        assert!(analyze_detector_calibration(&study).is_err());
+    }
+
+    #[test]
+    fn source_clusters_must_have_matching_size_across_splits() {
+        let mut study = minimal_study();
+        for observation in &mut study.observations {
+            if observation.split == ObservationSplitV1::CleanCalibration
+                && observation.sample_id == "cal-000"
+            {
+                observation.source_cluster_id = "cal-block-000".to_owned();
+            }
+        }
+        assert!(analyze_detector_calibration(&study).is_err());
+    }
+
+    #[test]
     fn test_cluster_uses_max_risk_and_counts_once_for_fpr() {
         let mut study = minimal_study();
         for observation in &mut study.observations {
