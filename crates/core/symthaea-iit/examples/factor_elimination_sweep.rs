@@ -11,7 +11,7 @@
 use std::time::{Duration, Instant};
 
 use symthaea_iit::{
-    min_fill_log_sum_product, plan_min_fill_elimination, BinaryLogFactor,
+    min_fill_log_sum_product, plan_min_fill_elimination, BinaryLogFactor, FactorGraphError,
 };
 
 #[derive(Clone, Copy)]
@@ -111,7 +111,7 @@ fn median_duration(samples: &mut [Duration]) -> Duration {
 
 fn run() -> Result<(), String> {
     println!(
-        "topology,variables,factors,eliminated_variables,plan_median_ns,plan_min_ns,induced_width,predicted_output_entries,predicted_peak_factor_entries,observed_peak_factor_entries,multiplications,end_to_end_median_ns,end_to_end_min_ns,validated"
+        "topology,variables,factors,eliminated_variables,admission_outcome,configured_max_factor_entries,plan_median_ns,plan_min_ns,induced_width,predicted_output_entries,predicted_peak_factor_entries,observed_peak_factor_entries,multiplications,end_to_end_median_ns,end_to_end_min_ns,validated"
     );
     for fixture in FIXTURES {
         let factors = build_factors(fixture)?;
@@ -120,11 +120,82 @@ fn run() -> Result<(), String> {
             .iter()
             .map(|factor| factor.variables().to_vec())
             .collect::<Vec<_>>();
-        let plan_warmup = plan_min_fill_elimination(
+        let plan_warmup = match plan_min_fill_elimination(
             &factor_scopes,
             &eliminate,
             MAX_FACTOR_ENTRIES,
-        ).map_err(|error| format!("planning failed for {}-{}: {error}", fixture.topology, fixture.variables))?;
+        ) {
+            Ok(plan) => plan,
+            Err(FactorGraphError::IntermediateTooLarge { entries, limit })
+                if fixture.topology == "grid" && matches!(fixture.variables, 144 | 196) =>
+            {
+                // These two largest grids intentionally cross the fixed memory
+                // budget. Record the exact preflight rejection as a qualified
+                // admission-control result; do not execute the contraction or
+                // raise the budget merely to make this sweep look successful.
+                let mut plan_samples = Vec::with_capacity(REPEATS);
+                for _ in 0..REPEATS {
+                    let start = Instant::now();
+                    let repeated = plan_min_fill_elimination(
+                        &factor_scopes,
+                        &eliminate,
+                        MAX_FACTOR_ENTRIES,
+                    );
+                    plan_samples.push(start.elapsed());
+                    match repeated {
+                        Err(FactorGraphError::IntermediateTooLarge {
+                            entries: repeated_entries,
+                            limit: repeated_limit,
+                        }) if repeated_entries == entries && repeated_limit == limit => {}
+                        Err(error) => {
+                            return Err(format!(
+                                "budget rejection was not deterministic for {}-{}: {error}",
+                                fixture.topology, fixture.variables
+                            ));
+                        }
+                        Ok(_) => {
+                            return Err(format!(
+                                "budget rejection disappeared during repeated preflight for {}-{}",
+                                fixture.topology, fixture.variables
+                            ));
+                        }
+                    }
+                }
+                let plan_median_ns = median_duration(&mut plan_samples).as_nanos();
+                let plan_min_ns = plan_samples
+                    .iter()
+                    .copied()
+                    .min()
+                    .unwrap_or_default()
+                    .as_nanos();
+                let fields = vec![
+                    fixture.topology.to_string(),
+                    fixture.variables.to_string(),
+                    factors.len().to_string(),
+                    eliminate.len().to_string(),
+                    "REJECTED_BUDGET".to_string(),
+                    limit.to_string(),
+                    plan_median_ns.to_string(),
+                    plan_min_ns.to_string(),
+                    String::new(),
+                    String::new(),
+                    entries.to_string(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    "true".to_string(),
+                ];
+                println!("{}", fields.join(","));
+                continue;
+            }
+            Err(error) => {
+                return Err(format!(
+                    "planning failed for {}-{}: {error}",
+                    fixture.topology, fixture.variables
+                ));
+            }
+        };
         let warmup = min_fill_log_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES)
             .map_err(|error| format!("warm-up failed for {}-{}: {error}", fixture.topology, fixture.variables))?;
         if warmup.factor.variables() != [fixture.variables - 1]
@@ -184,23 +255,25 @@ fn run() -> Result<(), String> {
         let validated = warmup.factor.log_values().iter().all(|value| value.is_finite())
             && warmup.predicted_output_entries == warmup.factor.log_values().len()
             && warmup.predicted_peak_factor_entries == warmup.peak_factor_entries;
-        println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            fixture.topology,
-            fixture.variables,
-            factors.len(),
-            eliminate.len(),
-            plan_median_ns,
-            plan_min_ns,
-            warmup.induced_width,
-            warmup.predicted_output_entries,
-            warmup.predicted_peak_factor_entries,
-            warmup.peak_factor_entries,
-            warmup.factor_multiplications,
-            median_ns,
-            min_ns,
-            validated,
-        );
+        let fields = vec![
+            fixture.topology.to_string(),
+            fixture.variables.to_string(),
+            factors.len().to_string(),
+            eliminate.len().to_string(),
+            "ADMITTED_EXACT".to_string(),
+            MAX_FACTOR_ENTRIES.to_string(),
+            plan_median_ns.to_string(),
+            plan_min_ns.to_string(),
+            warmup.induced_width.to_string(),
+            warmup.predicted_output_entries.to_string(),
+            warmup.predicted_peak_factor_entries.to_string(),
+            warmup.peak_factor_entries.to_string(),
+            warmup.factor_multiplications.to_string(),
+            median_ns.to_string(),
+            min_ns.to_string(),
+            validated.to_string(),
+        ];
+        println!("{}", fields.join(","));
     }
     Ok(())
 }
