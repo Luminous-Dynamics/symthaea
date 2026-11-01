@@ -9,7 +9,9 @@
     "isa_family": "aarch64",
     "os_version": null,
     "security_patch_level": null,
-    "build_fingerprint_sha256": null
+    "build_fingerprint_sha256": null,
+    "os_api_level": null,
+    "vendor_security_patch_level": null
   },
   "boot_integrity": {
     "bootloader_locked": "not_measured",
