@@ -121,6 +121,11 @@ def generate(output_path: Path) -> dict[str, Any]:
 
     import numpy as np
     import pyphi
+    from pyphi import connectivity
+    from pyphi.formalism.iit4 import evaluate_partition
+    from pyphi.formalism.iit4.formalism import IIT4_2023Formalism
+    from pyphi.measures.distribution import resolve_system_measure
+    from pyphi.partition import system_partitions, system_partition_types
     from pyphi.substrate import Substrate
     from pyphi.system import System
 
@@ -197,6 +202,55 @@ def generate(output_path: Path) -> dict[str, Any]:
             parallel=False,
             progress=False,
         )
+        # Reuse the exact fixed-state measure and partition family from the
+        # active IIT4_2023 formalism, then record every score (not only the MIP).
+        partition_scheme = IIT4_2023Formalism.partition_scheme
+        partition_type = system_partition_types[partition_scheme]
+        partition_filter = None
+        if getattr(partition_type, "may_yield_non_disconnecting_cuts", False):
+            def partition_filter(partition):
+                return (
+                    not connectivity.is_strong(
+                        fixed_system.apply_partition(partition).proper_cm
+                    )
+                ) or len(fixed_system) == 1
+        partitions = list(system_partitions(
+            fixed_system.node_indices,
+            node_labels=fixed_system.node_labels,
+            partition_scheme=partition_scheme,
+            filter_func=partition_filter,
+        ))
+        system_measure = resolve_system_measure("GENERALIZED_INTRINSIC_DIFFERENCE")
+        per_partition_scores = []
+        for partition_index, partition in enumerate(partitions):
+            partition_sia = evaluate_partition(
+                partition,
+                fixed_system,
+                system_state,
+                system_measure=system_measure,
+            )
+            partition_cut_sha, partition_cut_edges = _mip_cut_identity(
+                type("PartitionSia", (), {"partition": partition})()
+            )
+            if partition_cut_sha is None or partition_cut_edges is None:
+                raise RuntimeError("partition diagnostic has no directed cut identity")
+            if partition_sia.cause is None or partition_sia.effect is None:
+                raise RuntimeError("partition diagnostic is missing a direction")
+            per_partition_scores.append({
+                "partition_index": partition_index,
+                "cut_sha256": partition_cut_sha,
+                "removed_edges": partition_cut_edges,
+                "signed_phi": _json_value(partition_sia.signed_phi),
+                "phi": _json_value(partition_sia.phi),
+                "signed_normalized_phi": _json_value(partition_sia.signed_normalized_phi),
+                "normalized_phi": _json_value(partition_sia.normalized_phi),
+                "cause_signed_phi": _json_value(partition_sia.cause.signed_phi),
+                "cause_phi": _json_value(partition_sia.cause.phi),
+                "effect_signed_phi": _json_value(partition_sia.effect.signed_phi),
+                "effect_phi": _json_value(partition_sia.effect.phi),
+            })
+        if not per_partition_scores:
+            raise RuntimeError("PyPhi partition diagnostic emitted no scores")
         mip_tie_cuts = []
         for tied_sia in fixed_state_sia.ties:
             tied_sha, tied_edges = _mip_cut_identity(tied_sia)
@@ -218,6 +272,7 @@ def generate(output_path: Path) -> dict[str, Any]:
             "mip_tie_count": len(mip_tie_cut_sha256s),
             "mip_tie_cut_sha256s": mip_tie_cut_sha256s,
             "mip_tie_cut_removed_edges": mip_tie_cut_removed_edges,
+            "partition_scores": per_partition_scores,
             "phi": _json_value(raw.get("phi")),
             "signed_phi": _json_value(raw.get("signed_phi")),
             "normalized_phi": _json_value(raw.get("normalized_phi")),
@@ -268,6 +323,8 @@ def generate(output_path: Path) -> dict[str, Any]:
             "distinct_model_digest_count": len({p["model_sha256"] for p in points}),
             "distinct_request_digest_count": len({p["analysis_request_sha256"] for p in points}),
             "regime_count": len({p["regime"] for p in points}),
+            "partition_count_per_point": len(points[0]["partition_scores"]),
+            "partition_score_row_count": sum(len(p["partition_scores"]) for p in points),
             "boundary_count": len(boundaries),
             "all_points_complete": True,
         },
@@ -276,6 +333,7 @@ def generate(output_path: Path) -> dict[str, Any]:
             "Regime boundary entries are adjacent grid brackets where selection identity changes, not certified switch intervals.",
             "The oracle and Rust sweep bind identical canonical dense TPM, evaluation, candidate, state, formalism, quantity and parameter values.",
             "The complete fixed-state MIP tie family is obtained by re-running public System.sia(system_state=...) for the selected cause/effect pair; landscape-level state-pair ties are a separate concept.",
+            "Every eligible directed partition is independently evaluated with the active IIT4_2023 evaluate_partition path and GID system measure; rows are comparable by canonical cut digest.",
             "PyPhi and Rust may use distinct native sparse/dense representation identities; the canonical dense digests identify the shared mathematical input.",
             "This artifact does not claim cross-engine parity until a separate verifier compares every common field and selection.",
             "IIT 4.0 (2026) is not evaluated.",
