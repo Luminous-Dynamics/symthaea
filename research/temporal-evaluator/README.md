@@ -43,3 +43,40 @@ interaction measure, not a Shapley value.
 
 Six interaction test functions and fourteen exact-oracle test functions are
 authored; no Rust build or test has run for this draft.
+
+## Higher-order temporal interaction decomposition
+
+The evaluator-only `interaction_decomposition` module adds an exact Möbius /
+Harsanyi-dividend decomposition over the complete binary action lattice.
+
+For any non-empty action subset T, it computes:
+
+`v(S) = E(empty) - E(S)`
+
+`dividend(T) = sum over S subseteq T of (-1)^(|T|-|S|) * v(S)`
+
+The decomposition reports first-order action effects, pairwise interaction,
+and pure third-/fourth-/higher-order contributions after lower-order terms are
+removed. Positive coefficients mean additional exposure reduction
+(synergy); negative coefficients mean antagonism.
+
+A coefficient is emitted only if every required sub-subset is compatible and
+within the same episode's measured hard resource budget. Incompatible or
+over-budget subset counts are reported; a missing coefficient is not silently
+replaced by zero. The evaluator binds the full table to the same episode,
+future stream, model, action registry and resource budget.
+
+This is exact for the finite action lattice and the measured episode. It is
+not a Shapley allocation, a population-level causal effect or evidence of
+generalization. Causal interpretation requires valid randomized/matched
+interventions; stochastic systems need independent paired replicates and
+uncertainty intervals across held-out episodes. A single deterministic table
+only characterizes its declared context.
+
+Eight source-level tests cover additive controls, pure third-/fourth-order
+synergy, higher-order antagonism, conflict-group exclusions, budget exclusions,
+context/registry mismatch, and incomplete/duplicate subset tables.
+
+The evaluator package currently has 29 authored Rust test functions across
+joint-budget, pairwise-interaction and higher-order decomposition modules.
+No Rust build, format, Clippy or test execution is claimed.
