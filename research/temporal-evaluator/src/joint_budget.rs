@@ -492,6 +492,7 @@ mod tests {
             persistent_bytes: 10,
             retained_byte_us: 100,
             io_bytes: 20,
+            latency_us: 10,
             compute_units: compute,
             observations,
             energy_nj: 50,
