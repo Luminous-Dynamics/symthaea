@@ -52,6 +52,7 @@ pub enum DesignError {
     DuplicateHypothesisId { hypothesis_id: String },
     MissingUnresolvedHypothesis,
     ZeroUnresolvedPrior,
+    InconsistentHypothesisOrder,
     EmptyLikelihoodScenarioSet,
     EmptyLikelihoodScenarioId,
     DuplicateLikelihoodScenarioId { scenario_id: String },
@@ -122,6 +123,9 @@ impl fmt::Display for DesignError {
             }
             Self::ZeroUnresolvedPrior => {
                 write!(f, "OTHER_OR_UNRESOLVED must have a positive caller-supplied prior")
+            }
+            Self::InconsistentHypothesisOrder => {
+                write!(f, "all ranked open-world candidates must use identical hypothesis IDs in identical prior order")
             }
             Self::EmptyLikelihoodScenarioSet => {
                 write!(f, "open-world candidate must declare at least one likelihood scenario")
@@ -540,7 +544,7 @@ pub fn evaluate_open_world_candidate(
                 hypothesis_id: hypothesis_id.clone(),
             });
         }
-        if hypothesis_id == UNRESOLVED_HYPOTHESIS_ID {
+        if hypothesis_id.as_str() == UNRESOLVED_HYPOTHESIS_ID {
             unresolved_index = Some(index);
         }
     }
@@ -626,6 +630,14 @@ pub fn rank_open_world_candidates(
     validate_priors(priors)?;
     if candidates.is_empty() {
         return Err(DesignError::NoCandidateExperiments);
+    }
+
+    let reference_hypotheses = &candidates[0].hypothesis_ids;
+    if candidates
+        .iter()
+        .any(|candidate| candidate.hypothesis_ids != *reference_hypotheses)
+    {
+        return Err(DesignError::InconsistentHypothesisOrder);
     }
 
     let mut ids = HashSet::with_capacity(candidates.len());
@@ -919,11 +931,11 @@ mod tests {
             vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
             vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
         );
-        candidate.hypothesis_ids.pop();
+        candidate.hypothesis_ids[2] = "unresolved-but-not-calibrated".to_owned();
         let priors = [0.45, 0.45, 0.10];
         assert_eq!(
             evaluate_open_world_candidate(&priors, &candidate),
-            Err(DesignError::PriorCountMismatch { expected: 3, actual: 2 })
+            Err(DesignError::MissingUnresolvedHypothesis)
         );
     }
 
@@ -1048,6 +1060,56 @@ mod tests {
         assert_eq!(report.schema_version, "connectome-open-world-eig-v1");
         assert_eq!(report.unresolved_hypothesis_id, UNRESOLVED_HYPOTHESIS_ID);
         assert_eq!(report.ranked_experiments.len(), 1);
+    }
+
+    #[test]
+    fn open_world_rejects_duplicate_hypothesis_ids() {
+        let mut candidate = open_world_candidate(
+            "open-world", 1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        );
+        candidate.hypothesis_ids[1] = candidate.hypothesis_ids[0].clone();
+        let priors = [0.45, 0.45, 0.10];
+        assert!(matches!(
+            evaluate_open_world_candidate(&priors, &candidate),
+            Err(DesignError::DuplicateHypothesisId { .. })
+        ));
+    }
+
+    #[test]
+    fn open_world_rejects_empty_likelihood_scenario_set() {
+        let mut candidate = open_world_candidate(
+            "open-world", 1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        );
+        candidate.likelihood_scenarios.clear();
+        let priors = [0.45, 0.45, 0.10];
+        assert_eq!(
+            evaluate_open_world_candidate(&priors, &candidate),
+            Err(DesignError::EmptyLikelihoodScenarioSet)
+        );
+    }
+
+    #[test]
+    fn open_world_ranking_rejects_inconsistent_hypothesis_order() {
+        let first = open_world_candidate(
+            "first", 1.0,
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+            vec![vec![0.7, 0.3], vec![0.3, 0.7], vec![0.5, 0.5]],
+        );
+        let mut second = open_world_candidate(
+            "second", 1.0,
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+            vec![vec![0.7, 0.3], vec![0.3, 0.7], vec![0.5, 0.5]],
+        );
+        second.hypothesis_ids.swap(0, 1);
+        let priors = [0.45, 0.45, 0.10];
+        assert_eq!(
+            rank_open_world_candidates(&priors, &[first, second]),
+            Err(DesignError::InconsistentHypothesisOrder)
+        );
     }
 
     #[test]
