@@ -198,7 +198,6 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         bail!("unknown benchmark integrity evidence class");
     }
 
-    let evidence_class = string(value, "/evidence_class")?;
     let task_id = string(value, "/dataset/task_id")?.to_owned();
     let statement_sha256 = string(value, "/target/statement_sha256")?.to_owned();
     if string(value, "/dataset/cohort_id")?.trim().is_empty()
