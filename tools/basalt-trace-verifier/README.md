@@ -16,7 +16,7 @@ cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- \
   --out basalt-reference-report.json
 ```
 
-The standalone package is intentionally not a root workspace member. It uses a private lockfile so the repository-wide workspace glob/manifest problems do not contaminate this focused check.
+The standalone package is intentionally not a root workspace member. It uses a private lockfile so the repository-wide workspace glob/manifest problems do not contaminate this focused check. The source is normalized with the repository-pinned Rust 1.96 formatter; the dedicated verifier workflow checks formatting again on every exact PR head.
 
 ## What it verifies
 
