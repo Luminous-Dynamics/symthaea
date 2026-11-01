@@ -115,6 +115,13 @@
       "mutation": "Source or log cursor key is deleted and recreated with version reset",
       "expected": "Detect prohibited lineage reset using independent provisioning/authority evidence; no silent generation bootstrap",
       "safety_gate": true
+    },
+    {
+      "id": "SCAS-016",
+      "class": "rollback",
+      "mutation": "Restore an older etcd snapshot using --bump-revision and --mark-compacted so the store revision appears monotonic or advances beyond the externally observed revision",
+      "expected": "Independent monitor compares authenticated authority-incarnation identity and accepted-state commitment/predecessor chain; restored state is rejected or unknown even when its numeric revision is larger",
+      "safety_gate": true
     }
   ],
   "metrics": [
@@ -213,6 +220,12 @@
       "class": "safety",
       "unit": "milliseconds",
       "target": "measure; never promote before detection"
+    },
+    {
+      "id": "revision_bumped_restore_false_freshness",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
     }
   ],
   "workload_matrix": {
