@@ -193,3 +193,10 @@ Resource accounting separates elapsed wall-clock from summed branch wall-work. P
 PITB now has a separate v1 structural Lean-expression wire contract and an independent Rust verifier. It binds target expressions to exact source/task, Lean runtime-artifact, imported OLean-closure, and Lake environment metadata, maps FVarIds to ordered local-context indices, preserves the local-instance registry, and keeps transparent-let dependencies separate from nondependent-have value provenance. The contract deliberately uses an environment-scoped structural digest rather than claiming a cross-version semantic theorem ID. See docs/research/pitb-lean-expr-wire-v1-2026-11-01.md.
 
 The checked-in example is synthetic. The Rust verifier has not yet been compiled in this environment, and the Lean v1 exporter has not yet been implemented or run; no real capture or proof result is claimed.
+
+
+## Live elaboration snapshot arm (R5)
+
+R5 adds the Level-2 live proof-state snapshot baseline to the existing R0–R4 runtime comparison. It is R4 with the post-elaboration proof state captured once; branches share the immutable environment and receive independent mutable metavariable-context copies. This isolates the benefit of avoiding repeated import and theorem-body elaboration from the benefit of PITB's retrieval, context and strategy interventions.
+
+Every R5 branch ledger must bind a separate snapshot receipt SHA-256. The snapshot receipt is independently schema-validated and must attest the environment, goal, context, runtime/imported OLean identities, per-branch metavariable isolation, and cache policy. v0 requires mutable tactic/typeclass caches to be discarded or recreated per branch; cache sharing is not allowed unless a separate dependency-invalidation qualification exists. The checked-in R4 fixture remains a no-snapshot synthetic contract fixture.
