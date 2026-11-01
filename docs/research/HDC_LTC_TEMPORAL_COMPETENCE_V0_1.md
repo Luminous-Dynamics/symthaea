@@ -138,6 +138,24 @@ OAKS is an external natural-language benchmark, not identical to T10's structure
 
 The Adobe dataset repository's license restricts use to noncommercial research and teaching, excluding commercial product development or other commercial-gain activities. OAKS data must therefore remain in a noncommercial research lane unless a separate license is obtained. The OAKS evaluation-code README reports 435 OAKS-Novel questions while the dataset README reports 870; reconcile the precise data-file manifest and question-count convention before attempting a paper-score reproduction. No OAKS dataset has been downloaded or evaluated in this PR.
 
+## Edge Algorithm/System evaluation adapter
+
+A separate edge evaluation bridge is being developed in [#9804](https://github.com/Luminous-Dynamics/symthaea/issues/9804), branch `research/edge-temporal-bridge-v0.1`. The prototype is in `research/temporal-bench/src/edge_adapter.rs` and deliberately reuses the T1–T10 task registry rather than defining duplicate task generators.
+
+The bridge separates:
+- a frozen manifest containing task registry, per-task metrics, baseline families, exact candidate source/artifact/configuration/dependency pins, source-family split assignments, and an optional system target;
+- a candidate output receipt containing only public task digest, candidate identity, predictions/action/model-state trace commitments, and memory accounting;
+- a distinct evaluator receipt containing candidate-output binding, private oracle commitment, evaluator implementation digest, and task metric observations;
+- a System-track receipt binding candidate + evaluator + physical target, build materials, device session, raw latency samples, memory, complete-event energy and uncertainty.
+
+The API-level separation does not provide a process sandbox. The existing task generators still return both task and oracle together for local deterministic tests. Confirmatory evaluation must use separate OS-level permissions/processes, with a candidate interface that receives only the public task stream.
+
+Every T1–T10 task requires training, development, calibration and confirmatory source-family splits. The same source family cannot be used in multiple splits. Candidate baseline families are pinned to source revision, dependency lock, build artifact and configuration digests; names alone are not baseline evidence.
+
+System measurement is distinct from the algorithm track. It requires named board/core/accelerator tier, compiler/firmware/linker map/device session, raw per-event latency, protected SRAM/flash limits, and calibrated complete-event energy per successful on-time event with uncertainty. CPU, DSP/MVE, integrated-signal-processor, NPU, heterogeneous and neuromorphic target tiers must remain separate.
+
+The adapter is currently a receipt/contract prototype: seven synthetic tests are authored but uncompiled/unexecuted; no baseline has been run, no real dataset has been ingested, and no physical system measurement is claimed. Full design: `docs/research/EDGE_TEMPORAL_BENCHMARK_BRIDGE_V0_1.md`.
+
 ## 6. Baseline registry
 
 Required baseline families, where semantics are appropriate:
