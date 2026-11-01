@@ -132,3 +132,31 @@ cells, explicit availability delay, text payload hashing/whitespace,
 fixed-point quantization, file/row provenance, record identity and schema
 failures. The crate now has 54 source-authored test functions total. No build or
 test has run.
+
+
+## Microsecond bitemporal event revisions
+
+The crate also provides an append-only `BitemporalEventLedger` for event
+corrections and retractions. Event time is the world-time coordinate;
+`recorded_at_us` is transaction/knowledge time. As-known queries choose the
+latest revision visible at the requested knowledge time, then apply the
+world-time cutoff. A later correction/retraction cannot rewrite an earlier
+as-known result. Revisions preserve entity, modality, source and source-local
+sequence identity; transactions are atomic and use one timestamp.
+
+This is event-point validity (event_time <= valid_at), not a replacement for
+the day-interval assertion API in Broca's #9109/#9292 bitemporal ledger.
+
+## CSV adapters
+
+`csv_adapter` parses Time-IMM-style numeric `date_time,record_id,feature...`
+and unstructured text tables. It never silently infers arrival time: callers
+must explicitly choose an availability column or the labeled
+`EventTimeAssumedImmediate` approximation. Naive timestamps are parsed as UTC
+only when explicitly enabled. Numeric values use exact fixed-point millionths;
+unstructured payloads use content-addressed opaque references.
+
+The eight CSV tests cover irregular numeric rows, explicit availability,
+late-arrival filtering, missing values, exact decimal conversion, opaque text
+payloads, record/column validation and timezone assumptions. None has been
+compiled or run.
