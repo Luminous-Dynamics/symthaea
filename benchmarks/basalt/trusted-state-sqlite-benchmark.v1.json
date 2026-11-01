@@ -77,6 +77,12 @@
       "phase": "claim_boundary",
       "mutation": "Restore an older complete local database snapshot, including its old unkeyed digest",
       "expected": "local checks may pass; anti-rollback must remain unknown/false without external anchor"
+    },
+    {
+      "id": "TSTATE-SQL-013",
+      "phase": "configuration",
+      "mutation": "Open an existing symlink, non-regular database path, or an over-limit persisted state",
+      "expected": "Reject unsafe path or fail closed before admitting any new state transition"
     }
   ],
   "metrics": [
@@ -151,6 +157,12 @@
       "class": "efficiency",
       "unit": "milliseconds",
       "target": "measure p50/p95/p99 after clean close and injected abort"
+    },
+    {
+      "id": "unsafe_database_path_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
     }
   ],
   "benchmark_policy": {
