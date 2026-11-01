@@ -1,54 +1,206 @@
 {
- "$schema":"https://json-schema.org/draft/2020-12/schema",
- "$id":"https://luminousdynamics.io/schemas/pitb/proof-search-calibration-receipt-v0.schema.json",
- "title":"PITB proof-search calibration receipt v0",
- "description":"Aggregated validation-split calibration evidence by action type. This receipt summarizes trajectory outcomes; it is not itself a proof-success certificate.",
- "type":"object","additionalProperties":false,
- "required":["schema_version","evidence_class","receipt_id","split","dataset_id","dataset_manifest_sha256","prediction_model_id","prediction_model_version","calibration_method","minimum_bin_count","total_sample_count","worst_action_ece_ppm","mean_action_brier_score_ppm","source_receipt_manifest_sha256","action_groups"],
- "properties":{
-  "schema_version":{"const":"pitb.proof-search-calibration-receipt.v0"},
-  "evidence_class":{"enum":["synthetic_contract_fixture","measured_validation"]},
-  "receipt_id":{"type":"string","minLength":1},
-  "split":{"const":"validation"},
-  "dataset_id":{"type":"string","minLength":1},
-  "dataset_manifest_sha256":{"$ref":"#/$defs/sha256"},
-  "prediction_model_id":{"type":"string","minLength":1},
-  "prediction_model_version":{"type":"string","minLength":1},
-  "calibration_method":{"const":"equal_width_10_bin_per_action"},
-  "minimum_bin_count":{"const":20},
-  "total_sample_count":{"type":"integer","minimum":200},
-  "worst_action_ece_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-  "mean_action_brier_score_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-  "source_receipt_manifest_sha256":{"$ref":"#/$defs/sha256"},
-  "action_groups":{"type":"array","minItems":8,"maxItems":8,"items":{"$ref":"#/$defs/action_group"}}
- },
- "$defs":{
-  "sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-  "action_group":{
-   "type":"object","additionalProperties":false,
-   "required":["action_kind","sample_count","ece_ppm","brier_score_ppm","bins"],
-   "properties":{
-    "action_kind":{"enum":["continue_current_target","retrieve_context","change_decomposition","typed_repair","tactic_probe","spawn_snapshot_branch","semantic_check","restart_search"]},
-    "sample_count":{"type":"integer","minimum":200},
-    "ece_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-    "brier_score_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-    "bins":{"type":"array","minItems":10,"maxItems":10,"items":{"$ref":"#/$defs/bin"}}
-   }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-search-calibration-receipt-v0.schema.json",
+  "title": "PITB proof-search calibration receipt v0",
+  "description": "Aggregated validation-split calibration evidence by action type. This receipt summarizes trajectory outcomes; it is not itself a proof-success certificate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "receipt_id",
+    "split",
+    "dataset_id",
+    "dataset_manifest_sha256",
+    "prediction_model_id",
+    "prediction_model_version",
+    "calibration_method",
+    "minimum_bin_count",
+    "total_sample_count",
+    "worst_action_ece_ppm",
+    "mean_action_brier_score_ppm",
+    "source_receipt_manifest_sha256",
+    "evaluation_horizon_id",
+    "continuation_policy_sha256",
+    "action_groups"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-search-calibration-receipt.v0"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_contract_fixture",
+        "measured_validation"
+      ]
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "const": "validation"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prediction_model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prediction_model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_method": {
+      "const": "equal_width_10_bin_per_action"
+    },
+    "minimum_bin_count": {
+      "const": 20
+    },
+    "total_sample_count": {
+      "type": "integer",
+      "minimum": 200
+    },
+    "worst_action_ece_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "mean_action_brier_score_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "source_receipt_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "action_groups": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/action_group"
+      }
+    },
+    "evaluation_horizon_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "continuation_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
   },
-  "bin":{
-   "type":"object","additionalProperties":false,
-   "required":["bin_id","count","min_predicted_ppm","max_predicted_ppm","sum_predicted_ppm","sum_probability_squared_ppm2","sum_probability_on_success_ppm","success_count","outcome_receipt_manifest_sha256"],
-   "properties":{
-    "bin_id":{"type":"integer","minimum":0,"maximum":9},
-    "count":{"type":"integer","minimum":20},
-    "min_predicted_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-    "max_predicted_ppm":{"type":"integer","minimum":0,"maximum":1000000},
-    "sum_predicted_ppm":{"type":"integer","minimum":0},
-    "sum_probability_squared_ppm2":{"type":"integer","minimum":0},
-    "sum_probability_on_success_ppm":{"type":"integer","minimum":0},
-    "success_count":{"type":"integer","minimum":0},
-    "outcome_receipt_manifest_sha256":{"$ref":"#/$defs/sha256"}
-   }
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "action_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_kind",
+        "sample_count",
+        "ece_ppm",
+        "brier_score_ppm",
+        "bins"
+      ],
+      "properties": {
+        "action_kind": {
+          "enum": [
+            "continue_current_target",
+            "retrieve_context",
+            "change_decomposition",
+            "typed_repair",
+            "tactic_probe",
+            "spawn_snapshot_branch",
+            "semantic_check",
+            "restart_search"
+          ]
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "ece_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "brier_score_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "bins": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/bin"
+          }
+        }
+      }
+    },
+    "bin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bin_id",
+        "count",
+        "min_predicted_ppm",
+        "max_predicted_ppm",
+        "sum_predicted_ppm",
+        "sum_probability_squared_ppm2",
+        "sum_probability_on_success_ppm",
+        "success_count",
+        "outcome_receipt_manifest_sha256"
+      ],
+      "properties": {
+        "bin_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 20
+        },
+        "min_predicted_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "max_predicted_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "sum_predicted_ppm": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sum_probability_squared_ppm2": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sum_probability_on_success_ppm": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "success_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome_receipt_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
   }
- }
 }
