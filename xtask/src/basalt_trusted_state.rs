@@ -22,6 +22,7 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction, Tr
 use sha2::{Digest, Sha256};
 
 const MAX_ID_BYTES: usize = 128;
+const SQLITE_SCHEMA_VERSION: i64 = 1;
 const MAX_SQLITE_LOG_CURSORS: usize = 128;
 const MAX_SQLITE_SOURCE_CURSORS: usize = 4_096;
 const MAX_SQLITE_ACCEPTED_RECEIPTS: usize = 100_000;
@@ -115,11 +116,16 @@ pub struct TrustedState {
 struct AcceptedReceipt {
     source: SourceKey,
     generation: u64,
+    accepted_revision: u64,
     previous_seal_digest: Option<String>,
     seal_digest: String,
     receipt_digest: String,
     observer_profile_digest: String,
     boot_incarnation_digest: String,
+    profile_transition_evidence_digest: Option<String>,
+    boot_transition_evidence_digest: Option<String>,
+    log_origin_transition_evidence_digest: Option<String>,
+    policy_transition_evidence_digest: Option<String>,
     checkpoint: LogCheckpoint,
     policy_versions: PolicyVersions,
 }
@@ -137,6 +143,10 @@ impl AcceptedReceipt {
             && self.receipt_digest == candidate.receipt_digest
             && self.observer_profile_digest == candidate.observer_profile_digest
             && self.boot_incarnation_digest == candidate.boot_incarnation_digest
+            && self.profile_transition_evidence_digest == candidate.profile_transition_evidence_digest
+            && self.boot_transition_evidence_digest == candidate.boot_transition_evidence_digest
+            && self.log_origin_transition_evidence_digest == candidate.log_origin_transition_evidence_digest
+            && self.policy_transition_evidence_digest == candidate.policy_transition_evidence_digest
             && self.checkpoint.log_id == candidate.checkpoint.log_id
     }
 }
@@ -286,11 +296,16 @@ impl TrustedState {
             AcceptedReceipt {
                 source: candidate.source.clone(),
                 generation: candidate.generation,
+                accepted_revision: next_revision,
                 previous_seal_digest: candidate.previous_seal_digest.clone(),
                 seal_digest: candidate.seal_digest.clone(),
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
                 boot_incarnation_digest: candidate.boot_incarnation_digest.clone(),
+                profile_transition_evidence_digest: candidate.profile_transition_evidence_digest.clone(),
+                boot_transition_evidence_digest: candidate.boot_transition_evidence_digest.clone(),
+                log_origin_transition_evidence_digest: candidate.log_origin_transition_evidence_digest.clone(),
+                policy_transition_evidence_digest: candidate.policy_transition_evidence_digest.clone(),
                 checkpoint: candidate.checkpoint.clone(),
                 policy_versions: candidate.policy_versions.clone(),
             },
@@ -1599,6 +1614,7 @@ mod tests {
 const SQLITE_SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS basalt_state_meta (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
     revision TEXT NOT NULL,
     signer_policy_version TEXT,
     witness_policy_version TEXT,
@@ -1635,6 +1651,7 @@ CREATE TABLE IF NOT EXISTS basalt_source_cursors (
 
 CREATE TABLE IF NOT EXISTS basalt_accepted_receipts (
     receipt_digest TEXT PRIMARY KEY,
+    accepted_revision TEXT NOT NULL UNIQUE,
     host_id TEXT NOT NULL,
     source_id TEXT NOT NULL,
     partition_id TEXT NOT NULL,
@@ -1643,6 +1660,10 @@ CREATE TABLE IF NOT EXISTS basalt_accepted_receipts (
     seal_digest TEXT NOT NULL,
     observer_profile_digest TEXT NOT NULL,
     boot_incarnation_digest TEXT NOT NULL,
+    profile_transition_evidence_digest TEXT,
+    boot_transition_evidence_digest TEXT,
+    log_origin_transition_evidence_digest TEXT,
+    policy_transition_evidence_digest TEXT,
     log_id TEXT NOT NULL,
     tree_size TEXT NOT NULL,
     root_digest TEXT NOT NULL,
