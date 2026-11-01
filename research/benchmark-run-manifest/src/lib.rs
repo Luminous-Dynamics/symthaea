@@ -740,7 +740,7 @@ fn hash_latency(hasher: &mut Sha256, latency: &LatencyMeasurement) -> Result<(),
     hasher.update(latency.p99_us.to_le_bytes());
     hasher.update(latency.throughput_milli_per_second.to_le_bytes());
     match latency.deadline_us {
-        None => hasher.update([0]),
+        None => { hasher.update([0]); }
         Some(deadline) => {
             hasher.update([1]);
             hasher.update(deadline.to_le_bytes());
