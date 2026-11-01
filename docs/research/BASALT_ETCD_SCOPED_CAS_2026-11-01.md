@@ -153,7 +153,7 @@ The scoped design cannot eliminate the shared Raft log, resource limits, network
 
 ## 6. Restore and witness boundary
 
-The etcd cluster is a crash-fault state service, not a Byzantine witness quorum. A whole-cluster restore may restore an internally consistent older key space and lower logical revision. A separate monitor/witness domain must retain a more recent authenticated checkpoint of the authority state, or report freshness unknown.
+The etcd cluster is a crash-fault state service, not a Byzantine witness quorum. A whole-cluster restore may restore an internally consistent older key space. etcdutl also supports --bump-revision and --mark-compacted so the restored cluster can present a numerically advanced revision; this prevents stale watch caches from continuing, but does not prove that the restored contents descend from the latest externally accepted state. A separate monitor/witness domain must retain an authenticated authority-incarnation identity and accepted-state commitment (for example, the latest witnessed receipt/checkpoint digest and predecessor chain), not merely the maximum numeric revision. If that commitment cannot be reconciled, report freshness unknown.
 
 For log split-view detection, the Sigstore Rekor architecture specifies independent witnesses that persist checkpoints and distribute/gossip them; one witness alone is insufficient to rule out split views. BASALT should keep the state-authority monitor and transparency-log witness roles logically separable and declare their administrative failure domains.
 
@@ -203,7 +203,7 @@ Safety gates before efficiency:
 - exact retry returns original acceptance revision;
 - zero stale/serializable read promotion;
 - 100% explicit unknown where authority or witness freshness is unavailable;
-- authority restore never promoted without independent monitor evidence.
+- authority restore never promoted without independent monitor evidence, including restores performed with revision bump and mark-compacted.
 
 Efficiency metrics:
 - accepted transactions/sec;
