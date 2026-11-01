@@ -207,3 +207,11 @@ Every R5 branch ledger must bind a separate snapshot receipt SHA-256. The snapsh
 The separate receipt contract is `snapshot-branch-receipt-v0.schema.json`, with a synthetic no-run fixture at `fixtures/snapshot-branch-receipt.synthetic.json` and focused workflow `.github/workflows/pitb-sorrydb-snapshot-contract.yml`. It binds task/source identity, structural proof-state identity, Lean runtime and imported OLean manifests, snapshot server/RPC build identity, capture stage, shared immutable Environment, per-branch mutable MetavarContext copies, private workspaces, cache policy and measured branch/resource metrics.
 
 The receipt is required in addition to the branch ledger's `snapshot_receipt_sha256`. A hash-shaped link is not proof that a receipt exists; the independent schema validator must accept the receipt bytes and the run's evidence must be retained. The synthetic fixture remains explicitly not attempted. No live snapshot implementation or measured R5 result is claimed.
+
+
+The standalone R5 receipt schema and no-run fixture are:
+- `snapshot-branch-receipt-v0.schema.json`
+- `fixtures/snapshot-branch-receipt.synthetic.json`
+- `.github/workflows/pitb-sorrydb-snapshot-contract.yml`
+
+The LeanLean repository-compression cohort has a separate per-repository outcome contract under `leanlean-track/`; none of its scores are mixed into SorryDB or family-transfer reports.
