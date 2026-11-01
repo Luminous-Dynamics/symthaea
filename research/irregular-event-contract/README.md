@@ -172,3 +172,10 @@ minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
 idempotent event arrivals, and deterministic rebuild/digest parity. No Rust
 build or test has run.
+
+
+The source watermark adversarial evaluation fixture is
+`crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`.
+It pins 14 deterministic scenario families and separates false-complete rate
+(the primary safety metric) from false-incomplete rate/completeness lag. All
+qualification thresholds are targets, not measured results.
