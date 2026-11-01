@@ -837,16 +837,23 @@ mod tests {
             schema: SEARCH_POWER_CONFIG_SCHEMA.to_owned(),
             design_id: "search-time-block-power-pilot".to_owned(),
             primary_contrast: SearchPowerPrimaryContrastV1::AllowlistedMinusNetworkDisabled,
+            multiplicity_method: SearchPowerMultiplicityV1::SinglePrimary,
             candidate_block_counts: vec![20, 40, 60],
             monte_carlo_repetitions: 2_000,
             baseline_score_permille: 700.0,
+            score_floor_permille: 0,
+            score_ceiling_permille: 1_000,
             smallest_effect_of_interest_permille: 30.0,
             shared_block_noise_sd_permille: 20.0,
             arm_residual_noise_sd_permille: 45.0,
             within_block_correlation_permille: 500,
             effect_heterogeneity_sd_permille: 10.0,
             run_order_effect_permille: 5.0,
-            missing_block_rate_permille: 20,
+            carryover_after_network_access_permille: 0.0,
+            missing_block_rate_permille: 0,
+            budget_truncation_rate_permille: 0,
+            outcome_dependent_failure_rate_permille: 0,
+            failure_score_threshold_permille: 0,
             alpha_permille: 50,
             maximum_type_i_upper_permille: 60,
             minimum_power_lower_permille: 800,
@@ -889,6 +896,49 @@ mod tests {
         let mut config = config();
         config.simulation_seed_hex = "aabb".to_owned();
         assert!(qualify_search_time_trial_design(&config).is_err());
+    }
+
+    #[test]
+    fn any_missing_block_invalidates_the_whole_monte_carlo_repetition() {
+        let mut config = config();
+        config.candidate_block_counts = vec![20];
+        config.monte_carlo_repetitions = 1_000;
+        config.missing_block_rate_permille = 20;
+        config.maximum_inconclusive_rate_permille = 500;
+        let seed = validate_config(&config).unwrap();
+        let summary = simulate_repetitions(&config, &seed, 20, 0.0, 0).unwrap();
+        assert!(summary.inconclusive_repetitions > 0);
+        assert!(summary.estimable_repetitions < summary.planned_repetitions);
+        let outcome = summary.finish();
+        assert_eq!(outcome.rejection_rate.trials, 1_000);
+        assert_eq!(
+            outcome.estimable_rejection_rate.trials,
+            u64::from(outcome.estimable_repetitions)
+        );
+        assert!(outcome.total_missing_blocks > 0);
+        assert!(outcome.mean_completed_blocks.unwrap() < 20.0);
+    }
+
+    #[test]
+    fn carryover_is_explicitly_included_in_condition_order_simulation() {
+        let mut config = config();
+        config.baseline_score_permille = 500.0;
+        config.shared_block_noise_sd_permille = 0.0;
+        config.arm_residual_noise_sd_permille = 0.0;
+        config.effect_heterogeneity_sd_permille = 0.0;
+        config.run_order_effect_permille = 0.0;
+        config.carryover_after_network_access_permille = 100.0;
+        let seed = validate_config(&config).unwrap();
+        let mut rng = DeterministicRng::new(&seed, 20, 1, 1);
+        let block = simulate_block(&config, 0.0, &mut rng);
+        assert!(block.scores.iter().any(|score| *score > 500.0));
+    }
+
+    #[test]
+    fn bonferroni_mode_uses_a_stricter_detection_threshold() {
+        let mut config = config();
+        config.multiplicity_method = SearchPowerMultiplicityV1::BonferroniThreeContrasts;
+        assert!(detection_critical_value(&config, 19) > t_critical_975(19));
     }
 
     #[test]
