@@ -1058,6 +1058,93 @@ mod tests {
         }
     }
 
+    fn prequential_trace(
+        dataset: &TemporalStreamDataset,
+        include_updates: bool,
+    ) -> PrequentialExecutionTrace {
+        let mut actions = Vec::new();
+        let mut state_sha = sha('a');
+        let mut next_release = 0usize;
+
+        for observation in &dataset.observations {
+            while next_release < dataset.delayed_labels.len()
+                && dataset.delayed_labels[next_release].label_available_at_us <= observation.timestamp_us
+            {
+                let label = &dataset.delayed_labels[next_release];
+                actions.push(PrequentialAction::LabelReleased {
+                    event_index: label.event_index,
+                    timestamp_us: label.label_available_at_us,
+                    label: label.label,
+                });
+                if include_updates {
+                    let next_state = digest(
+                        b"test-prequential-state",
+                        format!("{state_sha}:{}", label.event_index).as_bytes(),
+                    );
+                    actions.push(PrequentialAction::ModelUpdate {
+                        event_index: label.event_index,
+                        timestamp_us: label.label_available_at_us,
+                        state_before_sha256: state_sha.clone(),
+                        state_after_sha256: next_state.clone(),
+                    });
+                    state_sha = next_state;
+                }
+                next_release += 1;
+            }
+
+            // Test fixture only: a test oracle emits the known label after constructing the
+            // observation. The auditor checks chronology; candidate implementations do not
+            // receive the delayed-label stream in their input interface.
+            let label = dataset.delayed_labels[observation.event_index].label;
+            actions.push(PrequentialAction::Prediction {
+                event_index: observation.event_index,
+                timestamp_us: observation.timestamp_us,
+                predicted_class: Some(label),
+                positive_probability_q15: if label == 1 { 32_768 } else { 0 },
+                model_state_sha256: state_sha.clone(),
+            });
+        }
+
+        while next_release < dataset.delayed_labels.len() {
+            let label = &dataset.delayed_labels[next_release];
+            actions.push(PrequentialAction::LabelReleased {
+                event_index: label.event_index,
+                timestamp_us: label.label_available_at_us,
+                label: label.label,
+            });
+            if include_updates {
+                let next_state = digest(
+                    b"test-prequential-state",
+                    format!("{state_sha}:{}", label.event_index).as_bytes(),
+                );
+                actions.push(PrequentialAction::ModelUpdate {
+                    event_index: label.event_index,
+                    timestamp_us: label.label_available_at_us,
+                    state_before_sha256: state_sha.clone(),
+                    state_after_sha256: next_state.clone(),
+                });
+                state_sha = next_state;
+            }
+            next_release += 1;
+        }
+
+        let mut trace = PrequentialExecutionTrace {
+            schema: PREQUENTIAL_TRACE_SCHEMA.into(),
+            version: BENCHMARK_VERSION.into(),
+            run_id: "prequential-test-run".into(),
+            candidate_id: "hdc-ltc-fixed-fixture".into(),
+            candidate_artifact_sha256: sha('b'),
+            dataset_sha256: dataset.dataset_sha256.clone(),
+            initial_model_state_sha256: sha('a'),
+            energy_receipt_sha256: sha('c'),
+            metrology_receipt_sha256: sha('d'),
+            actions,
+            execution_trace_sha256: String::new(),
+        };
+        trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
+        trace
+    }
+
     #[test]
     fn static_manifest_requires_modern_optimized_tinyml_baselines_and_digest() {
         let manifest = static_manifest();
@@ -1071,6 +1158,85 @@ mod tests {
         let mut tampered = manifest;
         tampered.locked_test_split_sha256 = sha('3');
         assert!(validate_edge_benchmark_manifest(&tampered).is_err());
+    }
+
+    #[test]
+    fn prequential_audit_accepts_predict_release_update_state_chain() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let trace = prequential_trace(&dataset, true);
+        let receipt = audit_prequential_execution(&dataset, &trace).unwrap();
+        assert_eq!(receipt.metrics.event_count, dataset.observations.len());
+        assert_eq!(receipt.metrics.label_release_count, dataset.observations.len());
+        assert_eq!(receipt.metrics.model_update_count, dataset.observations.len());
+        assert_eq!(receipt.metrics.accuracy, 1.0);
+        assert_eq!(receipt.metrics.coverage, 1.0);
+        assert_eq!(receipt.energy_receipt_sha256, trace.energy_receipt_sha256);
+        assert!(is_sha256(&receipt.receipt_sha256));
+    }
+
+    #[test]
+    fn prequential_audit_rejects_prediction_at_or_after_label_availability() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut trace = prequential_trace(&dataset, false);
+        let prediction = trace.actions.iter_mut().find_map(|action| match action {
+            PrequentialAction::Prediction { event_index, timestamp_us, .. } if *event_index == 0 => Some(timestamp_us),
+            _ => None,
+        }).unwrap();
+        *prediction = dataset.delayed_labels[0].label_available_at_us;
+        trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
+        assert!(audit_prequential_execution(&dataset, &trace).unwrap_err().to_string().contains("strictly before"));
+    }
+
+    #[test]
+    fn prequential_audit_rejects_update_before_label_release() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut trace = prequential_trace(&dataset, true);
+        let update_index = trace.actions.iter().position(|action| {
+            matches!(action, PrequentialAction::ModelUpdate { event_index: 0, .. })
+        }).unwrap();
+        let release_index = trace.actions.iter().position(|action| {
+            matches!(action, PrequentialAction::LabelReleased { event_index: 0, .. })
+        }).unwrap();
+        trace.actions.swap(update_index, release_index);
+        trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
+        assert!(audit_prequential_execution(&dataset, &trace).is_err());
+    }
+
+    #[test]
+    fn prequential_audit_rejects_broken_model_state_chain() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut trace = prequential_trace(&dataset, true);
+        let prediction = trace.actions.iter_mut().find_map(|action| match action {
+            PrequentialAction::Prediction { event_index, model_state_sha256, .. } if *event_index == 5 => Some(model_state_sha256),
+            _ => None,
+        }).unwrap();
+        *prediction = sha('e');
+        trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
+        assert!(audit_prequential_execution(&dataset, &trace).unwrap_err().to_string().contains("current model-state"));
+    }
+
+    #[test]
+    fn prequential_abstentions_reduce_coverage_and_are_not_scored_as_correct() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut trace = prequential_trace(&dataset, false);
+        let prediction = trace.actions.iter_mut().find_map(|action| match action {
+            PrequentialAction::Prediction { event_index: 0, predicted_class, .. } => Some(predicted_class),
+            _ => None,
+        }).unwrap();
+        *prediction = None;
+        trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
+        let receipt = audit_prequential_execution(&dataset, &trace).unwrap();
+        assert_eq!(receipt.metrics.abstention_count, 1);
+        assert!(receipt.metrics.coverage < 1.0);
+        assert!(receipt.metrics.accuracy < 1.0);
+    }
+
+    #[test]
+    fn prequential_trace_digest_tampering_is_rejected() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut trace = prequential_trace(&dataset, false);
+        trace.energy_receipt_sha256 = sha('f');
+        assert!(audit_prequential_execution(&dataset, &trace).unwrap_err().to_string().contains("digest mismatch"));
     }
 
     #[test]
