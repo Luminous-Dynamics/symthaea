@@ -27,6 +27,25 @@ PINNED_PYPHI_VERSION = "2.0.0rc4"
 EXPECTED_EXAMPLE = "pyphi.examples.iit4_2023_fig1a_substrate()"
 EXPECTED_FORMALISM = "IIT_4_0_2023"
 EXPECTED_STATE = (0, 1, 1)
+# Canonical binary TPM captured from the executed PyPhi 2.0.0rc4 Fig. 1A
+# reference run. PyPhi's weight->TPM builder is independently checked against
+# this matrix, but all cross-language computations use this exact matrix.
+EXPECTED_TPM_STATE_BY_NODE = [
+    [0.11920292202211757, 0.7685247834990178, 0.16798161486607552],
+    [0.026596993576865863, 0.9988874639671398, 0.5],
+    [0.973403006423134, 0.40131233988754816, 0.16798161486607552],
+    [0.8807970779778823, 0.9945137011005495, 0.5],
+    [0.11920292202211757, 0.0054862988994504045, 0.5],
+    [0.026596993576865863, 0.5986876601124519, 0.8320183851339245],
+    [0.973403006423134, 0.0011125360328603216, 0.5],
+    [0.8807970779778823, 0.23147521650098227, 0.8320183851339245],
+]
+EXPECTED_CONNECTIVITY = [
+    [1, 1, 1],
+    [1, 1, 0],
+    [0, 1, 1],
+]
+EXAMPLE_TPM_ABSOLUTE_TOLERANCE = 1e-14
 # Cross-language identity vectors captured from the successful pinned PyPhi
 # run and asserted by the Rust Fig. 1A fixture. These make input parity strict:
 # a one-ULP TPM change is a different model until both sides explicitly agree.
@@ -188,7 +207,55 @@ def run(output_path: Path) -> dict[str, Any]:
         raise RuntimeError("PyPhi is unavailable; install the pinned pyphi==2.0.0rc4 artifact") from exc
     formalism = EXPECTED_FORMALISM
     pyphi.config.progress_bars = False
-    substrate = pyphi.examples.iit4_2023_fig1a_substrate()
+
+    # Check the published upstream builder against a canonical, reviewed TPM.
+    # The builder can differ by an ULP across floating-point execution paths;
+    # that is recorded and bounded here, not allowed to alter the differential
+    # input used by Rust and PyPhi.
+    import numpy as np
+    from pyphi.substrate import Substrate
+
+    generated_substrate = pyphi.examples.iit4_2023_fig1a_substrate()
+    generated_tpm = _float_matrix(
+        generated_substrate.tpm.to_pandas().values.tolist()
+    )
+    generated_connectivity = [
+        [int(cell) for cell in row]
+        for row in generated_substrate.cm.tolist()
+    ]
+    if generated_connectivity != EXPECTED_CONNECTIVITY:
+        raise RuntimeError(
+            "upstream Fig. 1A builder connectivity differs from the reviewed canonical model"
+        )
+    if len(generated_tpm) != len(EXPECTED_TPM_STATE_BY_NODE) or any(
+        len(actual_row) != len(expected_row)
+        or any(
+            abs(actual - expected) > EXAMPLE_TPM_ABSOLUTE_TOLERANCE
+            for actual, expected in zip(actual_row, expected_row, strict=True)
+        )
+        for actual_row, expected_row in zip(
+            generated_tpm, EXPECTED_TPM_STATE_BY_NODE, strict=True
+        )
+    ):
+        raise RuntimeError(
+            "upstream Fig. 1A builder TPM differs from the reviewed canonical model "
+            f"by more than {EXAMPLE_TPM_ABSOLUTE_TOLERANCE}"
+        )
+    max_example_tpm_deviation = max(
+        abs(actual - expected)
+        for actual_row, expected_row in zip(
+            generated_tpm, EXPECTED_TPM_STATE_BY_NODE, strict=True
+        )
+        for actual, expected in zip(actual_row, expected_row, strict=True)
+    )
+
+    # All reference calculations and shared model/request digests use this exact
+    # TPM matrix, not a freshly recomputed floating-point approximation.
+    substrate = Substrate(
+        np.asarray(EXPECTED_TPM_STATE_BY_NODE, dtype=float),
+        cm=np.asarray(EXPECTED_CONNECTIVITY, dtype=int),
+        node_labels=generated_substrate.node_labels,
+    )
     model_sha256, evaluation_sha256, reference_manifest_sha256, canonical_model, model_bytes = _model_digest(
         substrate, state, formalism
     )
@@ -246,6 +313,9 @@ def run(output_path: Path) -> dict[str, Any]:
             "formalism": formalism,
             "upstream_example": reference["api_example"],
             "state": list(state),
+            "upstream_builder_tpm_max_abs_deviation": max_example_tpm_deviation,
+            "upstream_builder_tpm_tolerance": EXAMPLE_TPM_ABSOLUTE_TOLERANCE,
+            "model_input_semantics": "exact canonical TPM shared with the Rust Fig. 1A fixture; the upstream builder is separately checked within the recorded absolute tolerance",
             "model_sha256": model_sha256,
             "model_digest_semantics": "SHA-256 of SYMTHAEA-IIT-BINARY-TPM v0.1 bytes: n_units u32 LE, state-by-unit f64 LE TPM, then source-major connectivity bytes; negative zero normalized",
             "evaluation_sha256": evaluation_sha256,
