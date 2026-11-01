@@ -797,7 +797,7 @@ pub fn evaluate_open_world_decision_value(
     for scenario in &candidate.likelihood_scenarios {
         let outcome_count = candidate.outcomes.len();
         let mut outcome_marginals = vec![0.0f64; outcome_count];
-        for (hypothesis_index, prior) in priors.iter().enumerate() {
+        for (hypothesis_index, prior) in normalized_priors.iter().enumerate() {
             for outcome_index in 0..outcome_count {
                 outcome_marginals[outcome_index] +=
                     prior * scenario.likelihoods_by_hypothesis[hypothesis_index][outcome_index];
@@ -820,7 +820,7 @@ pub fn evaluate_open_world_decision_value(
                 .enumerate()
                 .map(|(hypothesis_index, prior)| {
                     prior * scenario.likelihoods_by_hypothesis[hypothesis_index][outcome_index]
-                        / outcome_probability
+                        / raw_outcome_probability
                 })
                 .collect();
 
@@ -2572,6 +2572,31 @@ mod tests {
         assert!(score.best_case_evsi > 0.0);
         assert_eq!(score.worst_case_evsi, 0.0);
         assert_eq!(score.worst_case_scenario_id, "shared-misspecification");
+    }
+
+    #[test]
+    fn evsi_is_stable_to_accepted_prior_floating_point_mass_error() {
+        let candidate = target_query_candidate(
+            "outcome-discriminator",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let problem = decision_problem_example();
+        let exact = evaluate_open_world_decision_value(
+            &[0.3, 0.3, 0.3, 0.1],
+            &candidate,
+            &problem,
+        ).unwrap();
+        let near = evaluate_open_world_decision_value(
+            &[0.3000000001, 0.3000000001, 0.3000000001, 0.1000000001],
+            &candidate,
+            &problem,
+        ).unwrap();
+        assert!((exact.worst_case_evsi - near.worst_case_evsi).abs() < 1.0e-12);
     }
 
     #[test]
