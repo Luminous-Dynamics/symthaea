@@ -231,7 +231,7 @@ pub struct TemporalObservation {
 /// Evaluator-only ground truth, released after the configured delay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct DelayedGroundTruth {
+struct DelayedGroundTruth {
     pub event_index: usize,
     pub label_available_at_us: u64,
     pub label: u8,
@@ -240,14 +240,17 @@ pub struct DelayedGroundTruth {
     pub is_out_of_distribution: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// Evaluator-owned dataset container. It intentionally does not implement Serialize,
+/// Deserialize or Debug so the combined delayed-label stream cannot be exposed accidentally
+/// through a model-facing serialization or debug dump. Candidate code receives only the
+/// public observation records; delayed labels remain private to this module.
+#[derive(Clone, PartialEq, Eq)]
 pub struct TemporalStreamDataset {
     pub schema: String,
     pub version: String,
     pub config: TemporalStreamConfig,
     pub observations: Vec<TemporalObservation>,
-    pub delayed_labels: Vec<DelayedGroundTruth>,
+    delayed_labels: Vec<DelayedGroundTruth>,
     pub dataset_sha256: String,
 }
 
@@ -376,11 +379,25 @@ pub fn generate_temporal_drift_stream(
 ) -> Result<TemporalStreamDataset, EdgeBenchmarkError> {
     generate_stream(config)
 }
+#[derive(Serialize)]
+struct TemporalStreamCanonical<'a> {
+    schema: &'a str,
+    version: &'a str,
+    config: &'a TemporalStreamConfig,
+    observations: &'a [TemporalObservation],
+    delayed_labels: &'a [DelayedGroundTruth],
+}
+
 pub fn compute_temporal_stream_sha256(
     dataset: &TemporalStreamDataset,
 ) -> Result<String, EdgeBenchmarkError> {
-    let mut canonical = dataset.clone();
-    canonical.dataset_sha256.clear();
+    let canonical = TemporalStreamCanonical {
+        schema: &dataset.schema,
+        version: &dataset.version,
+        config: &dataset.config,
+        observations: &dataset.observations,
+        delayed_labels: &dataset.delayed_labels,
+    };
     let bytes = serde_json::to_vec(&canonical)
         .map_err(|e| EdgeBenchmarkError::new("dataset", e.to_string()))?;
     Ok(digest(STREAM_DOMAIN, &bytes))
