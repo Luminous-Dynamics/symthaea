@@ -455,7 +455,7 @@ mod tests {
     use super::*;
     use crate::{
         event_tape::{
-            ActionEvent, ActionOutcome, BudgetModel, CandidateDisposition, ComparisonMode,
+            ActionEvent, BudgetModel, CandidateDisposition, ComparisonMode,
             EventTapeHeader, EventTapeObjectiveContract, EventTapeObjectiveSpec,
             EventTapeObjectiveMode, ExecutionContract, ExecutionMode, MeterValue,
             PolicySnapshot, ResourceReceipt,
@@ -610,7 +610,7 @@ mod tests {
             AuthorizedSequentialDecision::Measure { authorization } => {
                 assert_eq!(authorization.selected_action_id,"measure-a");
                 assert_eq!(authorization.expected_charge_microunits,1);
-                assert!(matches!(authorization.intent,ActionIntent::EvaluateCandidateVector{..}));
+                assert!(matches!(&authorization.intent,ActionIntent::EvaluateCandidateVector{..}));
             }
             AuthorizedSequentialDecision::Stop { .. } => panic!("expected the informative measurement"),
         }
