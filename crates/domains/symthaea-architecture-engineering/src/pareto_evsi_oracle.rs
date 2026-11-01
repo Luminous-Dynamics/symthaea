@@ -316,7 +316,7 @@ impl ExactEvsiProblem {
             self.validate_world_rows(
                 &decision.losses_by_world,
                 |row| row.world_id.as_str(),
-                "loss",
+                "losses_by_world",
                 decision_index,
                 "decisions",
             )?;
@@ -390,7 +390,7 @@ impl ExactEvsiProblem {
                 self.validate_world_rows(
                     &outcome.likelihoods_by_world,
                     |row| row.world_id.as_str(),
-                    "likelihood",
+                    "likelihoods_by_world",
                     action_index * MAX_OUTCOMES_PER_ACTION + outcome_index,
                     "actions",
                 )?;
@@ -433,7 +433,7 @@ impl ExactEvsiProblem {
         &self,
         rows: &[T],
         world_id: impl for<'a> Fn(&'a T) -> &'a str,
-        row_kind: &str,
+        rows_field: &str,
         parent_index: usize,
         parent_name: &str,
     ) -> Result<(), ExactEvsiError> {
@@ -446,7 +446,7 @@ impl ExactEvsiProblem {
         for (index, world) in self.worlds.iter().enumerate() {
             if world_id(&rows[index]) != world.world_id {
                 return Err(ExactEvsiError::new(
-                    format!("problem.{parent_name}[{parent_index}].{row_kind}s_by_world[{index}]"),
+                    format!("problem.{parent_name}[{parent_index}].{rows_field}[{index}]"),
                     "rows must exactly match canonical world ID order",
                 ));
             }
@@ -636,6 +636,12 @@ fn minimum_bayes_risk(
                 &mut compensation,
                 posterior[world_index] * loss.loss,
             );
+        }
+        if !risk.is_finite() {
+            return Err(ExactEvsiError::new(
+                format!("decision.{}.expected_loss", decision.decision_id),
+                "expected Bayes risk overflowed or became non-finite",
+            ));
         }
         match &best {
             None => best = Some((risk, decision.decision_id.clone())),
