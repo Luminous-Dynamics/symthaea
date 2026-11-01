@@ -895,6 +895,68 @@ mod tests {
         }
     }
 
+    fn anytime_history(problem_id: &str, seed: u64, dimensions: usize, budget: usize) -> AnytimeHistory {
+        let objective_specs = (0..dimensions).map(|index| ParetoObjectiveSpec {
+            objective_id: format!("f{}", index + 1),
+            direction: ObjectiveDirection::Minimize,
+            scale_lower: 0.0,
+            scale_upper: if index == 1 { 10.0 } else { 1.0 },
+        }).collect::<Vec<_>>();
+        let reference_front = if dimensions == 2 {
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]]
+        } else {
+            vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![0.0, 0.0, 1.0]]
+        };
+        let target_plan = super::super::pareto_anytime::AnytimeTargetPlan::new(vec![
+            super::super::pareto_anytime::AnytimeTarget {
+                target_id: "recorded-hv".to_owned(),
+                metric: super::super::pareto_anytime::AnytimeTargetMetric::Hypervolume,
+                threshold: 0.000001,
+                minimum_evidence_level: super::super::pareto_anytime::EvidenceLevel::Recorded,
+            },
+        ], reference_front).unwrap();
+        let header = super::super::pareto_anytime::AnytimeHistoryHeader::new(
+            format!("moead-{problem_id}-{seed}"),
+            ALGORITHM_ID,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "test-evaluator",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "test-independent-verifier",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            problem_id,
+            seed,
+            objective_specs,
+            vec![-0.1; dimensions],
+            target_plan,
+            "synthetic-objective-evaluation-unit-v0.1",
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            budget as u64,
+            vec![
+                super::super::pareto_anytime::ResourceMeter::EvaluatorCalls,
+                super::super::pareto_anytime::ResourceMeter::NormalizedChargeMicrounits,
+            ],
+        ).unwrap();
+        AnytimeHistory::new(header).unwrap()
+    }
+
+    #[test]
+    fn anytime_capture_preserves_moead_report_and_records_every_evaluation() {
+        let config = zdt_config(2026);
+        let expected = run_moead_zdt1(&config, 10).unwrap();
+        let population_size = config.weight_mode.population_size().unwrap();
+        let budget = population_size * (config.generations + 1);
+        let mut history = anytime_history("zdt1", config.seed, 2, budget);
+        let captured = run_moead_zdt1_with_history(&config, 10, &mut history).unwrap();
+        assert_eq!(captured, expected);
+        assert_eq!(history.events().len(), expected.objective_evaluations);
+        let receipt = super::super::pareto_anytime::analyze_anytime_history(&history).unwrap();
+        assert_eq!(receipt.objective_evaluation_attempt_count as usize, expected.objective_evaluations);
+        assert_eq!(receipt.total_resources.evaluator_calls, Some(expected.objective_evaluations as u64));
+        assert_eq!(receipt.total_resources.normalized_charge_microunits, Some(expected.objective_evaluations as u64));
+        assert!(receipt.required_resource_meters_satisfied);
+    }
+
     #[test]
     fn moead_zdt1_is_reproducible_with_exact_evaluation_budget() {
         let config = zdt_config(42);
