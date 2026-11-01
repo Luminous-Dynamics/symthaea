@@ -26,8 +26,8 @@ The six acceleration values are expressed in g. The documented activity codes ar
 | 8 | Lying |
 | 13 | Cycling (seated) |
 | 14 | Cycling (standing) |
-| 130 | Transport (sitting) |
-| 140 | Transport (standing) |
+| 130 | Raw code only: UCI metadata says cycling (sitting, inactive); the original paper describes transport (sitting) |
+| 140 | Raw code only: UCI metadata says cycling (standing, inactive); the original paper describes transport (standing) |
 
 ## Parser contract
 
@@ -55,11 +55,11 @@ The independent split unit is the participant/source-family recording. Freeze pa
 
 Never concatenate participant files and then randomly split windows. Repeated windows, samples and derived features from one participant stay in one partition.
 
-The parser's normalized time key is only an ordering/interval representation. Since the source timestamp is timezone-naive, it is not an absolute UTC instant. Keep the source bytes and archive SHA-256 in the existing real-data manifest; the parser's digest binds parsed row values and the declared source-family identity, not the publisher or original file bytes.
+The parser's normalized time key is only an ordering/interval representation. Since the source timestamp is timezone-naive, it is not an absolute UTC instant. Keep the source bytes and archive SHA-256 in the existing real-data manifest; the parser's digest binds parsed row values and the declared source-family identity, not the publisher or original file bytes. Activity code 130/140 semantics are deliberately left unresolved in the base parser because the current UCI metadata and original article use different descriptions.
 
 ## Initial comparison target
 
-The original HARTH paper reports two different label protocols. With all **12 annotated labels**, its SVM leave-one-subject-out mean F1 is **0.66 ± 0.32** (Table 2). The frequently cited **0.81 ± 0.18** is the SVM result after the paper merges those 12 labels into **nine physical activities** (Table 3): shuffling, transport-standing and standing are merged into standing; sitting and transport-sitting are merged into sitting. These are different tasks and must never be presented as one baseline. Reproduce both protocols with the exact paper features, participant folds, confusion-matrix aggregation and scoring before making an SOTA comparison.
+The original HARTH paper reports two different label protocols. With all **12 annotated label IDs**, its SVM leave-one-subject-out mean F1 is **0.66 ± 0.32** (Table 2). The frequently cited **0.81 ± 0.18** is the SVM result after the paper merges those 12 labels into **nine physical activities** (Table 3). Its merge maps label 3 (shuffling), 140 and 6 (standing) to standing, and labels 7 (sitting) and 130 to sitting. **There is a source-description conflict:** the original article names 130/140 as transport-sitting/transport-standing, while the current UCI dataset metadata names them cycling-sitting/standing inactive. The parser therefore preserves 130 and 140 as opaque IDs (`Label130`, `Label140`) and does not decide the semantics. The nine-class reproduction profile must document the paper's merge explicitly and pin the exact archive version/annotation source. These are different tasks and must never be presented as one baseline. Reproduce both protocols with the exact paper features, participant folds, confusion-matrix aggregation and scoring before making an SOTA comparison.
 
 The next matched comparison should include:
 - majority/stratified prior and simple threshold/feature baselines;
