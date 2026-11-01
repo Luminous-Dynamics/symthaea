@@ -1,6 +1,6 @@
 # PITB research track: paired causal proof-intervention experiments (2026-11-01)
 
-**Status:** preregistered-plan schema, deterministic assignment verifier and synthetic plan fixture added. No proof outcomes have been collected and no causal effect is measured.
+**Status:** preregistered-plan schema, deterministic assignment verifier, outcome schema, paired outcome analyzer and synthetic fixtures added. No real proof outcomes have been collected and no causal effect is measured.
 
 ## Research question
 
@@ -66,6 +66,23 @@ The verifier recomputes each pair ID from exact task/component/state/statement/m
 
 The fixture is synthetic contract data, not theorem attempts or measured outcomes.
 
+### Paired outcome contract and analyzer
+
+The outcome schema is `data/benchmarks/proof-insight-transfer-v0/intervention-trials/proof-intervention-trial-outcome-v0.schema.json`; the analyzer is `crates/bridges/symthaea-proof-insights/src/bin/analyze_proof_intervention_outcomes.rs`.
+
+The analyzer:
+- requires exactly one outcome row for every preregistered pair × arm, with unique run IDs;
+- joins exact task/component, repository commit, Lean toolchain, environment, initial proof state and state receipt, target statement, model seed, horizon, continuation policy and randomized execution-order index;
+- treats not-attempted, timeout, unavailable and other non-success statuses as zero in the assigned intention-to-treat denominator;
+- verifies the checked target digest and requires kernel/checker, semantic and applicable successor receipt digests for a verified success;
+- enforces all six resource caps and requires zero usage for an explicit non-attempt;
+- requires measured evidence files under a canonicalized evidence root, rejects path traversal/symlink escape, and hashes proof/checker/semantic/successor/run artifact bytes;
+- reports per-arm success/cost, paired win/loss/tie counts, paired ITT risk difference, component-cluster bootstrap intervals and paired mean cost difference.
+
+The analyzer deliberately emits `confirmatory_result_allowed=false`: it authenticates artifact bytes and checks receipt digests/joins, but it does not yet parse and independently validate the semantics of each checker, semantic-review, successor and run receipt type. Signed benchmark-integrity reviewer attestations and the pinned reviewer-key registry must be validated before a treatment effect is confirmatory. The synthetic generator exists only to exercise denominator, pairing, target-drift, budget and false-success negative controls; it is not an empirical result.
+
+The focused SorryDB workflow now validates the plan and outcome schemas/fixtures and runs both Rust CLIs' self-tests in the isolated PITB crate. The workflow has not yet produced exact-head CI evidence.
+
 ## Qualification targets (not results)
 
 - A1 improves paired semantic-gated success over A0 by ≥5 percentage points, with the component-cluster interval excluding zero.
@@ -79,8 +96,8 @@ A null result is valuable: it distinguishes the value of semantic support select
 
 ## Remaining work
 
-1. Execute schema and Rust verifier checks at the exact PR head.
-2. Add an outcome-receipt schema requiring one exact run and independent checker/semantic/successor receipts per pair × arm.
-3. Implement paired outcome analysis with cluster bootstrap, randomization inference, missingness checks and cost/success frontiers.
-4. Generate a real exhaustive support lattice from a pinned Lean context and build the first reviewed cohort.
+1. Execute the outcome schema checks, compile/self-test the paired outcome analyzer, and inspect exact-head CI receipts.
+2. Add strict receipt-type parsing and signed reviewer-attestation / registry verification to the measured outcome path.
+3. Add preregistered paired randomization inference and multiplicity-controlled comparisons alongside the component-cluster bootstrap.
+4. Generate a real exhaustive support lattice from a pinned Lean context and build the first integrity-reviewed cohort.
 5. Run a small validation smoke trial; freeze models, prompts, contexts, policy and caps before held-out testing.
