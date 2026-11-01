@@ -573,3 +573,20 @@ Every relation × task-family × difficulty cell carries an evaluator-only adjud
 
 This is a conservative protocol choice to avoid relabeling ambiguous semantics as transferable skill. It does not prove reviewer independence or identity: these fields are self-declared until a pinned external reviewer-identity and custody verifier is added. A digest proves only that the declared report content is unchanged.
 
+### LaRA: layer-wise representation geometry comparator
+
+Tracking: [Issue #9738](https://github.com/Luminous-Dynamics/symthaea/issues/9738).
+
+LaRA (Gwak et al., Findings of EMNLP 2026) is a required white-box comparator for RL post-training. It measures:
+- **RSM** — representation shift magnitude after targeted information removal, standardized against semantic neighbours.
+- **DC** — alignment between the original perturbation direction and the mean neighbour perturbation direction.
+- **RSI** — local representation variability across paraphrases of the perturbed question. LaRA flips the standardized RSI sign before aggregation because lower raw RSI means greater local rigidity.
+
+The paper applies a sign-preserving log compression, clean-reference median/MAD standardization by metric and layer, aligns metric directions, and averages across metrics and layers. Preserve this as the paper-faithful reproduction. Any covariance-aware or learned aggregation is a separate, nested-validation experiment.
+
+The paper uses 30 known members and 30 non-members per evaluated model, reports TPR@FPR=5%, and studies three open-source RL-trained mathematical reasoning models. Its own limitations note the white-box hidden-state requirement and added cost of multiple perturbations/layer extraction. With only 30 clean examples, the empirical FPR grid is 3.33 percentage points; if zero false positives are observed, the one-sided exact 95% binomial upper bound is still about 9.50%. Thus a reported/interpolated 5% ROC operating point is not a tightly established low-FPR guarantee.
+
+Initial replication gate: at least 300 independent clean negatives per preregistered model/family/threshold stratum is a minimum resolution target for a zero-error 1% FPR upper bound (about 0.994% one-sided 95%), not an adequate universal sample-size prescription. Use exact binomial bounds, model-pair/cluster uncertainty and a power-based design for nonzero errors, family multiplicity and expected heterogeneity. Report AUC, AUPRC, TPR@1% and TPR@5%, per-family results, selective risk/coverage, perturbation cost, hidden-state bytes and runtime separately. This is not a 1%-FPR result until independently powered and qualified.
+
+Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
+
