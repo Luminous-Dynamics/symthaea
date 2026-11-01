@@ -38,6 +38,8 @@ Use the in-toto attestation envelope with the SLSA Build Provenance v1 predicate
 
 Do not invent a parallel statement format. The verifier should parse the pinned major-version contract, reject malformed required fields, and retain the original signed envelope bytes for independent audit.
 
+**Standards parsing rule:** in-toto Statement v1 and SLSA Provenance v1 require consumers to ignore unrecognized fields unless the relevant specification says otherwise. Therefore, do not apply blanket unknown-field rejection to the standard attestation envelope or SLSA predicate. Validate all required security-critical fields, preserve the signed original bytes, and ignore standards-defined forward-compatible extensions. Symthaea-owned policy and receipt schemas may use strict unknown-field rejection because those are separately versioned local contracts. A URI-qualified extension must not become trusted merely because it is preserved; the trust policy must explicitly decide whether it affects the deployment claim.
+
 The attestation subject set must contain:
 - the exact model binary SHA-256 from the #9595 build receipt;
 - the exact firmware binary SHA-256 from the #9595 build receipt;
