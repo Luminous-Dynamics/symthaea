@@ -7,14 +7,15 @@ use std::error::Error;
 use std::fmt;
 
 use csv::{ReaderBuilder, StringRecord, Trim};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const SCHEMA: &str = "symthaea.nas.ppk2-trace-audit";
 const VERSION: &str = "0.1.0";
 const DOMAIN: &[u8] = b"symthaea.nas.ppk2-trace-audit.v0.1";
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ppk2TraceAuditConfig {
     pub voltage_v: f64,
     pub expected_sample_rate_hz: f64,
@@ -52,7 +53,8 @@ impl fmt::Display for Ppk2TraceAuditError {
 }
 impl Error for Ppk2TraceAuditError {}
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ppk2SegmentMetrics {
     pub segment_id: String,
     pub sample_count: usize,
@@ -70,7 +72,8 @@ pub struct Ppk2SegmentMetrics {
     pub maximum_gap_ratio: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ppk2TraceAuditReceipt {
     pub schema: String,
     pub version: String,
@@ -95,7 +98,8 @@ pub struct Ppk2TraceAuditReceipt {
     pub receipt_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ppk2TraceAuditResult {
     pub receipt: Ppk2TraceAuditReceipt,
 }
@@ -467,6 +471,29 @@ pub fn audit_ppk2_trace_csv(
     };
     receipt.receipt_sha256 = compute_ppk2_trace_audit_receipt_sha256(&receipt)?;
     Ok(Ppk2TraceAuditResult { receipt })
+}
+
+/// Rebuild an audit receipt from the exact supplied CSV bytes and compare every field.
+/// This is the offline verification path when both the receipt and CSV are available.
+pub fn verify_ppk2_trace_audit_receipt_against_csv(
+    samples_csv: &str,
+    receipt: &Ppk2TraceAuditReceipt,
+) -> Result<(), Ppk2TraceAuditError> {
+    validate_ppk2_trace_audit_receipt(receipt)?;
+    let config = Ppk2TraceAuditConfig {
+        voltage_v: receipt.voltage_v,
+        expected_sample_rate_hz: receipt.expected_sample_rate_hz,
+        sample_rate_tolerance_fraction: receipt.sample_rate_tolerance_fraction,
+        maximum_gap_ratio: receipt.maximum_gap_ratio,
+    };
+    let rebuilt = audit_ppk2_trace_csv(samples_csv, config)?;
+    if &rebuilt.receipt != receipt {
+        return Err(Ppk2TraceAuditError::new(
+            "receipt.source_reproduction",
+            "recomputed receipt does not exactly match the supplied receipt",
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
