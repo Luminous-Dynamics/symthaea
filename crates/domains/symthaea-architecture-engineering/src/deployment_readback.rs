@@ -806,6 +806,237 @@ fn map_artifact_error(error: DeploymentArtifactError) -> DeploymentReadbackError
     DeploymentReadbackError::new("deployment_artifact", error.to_string())
 }
 
+const SESSION_LEDGER_SCHEMA: &str = "symthaea.nas.deployment-readback-session-ledger";
+const SESSION_RECORD_DOMAIN: &[u8] = b"symthaea.nas.deployment-readback-session-record.v0.1";
+const SESSION_LEDGER_DOMAIN: &[u8] = b"symthaea.nas.deployment-readback-session-ledger.v0.1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeploymentReadbackSessionRecord {
+    pub target_id: String,
+    pub hardware_profile_sha256: String,
+    pub device_serial: String,
+    pub session_sequence: u64,
+    pub session_id: String,
+    pub artifact_sha256: String,
+    pub readback_receipt_sha256: String,
+    pub previous_record_sha256: Option<String>,
+    pub record_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeploymentReadbackSessionLedger {
+    pub schema: String,
+    pub version: String,
+    pub target_id: String,
+    pub hardware_profile_sha256: String,
+    pub device_serial: String,
+    pub records: Vec<DeploymentReadbackSessionRecord>,
+    pub ledger_sha256: String,
+}
+
+/// Create an empty per-device ledger for verified readback successes.
+pub fn create_deployment_readback_session_ledger(
+    target_id: impl Into<String>,
+    hardware_profile_sha256: impl Into<String>,
+    device_serial: impl Into<String>,
+) -> Result<DeploymentReadbackSessionLedger, DeploymentReadbackError> {
+    let mut ledger = DeploymentReadbackSessionLedger {
+        schema: SESSION_LEDGER_SCHEMA.into(),
+        version: VERSION.into(),
+        target_id: target_id.into(),
+        hardware_profile_sha256: hardware_profile_sha256.into(),
+        device_serial: device_serial.into(),
+        records: Vec::new(),
+        ledger_sha256: "0".repeat(SHA256_HEX_LEN),
+    };
+    validate_session_ledger_fields(&ledger)?;
+    ledger.ledger_sha256 = compute_deployment_readback_session_ledger_sha256(&ledger)?;
+    Ok(ledger)
+}
+
+pub fn compute_deployment_readback_session_ledger_sha256(
+    ledger: &DeploymentReadbackSessionLedger,
+) -> Result<String, DeploymentReadbackError> {
+    validate_session_ledger_fields(ledger)?;
+    let mut canonical = ledger.clone();
+    canonical.ledger_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| DeploymentReadbackError::new("session_ledger", error.to_string()))?;
+    Ok(digest_bytes(SESSION_LEDGER_DOMAIN, &bytes))
+}
+
+/// Append only a capability produced by byte-level readback verification. Caller-supplied
+/// success booleans or deserialized receipts cannot be appended through this API.
+pub fn append_verified_readback_session(
+    ledger: &mut DeploymentReadbackSessionLedger,
+    readback: &VerifiedDeploymentReadback,
+) -> Result<(), DeploymentReadbackError> {
+    verify_deployment_readback_session_ledger(ledger)?;
+    let receipt = readback.receipt();
+    if receipt.target_id != ledger.target_id
+        || receipt.hardware_profile_sha256 != ledger.hardware_profile_sha256
+        || receipt.device_serial != ledger.device_serial
+    {
+        return Err(DeploymentReadbackError::new(
+            "session_scope",
+            "verified readback belongs to a different target, profile or physical device",
+        ));
+    }
+    if ledger.records.iter().any(|record| record.session_id == receipt.session_id) {
+        return Err(DeploymentReadbackError::new(
+            "session_id",
+            "readback session ID has already been consumed by this ledger",
+        ));
+    }
+    if ledger.records.last().is_some_and(|last| receipt.session_sequence <= last.session_sequence) {
+        return Err(DeploymentReadbackError::new(
+            "session_sequence",
+            "readback session sequence must strictly increase for this device ledger",
+        ));
+    }
+
+    let mut record = DeploymentReadbackSessionRecord {
+        target_id: receipt.target_id.clone(),
+        hardware_profile_sha256: receipt.hardware_profile_sha256.clone(),
+        device_serial: receipt.device_serial.clone(),
+        session_sequence: receipt.session_sequence,
+        session_id: receipt.session_id.clone(),
+        artifact_sha256: receipt.artifact_sha256.clone(),
+        readback_receipt_sha256: receipt.readback_receipt_sha256.clone(),
+        previous_record_sha256: ledger.records.last().map(|last| last.record_sha256.clone()),
+        record_sha256: "0".repeat(SHA256_HEX_LEN),
+    };
+    record.record_sha256 = compute_deployment_readback_session_record_sha256(&record)?;
+    ledger.records.push(record);
+    ledger.ledger_sha256 = compute_deployment_readback_session_ledger_sha256(ledger)?;
+    Ok(())
+}
+
+pub fn compute_deployment_readback_session_record_sha256(
+    record: &DeploymentReadbackSessionRecord,
+) -> Result<String, DeploymentReadbackError> {
+    validate_session_record_fields(record)?;
+    let mut canonical = record.clone();
+    canonical.record_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| DeploymentReadbackError::new("session_record", error.to_string()))?;
+    Ok(digest_bytes(SESSION_RECORD_DOMAIN, &bytes))
+}
+
+pub fn verify_deployment_readback_session_ledger(
+    ledger: &DeploymentReadbackSessionLedger,
+) -> Result<(), DeploymentReadbackError> {
+    validate_session_ledger_fields(ledger)?;
+    if !is_sha256(&ledger.ledger_sha256)
+        || compute_deployment_readback_session_ledger_sha256(ledger)? != ledger.ledger_sha256
+    {
+        return Err(DeploymentReadbackError::new(
+            "ledger_sha256",
+            "does not match the canonical readback session ledger",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_session_ledger_fields(
+    ledger: &DeploymentReadbackSessionLedger,
+) -> Result<(), DeploymentReadbackError> {
+    if ledger.schema != SESSION_LEDGER_SCHEMA || ledger.version != VERSION {
+        return Err(DeploymentReadbackError::new(
+            "schema_version",
+            "unsupported readback session ledger schema/version",
+        ));
+    }
+    if ledger.target_id.trim().is_empty() || ledger.device_serial.trim().is_empty() {
+        return Err(DeploymentReadbackError::new(
+            "ledger_identity",
+            "target ID and device serial must be non-empty",
+        ));
+    }
+    require_sha256("hardware_profile_sha256", &ledger.hardware_profile_sha256)?;
+    require_sha256("ledger_sha256", &ledger.ledger_sha256)?;
+
+    let mut session_ids = HashSet::with_capacity(ledger.records.len());
+    let mut previous_sequence = 0u64;
+    let mut previous_digest: Option<&str> = None;
+    for (index, record) in ledger.records.iter().enumerate() {
+        validate_session_record_fields(record).map_err(|error| {
+            DeploymentReadbackError::new(format!("records[{index}].{}", error.field), error.message)
+        })?;
+        if record.target_id != ledger.target_id
+            || record.hardware_profile_sha256 != ledger.hardware_profile_sha256
+            || record.device_serial != ledger.device_serial
+        {
+            return Err(DeploymentReadbackError::new(
+                format!("records[{index}].scope"),
+                "record target/profile/device differs from its ledger",
+            ));
+        }
+        if record.session_sequence <= previous_sequence {
+            return Err(DeploymentReadbackError::new(
+                format!("records[{index}].session_sequence"),
+                "session sequence must strictly increase",
+            ));
+        }
+        if !session_ids.insert(record.session_id.as_str()) {
+            return Err(DeploymentReadbackError::new(
+                format!("records[{index}].session_id"),
+                "duplicate session ID in the verified readback ledger",
+            ));
+        }
+        if record.previous_record_sha256.as_deref() != previous_digest {
+            return Err(DeploymentReadbackError::new(
+                format!("records[{index}].previous_record_sha256"),
+                "hash-chain predecessor does not match the previous record",
+            ));
+        }
+        if compute_deployment_readback_session_record_sha256(record)? != record.record_sha256 {
+            return Err(DeploymentReadbackError::new(
+                format!("records[{index}].record_sha256"),
+                "does not match canonical session-record fields",
+            ));
+        }
+        previous_sequence = record.session_sequence;
+        previous_digest = Some(record.record_sha256.as_str());
+    }
+    Ok(())
+}
+
+fn validate_session_record_fields(
+    record: &DeploymentReadbackSessionRecord,
+) -> Result<(), DeploymentReadbackError> {
+    for (field, value) in [
+        ("target_id", record.target_id.as_str()),
+        ("device_serial", record.device_serial.as_str()),
+        ("session_id", record.session_id.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(DeploymentReadbackError::new(field, "must be non-empty"));
+        }
+    }
+    if record.session_sequence == 0 {
+        return Err(DeploymentReadbackError::new(
+            "session_sequence",
+            "must be positive",
+        ));
+    }
+    for (field, value) in [
+        ("hardware_profile_sha256", record.hardware_profile_sha256.as_str()),
+        ("artifact_sha256", record.artifact_sha256.as_str()),
+        ("readback_receipt_sha256", record.readback_receipt_sha256.as_str()),
+        ("record_sha256", record.record_sha256.as_str()),
+    ] {
+        require_sha256(field, value)?;
+    }
+    if let Some(previous) = record.previous_record_sha256.as_deref() {
+        require_sha256("previous_record_sha256", previous)?;
+    }
+    Ok(())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1121,6 +1352,66 @@ mod tests {
             &f.artifact, &readback, &f.registry, &bound,
         ).unwrap();
         assert!(matches!(scored, ScoredMeasurement::Measured { .. }));
+    }
+
+    #[test]
+    fn only_verified_readback_capabilities_can_advance_the_device_session_ledger() {
+        let f = fixture();
+        let readback = verify_deployment_flash_readback(
+            &f.artifact, &f.profile, &f.session, &f.bindings, &f.slices,
+            &f.model, &f.firmware, &f.capture,
+        ).unwrap();
+        let mut ledger = create_deployment_readback_session_ledger(
+            f.profile.profile_id.clone(),
+            f.profile.profile_sha256.clone(),
+            "device-serial-01",
+        ).unwrap();
+        append_verified_readback_session(&mut ledger, &readback).unwrap();
+        verify_deployment_readback_session_ledger(&ledger).unwrap();
+        assert_eq!(ledger.records.len(), 1);
+
+        assert!(append_verified_readback_session(&mut ledger, &readback).is_err());
+        assert_eq!(ledger.records.len(), 1);
+    }
+
+    #[test]
+    fn session_ledger_rejects_repeated_ids_and_non_monotonic_sequences() {
+        let f = fixture();
+        let first = verify_deployment_flash_readback(
+            &f.artifact, &f.profile, &f.session, &f.bindings, &f.slices,
+            &f.model, &f.firmware, &f.capture,
+        ).unwrap();
+        let mut ledger = create_deployment_readback_session_ledger(
+            f.profile.profile_id.clone(),
+            f.profile.profile_sha256.clone(),
+            "device-serial-01",
+        ).unwrap();
+        append_verified_readback_session(&mut ledger, &first).unwrap();
+
+        let mut reused = f.session.clone();
+        reused.session_id = "session-02".into();
+        let reused = verify_deployment_flash_readback(
+            &f.artifact, &f.profile, &reused, &f.bindings, &f.slices,
+            &f.model, &f.firmware, &f.capture,
+        ).unwrap();
+        assert!(append_verified_readback_session(&mut ledger, &reused).is_err());
+    }
+
+    #[test]
+    fn session_ledger_rejects_tampered_chain_even_after_outer_state_is_serialized() {
+        let f = fixture();
+        let readback = verify_deployment_flash_readback(
+            &f.artifact, &f.profile, &f.session, &f.bindings, &f.slices,
+            &f.model, &f.firmware, &f.capture,
+        ).unwrap();
+        let mut ledger = create_deployment_readback_session_ledger(
+            f.profile.profile_id.clone(),
+            f.profile.profile_sha256.clone(),
+            "device-serial-01",
+        ).unwrap();
+        append_verified_readback_session(&mut ledger, &readback).unwrap();
+        ledger.records[0].artifact_sha256 = sha('0');
+        assert!(verify_deployment_readback_session_ledger(&ledger).is_err());
     }
 
     #[test]
