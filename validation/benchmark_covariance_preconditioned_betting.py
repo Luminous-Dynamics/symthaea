@@ -86,7 +86,15 @@ def _draw(
     streams: int,
 ) -> np.ndarray:
     if noise_model == "gaussian":
-        return rng.multivariate_normal(mean, covariance(len(mean), rho), size=streams)
+        # Exact Gaussian equicorrelation factorization; avoids a dense d-by-d
+        # covariance factorization in high-dimensional stress sweeps.
+        common = rng.standard_normal(size=(streams, 1))
+        idiosyncratic = rng.standard_normal(size=(streams, len(mean)))
+        return (
+            mean[None, :]
+            + math.sqrt(rho) * common
+            + math.sqrt(1.0 - rho) * idiosyncratic
+        )
     if noise_model == "rademacher_factor":
         # Z_i - mean_i = sqrt(rho)*G_common + sqrt(1-rho)*G_i,
         # with independent Rademacher signs. Its covariance is Sigma(rho),
