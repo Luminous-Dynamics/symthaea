@@ -1781,10 +1781,10 @@ impl SqliteTrustedStateStore {
                 let initial = TrustedState::new();
                 tx.execute(
                     "INSERT INTO basalt_state_meta
-                     (singleton, revision, signer_policy_version, witness_policy_version,
+                     (singleton, schema_version, revision, signer_policy_version, witness_policy_version,
                       policy_bundle_digest, state_digest)
-                     VALUES (1, '0', NULL, NULL, NULL, ?1)",
-                    params![trusted_state_digest(&initial)],
+                     VALUES (1, ?1, '0', NULL, NULL, NULL, ?2)",
+                    params![SQLITE_SCHEMA_VERSION, trusted_state_digest(&initial)],
                 )?;
             }
             tx.commit()?;
@@ -1929,19 +1929,23 @@ fn parse_sql_u64(value: &str, field: &str) -> anyhow::Result<u64> {
 
 fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
     let (
+        schema_version,
         revision_text,
         signer_policy_text,
         witness_policy_text,
         policy_bundle_digest,
         expected_state_digest,
-    ): (String, Option<String>, Option<String>, Option<String>, String) =
+    ): (i64, String, Option<String>, Option<String>, Option<String>, String) =
         connection.query_row(
-            "SELECT revision, signer_policy_version, witness_policy_version,
+            "SELECT schema_version, revision, signer_policy_version, witness_policy_version,
                     policy_bundle_digest, state_digest
              FROM basalt_state_meta WHERE singleton = 1",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )?;
+    if schema_version != SQLITE_SCHEMA_VERSION {
+        anyhow::bail!("unsupported BASALT SQLite schema version {schema_version}");
+    }
 
     let revision = parse_sql_u64(&revision_text, "revision")?;
 
