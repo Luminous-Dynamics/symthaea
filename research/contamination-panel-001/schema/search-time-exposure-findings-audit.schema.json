@@ -15,6 +15,10 @@
     "answer_bearing_count",
     "unknown_count",
     "matched_item_reference_count",
+    "response_body_event_count",
+    "response_body_evidence_count",
+    "unavailable_body_event_count",
+    "body_evidence_coverage_permille",
     "findings_sha256",
     "claim_boundary",
     "issues"
@@ -68,6 +72,26 @@
       "items": {
         "type": "string"
       }
+    },
+    "response_body_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response_body_evidence_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unavailable_body_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "body_evidence_coverage_permille": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
     }
   }
 }
