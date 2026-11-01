@@ -11,6 +11,7 @@
 pub mod witness;
 pub mod joint_budget;
 pub mod interaction;
+pub mod interaction_decomposition;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
