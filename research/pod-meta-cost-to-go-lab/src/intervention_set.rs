@@ -522,7 +522,7 @@ mod tests {
         );
 
         let mut wrong_pool = matched.clone();
-        wrong_pool.trials[1].actions[0].admissible_operation_families = vec![2, 4];
+        wrong_pool.trials[1].actions[0].admissible_operation_families = vec![2, 3, 4];
         assert_eq!(
             wrong_pool.validate(),
             Err(InterventionSetError::CandidatePoolMismatch)
@@ -552,7 +552,12 @@ mod tests {
             simulator_digest: [8; 32],
         });
         matched.admissible_operation_families = vec![2, 3, 4];
-        matched.trials.push(trial(102, 4, 30));
+        for alternative in &mut matched.trials {
+            alternative.actions[0].admissible_operation_families = vec![2, 3, 4];
+        }
+        let mut third = trial(102, 4, 30);
+        third.actions[0].admissible_operation_families = vec![2, 3, 4];
+        matched.trials.push(third);
 
         let summary = matched.pareto_summary().unwrap();
         assert_eq!(
