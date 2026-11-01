@@ -2,7 +2,10 @@
 import unittest
 
 from benchmark_covariance_preconditioned_betting import (
+    covariance,
     covariance_envelope,
+    projective_matvec,
+    projective_quadratic,
     simulate_cell,
 )
 
@@ -22,6 +25,22 @@ class CovariancePreconditionedBenchmarkTests(unittest.TestCase):
             large_v = covariance_envelope(large)
             self.assertTrue(
                 np.array_equal(large_v[:small, :small], small_v)
+            )
+
+    def test_linear_operator_matches_dense_covariance(self):
+        import numpy as np
+
+        rng = np.random.default_rng(698502)
+        for dimension in (1, 2, 5, 16, 64):
+            dense = covariance_envelope(dimension)
+            values = rng.uniform(0.0, 1.5, size=(7, dimension))
+            expected_q = np.einsum("bi,ij,bj->b", values, dense, values)
+            self.assertTrue(
+                np.allclose(projective_quadratic(values), expected_q, rtol=1e-10, atol=1e-10)
+            )
+            expected_v = values @ dense
+            self.assertTrue(
+                np.allclose(projective_matvec(values), expected_v, rtol=1e-10, atol=1e-10)
             )
 
     def test_gaussian_and_rademacher_scenarios_emit_matched_rows(self):
