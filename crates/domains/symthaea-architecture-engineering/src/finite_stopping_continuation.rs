@@ -494,9 +494,9 @@ fn validate_probability_tree<N: TestTreeNode>(
         }
         let stop_value = node.test_value();
         let (optimal_value, action) = if continue_value > stop_value {
-            (continue_value, AdaptiveContinuationAction::ContinueObserving)
+            (continue_value, OptionalStoppingAction::ContinueObserving)
         } else {
-            (stop_value, AdaptiveContinuationAction::LaunchConditionalContinuation)
+            (stop_value, OptionalStoppingAction::StopAtCurrentHistory)
         };
         optimal_values.insert(node.node_id().to_owned(), optimal_value);
         optimal_actions.insert(node.node_id().to_owned(), action);
@@ -679,9 +679,9 @@ pub fn analyze_finite_stopping_continuation(
                 "conditional continuation summary missing for a history",
             ))?;
         let (value, action) = if continue_value > stop_value {
-            (continue_value, OptionalStoppingAction::ContinueObserving)
+            (continue_value, AdaptiveContinuationAction::ContinueObserving)
         } else {
-            (stop_value, OptionalStoppingAction::StopAtCurrentHistory)
+            (stop_value, AdaptiveContinuationAction::LaunchConditionalContinuation)
         };
         if value > node.test_value + SUPERMARTINGALE_TOLERANCE {
             return Err(StoppingContinuationError::new(
