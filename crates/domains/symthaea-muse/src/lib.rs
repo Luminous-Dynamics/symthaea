@@ -1036,6 +1036,7 @@ pub mod genre_presets;
 pub mod instruments;
 pub mod instrument_ontology;
 pub mod performance_gesture;
+pub mod gesture_controllability;
 pub mod learned_melody;
 pub mod melodic_grammar;
 pub mod midi_export;
