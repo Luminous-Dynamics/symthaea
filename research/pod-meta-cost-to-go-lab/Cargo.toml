@@ -1,0 +1,17 @@
+[package]
+name = "pod-meta-cost-to-go-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Typed resource ledger and proof cost-to-go feasibility research lab"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "pod-meta-cost-to-go"
+path = "src/main.rs"
