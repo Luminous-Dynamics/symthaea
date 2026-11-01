@@ -24,7 +24,7 @@ Accounting is explicit:
 - retained byte-time in byte-microseconds, integrated piecewise at observation
   times and finalized with `finish`;
 - eviction and non-retention counts;
-- replay selection count and declared replay work.
+- replay selection count, logical replay payload bytes, and declared replay work.
 
 Sampling is without replacement within one call and checks total replay work
 before committing the accounting update. Admission validates all resource
