@@ -17,6 +17,32 @@ from projective_vector_betting import (
 
 
 class ProjectiveVectorBettingTests(unittest.TestCase):
+    def test_global_envelope_is_projectively_consistent_across_dimensions(self):
+        # Every d-dimensional envelope is a principal extension of every
+        # smaller one, unlike the tighter fixed-dimension envelope.
+        for rho_min, rho_max in ((0.2, 0.8), (0.1, 0.6), (0.0, 1.0)):
+            matrices = {
+                d: projective_equicorrelation_envelope(d, rho_min, rho_max)
+                for d in (2, 3, 5, 8)
+            }
+            for small_d, large_d in ((2, 3), (2, 8), (3, 8), (5, 8)):
+                self.assertEqual(
+                    [row[:small_d] for row in matrices[large_d][:small_d]],
+                    matrices[small_d],
+                )
+            for d, envelope in matrices.items():
+                for rho in (rho_min, (rho_min + rho_max) / 2, rho_max):
+                    self.assertTrue(
+                        matrix_dominates(
+                            envelope, equicorrelation_covariance(d, rho)
+                        )
+                    )
+
+    def test_projective_envelope_rejects_invalid_interval(self):
+        for interval in ((-0.1, 0.8), (0.8, 0.2), (0.2, 1.1)):
+            with self.assertRaises(ValueError):
+                projective_equicorrelation_envelope(4, *interval)
+
     def test_equicorrelation_envelope_dominates_grid(self):
         d = 5
         envelope = equicorrelation_envelope(d, 0.2, 0.8, 0.5)
