@@ -844,7 +844,8 @@
         "end_column",
         "statement_sha256",
         "expected_informal_statement_sha256",
-        "source_span_sha256"
+        "source_span_sha256",
+        "source_coordinate_system"
       ],
       "properties": {
         "repository_remote": {
@@ -896,6 +897,9 @@
         },
         "source_span_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "source_coordinate_system": {
+          "const": "lean-filemap-line-1-column-0-unicode-codepoint-v0"
         }
       }
     },
