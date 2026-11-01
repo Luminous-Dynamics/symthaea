@@ -1366,6 +1366,77 @@ mod tests {
         assert!(after_negative.predicted_future_hv[0] < 0.0);
     }
 
+
+    #[test]
+    fn incomplete_action_set_checkpoint_restore_is_rejected() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        model.issue_action_set(
+            &digest('a'), 100, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let mut state = model.save_state();
+        state.pending.pop();
+        let mut restored = predictor();
+        assert_eq!(
+            restored.load_state(&state),
+            Err(ActionConditionedPredictorError::InvalidCheckpointState)
+        );
+        assert_eq!(restored.pending_forecast_count(), 0);
+    }
+
+    #[test]
+    fn one_late_counterfactual_branch_expires_the_complete_action_set_without_learning() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 100, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let before = model.save_state();
+        assert_eq!(
+            model.score_action_set(&[
+                ActionConditionedObservedOutcome {
+                    forecast_id: receipts[0].forecast_id,
+                    actual_future_hv: vec![0.1, 0.0],
+                    observed_frame_sequence: 101,
+                    observation_delay_seconds: 1.0,
+                },
+                ActionConditionedObservedOutcome {
+                    forecast_id: receipts[1].forecast_id,
+                    actual_future_hv: vec![0.1, 0.0],
+                    observed_frame_sequence: 101,
+                    observation_delay_seconds: 2.0,
+                },
+            ]),
+            Err(ActionConditionedPredictorError::ForecastTooLate)
+        );
+        assert_eq!(model.pending_forecast_count(), 0);
+        assert_eq!(model.expired_forecasts(), 2);
+        assert_eq!(model.training_steps(), before.training_steps);
+        assert_eq!(model.save_state().action_weights, before.action_weights);
+    }
+
     #[test]
     fn forecasts_are_one_shot_and_observations_must_be_later_and_on_time() {
         let mut model = predictor();
