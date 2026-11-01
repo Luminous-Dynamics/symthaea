@@ -4,11 +4,13 @@ import unittest
 from projective_vector_betting import (
     CoordinateHistory,
     CovariancePreconditionedBet,
+    ProjectiveEquicorrelationKernel,
     assert_symmetric_psd,
     coordinate_local_bets,
     equicorrelation_covariance,
     equicorrelation_envelope,
     projective_equicorrelation_envelope,
+    projective_vector_log_factor,
     fixed_log_mixture,
     gaussian_log_factor_expectation,
     matrix_dominates,
@@ -37,6 +39,61 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
                             envelope, equicorrelation_covariance(d, rho)
                         )
                     )
+
+    def test_low_rank_kernel_matches_dense_quadratic_and_matvec(self):
+        kernel = ProjectiveEquicorrelationKernel(7, 0.2, 0.8)
+        dense = kernel.dense()
+        values = [0.1, 0.2, 0.0, 0.7, 1.1, 0.0, 0.3]
+        active = [True, True, False, True, True, False, True]
+        masked = [value if on else 0.0 for value, on in zip(values, active)]
+        expected = sum(
+            masked[i] * dense[i][j] * masked[j]
+            for i in range(7) for j in range(7)
+        )
+        self.assertAlmostEqual(kernel.quadratic(values, active), expected)
+        expected_vec = [
+            sum(dense[i][j] * masked[j] for j in range(7)) if active[i] else 0.0
+            for i in range(7)
+        ]
+        self.assertEqual(kernel.matvec(values, active), expected_vec)
+
+    def test_low_rank_factor_matches_dense_factor(self):
+        kernel = ProjectiveEquicorrelationKernel(4, 0.2, 0.8)
+        scores = [0.4, -0.1, 1.2, 0.7]
+        bets = [0.3, 0.0, 0.5, 0.2]
+        active = [True, True, True, False]
+        dense_factor = vector_log_factor(scores, bets, active, kernel.dense())
+        low_rank_factor = projective_vector_log_factor(scores, bets, active, kernel)
+        self.assertAlmostEqual(low_rank_factor, dense_factor)
+
+    def test_low_rank_and_dense_bet_states_remain_equivalent(self):
+        kernel = ProjectiveEquicorrelationKernel(4, 0.2, 0.8)
+        dense_state = CovariancePreconditionedBet(kernel.dense(), step_size=0.07, cap=1.2)
+        low_rank_state = CovariancePreconditionedBet(kernel, step_size=0.07, cap=1.2)
+        rounds = [
+            ([True, False, False, False], [0.8, 99.0, 99.0, 99.0]),
+            ([True, True, False, False], [0.4, -0.2, 99.0, 99.0]),
+            ([True, True, True, False], [0.7, 0.1, 1.1, 99.0]),
+            ([True, True, True, True], [-0.1, 0.3, 0.5, 0.9]),
+            ([True, True, True, True], [0.2, -0.4, 0.3, 0.1]),
+        ]
+        for active, scores in rounds:
+            dense_bets = dense_state.bets(active)
+            low_rank_bets = low_rank_state.bets(active)
+            for x, y in zip(dense_bets, low_rank_bets):
+                self.assertAlmostEqual(x, y)
+            dense_state.observe(scores)
+            low_rank_state.observe(scores)
+            for x, y in zip(dense_state.snapshot()[0], low_rank_state.snapshot()[0]):
+                self.assertAlmostEqual(x, y)
+
+    def test_low_rank_kernel_principal_extension_is_identical(self):
+        small = ProjectiveEquicorrelationKernel(3, 0.2, 0.8)
+        large = ProjectiveEquicorrelationKernel(9, 0.2, 0.8)
+        self.assertEqual(
+            [row[:3] for row in large.dense()[:3]],
+            small.dense(),
+        )
 
     def test_projective_envelope_rejects_invalid_interval(self):
         for interval in ((-0.1, 0.8), (0.8, 0.2), (0.2, 1.1)):
