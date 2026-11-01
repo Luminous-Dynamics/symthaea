@@ -40,7 +40,7 @@ pub fn action_registry_sha256(
         });
     }
     let mut hasher = Sha256::new();
-    hasher.update(b"SYMTHAEA-JOINT-ACTION-REGISTRY-V1\\0");
+    hasher.update(b"SYMTHAEA-JOINT-ACTION-REGISTRY-V1\0");
     hasher.update(u32::try_from(sorted.len())
         .map_err(|_| JointBudgetError::ArithmeticOverflow)?
         .to_le_bytes());
