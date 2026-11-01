@@ -6,8 +6,8 @@
 
 use crate::{
     ChallengeManifestV1, ExposureMechanismV1, GENERATOR_VERSION, MANIFEST_SCHEMA,
-    PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1, SEALED_KEY_SCHEMA,
-    TierV1, hash_domain, validate_pair_packet,
+    PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SEALED_KEY_SCHEMA, SealedChallengeKeyV1, TierV1,
+    hash_domain, validate_pair_packet,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -99,14 +99,18 @@ pub struct DetectorEvaluationReportV1 {
 
 fn validate_spec(spec: &DetectorSpecV1) -> Result<(), String> {
     if spec.schema != DETECTOR_SPEC_SCHEMA {
-        return Err(format!("detector spec schema must be {DETECTOR_SPEC_SCHEMA}"));
+        return Err(format!(
+            "detector spec schema must be {DETECTOR_SPEC_SCHEMA}"
+        ));
     }
     if spec.detector_id.trim().is_empty()
         || spec.detector_id.len() > 128
         || spec.detector_version.trim().is_empty()
         || spec.detector_version.len() > 128
     {
-        return Err("detector_id and detector_version must be nonempty and <=128 characters".to_owned());
+        return Err(
+            "detector_id and detector_version must be nonempty and <=128 characters".to_owned(),
+        );
     }
     if spec.threshold_permille > 1_000 {
         return Err("threshold_permille must be in [0, 1000]".to_owned());
@@ -156,10 +160,7 @@ fn token_ngrams(value: &str, n: usize) -> BTreeSet<String> {
     if tokens.len() < n {
         return BTreeSet::new();
     }
-    tokens
-        .windows(n)
-        .map(|window| window.join(" "))
-        .collect()
+    tokens.windows(n).map(|window| window.join(" ")).collect()
 }
 
 fn jaccard_permille(left: &BTreeSet<String>, right: &BTreeSet<String>) -> u16 {
@@ -238,10 +239,7 @@ fn ratio_permille(numerator: u64, denominator: u64) -> Option<u16> {
     Some(scaled.min(1_000) as u16)
 }
 
-fn balanced_accuracy_permille(
-    recall: Option<u16>,
-    specificity: Option<u16>,
-) -> Option<u16> {
+fn balanced_accuracy_permille(recall: Option<u16>, specificity: Option<u16>) -> Option<u16> {
     match (recall, specificity) {
         (Some(recall), Some(specificity)) => {
             Some(((u32::from(recall) + u32::from(specificity)) / 2) as u16)
@@ -263,9 +261,7 @@ pub fn evaluate_detector_run(
     if sealed_key.schema != SEALED_KEY_SCHEMA {
         return Err(format!("sealed key schema must be {SEALED_KEY_SCHEMA}"));
     }
-    if manifest.schema != MANIFEST_SCHEMA
-        || manifest.generator_version != GENERATOR_VERSION
-    {
+    if manifest.schema != MANIFEST_SCHEMA || manifest.generator_version != GENERATOR_VERSION {
         return Err("challenge manifest schema or generator version is unsupported".to_owned());
     }
     if manifest.pairs_per_tier == 0 || manifest.pairs_per_tier > crate::MAX_PAIRS_PER_TIER {
@@ -289,8 +285,7 @@ pub fn evaluate_detector_run(
     if manifest.generation_id != packet.generation_id {
         return Err("manifest generation ID does not match the public packet".to_owned());
     }
-    if sealed_key.generation_id != packet.generation_id
-        || run.generation_id != packet.generation_id
+    if sealed_key.generation_id != packet.generation_id || run.generation_id != packet.generation_id
     {
         return Err("packet, sealed key and detector run generation IDs must match".to_owned());
     }
@@ -322,9 +317,7 @@ pub fn evaluate_detector_run(
         return Err("detector run has invalid identity or threshold".to_owned());
     }
     match run.kind {
-        DetectorKindV1::TokenNgramJaccard
-            if !(2..=8).contains(&run.token_ngram_size) =>
-        {
+        DetectorKindV1::TokenNgramJaccard if !(2..=8).contains(&run.token_ngram_size) => {
             return Err("detector run has unsupported token_ngram_size".to_owned());
         }
         DetectorKindV1::ExactTextEquality | DetectorKindV1::NormalizedTextEquality
@@ -345,7 +338,7 @@ pub fn evaluate_detector_run(
 
     let mut truth_by_id = BTreeMap::new();
     for truth in &sealed_key.pair_truth {
-        if !valid_digest(&truth.pair_id) {
+        if !crate::valid_digest(&truth.pair_id) {
             return Err("sealed-key row contains an invalid pair ID".to_owned());
         }
         if truth.target_mechanism != truth.target_tier.target_mechanism() {
@@ -354,7 +347,10 @@ pub fn evaluate_detector_run(
                 truth.pair_id
             ));
         }
-        let expected_label = if truth.planted_mechanisms_present.contains(&truth.target_mechanism) {
+        let expected_label = if truth
+            .planted_mechanisms_present
+            .contains(&truth.target_mechanism)
+        {
             crate::TargetControlLabelV1::PositiveForTargetTier
         } else {
             crate::TargetControlLabelV1::NegativeForTargetTier
@@ -416,11 +412,18 @@ pub fn evaluate_detector_run(
         }
     }
 
-    let pair_ids: BTreeSet<&str> = packet.pairs.iter().map(|pair| pair.pair_id.as_str()).collect();
+    let pair_ids: BTreeSet<&str> = packet
+        .pairs
+        .iter()
+        .map(|pair| pair.pair_id.as_str())
+        .collect();
     let mut scores_by_id = BTreeMap::<&str, u16>::new();
     for score in &run.scores {
         if !pair_ids.contains(score.pair_id.as_str()) {
-            return Err(format!("detector run includes unknown pair ID {}", score.pair_id));
+            return Err(format!(
+                "detector run includes unknown pair ID {}",
+                score.pair_id
+            ));
         }
         if score.risk_permille > 1_000 {
             return Err(format!(
@@ -459,8 +462,8 @@ pub fn evaluate_detector_run(
             if truth.target_tier != tier {
                 continue;
             }
-            let actual_positive = truth.target_control_label
-                == crate::TargetControlLabelV1::PositiveForTargetTier;
+            let actual_positive =
+                truth.target_control_label == crate::TargetControlLabelV1::PositiveForTargetTier;
             let predicted_positive = *scores_by_id
                 .get(pair.pair_id.as_str())
                 .ok_or_else(|| format!("detector run is missing pair {}", pair.pair_id))?
@@ -556,7 +559,9 @@ pub fn evaluate_detector_run(
 
 fn packet_digest(packet: &PublicChallengePacketV1) -> Result<String, String> {
     if packet.schema != PUBLIC_PACKET_SCHEMA {
-        return Err(format!("public packet schema must be {PUBLIC_PACKET_SCHEMA}"));
+        return Err(format!(
+            "public packet schema must be {PUBLIC_PACKET_SCHEMA}"
+        ));
     }
     let bytes = serde_json::to_vec_pretty(packet)
         .map_err(|error| format!("cannot serialize public packet: {error}"))?;
@@ -566,12 +571,14 @@ fn packet_digest(packet: &PublicChallengePacketV1) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ExposureMechanismV1, GeneratorConfigV1, generate_challenge_bundle,
-    };
+    use crate::{ExposureMechanismV1, GeneratorConfigV1, generate_challenge_bundle};
     use serde_json::json;
 
-    fn fixture() -> (PublicChallengePacketV1, SealedChallengeKeyV1, ChallengeManifestV1) {
+    fn fixture() -> (
+        PublicChallengePacketV1,
+        SealedChallengeKeyV1,
+        ChallengeManifestV1,
+    ) {
         let bundle = generate_challenge_bundle(
             &GeneratorConfigV1 {
                 generation_id: "detector-fixture".to_owned(),
@@ -582,10 +589,8 @@ mod tests {
         .unwrap();
         let packet: PublicChallengePacketV1 =
             serde_json::from_slice(&bundle.public_packet_bytes).unwrap();
-        let key: SealedChallengeKeyV1 =
-            serde_json::from_slice(&bundle.sealed_key_bytes).unwrap();
-        let manifest: ChallengeManifestV1 =
-            serde_json::from_slice(&bundle.manifest_bytes).unwrap();
+        let key: SealedChallengeKeyV1 = serde_json::from_slice(&bundle.sealed_key_bytes).unwrap();
+        let manifest: ChallengeManifestV1 = serde_json::from_slice(&bundle.manifest_bytes).unwrap();
         (packet, key, manifest)
     }
 
@@ -603,11 +608,9 @@ mod tests {
     #[test]
     fn exact_text_baseline_separates_exact_positive_and_negative_controls() {
         let (packet, key, manifest) = fixture();
-        let detector_run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 1_000, 0),
-        )
-        .unwrap();
+        let detector_run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 1_000, 0))
+                .unwrap();
         let report = evaluate_detector_run(&packet, &key, &manifest, &detector_run).unwrap();
         let t1 = report
             .metrics_by_tier
@@ -652,63 +655,61 @@ mod tests {
             serde_json::to_vec(&first).unwrap(),
             serde_json::to_vec(&second).unwrap()
         );
-        assert!(first.scores.iter().all(|score| score.risk_permille <= 1_000));
+        assert!(
+            first
+                .scores
+                .iter()
+                .all(|score| score.risk_permille <= 1_000)
+        );
     }
 
     #[test]
     fn detector_run_must_cover_each_public_pair_exactly_once() {
         let (packet, key, manifest) = fixture();
-        let mut run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let mut run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
         run.scores.pop();
-        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
-            .unwrap_err()
-            .contains("score every pair exactly once"));
+        assert!(
+            evaluate_detector_run(&packet, &key, &manifest, &run)
+                .unwrap_err()
+                .contains("score every pair exactly once")
+        );
     }
 
     #[test]
     fn duplicate_or_unknown_score_ids_fail_closed() {
         let (packet, key, manifest) = fixture();
-        let mut run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let mut run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
         run.scores[1].pair_id = run.scores[0].pair_id.clone();
-        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
-            .unwrap_err()
-            .contains("repeats pair ID"));
+        assert!(
+            evaluate_detector_run(&packet, &key, &manifest, &run)
+                .unwrap_err()
+                .contains("repeats pair ID")
+        );
 
-        let mut run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let mut run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
         run.scores[0].pair_id = "not-a-pair".to_owned();
-        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
-            .unwrap_err()
-            .contains("unknown pair ID"));
+        assert!(
+            evaluate_detector_run(&packet, &key, &manifest, &run)
+                .unwrap_err()
+                .contains("unknown pair ID")
+        );
     }
 
     #[test]
     fn sealed_key_mutation_without_manifest_update_fails_closed() {
         let (packet, mut key, manifest) = fixture();
-        let run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
-        key.pair_truth[0].target_control_label =
-            if key.pair_truth[0].target_control_label
-                == crate::TargetControlLabelV1::PositiveForTargetTier
-            {
-                crate::TargetControlLabelV1::NegativeForTargetTier
-            } else {
-                crate::TargetControlLabelV1::PositiveForTargetTier
-            };
+        let run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
+        key.pair_truth[0].target_control_label = if key.pair_truth[0].target_control_label
+            == crate::TargetControlLabelV1::PositiveForTargetTier
+        {
+            crate::TargetControlLabelV1::NegativeForTargetTier
+        } else {
+            crate::TargetControlLabelV1::PositiveForTargetTier
+        };
         let error = evaluate_detector_run(&packet, &key, &manifest, &run).unwrap_err();
         assert!(error.contains("sealed key bytes do not match the manifest commitment"));
     }
@@ -716,43 +717,41 @@ mod tests {
     #[test]
     fn wrong_sealed_key_or_packet_commitment_fails_closed() {
         let (packet, key, manifest) = fixture();
-        let run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
 
         let mut wrong_key = key.clone();
         wrong_key.public_packet_sha256 = "0".repeat(64);
-        assert!(evaluate_detector_run(&packet, &wrong_key, &manifest, &run)
-            .unwrap_err()
-            .contains("does not bind"));
+        assert!(
+            evaluate_detector_run(&packet, &wrong_key, &manifest, &run)
+                .unwrap_err()
+                .contains("does not bind")
+        );
 
         let mut wrong_run = run;
         wrong_run.public_packet_sha256 = "1".repeat(64);
-        assert!(evaluate_detector_run(&packet, &key, &manifest, &wrong_run)
-            .unwrap_err()
-            .contains("does not bind the exact public packet"));
+        assert!(
+            evaluate_detector_run(&packet, &key, &manifest, &wrong_run)
+                .unwrap_err()
+                .contains("does not bind the exact public packet")
+        );
     }
 
     #[test]
     fn unsupported_ngram_sizes_and_scores_outside_range_are_rejected() {
         let (packet, key, manifest) = fixture();
-        assert!(score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::TokenNgramJaccard, 500, 1)
-        )
-        .is_err());
+        assert!(
+            score_public_packet(&packet, &spec(DetectorKindV1::TokenNgramJaccard, 500, 1)).is_err()
+        );
 
-        let mut run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let mut run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
         run.scores[0].risk_permille = 1_001;
-        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
-            .unwrap_err()
-            .contains("exceeds 1000"));
+        assert!(
+            evaluate_detector_run(&packet, &key, &manifest, &run)
+                .unwrap_err()
+                .contains("exceeds 1000")
+        );
     }
 
     #[test]
@@ -761,7 +760,9 @@ mod tests {
         for truth in &mut key.pair_truth {
             if truth.target_tier == TierV1::T1Exact {
                 truth.target_control_label = crate::TargetControlLabelV1::PositiveForTargetTier;
-                truth.planted_mechanisms_present.push(ExposureMechanismV1::ExactInstance);
+                truth
+                    .planted_mechanisms_present
+                    .push(ExposureMechanismV1::ExactInstance);
                 truth.planted_mechanisms_present.sort();
                 truth.planted_mechanisms_present.dedup();
                 truth.right_source_lineage_sha256 = truth.left_source_lineage_sha256.clone();
@@ -771,13 +772,14 @@ mod tests {
         manifest.sealed_key_sha256 = hash_domain(b"sealed-key.v1", &key_bytes);
         // This fixture intentionally violates the generated balanced-control
         // pattern but remains internally consistent for the metrics contract.
-        let run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
         let report = evaluate_detector_run(&packet, &key, &manifest, &run).unwrap();
-        let t1 = report.metrics_by_tier.iter().find(|metric| metric.tier == TierV1::T1Exact).unwrap();
+        let t1 = report
+            .metrics_by_tier
+            .iter()
+            .find(|metric| metric.tier == TierV1::T1Exact)
+            .unwrap();
         assert_eq!(t1.negative_support, 0);
         assert_eq!(t1.specificity_permille, None);
         assert_eq!(t1.false_positive_rate_permille, None);
@@ -794,11 +796,8 @@ mod tests {
     #[test]
     fn strict_detector_run_deserialization_rejects_unknown_fields() {
         let (packet, _, _) = fixture();
-        let run = score_public_packet(
-            &packet,
-            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
-        )
-        .unwrap();
+        let run =
+            score_public_packet(&packet, &spec(DetectorKindV1::ExactTextEquality, 500, 0)).unwrap();
         let mut value = serde_json::to_value(run).unwrap();
         value["unexpected"] = json!(true);
         assert!(serde_json::from_value::<DetectorRunV1>(value).is_err());

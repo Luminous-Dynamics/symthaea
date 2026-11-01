@@ -119,8 +119,7 @@ fn deterministic_uniform(seed: &[u8], feature_id: &str, pair_id: &str) -> f64 {
     payload.extend_from_slice(pair_id.as_bytes());
     let digest = hmac_sha256(seed, &payload);
     let raw = u64::from_be_bytes([
-        digest[0], digest[1], digest[2], digest[3],
-        digest[4], digest[5], digest[6], digest[7],
+        digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
     ]);
     let mantissa = raw >> 12;
     (mantissa as f64 + 0.5) / TWO_POW_52
@@ -144,7 +143,9 @@ pub fn empirical_reference_p_values(
         return Err("feature_id must be nonempty and <=128 bytes".to_owned());
     }
     if seed.len() < MIN_SEED_BYTES {
-        return Err(format!("p-value seed must contain at least {MIN_SEED_BYTES} bytes"));
+        return Err(format!(
+            "p-value seed must contain at least {MIN_SEED_BYTES} bytes"
+        ));
     }
     if reference_scores.is_empty() {
         return Err("contaminated-reference score sample must not be empty".to_owned());
@@ -165,10 +166,16 @@ pub fn empirical_reference_p_values(
             return Err("test score pair_id must be nonempty and <=256 bytes".to_owned());
         }
         if !seen_ids.insert(observation.pair_id.as_str()) {
-            return Err(format!("duplicate test score pair_id {}", observation.pair_id));
+            return Err(format!(
+                "duplicate test score pair_id {}",
+                observation.pair_id
+            ));
         }
         if !observation.score.is_finite() {
-            return Err(format!("test score for {} must be finite", observation.pair_id));
+            return Err(format!(
+                "test score for {} must be finite",
+                observation.pair_id
+            ));
         }
 
         let count = match direction {
@@ -260,7 +267,11 @@ fn sharpen_weights(weights: &[f64], temperature_milli: u16) -> Result<Vec<f64>, 
     if temperature_milli == 0 || temperature_milli > 10_000 {
         return Err("softmax temperature must be in (0, 10]".to_owned());
     }
-    if weights.is_empty() || weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0) {
+    if weights.is_empty()
+        || weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
         return Err("softmax weights must be a nonempty finite nonnegative vector".to_owned());
     }
     let temperature = f64::from(temperature_milli) / 1_000.0;
@@ -286,7 +297,9 @@ fn weighted_cauchy_p_value(p_values: &[f64], weights: &[f64]) -> Result<f64, Str
     for (index, (p_value, weight)) in p_values.iter().zip(weights).enumerate() {
         validate_probability(*p_value, "Cauchy input p-value")?;
         if !weight.is_finite() || *weight < 0.0 {
-            return Err(format!("Cauchy weight {index} must be finite and nonnegative"));
+            return Err(format!(
+                "Cauchy weight {index} must be finite and nonnegative"
+            ));
         }
         weight_sum += *weight;
         let clipped = (*p_value).clamp(CAUCHY_EPS, 1.0 - CAUCHY_EPS);
@@ -331,7 +344,9 @@ pub fn ftd_weighted_cauchy_bh(
         (FtdWeightPolicyV1::OfficialRepositorySoftmaxSharpened, Some(value))
             if value > 0 && value <= 10_000 => {}
         (FtdWeightPolicyV1::OfficialRepositorySoftmaxSharpened, _) => {
-            return Err("official repository weight policy requires temperature in (0, 10]".to_owned());
+            return Err(
+                "official repository weight policy requires temperature in (0, 10]".to_owned(),
+            );
         }
     }
 
@@ -442,10 +457,8 @@ pub fn ftd_weighted_cauchy_bh(
         .collect();
 
     let mut feature_weights = Vec::with_capacity(features.len());
-    for ((feature, rejection_count), weight) in features
-        .iter()
-        .zip(feature_rejection_counts)
-        .zip(weights)
+    for ((feature, rejection_count), weight) in
+        features.iter().zip(feature_rejection_counts).zip(weights)
     {
         feature_weights.push(FtdFeatureWeightV1 {
             feature_id: feature.feature_id.clone(),
@@ -579,10 +592,11 @@ mod tests {
             serde_json::to_vec(&left).unwrap(),
             serde_json::to_vec(&right).unwrap()
         );
-        assert!(left
-            .p_values
-            .iter()
-            .all(|row| row.p_value > 0.0 && row.p_value < 1.0));
+        assert!(
+            left.p_values
+                .iter()
+                .all(|row| row.p_value > 0.0 && row.p_value < 1.0)
+        );
     }
 
     #[test]
@@ -597,30 +611,36 @@ mod tests {
                 score: 2.0,
             },
         ];
-        assert!(empirical_reference_p_values(
-            "f",
-            ReferenceTailV1::Greater,
-            &[1.0],
-            &duplicate,
-            &[0x44; 32]
-        )
-        .is_err());
-        assert!(empirical_reference_p_values(
-            "f",
-            ReferenceTailV1::Greater,
-            &[],
-            &duplicate[..1],
-            &[0x44; 32]
-        )
-        .is_err());
-        assert!(empirical_reference_p_values(
-            "f",
-            ReferenceTailV1::Greater,
-            &[f64::NAN],
-            &duplicate[..1],
-            &[0x44; 32]
-        )
-        .is_err());
+        assert!(
+            empirical_reference_p_values(
+                "f",
+                ReferenceTailV1::Greater,
+                &[1.0],
+                &duplicate,
+                &[0x44; 32]
+            )
+            .is_err()
+        );
+        assert!(
+            empirical_reference_p_values(
+                "f",
+                ReferenceTailV1::Greater,
+                &[],
+                &duplicate[..1],
+                &[0x44; 32]
+            )
+            .is_err()
+        );
+        assert!(
+            empirical_reference_p_values(
+                "f",
+                ReferenceTailV1::Greater,
+                &[f64::NAN],
+                &duplicate[..1],
+                &[0x44; 32]
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -636,7 +656,10 @@ mod tests {
 
     #[test]
     fn paper_normalized_weights_and_official_softmax_variant_are_distinct() {
-        let p1 = feature("strong", &[("a", 0.0001), ("b", 0.001), ("c", 0.01), ("d", 0.8)]);
+        let p1 = feature(
+            "strong",
+            &[("a", 0.0001), ("b", 0.001), ("c", 0.01), ("d", 0.8)],
+        );
         let p2 = feature("weak", &[("a", 0.4), ("b", 0.5), ("c", 0.6), ("d", 0.7)]);
         let paper = ftd_weighted_cauchy_bh(
             &[p1.clone(), p2.clone()],
@@ -689,40 +712,54 @@ mod tests {
         );
         assert_eq!(first.hypothesis_count, 3);
         assert_eq!(first.combined_p_values.len(), 3);
-        assert!(first.combined_p_values.iter().all(|row| row.p_value > 0.0 && row.p_value < 1.0));
-        assert_eq!(first.cross_hypothesis_dependence, "not_assessed_by_this_fusion_kernel");
+        assert!(
+            first
+                .combined_p_values
+                .iter()
+                .all(|row| row.p_value > 0.0 && row.p_value < 1.0)
+        );
+        assert_eq!(
+            first.cross_hypothesis_dependence,
+            "not_assessed_by_this_fusion_kernel"
+        );
     }
 
     #[test]
     fn incomplete_or_misaligned_feature_hypotheses_fail_closed() {
         let p1 = feature("a", &[("x", 0.01), ("y", 0.02)]);
         let p2 = feature("b", &[("x", 0.03), ("other", 0.04)]);
-        assert!(ftd_weighted_cauchy_bh(
-            &[p1, p2],
-            0.05,
-            FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
-            None
-        )
-        .is_err());
+        assert!(
+            ftd_weighted_cauchy_bh(
+                &[p1, p2],
+                0.05,
+                FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn p_values_and_fdr_alpha_are_range_checked() {
         let mut p1 = feature("a", &[("x", 0.01)]);
         p1.p_values[0].p_value = f64::NAN;
-        assert!(ftd_weighted_cauchy_bh(
-            &[p1],
-            0.05,
-            FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
-            None
-        )
-        .is_err());
-        assert!(ftd_weighted_cauchy_bh(
-            &[feature("a", &[("x", 0.01)])],
-            1.0,
-            FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
-            None
-        )
-        .is_err());
+        assert!(
+            ftd_weighted_cauchy_bh(
+                &[p1],
+                0.05,
+                FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            ftd_weighted_cauchy_bh(
+                &[feature("a", &[("x", 0.01)])],
+                1.0,
+                FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
+                None
+            )
+            .is_err()
+        );
     }
 }

@@ -1,16 +1,17 @@
 use contamination_panel_bench::{
-    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
+    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
+    PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
-    DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
-    audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
+    detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
+    exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
-        empirical_reference_p_values, ftd_weighted_cauchy_bh, FeaturePValuesV1,
-        FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
+        FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
+        empirical_reference_p_values, ftd_weighted_cauchy_bh,
     },
-    generate_challenge_bundle, GeneratorConfigV1,
+    generate_challenge_bundle,
     intervention::{
-        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1,
-        audit_intervention, randomize_intervention,
+        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
+        randomize_intervention,
     },
     training_receipt::validate_paired_training_execution_receipt,
 };
@@ -18,13 +19,13 @@ use std::{
     env,
     error::Error,
     fs,
-    io::{self, BufRead},
+    io::{self, BufRead, Read},
     path::Path,
     process,
 };
 
 fn decode_hex(input: &str) -> Result<Vec<u8>, String> {
-    if input.len() % 2 != 0 {
+    if !input.len().is_multiple_of(2) {
         return Err("seed hex must contain an even number of characters".to_owned());
     }
     let mut output = Vec::with_capacity(input.len() / 2);
@@ -46,10 +47,10 @@ fn hex_nibble(value: u8) -> Result<u8, String> {
 }
 
 fn write_bytes(path: &str, contents: &[u8]) -> Result<(), Box<dyn Error>> {
-    if let Some(parent) = Path::new(path).parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = Path::new(path).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
     }
     fs::write(path, contents)?;
     Ok(())
@@ -141,14 +142,9 @@ fn ftd_pvalues(args: &[String]) -> Result<(), Box<dyn Error>> {
     let reference_scores: Vec<f64> = serde_json::from_slice(&fs::read(&args[3])?)?;
     let test_scores: Vec<ScoreObservationV1> = serde_json::from_slice(&fs::read(&args[4])?)?;
     let seed = decode_hex(&args[5]).map_err(io::Error::other)?;
-    let p_values = empirical_reference_p_values(
-        &args[1],
-        direction,
-        &reference_scores,
-        &test_scores,
-        &seed,
-    )
-    .map_err(io::Error::other)?;
+    let p_values =
+        empirical_reference_p_values(&args[1], direction, &reference_scores, &test_scores, &seed)
+            .map_err(io::Error::other)?;
     let bytes = serde_json::to_vec_pretty(&p_values)?;
     write_bytes(&args[6], &bytes)?;
     println!(
@@ -168,28 +164,22 @@ fn ftd_fuse(args: &[String]) -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    let feature_p_values: Vec<FeaturePValuesV1> =
-        serde_json::from_slice(&fs::read(&args[1])?)?;
+    let feature_p_values: Vec<FeaturePValuesV1> = serde_json::from_slice(&fs::read(&args[1])?)?;
     let alpha = args[2].parse::<f64>()?;
     let (weight_policy, temperature) = match args[3].as_str() {
-        "paper" if args[4] == "none" => {
-            (FtdWeightPolicyV1::PaperNormalizedRejectionCounts, None)
-        }
+        "paper" if args[4] == "none" => (FtdWeightPolicyV1::PaperNormalizedRejectionCounts, None),
         "official" if args[4] != "none" => (
             FtdWeightPolicyV1::OfficialRepositorySoftmaxSharpened,
             Some(args[4].parse::<u16>()?),
         ),
         "paper" => return Err("paper policy requires temperature=none".into()),
-        "official" => return Err("official policy requires an integer temperature in thousandths".into()),
+        "official" => {
+            return Err("official policy requires an integer temperature in thousandths".into());
+        }
         _ => return Err("weight policy must be paper or official".into()),
     };
-    let report = ftd_weighted_cauchy_bh(
-        &feature_p_values,
-        alpha,
-        weight_policy,
-        temperature,
-    )
-    .map_err(io::Error::other)?;
+    let report = ftd_weighted_cauchy_bh(&feature_p_values, alpha, weight_policy, temperature)
+        .map_err(io::Error::other)?;
     let bytes = serde_json::to_vec_pretty(&report)?;
     write_bytes(&args[5], &bytes)?;
     println!(
@@ -238,8 +228,7 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         );
     }
     let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
-    let manifest: RandomizedInterventionManifestV1 =
-        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let manifest: RandomizedInterventionManifestV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
     let seed = decode_hex(&args[3]).map_err(io::Error::other)?;
     let report = audit_intervention(&design, &manifest, &seed).map_err(io::Error::other)?;
     write_bytes(&args[4], &serde_json::to_vec_pretty(&report)?)?;
@@ -275,6 +264,57 @@ fn analyze_causal_study_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn read_file_bounded(path: &str, maximum_bytes: u64) -> Result<Vec<u8>, Box<dyn Error>> {
+    let metadata = fs::metadata(path)?;
+    if metadata.len() > maximum_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("input file {path} exceeds {maximum_bytes} bytes"),
+        )
+        .into());
+    }
+    let file = fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    file.take(maximum_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > maximum_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("input file {path} grew beyond {maximum_bytes} bytes while reading"),
+        )
+        .into());
+    }
+    Ok(bytes)
+}
+
+fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench analyze-exposure-transfer <replicated-causal-study.json> <exposure-transfer-study.json> <transfer-report.json>"
+                .into(),
+        );
+    }
+    const MAX_STUDY_BYTES: u64 = 256 * 1024 * 1024;
+    let base_bytes = read_file_bounded(&args[1], MAX_STUDY_BYTES)?;
+    let transfer_bytes = read_file_bounded(&args[2], MAX_STUDY_BYTES)?;
+    let base_study: ReplicatedCausalStudyV1 = serde_json::from_slice(&base_bytes)?;
+    let transfer_study: ExposureTransferStudyV1 = serde_json::from_slice(&transfer_bytes)?;
+    let report =
+        analyze_exposure_transfer(&base_study, &transfer_study).map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "replicates={} families={} relations={} contrasts={} confirmatory_eligible={} status={}",
+        report.independent_model_pair_replicate_count,
+        report.family_count,
+        report.transfer_relation_effects.len(),
+        report.predeclared_contrasts.len(),
+        report.confirmatory_eligible,
+        report.analysis_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -283,16 +323,12 @@ fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         );
     }
     let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
-    let manifest: RandomizedInterventionManifestV1 =
-        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let manifest: RandomizedInterventionManifestV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
     let seed = decode_hex(&args[3]).map_err(io::Error::other)?;
     let receipt_bytes = fs::read(&args[4])?;
-    let report = validate_paired_training_execution_receipt(
-        &design,
-        &manifest,
-        &seed,
-        &receipt_bytes,
-    ).map_err(io::Error::other)?;
+    let report =
+        validate_paired_training_execution_receipt(&design, &manifest, &seed, &receipt_bytes)
+            .map_err(io::Error::other)?;
     write_bytes(&args[5], &serde_json::to_vec_pretty(&report)?)?;
     println!(
         "valid={} execution_consistent={} ready_for_external_verification={} independently_verified={}",
@@ -301,7 +337,10 @@ fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         report.ready_for_independent_attestation_verification,
         report.independently_verified
     );
-    println!("attestation status: {}", report.external_attestation_verification);
+    println!(
+        "attestation status: {}",
+        report.external_attestation_verification
+    );
     Ok(())
 }
 
@@ -324,7 +363,10 @@ fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
         let record: AdjudicationRecordV1 = serde_json::from_str(&line).map_err(|error| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("invalid adjudication JSON at line {}: {error}", line_number + 1),
+                format!(
+                    "invalid adjudication JSON at line {}: {error}",
+                    line_number + 1
+                ),
             )
         })?;
         records.push(record);
@@ -358,9 +400,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-intervention") => audit_intervention_cli(&args),
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
+        Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
