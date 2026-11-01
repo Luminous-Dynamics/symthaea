@@ -98,11 +98,42 @@ The capacity-aware decision problem can therefore be written as a mixed-integer 
                sum_i c_i*x_i <= B_t
                x_i = 1 for every previously committed rejection.
 
-There are n binary x variables, one count variable r, n continuous y variables, n+2 closure/count rows, plus capacity and persistence rows: O(n) variables and constraints. The closure logic no longer introduces 2^n rows. The overall problem is still a 0-1 optimization problem (NP-hard in general); this does not imply linear-time optimization. It gives a compact exact formulation suitable for HiGHS/CBC/SCIP/Gurobi/CP-SAT comparisons, with exact rational post-solution verification.
+There are n binary x variables, one continuous count variable r, and n continuous y variables. The count equality r=sum_i x_i makes r integral automatically, so declaring it integer is redundant. With capacity and persistence, the model has n+2+O(p) rows and O(n) nonzeros (6n+2 with one capacity row and no persistence rows). The closure logic no longer introduces 2^n rows. The overall problem is still a 0-1 optimization problem (NP-hard in general); this does not imply linear-time optimization. It gives a compact exact formulation suitable for HiGHS/CBC/SCIP/Gurobi comparisons, with exact rational post-solution verification.
 
 The new `validation/affine_projective_closure_milp.py` builds the model with exact Fraction coefficients, emits CPLEX-LP-compatible text with each row scaled to exact integer coefficients, provides an O(n) exact binary-decision verifier that does not trust solver auxiliary values, and retains a separate exhaustive verifier for small-family differential checks. `validation/test_affine_projective_closure_milp.py` differentially compares the exact MILP feasibility witness against direct enumeration for all rejection masks and rational evidence grids for n=1..4, and checks that the LP export preserves rational coefficients. The builder does not call or depend on a solver, and no solver performance claim is made.
 
 This is the key implementation target: preserve the small exhaustive verifier as the oracle, use the compact MILP for action selection, and independently replay every proposed solution against the original local-intersection definition before issuing a decision receipt.
+
+### First solver-backed engineering sweep (exploratory)
+
+A deterministic optional adapter has been added:
+
+- `validation/benchmark_affine_projective_closure_solvers.py` builds the exact model, converts it to SciPy's sparse MILP interface, calls `scipy.optimize.milp` (HiGHS), records primal/dual bounds, MIP gap, nodes, model dimensions, build/solve/verifier times, and independently replays the returned binary action using exact Fraction arithmetic.
+- `validation/test_benchmark_affine_projective_closure_solvers.py` checks deterministic instance manifests, linear model dimensions, exact exhaustive agreement on small cases, and optional solver results.
+- The rejection-count variable r is now continuous; its integrality follows from r=sum_i x_i with binary x_i.
+
+I also ran an independent SciPy 1.17.0 / HiGHS prototype in the current analysis environment on a seven-size synthetic sweep. All seven cases were proven optimal (solver status 0), all returned actions passed exact rational closure/capacity verification, and all reported zero MIP gap:
+
+| Active n | Selected | Utility | Cost | HiGHS solve time | Nodes |
+|---:|---:|---:|---:|---:|---:|
+| 10 | 9 | 522 | 118 | 2.55 ms | 1 |
+| 25 | 24 | 1,542 | 307 | 1.89 ms | 0 |
+| 50 | 48 | 2,647 | 601 | 2.78 ms | 1 |
+| 100 | 96 | 5,609 | 1,239 | 5.53 ms | 1 |
+| 250 | 240 | 12,643 | 2,971 | 20.89 ms | 1 |
+| 500 | 481 | 26,671 | 5,850 | 144.85 ms | 1 |
+| 1,000 | 963 | 55,871 | 11,846 | 291.78 ms | 1 |
+
+The generator sets d_i=w_i(M_i-1)=12/n and uses alpha=0.1, heterogeneous integer utilities and costs, and capacity at 95% of total cost. This creates a lower-cardinality closure requirement plus a knapsack trade-off. The exact verifier checks the output independently.
+
+**Interpretation:** this demonstrates that the compact formulation can be solved at n=1,000 on one tractable synthetic family in this environment. It is not a publishable solver benchmark, does not establish general 1-second performance, and does not demonstrate superiority over another solver. The instances were solved at or near the root node, so substantially harder and more diverse families are required.
+
+The checked-in benchmark runner and tests have been authored but were not executed against the repository checkout in this environment. Direct GitHub cloning was unavailable; the numerical sweep above used an independent local implementation of the same exact formulation, not the checked-in runner. Re-run the checked-in command in a connected development shell:
+
+    PYTHONPATH=validation python validation/benchmark_affine_projective_closure_solvers.py --sizes 10,25,50,100,250,500,1000 --seed 20261101 --output solver-sweep.json
+
+The next benchmark must include hard 0-1 knapsack instances, correlated utility/cost distributions, tight capacities, persistent-prefix constraints, high-precision rational coefficients, solver time limits, and at least three solvers under identical hardware/time/thread settings. Report both primal quality and proof-of-optimality time; finding a feasible incumbent is not the same as proving an optimum.
+
 
 
 **Guarantee boundary:** this O(n) separator applies to the raw affine intersection certificates used for the stopped-FDR construction. It does not automatically apply after a nonlinear running-maximum adjuster is applied separately to every intersection: the adjusted value A(max_{s<=t} E_s^{S,w}) is no longer an additive function of the current coordinate values. For SupFDR, use the projectivity-preserving adjuster from the #9538 track and keep exhaustive local-constraint checking until a separate valid separator for the adjusted family is derived. The raw-coordinate monotonicity field in the oracle is only a path diagnostic, not evidence that the supplied coordinate paths are valid e-processes; in particular, a nontrivial valid e-process started at one is not generally pathwise nondecreasing.
@@ -174,7 +205,7 @@ Run from the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_countable_global_projective_eclosure.py
 
-The source test suites now contain 27 test methods across the global-projective oracle and MILP model. The 16-test raw-separator suite had previously passed locally; the eleven newly authored adjusted-path and MILP tests have not yet been executed in this environment.
+The source test suites now contain 32 test methods across the global-projective oracle, MILP model, and solver benchmark. The 16-test raw-separator suite had previously passed locally; the adjusted-path, MILP, and solver-adapter tests have not yet been executed in this environment.
 
 ## 7. Prior-art boundary
 
