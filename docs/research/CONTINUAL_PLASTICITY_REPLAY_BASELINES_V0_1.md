@@ -58,6 +58,7 @@ The crate tracks:
 - time-integrated retained byte-time (byte-microseconds);
 - evictions and items not retained;
 - selected replay count;
+- logical replay payload bytes selected (not physical device I/O);
 - declared replay work units.
 
 The evaluator should additionally measure the complete deployed path:
@@ -140,7 +141,7 @@ semantics or resource boundaries into one leaderboard.
 
 ## 9. Current implementation and claim ceiling
 
-The Rust crate contains 12 source-authored test functions. No Cargo build,
+The Rust crate contains 13 source-authored test functions. No Cargo build,
 rustfmt, Clippy, tests or benchmark has run in this environment. No physical
 energy or latency has been measured. This package is a pair of replay data
 structure baselines, not evidence that replay or any Symthaea policy beats
