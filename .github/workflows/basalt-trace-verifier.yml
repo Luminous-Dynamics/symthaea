@@ -1,0 +1,43 @@
+name: BASALT Trace Verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-trace-verifier/**"
+      - "benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json"
+      - "benchmarks/basalt/storage-conformance-trace.v1.json"
+      - "docs/research/BASALT_STORAGE_CONFORMANCE_PROTOCOL_2026-11-01.md"
+      - ".github/workflows/basalt-trace-verifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/basalt-trace-verifier/**"
+      - "benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json"
+      - "benchmarks/basalt/storage-conformance-trace.v1.json"
+      - ".github/workflows/basalt-trace-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Verify standalone package formatting
+        run: cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --check
+      - name: Test reference reducer and negative controls
+        run: cargo test --manifest-path tools/basalt-trace-verifier/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/basalt-trace-verifier/Cargo.toml --all-targets -- -D warnings
+      - name: Run exact checked-in reference trace
+        run: cargo run --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --trace benchmarks/basalt/storage-conformance-trace.v1.json --out "$RUNNER_TEMP/basalt-reference-report.json"
+      - name: Preserve exact-head report
+        run: cat "$RUNNER_TEMP/basalt-reference-report.json"
