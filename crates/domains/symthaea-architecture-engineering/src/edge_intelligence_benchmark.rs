@@ -1350,6 +1350,11 @@ mod tests {
                 timestamp_us: observation.timestamp_us,
                 predicted_class: Some(label),
                 positive_probability_q15: if label == 1 { 32_768 } else { 0 },
+                novelty_score_q15: if dataset.delayed_labels[observation.event_index].is_out_of_distribution {
+                    32_768
+                } else {
+                    0
+                },
                 model_state_sha256: state_sha.clone(),
             });
         }
