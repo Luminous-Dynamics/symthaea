@@ -439,8 +439,8 @@ impl ExactEvsiProblem {
     ) -> Result<(), ExactEvsiError> {
         if rows.len() != self.worlds.len() {
             return Err(ExactEvsiError::new(
-                format!("problem.{parent_name}[{parent_index}]"),
-                format!("{row_kind} table must contain exactly one row for every world"),
+                format!("problem.{parent_name}[{parent_index}].{rows_field}"),
+                "table must contain exactly one row for every world",
             ));
         }
         for (index, world) in self.worlds.iter().enumerate() {
