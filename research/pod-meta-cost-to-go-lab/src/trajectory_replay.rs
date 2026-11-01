@@ -152,7 +152,7 @@ impl PrefixForecaster for LastObservedActionForecaster {
             .checked_add(prefix.frontier_features.mandatory_verifier_operations)
             .ok_or(PrefixForecasterError::ArithmeticOverflow)?
             .max(1);
-        let q50 = checked_scale(unit_cost, work_units)
+        let q50 = checked_scale(unit_cost, u128::from(work_units))
             .ok_or(PrefixForecasterError::ArithmeticOverflow)?;
         let q90 = checked_scale(q50, u128::from(self.q90_multiplier))
             .ok_or(PrefixForecasterError::ArithmeticOverflow)?;
@@ -201,7 +201,7 @@ pub enum PrefixOutcomeLabel {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PrefixReplayRow {
+pub struct TrajectoryPrefixReplayRow {
     pub prefix: PrefixView,
     pub model_digest: [u8; 32],
     pub forecast: PrefixCostForecast,
@@ -212,7 +212,7 @@ pub struct PrefixReplayRow {
 pub struct TrajectoryReplayResult {
     pub run_id: u64,
     pub task_family: u32,
-    pub rows: Vec<PrefixReplayRow>,
+    pub rows: Vec<TrajectoryPrefixReplayRow>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -503,7 +503,7 @@ impl PrefixReplayEngine {
             let label = trajectory
                 .outcome_label(index)
                 .map_err(PrefixReplayEngineError::Trajectory)?;
-            rows.push(PrefixReplayRow {
+            rows.push(TrajectoryPrefixReplayRow {
                 prefix,
                 model_digest,
                 forecast,
