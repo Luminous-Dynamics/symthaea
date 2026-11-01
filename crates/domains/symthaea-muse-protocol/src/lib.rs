@@ -1418,6 +1418,65 @@ pub enum ObligationState {
     Unresolved,
 }
 
+/// Transformation contract for a typed motif-return obligation.
+/// These labels describe symbolic score relationships; they are not claims
+/// that a listener will recognize or emotionally value the return.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObligationMotifTransformationV1 {
+    Literal,
+    Transposed,
+    Inverted,
+    Augmented,
+    Diminished,
+    Fragmented,
+    Restored,
+}
+
+/// Typed obligation semantics carried beside a composer-owned lifecycle trace.
+/// The Analyst independently checks supported variants against the exact score.
+/// Variants without a qualified score-side oracle remain insufficient evidence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ObligationKindV1 {
+    ReturnMotif {
+        motif_id: String,
+        /// Exact source-note identities that define the promised motif.
+        source_event_ids: Vec<String>,
+        transformation: ObligationMotifTransformationV1,
+    },
+    ReachKey {
+        key_label: String,
+    },
+    Cadence {
+        cadence_type: String,
+    },
+    ResolveAlteredDegree {
+        degree_label: String,
+    },
+    EnterVoice {
+        voice_id: String,
+    },
+    ReachClimax,
+    RestoreIdentity {
+        identity_id: String,
+    },
+    Custom {
+        label: String,
+    },
+}
+
+/// Versioned semantic definition for one lifecycle obligation.
+///
+/// The definition must remain identical across all transitions with the same
+/// obligation ID. This is a data binding, not a signature or proof of authorship.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObligationDefinitionV1 {
+    pub schema_version: u16,
+    pub kind: ObligationKindV1,
+}
+
 /// One composer-asserted transition of a compositional obligation from
 /// one lifecycle state to another (`from: None` for its creation).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1429,6 +1488,10 @@ pub struct ObligationTransitionTrace {
     pub score_event_ids: Vec<String>,
     pub responsible_pass: String,
     pub transformation: Option<String>,
+    /// Typed semantic promise. Missing values remain readable for legacy
+    /// traces, but a fulfilled legacy transition is not semantically verified.
+    #[serde(default)]
+    pub definition: Option<ObligationDefinitionV1>,
     pub assertion: EvidenceSourceEnvelope,
 }
 
