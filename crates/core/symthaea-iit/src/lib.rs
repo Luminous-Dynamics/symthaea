@@ -457,7 +457,7 @@ pub fn certify_iit4_2023_system_phi_upper_bound_for_binding(
         theorem_id: IIT4_2023_SYSTEM_PHI_BOUND_THEOREM_ID.to_string(),
         formalism_id: FormalismProfile::Iit4_0_2023.id().to_string(),
         partition_family_id: IIT4_2023_SYSTEM_PHI_BOUND_PARTITION_FAMILY_ID.to_string(),
-        model_sha256: model.model_sha256(),
+        model_sha256: model_sha256.to_string(),
         candidate_system: candidate_system.to_vec(),
         upper_bound,
         binary_units: true,
