@@ -257,6 +257,8 @@
             "topology_counts",
             "unbounded_count",
             "unbounded_rate",
+            "finite_noncovering_set_count",
+            "finite_noncovering_set_rate",
             "finite_width_count",
             "finite_width_median",
             "finite_width_p90"
@@ -372,6 +374,18 @@
                 "null"
               ],
               "minimum": 0
+            },
+            "finite_noncovering_set_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "finite_noncovering_set_rate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
             }
           }
         },
