@@ -2009,7 +2009,7 @@ mod tests {
             emphasis: "normal".into(),
             section_intensity: 1.0,
         });
-        trace.obligation_transitions[1].definition = Some(ObligationDefinitionV1 {
+        let definition = Some(ObligationDefinitionV1 {
             schema_version: 1,
             kind: ObligationKindV1::ReturnMotif {
                 motif_id: "motif-a".into(),
@@ -2017,12 +2017,18 @@ mod tests {
                 transformation: ObligationMotifTransformationV1::Transposed,
             },
         });
+        trace.obligation_transitions[0].definition = definition.clone();
+        trace.obligation_transitions[1].definition = definition;
         trace.obligation_transitions[1].score_event_ids = vec!["n2".into(), "n3".into()];
         let accepted = verify_composer_trace(&trace, &composition, "score", 0);
         assert!(!accepted
             .issues
             .iter()
             .any(|issue| issue.code == "obligation-motif-transformation-not-realized"));
+        assert_eq!(
+            accepted.evidence.verification_status,
+            VerificationStatus::Verified
+        );
 
         composition.notes[3].midi = 67;
         let rejected = verify_composer_trace(&trace, &composition, "score", 0);
