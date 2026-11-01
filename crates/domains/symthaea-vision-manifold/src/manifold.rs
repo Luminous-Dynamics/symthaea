@@ -7258,6 +7258,131 @@ mod tests {
         assert!(accuracy.errors[0].is_finite());
         assert!(accuracy.persistence_errors[0].is_finite());
         assert!(accuracy.mean_lateness_seconds[0] >= 0.0);
+        assert_eq!(accuracy.score_receipt_count, 1);
+        assert_eq!(accuracy.evicted_score_receipts, 0);
+
+        let receipt = &evaluator.score_receipts()[0];
+        assert_eq!(receipt.forecast_id, 1);
+        assert_eq!(receipt.horizon_index, 0);
+        assert_eq!(receipt.source_frame_sequence, Some(1));
+        assert_eq!(receipt.target_frame_sequence, 3);
+        assert_eq!(receipt.issued_at_seconds, 0.04);
+        assert!((receipt.due_at_seconds - 0.09).abs() < 1e-9);
+        assert!((receipt.observed_at_seconds - 0.12).abs() < 1e-9);
+        assert!((receipt.lateness_seconds - 0.03).abs() < 1e-9);
+        assert_eq!(receipt.status, HorizonForecastReceiptStatus::Scored);
+        assert!(receipt.prediction_error.is_some());
+        assert!(receipt.persistence_error.is_some());
+        for digest in [
+            receipt.source_observation_blake3.as_deref().unwrap(),
+            receipt.source_belief_blake3.as_deref().unwrap(),
+            receipt.predictor_parameter_blake3.as_deref().unwrap(),
+            receipt.prediction_blake3.as_str(),
+            receipt.persistence_blake3.as_str(),
+            receipt.target_observation_blake3.as_str(),
+        ] {
+            assert!(is_lower_hex_blake3(digest));
+        }
+    }
+
+    #[test]
+    fn test_delayed_horizon_receipt_ledger_is_bounded_and_checkpointed() {
+        let config = VisionConfig {
+            hdc_dim: 256,
+            ..VisionConfig::default()
+        };
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        let mut evaluator = DelayedHorizonEvaluator::with_limits(
+            vec![(0.01, "near".into())],
+            1,
+            2,
+        )
+        .unwrap();
+
+        for value in [10, 20, 30, 40, 50] {
+            manifold
+                .observe_frame_checked(&vec![value; 64], 8, 8, 1, 0.02)
+                .unwrap();
+            evaluator.observe(&manifold, 0.02).unwrap();
+        }
+
+        assert_eq!(evaluator.score_receipts().len(), 2);
+        assert_eq!(evaluator.evicted_score_receipts(), 2);
+        assert_eq!(evaluator.score_receipts()[0].forecast_id, 3);
+        assert_eq!(evaluator.score_receipts()[1].forecast_id, 4);
+        assert_eq!(evaluator.accuracy(manifold.frame_count()).score_receipt_count, 2);
+
+        let saved = evaluator.save_state();
+        assert!(DelayedHorizonEvaluator::validate_state(&saved).is_ok());
+        let mut restored = DelayedHorizonEvaluator::default();
+        restored.load_state(&saved).unwrap();
+        assert_eq!(restored.save_state(), saved);
+
+        let mut over_capacity = saved.clone();
+        over_capacity.score_receipts.push(over_capacity.score_receipts[0].clone());
+        assert!(DelayedHorizonEvaluator::validate_state(&over_capacity).is_err());
+
+        let mut duplicate_id = saved.clone();
+        duplicate_id.score_receipts[1].forecast_id = duplicate_id.score_receipts[0].forecast_id;
+        assert!(DelayedHorizonEvaluator::validate_state(&duplicate_id).is_err());
+    }
+
+    #[test]
+    fn test_delayed_horizon_legacy_pending_work_migrates_without_fabricated_lineage() {
+        let config = VisionConfig {
+            hdc_dim: 256,
+            ..VisionConfig::default()
+        };
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        manifold
+            .observe_frame_checked(&vec![10; 64], 8, 8, 1, 0.01)
+            .unwrap();
+        let mut evaluator = DelayedHorizonEvaluator::default();
+        evaluator.observe(&manifold, 0.01).unwrap();
+
+        let mut legacy = evaluator.save_state();
+        legacy.schema_version = 3;
+        legacy.next_forecast_id = 0;
+        legacy.score_receipts.clear();
+        legacy.max_score_receipts = 0;
+        for forecast in &mut legacy.pending {
+            forecast.forecast_id = 0;
+            forecast.source_frame_sequence = None;
+            forecast.issued_at_seconds = 0.0;
+            forecast.source_observation_blake3 = None;
+            forecast.source_belief_blake3 = None;
+            forecast.predictor_parameter_blake3 = None;
+            forecast.prediction_blake3 = None;
+            forecast.persistence_blake3 = None;
+        }
+
+        let mut restored = DelayedHorizonEvaluator::default();
+        restored.load_state(&legacy).unwrap();
+        let migrated = restored.save_state();
+        assert_eq!(migrated.schema_version, DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION);
+        assert_eq!(migrated.pending.len(), legacy.pending.len());
+        assert_eq!(migrated.pending[0].forecast_id, 1);
+        assert!(migrated.pending[0].source_frame_sequence.is_none());
+        assert!(migrated.pending[0].source_observation_blake3.is_none());
+        assert!(migrated.pending[0].source_belief_blake3.is_none());
+        assert!(migrated.pending[0].predictor_parameter_blake3.is_none());
+        assert!(migrated.pending[0].prediction_blake3.is_some());
+        assert!(migrated.pending[0].persistence_blake3.is_some());
+        assert!(DelayedHorizonEvaluator::validate_state(&migrated).is_ok());
+    }
+
+    #[test]
+    fn test_visual_forecast_fingerprints_are_deterministic_and_dimension_bound() {
+        let first = ContinuousHV::from_vec(vec![0.1, 0.2, 0.3]);
+        let same = ContinuousHV::from_vec(vec![0.1, 0.2, 0.3]);
+        let changed = ContinuousHV::from_vec(vec![0.1, 0.2, 0.4]);
+        let different_dim = ContinuousHV::from_vec(vec![0.1, 0.2]);
+
+        let digest = visual_hv_blake3(&first);
+        assert_eq!(digest, visual_hv_blake3(&same));
+        assert_ne!(digest, visual_hv_blake3(&changed));
+        assert_ne!(digest, visual_hv_blake3(&different_dim));
+        assert!(is_lower_hex_blake3(&digest));
     }
 
     #[test]
@@ -7363,6 +7488,14 @@ mod tests {
         assert_eq!(accuracy.sample_counts, vec![0]);
         assert_eq!(accuracy.expired_forecasts, vec![1]);
         assert_eq!(accuracy.dropped_forecasts, vec![0]);
+        assert_eq!(accuracy.score_receipt_count, 1);
+        let receipt = &evaluator.score_receipts()[0];
+        assert_eq!(receipt.status, HorizonForecastReceiptStatus::Expired);
+        assert_eq!(receipt.source_frame_sequence, Some(1));
+        assert_eq!(receipt.target_frame_sequence, 2);
+        assert_eq!(receipt.prediction_error, None);
+        assert_eq!(receipt.persistence_error, None);
+        assert!((receipt.lateness_seconds - 0.9).abs() < 1e-9);
     }
 
     #[test]
