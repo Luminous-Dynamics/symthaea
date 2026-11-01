@@ -62,6 +62,11 @@ A policy can submit an action estimate for each feasible next step. Wait/sleep m
 ## Receipt and reproducibility
 
 The content-addressed plan receipt binds:
+- digest of current public observation/history and persistent state;
+- forecast model digest used to estimate observation outcome probabilities and posterior task losses;
+- calibration receipt digest for those probabilities/loss estimates;
+- decision-policy digest that defines the task loss and action semantics;
+- per-action resource-cost-model digest;
 - current expected task loss;
 - complete remaining resource budget;
 - sorted non-dominated action set;
@@ -71,7 +76,7 @@ The content-addressed plan receipt binds:
 - rejected action IDs/reasons;
 - canonical plan digest.
 
-Receipt validation recomputes each frontier action's expected task loss from the stored outcome distribution and checks resource feasibility, sorted/unique action IDs, no duplicate IDs across accepted/rejected lists, absence of dominated frontier actions and canonical digest.
+Receipt validation recomputes each frontier action's expected task loss from the stored outcome distribution and checks provenance digests, resource-cost-model identity, resource feasibility, sorted/unique action IDs, no duplicate IDs across accepted/rejected lists, absence of dominated frontier actions and canonical digest.
 
 The receipt is a planning artifact, not proof that an observation was actually acquired. Actual sample timestamps, sensor state, input bytes, action execution, power trace, event quality and device session need separate candidate/system receipts.
 
