@@ -75,7 +75,7 @@ provenance and preprocessing resource accounting.
 
 ## 6. Test coverage and limits
 
-Sixteen source-authored Rust test functions cover irregular and asynchronous
+Thirty-five source-authored Rust test functions cover irregular and asynchronous
 records, delayed arrival, non-retroactive visibility, out-of-order event time,
 missingness/censoring, opaque multimodal payload validation, duplicates, source identity, fixed-point validation,
 known-future covariate publication/validity, entity filtering and tie handling.
@@ -187,3 +187,45 @@ The parsed table returns dataset ID, record ID, stable entity ID, exact source
 file digest, timestamp-zone digest, availability-policy digest and the
 canonical adapter-configuration digest. These values should be copied into the
 benchmark run manifest alongside the split and train-only scaler digests.
+
+
+## 7. Microsecond bitemporal event revisions
+
+The crate adds `BitemporalEventLedger` for append-only Assert/Supersede/Retract
+revisions at microsecond resolution. Each revision binds a global revision ID,
+event ID, per-event sequence, event record and transaction timestamp
+(`recorded_at_us`). A correction must preserve entity, modality, source and
+source-local sequence. Its record must have been available no later than the
+transaction that records it.
+
+Queries at `(valid_at_us, known_at_us)` choose the latest revision committed
+by the knowledge-time coordinate and return it only when its event time is no
+later than the valid-time coordinate. Later corrections and retractions never
+rewrite an earlier as-known view. Transactions use one shared timestamp,
+strictly increasing across committed batches, and clone/validate/commit
+atomicity. The deterministic state digest commits to ordered revision history.
+
+This models point events, not arbitrary valid-time intervals. It complements
+the existing Broca daily valid-interval ledger (#9109) and composed proof
+runtime (#9292); it does not replace or yet integrate with those APIs. Durable
+WAL persistence, source authentication and authorization remain out of scope.
+
+## 8. Strict CSV adapter
+
+`csv_adapter` reads numeric `date_time,record_id,feature...` CSV and separate
+opaque text CSV modalities. It has an explicit availability policy:
+`ExplicitColumn(name)` reads actual arrival time from a supplied column;
+`EventTimeAssumedImmediate` is a visible approximation recorded in the
+adapter manifest. The latter must not be used for causal claims unless the
+dataset's semantics justify immediate availability.
+
+Naive date/time strings are rejected unless the caller explicitly allows the
+UTC interpretation. Numeric values are parsed as fixed-point millionths
+without floating-point conversion; missing values remain missing, not zero.
+Opaque UTF-8 text is content-addressed by SHA-256 and referenced by byte length
+and encoding ID. Feature names receive stable modality IDs; hash collisions
+fail closed.
+
+No Time-IMM dataset was loaded, and no Cargo build, formatting, Clippy or test
+has run. The CSV adapter is a first parser, not yet an official-split or
+benchmark evaluator implementation.
