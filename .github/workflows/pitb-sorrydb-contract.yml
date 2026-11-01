@@ -672,6 +672,8 @@ jobs:
           assert run["properties"]["evidence_kind"]["const"] == "run"
           assert "target_integrity_receipt_sha256" in run["required"]
           assert "semantic_gate_receipt_sha256" not in run["required"]
+          assert "target_integrity_receipt_sha256" in run["properties"]
+          assert "semantic_gate_receipt_sha256" not in run["properties"]
           assert successor["properties"]["evidence_kind"]["const"] == "successor"
           assert all(schema["properties"]["evidence_class"]["const"] == "measured_evidence" for schema in (checker, run, successor))
           print("PITB_INTERVENTION_EVIDENCE_SCHEMAS_PASS: checker/run/successor strict measured receipt contracts")
