@@ -5,6 +5,8 @@ on:
     paths:
       - "crates/bridges/symthaea-proof-insights/src/bin/import_sorrydb_snapshot.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/analyze_sorrydb_branch_ledger.rs"
+      - "crates/bridges/symthaea-proof-insights/src/bin/allocate_proof_search_budget.rs"
+      - "data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/**"
       - "crates/bridges/symthaea-proof-insights/src/snapshot_branch_receipt.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/verify_snapshot_branch_receipt.rs"
       - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/**"
@@ -492,6 +494,8 @@ jobs:
           cargo run --locked --bin import_sorrydb_snapshot -- --self-test
           cargo run --locked --bin analyze_sorrydb_branch_ledger -- --self-test \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json"
+          cargo run --locked --bin allocate_proof_search_budget -- --self-test \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/fixtures/proof-search-allocation.synthetic.json"
           snapshot_fixture="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/snapshot-branch-receipt.synthetic.json"
           cargo run --locked --bin verify_snapshot_branch_receipt -- --self-test "$snapshot_fixture"
           python - "$snapshot_fixture" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json" "$RUNNER_TEMP/pitb-r5-ledger.synthetic.json" <<'PY'
