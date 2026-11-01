@@ -12,6 +12,10 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::evidence_artifact::{
+    verify_evidence_artifact_byte_receipt, EvidenceArtifactByteReceipt,
+    EvidenceArtifactManifest, ResolvedEvidenceArtifact,
+};
 use super::pareto_objectives::{
     analyze_pareto, analyze_reference_front_indicators, ParetoAnalysisPlan, ParetoCandidate,
     ParetoObjectiveSpec,
@@ -1019,6 +1023,84 @@ fn validate_and_apply_event(
     state.previous_digest = event.event_sha256.clone();
     Ok(())
 }
+/// Append an ArtifactVerified promotion only after reconstructing the byte receipt from the
+/// exact frozen manifest and supplied bytes. This establishes byte integrity, not semantic
+/// correctness or held-out validity. A later domain-specific verifier must establish those.
+pub fn append_artifact_verified_promotion(
+    history: &mut AnytimeHistory,
+    manifest: &EvidenceArtifactManifest,
+    resolved_artifacts: &[ResolvedEvidenceArtifact],
+    byte_receipt: &EvidenceArtifactByteReceipt,
+    verification_resources: ResourceCost,
+    started_elapsed_millis: u64,
+    completed_elapsed_millis: u64,
+) -> Result<String, AnytimeError> {
+    history.validate()?;
+    manifest.validate().map_err(|error| AnytimeError::new(
+        "artifact_manifest",
+        error.to_string(),
+    ))?;
+    let header = history.header();
+    if manifest.run_id != header.run_id
+        || manifest.source_commit != header.source_commit
+        || byte_receipt.candidate_id != manifest.candidate_id
+    {
+        return Err(AnytimeError::new(
+            "artifact_manifest.identity",
+            "manifest run/source-commit/candidate identity differs from the anytime history",
+        ));
+    }
+    if byte_receipt.verifier_id != header.verifier_id
+        || byte_receipt.verifier_build_sha256 != header.verifier_build_sha256
+    {
+        return Err(AnytimeError::new(
+            "artifact_receipt.verifier",
+            "byte receipt verifier identity/build differs from the frozen history header",
+        ));
+    }
+
+    verify_evidence_artifact_byte_receipt(
+        manifest,
+        &byte_receipt.verifier_id,
+        &byte_receipt.verifier_build_sha256,
+        resolved_artifacts,
+        byte_receipt,
+    ).map_err(|error| AnytimeError::new("artifact_byte_receipt", error.to_string()))?;
+
+    let candidate_evidence = history.events.iter().find_map(|event| {
+        match &event.action {
+            AnytimeAction::CandidateEvaluation {
+                candidate_id,
+                outcome: EvaluationOutcome::Succeeded,
+                evidence_sha256: Some(evidence_sha256),
+                ..
+            } if candidate_id == &manifest.candidate_id => Some(evidence_sha256.as_str()),
+            _ => None,
+        }
+    }).ok_or_else(|| AnytimeError::new(
+        "artifact_manifest.candidate_id",
+        "candidate has no successful evaluation in this history",
+    ))?;
+    if candidate_evidence != manifest.candidate_evidence_sha256 {
+        return Err(AnytimeError::new(
+            "artifact_manifest.candidate_evidence_sha256",
+            "manifest evidence digest differs from the candidate evaluation",
+        ));
+    }
+
+    history.append(AnytimeEventDraft {
+        started_elapsed_millis,
+        completed_elapsed_millis,
+        resources: verification_resources,
+        action: AnytimeAction::CandidateVerification {
+            candidate_id: manifest.candidate_id.clone(),
+            evidence_sha256: manifest.candidate_evidence_sha256.clone(),
+            level: EvidenceLevel::ArtifactVerified,
+            verifier_receipt_sha256: byte_receipt.receipt_sha256.clone(),
+        },
+    })
+}
+
 /// Captures deterministic optimizer objective evaluations in the shared anytime format.
 ///
 /// This recorder uses synthetic objective-evaluation units only. It deliberately records
