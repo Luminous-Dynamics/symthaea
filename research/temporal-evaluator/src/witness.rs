@@ -342,12 +342,14 @@ pub fn verify_checkpoint_quorum(
             None => {
                 current_responses.insert(witness_id, attestation);
             }
-            Some(existing) if **existing == *attestation => {
-                // Exact retransmission: count the signed statement only once.
+            Some(existing) if same_checkpoint_vote(existing, attestation) => {
+                // Same evaluator/challenge/checkpoint vote with a different
+                // observation timestamp is a re-attestation, not equivocation.
+                // It still contributes only one witness identity to the quorum.
             }
             Some(_) => {
-                // Only conflicting, authenticated responses for this exact
-                // evaluator and challenge can establish equivocation.
+                // Only conflicting, authenticated checkpoint statements for
+                // this exact evaluator and challenge establish equivocation.
                 equivocating_witnesses.insert(witness_id);
             }
         }
@@ -438,6 +440,18 @@ pub fn verify_checkpoint_quorum(
         confirming_witnesses: current_epoch_matching,
         stale_witnesses,
     })
+}
+
+fn same_checkpoint_vote(
+    left: &SignedWitnessAttestation,
+    right: &SignedWitnessAttestation,
+) -> bool {
+    left.payload.witness_id == right.payload.witness_id
+        && left.payload.evaluator_id == right.payload.evaluator_id
+        && left.payload.challenge == right.payload.challenge
+        && left.payload.checkpoint_epoch == right.payload.checkpoint_epoch
+        && left.payload.checkpoint_sha256 == right.payload.checkpoint_sha256
+        && left.payload.previous_checkpoint_sha256 == right.payload.previous_checkpoint_sha256
 }
 
 fn public_key_id(key: &VerifyingKey) -> [u8; 16] {
@@ -736,6 +750,29 @@ mod tests {
     }
 
     #[test]
+    fn same_checkpoint_vote_with_new_timestamp_is_deduplicated_not_equivocation() {
+        let evaluator_key = SigningKey::from_bytes(&[51; 32]);
+        let witness_keys = witness_keys(52);
+        let current = checkpoint(&evaluator_key, 5, [8; 32]);
+        let challenge = [111; 32];
+        let attestations = vec![
+            attest(&current, &witness_keys[0], 100, challenge),
+            attest(&current, &witness_keys[1], 101, challenge),
+            attest(&current, &witness_keys[2], 102, challenge),
+            attest(&current, &witness_keys[2], 103, challenge),
+        ];
+        let result = verify_checkpoint_quorum(
+            &current,
+            &evaluator_key.verifying_key(),
+            challenge,
+            &attestations,
+            &witnesses(&witness_keys),
+            bft_policy(),
+        ).unwrap();
+        assert_eq!(result.confirming_witnesses, 3);
+    }
+
+    #[test]
     fn invalid_unknown_and_equivocating_responses_cannot_poison_valid_quorum() {
         let evaluator_key = SigningKey::from_bytes(&[31; 32]);
         let witness_keys = witness_keys(32);
@@ -763,12 +800,13 @@ mod tests {
         assert_eq!(result.confirming_witnesses, 3);
         assert_eq!(result.stale_witnesses, 0);
 
+        let conflicting = checkpoint(&evaluator_key, 2, [10; 32]);
         let equivocal = vec![
             attest(&checkpoint, &witness_keys[0], 70, challenge),
             attest(&checkpoint, &witness_keys[1], 71, challenge),
             attest(&checkpoint, &witness_keys[2], 72, challenge),
             attest(&checkpoint, &witness_keys[3], 73, challenge),
-            attest(&checkpoint, &witness_keys[3], 74, challenge),
+            attest(&conflicting, &witness_keys[3], 74, challenge),
         ];
         let result = verify_checkpoint_quorum(
             &checkpoint,
