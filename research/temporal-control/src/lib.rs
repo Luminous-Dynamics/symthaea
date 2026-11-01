@@ -62,6 +62,7 @@ pub struct ResourcePrices {
     pub persistent_bytes: u64,
     pub retained_byte_us: u64,
     pub io_bytes: u64,
+    pub latency_us: u64,
     pub compute_units: u64,
     pub observations: u64,
     pub energy_nj: u64,
