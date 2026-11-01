@@ -62,7 +62,9 @@
       "document_id": "doc-echo-schedule",
       "adjacent_query": "For the Echo inspection, calculate labor and lodging cost using the same rates.",
       "distractor_answer": 765,
-      "confusion_mechanism": "The Echo schedule has three nights rather than Delta's two; adopting it answers the nearby question, not the original Delta question."
+      "confusion_mechanism": "The Echo schedule has three nights rather than Delta's two; adopting it answers the nearby question, not the original Delta question.",
+      "billable_days": 3,
+      "overnight_stays": 3
     }
   ],
   "allowed_alternative_evidence_paths": [
@@ -73,6 +75,13 @@
     ]
   ],
   "answer_sha256": "f6103ca1e01bd200a9258a366b7e8c22a542e771bf11a0679967a5bb47ef3688",
-  "oracle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "claim_boundary": "sealed synthetic oracle; oracle_sha256 is a placeholder until canonical bundle digesting is implemented"
+  "oracle_sha256": "ba58bba540e02c7a0b647c6303dbbe0bee53e05b2219f8185753c21d26a8e797",
+  "claim_boundary": "sealed synthetic oracle; digest is SHA-256 of serialized oracle with oracle_sha256 cleared",
+  "calculation": {
+    "labor_rate_per_day": 180,
+    "billable_days": 3,
+    "overnight_rate": 75,
+    "overnight_stays": 2,
+    "expected_total": 690
+  }
 }
