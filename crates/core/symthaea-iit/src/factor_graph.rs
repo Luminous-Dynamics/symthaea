@@ -1173,7 +1173,7 @@ fn min_fill_order_scopes(
     }
 
     let active: BTreeSet<usize> = eliminate.iter().copied().collect();
-    let planner_work = MinFillPlannerWork::default();
+    let mut planner_work = MinFillPlannerWork::default();
 
     // The incremental score cache is valuable when a high-degree hub shares
     // many degree-one neighbours. On chains, rings, and ordinary grids, the
@@ -1185,8 +1185,6 @@ fn min_fill_order_scopes(
     let mut versions = BTreeMap::<usize, u64>::new();
     let mut scores = BTreeMap::<usize, (usize, usize)>::new();
     let mut queue = BinaryHeap::<Reverse<(usize, usize, usize, u64)>>::new();
-    let mut planner_work = planner_work;
-
     for variable in active.iter().copied() {
         versions.insert(variable, 0);
         let score = fill_score(variable, &adjacency, &mut planner_work)?;
@@ -1667,6 +1665,58 @@ mod tests {
         assert_eq!(plan.planner_work.affected_candidates_refreshed, 0);
         assert_eq!(plan.planner_work.leaf_fast_path_updates, leaves);
         assert_eq!(plan.planner_work.clique_pair_checks, 0);
+    }
+
+    #[test]
+    fn min_fill_selects_incremental_path_for_retained_hub_with_active_spokes() {
+        let leaves = 2_048usize;
+        let scopes = (1..=leaves)
+            .map(|leaf| vec![0, leaf])
+            .collect::<Vec<_>>();
+        let eliminate = (1..=leaves).collect::<Vec<_>>();
+        let plan = plan_min_fill_elimination(&scopes, &eliminate, 2).unwrap();
+
+        assert_eq!(plan.elimination_order, eliminate);
+        assert_eq!(plan.induced_width, 1);
+        assert_eq!(plan.planner_work.fill_score_evaluations, leaves);
+        assert_eq!(plan.planner_work.affected_adjacency_visits, 0);
+        assert_eq!(plan.planner_work.affected_candidates_refreshed, 0);
+        // The shared hub is retained rather than eliminated, so the active
+        // spokes are deleted without refreshing any score.
+        assert_eq!(plan.planner_work.leaf_fast_path_updates, 0);
+    }
+
+    #[test]
+    fn min_fill_keeps_full_rescan_path_for_chains_rings_and_grids() {
+        let chain = (0..63).map(|unit| vec![unit, unit + 1]).collect::<Vec<_>>();
+        let chain_plan =
+            plan_min_fill_elimination(&chain, &(0..64).collect::<Vec<_>>(), 4).unwrap();
+        assert_eq!(chain_plan.induced_width, 1);
+        assert_eq!(chain_plan.planner_work.leaf_fast_path_updates, 0);
+
+        let ring = (0..64)
+            .map(|unit| vec![unit, (unit + 1) % 64])
+            .collect::<Vec<_>>();
+        let ring_plan =
+            plan_min_fill_elimination(&ring, &(0..64).collect::<Vec<_>>(), 8).unwrap();
+        assert_eq!(ring_plan.induced_width, 2);
+        assert_eq!(ring_plan.planner_work.leaf_fast_path_updates, 0);
+
+        let mut grid = Vec::new();
+        for row in 0..8 {
+            for column in 0..8 {
+                let here = row * 8 + column;
+                if column + 1 < 8 {
+                    grid.push(vec![here, here + 1]);
+                }
+                if row + 1 < 8 {
+                    grid.push(vec![here, here + 8]);
+                }
+            }
+        }
+        let grid_plan =
+            plan_min_fill_elimination(&grid, &(0..64).collect::<Vec<_>>(), 1 << 12).unwrap();
+        assert_eq!(grid_plan.planner_work.leaf_fast_path_updates, 0);
     }
 
     #[test]
