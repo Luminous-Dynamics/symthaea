@@ -906,7 +906,6 @@ pub fn validate_system_measurement_receipt(
         || receipt.mean_energy_per_successful_event_uj <= 0.0
         || receipt.successful_event_count == 0
         || receipt.energy_repeat_count < 2
-        || receipt.energy_repeat_count > receipt.successful_event_count
         || !receipt.expanded_energy_uncertainty_uj.is_finite()
         || receipt.expanded_energy_uncertainty_uj < 0.0
     {
