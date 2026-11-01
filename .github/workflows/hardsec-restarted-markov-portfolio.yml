@@ -47,7 +47,7 @@ jobs:
           episodes = receipt["enumeration"]["episodes"]
           assert [row["initial_state"] for row in episodes] == [0, 1]
           assert [row["path_mass_numerator"] for row in episodes] == ["4096", "4096"]
-          assert [row["anytime_crossing_mass_numerator"] for row in episodes] == ["64", "128"]
+          assert [row["anytime_crossing_mass_numerator"] for row in episodes] == ["128", "128"]
           assert all(row["path_mass_is_one"] for row in episodes)
           assert all(row["anytime_crossing_probability_at_or_below_alpha"] for row in episodes)
           assert receipt["guarantee"]["conditional_factor_le_one_for_every_fixture_portfolio"]
@@ -56,5 +56,15 @@ jobs:
           assert receipt["guarantee"]["arbitrary_serial_pmu_pfa_claim"] is False
           assert receipt["guarantee"]["physical_hardware_evidence"] is False
           assert receipt["guarantee"]["effective_sample_size_estimate"] is None
+          envelope = receipt["frozen_upper_envelope"]
+          assert envelope["numerators"] == [[4, 3], [3, 3]]
+          assert envelope["denominators"] == [[5, 10], [5, 5]]
+          calibration = envelope["calibration"]
+          assert calibration["method"] == "fixed_n_hoeffding_upper_bound_with_integer_outward_rounding"
+          assert calibration["visits_per_source_state"] == 1000
+          assert calibration["success_counts"] == [[750, 250], [500, 500]]
+          assert calibration["delta_per_coordinate"] == "1/40"
+          assert calibration["calibration_tally_is_synthetic"] is True
+          assert calibration["physical_calibration_data"] is False
           print("HARDSEC-025 exact rational restarted Markov portfolio oracle qualified.")
           PY
