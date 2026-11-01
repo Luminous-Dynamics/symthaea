@@ -213,7 +213,6 @@ fn make_eligible_integrity(
     value["elaboration"]["receipt_sha256"] = json!(sha256_hex(elaboration_bytes));
     value["counterexample_audit"]["receipt_sha256"] = json!(sha256_hex(counterexample_bytes));
     value["vacuity_audit"]["receipt_sha256"] = json!(sha256_hex(vacuity_bytes));
-    value["semantic_review"]["reviewer_attestation_sha256"] = json!(sha256_hex(reviewer_bytes));
 
     // Keep all axiom manifests canonical and sorted, even in the synthetic example.
     value["axioms"]["used_axioms"] = json!([]);
