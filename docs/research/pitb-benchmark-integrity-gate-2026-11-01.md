@@ -38,7 +38,7 @@ The receipt pins:
 7. Semantic-review status, scope, reviewer identity and attestation digest.
 8. A derived integrity status (not_attempted, pending, eligible or ineligible).
 
-The Rust verifier recomputes the sorted axiom-list digests and unexpected-axiom count; it derives the integrity status rather than trusting the claimed status; checks source-path safety and exact target identity; and can verify the receipt's exact byte SHA-256. It now also requires a measured evidence-artifact manifest and, for eligible targets, opens and hashes eleven concrete files under an explicit evidence root: source file, intended informal statement, Lean binary, Lake manifest, root module, elaboration receipt, used-axiom manifest, axiom allowlist, counterexample receipt, vacuity receipt and reviewer attestation. Artifact paths are repository-relative to the evidence root; canonicalized paths must remain inside that root, so traversal and symlink escapes fail closed. The verifier recomputes the selected source-span digest from the pinned file using 1-based lines and Unicode-codepoint columns, then checks it against the registered source_span_sha256.
+The Rust verifier recomputes the sorted axiom-list digests and unexpected-axiom count; derives integrity status instead of trusting a caller flag; checks source-path safety and exact target identity; and verifies receipt bytes. For measured audits it opens and hashes eleven concrete files under an explicit evidence root: source file, intended informal statement, Lean binary, Lake manifest, root module, elaboration receipt, used-axiom manifest, axiom allowlist, counterexample receipt, vacuity receipt and reviewer attestation. Artifact paths must remain inside the canonical evidence root; traversal and symlink escapes fail closed. The verifier recomputes the selected source-span digest from the pinned file using 1-based lines and Unicode-codepoint columns and checks source_span_sha256.
 
 ### What eligibility means—and does not mean
 
@@ -54,7 +54,7 @@ A measured target can become **eligible** only when:
 
 A counterexample, target mismatch, unresolved metavariable, sorryAx, unapproved axiom, or rejected semantic review makes the task ineligible. A missing test, pending review, inconclusive probe or absent attestation keeps it pending. Pending and ineligible tasks remain visible in the cohort manifest; they are not silently deleted or counted as prover failures.
 
-**No counterexample found is not a proof of non-vacuity.** It only records the result of a named, bounded probe. The independent semantic review is mandatory for eligibility. The review must consider the original source/problem statement and intended assumptions, not merely the generated Lean declaration. A source-to-coordinate check alone does not qualify: the approved scope must include informal-to-formal review with a pinned intended-statement digest, domain-expert review, or combined review. The combined scope requires the intended informal-statement digest. The current receipt hash binds a reviewer-attestation artifact but does not cryptographically authenticate reviewer identity; a signed-attestation/trusted-reviewer-key layer remains future work.
+**No counterexample found is not a proof of non-vacuity.** It only records the result of a named, bounded probe. The independent semantic review is mandatory for eligibility. The review must consider the original source/problem statement and intended assumptions, not merely the generated Lean declaration. A source-to-coordinate check alone does not qualify: the approved scope must include informal-to-formal review with a pinned intended-statement digest, domain-expert review, or combined review. The combined scope requires the intended informal-statement digest. An approved measured audit must now carry an Ed25519 attestation verified against a reviewer-key registry whose exact bytes are pinned out of band by the caller. The signature binds audit ID, reviewer identity/key ID, task ID, statement digest, intended informal statement digest, review scope, cohort, snapshot, repository commit, source path, source-file digest and exact source-span digest. The registry must list the key as active; a revoked key fails even when the receipt and run are updated to the new registry digest. No production reviewer keys are committed: the only private key is deterministic test material created in the ephemeral self-test.
 
 Likewise, a sorted axiom allowlist is a policy boundary, not a universal claim that every allowed axiom is appropriate for every benchmark. Each cohort must pin and justify its allowlist, and task-level reports must expose the actual axiom closure.
 
@@ -131,7 +131,7 @@ The strongest defensible initial result is not necessarily a higher solve rate. 
 
 ## Remaining blockers
 
-1. The evidence bundle now authenticates exact artifact bytes, but reviewer identity/signatures are not yet cryptographically authenticated against an independently governed reviewer-key registry. The attestation file is hash-bound, not yet a trusted digital signature.
+1. The verifier checks Ed25519 signatures against a caller-pinned registry digest, but governance of that out-of-band pin remains external: production must obtain the expected registry SHA-256 from a separately controlled benchmark manifest or release process, not from the receipt being verified. Key enrollment, reviewer identity proofing, rotation and revocation procedures still need an independently governed operating policy.
 2. The verifier checks source/target identities and the claimed sorted axiom closure, but the measured capture pipeline that obtains the full transitive axiom closure must still be implemented and independently tested.
 3. Counterexample and vacuity probes are evidence, not formal completeness proofs. Their algorithms, bounds and failure modes must be pinned.
 4. A complete source-to-informal-statement audit needs reviewer guidance, adjudication and disagreement handling.
@@ -142,7 +142,7 @@ The strongest defensible initial result is not necessarily a higher solve rate. 
 1. Compile and run verify_benchmark_integrity in the isolated PITB crate workflow.
 2. Add a Lean capture adapter that records the target type, environment, metavariable state and transitive axiom closure at the exact task source coordinates.
 3. Pin and replay counterexample/vacuity probes on a small smoke cohort from at least two distinct Lean toolchains.
-4. Prepare an independent semantic-review protocol and signed reviewer-attestation format.
+4. Establish reviewer identity proofing, key enrollment, revocation and two-person registry update procedures outside the repository.
 5. Audit a stratified smoke sample from SorryDB_2601, report eligible/pending/ineligible counts, and retain all evidence.
 6. Only after that audit should PITB compare proof-system performance on the eligible denominator; publish pending/ineligible strata separately.
 
@@ -150,3 +150,16 @@ The strongest defensible initial result is not necessarily a higher solve rate. 
 ## SorryDB score-path integration
 
 The SorryDB task-run receipt now includes a required `task_integrity` field. Synthetic no-run fixtures set it to `null`; measured runs must bind exact eligible receipt bytes and materialized evidence artifacts. verify_sorrydb_run_integrity --verify RUN INTEGRITY EVIDENCE_ROOT opens the eleven required evidence files, checks their SHA-256 links, rejects symlink/path escapes, verifies that the source coordinates select the registered source-span bytes, and then joins the task ID, SorryDB_2601 cohort/snapshot, repository remote/branch/commit, Lean version and Lake manifest. Its self-test mutates source bytes and coordinates to prove that the bundle gate fails closed. This still does not cryptographically authenticate reviewer identity/signatures, nor replace proof-attempt checker/replay receipt verification or claim a measured SorryDB result.
+
+
+## Signed verification commands
+
+The standalone target verifier accepts only the signed path for measured eligibility:
+
+`verify_benchmark_integrity --verify RECEIPT --evidence-root DIR --reviewer-key-registry REGISTRY --expected-registry-sha256 HEX [--expected-sha256 RECEIPT_HEX]`
+
+The SorryDB adapter additionally joins the source task/run receipt:
+
+`verify_sorrydb_run_integrity --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT REVIEWER_REGISTRY EXPECTED_REGISTRY_SHA256`
+
+The registry digest is an explicit external trust input. Do not take the expected digest from the same receipt or registry file under test. The ordinary `verify_bytes` and metadata-only `validate_value` helpers cannot return signed eligibility; the former rejects measured eligible receipts, while the latter is used only for structural status derivation in self-tests.
