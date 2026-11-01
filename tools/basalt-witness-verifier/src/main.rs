@@ -1,6 +1,4 @@
-use basalt_witness_verifier::{
-    QuorumKind, sha256_prefixed, verify_witness_envelope,
-};
+use basalt_witness_verifier::{QuorumKind, sha256_prefixed, verify_witness_envelope};
 use serde::Serialize;
 use std::env;
 use std::fs;

@@ -472,7 +472,7 @@ mod tests {
         let pin = sha256_prefixed(&trust_bytes);
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
         let verified = verify_witness_envelope(
-            &envelope ,
+            &envelope,
             &trust_bytes,
             &pin,
             TEST_PAYLOAD_TYPE,
@@ -492,7 +492,7 @@ mod tests {
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..2]);
         assert!(
             verify_witness_envelope(
-                &envelope ,
+                &envelope,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -520,14 +520,8 @@ mod tests {
         envelope.signatures = vec![duplicate.clone(), duplicate.clone(), duplicate];
         let raw = envelope.to_json().unwrap();
         assert!(
-            verify_witness_envelope(
-                &raw ,
-                &bytes,
-                &pin,
-                TEST_PAYLOAD_TYPE,
-                QuorumKind::Write
-            )
-            .is_err()
+            verify_witness_envelope(&raw, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write)
+                .is_err()
         );
     }
 
@@ -540,7 +534,7 @@ mod tests {
         let envelope = sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
         assert!(
             verify_witness_envelope(
-                &envelope ,
+                &envelope,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -565,14 +559,8 @@ mod tests {
             "signatures": envelope.signatures.iter().map(|x| serde_json::json!({"keyid":x.keyid,"sig":x.sig})).collect::<Vec<_>>()
         })).unwrap();
         assert!(
-            verify_witness_envelope(
-                &raw ,
-                &bytes,
-                &pin,
-                TEST_PAYLOAD_TYPE,
-                QuorumKind::Write
-            )
-            .is_err()
+            verify_witness_envelope(&raw, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write)
+                .is_err()
         );
     }
 
@@ -586,7 +574,7 @@ mod tests {
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, noncanonical, &seeds[..3]);
         assert!(
             verify_witness_envelope(
-                &envelope ,
+                &envelope,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -611,7 +599,7 @@ mod tests {
         );
         assert!(
             verify_witness_envelope(
-                duplicate.as_bytes() ,
+                duplicate.as_bytes(),
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -631,7 +619,7 @@ mod tests {
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, payload, &seeds[..3]);
         assert!(
             verify_witness_envelope(
-                &envelope ,
+                &envelope,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -682,7 +670,7 @@ mod tests {
             .unwrap();
         assert!(
             verify_witness_envelope(
-                &envelope ,
+                &envelope,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
