@@ -404,7 +404,7 @@ pub fn reconcile_noisy_event_tape_with_anytime_history(
 
     let mut tape_rows = Vec::new();
     for (index, envelope) in tape.events().iter().enumerate() {
-        if matches!(envelope.payload.intent, ActionIntent::ObserveCandidateReplicate { .. }) {
+        if matches!(&envelope.payload.intent, ActionIntent::ObserveCandidateReplicate { .. }) {
             tape_rows.push(fingerprint_from_tape(&envelope.payload.intent, &envelope.payload.outcome, &format!("events[{index}]"))?);
         }
     }
@@ -414,9 +414,14 @@ pub fn reconcile_noisy_event_tape_with_anytime_history(
             history_rows.push(row);
         }
     }
-    let key = |row: &ObservationFingerprint| (&row.candidate_id, &row.replicate_id);
-    tape_rows.sort_by(|a,b| key(a).cmp(&key(b)));
-    history_rows.sort_by(|a,b| key(a).cmp(&key(b)));
+    tape_rows.sort_by(|left, right| {
+        (&left.candidate_id, &left.replicate_id)
+            .cmp(&(&right.candidate_id, &right.replicate_id))
+    });
+    history_rows.sort_by(|left, right| {
+        (&left.candidate_id, &left.replicate_id)
+            .cmp(&(&right.candidate_id, &right.replicate_id))
+    });
     if tape_rows != history_rows {
         return Err(EventTapeNoisyError::new("reconciliation.observations", "attempt identity/status/seed/objective/evidence fields differ across histories"));
     }
