@@ -1,0 +1,172 @@
+{
+  "schema": "symthaea.temporal_source_watermark_completeness.v0.1",
+  "tracking_issue": 9768,
+  "implementation": "research/irregular-event-contract/src/watermarks.rs",
+  "event_ledger": "research/irregular-event-contract/src/lib.rs::BitemporalEventLedger",
+  "time_unit": "microseconds",
+  "interval_convention": "half_open_[start,end)",
+  "watermark_convention": "exclusive_event_time_lower_bound_for_future_on_time_arrivals",
+  "required_source_identity": [
+    "entity_id",
+    "modality_id",
+    "source_id"
+  ],
+  "progress_record": {
+    "identity": [
+      "progress_id",
+      "source",
+      "stream_generation",
+      "progress_sequence"
+    ],
+    "transaction_time": "recorded_at_us",
+    "policy_binding": "nonzero_policy_sha256",
+    "policy_digest_may_change_within_generation": false,
+    "policy_change_requires": "next_stream_generation",
+    "generation_change_must_not_decrease_watermark": true,
+    "end_of_stream_is_terminal": true
+  },
+  "query": {
+    "coordinates": [
+      "entity_id",
+      "required_sources",
+      "interval_start_us",
+      "interval_end_exclusive_us",
+      "known_at_us"
+    ],
+    "complete_when": "all_required_sources_watermark_at_least_interval_end_or_terminal",
+    "no_progress": "incomplete",
+    "late_breach": "contested",
+    "historical_query": "progress_and_late_arrival_only_visible_at_or_before_known_at"
+  },
+  "arrival": {
+    "event_time_less_than_prior_watermark": "late_breach",
+    "event_time_equal_to_watermark": "on_time",
+    "after_end_of_stream": "late_breach",
+    "all_arrival_classifications_recorded": true,
+    "duplicate_event_arrival": "reject",
+    "global_transaction_clock": "strictly_increasing_across_progress_and_arrival_transactions",
+    "multiple_same_time_arrivals": "atomic_batch",
+    "raw_event_persistence": "bitemporal_event_ledger_owns_authoritative_event"
+  },
+  "adversarial_scenarios": [
+    {
+      "id": "WM-001",
+      "name": "no_progress",
+      "expect": "incomplete",
+      "safety": "absence_must_not_be_inferred"
+    },
+    {
+      "id": "WM-002",
+      "name": "multi_source_minimum_watermark",
+      "expect": "incomplete_until_slowest_required_source_advances",
+      "safety": "all_required_modalities_must_close"
+    },
+    {
+      "id": "WM-003",
+      "name": "exclusive_end_boundary",
+      "expect": "complete_when_watermark_equals_interval_end",
+      "safety": "half_open_interval_boundary"
+    },
+    {
+      "id": "WM-004",
+      "name": "later_progress_as_known",
+      "expect": "earlier_known_at_remains_incomplete",
+      "safety": "no_future_progress_leakage"
+    },
+    {
+      "id": "WM-005",
+      "name": "late_event_below_watermark",
+      "expect": "contested_after_receipt",
+      "safety": "late_event_not_dropped"
+    },
+    {
+      "id": "WM-006",
+      "name": "event_exactly_at_watermark",
+      "expect": "on_time",
+      "safety": "exclusive_boundary_not_inclusive"
+    },
+    {
+      "id": "WM-007",
+      "name": "terminal_source",
+      "expect": "complete_for_future_intervals",
+      "safety": "end_of_stream_is_explicit"
+    },
+    {
+      "id": "WM-008",
+      "name": "watermark_regression",
+      "expect": "reject_without_mutation",
+      "safety": "monotonic_progress"
+    },
+    {
+      "id": "WM-009",
+      "name": "generation_change_policy_binding",
+      "expect": "new_generation_required_for_policy_change_and_watermark_must_not_regress",
+      "safety": "policy_semantics_are_versioned"
+    },
+    {
+      "id": "WM-010",
+      "name": "progress_backdated_after_arrival",
+      "expect": "reject_without_mutation",
+      "safety": "global_knowledge_time_order"
+    },
+    {
+      "id": "WM-011",
+      "name": "on_time_arrival_replayed_after_watermark",
+      "expect": "duplicate_arrival_rejected_not_reclassified_late",
+      "safety": "arrival_idempotency"
+    },
+    {
+      "id": "WM-012",
+      "name": "same_time_multi_event_arrival",
+      "expect": "atomic_batch",
+      "safety": "timestamp_ties_have_one_transaction"
+    },
+    {
+      "id": "WM-013",
+      "name": "failed_multi_source_progress_batch",
+      "expect": "no_source_position_changes",
+      "safety": "atomic_progress"
+    },
+    {
+      "id": "WM-014",
+      "name": "history_rebuild_and_digest",
+      "expect": "exact_index_and_receipt_parity",
+      "safety": "append_only_replay"
+    }
+  ],
+  "metrics": {
+    "primary": [
+      "false_complete_rate"
+    ],
+    "safety": [
+      "late_arrival_breach_recall",
+      "historical_as_known_mutation_count"
+    ],
+    "availability": [
+      "false_incomplete_rate",
+      "completeness_lag_us"
+    ],
+    "diagnostic": [
+      "per_source_watermark_skew_us",
+      "required_source_blocked_fraction",
+      "late_arrival_detection_latency_us",
+      "unknown_until_complete_fraction"
+    ]
+  },
+  "qualification_targets": {
+    "deterministic_false_complete_count": 0,
+    "injected_late_event_detection_recall": 1,
+    "historical_as_known_mutation_count": 0,
+    "append_rebuild_digest_mismatch_count": 0,
+    "always_incomplete_policy_accepted": false
+  },
+  "validation_status": {
+    "rust_test_functions_authored": 17,
+    "unit_tests_executed": false,
+    "external_stream_replay_executed": false,
+    "durable_persistence_executed": false,
+    "source_authentication_executed": false,
+    "benchmark_results_available": false,
+    "targets_are_results": false
+  }
+}

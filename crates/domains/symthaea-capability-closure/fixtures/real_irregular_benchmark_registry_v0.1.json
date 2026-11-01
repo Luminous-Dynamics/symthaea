@@ -1,0 +1,210 @@
+{
+  "schema": "symthaea.real_irregular_benchmark_registry.v0.1",
+  "tracking_issue": 9700,
+  "parent_research": [
+    "NEURO-SILICON-009",
+    "NEURO-SILICON-010"
+  ],
+  "assets": [
+    {
+      "id": "time_imm",
+      "role": "primary_irregular_multimodal",
+      "track": "irregular_forecasting",
+      "paper_url": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/4199594d3c15736df2bf5274fa3155f4-Abstract-Datasets_and_Benchmarks_Track.html",
+      "data_url": "https://github.com/blacksnail789521/Time-IMM",
+      "benchmark_url": "https://github.com/blacksnail789521/IMM-TSF",
+      "properties": [
+        "nine_irregularity_types",
+        "asynchronous_modalities",
+        "cause_driven_irregularity"
+      ],
+      "official_split": "chronological entity-specific 60/20/20; verify current released harness",
+      "required_baselines": [
+        "Informer",
+        "DLinear",
+        "PatchTST",
+        "TimesNet",
+        "TimeMixer",
+        "TimeLLM",
+        "TTM",
+        "CRU",
+        "APN",
+        "KAFNet"
+      ],
+      "redistribution_note": "Eight datasets included; MIMIC-IV processed data not redistributed due to data-use agreement; authorized users must preprocess locally.",
+      "timestamp_caveat": "time_series.csv and text.csv provide date_time; verify event-time versus actual availability-time semantics by modality before causal evaluation.",
+      "repository_commit": "e934cef23d526817dcf0d1a66c6f82274c96c04b",
+      "readme_blob_sha": "593a1ef31c9a5354f7b672fb2e8711b0aa8e2a24"
+    },
+    {
+      "id": "imm_tsf",
+      "role": "official_irregular_benchmark_library",
+      "track": "irregular_forecasting",
+      "code_url": "https://github.com/blacksnail789521/IMM-TSF",
+      "resource_caveat": "README requires 24 GB total GPU RAM for LLaMA 3.1/DeepSeek embedding paths; treat text-embedding/model-size arms separately from structured-only runs.",
+      "repository_commit": "b9e245f2238a9c35d241dbc5bd943c28193a5b90",
+      "readme_blob_sha": "99be43c391e21cef8247a138fa0b479d041a2b22"
+    },
+    {
+      "id": "apn",
+      "role": "strong_irregular_forecast_baseline",
+      "track": "irregular_forecasting",
+      "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/view/39563",
+      "code_url": "https://github.com/decisionintelligence/APN",
+      "method": "adaptive time-aware patch aggregation plus query/MLP head",
+      "paper_claim_only": "accuracy and efficiency competitive; reproduce before asserting",
+      "reproduction_environment": {
+        "python": "3.11.13",
+        "pytorch": "2.6.0+cu124"
+      },
+      "optimizer_audit": "README states paper describes AdamW but released experiments used Adam; reproduce Adam release path first, then AdamW as a separate ablation.",
+      "repository_commit": "f0d6eeb7a2ee2d7c76475bf725b7ea25f98af3f4",
+      "readme_blob_sha": "cd952af7fe60448d9bd826423d0b57944d178060",
+      "loader_audit": {
+        "config_defaults": {
+          "train_val_loader_shuffle": null,
+          "train_val_loader_drop_last": null
+        },
+        "implementation": "data_factory sets shuffle_flag = configured_value or True and drop_last = configured_value or True for train and validation",
+        "result": "validation shuffles and drops last batch by default; explicit zero is also coerced to true",
+        "p12_script": {
+          "iterations": 5,
+          "seed_values": [
+            2024,
+            2025,
+            2026,
+            2027,
+            2028
+          ],
+          "epochs": 200,
+          "patience": 10
+        },
+        "clean_evaluation_override": {
+          "validation_shuffle": false,
+          "validation_drop_last": false,
+          "full_validation_coverage": true
+        }
+      }
+    },
+    {
+      "id": "kafnet",
+      "role": "strong_irregular_forecast_baseline",
+      "track": "irregular_forecasting",
+      "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/view/40149",
+      "code_url": "https://github.com/zhouziyu02/KAFNet",
+      "method": "canonical pre-alignment, pre-convolution, temporal kernel aggregation, frequency linear attention",
+      "paper_claim_only": "7.2x parameter reduction and 8.4x training-inference acceleration reported by authors",
+      "reproduction_coverage_audit": "README exposes test.sh for HumanActivity; paper reports four datasets. Audit all release scripts before claiming full paper reproduction.",
+      "repository_commit": "1532833bca60a114476affff0f7360f955f250ac",
+      "readme_blob_sha": "1cb7280b05dd851dbd30c17f7a46fa7f6c5318e6"
+    },
+    {
+      "id": "gift_eval",
+      "role": "broad_zero_shot_forecasting",
+      "track": "general_forecasting",
+      "paper_url": "https://arxiv.org/abs/2410.10393",
+      "code_url": "https://github.com/SalesforceAIResearch/gift-eval",
+      "properties": [
+        "23_datasets",
+        "144000_series",
+        "177m_points",
+        "seven_domains",
+        "ten_frequencies"
+      ],
+      "not_equivalent_to": "Time-IMM irregular forecasting",
+      "zero_shot_rule": "no GIFT-Eval training split and no test-data leakage; preserve official TestData Leakage and Zero-shot metadata.",
+      "repository_commit": "82f89c3a2de1e7cd98e35dbcb6917cb4ebb6fd18",
+      "readme_blob_sha": "8895d8600d33983949916694047b372f6731a64c"
+    },
+    {
+      "id": "gift_eval_ctx",
+      "role": "future_context_value_analysis",
+      "track": "contextual_forecasting",
+      "paper_url": "https://arxiv.org/abs/2610.17794",
+      "properties": [
+        "10000_instances",
+        "20_datasets",
+        "future_derived_macro_micro_effect_annotations"
+      ],
+      "leakage_guard": "future-derived realized trajectory annotations are evaluator-only unless equivalent context is known before forecast origin"
+    },
+    {
+      "id": "neurobench",
+      "role": "neuromorphic_cross_validation",
+      "track": "algorithm_and_system",
+      "paper_url": "https://www.nature.com/articles/s41467-025-56739-4",
+      "code_url": "https://github.com/NeuroBench/neurobench",
+      "tasks": [
+        "few_shot_class_incremental_keyword",
+        "chaotic_function_prediction"
+      ],
+      "measurement_caveat": "algorithm v1.0 excludes some pre/postprocessing costs; full system path needed"
+    },
+    {
+      "id": "continualai_avalanche",
+      "role": "continual_learning_replay_baselines",
+      "track": "task_domain_class_incremental",
+      "code_url": "https://github.com/ContinualAI/continual-learning-baselines",
+      "methods": [
+        "ER",
+        "reservoir_replay",
+        "GEM",
+        "AGEM",
+        "EWC",
+        "SI",
+        "LwF",
+        "iCaRL",
+        "GDumb",
+        "ER_ACE"
+      ]
+    },
+    {
+      "id": "cl_bench",
+      "role": "stateful_agent_evaluation_context",
+      "track": "LLM_agent",
+      "url": "https://continual-learning-bench.com/",
+      "not_directly_comparable_to": "HDC/LTC forecasting model"
+    },
+    {
+      "id": "memorybench",
+      "role": "user_feedback_agent_evaluation_context",
+      "track": "LLM_agent",
+      "paper_url": "https://proceedings.mlr.press/v306/ai26e.html",
+      "not_directly_comparable_to": "HDC/LTC forecasting model"
+    }
+  ],
+  "event_contract": [
+    "entity_id",
+    "modality_id",
+    "event_time",
+    "availability_time",
+    "source_sequence",
+    "observation_status",
+    "value",
+    "unit_scale",
+    "source_sha256"
+  ],
+  "forecast_causality": "candidate may consume only records with availability_time <= forecast_origin",
+  "preprocessing": "resampling/imputation/interpolation must be separately versioned and charged",
+  "metric_groups": [
+    "point_forecast",
+    "probabilistic_forecast",
+    "calibration",
+    "wrong_belief_exposure",
+    "abstention_exposure",
+    "missing_output_exposure",
+    "recovery_latency",
+    "model_footprint",
+    "peak_memory",
+    "end_to_end_latency",
+    "physical_energy",
+    "replay_byte_time"
+  ],
+  "validation_status": {
+    "dataset_adapter_implemented": false,
+    "baseline_reproductions_executed": false,
+    "benchmark_executed": false,
+    "sota_claim": false
+  },
+  "pin_semantics": "repository_commit is a tree commit; readme_blob_sha is a file blob object and is not a commit"
+}
