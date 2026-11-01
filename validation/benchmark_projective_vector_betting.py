@@ -20,20 +20,21 @@ def covariance(d: int, rho: float) -> np.ndarray:
 
 
 def covariance_envelope(
-    d: int, rho_min: float = 0.2, rho_max: float = 0.8, rho_reference: float = 0.5
+    d: int, rho_min: float = 0.2, rho_max: float = 0.8
 ) -> np.ndarray:
-    if not rho_min <= rho_reference <= rho_max:
-        raise ValueError("reference rho must lie inside declared interval")
-    delta = max(
-        0.0,
-        (d - 1) * (rho_max - rho_reference),
-        rho_reference - rho_min,
-    )
-    result = covariance(d, rho_reference) + delta * np.eye(d)
+    """Dimension-free projective kernel V_d=(1-rho_min)I+rho_max*11^T."""
+    if d < 1 or not (0.0 <= rho_min <= rho_max <= 1.0):
+        raise ValueError("invalid dimension or correlation interval")
+    result = (1.0 - rho_min) * np.eye(d) + rho_max * np.ones((d, d))
     for rho in np.linspace(rho_min, rho_max, 101):
         if np.linalg.eigvalsh(result - covariance(d, float(rho))).min() < -1e-9:
-            raise ValueError("constructed envelope does not dominate declared grid")
+            raise ValueError("projective envelope does not dominate declared grid")
     return result
+
+
+def projective_quadratic(values: np.ndarray) -> np.ndarray:
+    """O(d) quadratic lambda^T V lambda for V=.8 I + .8 11^T."""
+    return 0.8 * np.sum(values * values, axis=-1) + 0.8 * np.sum(values, axis=-1) ** 2
 
 
 def wilson_interval(successes: int, trials: int, z: float = 1.959963984540054) -> tuple[float, float]:
@@ -91,8 +92,7 @@ def run_fixed_intersection(
         raise ValueError("invalid alpha, threshold or cap")
 
     rng = np.random.default_rng(seed)
-    proxy = covariance_envelope(dimension)
-    proxy_diagonal = np.diag(proxy)
+    proxy_diagonal = np.full(dimension, 1.6, dtype=np.float64)
     results: list[dict[str, Any]] = []
     scenarios = (
         ("all_null", np.zeros(dimension)),
@@ -101,9 +101,8 @@ def run_fixed_intersection(
     )
 
     for rho in rho_values:
-        true_covariance = covariance(dimension, rho)
-        if np.linalg.eigvalsh(proxy - true_covariance).min() < -1e-9:
-            raise ValueError("true covariance lies outside the declared envelope")
+        if not 0.2 <= rho <= 0.8:
+            raise ValueError("true correlation lies outside the registered projective envelope")
 
         for scenario, mean in scenarios:
             history = np.zeros((streams, dimension, horizon), dtype=np.float64)
@@ -116,7 +115,13 @@ def run_fixed_intersection(
             }
 
             for t in range(horizon):
-                score = rng.multivariate_normal(mean, true_covariance, size=streams)
+                common = rng.normal(size=(streams, 1))
+                idiosyncratic = rng.normal(size=(streams, dimension))
+                score = (
+                    mean[None, :]
+                    + math.sqrt(rho) * common
+                    + math.sqrt(1.0 - rho) * idiosyncratic
+                )
                 if t >= warmup:
                     prior = history[:, :, :t]
                     coordinate_mean = prior.mean(axis=2)
@@ -133,9 +138,7 @@ def run_fixed_intersection(
                     vector_bet = np.zeros((streams, dimension))
                     scalar_bet = np.zeros(streams)
 
-                vector_penalty = np.einsum(
-                    "bi,ij,bj->b", vector_bet, proxy, vector_bet, optimize=True
-                )
+                vector_penalty = projective_quadratic(vector_bet)
                 log_vector += np.sum(vector_bet * score, axis=1) - 0.5 * vector_penalty
 
                 # Coordinate e-processes form a fixed 1/d mixture, valid under
@@ -147,9 +150,7 @@ def run_fixed_intersection(
                 scalar_vector = np.broadcast_to(
                     scalar_bet[:, None], (streams, dimension)
                 )
-                scalar_penalty = np.einsum(
-                    "bi,ij,bj->b", scalar_vector, proxy, scalar_vector, optimize=True
-                )
+                scalar_penalty = projective_quadratic(scalar_vector)
                 log_scalar += (
                     scalar_bet * score.sum(axis=1) - 0.5 * scalar_penalty
                 )
@@ -206,12 +207,12 @@ def run_predictable_arrival_null(
     one all-null intersection process with predictable random active sets.
     """
     rng = np.random.default_rng(seed)
-    proxy = covariance_envelope(dimension)
     results: list[dict[str, Any]] = []
     coordinate_ids = np.arange(dimension)[None, :]
 
     for rho in rho_values:
-        true_covariance = covariance(dimension, rho)
+        if not 0.2 <= rho <= 0.8:
+            raise ValueError("true correlation lies outside the registered projective envelope")
         active_count = np.ones(streams, dtype=np.int64)
         observations_sum = np.zeros((streams, dimension))
         observations_count = np.zeros((streams, dimension), dtype=np.int64)
@@ -245,11 +246,14 @@ def run_predictable_arrival_null(
                 cap,
             )
             bet = np.where((observations_count >= warmup) & active, bet, 0.0)
-            score = rng.multivariate_normal(
-                np.zeros(dimension), true_covariance, size=streams
+            common = rng.normal(size=(streams, 1))
+            idiosyncratic = rng.normal(size=(streams, dimension))
+            score = (
+                math.sqrt(rho) * common
+                + math.sqrt(1.0 - rho) * idiosyncratic
             )
 
-            penalty = np.einsum("bi,ij,bj->b", bet, proxy, bet, optimize=True)
+            penalty = projective_quadratic(bet)
             log_capital += np.sum(bet * score, axis=1) - 0.5 * penalty
             observations_sum += np.where(active, score, 0.0)
             observations_count += active.astype(np.int64)
@@ -294,7 +298,9 @@ def run_benchmark(
         "bet_cap": 1.5,
         "covariance_family": "equicorrelation",
         "declared_rho_interval": [0.2, 0.8],
-        "covariance_envelope": "Sigma(0.5) + 1.2 I",
+        "covariance_envelope": "0.8 I + 0.8 11^T (principal-submatrix consistent)",
+        "covariance_operator_complexity": "O(d) time and O(1) kernel parameters",
+        "projective_under_universe_extension": True,
         "methods": [
             "vector_coordinate_bet",
             "shared_scalar_bet",
