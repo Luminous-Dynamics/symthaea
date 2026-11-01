@@ -100,14 +100,17 @@ fn exact_episode(initial_state: usize) -> ExactEpisode {
 
 fn conditional_expected_factor_is_one(current_state: usize) -> bool {
     let mut numerator_sum = 0_u128;
-    let common_denominator = BET_DENOMINATOR * TRANSITION_DENOMINATOR;
     for next_state in 0..2 {
         let transition_numerator = TRANSITION_NUMERATORS[current_state][next_state];
-        // p(i,j) * q(j)/p(i,j) = q(j), represented over a common denominator.
-        numerator_sum += transition_numerator * BET_NUMERATOR
-            * (common_denominator / (TRANSITION_DENOMINATOR * transition_numerator));
+        if transition_numerator == 0 {
+            return false;
+        }
+        // (a/10) * (1/2) / (a/10) = 1/2 = 5/10.
+        numerator_sum += BET_NUMERATOR
+            * (TRANSITION_DENOMINATOR / BET_DENOMINATOR);
     }
-    numerator_sum == common_denominator * BET_NUMERATOR
+    // Both next-state branches contribute 5/10, so their sum is exactly 10/10.
+    numerator_sum == TRANSITION_DENOMINATOR
 }
 
 fn report() -> Value {
