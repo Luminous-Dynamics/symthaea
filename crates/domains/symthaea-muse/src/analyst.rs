@@ -1103,43 +1103,39 @@ fn verify_obligation_semantics(
             target_event_ids,
             *transformation,
         ),
-        ObligationKindV1::EnterVoice { voice_id } => {
-            if voice_id.trim().is_empty() {
+        ObligationKindV1::EnterVoice { voice_role } => {
+            if voice_role.trim().is_empty() {
                 return Err(ObligationSemanticError::Contradiction(
                     "obligation-voice-definition-invalid",
-                    "voice ID is empty".into(),
+                    "voice role is empty".into(),
                 ));
             }
             let notes = resolve_obligation_events(composition, target_event_ids, "voice entrance")?;
             if notes
                 .iter()
-                .any(|note| note.voice_role.eq_ignore_ascii_case(voice_id))
+                .any(|note| !note.voice_role.eq_ignore_ascii_case(voice_role))
             {
-                Ok(())
-            } else {
-                Err(ObligationSemanticError::Contradiction(
-                    "obligation-voice-not-entered",
-                    format!("none of the cited notes belongs to voice {voice_id}"),
-                ))
+                return Err(ObligationSemanticError::Contradiction(
+                    "obligation-voice-role-mismatch",
+                    format!("not all cited notes belong to voice role {voice_role}"),
+                ));
             }
-        }
-        ObligationKindV1::ReachClimax => {
-            let notes = resolve_obligation_events(composition, target_event_ids, "climax")?;
-            if notes
-                .iter()
-                .any(|note| note.emphasis.eq_ignore_ascii_case("climax"))
-            {
-                Ok(())
-            } else {
-                Err(ObligationSemanticError::Contradiction(
-                    "obligation-climax-not-reached",
-                    "none of the cited score events is marked as the climax".into(),
-                ))
+            let first_target_beat = notes[0].onset.beats;
+            if composition.notes.iter().any(|note| {
+                note.voice_role.eq_ignore_ascii_case(voice_role)
+                    && note.onset.beats < first_target_beat
+            }) {
+                return Err(ObligationSemanticError::Contradiction(
+                    "obligation-voice-already-active",
+                    format!("voice role {voice_role} has score events before the claimed entrance"),
+                ));
             }
+            Ok(())
         }
         ObligationKindV1::ReachKey { .. }
         | ObligationKindV1::Cadence { .. }
         | ObligationKindV1::ResolveAlteredDegree { .. }
+        | ObligationKindV1::ReachClimax
         | ObligationKindV1::RestoreIdentity { .. }
         | ObligationKindV1::Custom { .. } => Err(ObligationSemanticError::Insufficient(
             "obligation-kind-not-yet-qualified",
@@ -1881,7 +1877,7 @@ mod tests {
                     definition: Some(ObligationDefinitionV1 {
                         schema_version: 1,
                         kind: ObligationKindV1::EnterVoice {
-                            voice_id: "Melody".into(),
+                            voice_role: "Bass".into(),
                         },
                     }),
                     assertion: assertion("obligation-a-created"),
@@ -1896,7 +1892,7 @@ mod tests {
                     definition: Some(ObligationDefinitionV1 {
                         schema_version: 1,
                         kind: ObligationKindV1::EnterVoice {
-                            voice_id: "Melody".into(),
+                            voice_role: "Bass".into(),
                         },
                     }),
                     assertion: assertion("obligation-a-fulfilled"),
@@ -1933,14 +1929,15 @@ mod tests {
     }
 
     #[test]
-    fn fulfilled_enter_voice_rejects_valid_notes_from_the_wrong_voice() {
+    fn fulfilled_enter_voice_requires_a_new_voice_role_entry() {
         let (mut composition, trace) = trace_fixture();
-        composition.notes[1].voice_role = "Bass".into();
+        composition.notes[0].voice_role = "Melody".into();
+        composition.notes[1].voice_role = "Harmony".into();
         let report = verify_composer_trace(&trace, &composition, "score", 0);
         assert!(report
             .issues
             .iter()
-            .any(|issue| issue.code == "obligation-voice-not-entered"));
+            .any(|issue| issue.code == "obligation-voice-already-active"));
         assert_eq!(
             report.evidence.verification_status,
             VerificationStatus::Discrepancy
@@ -1948,7 +1945,7 @@ mod tests {
     }
 
     #[test]
-    fn fulfilled_reach_climax_requires_a_cited_climax_event() {
+    fn reach_climax_remains_insufficient_without_a_score_side_oracle() {
         let (mut composition, mut trace) = trace_fixture();
         composition.notes[1].emphasis = "climax".into();
         let definition = Some(ObligationDefinitionV1 {
@@ -1957,18 +1954,15 @@ mod tests {
         });
         trace.obligation_transitions[0].definition = definition.clone();
         trace.obligation_transitions[1].definition = definition;
-        let accepted = verify_composer_trace(&trace, &composition, "score", 0);
-        assert!(!accepted
+        let report = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(report
             .issues
             .iter()
-            .any(|issue| issue.code == "obligation-climax-not-reached"));
-
-        composition.notes[1].emphasis = "normal".into();
-        let rejected = verify_composer_trace(&trace, &composition, "score", 0);
-        assert!(rejected
-            .issues
-            .iter()
-            .any(|issue| issue.code == "obligation-climax-not-reached"));
+            .any(|issue| issue.code == "obligation-kind-not-yet-qualified"));
+        assert_eq!(
+            report.evidence.verification_status,
+            VerificationStatus::InsufficientEvidence
+        );
     }
 
     #[test]
