@@ -1,6 +1,8 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
-    PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
+    PublicChallengePacketV1, SealedChallengeKeyV1,
+    adjudication_attrition::{AdjudicationAttritionStudyV1, analyze_adjudication_attrition},
+    audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
@@ -315,6 +317,38 @@ fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+fn analyze_adjudication_attrition_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 5 {
+        return Err(
+            "usage: contamination-panel-bench analyze-adjudication-attrition <replicated-causal-study.json> <exposure-transfer-study.json> <adjudication-attrition-study.json> <attrition-report.json>"
+                .into(),
+        );
+    }
+    const MAX_STUDY_BYTES: u64 = 512 * 1024 * 1024;
+    let base_bytes = read_file_bounded(&args[1], MAX_STUDY_BYTES)?;
+    let transfer_bytes = read_file_bounded(&args[2], MAX_STUDY_BYTES)?;
+    let attrition_bytes = read_file_bounded(&args[3], MAX_STUDY_BYTES)?;
+    let base_study: ReplicatedCausalStudyV1 = serde_json::from_slice(&base_bytes)?;
+    let transfer_study: ExposureTransferStudyV1 = serde_json::from_slice(&transfer_bytes)?;
+    let attrition_study: AdjudicationAttritionStudyV1 = serde_json::from_slice(&attrition_bytes)?;
+    let report = analyze_adjudication_attrition(&base_study, &transfer_study, &attrition_study)
+        .map_err(io::Error::other)?;
+    write_bytes(&args[4], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "candidates={} accepted={} excluded={} acceptance_permille={:.2} relations={} cells={} confirmatory_eligible={} status={}",
+        report.candidate_count,
+        report.accepted_count,
+        report.excluded_count,
+        report.overall_acceptance_rate_permille,
+        report.relation_reports.len(),
+        report.cell_reports.len(),
+        report.confirmatory_eligible,
+        report.analysis_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -401,9 +435,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
+        Some("analyze-adjudication-attrition") => analyze_adjudication_attrition_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

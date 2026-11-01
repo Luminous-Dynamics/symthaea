@@ -590,3 +590,85 @@ Initial replication gate: at least 300 independent clean negatives per preregist
 
 Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
 
+## Adjudication attrition and full-candidate partial identification (SCI-ADJUDICATION-ATTRITION-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9733
+
+### Why this matters
+
+The exposure-transfer ladder deliberately rejects indeterminate or weakly adjudicated semantic-equivalence and same-skill candidates. That keeps ambiguous labels out of the accepted scoring set, but it introduces a selection problem: the hardest examples may be the most likely to be disputed. A clean, high-performing unanimous subset can therefore overstate how representative the accepted cohort is.
+
+This extension treats adjudication as a measured sampling process. The candidate universe is frozen before review, every candidate receives one terminal decision, and all candidates remain in the denominator. No post-adjudication replacement is permitted; additions require a new manifest version.
+
+### Five terminal outcomes
+
+- accepted: enters the relation-specific transfer-scoring cohort;
+- indeterminate: reviewers cannot resolve the relation;
+- rejected: reviewers reject the predeclared relation;
+- duplicate: candidate violates the registered duplicate policy;
+- protocol_invalid: candidate violates generation, lineage, freeze or evaluation constraints.
+
+Indeterminate, rejected, duplicate and protocol-invalid examples remain visible in attrition counts. The analyzer reports each reason category separately rather than compressing all exclusions into one number.
+
+### Worst-case bounds when outcomes are unknown
+
+For a binary per-item outcome, the treatment-minus-placebo effect on one excluded item lies in [-1, +1]. No missing-at-random assumption is made.
+
+For a cell with N frozen candidates, A accepted/scored candidates, and accepted aggregate score difference D = treatment successes minus placebo successes:
+
+    lower = 1000 * (D - (N - A)) / N
+    upper = 1000 * (D + (N - A)) / N
+
+The accepted-subset effect is 1000 * D / A when A > 0. When A = 0, the accepted-subset effect is non-estimable and the full-candidate bound is [-1000, +1000] permille. This is a bound for the frozen pre-adjudication candidate-hypothesis universe, not a point estimate or bound for a latent population of tasks whose semantic/skill relation is objectively true.
+
+Example: two accepted candidates have a +1000‰ effect, while four candidates are excluded. The accepted subset looks perfect (+1000‰), but the full-candidate bound is [-333.3‰, +1000‰]. The data do not establish a positive full-universe effect.
+
+Cell bounds are reported by relation × task family × difficulty band. Relation-level bounds equally weight difficulty bands within a family and then equally weight task families. The report also separately shows pooled candidate-volume acceptance and family-macro acceptance so a large domain cannot hide a low-coverage one.
+
+Confidence intervals are computed across independently trained model-pair replicates. Candidate items, reviewers and repeated generations are not independent training replicates. The v1 intervals are descriptive replicate-level intervals, not simultaneous or multiplicity-adjusted coverage across six relations and many cells.
+
+### Frozen-manifest contract
+
+The candidate manifest records opaque candidate ID, task family, difficulty band, predeclared relation, and per-candidate source/recipe lineage commitments. It is frozen before adjudication starts. All candidate IDs are globally unique. Each record has exactly one terminal decision with a reason code, reviewer pseudonyms, agreement (where meaningful) and a UTC decision timestamp.
+
+Each task-family × difficulty cell must contain all six transfer relations. Accepted items must match the transfer study's scored item IDs exactly for every model-pair replicate. The transfer row's item-set digest, source/recipe lineage digests, reviewer set, minimum agreement and accepted-cell adjudication digest must bind to the frozen manifest and per-item decisions.
+
+Accepted, indeterminate and rejected records require at least three reviewers; duplicate/protocol-invalid decisions require at least one. Accepted semantic-equivalent and novel-recipe/same-skill items require unanimous per-item agreement. Pseudonyms and SHA-256 commitments are consistency evidence, not identity authentication.
+
+### Canonical digest API
+
+The module src/adjudication_attrition.rs exports helpers for independent artifact construction:
+- compute_candidate_manifest_sha256
+- compute_adjudication_report_sha256
+- compute_accepted_cell_adjudication_sha256
+- compute_candidate_cell_lineage_sha256
+- compute_transfer_study_sha256
+- The report also binds the complete attrition-study artifact with domain-separated SHA-256.
+
+All use domain-separated SHA-256. Manifest candidates and adjudication records are sorted by candidate ID; reviewer IDs are sorted before adjudication digests; item IDs are sorted before item-set commitments. Hash domains and the full protocol are registered in fixtures/adjudication-attrition-protocol.v1.json.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-adjudication-attrition \
+      replicated-causal-study.json \
+      exposure-transfer-study.json \
+      adjudication-attrition-study.json \
+      attrition-report.json
+
+The analyzer revalidates the base causal study, transfer-study identity and per-replicate checkpoint/training-receipt bindings before calculating cell and family-macro bounds. It binds the complete attrition-study artifact and hard-sets intervals_multiplicity_adjusted=false, independently_authenticated=false and confirmatory_eligible=false.
+
+### Qualification targets (not achieved results)
+
+- 100% of frozen candidates have exactly one terminal decision.
+- Zero unmatched candidate IDs, unreported replacements, duplicate IDs or scored items outside the accepted cohort.
+- Every accepted item has matching score evidence from every independent model-pair replicate.
+- Every transfer relation cell is reported with candidate, accepted and each exclusion count.
+- Every relation has accepted-cohort effects and full-candidate lower/upper bounds side by side; zero-accepted cells remain non-estimable rather than being backfilled.
+- Multi-domain evaluation across mathematics, code, science, factual QA, tool use and multimodal tasks.
+- Power and precision planning remains at the independent model-pair level; a large candidate count does not create more independent training interventions.
+
+### Claim ceiling
+
+The bounds are conservative partial-identification intervals under the binary per-item treatment-effect definition. They do not repair wrong labels among accepted candidates, prove reviewers are independent, authenticate evaluator custody, identify why examples were disputed, eliminate global model interference, or prove transfer outside the registered benchmark. A wide interval is an honest statement that the evidence is insufficient—not a failure to be concealed.
+

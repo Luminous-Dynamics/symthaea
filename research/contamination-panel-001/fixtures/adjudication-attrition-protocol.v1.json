@@ -1,0 +1,119 @@
+{
+  "schema": "symthaea.adjudication_attrition_protocol.v1",
+  "protocol_id": "SCI-ADJUDICATION-ATTRITION-001",
+  "version": "1.0.0",
+  "status": "research_protocol_not_qualified",
+  "purpose": "Measure selective loss between the frozen candidate universe and the accepted transfer-scoring cohort; bound the full-universe effect without assuming missing-at-random adjudication.",
+  "relation_visibility": "evaluator_only",
+  "terminal_decisions": [
+    {
+      "id": "accepted",
+      "meaning": "Blinded reviewers accept the candidate's predeclared relation hypothesis; item enters transfer-scoring cohort."
+    },
+    {
+      "id": "indeterminate",
+      "meaning": "Reviewers cannot reliably decide relation/equivalence; item is retained in denominator but not scored as an accepted relation."
+    },
+    {
+      "id": "rejected",
+      "meaning": "Reviewers reject the predeclared relation hypothesis; item is retained in denominator but not scored in that relation."
+    },
+    {
+      "id": "duplicate",
+      "meaning": "Candidate is a duplicate of another candidate under the preregistered duplicate policy; retained in attrition accounting."
+    },
+    {
+      "id": "protocol_invalid",
+      "meaning": "Candidate violates generation, freeze, lineage, or evaluation protocol; retained in attrition accounting."
+    }
+  ],
+  "freeze_contract": {
+    "timestamp_format": "YYYY-MM-DDTHH:MM:SSZ",
+    "candidate_universe_frozen_before_adjudication": true,
+    "decision_records_after_freeze": true,
+    "every_candidate_has_exactly_one_terminal_decision": true,
+    "no_replacement_after_freeze": true,
+    "added_candidates_require_new_manifest_version": true,
+    "candidate_ids_globally_unique": true,
+    "cell_key": [
+      "task_family",
+      "difficulty_band",
+      "relation"
+    ],
+    "relation_matrix": "Every task-family × difficulty-band cell contains all six exposure-transfer relations."
+  },
+  "adjudication_contract": {
+    "accepted_reviewers_min": 3,
+    "indeterminate_rejected_reviewers_min": 3,
+    "duplicate_protocol_invalid_reviewers_min": 1,
+    "reviewer_ids_unique_per_candidate": true,
+    "general_acceptance_min_agreement_permille": 800,
+    "semantic_equivalent_min_agreement_permille": 1000,
+    "novel_recipe_same_skill_min_agreement_permille": 1000,
+    "candidate_decisions_are_terminal": true,
+    "reviewer_pseudonyms_are_not_identity_authentication": true
+  },
+  "hash_contract": {
+    "candidate_manifest_domain": "adjudication-candidate-manifest.v1",
+    "adjudication_report_domain": "adjudication-attrition-report.v1",
+    "accepted_cell_adjudication_domain": "exposure-transfer-cell-adjudication.v1",
+    "source_lineage_cell_domain": "exposure-transfer-source-lineage-cell.v1",
+    "recipe_lineage_cell_domain": "exposure-transfer-recipe-lineage-cell.v1",
+    "transfer_study_domain": "exposure-transfer-study.v1",
+    "canonicalization": "Serialize typed structs as compact serde_json; sort manifest candidates and adjudication records by candidate_id; sort reviewer_ids inside each adjudication record; sort item IDs before item-set digest."
+  },
+  "estimand": {
+    "unit": "binary item outcome",
+    "accepted_item_effect": "treatment_success - placebo_success, in {-1,0,+1}",
+    "excluded_item_effect_bounds": [
+      -1,
+      1
+    ],
+    "full_candidate_lower": "(sum_accepted(treatment_success - placebo_success) - excluded_count) / candidate_count",
+    "full_candidate_upper": "(sum_accepted(treatment_success - placebo_success) + excluded_count) / candidate_count",
+    "scale": "permille; multiply by 1000",
+    "missingness_assumption": "No missing-at-random assumption. Every excluded candidate receives the worst-case binary effect interval [-1,+1].",
+    "zero_accepted_items": "The cell is non-estimable on the accepted subset; full candidate effect remains bounded by [-1000,+1000] permille."
+  },
+  "aggregation": {
+    "cell": "Per task-family × difficulty-band × relation.",
+    "relation_effect": "Equal-weight difficulty bands within each family, then equal-weight families.",
+    "uncertainty": "95% Student-t intervals across independent model-pair training replicates; questions, candidates and adjudicators are not independent training replicates.",
+    "coverage": "Report pooled candidate-volume acceptance and family-macro acceptance separately."
+  },
+  "benchmark_domains": [
+    "mathematics",
+    "code",
+    "science",
+    "factual_qa",
+    "tool_use",
+    "multimodal"
+  ],
+  "required_outputs": [
+    "frozen candidate count by relation × task family × difficulty band",
+    "accepted, indeterminate, rejected, duplicate and protocol-invalid counts",
+    "acceptance rate and reviewer disagreement by cell",
+    "accepted-cohort treatment-minus-placebo effect",
+    "full-candidate worst-case lower and upper effect bounds",
+    "per-model-pair bounds and family-macro relation bounds",
+    "candidate-manifest, adjudication-report, lineage and transfer-study digests"
+  ],
+  "qualification_targets": {
+    "candidate_decision_coverage_permille": 1000,
+    "unmatched_candidate_decision_records": 0,
+    "duplicate_candidate_ids": 0,
+    "post_freeze_replacements": 0,
+    "transfer_item_ids_not_in_accepted_cohort": 0,
+    "accepted_candidates_missing_transfer_scores": 0,
+    "relation_cells_missing_from_frozen_manifest": 0,
+    "claim_rule": "Report full-candidate bounds beside accepted-subset effects; a narrow accepted-subset interval cannot substitute for a wide partial-identification interval."
+  },
+  "claim_ceiling": [
+    "Bounds are conservative under binary item outcomes and the declared treatment-minus-placebo estimand.",
+    "Bounds do not repair incorrect labels among accepted items or identify the reason for disagreement.",
+    "A wide bound is an honest non-result, not evidence of no effect.",
+    "The protocol does not authenticate reviewer identity or evaluator custody.",
+    "Global model parameter updates can create interference across relation strata.",
+    "No causal direct-effect, FDR-control, external-validity or SOTA claim follows from a passing schema or synthetic test."
+  ]
+}
