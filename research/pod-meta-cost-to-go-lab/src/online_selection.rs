@@ -82,10 +82,18 @@ impl OnlineFeedbackDisposition {
     fn action_id_digest(self) -> Option<[u8; 32]> {
         match self {
             Self::ActionOutcomeUnknown { action_id_digest }
-            | Self::ExactVerifiedCost { action_id_digest, .. }
-            | Self::CoverageBitOnly { action_id_digest, .. }
-            | Self::RightCensored { action_id_digest, .. }
-            | Self::CompetingTerminal { action_id_digest, .. } => Some(action_id_digest),
+            | Self::ExactVerifiedCost {
+                action_id_digest, ..
+            }
+            | Self::CoverageBitOnly {
+                action_id_digest, ..
+            }
+            | Self::RightCensored {
+                action_id_digest, ..
+            }
+            | Self::CompetingTerminal {
+                action_id_digest, ..
+            } => Some(action_id_digest),
         }
     }
 
@@ -617,7 +625,10 @@ mod tests {
             .unwrap();
         assert_eq!(ledger.report(2).action_outcome_unknown, 1);
         assert_eq!(
-            ledger.append_feedback(receipt(2, 1, 3,
+            ledger.append_feedback(receipt(
+                2,
+                1,
+                3,
                 OnlineFeedbackDisposition::ActionOutcomeUnknown {
                     action_id_digest: [6; 32],
                 },
