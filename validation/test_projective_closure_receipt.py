@@ -37,7 +37,7 @@ class ProjectiveClosureReceiptTests(unittest.TestCase):
     def _round_trip(self, entries, sequence=1, previous=None):
         config = {
             "alpha": "1/20",
-            "weights_version": "weights-v1",
+            "weight_digest": _manifest("weights"),
             "evidence_version": "evidence-v1",
             "tree_schema": 1,
         }
@@ -183,6 +183,21 @@ class ProjectiveClosureReceiptTests(unittest.TestCase):
                 expected_snapshot_hash=snapshot.snapshot_hash,
                 expected_manifest_root=_manifest(),
                 expected_weight_digest=_manifest("other weights"),
+            )
+
+    def test_receipt_parameters_cannot_be_rewritten_outside_snapshot(self):
+        entries = [
+            {"hypothesis_id": f"h{i}", "b": Fraction(i - 1, 5), "selected": i < 2}
+            for i in range(5)
+        ]
+        snapshot, receipt = self._round_trip(entries)
+        changed = deepcopy(receipt)
+        changed["weight_digest"] = _manifest("different weights")
+        with self.assertRaises(ValueError):
+            verify_score_receipt(
+                changed,
+                expected_snapshot_hash=snapshot.snapshot_hash,
+                expected_manifest_root=_manifest(),
             )
 
     def test_snapshot_chain_metadata_is_committed(self):
