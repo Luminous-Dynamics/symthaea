@@ -659,14 +659,20 @@ pub enum ConstrainedActionDecision {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct InformationAcquisitionOption {
+    pub history_sha256: String,
+    pub action_manifest_sha256: String,
+    pub query_manifest_sha256: String,
     pub query_id: String,
     pub action_ids: Vec<u64>,
+    pub outcome_ids: Vec<String>,
     /// Probability of each information outcome; must sum to one.
     pub outcome_probabilities: Vec<f64>,
     /// Conditional action utilities indexed [information outcome][action row].
     pub conditional_action_utilities: Vec<Vec<f64>>,
     /// All-in query cost expressed in the same preregistered utility units.
     pub acquisition_cost: f64,
+    /// Recomputed digest binding the exact scenario, utility and cost bytes.
+    pub evidence_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -851,18 +857,98 @@ fn best_action_index(action_ids: &[u64], utilities: &[f64]) -> usize {
     best
 }
 
-fn evaluate_information_option(
+fn validate_information_option_shape(
     option: &InformationAcquisitionOption,
-) -> Result<InformationOptionEvaluation, IntervalError> {
-    if option.query_id.trim().is_empty()
+) -> Result<(), IntervalError> {
+    if !is_lower_hex_sha256(&option.history_sha256)
+        || !is_lower_hex_sha256(&option.action_manifest_sha256)
+        || !is_lower_hex_sha256(&option.query_manifest_sha256)
+        || !is_lower_hex_sha256(&option.evidence_sha256)
+        || option.query_id.trim().is_empty()
         || option.query_id.trim() != option.query_id
         || !option.acquisition_cost.is_finite()
         || option.acquisition_cost < 0.0
         || option.action_ids.len() < 2
-        || option.outcome_probabilities.is_empty()
+        || option.outcome_ids.is_empty()
+        || option.outcome_ids.len() != option.outcome_probabilities.len()
         || option.conditional_action_utilities.len() != option.outcome_probabilities.len()
     {
         return Err(IntervalError::InvalidInformationOption);
+    }
+    let mut action_ids = option.action_ids.clone();
+    action_ids.sort_unstable();
+    if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateActionId);
+    }
+    let mut outcome_ids: Vec<&str> = Vec::with_capacity(option.outcome_ids.len());
+    for outcome_id in &option.outcome_ids {
+        if outcome_id.trim().is_empty() || outcome_id.trim() != outcome_id {
+            return Err(IntervalError::InvalidInformationOption);
+        }
+        outcome_ids.push(outcome_id);
+    }
+    outcome_ids.sort_unstable();
+    if outcome_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::InvalidInformationOption);
+    }
+    let mut probability_sum = 0.0;
+    for probability in &option.outcome_probabilities {
+        if !probability.is_finite() || *probability < 0.0 || *probability > 1.0 {
+            return Err(IntervalError::InvalidOutcomeProbabilities);
+        }
+        probability_sum += probability;
+    }
+    if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > 1e-9 {
+        return Err(IntervalError::InvalidOutcomeProbabilities);
+    }
+    for utilities in &option.conditional_action_utilities {
+        if utilities.len() != option.action_ids.len()
+            || utilities.iter().any(|utility| !utility.is_finite())
+        {
+            return Err(IntervalError::InvalidInformationOption);
+        }
+    }
+    Ok(())
+}
+
+/// Canonical SHA-256 over history/action/query identities, outcome partition,
+/// probabilities, conditional utilities and acquisition cost.
+pub fn compute_information_option_sha256(
+    option: &InformationAcquisitionOption,
+) -> Result<String, IntervalError> {
+    validate_information_option_shape(option)?;
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"cmaq-018-evsi-option-v0.1\0");
+    append_len_prefixed(&mut bytes, option.history_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, option.action_manifest_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, option.query_manifest_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, option.query_id.as_bytes());
+    append_u64_values(&mut bytes, &option.action_ids);
+    bytes.extend_from_slice(&(option.outcome_ids.len() as u64).to_le_bytes());
+    for outcome_id in &option.outcome_ids {
+        append_len_prefixed(&mut bytes, outcome_id.as_bytes());
+    }
+    bytes.extend_from_slice(&option.acquisition_cost.to_bits().to_le_bytes());
+    bytes.extend_from_slice(&(option.outcome_probabilities.len() as u64).to_le_bytes());
+    for probability in &option.outcome_probabilities {
+        bytes.extend_from_slice(&probability.to_bits().to_le_bytes());
+    }
+    bytes.extend_from_slice(&(option.conditional_action_utilities.len() as u64).to_le_bytes());
+    for utilities in &option.conditional_action_utilities {
+        bytes.extend_from_slice(&(utilities.len() as u64).to_le_bytes());
+        for utility in utilities {
+            bytes.extend_from_slice(&utility.to_bits().to_le_bytes());
+        }
+    }
+    Ok(sha256_hex(&bytes))
+}
+
+fn evaluate_information_option(
+    option: &InformationAcquisitionOption,
+) -> Result<InformationOptionEvaluation, IntervalError> {
+    validate_information_option_shape(option)?;
+    if compute_information_option_sha256(option)? != option.evidence_sha256 {
+        return Err(IntervalError::JointDrawBankDigestMismatch);
     }
 
     let mut action_ids = option.action_ids.clone();
@@ -1879,13 +1965,20 @@ mod tests {
         probabilities: Vec<f64>,
         utilities: Vec<Vec<f64>>,
     ) -> InformationAcquisitionOption {
-        InformationAcquisitionOption {
+        let mut option = InformationAcquisitionOption {
+            history_sha256: "a".repeat(64),
+            action_manifest_sha256: "b".repeat(64),
+            query_manifest_sha256: "c".repeat(64),
             query_id: query_id.into(),
             action_ids: vec![17, 3],
+            outcome_ids: (0..probabilities.len()).map(|i| format!("outcome-{i}")).collect(),
             outcome_probabilities: probabilities,
             conditional_action_utilities: utilities,
             acquisition_cost: cost,
-        }
+            evidence_sha256: "d".repeat(64),
+        };
+        option.evidence_sha256 = compute_information_option_sha256(&option).unwrap();
+        option
     }
 
     #[test]
