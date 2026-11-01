@@ -1515,6 +1515,7 @@ CREATE TABLE IF NOT EXISTS basalt_source_cursors (
     receipt_digest TEXT NOT NULL,
     observer_profile_digest TEXT NOT NULL,
     boot_incarnation_digest TEXT NOT NULL,
+    log_id TEXT NOT NULL,
     PRIMARY KEY (host_id, source_id, partition_id)
 ) WITHOUT ROWID;
 
@@ -1898,7 +1899,7 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
     {
         let mut statement = connection.prepare(
             "SELECT host_id, source_id, partition_id, generation, seal_digest,
-                    receipt_digest, observer_profile_digest, boot_incarnation_digest
+                    receipt_digest, observer_profile_digest, boot_incarnation_digest, log_id
              FROM basalt_source_cursors ORDER BY host_id, source_id, partition_id",
         )?;
         let rows = statement.query_map([], |row| {
@@ -1911,6 +1912,7 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 row.get::<_, String>(5)?,
                 row.get::<_, String>(6)?,
                 row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
             ))
         })?;
         for row in rows {
@@ -1923,6 +1925,7 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 receipt_digest,
                 observer_profile_digest,
                 boot_incarnation_digest,
+                log_id,
             ) = row?;
             let key = SourceKey {
                 provisioned_host_id: host_id,
@@ -1935,6 +1938,7 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 receipt_digest,
                 observer_profile_digest,
                 boot_incarnation_digest,
+                log_id,
             };
             if !valid_id(&key.provisioned_host_id)
                 || !valid_id(&key.source_id)
@@ -1944,6 +1948,7 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 || !valid_digest(&cursor.receipt_digest)
                 || !valid_digest(&cursor.observer_profile_digest)
                 || !valid_digest(&cursor.boot_incarnation_digest)
+                || !valid_id(&cursor.log_id)
                 || state.source_cursors.insert(key, cursor).is_some()
             {
                 anyhow::bail!("invalid or duplicate persisted source cursor");
@@ -2057,10 +2062,12 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
             .get(&cursor.receipt_digest)
             .ok_or_else(|| anyhow::anyhow!("source cursor has no accepted receipt record"))?;
         if &accepted.source != key
+            || !state.log_cursors.contains_key(&cursor.log_id)
             || accepted.generation != cursor.generation
             || accepted.seal_digest != cursor.seal_digest
             || accepted.observer_profile_digest != cursor.observer_profile_digest
             || accepted.boot_incarnation_digest != cursor.boot_incarnation_digest
+            || accepted.checkpoint.log_id != cursor.log_id
         {
             anyhow::bail!("source cursor does not match its accepted receipt");
         }
@@ -2113,14 +2120,15 @@ where
     transaction.execute(
         "INSERT INTO basalt_source_cursors
          (host_id, source_id, partition_id, generation, seal_digest, receipt_digest,
-          observer_profile_digest, boot_incarnation_digest)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+          observer_profile_digest, boot_incarnation_digest, log_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT(host_id, source_id, partition_id) DO UPDATE SET
           generation=excluded.generation,
           seal_digest=excluded.seal_digest,
           receipt_digest=excluded.receipt_digest,
           observer_profile_digest=excluded.observer_profile_digest,
-          boot_incarnation_digest=excluded.boot_incarnation_digest",
+          boot_incarnation_digest=excluded.boot_incarnation_digest,
+          log_id=excluded.log_id",
         params![
             receipt.source.provisioned_host_id,
             receipt.source.source_id,
@@ -2130,6 +2138,7 @@ where
             source.receipt_digest,
             source.observer_profile_digest,
             source.boot_incarnation_digest,
+            source.log_id,
         ],
     )?;
     after_stage(SqliteCommitStage::SourceCursorWritten)?;
@@ -2254,6 +2263,7 @@ pub fn trusted_state_digest(state: &TrustedState) -> String {
         hash_state_string(&mut hasher, &cursor.receipt_digest);
         hash_state_string(&mut hasher, &cursor.observer_profile_digest);
         hash_state_string(&mut hasher, &cursor.boot_incarnation_digest);
+        hash_state_string(&mut hasher, &cursor.log_id);
     }
 
     hash_state_u64(&mut hasher, state.accepted_receipts.len() as u64);
