@@ -416,14 +416,15 @@
       "request": {
         "restored_incarnation_id": "incarnation-1",
         "restored_state_digest": "sha256:c1930b1ae009dbcc935a31fde2395b6e59468586756ff11db40c8bd4e74106e4",
-        "witness_sequence_seen": 10
+        "witness_sequence_seen": 10,
+        "restored_authority_revision": "rev-2"
       },
       "result": {
         "outcome": "rejected_anti_rollback",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
-        "current_authority_revision": "rev-6",
-        "reason": "restored snapshot reuses the authority identity but does not match the independently witnessed head at sequence 12"
+        "current_authority_revision": "rev-2",
+        "reason": "restored store reports rev-2, while the independent witness head reports rev-6 at sequence 12; the restored state digest does not match that witnessed head"
       },
       "runner_id": "runner-1"
     }
@@ -462,7 +463,8 @@
       "incarnation_id": "incarnation-1",
       "state_digest": "sha256:7792f2fd9bc92f0402afef5a6d458032b0d7d760bc340c1f9c98259969db3aa9",
       "predecessor_witness_digest": null,
-      "signed_record_digest": "sha256:4d88189f5944d2049c5c128d00801c88adb0e7ea39f0f6994a8fa4b7c2ac20d1"
+      "signed_record_digest": "sha256:4d88189f5944d2049c5c128d00801c88adb0e7ea39f0f6994a8fa4b7c2ac20d1",
+      "authority_revision": "rev-3"
     },
     {
       "witness_id": "independent-witness-1",
@@ -471,7 +473,8 @@
       "incarnation_id": "incarnation-1",
       "state_digest": "sha256:3fa18899d4f363314c22d5b5208860870c67ead32e66e07c2c874d0d455b3345",
       "predecessor_witness_digest": "sha256:4d88189f5944d2049c5c128d00801c88adb0e7ea39f0f6994a8fa4b7c2ac20d1",
-      "signed_record_digest": "sha256:1a4574ce2e837fa42105786b586fe823a2097e4ae1fc037ac067c4f3b12e1193"
+      "signed_record_digest": "sha256:1a4574ce2e837fa42105786b586fe823a2097e4ae1fc037ac067c4f3b12e1193",
+      "authority_revision": "rev-5"
     },
     {
       "witness_id": "independent-witness-1",
@@ -480,7 +483,8 @@
       "incarnation_id": "incarnation-1",
       "state_digest": "sha256:19c61ffd80a6c5a9ee3b97359d0e51342bcabec430df9ece176901e83b611c90",
       "predecessor_witness_digest": "sha256:1a4574ce2e837fa42105786b586fe823a2097e4ae1fc037ac067c4f3b12e1193",
-      "signed_record_digest": "sha256:bfd1d7c184eb03f632bb905415f063443b625b15e8a092e711d7e779971df6c6"
+      "signed_record_digest": "sha256:bfd1d7c184eb03f632bb905415f063443b625b15e8a092e711d7e779971df6c6",
+      "authority_revision": "rev-6"
     }
   ],
   "final_observation": {
