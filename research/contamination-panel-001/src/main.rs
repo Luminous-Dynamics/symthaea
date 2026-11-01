@@ -25,6 +25,9 @@ use contamination_panel_bench::{
         SearchCapturedResponseBodyV1, SearchTimeExposureFindingsV1, SearchTimeExposureTraceV1,
         analyze_search_time_response_bodies, audit_search_time_findings, audit_search_time_trace,
     },
+    search_time_causal::{
+        SearchTimeAccessTrialStudyV1, analyze_search_time_access_trial,
+    },
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
@@ -625,12 +628,42 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("match-search-time-bodies") => match_search_time_bodies_cli(&args),
         Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
         Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
+        Some("analyze-search-time-access-trial") => analyze_search_time_access_trial_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | match-search-time-bodies | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | match-search-time-bodies | audit-search-time-trace | audit-search-time-findings | analyze-search-time-access-trial | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
+}
+
+fn analyze_search_time_access_trial_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-search-time-access-trial <study.json> <report.json>"
+                .into(),
+        );
+    }
+    let study_bytes = read_bounded(
+        &args[1],
+        256 * 1024 * 1024,
+        "search-time access study",
+    )?;
+    let study: SearchTimeAccessTrialStudyV1 = serde_json::from_slice(&study_bytes)?;
+    let report =
+        analyze_search_time_access_trial(&study).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "blocks={} min_blocks={} allowlisted-disabled={:.3}pp unrestricted-disabled={:.3}pp unrestricted-allowlisted={:.3}pp confirmatory_eligible={}",
+        report.independent_block_count,
+        report.minimum_confirmatory_blocks,
+        report.allowlisted_minus_disabled_accuracy_permille.mean / 10.0,
+        report.unrestricted_minus_disabled_accuracy_permille.mean / 10.0,
+        report.unrestricted_minus_allowlisted_accuracy_permille.mean / 10.0,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
 }
 
 fn main() {
