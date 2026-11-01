@@ -406,8 +406,8 @@ fn self_test(path: &PathBuf) -> Result<()> {
     must_reject("pair ID does not bind exact task/state/seed", bad)?;
 
     let mut bad = value.clone();
-    bad["pairs"][0]["execution_order"][0] =
-        bad["pairs"][0]["execution_order"][1].clone();
+    let duplicated_arm = bad["pairs"][0]["execution_order"][1].clone();
+    bad["pairs"][0]["execution_order"][0] = duplicated_arm;
     must_reject("execution order is not a permutation of all arms", bad)?;
 
     let mut bad = value.clone();
@@ -421,7 +421,8 @@ fn self_test(path: &PathBuf) -> Result<()> {
     must_reject("shared mutable caches across paired arms", bad)?;
 
     let mut bad = value.clone();
-    bad["pairs"][1]["model_seed_sha256"] = bad["pairs"][0]["model_seed_sha256"].clone();
+    let substituted_seed = bad["pairs"][0]["model_seed_sha256"].clone();
+    bad["pairs"][1]["model_seed_sha256"] = substituted_seed;
     must_reject("pair ID fails after model seed substitution", bad)?;
 
     let mut bad = value.clone();
