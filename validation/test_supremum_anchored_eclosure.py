@@ -3,6 +3,9 @@ import unittest
 
 from supremum_anchored_eclosure import (
     build_supremum_anchored_certificates,
+    build_additive_anchored_auxiliary,
+    build_additive_anchored_coordinate_e_paths,
+    select_additive_anchored_e_bh,
     fdp_for_intersection,
     pathwise_supremum_bound,
     select_largest_certified_superset,
@@ -156,6 +159,167 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
                 alpha=Fraction(1, 10),
                 adjusted_auxiliary={frozenset({"a"}): [Fraction(1)]},
             )
+
+    def test_additive_auxiliary_matches_anchored_intersection_paths(self):
+        universe = ("a", "b", "c")
+        baseline = [("a",), ("a", "b")]
+        q = {
+            "a": Fraction(1, 10),
+            "b": Fraction(1, 10),
+            "c": Fraction(1, 10),
+        }
+        v = {
+            "a": Fraction(1, 5),
+            "b": Fraction(1, 5),
+            "c": Fraction(1, 5),
+        }
+        coordinate_aux = {
+            "a": [Fraction(2), Fraction(3)],
+            "b": [Fraction(1), Fraction(2)],
+            "c": [Fraction(4), Fraction(1)],
+        }
+        alpha = Fraction(1, 5)
+
+        local_aux = build_additive_anchored_auxiliary(
+            universe=universe,
+            coordinate_budgets=q,
+            auxiliary_budgets=v,
+            coordinate_auxiliary_paths=coordinate_aux,
+        )
+        local_paths = build_supremum_anchored_certificates(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            alpha=alpha,
+            adjusted_auxiliary=local_aux,
+        )
+        coordinate_paths = build_additive_anchored_coordinate_e_paths(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            auxiliary_budgets=v,
+            coordinate_auxiliary_paths=coordinate_aux,
+            alpha=alpha,
+        )
+        for intersection, path in local_paths.items():
+            for t, value in enumerate(path):
+                self.assertEqual(
+                    value,
+                    sum(
+                        (coordinate_paths[i][t] for i in intersection),
+                        Fraction(0),
+                    ),
+                )
+
+    def test_additive_budget_residual_zero_and_fail_closed(self):
+        universe = ("a", "b")
+        zero_aux = {"a": [Fraction(0)], "b": [Fraction(0)]}
+        local = build_additive_anchored_auxiliary(
+            universe=universe,
+            coordinate_budgets={"a": Fraction(1), "b": Fraction(0)},
+            auxiliary_budgets={"a": Fraction(0), "b": Fraction(0)},
+            coordinate_auxiliary_paths=zero_aux,
+        )
+        self.assertTrue(all(path == (Fraction(0),) for path in local.values()))
+        with self.assertRaises(ValueError):
+            build_additive_anchored_auxiliary(
+                universe=universe,
+                coordinate_budgets={"a": Fraction(3, 4), "b": Fraction(0)},
+                auxiliary_budgets={"a": Fraction(1, 2), "b": Fraction(0)},
+                coordinate_auxiliary_paths=zero_aux,
+            )
+        with self.assertRaises(ValueError):
+            build_additive_anchored_coordinate_e_paths(
+                universe=universe,
+                baseline_path=[("a",)],
+                coordinate_budgets={"a": Fraction(1, 2), "b": Fraction(0)},
+                auxiliary_budgets={"a": Fraction(1, 2), "b": Fraction(0)},
+                coordinate_auxiliary_paths={
+                    "a": [Fraction(1)], "b": [Fraction(-1)]
+                },
+                alpha=Fraction(1, 10),
+            )
+
+    def test_additive_anchored_ebh_matches_exhaustive_closure(self):
+        universe = ("a", "b", "c", "d")
+        baseline = [("a",), ("a", "b")]
+        q = {i: Fraction(1, 20) for i in universe}
+        v = {i: Fraction(1, 10) for i in universe}
+        coordinate_aux = {
+            "a": [Fraction(6), Fraction(2)],
+            "b": [Fraction(5), Fraction(7)],
+            "c": [Fraction(7), Fraction(1)],
+            "d": [Fraction(0), Fraction(6)],
+        }
+        alpha = Fraction(1, 5)
+        paths = build_additive_anchored_coordinate_e_paths(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            auxiliary_budgets=v,
+            coordinate_auxiliary_paths=coordinate_aux,
+            alpha=alpha,
+        )
+        for t in range(len(baseline)):
+            coordinate_values = {i: paths[i][t] for i in universe}
+            ebh = select_additive_anchored_e_bh(
+                coordinate_e_values=coordinate_values,
+                alpha=alpha,
+                anchor=baseline[t],
+            )
+            local_values = {
+                intersection: sum(
+                    (coordinate_values[i] for i in intersection),
+                    Fraction(0),
+                )
+                for intersection in (
+                    frozenset(group)
+                    for size in range(1, len(universe) + 1)
+                    for group in __import__("itertools").combinations(universe, size)
+                )
+            }
+            exhaustive = select_largest_certified_superset(
+                universe=universe,
+                anchor=baseline[t],
+                local_e_values=local_values,
+                alpha=alpha,
+            )
+            self.assertEqual(ebh, exhaustive)
+            valid, _ = verify_closure_path(
+                universe=universe,
+                rejection_path=[ebh],
+                local_e_paths={
+                    key: (value,) for key, value in local_values.items()
+                },
+                alpha=alpha,
+            )
+            self.assertTrue(valid)
+
+    def test_additive_ebh_always_retains_ever_rejected_baseline(self):
+        universe = ("a", "b", "c")
+        baseline = [("a",), ("a", "b"), ("b", "c")]
+        q = {i: Fraction(1, 10) for i in universe}
+        v = {i: Fraction(1, 10) for i in universe}
+        coordinate_aux = {
+            "a": [Fraction(0), Fraction(0), Fraction(0)],
+            "b": [Fraction(0), Fraction(0), Fraction(0)],
+            "c": [Fraction(0), Fraction(0), Fraction(0)],
+        }
+        paths = build_additive_anchored_coordinate_e_paths(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            auxiliary_budgets=v,
+            coordinate_auxiliary_paths=coordinate_aux,
+            alpha=Fraction(1, 10),
+        )
+        for t, baseline_set in enumerate(baseline):
+            chosen = select_additive_anchored_e_bh(
+                coordinate_e_values={i: paths[i][t] for i in universe},
+                alpha=Fraction(1, 10),
+                anchor=baseline_set,
+            )
+            self.assertTrue(frozenset(baseline_set) <= chosen)
 
     def test_empty_rejection_and_empty_truth(self):
         self.assertEqual(fdp_for_intersection((), ("a",)), Fraction(0))
