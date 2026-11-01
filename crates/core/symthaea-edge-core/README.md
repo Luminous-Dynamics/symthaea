@@ -42,7 +42,7 @@ The caller can pass `alpha_q15` directly or use `alpha_from_ratio_q16` / `alpha_
 
 ```rust
 use symthaea_edge_core::{
-    BoundedEdgeCore, PackedHv, Q15_ONE,
+    BoundedEdgeCore, PackedHv,
 };
 
 type EdgeCore = BoundedEdgeCore<128, 4, 16, 256>;
