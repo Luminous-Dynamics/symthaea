@@ -1417,11 +1417,15 @@ fn main() {
     let matched_contrast = matched_interventions.verified_contrasts().unwrap()[0];
     let pareto_summary = matched_interventions.pareto_summary().unwrap();
     println!(
-        "INTERVENTION_SET_ROW\tpareto-frontier\t{}\t{}\t{}\t{}",
+        "INTERVENTION_SET_ROW\tpareto-frontier\t{}\t{}\t{}\t{}\t{}",
         pareto_summary.alternatives.len(),
         pareto_summary.frontier_operation_families.len(),
         pareto_summary.frontier_operation_families[0],
-        pareto_summary.frontier_operation_families[1]
+        pareto_summary.frontier_operation_families[1],
+        matches!(
+            pareto_summary.interpretation,
+            pod_meta_cost_to_go_lab::InterventionInterpretation::SimulatedContrast
+        )
     );
     println!(
         "INTERVENTION_SET_ROW\tmatched-simulation-contrast\t{}\t{}\t{}\t{}\t{}",
