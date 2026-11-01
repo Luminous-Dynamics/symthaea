@@ -22,6 +22,7 @@ const PLAN_DOMAIN: &[u8] = b"symthaea.nas.deployment-quota-plan.v0.1";
 const SHA256_HEX_LEN: usize = 64;
 const MAX_ATTEMPTS: u64 = 1_000_000;
 const MAX_QUOTA: u64 = 100_000;
+const MAX_FINITE_POPULATION: u64 = 1_000_000;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -366,10 +367,10 @@ fn validate_finite_population_fields(
     ] {
         require_sha256(field, value)?;
     }
-    if manifest.total_candidates == 0 || manifest.total_candidates > 1_000_000_000 {
+    if manifest.total_candidates == 0 || manifest.total_candidates > MAX_FINITE_POPULATION {
         return Err(DeploymentQuotaError::new(
             "total_candidates",
-            "must be in 1..=1,000,000,000",
+            format!("must be in 1..={MAX_FINITE_POPULATION}"),
         ));
     }
     if manifest.deployment_feasible_candidates > manifest.total_candidates {
@@ -498,7 +499,7 @@ fn validate_finite_population_plan_fields(
         return Err(DeploymentQuotaError::new("population_id", "must be non-empty"));
     }
     if plan.total_candidates == 0
-        || plan.total_candidates > 1_000_000_000
+        || plan.total_candidates > MAX_FINITE_POPULATION
         || plan.deployment_feasible_candidates > plan.total_candidates
     {
         return Err(DeploymentQuotaError::new(
