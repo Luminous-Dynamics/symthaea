@@ -15,7 +15,7 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
-use super::{EventRecord, SourceKeyPlaceholder};
+use super::EventRecord;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SourceKey {
@@ -90,6 +90,13 @@ pub struct LateEventBreach {
     pub event: EventRecord,
     pub recorded_at_us: i64,
     pub kind: LateEventKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EventArrivalReceipt {
+    pub event: EventRecord,
+    pub recorded_at_us: i64,
+    pub classification: EventArrivalClassification,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -176,7 +183,7 @@ pub enum WatermarkError {
         available_at_us: i64,
         recorded_at_us: i64,
     },
-    DuplicateLateEventReceipt {
+    DuplicateEventArrival {
         event_id: u64,
     },
     ArithmeticOverflow,
@@ -205,7 +212,7 @@ impl fmt::Display for WatermarkError {
             Self::InvalidCompletenessInterval => write!(f, "completeness interval must be non-empty and half-open"),
             Self::InvalidEventRecord => write!(f, "event record failed its event contract"),
             Self::EventUnavailableAtReceipt { available_at_us, recorded_at_us } => write!(f, "event availability {available_at_us} is after arrival receipt time {recorded_at_us}"),
-            Self::DuplicateLateEventReceipt { event_id } => write!(f, "late event {event_id} already has a breach receipt"),
+            Self::DuplicateEventArrival { event_id } => write!(f, "event {event_id} already has an arrival receipt"),
             Self::ArithmeticOverflow => write!(f, "watermark counter or digest length arithmetic overflowed"),
             Self::InvalidHistory => write!(f, "source watermark history or indexes are inconsistent"),
         }
@@ -218,8 +225,9 @@ pub struct SourceWatermarkLedger {
     revisions: Vec<SourceProgressRevision>,
     revision_by_id: BTreeMap<u64, usize>,
     revisions_by_source: BTreeMap<SourceKey, Vec<usize>>,
+    event_arrivals: Vec<EventArrivalReceipt>,
+    seen_event_ids: BTreeSet<u64>,
     late_breaches: Vec<LateEventBreach>,
-    late_event_ids: BTreeSet<u64>,
 }
 
 impl SourceWatermarkLedger {
@@ -490,8 +498,8 @@ impl SourceWatermarkLedger {
                 recorded_at_us,
             });
         }
-        if self.late_event_ids.contains(&event.event_id) {
-            return Err(WatermarkError::DuplicateLateEventReceipt {
+        if self.seen_event_ids.contains(&event.event_id) {
+            return Err(WatermarkError::DuplicateEventArrival {
                 event_id: event.event_id,
             });
         }
@@ -520,8 +528,16 @@ impl SourceWatermarkLedger {
             },
         };
 
+        // Record every arrival classification, not just breaches. Otherwise
+        // replaying an already-on-time event after a later watermark could
+        // reclassify it as late and mutate the historical knowledge state.
+        self.seen_event_ids.insert(event.event_id);
+        self.event_arrivals.push(EventArrivalReceipt {
+            event,
+            recorded_at_us,
+            classification,
+        });
         if let EventArrivalClassification::Late(kind) = classification {
-            self.late_event_ids.insert(event.event_id);
             self.late_breaches.push(LateEventBreach {
                 event,
                 recorded_at_us,
@@ -545,10 +561,10 @@ impl SourceWatermarkLedger {
             rebuilt.append_batch(self.revisions[offset..end].iter().copied())?;
             offset = end;
         }
-        for breach in &self.late_breaches {
-            match rebuilt.record_event_arrival(breach.event, breach.recorded_at_us)? {
-                EventArrivalClassification::Late(kind) if kind == breach.kind => {}
-                _ => return Err(WatermarkError::InvalidHistory),
+        for receipt in &self.event_arrivals {
+            let replayed = rebuilt.record_event_arrival(receipt.event, receipt.recorded_at_us)?;
+            if replayed != receipt.classification {
+                return Err(WatermarkError::InvalidHistory);
             }
         }
         if rebuilt != *self {
@@ -580,16 +596,17 @@ impl SourceWatermarkLedger {
                 }
             }
         }
-        for breach in &self.late_breaches {
-            hasher.update(breach.event.event_id.to_le_bytes());
-            hasher.update(breach.recorded_at_us.to_le_bytes());
-            super::hash_event_record(&mut hasher, &breach.event);
-            match breach.kind {
-                LateEventKind::BelowExclusiveWatermark { exclusive_watermark_us } => {
+        for receipt in &self.event_arrivals {
+            hasher.update(receipt.event.event_id.to_le_bytes());
+            hasher.update(receipt.recorded_at_us.to_le_bytes());
+            super::hash_event_record(&mut hasher, &receipt.event);
+            match receipt.classification {
+                EventArrivalClassification::OnTime => hasher.update([0]),
+                EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark { exclusive_watermark_us }) => {
                     hasher.update([1]);
                     hasher.update(exclusive_watermark_us.to_le_bytes());
                 }
-                LateEventKind::AfterEndOfStream { final_exclusive_watermark_us } => {
+                EventArrivalClassification::Late(LateEventKind::AfterEndOfStream { final_exclusive_watermark_us }) => {
                     hasher.update([2]);
                     hasher.update(final_exclusive_watermark_us.to_le_bytes());
                 }
@@ -780,6 +797,23 @@ mod tests {
         );
         assert!(ledger.revisions().is_empty());
         assert_eq!(ledger.state_sha256(), before);
+    }
+
+    #[test]
+    fn on_time_arrival_is_single_use_and_cannot_be_reclassified_after_watermark_advance() {
+        let mut ledger = SourceWatermarkLedger::default();
+        let original = event(1, 1, 50, 20);
+        assert_eq!(
+            ledger.record_event_arrival(original, 20),
+            Ok(EventArrivalClassification::OnTime)
+        );
+        ledger.append(progress(1, 1, 1, 1, 30, 100, false)).unwrap();
+        assert_eq!(
+            ledger.record_event_arrival(original, 40),
+            Err(WatermarkError::DuplicateEventArrival { event_id: 1 })
+        );
+        assert!(ledger.late_breaches().is_empty());
+        assert_eq!(ledger.verify_consistency(), Ok(()));
     }
 
     #[test]
