@@ -26,6 +26,7 @@ The first artifact set is:
 
 - `benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json`
 - `benchmarks/basalt/storage-conformance-trace.v1.json`
+- `benchmarks/basalt/schema/storage-observations.v1.schema.json`
 
 The fixture is intentionally small and deterministic. It is a reference input, not an observed backend run. Each operation's `expected_result` describes the reference semantic outcome; it must not be presented as a backend observation or engine measurement. A future adapter emits a separate observation/event-log artifact that the verifier checks against this reference. The explicit `fixture_digest_catalog` gives each symbolic digest token's SHA-256 preimage so equality and witness-chain examples are reproducible.
 
@@ -53,7 +54,7 @@ Monotonic timestamps establish intervals only within the same explicit `runner_i
 - real-time precedence when operation A completed before operation B was invoked;
 - overlap as concurrency, not as an assumed order.
 
-A later implementation should use an event log with explicit invocation, completion, fault and observation records. The v1 fixture compresses each operation to one interval record for readability; this does not relax the ordering semantics.
+A later implementation should use an event log with explicit invocation, completion, fault and observation records. The v1 fixture compresses each operation to one interval record for readability; this does not relax the ordering semantics. Its explicit `reference_linearization_order` records the chosen legal replay for this deterministic reference scenario. The verifier checks that this order respects per-client program order, declared dependencies and same-runner real-time precedence. A future observed concurrent history must be checked for a legal linearization; it must not be forced to match one arbitrary order when operations overlap.
 
 ## Reference transition rules
 
@@ -207,4 +208,4 @@ This PR adds a versioned trace schema, one deterministic reference fixture and t
 
 ## Expected versus observed evidence
 
-The v1 reference fixture's per-operation field is named `expected_result`. It is authored reference-model data, not a backend measurement. A live backend runner must write a separate immutable observation log with actual invocation/completion, returned outcome, fault events, store observations and final state. Never replace an expected result with the backend's self-reported result inside the reference fixture. The Rust verifier in #9800 must consume the reference fixture and the separate observed artifact, then produce its own status.
+The v1 reference fixture's per-operation field is named `expected_result`. It is authored reference-model data, not a backend measurement. A live backend runner must write a separate immutable observation log conforming to `benchmarks/basalt/schema/storage-observations.v1.schema.json`, with actual invocation/completion, returned outcome, fault events, backend/build/configuration provenance, witness observations and final state. Never replace an expected result with the backend's self-reported result inside the reference fixture. The Rust verifier in #9800 must consume the reference fixture and the separate observed artifact, then produce its own status.
