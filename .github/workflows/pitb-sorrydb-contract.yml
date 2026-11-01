@@ -490,6 +490,31 @@ jobs:
           cargo run --locked --bin import_sorrydb_snapshot -- --self-test
           cargo run --locked --bin analyze_sorrydb_branch_ledger -- --self-test \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json"
+          snapshot_fixture="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/snapshot-branch-receipt.synthetic.json"
+          cargo run --locked --bin verify_snapshot_branch_receipt -- --self-test "$snapshot_fixture"
+          python - "$snapshot_fixture" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json" "$RUNNER_TEMP/pitb-r5-ledger.synthetic.json" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          receipt_path, ledger_path, output_path = map(Path, sys.argv[1:])
+          receipt = json.loads(receipt_path.read_text())
+          ledger = json.loads(ledger_path.read_text())
+          receipt["task"]["task_id"] = ledger["task"]["task_id"]
+          receipt["task"]["repository_commit"] = ledger["task"]["repository_commit"]
+          receipt["proof_state"]["proof_state_sha256"] = ledger["task"]["proof_state_sha256"]
+          receipt_path_copy = Path(__import__("os").environ["RUNNER_TEMP"]) / "pitb-r5-receipt.synthetic.json"
+          receipt_path_copy.write_text(json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n")
+          ledger["arm_id"] = "R5"
+          ledger["snapshot_receipt_sha256"] = hashlib.sha256(receipt_path_copy.read_bytes()).hexdigest()
+          output_path.write_text(json.dumps(ledger, sort_keys=True, separators=(",", ":")) + "\n")
+          print("PITB_R5_SYNTHETIC_JOIN_FIXTURE_PASS: task/commit/proof-state identities and exact receipt bytes linked")
+          PY
+          cargo run --locked --bin verify_snapshot_branch_receipt -- --verify "$RUNNER_TEMP/pitb-r5-receipt.synthetic.json"
+          cargo run --locked --bin analyze_sorrydb_branch_ledger -- --validate \
+            "$RUNNER_TEMP/pitb-r5-ledger.synthetic.json" \
+            --snapshot-receipt "$RUNNER_TEMP/pitb-r5-receipt.synthetic.json"
           input="$GITHUB_WORKSPACE/_pitb-sorrydb/data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
           cargo run --locked --bin import_sorrydb_snapshot -- --input "$input" --output "$RUNNER_TEMP/sorrydb-manifest-a.json"
           cargo run --locked --bin import_sorrydb_snapshot -- --input "$input" --output "$RUNNER_TEMP/sorrydb-manifest-b.json"
