@@ -82,13 +82,41 @@ struct Intervention {
 }
 
 const ACTIONS: [Intervention; ACTION_COUNT] = [
-    Intervention { id: 0, force: 0.00, grip: 0.0 },
-    Intervention { id: 1, force: 0.25, grip: 0.0 },
-    Intervention { id: 2, force: 0.50, grip: 0.0 },
-    Intervention { id: 3, force: 0.75, grip: 0.0 },
-    Intervention { id: 4, force: 1.00, grip: 0.0 },
-    Intervention { id: 5, force: 0.50, grip: 1.0 },
-    Intervention { id: 6, force: 1.00, grip: 1.0 },
+    Intervention {
+        id: 0,
+        force: 0.00,
+        grip: 0.0,
+    },
+    Intervention {
+        id: 1,
+        force: 0.25,
+        grip: 0.0,
+    },
+    Intervention {
+        id: 2,
+        force: 0.50,
+        grip: 0.0,
+    },
+    Intervention {
+        id: 3,
+        force: 0.75,
+        grip: 0.0,
+    },
+    Intervention {
+        id: 4,
+        force: 1.00,
+        grip: 0.0,
+    },
+    Intervention {
+        id: 5,
+        force: 0.50,
+        grip: 1.0,
+    },
+    Intervention {
+        id: 6,
+        force: 1.00,
+        grip: 1.0,
+    },
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -245,9 +273,7 @@ fn true_effect(
             let slope = if history.x < 0.0 { 0.70 } else { -0.70 };
             slope * f - 0.10 * f * f + 0.05 * g
         }
-        Scenario::Interaction => {
-            0.20 * f + 0.10 * g + 0.80 * f * g - 0.20 * f * f - 0.15 * g * g
-        }
+        Scenario::Interaction => 0.20 * f + 0.10 * g + 0.80 * f * g - 0.20 * f * f - 0.15 * g * g,
         Scenario::TerminationSeam => 0.25 * f + 0.05 * g,
         Scenario::HiddenRegime => {
             let slope = if hidden_regime_positive { 0.65 } else { -0.65 };
@@ -257,23 +283,19 @@ fn true_effect(
 }
 
 fn true_outcome(case: EpisodeCase, scenario: Scenario, action: Intervention) -> Outcome {
-    let terminal = scenario == Scenario::TerminationSeam
-        && action.force >= 0.75
-        && action.grip > 0.50;
+    let terminal =
+        scenario == Scenario::TerminationSeam && action.force >= 0.75 && action.grip > 0.50;
     let base = 1.0 - 0.08 * case.history.x.powi(2) - 0.03 * case.history.v.powi(2);
     let utility = base
-        + true_effect(
-            scenario,
-            case.history,
-            case.hidden_regime_positive,
-            action,
-        )
+        + true_effect(scenario, case.history, case.hidden_regime_positive, action)
         + case.common_disturbance
         - if terminal { 2.0 } else { 0.0 };
 
     Outcome {
         utility,
-        next_x: case.history.x + 0.12 * action.force + 0.03 * action.grip
+        next_x: case.history.x
+            + 0.12 * action.force
+            + 0.03 * action.grip
             + 0.10 * case.common_disturbance,
         next_v: 0.75 * case.history.v + 0.08 * action.force - 0.04 * action.grip
             + case.common_disturbance,
@@ -414,9 +436,7 @@ fn branch_predictions(
         .iter()
         .map(|action| {
             predictor
-                .and_then(|model| {
-                    model.predict(&history, *action, ForecastKind::Counterfactual)
-                })
+                .and_then(|model| model.predict(&history, *action, ForecastKind::Counterfactual))
                 .map(|forecast| {
                     debug_assert_eq!(forecast.kind, ForecastKind::Counterfactual);
                     forecast.outcome
@@ -505,8 +525,16 @@ fn evaluate_episode(
         .iter()
         .filter(|prediction| prediction.is_some())
         .count();
-    let oracle_branch_evaluations = if model == Model::Oracle { ACTION_COUNT } else { 0 };
-    let pair_effect_evaluations = if model == Model::ExplicitEffectHead { PAIR_COUNT } else { 0 };
+    let oracle_branch_evaluations = if model == Model::Oracle {
+        ACTION_COUNT
+    } else {
+        0
+    };
+    let pair_effect_evaluations = if model == Model::ExplicitEffectHead {
+        PAIR_COUNT
+    } else {
+        0
+    };
 
     let total_pairs = canonical.len() * (canonical.len() - 1) / 2;
     let mut covered_pairs = 0usize;
@@ -524,16 +552,12 @@ fn evaluate_episode(
         for right_index in (left_index + 1)..canonical.len() {
             let left_action = canonical[left_index];
             let right_action = canonical[right_index];
-            let true_delta = branches[left_index].outcome.utility
-                - branches[right_index].outcome.utility;
+            let true_delta =
+                branches[left_index].outcome.utility - branches[right_index].outcome.utility;
 
-            if let Some(predicted_delta) = predicted_effect(
-                model,
-                case.history,
-                left_action,
-                right_action,
-                &predictions,
-            ) {
+            if let Some(predicted_delta) =
+                predicted_effect(model, case.history, left_action, right_action, &predictions)
+            {
                 covered_pairs += 1;
                 effect_error_sum += (predicted_delta - true_delta).abs();
                 effect_error_count += 1;
@@ -577,8 +601,7 @@ fn evaluate_episode(
     let mut selected_action: Option<Intervention> = None;
     let mut selected_score = f64::NEG_INFINITY;
     for action in &canonical {
-        if let Some(score) =
-            predicted_effect(model, case.history, *action, baseline, &predictions)
+        if let Some(score) = predicted_effect(model, case.history, *action, baseline, &predictions)
         {
             if score > selected_score {
                 selected_score = score;
@@ -630,7 +653,11 @@ fn evaluate_episode(
     });
 
     // These assertions make same-history identity and action identity evaluator-owned invariants.
-    debug_assert!(branches.iter().all(|branch| branch.history_id == case.history_id));
+    debug_assert!(
+        branches
+            .iter()
+            .all(|branch| branch.history_id == case.history_id)
+    );
     debug_assert_eq!(
         branches
             .iter()
@@ -659,9 +686,8 @@ fn evaluate_episode(
         branch_outcome_mae: (!branch_outcome_errors.is_empty()).then(|| {
             branch_outcome_errors.iter().sum::<f64>() / branch_outcome_errors.len() as f64
         }),
-        branch_state_mae: (!branch_state_errors.is_empty()).then(|| {
-            branch_state_errors.iter().sum::<f64>() / branch_state_errors.len() as f64
-        }),
+        branch_state_mae: (!branch_state_errors.is_empty())
+            .then(|| branch_state_errors.iter().sum::<f64>() / branch_state_errors.len() as f64),
         terminal_false_safe_rate,
         branch_prediction_evaluations,
         pair_effect_evaluations,
@@ -673,7 +699,6 @@ fn mean_optional(values: &[Option<f64>]) -> Option<f64> {
     let present: Vec<f64> = values.iter().filter_map(|value| *value).collect();
     (!present.is_empty()).then(|| present.iter().sum::<f64>() / present.len() as f64)
 }
-
 
 fn optional_sample_count(values: &[Option<f64>]) -> usize {
     values.iter().filter(|value| value.is_some()).count()
@@ -703,14 +728,12 @@ fn bootstrap_mean_ci(values: &[Option<f64>], seed: u64) -> Option<(f64, f64)> {
 }
 
 fn metric_bootstrap_seed(scenario: Scenario, model: Model, salt: u64) -> u64 {
-    let scenario_hash = scenario
-        .name()
-        .bytes()
-        .fold(0u64, |hash, byte| hash.wrapping_mul(131).wrapping_add(byte as u64));
-    let model_hash = model
-        .name()
-        .bytes()
-        .fold(0u64, |hash, byte| hash.wrapping_mul(137).wrapping_add(byte as u64));
+    let scenario_hash = scenario.name().bytes().fold(0u64, |hash, byte| {
+        hash.wrapping_mul(131).wrapping_add(byte as u64)
+    });
+    let model_hash = model.name().bytes().fold(0u64, |hash, byte| {
+        hash.wrapping_mul(137).wrapping_add(byte as u64)
+    });
     BASE_SEED ^ scenario_hash.rotate_left(13) ^ model_hash.rotate_left(29) ^ salt
 }
 
@@ -728,7 +751,10 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         metric_bootstrap_seed(scenario, model, 1),
     );
     let magnitude_ci = bootstrap_mean_ci(
-        &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
+        &rows
+            .iter()
+            .map(|row| row.effect_magnitude_mae)
+            .collect::<Vec<_>>(),
         metric_bootstrap_seed(scenario, model, 2),
     );
     let tau_ci = bootstrap_mean_ci(
@@ -766,16 +792,20 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         effect_sign_accuracy_ci95_lower: sign_ci.map(|interval| interval.0),
         effect_sign_accuracy_ci95_upper: sign_ci.map(|interval| interval.1),
         mean_effect_magnitude_mae: mean_optional(
-            &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.effect_magnitude_mae)
+                .collect::<Vec<_>>(),
         ),
         effect_magnitude_mae_episode_count: optional_sample_count(
-            &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.effect_magnitude_mae)
+                .collect::<Vec<_>>(),
         ),
         effect_magnitude_mae_ci95_lower: magnitude_ci.map(|interval| interval.0),
         effect_magnitude_mae_ci95_upper: magnitude_ci.map(|interval| interval.1),
-        mean_rank_tau_b: mean_optional(
-            &rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>(),
-        ),
+        mean_rank_tau_b: mean_optional(&rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>()),
         rank_tau_b_episode_count: optional_sample_count(
             &rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>(),
         ),
@@ -790,31 +820,55 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         top1_regret_ci95_lower: regret_ci.map(|interval| interval.0),
         top1_regret_ci95_upper: regret_ci.map(|interval| interval.1),
         mean_null_false_effect_rate: mean_optional(
-            &rows.iter().map(|row| row.null_false_effect_rate).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.null_false_effect_rate)
+                .collect::<Vec<_>>(),
         ),
         null_false_effect_episode_count: optional_sample_count(
-            &rows.iter().map(|row| row.null_false_effect_rate).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.null_false_effect_rate)
+                .collect::<Vec<_>>(),
         ),
         null_false_effect_rate_ci95_lower: null_false_effect_ci.map(|interval| interval.0),
         null_false_effect_rate_ci95_upper: null_false_effect_ci.map(|interval| interval.1),
         mean_branch_coverage: rows.iter().map(|row| row.branch_coverage).sum::<f64>() / denominator,
         mean_branch_outcome_mae: mean_optional(
-            &rows.iter().map(|row| row.branch_outcome_mae).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.branch_outcome_mae)
+                .collect::<Vec<_>>(),
         ),
         branch_outcome_mae_episode_count: optional_sample_count(
-            &rows.iter().map(|row| row.branch_outcome_mae).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.branch_outcome_mae)
+                .collect::<Vec<_>>(),
         ),
         mean_branch_state_mae: mean_optional(
-            &rows.iter().map(|row| row.branch_state_mae).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.branch_state_mae)
+                .collect::<Vec<_>>(),
         ),
         branch_state_mae_episode_count: optional_sample_count(
-            &rows.iter().map(|row| row.branch_state_mae).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.branch_state_mae)
+                .collect::<Vec<_>>(),
         ),
         mean_terminal_false_safe_rate: mean_optional(
-            &rows.iter().map(|row| row.terminal_false_safe_rate).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.terminal_false_safe_rate)
+                .collect::<Vec<_>>(),
         ),
         terminal_false_safe_rate_episode_count: optional_sample_count(
-            &rows.iter().map(|row| row.terminal_false_safe_rate).collect::<Vec<_>>(),
+            &rows
+                .iter()
+                .map(|row| row.terminal_false_safe_rate)
+                .collect::<Vec<_>>(),
         ),
         terminal_false_safe_rate_ci95_lower: false_safe_ci.map(|interval| interval.0),
         terminal_false_safe_rate_ci95_upper: false_safe_ci.map(|interval| interval.1),
@@ -1008,7 +1062,6 @@ fn main() {
 mod tests {
     use super::*;
 
-
     #[test]
     fn episode_bootstrap_interval_is_deterministic_and_respects_constant_metrics() {
         let values = vec![Some(0.25); EPISODES];
@@ -1019,7 +1072,6 @@ mod tests {
         assert!((first.0 - 0.25).abs() < 1e-12);
         assert!((first.1 - 0.25).abs() < 1e-12);
     }
-
 
     #[test]
     fn optional_metric_denominators_track_defined_episode_histories() {
@@ -1036,7 +1088,6 @@ mod tests {
         assert!((interval.0 - 0.5).abs() < 1e-12);
         assert!((interval.1 - 0.5).abs() < 1e-12);
     }
-
 
     #[test]
     fn candidate_predictor_trait_exposes_only_observed_history_and_hypothetical_action() {
@@ -1075,7 +1126,6 @@ mod tests {
             .expect("effect head produces a pairwise effect");
         assert!((delta - 0.62).abs() < 1e-12);
     }
-
 
     #[test]
     fn kendall_tau_b_counts_both_sided_and_shared_ties() {
@@ -1128,26 +1178,24 @@ mod tests {
     fn state_dependent_action_effect_reverses_across_histories() {
         let case = make_episode_case(BASE_SEED);
         let negative = EpisodeCase {
-            history: ObservedHistory { x: -0.2, ..case.history },
+            history: ObservedHistory {
+                x: -0.2,
+                ..case.history
+            },
             ..case
         };
         let positive = EpisodeCase {
-            history: ObservedHistory { x: 0.2, ..case.history },
+            history: ObservedHistory {
+                x: 0.2,
+                ..case.history
+            },
             ..case
         };
-        let negative_delta = true_outcome(
-            negative,
-            Scenario::StateDependentReversal,
-            ACTIONS[3],
-        )
-        .utility
+        let negative_delta = true_outcome(negative, Scenario::StateDependentReversal, ACTIONS[3])
+            .utility
             - true_outcome(negative, Scenario::StateDependentReversal, ACTIONS[0]).utility;
-        let positive_delta = true_outcome(
-            positive,
-            Scenario::StateDependentReversal,
-            ACTIONS[3],
-        )
-        .utility
+        let positive_delta = true_outcome(positive, Scenario::StateDependentReversal, ACTIONS[3])
+            .utility
             - true_outcome(positive, Scenario::StateDependentReversal, ACTIONS[0]).utility;
         assert!(negative_delta > 0.0);
         assert!(positive_delta < 0.0);
@@ -1174,8 +1222,14 @@ mod tests {
     #[test]
     fn hidden_regime_changes_action_effect_without_changing_observed_history() {
         let case = make_episode_case(BASE_SEED);
-        let positive = EpisodeCase { hidden_regime_positive: true, ..case };
-        let negative = EpisodeCase { hidden_regime_positive: false, ..case };
+        let positive = EpisodeCase {
+            hidden_regime_positive: true,
+            ..case
+        };
+        let negative = EpisodeCase {
+            hidden_regime_positive: false,
+            ..case
+        };
         let positive_delta = true_outcome(positive, Scenario::HiddenRegime, ACTIONS[4]).utility
             - true_outcome(positive, Scenario::HiddenRegime, ACTIONS[0]).utility;
         let negative_delta = true_outcome(negative, Scenario::HiddenRegime, ACTIONS[4]).utility
@@ -1197,7 +1251,11 @@ mod tests {
                 outcome: true_outcome(case, Scenario::Monotone, *action),
             })
             .collect();
-        assert!(branches.iter().all(|branch| branch.history_id == case.history_id));
+        assert!(
+            branches
+                .iter()
+                .all(|branch| branch.history_id == case.history_id)
+        );
         assert_eq!(
             branches
                 .iter()
@@ -1224,12 +1282,18 @@ mod tests {
             case,
             &reversed,
         );
-        assert_eq!(forward.pair_coverage.to_bits(), backward.pair_coverage.to_bits());
+        assert_eq!(
+            forward.pair_coverage.to_bits(),
+            backward.pair_coverage.to_bits()
+        );
         assert_eq!(
             forward.effect_magnitude_mae.unwrap().to_bits(),
             backward.effect_magnitude_mae.unwrap().to_bits()
         );
-        assert_eq!(forward.top1_regret.unwrap().to_bits(), backward.top1_regret.unwrap().to_bits());
+        assert_eq!(
+            forward.top1_regret.unwrap().to_bits(),
+            backward.top1_regret.unwrap().to_bits()
+        );
     }
 
     #[test]
@@ -1238,10 +1302,8 @@ mod tests {
         let mut other = case;
         other.history.x += 0.15;
         other.history.v -= 0.12;
-        let prediction_first =
-            branch_predictions(Model::PointOutcome, case.history, &ACTIONS);
-        let prediction_second =
-            branch_predictions(Model::PointOutcome, other.history, &ACTIONS);
+        let prediction_first = branch_predictions(Model::PointOutcome, case.history, &ACTIONS);
+        let prediction_second = branch_predictions(Model::PointOutcome, other.history, &ACTIONS);
         let first = predicted_effect(
             Model::PointOutcome,
             case.history,
@@ -1264,8 +1326,7 @@ mod tests {
     #[test]
     fn support_aware_model_abstains_on_unsupported_interventions() {
         let case = make_episode_case(BASE_SEED);
-        let predictions =
-            branch_predictions(Model::SupportAwarePoint, case.history, &ACTIONS);
+        let predictions = branch_predictions(Model::SupportAwarePoint, case.history, &ACTIONS);
         assert!(predictions[0].is_some());
         assert!(predictions[3].is_some());
         assert!(predictions[4].is_none());
@@ -1283,7 +1344,6 @@ mod tests {
         assert_eq!(metrics.top1_regret.unwrap(), 0.0);
         assert_eq!(metrics.pair_coverage, 1.0);
     }
-
 
     #[test]
     fn explicit_effect_head_has_no_absolute_branch_error_denominator() {
