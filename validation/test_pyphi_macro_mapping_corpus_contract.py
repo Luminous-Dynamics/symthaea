@@ -75,6 +75,11 @@ class PyPhiMacroMappingCorpusContractTests(unittest.TestCase):
         self.assertIn("spec_sha256", required)
         self.assertIn("complement_flipped", required)
         self.assertIn("canonical_mapping", required)
+        self.assertIn("background_apportionment", required)
+        background = self.schema["properties"]["cases"]["items"]["properties"][
+            "background_apportionment"
+        ]
+        self.assertTrue(background["uniqueItems"])
 
 
 if __name__ == "__main__":
