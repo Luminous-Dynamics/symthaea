@@ -4,9 +4,11 @@ on:
   pull_request:
     paths:
       - "examples/hardsec_mobile_device_profile_audit.rs"
+      - "examples/hardsec_android_readonly_inventory.rs"
       - "schemas/hardsec-mobile-device-profile-v1.schema.json"
       - "tests/fixtures/hardsec/mobile-device-v1/**"
       - "docs/research/HARDSEC_027_MOBILE_DEVICE_SECURITY.md"
+      - "docs/research/HARDSEC_028_ANDROID_READONLY_INVENTORY.md"
       - "tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-mobile-device-profile-audit.yml"
   workflow_dispatch:
@@ -31,14 +33,16 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
-      - name: Check mobile profile auditor formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_mobile_device_profile_audit.rs
+      - name: Check mobile profile and Android inventory formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_mobile_device_profile_audit.rs examples/hardsec_android_readonly_inventory.rs
+      - name: Run fixed-command Android inventory unit tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-android-readonly-inventory --example hardsec_android_readonly_inventory
       - name: Run profile privacy and evidence contract tests
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit
       - name: Verify synthetic mobile profile receipt
         run: |
           set -euo pipefail
-          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit > /tmp/hardsec-027-mobile-profile.json
+          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit -- --profile tests/fixtures/hardsec/mobile-device-v1/pixel-8-pro-capability-fixture.json > /tmp/hardsec-027-mobile-profile.json
           python3 - <<'PY'
           import json
           with open("/tmp/hardsec-027-mobile-profile.json", "r", encoding="utf-8") as handle:
@@ -50,6 +54,8 @@ jobs:
           assert receipt["capability_vs_runtime"]["mte_runtime_state"] == "not_measured"
           assert receipt["capability_vs_runtime"]["boot_state"] == "not_measured"
           assert receipt["capability_vs_runtime"]["attestation_security_level"] == "not_measured"
+          assert receipt["capability_vs_runtime"]["reported_bootloader_lock_state"] == "not_measured"
+          assert receipt["capability_vs_runtime"]["reported_verified_boot_state"] == "not_measured"
           assert receipt["measurement"]["pmu_access_status"] == "not_measured"
           assert receipt["qualification"]["device_was_queried"] is False
           assert receipt["qualification"]["runtime_integrity_verified"] is False
