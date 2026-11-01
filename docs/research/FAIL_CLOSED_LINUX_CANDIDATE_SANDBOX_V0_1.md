@@ -73,4 +73,4 @@ Before any confirmatory run:
 
 ## Status
 
-This file records the design and implementation tranches. No supervisor executable, seccomp filter, cgroup verifier or adversarial integration test is implemented by this document. The design is not yet a qualified security boundary.
+The first pure planning tranche is implemented in `research/temporal-bench/src/sandbox_profile.rs` and exported from the crate. It validates pinned Nix-store path shapes, nonzero candidate/Bubblewrap/seccomp/closure digests, closure uniqueness and inclusion of the candidate, bounded resource settings and seccomp fd 3. It emits deterministic Bubblewrap and systemd scope argv vectors and hashes the exact plan. Twelve tests are authored for explicit namespaces, no try-flags, exact read-only closure binds, scope/pipe semantics, seccomp fd pinning, resource bounds and digest behavior; they have not been compiled or run. No supervisor executable, seccomp filter, cgroup verifier or adversarial integration test is implemented by this document. The design is not yet a qualified security boundary.
