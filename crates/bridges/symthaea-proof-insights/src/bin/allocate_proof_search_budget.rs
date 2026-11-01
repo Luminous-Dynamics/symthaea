@@ -80,7 +80,7 @@ fn is_lower_hex(value: &str, length: usize) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn digest(value: &Value, path: &str) -> Result<&str> {
+fn digest<'a>(value: &'a Value, path: &str) -> Result<&'a str> {
     let candidate = string(value, path)?;
     if !is_lower_hex(candidate, 64) {
         bail!("{path} must be a 64-character lowercase SHA-256 digest");
