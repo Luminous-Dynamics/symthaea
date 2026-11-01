@@ -253,6 +253,7 @@
                 "indeterminate",
                 "retryable_abort",
                 "receipt_found",
+                "restore_verified",
                 "rejected_anti_rollback_unknown",
                 "rejected_anti_rollback"
               ]
