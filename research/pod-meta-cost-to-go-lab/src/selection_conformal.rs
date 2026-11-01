@@ -318,8 +318,7 @@ fn max_normalized_residual(
         if uncertainty[index] == 0 {
             return Err(SelectionCalibrationError::InvalidPredictionScale);
         }
-        let score = (actual[index] as f64 - estimate[index] as f64)
-            / uncertainty[index] as f64;
+        let score = (actual[index] as f64 - estimate[index] as f64) / uncertainty[index] as f64;
         if !score.is_finite() {
             return Err(SelectionCalibrationError::ResourceOverflow);
         }
@@ -481,7 +480,9 @@ mod tests {
         let mut shifted = prediction();
         shifted.shift_status = ShiftStatus::SuspectedShift;
         assert!(matches!(
-            calibrator.predict_upper(&selection(101, 9), shifted).unwrap(),
+            calibrator
+                .predict_upper(&selection(101, 9), shifted)
+                .unwrap(),
             SelectedProofEnvelope::Unbounded {
                 reason: SelectionUnboundedReason::ShiftedFrontier,
                 ..
@@ -627,12 +628,7 @@ mod tests {
         );
         assert_eq!(
             SelectionConditionedConformalCalibrator::fit(
-                &rows,
-                0.1,
-                MODEL,
-                POLICY,
-                POPULATION,
-                [0; 32]
+                &rows, 0.1, MODEL, POLICY, POPULATION, [0; 32]
             ),
             Err(SelectionCalibrationError::MissingCalibrationDigest)
         );
