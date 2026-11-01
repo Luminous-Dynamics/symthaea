@@ -52,6 +52,6 @@
       "provenance": "synthetic nearby-scenario distractor"
     }
   ],
-  "corpus_sha256": "0a843d3d48428f0ff534b91f14995045df35570a12041180070cd09f16dba178",
+  "corpus_sha256": "d70d17cfef38833f609057094a471215f81802783dc26e6e605b621c8a2330f5",
   "claim_boundary": "synthetic candidate-visible corpus fixture; digest is SHA-256 of serialized corpus with corpus_sha256 cleared"
 }
