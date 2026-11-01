@@ -423,8 +423,9 @@
         "outcome": "rejected_anti_rollback",
         "receipt_id": null,
         "receipt_acceptance_revision": null,
-        "current_authority_revision": "rev-2",
-        "reason": "restored store reports rev-2, while the independent witness head reports rev-6 at sequence 12; the restored state digest does not match that witnessed head"
+        "current_authority_revision": "rev-6",
+        "reason": "restored store reports rev-2, while the independent witness head reports rev-6 at sequence 12; the restored state digest does not match that witnessed head",
+        "observed_store_revision": "rev-2"
       },
       "runner_id": "runner-1"
     }
