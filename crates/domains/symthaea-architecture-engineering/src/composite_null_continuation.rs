@@ -323,7 +323,7 @@ impl CompositeNullContinuationPlan {
                     .find(|row| row.outcome_id == branch.first_stage_outcome_id)
                     .map(|row| row.interim_test_value)
                     .ok_or_else(|| CompositeContinuationError::new(
-                        &branch_path,
+                        branch_path.clone(),
                         "validated first-stage outcome disappeared",
                     ))?;
                 if conditional_rejection > interim + CONDITIONAL_TOLERANCE {
