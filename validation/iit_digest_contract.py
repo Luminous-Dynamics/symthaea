@@ -16,6 +16,12 @@ from collections.abc import Sequence
 MODEL_MAGIC = b"SYMTHAEA-IIT-BINARY-TPM\0v0.1\0"
 EVALUATION_MAGIC = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0"
 ANALYSIS_REQUEST_MAGIC = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0"
+PRIMITIVE_REQUEST_MAGIC = b"SYMTHAEA-IIT-PRIMITIVE-REQUEST\0v0.1\0"
+PRIMITIVE_OPERATION_IDS = {
+    "cause_repertoire": "iit4_cause_repertoire",
+    "effect_repertoire": "iit4_effect_repertoire",
+    "forward_cause_likelihood": "iit4_forward_cause_likelihood",
+}
 MAX_DENSE_UNITS = 16
 FORMALISM_IDS = {"IIT_3_0", "IIT_4_0_2023", "IIT_4_0_2026"}
 IIT3_QUANTITIES = {"iit3_system_phi"}
@@ -136,6 +142,70 @@ def evaluation_digest(model_bytes: bytes, state: Sequence[int | bool]) -> str:
     ):
         raise ValueError("evaluation state must be n_units integer/bool binary bits")
     return hashlib.sha256(EVALUATION_MAGIC + model_bytes + bytes(map(int, state))).hexdigest()
+
+
+def primitive_request_digest(
+    model_bytes: bytes,
+    state: Sequence[int | bool],
+    candidate_system: Sequence[int],
+    mechanism: Sequence[int],
+    purview: Sequence[int],
+    formalism: str,
+    operation_id: str,
+) -> str:
+    """Bind one ordered primitive repertoire request to exact model bytes.
+
+    Candidate systems are sets and therefore canonicalized in ascending order.
+    Mechanism and purview order are preserved because the output vector's bit
+    ordering is defined by the requested purview order.
+    """
+    n_units = _model_unit_count(model_bytes)
+    if len(state) != n_units or any(
+        not isinstance(bit, (int, bool)) or int(bit) not in (0, 1) for bit in state
+    ):
+        raise ValueError("evaluation state must be n_units integer/bool binary bits")
+
+    def validate_indices(values: Sequence[int], name: str, *, allow_empty: bool) -> list[int]:
+        indices = list(values)
+        if not allow_empty and not indices:
+            raise ValueError(f"{name} must be non-empty")
+        if any(not isinstance(unit, int) or isinstance(unit, bool) for unit in indices):
+            raise ValueError(f"{name} indices must be integers")
+        if len(set(indices)) != len(indices):
+            raise ValueError(f"{name} indices must be unique")
+        if any(unit < 0 or unit >= n_units for unit in indices):
+            raise ValueError(f"{name} index is outside the model unit range")
+        return indices
+
+    candidate = validate_indices(candidate_system, "candidate system", allow_empty=False)
+    mech = validate_indices(mechanism, "mechanism", allow_empty=True)
+    pv = validate_indices(purview, "purview", allow_empty=True)
+    if formalism != "IIT_4_0_2023":
+        raise ValueError("primitive repertoire requests currently qualify only IIT_4_0_2023")
+    if operation_id not in set(PRIMITIVE_OPERATION_IDS.values()):
+        raise ValueError(f"unknown primitive operation identifier: {operation_id!r}")
+    candidate_set = set(candidate)
+    if any(unit not in candidate_set for unit in mech):
+        raise ValueError("mechanism must be contained in the candidate system")
+    if any(unit not in candidate_set for unit in pv):
+        raise ValueError("purview must be contained in the candidate system")
+
+    candidate.sort()
+    encoded = bytearray(PRIMITIVE_REQUEST_MAGIC)
+    encoded.extend(model_bytes)
+    encoded.extend(bytes(map(int, state)))
+    encoded.extend(struct.pack("<I", len(candidate)))
+    for unit in candidate:
+        encoded.extend(struct.pack("<I", unit))
+    encoded.extend(b"\\0")
+    encoded.extend(formalism.encode("utf-8"))
+    encoded.extend(b"\\0")
+    encoded.extend(operation_id.encode("utf-8"))
+    for indices in (mech, pv):
+        encoded.extend(struct.pack("<I", len(indices)))
+        for unit in indices:
+            encoded.extend(struct.pack("<I", unit))
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def analysis_request_digest(
