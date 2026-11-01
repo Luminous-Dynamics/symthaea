@@ -200,3 +200,10 @@ The checked-in example is synthetic. The Rust verifier has not yet been compiled
 R5 adds the Level-2 live proof-state snapshot baseline to the existing R0–R4 runtime comparison. It is R4 with the post-elaboration proof state captured once; branches share the immutable environment and receive independent mutable metavariable-context copies. This isolates the benefit of avoiding repeated import and theorem-body elaboration from the benefit of PITB's retrieval, context and strategy interventions.
 
 Every R5 branch ledger must bind a separate snapshot receipt SHA-256. The snapshot receipt is independently schema-validated and must attest the environment, goal, context, runtime/imported OLean identities, per-branch metavariable isolation, and cache policy. v0 requires mutable tactic/typeclass caches to be discarded or recreated per branch; cache sharing is not allowed unless a separate dependency-invalidation qualification exists. The checked-in R4 fixture remains a no-snapshot synthetic contract fixture.
+
+
+### R5 snapshot receipt v0
+
+The separate receipt contract is `snapshot-branch-receipt-v0.schema.json`, with a synthetic no-run fixture at `fixtures/snapshot-branch-receipt.synthetic.json` and focused workflow `.github/workflows/pitb-sorrydb-snapshot-contract.yml`. It binds task/source identity, structural proof-state identity, Lean runtime and imported OLean manifests, snapshot server/RPC build identity, capture stage, shared immutable Environment, per-branch mutable MetavarContext copies, private workspaces, cache policy and measured branch/resource metrics.
+
+The receipt is required in addition to the branch ledger's `snapshot_receipt_sha256`. A hash-shaped link is not proof that a receipt exists; the independent schema validator must accept the receipt bytes and the run's evidence must be retained. The synthetic fixture remains explicitly not attempted. No live snapshot implementation or measured R5 result is claimed.
