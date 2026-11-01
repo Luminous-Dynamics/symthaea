@@ -284,6 +284,61 @@ pub fn evaluate_ppk2_energy_uncertainty(
     Ok(receipt)
 }
 
+pub fn validate_energy_uncertainty_receipt(
+    receipt: &EnergyUncertaintyReceipt,
+) -> Result<(), MetrologyUncertaintyError> {
+    if receipt.schema != RECEIPT_SCHEMA || receipt.version != VERSION {
+        return Err(MetrologyUncertaintyError::new("schema_version", "unsupported receipt schema/version"));
+    }
+    for (field, value) in [
+        ("trace_receipt_sha256", receipt.trace_receipt_sha256.as_str()),
+        ("metrology_manifest_sha256", receipt.metrology_manifest_sha256.as_str()),
+        ("receipt_sha256", receipt.receipt_sha256.as_str()),
+    ] {
+        if !is_sha256(value) {
+            return Err(MetrologyUncertaintyError::new(field, "must be lowercase SHA-256 hex"));
+        }
+    }
+    for (field, value) in [
+        ("mean_energy_uj", receipt.mean_energy_uj),
+        ("sample_standard_deviation_uj", receipt.sample_standard_deviation_uj),
+        ("type_a_standard_uncertainty_uj", receipt.type_a_standard_uncertainty_uj),
+        ("type_b_standard_uncertainty_uj", receipt.type_b_standard_uncertainty_uj),
+        ("combined_standard_uncertainty_uj", receipt.combined_standard_uncertainty_uj),
+        ("coverage_factor", receipt.coverage_factor),
+        ("expanded_uncertainty_uj", receipt.expanded_uncertainty_uj),
+        ("lower_bound_uj", receipt.lower_bound_uj),
+        ("upper_bound_uj", receipt.upper_bound_uj),
+    ] {
+        if !value.is_finite() {
+            return Err(MetrologyUncertaintyError::new(field, "must be finite"));
+        }
+    }
+    if receipt.replicate_count < 2
+        || receipt.mean_energy_uj <= 0.0
+        || receipt.sample_standard_deviation_uj < 0.0
+        || receipt.type_a_standard_uncertainty_uj < 0.0
+        || receipt.type_b_standard_uncertainty_uj < 0.0
+        || receipt.coverage_factor <= 0.0
+    {
+        return Err(MetrologyUncertaintyError::new("receipt", "replicate count and uncertainty values are outside valid bounds"));
+    }
+    let expected_combined = receipt.type_a_standard_uncertainty_uj.hypot(receipt.type_b_standard_uncertainty_uj);
+    let expected_expanded = receipt.coverage_factor * expected_combined;
+    let tolerance = 1e-10 * receipt.mean_energy_uj.abs().max(1.0);
+    if (receipt.combined_standard_uncertainty_uj - expected_combined).abs() > tolerance
+        || (receipt.expanded_uncertainty_uj - expected_expanded).abs() > tolerance
+        || (receipt.lower_bound_uj - (receipt.mean_energy_uj - expected_expanded)).abs() > tolerance
+        || (receipt.upper_bound_uj - (receipt.mean_energy_uj + expected_expanded)).abs() > tolerance
+    {
+        return Err(MetrologyUncertaintyError::new("receipt.derived_fields", "uncertainty fields are inconsistent"));
+    }
+    if receipt_sha256(receipt)? != receipt.receipt_sha256 {
+        return Err(MetrologyUncertaintyError::new("receipt_sha256", "does not match canonical receipt"));
+    }
+    Ok(())
+}
+
 /// Only claim strict superiority when the expanded intervals do not overlap.
 /// Shared systematic errors are not assumed to cancel; paired-covariance modeling is a
 /// separate future extension and must be justified by the acquisition design.
@@ -291,14 +346,10 @@ pub fn compare_energy_uncertainty(
     candidate: &EnergyUncertaintyReceipt,
     reference: &EnergyUncertaintyReceipt,
 ) -> Result<EnergyComparison, MetrologyUncertaintyError> {
-    for (field, value) in [
-        ("candidate.receipt_sha256", candidate.receipt_sha256.as_str()),
-        ("reference.receipt_sha256", reference.receipt_sha256.as_str()),
-    ] {
-        if !is_sha256(value) {
-            return Err(MetrologyUncertaintyError::new(field, "must be lowercase SHA-256 hex"));
-        }
-    }
+    validate_energy_uncertainty_receipt(candidate)
+        .map_err(|error| MetrologyUncertaintyError::new("candidate", error.to_string()))?;
+    validate_energy_uncertainty_receipt(reference)
+        .map_err(|error| MetrologyUncertaintyError::new("reference", error.to_string()))?;
     let decision = if candidate.upper_bound_uj < reference.lower_bound_uj {
         EnergyComparisonDecision::CandidateStrictlyLower
     } else if candidate.lower_bound_uj > reference.upper_bound_uj {
@@ -431,6 +482,15 @@ mod tests {
         let b = evaluate_ppk2_energy_uncertainty(&t_b, &manifest()).unwrap();
         let result = compare_energy_uncertainty(&b, &a).unwrap();
         assert_eq!(result.decision, EnergyComparisonDecision::IndeterminateIntervalsOverlap);
+    }
+
+    #[test]
+    fn rejects_tampered_uncertainty_receipt_before_comparison() {
+        let a = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 10.0, 10.0]), &manifest()).unwrap();
+        let mut forged = evaluate_ppk2_energy_uncertainty(&trace(&[5.0, 5.0, 5.0]), &manifest()).unwrap();
+        forged.lower_bound_uj = 0.0;
+        assert!(validate_energy_uncertainty_receipt(&forged).is_err());
+        assert!(compare_energy_uncertainty(&forged, &a).is_err());
     }
 
     #[test]
