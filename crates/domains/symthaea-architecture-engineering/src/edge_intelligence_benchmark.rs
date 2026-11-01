@@ -588,6 +588,61 @@ pub fn validate_edge_benchmark_manifest(
 mod tests {
     use super::*;
 
+    fn sha(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn static_manifest() -> EdgeBenchmarkManifest {
+        let candidates = vec![
+            EdgeCandidateDefinition {
+                candidate_id: "executorch-cmsis".into(),
+                family: EdgeCandidateFamily::ExecuTorchCmsisNn,
+                runtime: "ExecuTorch Cortex-M + CMSIS-NN".into(),
+                precision: "int8".into(),
+                artifact_sha256: sha('a'),
+                configuration_sha256: sha('b'),
+            },
+            EdgeCandidateDefinition {
+                candidate_id: "tflm-cmsis".into(),
+                family: EdgeCandidateFamily::TfliteMicroCmsisNn,
+                runtime: "TFLite Micro + CMSIS-NN".into(),
+                precision: "int8".into(),
+                artifact_sha256: sha('c'),
+                configuration_sha256: sha('d'),
+            },
+        ];
+        let mut manifest = EdgeBenchmarkManifest {
+            schema: BENCHMARK_SCHEMA.into(),
+            version: BENCHMARK_VERSION.into(),
+            benchmark_id: "symthaea-tinyml-static-v0".into(),
+            track: EdgeBenchmarkTrack::StaticInference,
+            target: EdgeBenchmarkTarget {
+                target_id: "cortex-m55-fixture".into(),
+                board_revision: "board-rev-a".into(),
+                cpu_core: "cortex-m55".into(),
+                accelerator_profile: "cpu-only-npu-disabled".into(),
+                sram_budget_bytes: 512 * 1024,
+                protected_sram_reserve_bytes: 64 * 1024,
+                flash_budget_bytes: 2 * 1024 * 1024,
+                p95_deadline_ms: 100,
+            },
+            dataset_sha256: sha('e'),
+            train_split_sha256: sha('f'),
+            validation_split_sha256: sha('1'),
+            locked_test_split_sha256: sha('2'),
+            quality_metric_id: "top1_accuracy".into(),
+            minimum_quality_score: 0.85,
+            maximum_false_alarms_per_hour: 10.0,
+            energy_semantics: EdgeEnergySemantics::PerInference,
+            prequential_predict_before_learn: true,
+            locked_test_labels: true,
+            candidate_definitions: candidates,
+            manifest_sha256: String::new(),
+        };
+        manifest.manifest_sha256 = compute_edge_benchmark_manifest_sha256(&manifest).unwrap();
+        manifest
+    }
+
     fn stream_config() -> TemporalStreamConfig {
         TemporalStreamConfig {
             event_count: 2_000,
@@ -599,6 +654,21 @@ mod tests {
             label_delay_us: 20_000,
             drift: TemporalDriftSchedule::Gradual { start_event: 500, end_event: 900, to_regime: 1 },
         }
+    }
+
+    #[test]
+    fn static_manifest_requires_modern_optimized_tinyml_baselines_and_digest() {
+        let manifest = static_manifest();
+        validate_edge_benchmark_manifest(&manifest).unwrap();
+
+        let mut incomplete = manifest.clone();
+        incomplete.candidate_definitions.remove(0);
+        incomplete.manifest_sha256 = compute_edge_benchmark_manifest_sha256(&incomplete).unwrap();
+        assert!(validate_edge_benchmark_manifest(&incomplete).is_err());
+
+        let mut tampered = manifest;
+        tampered.locked_test_split_sha256 = sha('3');
+        assert!(validate_edge_benchmark_manifest(&tampered).is_err());
     }
 
     #[test]
