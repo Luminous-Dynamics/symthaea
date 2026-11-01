@@ -1482,10 +1482,21 @@ mod tests {
     fn calibration_support_counts_independent_clusters_not_questions() {
         let mut study = minimal_study();
         for observation in &mut study.observations {
-            if observation.split == ObservationSplitV1::CleanCalibration
-                && (observation.sample_id == "cal-000" || observation.sample_id == "cal-001")
-            {
-                observation.source_cluster_id = "cal-block-000".to_owned();
+            if observation.split == ObservationSplitV1::CleanCalibration {
+                let index = observation
+                    .sample_id
+                    .strip_prefix("cal-")
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap();
+                observation.source_cluster_id = format!("cal-block-{:03}", index / 2);
+            }
+            if observation.split == ObservationSplitV1::LockedTest {
+                observation.source_cluster_id =
+                    if observation.sample_id == "test-000" || observation.sample_id == "test-001" {
+                        "test-clean-block".to_owned()
+                    } else {
+                        "test-contaminated-block".to_owned()
+                    };
             }
         }
         let report = analyze_detector_calibration(&study).unwrap();
@@ -1493,7 +1504,7 @@ mod tests {
             report
                 .group_cells
                 .iter()
-                .all(|cell| cell.calibration_clean_support == 99)
+                .all(|cell| cell.calibration_clean_support == 50)
         );
     }
 
