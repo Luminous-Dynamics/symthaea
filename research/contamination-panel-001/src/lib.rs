@@ -1367,5 +1367,6 @@ pub mod causal_analysis;
 pub mod fresh_instance;
 
 pub mod fresh_scoring;
+pub mod retrieval_decomposition;
 
 pub mod search_time;
