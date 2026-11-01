@@ -1,7 +1,10 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt,
-    ForecastReceipt, ReconciliationOutcome, RemainingCostForecast, ReservationId, ResourceVector,
-    ShiftStatus, StateEvidence, TerminalOutcome, assess_completion_feasibility,
+    BudgetLedger, CompletedCalibrationExample, EffectDisposition, ForecastId, ForecastJournal,
+    ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients, JointCostEnvelope,
+    LinearProofFrontierCostModel, ProofFrontierFeatures, ReconciliationOutcome,
+    RemainingCostForecast, ReservationId, ResourceVector, ShiftStatus,
+    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
+    assess_joint_resource_fit,
 };
 
 fn tokens(value: u128) -> ResourceVector {
@@ -300,4 +303,117 @@ fn main() {
             .outcome(ForecastId(102))
             .is_some_and(|outcome| matches!(outcome.terminal, TerminalOutcome::RightCensored(_)))
     );
+    let unit_cost = ResourceVector::new(3, 3, 3, 3, 3, 3);
+    let model_digest = [21; 32];
+    let population_digest = [23; 32];
+    let frontier_model = LinearProofFrontierCostModel {
+        model_digest,
+        point_cost: FrontierCostCoefficients {
+            intercept: ResourceVector::new(10, 10, 10, 10, 10, 10),
+            per_unresolved_obligation: unit_cost,
+            ..FrontierCostCoefficients::default()
+        },
+        uncertainty_scale: FrontierCostCoefficients {
+            intercept: ResourceVector::new(2, 2, 2, 2, 2, 2),
+            ..FrontierCostCoefficients::default()
+        },
+    };
+    let frontier_features = ProofFrontierFeatures {
+        unresolved_obligations: 4,
+        mandatory_obligations: 2,
+        maximum_dependency_depth: 3,
+        dependency_edges: 3,
+        admissible_alternatives: 4,
+        missing_evidence_requirements: 1,
+        distinct_operation_families: 2,
+        distinct_evidence_families: 2,
+        mandatory_verifier_operations: 1,
+    };
+    let frontier_prediction = frontier_model
+        .predict(
+            frontier_features,
+            [22; 32],
+            population_digest,
+            ShiftStatus::InDomain,
+        )
+        .unwrap();
+    let calibration_examples = (1..=9_u128)
+        .map(|score| {
+            let point = frontier_prediction.point_cost;
+            let scale = frontier_prediction.uncertainty_scale;
+            let residual = ResourceVector::new(
+                score * scale.tokens,
+                score * scale.tool_calls,
+                score * scale.cpu_ms,
+                score * scale.gpu_ms,
+                score * scale.wall_ms,
+                score * scale.micro_usd,
+            );
+            CompletedCalibrationExample {
+                episode_id: score as u64,
+                prediction: frontier_prediction,
+                observed_remaining: point.checked_add(residual).unwrap(),
+                completion_verifier_digest: [24; 32],
+            }
+        })
+        .collect::<Vec<_>>();
+    let vector_calibrator = SplitVectorConformalCalibrator::fit(
+        &calibration_examples,
+        0.10,
+        model_digest,
+        [25; 32],
+        population_digest,
+    )
+    .unwrap();
+    let joint_envelope = vector_calibrator
+        .predict_upper(frontier_prediction)
+        .unwrap();
+    let JointCostEnvelope::Bounded(ref joint_bound) = joint_envelope else {
+        panic!("nine exchangeable completed cases support a finite 90% conformal rank");
+    };
+    let joint_fit = assess_joint_resource_fit(
+        &joint_envelope,
+        tokens(5),
+        &BudgetLedger::new(ResourceVector::new(1000, 1000, 1000, 1000, 1000, 1000)),
+    );
+    assert_eq!(
+        joint_fit,
+        pod_meta_cost_to_go_lab::JointBudgetDecision::Fits
+    );
+    println!(
+        "VECTOR_CONFORMAL_ROW\tjoint-max-score-envelope\t{:.2}\t{}\t{}\t{}",
+        joint_bound.target_coverage,
+        joint_bound.calibration_count,
+        joint_bound.conformal_threshold,
+        joint_bound.upper.tokens
+    );
+
+    let shifted_prediction = frontier_model
+        .predict(
+            frontier_features,
+            [22; 32],
+            population_digest,
+            ShiftStatus::SuspectedShift,
+        )
+        .unwrap();
+    let shifted_envelope = vector_calibrator.predict_upper(shifted_prediction).unwrap();
+    assert!(matches!(
+        shifted_envelope,
+        JointCostEnvelope::Unbounded { .. }
+    ));
+    println!("VECTOR_CONFORMAL_ROW\tshift-abstention\tunbounded");
+
+    let small_calibrator = SplitVectorConformalCalibrator::fit(
+        &calibration_examples[..8],
+        0.10,
+        model_digest,
+        [26; 32],
+        population_digest,
+    )
+    .unwrap();
+    assert!(matches!(
+        small_calibrator.predict_upper(frontier_prediction).unwrap(),
+        JointCostEnvelope::Unbounded { .. }
+    ));
+    println!("VECTOR_CONFORMAL_ROW\tfinite-sample-rank-overflow\tunbounded");
 }

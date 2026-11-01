@@ -185,7 +185,11 @@ The unconditional time-to-sufficient-proof estimator is separately specified in 
 
 The append-only pre-execution forecast and separately appended evaluator/meter outcome API is specified in [FORECAST_JOURNAL_V1.md](FORECAST_JOURNAL_V1.md). It enforces unique forecast IDs, monotonic decision sequences per run, outcome-to-forecast linkage, separate verifier evidence for sufficient completion, and single-assignment outcome records. It is an in-process serialized journal, not a signed log or distributed ledger.
 
-## 14. External comparators and claim limits
+## 14. Proof-frontier and simultaneous resource-vector prediction
+
+The first frontier-conditioned structural model and split-conformal six-resource upper envelope are specified in [FRONTIER_VECTOR_CONFORMAL_V1.md](FRONTIER_VECTOR_CONFORMAL_V1.md). Its joint score is the maximum positive normalized residual across all resource dimensions; calibration is restricted to independently verified completed episodes from a declared exchangeability cohort. Censored episodes remain in survival analysis and are not silently treated as completed-case residuals. The result provides marginal simultaneous coverage under split-conformal exchangeability assumptions, not conditional subgroup coverage or arbitrary-shift validity.
+
+## 15. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.

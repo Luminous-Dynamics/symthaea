@@ -12,7 +12,8 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - reservation overruns and hard-cap violations remain observable;
 - a shift-aware feasibility gate includes the mandatory verification reserve;
 - a non-parametric time-to-sufficient-proof baseline separates right-censoring from competing terminal events;
-- an append-only forecast journal stores pre-execution predictions separately from evaluator, meter, and verifier outcomes.
+- an append-only forecast journal stores pre-execution predictions separately from evaluator, meter, and verifier outcomes;
+- a proof-frontier structural baseline feeds one-sided split-conformal simultaneous resource-vector envelopes.
 
 ## Run
 

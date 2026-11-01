@@ -1,3 +1,6 @@
+pub mod vector_conformal;
+pub use vector_conformal::*;
+
 pub mod forecast_journal;
 pub mod survival;
 pub use forecast_journal::*;
