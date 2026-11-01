@@ -13,6 +13,7 @@
     "authority",
     "initial_state",
     "operations",
+    "reference_linearization_order",
     "faults",
     "witness_observations",
     "final_observation",
@@ -68,6 +69,11 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/operation" }
+    },
+    "reference_linearization_order": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
     },
     "faults": {
       "type": "array",
