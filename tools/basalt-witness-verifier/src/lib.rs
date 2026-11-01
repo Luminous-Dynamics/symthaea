@@ -14,7 +14,7 @@ pub const WITNESS_SET_PAYLOAD_TYPE: &str =
 pub const TRUST_ROOT_PAYLOAD_TYPE: &str =
     "application/vnd.luminous.basalt.witness-trust-root.v1+json";
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TrustStore {
     pub schema_version: u32,
@@ -29,7 +29,7 @@ pub struct TrustStore {
     pub members: Vec<TrustMember>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TrustMember {
     pub member_id: String,
@@ -411,8 +411,7 @@ mod tests {
     fn sign_payload(payload_type: &str, payload: &[u8], seeds: &[[u8; 32]]) -> Vec<u8> {
         let signers = seeds
             .iter()
-            .enumerate()
-            .map(|(index, seed)| {
+            .map(|seed| {
                 let signing_key = SigningKey::from_bytes(seed);
                 let public_bytes = signing_key.verifying_key().to_bytes();
                 let public_key = STANDARD.encode(public_bytes);
@@ -551,14 +550,29 @@ mod tests {
         let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
         let mut trust = build_trust(&seeds);
         trust.members[3].status = "revoked".to_string();
-        trust.member_count = 3;
-        trust.fault_tolerance = 0;
-        trust.write_quorum = 1;
-        trust.read_quorum = 1;
-        // The original 3-of-4 quorum is no longer the active set; its metadata is invalid.
+        let replacement_seed = test_seed(11);
+        let replacement_key = SigningKey::from_bytes(&replacement_seed);
+        let replacement_public = STANDARD.encode(replacement_key.verifying_key().to_bytes());
+        trust.members.push(TrustMember {
+            member_id: "member-replacement".to_string(),
+            keyid: canonical_key_id(&replacement_public).unwrap(),
+            algorithm: "ed25519".to_string(),
+            public_key: replacement_public,
+            administrative_domain: "admin-domain-replacement".to_string(),
+            status: "active".to_string(),
+        });
+        // Four active keys remain in the new set; an envelope containing only two
+        // active signatures plus the revoked member's signature must not pass 3-of-4.
         let bytes = trust_bytes(&trust);
         let pin = sha256_prefixed(&bytes);
-        let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[3..]);
+        let signers = [
+            Ed25519Signer::from_bytes(&seeds[0]).unwrap().with_key_id(trust.members[0].keyid.clone()),
+            Ed25519Signer::from_bytes(&seeds[1]).unwrap().with_key_id(trust.members[1].keyid.clone()),
+            Ed25519Signer::from_bytes(&seeds[3]).unwrap().with_key_id(trust.members[3].keyid.clone()),
+        ];
+        let signer_refs: Vec<&dyn dsse::Signer> =
+            signers.iter().map(|signer| signer as &dyn dsse::Signer).collect();
+        let envelope = sign_with(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &signer_refs).unwrap().to_json().unwrap();
         assert!(verify_witness_envelope(
             &envelope, &trust, &bytes, &pin, TEST_PAYLOAD_TYPE, QuorumKind::Write
         ).is_err());
