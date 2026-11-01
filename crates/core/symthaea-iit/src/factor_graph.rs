@@ -1705,6 +1705,11 @@ mod tests {
 
                 // Disconnected eliminated variables are intentionally left out
                 // for some seeds; summing one must contribute an exact factor 2.
+                // The API rejects a truly empty factor graph, so represent the
+                // empty product (one) with an explicit scalar identity factor.
+                if factors.is_empty() {
+                    factors.push(BinaryFactor::scalar(1.0).unwrap());
+                }
                 let mut expected = vec![0.0; 1usize << retained.len()];
                 for full_assignment in 0..(1usize << variable_count) {
                     let mut joint_weight = 1.0;
@@ -1854,7 +1859,10 @@ mod tests {
 
         let variable_one_off = factor.condition(1, false).unwrap();
         assert_eq!(variable_one_off.variables(), &[3]);
-        assert_eq!(variable_one_off.log_values(), &[1.0_f64.ln(), 3.0_f64.ln()]);
+        assert_eq!(
+            variable_one_off.log_values(),
+            &[f64::NEG_INFINITY, 3.0_f64.ln()]
+        );
 
         assert_eq!(factor.condition(99, true).unwrap(), factor);
     }
