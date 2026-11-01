@@ -19,6 +19,8 @@ pub const SEARCH_MAX_EVENTS: usize = 1_000_000;
 pub const SEARCH_MAX_TRACE_BYTES: usize = 256 * 1024 * 1024;
 pub const SEARCH_MAX_FINDINGS_BYTES: usize = 64 * 1024 * 1024;
 pub const SEARCH_MAX_ALLOWLIST_DESTINATIONS: usize = 100_000;
+pub const SEARCH_MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
+pub const SEARCH_MAX_TOTAL_BODY_BYTES: usize = 128 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -169,9 +171,23 @@ pub struct SearchTimeExposureFindingsV1 {
     pub schema: String,
     pub run_id: String,
     pub trace_root_sha256: String,
+    pub response_body_event_count: u64,
+    pub response_body_evidence_count: u64,
+    /// Allowed events whose response bodies were not retained for matching.
+    pub unavailable_body_event_sequences: Vec<u64>,
     pub findings: Vec<SearchExposureFindingV1>,
     pub findings_sha256: String,
     pub claim_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchCapturedResponseBodyV1 {
+    pub event_sequence: u64,
+    pub content_type: String,
+    /// Evaluator-only raw body. Never copy this field into a public finding.
+    pub body_text: String,
+    pub response_sha256: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -187,6 +203,10 @@ pub struct SearchTimeExposureFindingsAuditV1 {
     pub answer_bearing_count: u64,
     pub unknown_count: u64,
     pub matched_item_reference_count: u64,
+    pub response_body_event_count: u64,
+    pub response_body_evidence_count: u64,
+    pub unavailable_body_event_count: u64,
+    pub body_evidence_coverage_permille: Option<u16>,
     pub findings_sha256: String,
     pub claim_boundary: String,
     pub issues: Vec<String>,
@@ -237,6 +257,297 @@ fn trace_digest(trace: &SearchTimeExposureTraceV1) -> Result<String, String> {
     let bytes = serde_json::to_vec(&normalized)
         .map_err(|error| format!("cannot serialize search trace: {error}"))?;
     Ok(hash_domain(b"search-time-trace.v1", &bytes))
+}
+
+/// Domain-separated digest for the exact UTF-8 response body bytes.
+pub fn search_response_body_digest(body: &str) -> String {
+    hash_domain(b"search-time-response-body.v1", body.as_bytes())
+}
+
+fn normalized_words(input: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    for ch in input.chars() {
+        if ch.is_ascii_alphanumeric() {
+            current.push(ch.to_ascii_lowercase());
+        } else if !current.is_empty() {
+            words.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        words.push(current);
+    }
+    words
+}
+
+fn contains_word_sequence(haystack: &[String], needle: &[String]) -> bool {
+    !needle.is_empty() && haystack.windows(needle.len()).any(|window| window == needle)
+}
+
+fn shared_shingle_count(left: &[String], right: &[String], width: usize) -> usize {
+    if left.len() < width || right.len() < width {
+        return 0;
+    }
+    let left_shingles: BTreeSet<Vec<&str>> = left.windows(width)
+        .map(|window| window.iter().map(String::as_str).collect())
+        .collect();
+    let right_shingles: BTreeSet<Vec<&str>> = right.windows(width)
+        .map(|window| window.iter().map(String::as_str).collect())
+        .collect();
+    left_shingles.intersection(&right_shingles).count()
+}
+
+fn extract_json_objects(input: &str) -> Vec<&str> {
+    let bytes = input.as_bytes();
+    let mut objects = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] != b'{' {
+            index += 1;
+            continue;
+        }
+        let start = index;
+        let mut depth = 0_u32;
+        let mut in_string = false;
+        let mut escaped = false;
+        let mut cursor = index;
+        let mut end = None;
+        while cursor < bytes.len() {
+            let byte = bytes[cursor];
+            if in_string {
+                if escaped {
+                    escaped = false;
+                } else if byte == b'\\' {
+                    escaped = true;
+                } else if byte == b'"' {
+                    in_string = false;
+                }
+            } else {
+                match byte {
+                    b'"' => in_string = true,
+                    b'{' => depth += 1,
+                    b'}' => {
+                        depth = depth.saturating_sub(1);
+                        if depth == 0 {
+                            end = Some(cursor + 1);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            cursor += 1;
+        }
+        if let Some(end) = end {
+            if let Some(object) = input.get(start..end) {
+                objects.push(object);
+            }
+            index = end;
+        } else {
+            index = start + 1;
+        }
+    }
+    objects
+}
+
+fn matching_answer_items(
+    body: &str,
+    bundle: &FreshChallengeBundleV1,
+) -> BTreeSet<String> {
+    let mut matched = BTreeSet::new();
+    for object in extract_json_objects(body) {
+        if let Ok(solution) = serde_json::from_str::<ExactLinearSolutionV1>(object) {
+            for entry in &bundle.sealed_oracle_packet.entries {
+                if solution == entry.solution {
+                    matched.insert(entry.item_id.clone());
+                }
+            }
+        }
+    }
+    matched
+}
+
+fn analyze_response_body(
+    body: &str,
+    bundle: &FreshChallengeBundleV1,
+) -> (SearchExposureClassV1, Vec<String>, SearchFindingMethodV1, u16) {
+    let body_words = normalized_words(body);
+    let answer_items = matching_answer_items(body, bundle);
+    if !answer_items.is_empty() {
+        return (
+            SearchExposureClassV1::AnswerBearing,
+            answer_items.into_iter().collect(),
+            SearchFindingMethodV1::ExactMatch,
+            1_000,
+        );
+    }
+
+    let mut context_items = BTreeSet::new();
+    let mut exact_context = false;
+    let mut fuzzy_context = false;
+    for task in &bundle.public_packet.tasks {
+        let task_words = normalized_words(&task.task_text);
+        if task_words.len() >= 8 && contains_word_sequence(&body_words, &task_words) {
+            exact_context = true;
+            context_items.insert(task.item_id.clone());
+            continue;
+        }
+        // This conservative lexical rule is only a candidate duplicate detector:
+        // require at least two distinct shared 6-token shingles. It is not semantic.
+        if task_words.len() >= 12 && shared_shingle_count(&body_words, &task_words, 6) >= 2 {
+            fuzzy_context = true;
+            context_items.insert(task.item_id.clone());
+        }
+    }
+    if !context_items.is_empty() {
+        return (
+            SearchExposureClassV1::ContextBearing,
+            context_items.into_iter().collect(),
+            if exact_context {
+                SearchFindingMethodV1::ExactMatch
+            } else {
+                SearchFindingMethodV1::FuzzyText
+            },
+            if exact_context { 1_000 } else { 800 },
+        );
+    }
+
+    let mut metadata_items = BTreeSet::new();
+    for task in &bundle.public_packet.tasks {
+        let item_words = normalized_words(&task.item_id);
+        if contains_word_sequence(&body_words, &item_words) {
+            metadata_items.insert(task.item_id.clone());
+        }
+    }
+    let metadata_terms = [
+        bundle.public_packet.batch_id.as_str(),
+        bundle.public_packet.benchmark_id.as_str(),
+        bundle.public_packet.benchmark_version.as_str(),
+        bundle.public_packet.task_family.as_str(),
+    ];
+    let metadata_found = metadata_terms.iter().any(|term| {
+        let words = normalized_words(term);
+        contains_word_sequence(&body_words, &words)
+    });
+    if metadata_found || !metadata_items.is_empty() {
+        return (
+            SearchExposureClassV1::MetadataOnly,
+            metadata_items.into_iter().collect(),
+            SearchFindingMethodV1::ExactMatch,
+            1_000,
+        );
+    }
+    (
+        SearchExposureClassV1::Unknown,
+        Vec::new(),
+        SearchFindingMethodV1::Other,
+        0,
+    )
+}
+
+/// Deterministically match evaluator-retained response bodies against task
+/// metadata, exact/near-exact task text, and sealed exact-answer objects.
+///
+/// Semantic paraphrase detection is intentionally not attempted. Every
+/// response-bearing allowed event must either have a retained body record or
+/// be explicitly listed as unavailable. Raw body text is not copied to output.
+pub fn analyze_search_time_response_bodies(
+    trace: &SearchTimeExposureTraceV1,
+    bundle: &FreshChallengeBundleV1,
+    response_bodies: &[SearchCapturedResponseBodyV1],
+    unavailable_body_event_sequences: &[u64],
+) -> Result<SearchTimeExposureFindingsV1, String> {
+    let trace_audit = audit_search_time_trace(trace)?;
+    if !trace_audit.valid {
+        return Err("search-time trace failed integrity audit".to_owned());
+    }
+    if trace.challenge_packet_sha256 != bundle.public_packet.public_packet_sha256 {
+        return Err("search trace and fresh challenge packet are not bound".to_owned());
+    }
+    if response_bodies.len() > SEARCH_MAX_EVENTS
+        || unavailable_body_event_sequences.len() > SEARCH_MAX_EVENTS
+    {
+        return Err("body evidence count exceeds search event limit".to_owned());
+    }
+    let expected_events: BTreeMap<u64, &SearchTimeEventV1> = trace.events.iter()
+        .filter(|event| {
+            event.disposition == SearchEventDispositionV1::Allowed && event.response_bytes > 0
+        })
+        .map(|event| (event.sequence, event))
+        .collect();
+    let mut evidence_sequences = BTreeSet::new();
+    let mut total_body_bytes = 0_usize;
+    let mut findings = Vec::with_capacity(response_bodies.len());
+    for record in response_bodies {
+        if !evidence_sequences.insert(record.event_sequence) {
+            return Err("duplicate retained response-body event sequence".to_owned());
+        }
+        if record.content_type.trim().is_empty() {
+            return Err("response-body evidence requires a content type".to_owned());
+        }
+        let event = expected_events.get(&record.event_sequence)
+            .ok_or_else(|| format!("response-body evidence references non-body event {}", record.event_sequence))?;
+        let byte_len = record.body_text.len();
+        if byte_len > SEARCH_MAX_BODY_BYTES {
+            return Err("individual retained response body exceeds 16 MiB safety bound".to_owned());
+        }
+        total_body_bytes = total_body_bytes.checked_add(byte_len)
+            .ok_or_else(|| "total retained response body size overflowed".to_owned())?;
+        if total_body_bytes > SEARCH_MAX_TOTAL_BODY_BYTES {
+            return Err("total retained response bodies exceed 128 MiB safety bound".to_owned());
+        }
+        validate_digest(&record.response_sha256, "response_body.response_sha256")?;
+        let actual_digest = search_response_body_digest(&record.body_text);
+        if actual_digest != record.response_sha256
+            || event.response_sha256.as_deref() != Some(record.response_sha256.as_str())
+            || event.response_bytes != byte_len as u64
+        {
+            return Err(format!("retained response body does not match event {} receipt", record.event_sequence));
+        }
+        let (exposure_class, matched_item_ids, method, confidence_permille) =
+            analyze_response_body(&record.body_text, bundle);
+        findings.push(SearchExposureFindingV1 {
+            event_sequence: record.event_sequence,
+            exposure_class,
+            matched_item_ids,
+            evidence_sha256: record.response_sha256.clone(),
+            method,
+            confidence_permille,
+        });
+    }
+    let mut unavailable = BTreeSet::new();
+    for sequence in unavailable_body_event_sequences {
+        if !unavailable.insert(*sequence) {
+            return Err("duplicate unavailable body event sequence".to_owned());
+        }
+        if !expected_events.contains_key(sequence) {
+            return Err(format!("unavailable body sequence {sequence} is not a response-bearing allowed event"));
+        }
+    }
+    if !evidence_sequences.is_disjoint(&unavailable) {
+        return Err("a response body cannot be both retained and unavailable".to_owned());
+    }
+    let accounted: BTreeSet<u64> = evidence_sequences.union(&unavailable).copied().collect();
+    let expected: BTreeSet<u64> = expected_events.keys().copied().collect();
+    if accounted != expected {
+        return Err("every response-bearing allowed event must be retained or explicitly unavailable".to_owned());
+    }
+    findings.sort_by_key(|finding| finding.event_sequence);
+    let mut artifact = SearchTimeExposureFindingsV1 {
+        schema: SEARCH_FINDINGS_SCHEMA.to_owned(),
+        run_id: trace.run_id.clone(),
+        trace_root_sha256: trace.trace_root_sha256.clone(),
+        response_body_event_count: u64::try_from(expected_events.len())
+            .map_err(|_| "response body event count exceeds u64")?,
+        response_body_evidence_count: u64::try_from(response_bodies.len())
+            .map_err(|_| "response body evidence count exceeds u64")?,
+        unavailable_body_event_sequences: unavailable.into_iter().collect(),
+        findings,
+        findings_sha256: String::new(),
+        claim_boundary: "deterministic_exact_and_lexical_duplicate_matching_only;semantic_paraphrase_and_causal_influence_not_established;raw_response_bodies_remain_evaluator_only".to_owned(),
+    };
+    artifact.findings_sha256 = findings_digest(&artifact)?;
+    Ok(artifact)
 }
 
 fn findings_digest(findings: &SearchTimeExposureFindingsV1) -> Result<String, String> {
