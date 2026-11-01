@@ -378,13 +378,19 @@ pub struct WitnessSetChainReport {
     pub claim_ceiling: String,
 }
 
+/// Opaque verified witness-set metadata. It can safely be supplied as the
+/// predecessor when checking the next set version.
+pub struct VerifiedWitnessSet {
+    pub report: WitnessSetChainReport,
+    metadata: WitnessSetMetadata,
+}
+
 struct PreparedRoot {
     verifiers: Vec<Ed25519Verifier>,
 }
 
 struct TrustedRootVersion {
     metadata: WitnessTrustRoot,
-    digest: String,
     prepared: PreparedRoot,
 }
 
@@ -561,7 +567,6 @@ pub fn verify_trust_root_chain(
     let mut versions = vec![root.trust_root_version.clone()];
     let mut trusted_roots = vec![TrustedRootVersion {
         metadata: root.clone(),
-        digest: root_digest.clone(),
         prepared,
     }];
     let mut prepared = prepare_root(&root)?;
@@ -616,7 +621,6 @@ pub fn verify_trust_root_chain(
         versions.push(successor.trust_root_version.clone());
         trusted_roots.push(TrustedRootVersion {
             metadata: successor.clone(),
-            digest: root_digest.clone(),
             prepared: next_prepared,
         });
         root = successor;
@@ -709,13 +713,14 @@ fn validate_witness_set(set: &WitnessSetMetadata) -> Result<(), String> {
     Ok(())
 }
 
-/// Verifies an initial or successor witness-set metadata envelope using the latest
-/// root keyset. Pass the previous verified metadata for each rotation after genesis.
+/// Verifies an initial or successor witness-set metadata envelope under the root
+/// version named in its signed payload. Opaque predecessor handles prevent callers
+/// from substituting unverified witness-set metadata.
 pub fn verify_witness_set_metadata(
     envelope_bytes: &[u8],
     root_chain: &VerifiedTrustRootChain,
-    previous_set: Option<&WitnessSetMetadata>,
-) -> Result<(WitnessSetMetadata, WitnessSetChainReport), String> {
+    previous_set: Option<&VerifiedWitnessSet>,
+) -> Result<VerifiedWitnessSet, String> {
     // Read only the untrusted version selector, then authenticate the exact payload
     // under that version's keys and reparse the authenticated canonical bytes.
     let strict: StrictEnvelope = serde_json::from_slice(envelope_bytes)
@@ -759,7 +764,8 @@ pub fn verify_witness_set_metadata(
                 return Err("initial witness-set metadata does not match the root-pinned commitment".to_string());
             }
         }
-        Some(previous) => {
+        Some(previous_verified) => {
+            let previous = &previous_verified.metadata;
             let expected_version = parse_canonical_u64(&previous.witness_set_version, "previous witness set version")?
                 .checked_add(1)
                 .ok_or_else(|| "witness-set version overflow".to_string())?;
@@ -788,7 +794,10 @@ pub fn verify_witness_set_metadata(
         write_quorum: set.write_quorum,
         claim_ceiling: "Verifies canonical witness-set metadata signed by the latest verified root threshold and linked to the pinned genesis commitment or previous set digest. Does not prove deployed member durability or operational failure-domain independence.".to_string(),
     };
-    Ok((set, report))
+    Ok(VerifiedWitnessSet {
+        report,
+        metadata: set,
+    })
 }
 
 /// Verifies a DSSE envelope against active keys from an already pinned trust store.
