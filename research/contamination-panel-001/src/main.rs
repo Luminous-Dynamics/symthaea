@@ -4,6 +4,7 @@ use contamination_panel_bench::{
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
+    self_critique::{SelfCritiqueScoringRequestV1, score_self_critique_request},
     ftd::{
         FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
         empirical_reference_p_values, ftd_weighted_cauchy_bh,
@@ -310,6 +311,32 @@ fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> 
         report.predeclared_contrasts.len(),
         report.confirmatory_eligible,
         report.analysis_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
+fn score_self_critique_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench score-self-critique <scoring-request.json> <score-report.json>"
+                .into(),
+        );
+    }
+    const MAX_SELF_CRITIQUE_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_SELF_CRITIQUE_REQUEST_BYTES)?;
+    let request: SelfCritiqueScoringRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = score_self_critique_request(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "sample={} source={:?} score={:.6} initial_coverage={}‰ critique_coverage={}‰ authenticated={} confirmatory_eligible={}",
+        report.sample_id,
+        report.entropy_source,
+        report.contamination_score,
+        report.initial_entropy_coverage_permille,
+        report.critique_entropy_coverage_permille,
+        report.independently_authenticated,
+        report.confirmatory_eligible
     );
     println!("claim boundary: {}", report.claim_boundary);
     Ok(())
