@@ -115,3 +115,8 @@ The SorryDB_2601 cohort remains a separate real-project benchmark from the 372-f
 - Lean recursive Name representation: https://github.com/leanprover/lean4/blob/master/src/Init/Prelude.lean
 - PITB current v2 evidence contract: lean-pilot/PITBCounterfactualPilot/ContextEvidenceV2.lean
 - SorryDB_2601 task and source pins: sorrydb-track/smoke-cohort-candidates.v0.json
+
+
+### Live snapshot identity is a stronger envelope than the static wire proof-state hash
+
+The structural wire v1 proof-state digest identifies the Lean target, goal metadata and ordered local context. A live R5 snapshot also contains the full mutable MetavarContext, so R5 does not reuse the static wire hash as its complete snapshot identity. Its receipt recomputes a distinct `PITB-LIVE-PROOF-STATE-V0` digest over the environment, goal metadata, target expression, local context and MetavarContext component digests. This binds open metavariables and their assignments/constraints to the snapshot identity. The opaque snapshot payload and server/RPC build identity remain separately content-addressed in the receipt.
