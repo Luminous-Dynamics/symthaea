@@ -385,30 +385,31 @@ fn generate_hidden_episode(scenario: &ActiveSensingScenario) -> HiddenEpisode {
     HiddenEpisode { events, event_at_step }
 }
 
-fn sensor_energy_nj(sensor: ActiveSensingSensor) -> u64 {
-    match sensor {
-        ActiveSensingSensor::LowPower => LOW_POWER_SAMPLE_ENERGY_NJ,
-        ActiveSensingSensor::HighFidelity => HIGH_FIDELITY_SAMPLE_ENERGY_NJ,
-    }
-}
-
 fn acquire_measurement(
-    rng: &mut SplitMix64,
     scenario: &ActiveSensingScenario,
     step: u64,
     hidden_positive: bool,
     sensor: ActiveSensingSensor,
 ) -> PublicSensorMeasurement {
-    let (base_fp, base_fn) = match sensor {
+    let (base_fp, base_fn, sensor_domain) = match sensor {
         ActiveSensingSensor::LowPower => (
             LOW_POWER_FALSE_POSITIVE_PPM,
             LOW_POWER_FALSE_NEGATIVE_PPM,
+            0x4C4F57504F574552,
         ),
         ActiveSensingSensor::HighFidelity => (
             HIGH_FIDELITY_FALSE_POSITIVE_PPM,
             HIGH_FIDELITY_FALSE_NEGATIVE_PPM,
+            0x4849474846494445,
         ),
     };
+    // Counterfactual noise is keyed by scenario seed, sample time, and sensor.
+    // A policy sampling less often therefore cannot shift the random draws used
+    // by later observations for another policy in a paired comparison.
+    let sample_seed = scenario.seed
+        ^ step.wrapping_mul(0x9E3779B97F4A7C15)
+        ^ sensor_domain;
+    let mut rng = SplitMix64::new(sample_seed);
     let extra = extra_sensor_error_ppm(scenario, step);
     let false_positive = base_fp.saturating_add(extra).min(PROBABILITY_SCALE);
     let false_negative = base_fn.saturating_add(extra).min(PROBABILITY_SCALE);
@@ -420,7 +421,6 @@ fn acquire_measurement(
     };
     PublicSensorMeasurement { sample_step: step, sensor, positive }
 }
-
 fn ppm(numerator: u64, denominator: u64) -> Option<u32> {
     if denominator == 0 {
         None
@@ -627,7 +627,6 @@ pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
     }
 
     let hidden = generate_hidden_episode(&scenario);
-    let mut sensor_rng = SplitMix64::new(scenario.seed ^ 0x53454E534F525F31);
     let mut last_measurement: Option<PublicSensorMeasurement> = None;
     let mut detected = vec![false; hidden.events.len()];
     let mut detection_delays_steps = Vec::new();
@@ -707,7 +706,6 @@ pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
                     .checked_add(LOW_POWER_SAMPLE_ENERGY_NJ)
                     .ok_or_else(|| ActiveSensingSimulationError::new("result.sensor_energy_nj", "overflow"))?;
                 let measurement = acquire_measurement(
-                    &mut sensor_rng,
                     &scenario,
                     step,
                     event_index.is_some(),
@@ -725,7 +723,6 @@ pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
                     .checked_add(HIGH_FIDELITY_SAMPLE_ENERGY_NJ)
                     .ok_or_else(|| ActiveSensingSimulationError::new("result.sensor_energy_nj", "overflow"))?;
                 let measurement = acquire_measurement(
-                    &mut sensor_rng,
                     &scenario,
                     step,
                     event_index.is_some(),
@@ -819,6 +816,47 @@ mod tests {
         let second = run_active_sensing_episode(scenario, policy_digest(1), &mut second_policy).unwrap();
         assert_eq!(first, second);
         validate_active_sensing_result(&first).unwrap();
+    }
+
+    #[test]
+    fn paired_runs_share_the_same_sensor_outcome_at_the_same_time_and_modality() {
+        struct Capture<P> {
+            inner: P,
+            observations: Vec<PublicObservation>,
+        }
+        impl<P: ActiveSensingPolicy> ActiveSensingPolicy for Capture<P> {
+            fn decide(&mut self, observation: &PublicObservation) -> PolicyAction {
+                self.observations.push(*observation);
+                self.inner.decide(observation)
+            }
+        }
+
+        let scenario = scenario(ActiveSensingShift::Stable);
+        let mut fast = Capture {
+            inner: FixedRateBaseline {
+                sensor: ActiveSensingSensor::LowPower,
+                interval_steps: 1,
+            },
+            observations: Vec::new(),
+        };
+        let mut sparse = Capture {
+            inner: FixedRateBaseline {
+                sensor: ActiveSensingSensor::LowPower,
+                interval_steps: 7,
+            },
+            observations: Vec::new(),
+        };
+        run_active_sensing_episode(scenario, policy_digest(8), &mut fast).unwrap();
+        run_active_sensing_episode(scenario, policy_digest(9), &mut sparse).unwrap();
+        let fast_first_measurement = fast.observations.iter()
+            .find_map(|observation| observation.last_measurement)
+            .unwrap();
+        let sparse_first_measurement = sparse.observations.iter()
+            .find_map(|observation| observation.last_measurement)
+            .unwrap();
+        assert_eq!(fast_first_measurement.sample_step, 0);
+        assert_eq!(sparse_first_measurement.sample_step, 0);
+        assert_eq!(fast_first_measurement, sparse_first_measurement);
     }
 
     #[test]
