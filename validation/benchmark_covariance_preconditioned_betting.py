@@ -22,6 +22,16 @@ def covariance(dimension: int, rho: float) -> np.ndarray:
     return (1.0 - rho) * np.eye(dimension) + rho * np.ones((dimension, dimension))
 
 
+def projective_quadratic(values: np.ndarray) -> np.ndarray:
+    """O(d) quadratic form for V=.8I+.8*11^T, last axis is coordinates."""
+    return 0.8 * np.sum(values * values, axis=-1) + 0.8 * np.sum(values, axis=-1) ** 2
+
+
+def projective_matvec(values: np.ndarray) -> np.ndarray:
+    """O(d) matrix-vector product Vx for V=.8I+.8*11^T."""
+    return 0.8 * values + 0.8 * np.sum(values, axis=-1, keepdims=True)
+
+
 def covariance_envelope(dimension: int) -> np.ndarray:
     """One global projective kernel for every finite universe dimension.
 
@@ -128,8 +138,10 @@ def simulate_cell(
     if scenario not in means:
         raise ValueError(f"unknown scenario: {scenario}")
     mean = means[scenario]
-    proxy = covariance_envelope(dimension)
-    proxy_diag = np.diag(proxy)
+    if dimension < 1:
+        raise ValueError("dimension must be positive")
+    # Analytic projective kernel parameters: V=.8I+.8*11^T, diag(V)=1.6.
+    proxy_diag = 1.6
     etas = np.asarray(eta_values, dtype=np.float64)
     rng = np.random.default_rng(
         _cell_seed(
@@ -138,7 +150,7 @@ def simulate_cell(
         )
     )
 
-    history = np.zeros((streams, dimension, horizon), dtype=np.float64)
+    history_sum = np.zeros((streams, dimension), dtype=np.float64)
     log_vector = np.zeros(streams)
     log_scalar = np.zeros(streams)
     log_coordinate = np.zeros((streams, dimension))
@@ -165,12 +177,11 @@ def simulate_cell(
         score = _draw(rng, mean, rho, noise_model, streams)
 
         if t >= warmup:
-            prior = history[:, :, :t]
-            coordinate_mean = prior.mean(axis=2)
+            coordinate_mean = history_sum / float(t)
             vector_bet = np.clip(
                 coordinate_mean - threshold / math.sqrt(t), 0.0, cap
             )
-            pooled_mean = prior.mean(axis=(1, 2))
+            pooled_mean = history_sum.sum(axis=1) / float(t * dimension)
             scalar_bet = np.clip(
                 pooled_mean - threshold / math.sqrt(t), 0.0, cap
             )
@@ -178,9 +189,7 @@ def simulate_cell(
             vector_bet = np.zeros((streams, dimension))
             scalar_bet = np.zeros(streams)
 
-        vector_penalty = np.einsum(
-            "bi,ij,bj->b", vector_bet, proxy, vector_bet, optimize=True
-        )
+        vector_penalty = projective_quadratic(vector_bet)
         log_vector += np.sum(vector_bet * score, axis=1) - 0.5 * vector_penalty
 
         log_coordinate += (
@@ -194,24 +203,18 @@ def simulate_cell(
         scalar_vector = np.broadcast_to(
             scalar_bet[:, None], (streams, dimension)
         )
-        scalar_penalty = np.einsum(
-            "bi,ij,bj->b", scalar_vector, proxy, scalar_vector, optimize=True
-        )
+        scalar_penalty = projective_quadratic(scalar_vector)
         log_scalar += (
             scalar_bet * score.sum(axis=1) - 0.5 * scalar_penalty
         )
 
         # The e-factors use the current, pre-observation lambda for every eta.
-        eta_penalty = np.einsum(
-            "kbi,ij,kbj->kb", lambda_eta, proxy, lambda_eta, optimize=True
-        )
+        eta_penalty = projective_quadratic(lambda_eta)
         log_eta += (
             np.sum(lambda_eta * score[None, :, :], axis=2)
             - 0.5 * eta_penalty
         )
-        eta_gradient = score[None, :, :] - np.einsum(
-            "kbi,ij->kbj", lambda_eta, proxy, optimize=True
-        )
+        eta_gradient = score[None, :, :] - projective_matvec(lambda_eta)
         lambda_eta = np.clip(
             lambda_eta
             + etas[:, None, None]
@@ -251,7 +254,7 @@ def simulate_cell(
         crossed["fixed_50_50_vector_eta_mixture"] |= (
             log_vector_eta_portfolio >= -math.log(alpha)
         )
-        history[:, :, t] = score
+        history_sum += score
 
     output: list[dict[str, Any]] = []
     for method, did_cross in crossed.items():
