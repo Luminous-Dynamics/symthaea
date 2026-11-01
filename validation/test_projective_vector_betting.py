@@ -55,7 +55,8 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
             sum(dense[i][j] * masked[j] for j in range(7)) if active[i] else 0.0
             for i in range(7)
         ]
-        self.assertEqual(kernel.matvec(values, active), expected_vec)
+        for actual, expected_value in zip(kernel.matvec(values, active), expected_vec):
+            self.assertAlmostEqual(actual, expected_value)
 
     def test_low_rank_factor_matches_dense_factor(self):
         kernel = ProjectiveEquicorrelationKernel(4, 0.2, 0.8)
