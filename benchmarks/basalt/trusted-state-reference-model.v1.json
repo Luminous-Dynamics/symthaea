@@ -1,0 +1,169 @@
+{
+  "suite_id": "basalt-trusted-state-reference-model-v1",
+  "benchmark_version": 1,
+  "title": "BASALT pure trusted-state transition reference model",
+  "claim_ceiling": "Deterministic state-machine conformance for revision-bound transitions, receipt idempotency, source generation continuity, policy monotonicity and log-checkpoint progression. This benchmark does not execute cryptography, a durable storage backend, a remote anti-rollback anchor, witness consensus, or observer/close qualification.",
+  "model_command": "cargo run -p xtask -- basalt-trusted-state-model-check",
+  "implementation_path": "xtask/src/basalt_trusted_state.rs",
+  "scenarios": [
+    {
+      "id": "TSTATE-MODEL-001",
+      "invariant": "Pinned first-use checkpoint and generation-1 source cursor",
+      "expected": "Commit log cursor, source cursor, policy versions and receipt record in one model state revision"
+    },
+    {
+      "id": "TSTATE-MODEL-002",
+      "invariant": "Retry exact previously accepted DSSE-envelope digest and exact semantic bindings",
+      "expected": "Return already-committed without advancing revision"
+    },
+    {
+      "id": "TSTATE-MODEL-003",
+      "invariant": "Two plans previewed from the same state revision race to commit",
+      "expected": "Exactly one plan commits; the other receives compare conflict"
+    },
+    {
+      "id": "TSTATE-MODEL-004",
+      "invariant": "After a stale compare conflict, retry the exact same receipt against newer state",
+      "expected": "Discover the exact accepted receipt and return already-committed"
+    },
+    {
+      "id": "TSTATE-MODEL-005",
+      "invariant": "Candidate skips one source generation",
+      "expected": "Reject generation gap"
+    },
+    {
+      "id": "TSTATE-MODEL-006",
+      "invariant": "Checkpoint at same tree size presents a different Merkle root",
+      "expected": "Reject checkpoint fork"
+    },
+    {
+      "id": "TSTATE-MODEL-007",
+      "invariant": "Candidate presents smaller transparency tree size",
+      "expected": "Reject stale checkpoint"
+    },
+    {
+      "id": "TSTATE-MODEL-008",
+      "invariant": "Candidate presents malformed consistency-proof digest reference",
+      "expected": "Reject malformed proof reference"
+    },
+    {
+      "id": "TSTATE-MODEL-009",
+      "invariant": "Observer profile digest changes without transition authorization",
+      "expected": "Reject unauthorized profile transition without new cursor"
+    },
+    {
+      "id": "TSTATE-MODEL-010",
+      "invariant": "Observer profile changes with explicit transition evidence at next generation",
+      "expected": "Prepare successor on the same stable cursor"
+    },
+    {
+      "id": "TSTATE-MODEL-011",
+      "invariant": "Boot incarnation changes without transition authorization",
+      "expected": "Reject unauthorized boot transition"
+    },
+    {
+      "id": "TSTATE-MODEL-012",
+      "invariant": "Boot incarnation changes with explicit transition evidence at next generation",
+      "expected": "Prepare successor without resetting source generation"
+    },
+    {
+      "id": "TSTATE-MODEL-013",
+      "invariant": "Signer policy version decreases",
+      "expected": "Reject policy rollback"
+    },
+    {
+      "id": "TSTATE-MODEL-014",
+      "invariant": "A previously accepted receipt digest is reused with different semantics",
+      "expected": "Reject receipt digest collision/equivocation"
+    },
+    {
+      "id": "TSTATE-MODEL-015",
+      "invariant": "Candidate was verified against a stale state revision",
+      "expected": "Reject compare conflict and require re-verification"
+    },
+    {
+      "id": "TSTATE-MODEL-016",
+      "invariant": "Two independent source streams preview against the same log checkpoint and state revision; the loser must re-read, re-verify and rebase",
+      "expected": "Both source cursors commit in sequence; the shared log checkpoint has no lost update"
+    },
+    {
+      "id": "TSTATE-MODEL-017",
+      "invariant": "Sixteen threads concurrently attempt the same prepared state plan",
+      "expected": "Exactly one commit succeeds and fifteen receive compare conflicts"
+    },
+    {
+      "id": "TSTATE-MODEL-018",
+      "invariant": "A plan prepared against a state snapshot is submitted to a divergent snapshot with the same revision number",
+      "expected": "Reject StateSnapshotMismatch and leave the divergent snapshot byte-for-byte/field-for-field unchanged"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "partial_model_state_advances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "double_commits_from_one_revision",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "non_idempotent_exact_receipt_retries",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "source_generation_gap_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "checkpoint_fork_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "stale_checkpoint_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "unauthorized_profile_or_boot_transition_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "policy_rollback_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "receipt_digest_collision_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "anti_rollback_qualification_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    }
+  ],
+  "benchmark_policy": {
+    "reference_model_only": true,
+    "no_external_proofs_verified": true,
+    "no_storage_durability_claim": true,
+    "anti_rollback_always_unqualified": true,
+    "deterministic_case_coverage": true
+  }
+}
