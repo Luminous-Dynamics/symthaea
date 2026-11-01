@@ -467,6 +467,9 @@ fn validate_retry_groups(trace: &Trace, errors: &mut Vec<String>) {
                 push_error(errors, format!("retry group {group} attempt lacks happens_after edge"));
             }
         }
+        if fault_for(trace, first, "serialization_failure").is_none() {
+            push_error(errors, format!("retry group {group} has no SQLSTATE/serialization-failure injection"));
+        }
         if first.expected_result.outcome != "retryable_abort" {
             push_error(errors, format!("retry group {group} first attempt is not a retryable abort"));
         }
@@ -716,6 +719,15 @@ pub fn verify_reference(trace: &Trace, trace_bytes: &[u8]) -> VerificationReport
     let results = replay(trace, &mut errors);
     let trace_hash = Sha256::digest(trace_bytes);
     let digest = format!("sha256:{}", hex_lower(&trace_hash));
+    let mutant_results = verify_mutants(trace);
+    let mut mutants_detected = 0usize;
+    for control in &trace.negative_controls {
+        match mutant_results.iter().find(|(id, _)| id == &control.mutation_id) {
+            Some((_, true)) => mutants_detected += 1,
+            Some((_, false)) => push_error(&mut errors, format!("negative control {} was not detected", control.mutation_id)),
+            None => push_error(&mut errors, format!("negative control {} has no executable mutant", control.mutation_id)),
+        }
+    }
     VerificationReport {
         report_version: 1,
         status: if errors.is_empty() { "pass" } else { "fail" }.to_string(),
@@ -723,7 +735,7 @@ pub fn verify_reference(trace: &Trace, trace_bytes: &[u8]) -> VerificationReport
         trace_sha256: digest,
         operations_replayed: results.len(),
         invariants_checked: trace.invariant_expectations.len(),
-        mutants_detected: 0,
+        mutants_detected,
         mutants_seeded: trace.negative_controls.len(),
         counterexamples: errors,
     }
