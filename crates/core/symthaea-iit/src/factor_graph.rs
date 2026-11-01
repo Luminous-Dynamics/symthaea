@@ -1346,25 +1346,39 @@ fn has_hub_leaf_frontier(
     const MIN_HUB_ACTIVE_DEGREE: usize = 16;
     const MIN_SHARED_LEAVES: usize = 8;
 
-    for neighbours in adjacency.values() {
-        let active_degree = neighbours
-            .iter()
-            .filter(|neighbour| active.contains(neighbour))
-            .count();
+    // Build both degree notions once. Re-counting each candidate leaf's
+    // adjacency while scanning every high-degree vertex can turn this cheap
+    // dispatch into cubic work on dense graphs.
+    let degree_profiles = adjacency
+        .iter()
+        .map(|(variable, neighbours)| {
+            let active_degree = neighbours
+                .iter()
+                .filter(|neighbour| active.contains(neighbour))
+                .count();
+            let primal_degree = neighbours
+                .iter()
+                .filter(|neighbour| adjacency.contains_key(neighbour))
+                .count();
+            (*variable, (active_degree, primal_degree))
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    for (hub, neighbours) in adjacency {
+        let Some((active_degree, _)) = degree_profiles.get(hub).copied() else {
+            continue;
+        };
         if active_degree < MIN_HUB_ACTIVE_DEGREE {
             continue;
         }
+
         let active_leaves = neighbours
             .iter()
             .filter(|neighbour| active.contains(neighbour))
             .filter(|leaf| {
-                adjacency.get(leaf).is_some_and(|leaf_neighbours| {
-                    leaf_neighbours
-                        .iter()
-                        .filter(|candidate| adjacency.contains_key(candidate))
-                        .count()
-                        == 1
-                })
+                degree_profiles
+                    .get(leaf)
+                    .is_some_and(|(_, primal_degree)| *primal_degree == 1)
             })
             .count();
         if active_leaves >= MIN_SHARED_LEAVES
@@ -1665,6 +1679,31 @@ mod tests {
         assert_eq!(plan.planner_work.affected_candidates_refreshed, 0);
         assert_eq!(plan.planner_work.leaf_fast_path_updates, leaves);
         assert_eq!(plan.planner_work.clique_pair_checks, 0);
+    }
+
+    #[test]
+    fn hub_leaf_dispatch_is_linear_in_primal_adjacency_and_rejects_dense_graphs() {
+        let variables = 64usize;
+        let mut star = BTreeMap::<usize, BTreeSet<usize>>::new();
+        for leaf in 1..variables {
+            star.entry(0).or_default().insert(leaf);
+            star.entry(leaf).or_default().insert(0);
+        }
+        let all_active = (0..variables).collect::<BTreeSet<_>>();
+        assert!(has_hub_leaf_frontier(&star, &all_active));
+
+        let retained_hub = (1..variables).collect::<BTreeSet<_>>();
+        assert!(has_hub_leaf_frontier(&star, &retained_hub));
+
+        let mut dense = BTreeMap::<usize, BTreeSet<usize>>::new();
+        for left in 0..variables {
+            for right in 0..variables {
+                if left != right {
+                    dense.entry(left).or_default().insert(right);
+                }
+            }
+        }
+        assert!(!has_hub_leaf_frontier(&dense, &all_active));
     }
 
     #[test]
