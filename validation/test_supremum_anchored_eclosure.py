@@ -478,6 +478,61 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
             )
             self.assertTrue(valid)
 
+    def test_additive_ebh_path_has_supfdr_certificate(self):
+        universe = ("a", "b", "c", "d")
+        baseline = [("a",), ("a", "b"), ("a", "b")]
+        q = {i: Fraction(1, 20) for i in universe}
+        v = {i: Fraction(1, 5) for i in universe}
+        coordinate_aux = {
+            "a": [Fraction(1), Fraction(2), Fraction(3)],
+            "b": [Fraction(2), Fraction(4), Fraction(5)],
+            "c": [Fraction(1), Fraction(3), Fraction(6)],
+            "d": [Fraction(1), Fraction(1), Fraction(2)],
+        }
+        alpha = Fraction(1, 5)
+        paths = build_additive_anchored_coordinate_e_paths(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            auxiliary_budgets=v,
+            coordinate_auxiliary_paths=coordinate_aux,
+            alpha=alpha,
+        )
+        rejection_path = [
+            select_additive_anchored_e_bh(
+                coordinate_e_values={i: paths[i][t] for i in universe},
+                alpha=alpha,
+                anchor=baseline[t],
+            )
+            for t in range(len(baseline))
+        ]
+        local_paths = {
+            frozenset(group): tuple(
+                sum((paths[i][t] for i in group), Fraction(0))
+                for t in range(len(baseline))
+            )
+            for size in range(1, len(universe) + 1)
+            for group in combinations(universe, size)
+        }
+        valid, _ = verify_closure_path(
+            universe=universe,
+            rejection_path=rejection_path,
+            local_e_paths=local_paths,
+            alpha=alpha,
+        )
+        self.assertTrue(valid)
+        observed, certificate = pathwise_supremum_bound(
+            truth=("c", "d"),
+            rejection_path=rejection_path,
+            local_e_paths=local_paths,
+            alpha=alpha,
+        )
+        self.assertLessEqual(observed, certificate)
+        self.assertTrue(all(
+            frozenset(baseline[t]) <= rejection_path[t]
+            for t in range(len(baseline))
+        ))
+
     def test_additive_ebh_always_retains_ever_rejected_baseline(self):
         universe = ("a", "b", "c")
         baseline = [("a",), ("a", "b"), ("b", "c")]
