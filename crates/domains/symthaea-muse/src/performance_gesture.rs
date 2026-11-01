@@ -317,10 +317,10 @@ impl ScoreNoteIdentityMapV1 {
             hash_string(&mut hasher, &note.instrument_id);
             match note.source_model_id.as_deref() {
                 Some(model) => {
-                    hasher.update([1]);
+                    hasher.update([1u8]);
                     hash_string(&mut hasher, model);
                 }
-                None => hasher.update([0]),
+                None => hasher.update([0u8]),
             }
             hasher.update(note.onset.numerator.to_be_bytes());
             hasher.update(note.onset.denominator.to_be_bytes());
@@ -445,11 +445,15 @@ impl PerformanceGestureTrackV1 {
                 GestureTarget::Part { part_id } => {
                     let part_notes: Vec<_> = identity_map.notes.iter()
                         .filter(|note| note.part_id == *part_id).collect();
-                    let homogeneous_assignment = !part_notes.is_empty() && part_notes.iter().all(|note| {
-                        note.instrument_id == event.instrument_id
-                            && event.source_model_id.as_deref()
-                                .is_none_or(|model| note.source_model_id.as_deref() == Some(model))
-                    });
+                    let part_model = part_notes.first().and_then(|note| note.source_model_id.as_deref());
+                    let all_share_one_assignment = !part_notes.is_empty()
+                        && part_notes.iter().all(|note| {
+                            note.instrument_id == event.instrument_id
+                                && note.source_model_id.as_deref() == part_model
+                        });
+                    let event_model_matches = event.source_model_id.as_deref()
+                        .is_none_or(|model| Some(model) == part_model);
+                    let homogeneous_assignment = all_share_one_assignment && event_model_matches;
                     if !homogeneous_assignment {
                         issues.push(format!(
                             "event[{index}] part scope is absent or spans multiple instrument/model assignments; use note-scoped gestures"
@@ -969,6 +973,19 @@ mod tests {
     }
 
     #[test]
+    fn identity_map_rejects_missing_or_reordered_score_note_entries() {
+        let mut missing = identity_map_fixture();
+        missing.notes.pop();
+        missing.identity_map_sha256 = missing.compute_digest();
+        assert!(missing.validate_for_score(&"a".repeat(64), 2).is_err());
+
+        let mut reordered = identity_map_fixture();
+        reordered.notes.swap(0, 1);
+        reordered.identity_map_sha256 = reordered.compute_digest();
+        assert!(reordered.validate_for_score(&"a".repeat(64), 2).is_err());
+    }
+
+    #[test]
     fn note_scoped_gesture_must_match_score_note_part_instrument_model_and_time() {
         let map = identity_map_fixture();
         let mut gesture = event(
@@ -1003,7 +1020,7 @@ mod tests {
         // A time inside the second note is valid; the ID is never reconstructed
         // from pitch, timing or its position in the event stream.
         assert!(wrong_time
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .is_ok());
 
         gesture.target = GestureTarget::Note {
@@ -1013,7 +1030,7 @@ mod tests {
         let mut wrong_part = PerformanceGestureTrackV1::new(vec![gesture]);
         wrong_part.bind_to_score_sha256("a".repeat(64));
         assert!(wrong_part
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("unknown part/note")));
@@ -1040,7 +1057,7 @@ mod tests {
         let mut wrong_instrument = PerformanceGestureTrackV1::new(vec![base.clone()]);
         wrong_instrument.bind_to_score_sha256("a".repeat(64));
         assert!(wrong_instrument
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("instrument identity")));
@@ -1050,7 +1067,7 @@ mod tests {
         let mut wrong_model = PerformanceGestureTrackV1::new(vec![base.clone()]);
         wrong_model.bind_to_score_sha256("a".repeat(64));
         assert!(wrong_model
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("source model")));
@@ -1060,7 +1077,7 @@ mod tests {
         let mut after_note = PerformanceGestureTrackV1::new(vec![base]);
         after_note.bind_to_score_sha256("a".repeat(64));
         assert!(after_note
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("after target note end")));
@@ -1086,14 +1103,14 @@ mod tests {
         let mut track = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
         track.bind_to_score_sha256("a".repeat(64));
         assert!(track
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .is_ok());
 
         gesture.instrument_id = "flute".to_string();
         let mut wrong_part_instrument = PerformanceGestureTrackV1::new(vec![gesture]);
         wrong_part_instrument.bind_to_score_sha256("a".repeat(64));
         assert!(wrong_part_instrument
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .is_err());
     }
 
