@@ -27,7 +27,8 @@
     "evidence_domain": {
       "enum": [
         "synthetic_fixture",
-        "physical_device_lab"
+        "physical_device_lab",
+        "physical_device_capture"
       ]
     },
     "device": {
@@ -40,7 +41,9 @@
         "isa_family",
         "os_version",
         "security_patch_level",
-        "build_fingerprint_sha256"
+        "build_fingerprint_sha256",
+        "os_api_level",
+        "vendor_security_patch_level"
       ],
       "properties": {
         "platform": {
@@ -85,6 +88,18 @@
             "null"
           ],
           "pattern": "^([0-9a-f]{64})?$"
+        },
+        "os_api_level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vendor_security_patch_level": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -99,7 +114,9 @@
         "attestation_challenge_freshness",
         "certificate_chain_status",
         "patch_level_binding_status",
-        "evidence_ids"
+        "evidence_ids",
+        "reported_bootloader_lock_state",
+        "reported_verified_boot_state"
       ],
       "properties": {
         "bootloader_locked": {
@@ -177,6 +194,25 @@
           "items": {
             "type": "string"
           }
+        },
+        "reported_bootloader_lock_state": {
+          "enum": [
+            "locked_reported",
+            "unlocked_reported",
+            "conflicting_reports",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "reported_verified_boot_state": {
+          "enum": [
+            "green_reported",
+            "yellow_reported",
+            "orange_reported",
+            "red_reported",
+            "unknown",
+            "not_measured"
+          ]
         }
       }
     },
@@ -483,7 +519,8 @@
             "attested",
             "unsupported",
             "unknown",
-            "not_measured"
+            "not_measured",
+            "on_device_reported"
           ]
         },
         "runtime_state": {

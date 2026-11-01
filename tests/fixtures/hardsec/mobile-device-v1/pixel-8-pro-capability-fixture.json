@@ -9,7 +9,9 @@
     "isa_family": "aarch64",
     "os_version": null,
     "security_patch_level": null,
-    "build_fingerprint_sha256": null
+    "build_fingerprint_sha256": null,
+    "os_api_level": null,
+    "vendor_security_patch_level": null
   },
   "boot_integrity": {
     "bootloader_locked": "not_measured",
@@ -19,7 +21,9 @@
     "attestation_challenge_freshness": "not_measured",
     "certificate_chain_status": "not_measured",
     "patch_level_binding_status": "not_measured",
-    "evidence_ids": []
+    "evidence_ids": [],
+    "reported_bootloader_lock_state": "not_measured",
+    "reported_verified_boot_state": "not_measured"
   },
   "hardware_protections": {
     "memory_tagging": {
