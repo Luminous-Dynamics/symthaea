@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Seventy Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests, 14 source-watermark tests) for delayed-observation non-leakage,
+Seventy-two Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests, 16 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -158,13 +158,16 @@ An event with event_time strictly below a previously recorded exclusive
 watermark is preserved as a late-arrival breach, not silently dropped. An
 event exactly at the watermark is not late. The module records all event
 arrival classifications idempotently, so an event first accepted as on-time
-cannot be reclassified after a later watermark. A late breach contests only
+cannot be reclassified after a later watermark. Progress transactions and
+arrival transactions share one strictly increasing knowledge-time clock; a
+watermark cannot be backdated behind an already observed event. Multiple
+same-time arrivals can be committed as one atomic batch. A late breach contests only
 new completeness queries after its receipt time; earlier as-known results
 remain unchanged. The caller must also append the raw event to the bitemporal
 event ledger; the watermark module records the breach receipt, not the
 authoritative event itself.
 
-Fourteen source-authored watermark tests cover empty progress, multi-source
+Sixteen source-authored watermark tests cover empty progress, multi-source
 minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
 idempotent event arrivals, and deterministic rebuild/digest parity. No Rust
