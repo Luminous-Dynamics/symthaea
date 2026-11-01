@@ -54,7 +54,7 @@ Every witness attestation binds:
 - previous checkpoint digest;
 - witness observation timestamp.
 
-The evaluator must generate an unpredictable fresh challenge using an OS CSPRNG for each quorum query, persist it with the request, and reject zero/reused challenges. The pure verification API takes the challenge as input and rejects any response that does not match it. Challenge generation and remote transport are not implemented in this prototype.
+The evaluator must generate an unpredictable fresh challenge using an OS CSPRNG for each quorum query, persist it with the request, and reject zero/reused challenges. The pure verification API takes the challenge as input. A response with a stale challenge is a non-vote and cannot abort an otherwise valid quorum; it is counted as stale. Challenge generation and remote transport are not implemented in this prototype.
 
 A witness service must:
 1. authenticate the evaluator request;
@@ -71,9 +71,10 @@ If the witness cannot durably commit its state, it must not attest.
 `verify_checkpoint_quorum`:
 - validates a strict BFT witness configuration;
 - verifies the local evaluator checkpoint signature;
-- verifies each witness response against an allow-listed key using strict Ed25519;
-- rejects unknown and duplicate witness identities;
-- rejects challenge mismatch;
+- verifies candidate responses against allow-listed keys using strict Ed25519;
+- ignores unknown, malformed, or invalidly signed responses rather than allowing unauthenticated input to poison a valid quorum;
+- deduplicates byte-for-byte identical retransmissions and excludes a witness that supplies conflicting signed responses;
+- treats a stale-challenge response as a non-vote, counted as stale, rather than aborting the quorum check;
 - groups attestations by evaluator epoch, checkpoint digest and previous digest;
 - requires (q) matching witnesses for acceptance;
 - detects local rollback only when a quorum confirms a higher epoch;
@@ -96,16 +97,17 @@ A single higher-epoch or conflicting response cannot override a three-of-four qu
 
 ## 7. Tests authored (not executed)
 
-Nine source-level tests cover:
+Ten source-level test functions cover:
 1. three-of-four confirmation of an exact current checkpoint;
 2. stale witness reporting while a current quorum succeeds;
 3. rollback detection when a witness quorum has a newer epoch;
 4. same-epoch conflicting quorum rejection;
 5. insufficient quorum and weak-policy rejection;
-6. replay of an old attestation under a fresh challenge;
-7. duplicate/unknown witness response rejection;
-8. one Byzantine higher-epoch response cannot override a current quorum;
-9. one Byzantine conflicting-head response cannot deny a current quorum.
+6. replay of old attestations yields no quorum under a fresh challenge;
+7. one stale-challenge response cannot block a valid current quorum;
+8. invalid-signature, unknown-identity and equivocating responses cannot poison a valid quorum;
+9. one Byzantine higher-epoch response cannot override a current quorum;
+10. one Byzantine conflicting-head response cannot deny a current quorum.
 
 No Cargo compilation, rustfmt, Clippy, Rust test execution, remote witness experiment or snapshot/restore campaign has run.
 
