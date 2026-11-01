@@ -353,8 +353,9 @@ fn audit_corpus_and_oracle(
             return Err(format!("claim {} has neither source support nor derivation", claim.claim_id));
         }
         for span in &claim.supporting_spans {
-            if exact_span(&document_map, span).is_err() {
-                evidence_spans_match = false;
+            match exact_span(&document_map, span) {
+                Ok(span_text) if span_text == claim.claim_text => {}
+                Ok(_) | Err(_) => evidence_spans_match = false,
             }
         }
     }
@@ -547,11 +548,15 @@ mod tests {
             serde_json::from_str::<Value>(include_str!(
                 "../schema/retrieval-decomposition-experiment.schema.json"
             )).unwrap(),
+            serde_json::from_str::<Value>(include_str!(
+                "../schema/retrieval-decomposition-audit.schema.json"
+            )).unwrap(),
         ];
         let values = [
             serde_json::to_value(&bundle.corpus).unwrap(),
             serde_json::to_value(&bundle.oracle).unwrap(),
             serde_json::to_value(&bundle.experiment).unwrap(),
+            serde_json::to_value(&audit).unwrap(),
         ];
         for (schema, value) in schemas.iter().zip(values.iter()) {
             let required: BTreeSet<String> = schema["required"].as_array().unwrap()
@@ -563,8 +568,10 @@ mod tests {
             assert_eq!(required, properties);
             assert_eq!(actual, properties);
         }
-        let audit_value = serde_json::to_value(&audit).unwrap();
-        assert_eq!(audit_value["schema"], AUDIT_SCHEMA);
+        assert_eq!(
+            schemas[3]["properties"]["schema"]["const"].as_str(),
+            Some(AUDIT_SCHEMA)
+        );
     }
 
     #[test]
