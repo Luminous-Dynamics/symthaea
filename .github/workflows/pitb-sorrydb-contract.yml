@@ -511,7 +511,7 @@ jobs:
               receipt["proof_state"]["metavar_context_sha256"]
           )
           receipt["proof_state"]["proof_state_sha256"] = hashlib.sha256(
-              b"PITB-LIVE-PROOF-STATE-V0\\0"
+              b"PITB-LIVE-PROOF-STATE-V0\0"
               + b"".join(bytes.fromhex(digest) for digest in component_digests)
           ).hexdigest()
           ledger["task"]["proof_state_sha256"] = receipt["proof_state"]["proof_state_sha256"]
