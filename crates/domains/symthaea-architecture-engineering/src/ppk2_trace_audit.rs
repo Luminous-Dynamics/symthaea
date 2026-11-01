@@ -246,7 +246,7 @@ fn audit_segment(
     })
 }
 
-fn receipt_digest(r: &Ppk2TraceAuditReceipt) -> Result<String, Ppk2TraceAuditError> {
+pub fn compute_ppk2_trace_audit_receipt_sha256(r: &Ppk2TraceAuditReceipt) -> Result<String, Ppk2TraceAuditError> {
     let mut canonical = r.clone();
     canonical.receipt_sha256.clear();
     let bytes = serde_json::to_vec(&canonical).map_err(|e| {
@@ -302,10 +302,8 @@ pub fn validate_ppk2_trace_audit_receipt(
         }
         total_samples += segment.sample_count;
         for (field, value) in [
-            ("first_time_ms", segment.first_time_ms),
             ("last_time_ms", segment.last_time_ms),
             ("duration_ms", segment.duration_ms),
-            ("minimum_current_ua", segment.minimum_current_ua),
             ("maximum_current_ua", segment.maximum_current_ua),
             ("time_weighted_mean_current_ua", segment.time_weighted_mean_current_ua),
             ("mean_power_uw", segment.mean_power_uw),
@@ -322,7 +320,10 @@ pub fn validate_ppk2_trace_audit_receipt(
                 ));
             }
         }
-        if segment.last_time_ms <= segment.first_time_ms
+        if !segment.first_time_ms.is_finite()
+            || !segment.minimum_current_ua.is_finite()
+            || segment.minimum_current_ua < 0.0
+            || segment.last_time_ms <= segment.first_time_ms
             || (segment.last_time_ms - segment.first_time_ms - segment.duration_ms).abs() > 1e-9
             || segment.minimum_current_ua > segment.maximum_current_ua
             || segment.maximum_gap_ratio > receipt.maximum_gap_ratio
@@ -355,7 +356,7 @@ pub fn validate_ppk2_trace_audit_receipt(
     {
         return Err(Ppk2TraceAuditError::new("receipt.aggregates", "aggregate metrics do not match segment inventory"));
     }
-    if receipt_digest(receipt)? != receipt.receipt_sha256 {
+    if compute_ppk2_trace_audit_receipt_sha256(receipt)? != receipt.receipt_sha256 {
         return Err(Ppk2TraceAuditError::new("receipt.receipt_sha256", "does not match canonical receipt"));
     }
     Ok(())
@@ -449,7 +450,7 @@ pub fn audit_ppk2_trace_csv(
         segments: metrics,
         receipt_sha256: String::new(),
     };
-    receipt.receipt_sha256 = receipt_digest(&receipt)?;
+    receipt.receipt_sha256 = compute_ppk2_trace_audit_receipt_sha256(&receipt)?;
     Ok(Ppk2TraceAuditResult { receipt })
 }
 
