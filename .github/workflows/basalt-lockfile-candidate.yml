@@ -1,0 +1,31 @@
+name: BASALT Standalone Lockfile Candidate
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-trace-verifier/Cargo.toml"
+      - "tools/basalt-trace-verifier/Cargo.lock"
+      - ".github/workflows/basalt-lockfile-candidate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Generate lockfile with Cargo
+        run: |
+          cargo generate-lockfile --manifest-path tools/basalt-trace-verifier/Cargo.toml
+          mkdir -p basalt-lockfile-candidate
+          cp tools/basalt-trace-verifier/Cargo.lock basalt-lockfile-candidate/Cargo.lock
+      - name: Upload Cargo-generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-standalone-lockfile-${{ github.sha }}
+          path: basalt-lockfile-candidate/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1

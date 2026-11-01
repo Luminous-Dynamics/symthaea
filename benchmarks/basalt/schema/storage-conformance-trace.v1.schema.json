@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/storage-conformance-trace.v1.schema.json",
+  "title": "BASALT backend-neutral storage conformance trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "version",
+    "trace_id",
+    "claim_ceiling",
+    "generator",
+    "authority",
+    "initial_state",
+    "operations",
+    "reference_linearization_order",
+    "faults",
+    "witness_observations",
+    "final_observation",
+    "invariant_expectations",
+    "fixture_digest_catalog",
+    "negative_controls"
+  ],
+  "properties": {
+    "suite_id": { "const": "basalt-storage-conformance-trace" },
+    "version": { "const": 1 },
+    "trace_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+    "claim_ceiling": { "type": "string", "minLength": 1 },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "seed", "clock_basis", "ordering_rule"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "seed": { "type": "string", "pattern": "^[0-9a-f]{16,128}$" },
+        "clock_basis": { "const": "monotonic_nanoseconds_per_runner" },
+        "ordering_rule": { "const": "per_runner_only; no cross-host wall-clock ordering" }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_id", "incarnation_id"],
+      "properties": {
+        "authority_id": { "type": "string", "minLength": 1 },
+        "incarnation_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_revision", "state_digest", "policy_digest", "source_cursors", "log_cursors"],
+      "properties": {
+        "authority_revision": { "type": "string", "minLength": 1 },
+        "state_digest": { "$ref": "#/$defs/digest" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
+        "source_cursors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/source_cursor" }
+        },
+        "log_cursors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/log_cursor" }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "reference_linearization_order": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "faults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fault" }
+    },
+    "witness_observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/witness_observation" }
+    },
+    "final_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_revision", "state_digest", "policy_digest", "source_cursors", "log_cursors", "accepted_receipts"],
+      "properties": {
+        "authority_revision": { "type": "string", "minLength": 1 },
+        "state_digest": { "$ref": "#/$defs/digest" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
+        "source_cursors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/source_cursor" }
+        },
+        "log_cursors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/log_cursor" }
+        },
+        "accepted_receipts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/receipt" }
+        }
+      }
+    },
+    "invariant_expectations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "expected"],
+        "properties": {
+          "id": {
+            "enum": [
+              "ATOMIC_FOUR_RECORD_TRANSITION",
+              "SINGLE_WINNER_PER_PREDECESSOR",
+              "INDEPENDENT_SCOPE_PROGRESS",
+              "EXACT_RETRY_IDEMPOTENCY",
+              "RECEIPT_REVISION_IS_IMMUTABLE",
+              "CURRENT_REVISION_IS_NOT_RECEIPT_REVISION",
+              "WHOLE_TRANSACTION_RETRY",
+              "POLICY_COMPARE_AT_COMMIT",
+              "LOST_RESPONSE_RECOVERY",
+              "RESTORE_REQUIRES_EXTERNAL_WITNESS",
+              "NO_FALSE_FRESHNESS_ON_WITNESS_MISMATCH"
+            ]
+          },
+          "expected": { "const": "pass" }
+        }
+      }
+    },
+    "fixture_digest_catalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "preimage", "digest", "role"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "preimage": { "type": "string", "minLength": 1 },
+          "digest": { "$ref": "#/$defs/digest" },
+          "role": {
+            "enum": ["policy", "state", "cursor_predecessor", "receipt", "witness_record"]
+          }
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mutation_id", "mutation", "must_be_detected"],
+        "properties": {
+          "mutation_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+          "mutation": { "type": "string", "minLength": 1 },
+          "must_be_detected": { "const": true }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "source_cursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "generation", "cursor", "predecessor_digest"],
+      "properties": {
+        "source_id": { "type": "string", "minLength": 1 },
+        "generation": { "type": "integer", "minimum": 0 },
+        "cursor": { "type": "string", "minLength": 1 },
+        "predecessor_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "log_cursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["log_origin_id", "checkpoint"],
+      "properties": {
+        "log_origin_id": { "type": "string", "minLength": 1 },
+        "checkpoint": { "type": "string", "minLength": 1 }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "receipt_digest", "receipt_acceptance_revision"],
+      "properties": {
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "receipt_digest": { "$ref": "#/$defs/digest" },
+        "receipt_acceptance_revision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op_id", "runner_id", "client_id", "client_sequence", "kind", "scope", "invoked_at_ns", "completed_at_ns", "request", "expected_result"],
+      "properties": {
+        "op_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+        "runner_id": { "type": "string", "minLength": 1 },
+        "client_id": { "type": "string", "minLength": 1 },
+        "client_sequence": { "type": "integer", "minimum": 0 },
+        "retry_group_id": { "type": "string", "minLength": 1 },
+        "transaction_attempt": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["advance", "receipt_lookup", "restore_verify", "policy_publish"] },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_id", "log_origin_id"],
+          "properties": {
+            "source_id": { "type": "string", "minLength": 1 },
+            "log_origin_id": { "type": "string", "minLength": 1 }
+          }
+        },
+        "invoked_at_ns": { "type": "integer", "minimum": 0 },
+        "completed_at_ns": { "type": "integer", "minimum": 0 },
+        "happens_after": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "expected_source_generation": { "type": "integer", "minimum": 0 },
+            "expected_source_predecessor_digest": { "$ref": "#/$defs/digest" },
+            "expected_log_checkpoint": { "type": "string", "minLength": 1 },
+            "expected_policy_digest": { "$ref": "#/$defs/digest" },
+            "receipt_id": { "type": "string", "minLength": 1 },
+            "receipt_digest": { "$ref": "#/$defs/digest" },
+            "next_source_cursor": { "type": "string", "minLength": 1 },
+            "next_source_predecessor_digest": { "$ref": "#/$defs/digest" },
+            "next_log_checkpoint": { "type": "string", "minLength": 1 },
+            "restored_incarnation_id": { "type": "string", "minLength": 1 },
+            "restored_authority_revision": { "type": "string", "minLength": 1 },
+            "restored_state_digest": { "$ref": "#/$defs/digest" },
+            "witness_sequence_seen": { "type": "integer", "minimum": 0 },
+            "next_policy_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "expected_result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "receipt_id", "receipt_acceptance_revision", "current_authority_revision", "reason"],
+          "properties": {
+            "outcome": {
+              "enum": [
+                "committed",
+                "duplicate",
+                "compare_conflict",
+                "indeterminate",
+                "retryable_abort",
+                "receipt_found",
+                "restore_verified",
+                "rejected_anti_rollback_unknown",
+                "rejected_anti_rollback"
+              ]
+            },
+            "receipt_id": { "type": ["string", "null"] },
+            "receipt_acceptance_revision": { "type": ["string", "null"] },
+            "current_authority_revision": { "type": ["string", "null"] },
+            "observed_store_revision": { "type": ["string", "null"] },
+            "reason": { "type": ["string", "null"] }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "advance" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "request": {
+                "required": [
+                  "expected_source_generation",
+                  "expected_source_predecessor_digest",
+                  "expected_log_checkpoint",
+                  "expected_policy_digest",
+                  "receipt_id",
+                  "receipt_digest",
+                  "next_source_cursor",
+                  "next_source_predecessor_digest",
+                  "next_log_checkpoint"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "receipt_lookup" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "request": { "required": ["receipt_id", "receipt_digest"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "restore_verify" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "request": {
+                "required": ["restored_incarnation_id", "restored_authority_revision", "restored_state_digest", "witness_sequence_seen"]
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "policy_publish" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "request": {
+                "required": ["expected_policy_digest", "next_policy_digest"]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fault_id", "target_op_id", "runner_id", "at_ns", "class", "action"],
+      "properties": {
+        "fault_id": { "type": "string", "minLength": 1 },
+        "target_op_id": { "type": "string", "minLength": 1 },
+        "runner_id": { "type": "string", "minLength": 1 },
+        "at_ns": { "type": "integer", "minimum": 0 },
+        "class": {
+          "enum": [
+            "process_crash",
+            "power_loss_image",
+            "io_error",
+            "response_loss",
+            "network_partition",
+            "network_delay",
+            "serialization_failure",
+            "member_restart",
+            "snapshot_restore",
+            "witness_unavailable"
+          ]
+        },
+        "action": { "type": "string", "minLength": 1 }
+      }
+    },
+    "witness_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["witness_id", "sequence", "authority_id", "incarnation_id", "authority_revision", "state_digest", "predecessor_witness_digest", "signed_record_digest"],
+      "properties": {
+        "witness_id": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "authority_id": { "type": "string", "minLength": 1 },
+        "incarnation_id": { "type": "string", "minLength": 1 },
+        "authority_revision": { "type": "string", "minLength": 1 },
+        "state_digest": { "$ref": "#/$defs/digest" },
+        "predecessor_witness_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "signed_record_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
