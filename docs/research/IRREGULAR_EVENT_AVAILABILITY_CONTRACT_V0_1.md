@@ -126,7 +126,7 @@ The current source contains 55 authored Rust test functions:
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests;
-- 14 source-watermark/completeness tests.
+- 16 source-watermark/completeness tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
@@ -164,7 +164,7 @@ shows each required source's progress and returns the exact blocked source and
 late-breach sets. Terminal/end-of-stream is stronger than a finite watermark
 and closes intervals beyond its final event-time bound.
 
-Fourteen source-authored tests cover missing progress, multi-source minimum,
+Sixteen source-authored tests cover missing progress, multi-source minimum,
 exclusive boundary behavior, as-known watermarks, late arrivals, terminal
 sources, monotonicity/generation, policy identity, atomic batches, duplicate
 arrivals and replay/index digest parity.
