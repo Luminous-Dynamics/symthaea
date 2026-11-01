@@ -22,7 +22,7 @@ struct Fixture {
     height: usize,
 }
 
-const FIXTURES: [Fixture; 18] = [
+const FIXTURES: [Fixture; 23] = [
     Fixture { topology: "chain", variables: 32, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 64, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 128, width: 0, height: 0 },
@@ -30,6 +30,11 @@ const FIXTURES: [Fixture; 18] = [
     Fixture { topology: "chain", variables: 512, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 1_024, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 2_048, width: 0, height: 0 },
+    Fixture { topology: "star", variables: 64, width: 0, height: 0 },
+    Fixture { topology: "star", variables: 256, width: 0, height: 0 },
+    Fixture { topology: "star", variables: 512, width: 0, height: 0 },
+    Fixture { topology: "star", variables: 1_024, width: 0, height: 0 },
+    Fixture { topology: "star", variables: 2_048, width: 0, height: 0 },
     Fixture { topology: "ring", variables: 32, width: 0, height: 0 },
     Fixture { topology: "ring", variables: 64, width: 0, height: 0 },
     Fixture { topology: "ring", variables: 128, width: 0, height: 0 },
@@ -66,6 +71,11 @@ fn build_factors(fixture: Fixture) -> Result<Vec<BinaryLogFactor>, String> {
         "chain" => {
             for variable in 0..fixture.variables.saturating_sub(1) {
                 add_edge(&mut factors, variable, variable + 1)?;
+            }
+        }
+        "star" => {
+            for leaf in 1..fixture.variables {
+                add_edge(&mut factors, 0, leaf)?;
             }
         }
         "ring" => {
@@ -111,7 +121,7 @@ fn median_duration(samples: &mut [Duration]) -> Duration {
 
 fn run() -> Result<(), String> {
     println!(
-        "topology,variables,factors,eliminated_variables,admission_outcome,configured_max_factor_entries,plan_median_ns,plan_min_ns,induced_width,predicted_output_entries,predicted_peak_factor_entries,observed_peak_factor_entries,multiplications,end_to_end_median_ns,end_to_end_min_ns,validated"
+        "topology,variables,factors,eliminated_variables,admission_outcome,configured_max_factor_entries,plan_median_ns,plan_min_ns,induced_width,planner_fill_score_evaluations,planner_fill_score_adjacency_visits,planner_affected_adjacency_visits,planner_stale_queue_entries_discarded,planner_affected_candidates_refreshed,planner_leaf_fast_path_updates,planner_clique_pair_checks,predicted_output_entries,predicted_peak_factor_entries,observed_peak_factor_entries,multiplications,end_to_end_median_ns,end_to_end_min_ns,validated"
     );
     for fixture in FIXTURES {
         let factors = build_factors(fixture)?;
@@ -179,8 +189,15 @@ fn run() -> Result<(), String> {
                     plan_min_ns.to_string(),
                     String::new(),
                     String::new(),
-                    entries.to_string(),
                     String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    String::new(),
+                    entries.to_string(),
                     String::new(),
                     String::new(),
                     String::new(),
@@ -205,6 +222,7 @@ fn run() -> Result<(), String> {
             || plan_warmup.induced_width != warmup.induced_width
             || plan_warmup.predicted_output_entries != warmup.predicted_output_entries
             || plan_warmup.predicted_peak_factor_entries != warmup.peak_factor_entries
+            || plan_warmup.planner_work != warmup.planner_work
         {
             return Err(format!(
                 "result-shape or finiteness invariant failed for {}-{}",
@@ -241,6 +259,7 @@ fn run() -> Result<(), String> {
                 || report.predicted_output_entries != warmup.predicted_output_entries
                 || report.predicted_peak_factor_entries != warmup.predicted_peak_factor_entries
                 || report.peak_factor_entries != warmup.peak_factor_entries
+                || report.planner_work != warmup.planner_work
             {
                 return Err(format!(
                     "deterministic-work invariant failed for {}-{}",
@@ -265,6 +284,13 @@ fn run() -> Result<(), String> {
             plan_median_ns.to_string(),
             plan_min_ns.to_string(),
             warmup.induced_width.to_string(),
+            warmup.planner_work.fill_score_evaluations.to_string(),
+            warmup.planner_work.fill_score_adjacency_visits.to_string(),
+            warmup.planner_work.affected_adjacency_visits.to_string(),
+            warmup.planner_work.stale_queue_entries_discarded.to_string(),
+            warmup.planner_work.affected_candidates_refreshed.to_string(),
+            warmup.planner_work.leaf_fast_path_updates.to_string(),
+            warmup.planner_work.clique_pair_checks.to_string(),
             warmup.predicted_output_entries.to_string(),
             warmup.predicted_peak_factor_entries.to_string(),
             warmup.peak_factor_entries.to_string(),
