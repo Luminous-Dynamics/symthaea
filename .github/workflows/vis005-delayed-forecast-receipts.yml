@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: vis005-delayed-receipts-\${{ github.event.pull_request.head.sha || github.sha }}
+  group: vis005-delayed-receipts-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Install pinned Rust toolchain
