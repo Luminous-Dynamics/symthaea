@@ -1,0 +1,60 @@
+{
+  "schema_version": "pitb.sorrydb.snapshot-branch-receipt.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "run_status": "not_attempted",
+  "task": {
+    "task_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "repository_commit": "2222222222222222222222222222222222222222",
+    "source_path": "Synthetic/Target.lean",
+    "source_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "sorry_line": 10,
+    "sorry_character": 14
+  },
+  "environment": {
+    "lean_toolchain": "leanprover/lean4:v4.34.1",
+    "lean_binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "lean_runtime_manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "imported_olean_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "environment_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "proof_state": {
+    "wire_schema": "pitb.lean-expr-wire.v1",
+    "goal_metadata_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "target_expr_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "local_context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "metavar_context_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "proof_state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "server": {
+    "lean_server_binary_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "snapshot_extension_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "rpc_contract_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "snapshot_protocol": "pitb-dsp-snapshot-rpc-v0"
+  },
+  "execution_contract": {
+    "capture_stage": "post_elaboration_pre_tactic",
+    "environment_policy": "immutable_shared_by_reference",
+    "mutable_state_policy": "independent_metavar_context_copy_per_branch",
+    "branch_workspace_policy": "private_workspace_per_branch",
+    "typeclass_cache_policy": "discard_and_reinitialize_per_branch"
+  },
+  "snapshot": {
+    "capture_status": "not_attempted",
+    "snapshot_id_sha256": null,
+    "snapshot_payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "measurements": {
+    "capture_wall_ms": 0,
+    "branch_count": 0,
+    "branch_restore_p50_ms": 0,
+    "branch_restore_p95_ms": 0,
+    "environment_reload_count": 0,
+    "theorem_reelaboration_count": 0,
+    "stale_cache_observations": 0,
+    "branch_wall_work_ms": 0,
+    "elapsed_wall_ms": 0,
+    "lean_cpu_ms": 0,
+    "peak_rss_bytes": 0
+  },
+  "branches": []
+}
