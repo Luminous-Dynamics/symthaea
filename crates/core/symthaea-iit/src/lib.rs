@@ -4036,9 +4036,23 @@ mod tests {
             .unwrap();
         assert_ne!(result.receipt_sha256().unwrap(), other_precision.receipt_sha256().unwrap());
 
+        for state_pair in &result.state_pair_results {
+            assert!(!state_pair.tied_partitions.is_empty());
+            assert!(state_pair.tied_partitions.iter().any(|partition| {
+                partition.cut_matrix() == state_pair.winning_partition.cut_matrix()
+            }));
+        }
+
         let mut tampered_score = result.clone();
         tampered_score.state_pair_results[0].score.phi += 0.001;
         assert_ne!(result.receipt_sha256().unwrap(), tampered_score.receipt_sha256().unwrap());
+
+        let mut tampered_mip_ties = result.clone();
+        tampered_mip_ties.state_pair_results[0].tied_partitions.clear();
+        assert_ne!(
+            result.receipt_sha256().unwrap(),
+            tampered_mip_ties.receipt_sha256().unwrap(),
+        );
 
         let mut non_finite = result;
         non_finite.phi_s = Some(f64::NAN);
