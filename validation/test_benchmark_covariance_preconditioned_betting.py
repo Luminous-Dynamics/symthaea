@@ -31,7 +31,7 @@ class CovariancePreconditionedBenchmarkTests(unittest.TestCase):
         import numpy as np
 
         rng = np.random.default_rng(698502)
-        for dimension in (1, 2, 5, 16, 64):
+        for dimension in (2, 3, 5, 16, 64):
             dense = covariance_envelope(dimension)
             values = rng.uniform(0.0, 1.5, size=(7, dimension))
             expected_q = np.einsum("bi,ij,bj->b", values, dense, values)
