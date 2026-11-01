@@ -1,6 +1,7 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    exposure_transfer::{analyze_exposure_transfer, ExposureTransferStudyV1},
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -275,6 +276,34 @@ fn analyze_causal_study_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+
+fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench analyze-exposure-transfer <replicated-causal-study.json> <exposure-transfer-study.json> <transfer-report.json>"
+                .into(),
+        );
+    }
+    let base_study: ReplicatedCausalStudyV1 =
+        serde_json::from_slice(&fs::read(&args[1])?)?;
+    let transfer_study: ExposureTransferStudyV1 =
+        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let report = analyze_exposure_transfer(&base_study, &transfer_study)
+        .map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "replicates={} families={} relations={} contrasts={} confirmatory_eligible={} status={}",
+        report.independent_model_pair_replicate_count,
+        report.family_count,
+        report.transfer_relation_effects.len(),
+        report.predeclared_contrasts.len(),
+        report.confirmatory_eligible,
+        report.analysis_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -358,9 +387,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-intervention") => audit_intervention_cli(&args),
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
+        Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
