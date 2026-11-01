@@ -1,0 +1,40 @@
+name: BASALT Witness Crypto Verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-witness-verifier/**"
+      - "benchmarks/basalt/schema/witness-*.schema.json"
+      - "benchmarks/basalt/witness-crypto-test-vectors.v1.json"
+      - ".github/workflows/basalt-witness-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  witness-crypto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Generate initial candidate lockfile
+        run: cargo generate-lockfile --manifest-path tools/basalt-witness-verifier/Cargo.toml
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/basalt-witness-verifier/Cargo.toml -- --check
+      - name: Test DSSE, JCS and threshold verification
+        run: cargo test --manifest-path tools/basalt-witness-verifier/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/basalt-witness-verifier/Cargo.toml --all-targets -- -D warnings
+      - name: Upload Cargo-generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-witness-verifier-lockfile-${{ github.sha }}
+          path: tools/basalt-witness-verifier/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
