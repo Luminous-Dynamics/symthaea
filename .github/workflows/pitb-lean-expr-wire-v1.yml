@@ -66,6 +66,12 @@ jobs:
           bad["environment"]["clean_checkout"] = False
           reject("dirty checkout", bad)
           bad = copy.deepcopy(fixture)
+          del bad["environment"]["imported_olean_manifest_sha256"]
+          reject("missing imported OLean manifest", bad)
+          bad = copy.deepcopy(fixture)
+          del bad["environment"]["lean_runtime_manifest_sha256"]
+          reject("missing Lean runtime manifest", bad)
+          bad = copy.deepcopy(fixture)
           bad["target"]["unreviewed"] = True
           reject("unknown expression field", bad)
           print("PITB_LEAN_EXPR_WIRE_SCHEMA_PASS: synthetic shape only; no Lean capture or kernel proof")
