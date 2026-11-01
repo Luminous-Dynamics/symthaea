@@ -8,7 +8,10 @@ from predictable_arrival_ledger import (
     build_same_round_lookahead_negative_control,
     verify_predictable_arrival_ledger,
 )
-from countable_global_projective_eclosure import projective_certificate
+from countable_global_projective_eclosure import (
+    projective_certificate,
+    verify_countable_global_projective_path,
+)
 
 
 def _scores():
@@ -116,6 +119,8 @@ class PredictableArrivalLedgerTests(unittest.TestCase):
         )
         replay = verify_predictable_arrival_ledger(ledger)
         histories = {hypothesis_id: [] for hypothesis_id in ledger["header"]["hypothesis_ids"]}
+        coordinate_paths = {i: [] for i in range(1, 4)}
+        active_by_time = []
         for event, active_ids in zip(ledger["events"], replay["active_by_round"]):
             for hypothesis_id, score_hex in event["observed_scores"]:
                 histories[hypothesis_id].append(float.fromhex(score_hex))
@@ -125,18 +130,33 @@ class PredictableArrivalLedgerTests(unittest.TestCase):
             values = {
                 hypothesis_id: (
                     1.0 + sum(histories[hypothesis_id]) ** 2 / 10.0
-                    if histories[hypothesis_id]
+                    if hypothesis_id in active_ids
                     else 1.0
                 )
                 for hypothesis_id in ledger["header"]["hypothesis_ids"]
             }
-            full = projective_certificate((1, 2, 3), {i + 1: values[f"h{i+1}"] for i in range(3)})
+            value_map = {i + 1: values[f"h{i+1}"] for i in range(3)}
+            full = projective_certificate((1, 2, 3), value_map)
             active_nulls = tuple(int(h[1:]) for h in active_ids)
-            active = projective_certificate(
-                active_nulls,
-                {i + 1: values[f"h{i+1}"] for i in range(3)},
-            )
+            active = projective_certificate(active_nulls, value_map)
             self.assertEqual(full, active)
+            active_by_time.append(tuple(int(h[1:]) for h in active_ids))
+            for i in range(1, 4):
+                coordinate_paths[i].append(value_map[i])
+
+        # Bridge the verified event order into the finite global-projective
+        # closure oracle. This validates the algebraic all-subsets contract
+        # and neutral-one padding along the exact same arrival path.
+        closure = verify_countable_global_projective_path(
+            active_by_time,
+            [[] for _ in active_by_time],
+            (1, 2, 3),
+            coordinate_paths,
+            0.05,
+            scheme="geometric",
+        )
+        self.assertTrue(closure["valid"], closure["failures"])
+        self.assertTrue(all(row["projective_identity"] for row in closure["rows"]))
 
     def test_randomized_replay_is_deterministic_and_nested(self):
         rng = random.Random(980601)
