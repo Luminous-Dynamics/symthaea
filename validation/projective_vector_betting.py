@@ -6,6 +6,7 @@ That coverage property is an explicit statistical assumption/certificate.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import exp, isfinite, log, sqrt
 from typing import Iterable, Sequence
 
@@ -97,6 +98,119 @@ def equicorrelation_envelope(
     ]
     assert_symmetric_psd(result)
     return result
+
+
+def projective_equicorrelation_envelope(
+    dimension: int, rho_min: float = 0.2, rho_max: float = 0.8
+) -> list[list[float]]:
+    """A single kernel whose finite principal submatrices dominate all rho.
+
+    V_d = (1-rho_min) I_d + rho_max 11^T. For every rho in
+    [rho_min,rho_max],
+
+      V_d - Sigma_d(rho)
+        = (rho-rho_min) I_d + (rho_max-rho) 11^T,
+
+    which is PSD because both coefficients are nonnegative. Unlike the
+    tighter dimension-specific envelope above, this family is projectively
+    consistent: every principal submatrix is the same formula at the smaller
+    dimension. This form requires 0 <= rho_min <= rho_max <= 1.
+    """
+    if dimension < 1:
+        raise ValueError("dimension must be positive")
+    if not (0.0 <= rho_min <= rho_max <= 1.0):
+        raise ValueError("projective envelope requires 0 <= rho_min <= rho_max <= 1")
+    diagonal = 1.0 - rho_min + rho_max
+    result = [
+        [diagonal if i == j else rho_max for j in range(dimension)]
+        for i in range(dimension)
+    ]
+    assert_symmetric_psd(result)
+    return result
+
+
+
+@dataclass(frozen=True)
+class ProjectiveEquicorrelationKernel:
+    """O(d) operator for V_d = (1-rho_min)I + rho_max*11^T.
+
+    Stores the infinite-dimensional projective kernel by two scalars rather
+    than a dense d-by-d matrix. Its finite principal submatrices are obtained
+    by restricting the coordinate vector; no envelope changes under extension.
+    """
+    dimension: int
+    rho_min: float = 0.2
+    rho_max: float = 0.8
+
+    def __post_init__(self) -> None:
+        if self.dimension < 1:
+            raise ValueError("dimension must be positive")
+        if not (0.0 <= self.rho_min <= self.rho_max <= 1.0):
+            raise ValueError("require 0 <= rho_min <= rho_max <= 1")
+
+    @property
+    def diagonal(self) -> float:
+        return 1.0 - self.rho_min + self.rho_max
+
+    @property
+    def diagonal_part(self) -> float:
+        return 1.0 - self.rho_min
+
+    @property
+    def common_part(self) -> float:
+        return self.rho_max
+
+    def dense(self) -> list[list[float]]:
+        return projective_equicorrelation_envelope(
+            self.dimension, self.rho_min, self.rho_max
+        )
+
+    def quadratic(self, values: Sequence[float], active: Sequence[bool] | None = None) -> float:
+        if len(values) != self.dimension:
+            raise ValueError("vector dimension mismatch")
+        mask = [True] * self.dimension if active is None else [bool(x) for x in active]
+        if len(mask) != self.dimension:
+            raise ValueError("active mask dimension mismatch")
+        active_values = [float(values[i]) for i, on in enumerate(mask) if on]
+        if any(not isfinite(x) for x in active_values):
+            raise ValueError("vector entries must be finite")
+        total = sum(active_values)
+        return self.diagonal_part * sum(x * x for x in active_values) + self.common_part * total * total
+
+    def matvec(self, values: Sequence[float], active: Sequence[bool] | None = None) -> list[float]:
+        if len(values) != self.dimension:
+            raise ValueError("vector dimension mismatch")
+        mask = [True] * self.dimension if active is None else [bool(x) for x in active]
+        if len(mask) != self.dimension:
+            raise ValueError("active mask dimension mismatch")
+        active_values = [float(values[i]) if mask[i] else 0.0 for i in range(self.dimension)]
+        if any(not isfinite(x) for x in active_values):
+            raise ValueError("vector entries must be finite")
+        total = sum(active_values)
+        return [
+            self.diagonal_part * active_values[i] + self.common_part * total
+            if mask[i] else 0.0
+            for i in range(self.dimension)
+        ]
+
+
+def projective_vector_log_factor(
+    scores: Sequence[float],
+    bets: Sequence[float],
+    active: Sequence[bool],
+    kernel: ProjectiveEquicorrelationKernel,
+) -> float:
+    """Evaluate a projective intersection log-factor in O(d) time."""
+    z = _finite_vector(scores, "scores")
+    lam = _finite_vector(bets, "bets")
+    mask = [bool(x) for x in active]
+    if len(z) != kernel.dimension or len(lam) != kernel.dimension or len(mask) != kernel.dimension:
+        raise ValueError("scores, bets and active mask must match kernel dimension")
+    if any(x < 0.0 for x in lam):
+        raise ValueError("bets must be nonnegative")
+    linear = sum(lam[i] * z[i] for i in range(kernel.dimension) if mask[i])
+    penalty = kernel.quadratic(lam, mask)
+    return linear - 0.5 * penalty
 
 
 def matrix_dominates(upper: Sequence[Sequence[float]], lower: Sequence[Sequence[float]]) -> bool:
@@ -240,3 +354,96 @@ class CoordinateHistory:
 
     def snapshot(self) -> tuple[tuple[float, ...], ...]:
         return tuple(tuple(x) for x in self._history)
+
+
+class CovariancePreconditionedBet:
+    """Predictable projected-gradient strategy for one fixed intersection.
+
+    Call bets(active) before revealing each round's scores, then call
+    observe(scores) exactly once. The update changes only the next round's
+    bet. Active coordinates must form a nested sequence. Scores for inactive
+    coordinates are ignored, which is important for projectivity.
+
+    The update is a power heuristic only. Validity follows from the ordinary
+    predictable nonnegative-bet e-factor and the caller's conditional mgf
+    envelope, not from convergence of the gradient update.
+    """
+
+    def __init__(
+        self,
+        mgf_proxy: Sequence[Sequence[float]] | ProjectiveEquicorrelationKernel,
+        step_size: float = 0.05,
+        cap: float = 1.5,
+    ):
+        self._kernel = mgf_proxy if isinstance(mgf_proxy, ProjectiveEquicorrelationKernel) else None
+        if self._kernel is not None:
+            self._proxy = None
+            self._dimension = self._kernel.dimension
+            self._diagonal = [self._kernel.diagonal] * self._dimension
+        else:
+            assert_symmetric_psd(mgf_proxy)
+            self._proxy = [[float(x) for x in row] for row in mgf_proxy]
+            self._dimension = len(self._proxy)
+            self._diagonal = [self._proxy[i][i] for i in range(self._dimension)]
+        if any(x <= 0.0 for x in self._diagonal):
+            raise ValueError("mgf_proxy diagonal entries must be strictly positive")
+        if not isfinite(step_size) or step_size < 0.0:
+            raise ValueError("step_size must be finite and nonnegative")
+        if not isfinite(cap) or cap < 0.0:
+            raise ValueError("cap must be finite and nonnegative")
+        self.step_size = float(step_size)
+        self.cap = float(cap)
+        self._bets = [0.0] * self._dimension
+        self._seen_active = [False] * self._dimension
+        self._pending_active: list[bool] | None = None
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def bets(self, active: Sequence[bool]) -> list[float]:
+        """Freeze and return the pre-update bet vector for the current round."""
+        if self._pending_active is not None:
+            raise RuntimeError("observe the current round before requesting new bets")
+        mask = [bool(x) for x in active]
+        if len(mask) != self._dimension:
+            raise ValueError("active mask dimension mismatch")
+        if any(seen and not on for seen, on in zip(self._seen_active, mask)):
+            raise ValueError("active sets must be nested; retraction is not supported")
+        self._pending_active = mask
+        return [self._bets[i] if mask[i] else 0.0 for i in range(self._dimension)]
+
+    def observe(self, scores: Sequence[float]) -> None:
+        """Update next-round bets using only the just-observed active scores."""
+        if self._pending_active is None:
+            raise RuntimeError("call bets(active) before observing scores")
+        z = _finite_vector(scores, "scores")
+        if len(z) != self._dimension:
+            raise ValueError("score dimension mismatch")
+        active_ids = [i for i, on in enumerate(self._pending_active) if on]
+        old = list(self._bets)
+        updated = list(self._bets)
+        if self._kernel is not None:
+            structured_drift = self._kernel.matvec(old, self._pending_active)
+        else:
+            structured_drift = None
+        for i in active_ids:
+            covariance_drift = (
+                structured_drift[i]
+                if structured_drift is not None
+                else sum(self._proxy[i][j] * old[j] for j in active_ids)
+            )
+            gradient = z[i] - covariance_drift
+            candidate = old[i] + self.step_size * gradient / self._diagonal[i]
+            if not isfinite(candidate):
+                raise ValueError("bet update overflowed; refusing non-finite state")
+            updated[i] = min(self.cap, max(0.0, candidate))
+        self._bets = updated
+        self._seen_active = list(self._pending_active)
+        self._pending_active = None
+
+    def snapshot(self) -> tuple[tuple[float, ...], tuple[bool, ...]]:
+        """Return immutable bet/activation state for audit and prefix tests."""
+        if self._pending_active is not None:
+            raise RuntimeError("cannot snapshot while a round awaits observation")
+        return tuple(self._bets), tuple(self._seen_active)
