@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 const MACRO_MAPPING_MAGIC: &[u8] = b"SYMTHAEA-IIT-MACRO-MAPPING\0v0.1\0";
-const MACRO_UNIT_SPEC_MAGIC: &[u8] = b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.1\0";
+const MACRO_UNIT_SPEC_MAGIC: &[u8] = b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.2\0";
 
 /// Errors for an invalid or over-budget macro-unit mapping.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -37,6 +37,10 @@ pub enum MacroUnitError {
     DuplicateBlackboxOutput { slot: usize },
     #[error("blackbox output constituent {slot} is outside 0..{constituents}")]
     BlackboxOutputOutOfRange { slot: usize, constituents: usize },
+    #[error("background apportionment contains duplicate micro unit {unit}")]
+    DuplicateBackgroundApportionment { unit: usize },
+    #[error("background apportionment overlaps constituent micro unit {unit}")]
+    BackgroundOverlapsConstituents { unit: usize },
     #[error("constant mappings do not define a non-trivial macro unit")]
     ConstantMapping,
     #[error("sequence-state index {index} is outside the mapping domain of {states} states")]
@@ -44,7 +48,7 @@ pub enum MacroUnitError {
 }
 
 /// A binary macro unit with an explicit constituent order, temporal grain,
-/// truth table, and complement orientation.
+/// truth table, background apportionment, and complement orientation.
 ///
 /// The truth table's input index is a little-endian bit index. Bit
 /// (time * constituents.len() + constituent_slot) selects the named
@@ -54,14 +58,16 @@ pub enum MacroUnitError {
 /// A mapping and its Boolean complement describe the same unoriented macro
 /// unit with opposite macro-state labels. mapping_sha256 therefore binds the
 /// canonical representative (the lexicographically smaller of the mapping and
-/// its complement), while spec_sha256 additionally binds the orientation.
-/// This keeps unit-shape equivalence separate from the state-label transform.
+/// its complement), while spec_sha256 additionally binds background
+/// apportionment and the orientation. This keeps unit-shape equivalence
+/// separate from the state-label transform.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MacroUnitSpec {
     constituents: Vec<usize>,
     update_grain: usize,
     sequence_state_bits: usize,
     canonical_mapping: Vec<bool>,
+    background_apportionment: Vec<usize>,
     complement_flipped: bool,
     mapping_sha256: String,
     spec_sha256: String,
@@ -76,6 +82,21 @@ impl MacroUnitSpec {
     pub fn coarse_grain(
         constituents: Vec<usize>,
         on_counts: &[usize],
+        max_mapping_entries: usize,
+    ) -> Result<Self, MacroUnitError> {
+        Self::coarse_grain_with_background(
+            constituents,
+            on_counts,
+            Vec::new(),
+            max_mapping_entries,
+        )
+    }
+
+    /// Build a coarse-graining unit with explicit background apportionment.
+    pub fn coarse_grain_with_background(
+        constituents: Vec<usize>,
+        on_counts: &[usize],
+        background_apportionment: Vec<usize>,
         max_mapping_entries: usize,
     ) -> Result<Self, MacroUnitError> {
         let maximum_count = constituents.len();
@@ -93,7 +114,13 @@ impl MacroUnitSpec {
         let mapping = (0..expected_entries)
             .map(|state| on_count_set.contains(&(state.count_ones() as usize)))
             .collect();
-        Self::new(constituents, 1, mapping, max_mapping_entries)
+        Self::new_with_background(
+            constituents,
+            1,
+            mapping,
+            background_apportionment,
+            max_mapping_entries,
+        )
     }
 
     /// Build the PyPhi-compatible blackboxing family.
@@ -105,6 +132,23 @@ impl MacroUnitSpec {
         constituents: Vec<usize>,
         update_grain: usize,
         output_constituents: &[usize],
+        max_mapping_entries: usize,
+    ) -> Result<Self, MacroUnitError> {
+        Self::blackbox_with_background(
+            constituents,
+            update_grain,
+            output_constituents,
+            Vec::new(),
+            max_mapping_entries,
+        )
+    }
+
+    /// Build a blackboxing unit with explicit background apportionment.
+    pub fn blackbox_with_background(
+        constituents: Vec<usize>,
+        update_grain: usize,
+        output_constituents: &[usize],
+        background_apportionment: Vec<usize>,
         max_mapping_entries: usize,
     ) -> Result<Self, MacroUnitError> {
         if output_constituents.is_empty() {
@@ -135,7 +179,13 @@ impl MacroUnitSpec {
                 })
             })
             .collect();
-        Self::new(constituents, update_grain, mapping, max_mapping_entries)
+        Self::new_with_background(
+            constituents,
+            update_grain,
+            mapping,
+            background_apportionment,
+            max_mapping_entries,
+        )
     }
 
     /// Construct a macro unit without allocating more than max_mapping_entries.
@@ -147,6 +197,26 @@ impl MacroUnitSpec {
         constituents: Vec<usize>,
         update_grain: usize,
         mapping: Vec<bool>,
+        max_mapping_entries: usize,
+    ) -> Result<Self, MacroUnitError> {
+        Self::new_with_background(
+            constituents,
+            update_grain,
+            mapping,
+            Vec::new(),
+            max_mapping_entries,
+        )
+    }
+
+    /// Construct a macro unit with explicit background apportionment.
+    ///
+    /// Background indices are a set and are canonicalized in ascending order.
+    /// They must be unique and disjoint from the unit's micro constituents.
+    pub fn new_with_background(
+        constituents: Vec<usize>,
+        update_grain: usize,
+        mapping: Vec<bool>,
+        mut background_apportionment: Vec<usize>,
         max_mapping_entries: usize,
     ) -> Result<Self, MacroUnitError> {
         if constituents.is_empty() {
@@ -179,6 +249,18 @@ impl MacroUnitSpec {
             return Err(MacroUnitError::ConstantMapping);
         }
 
+        background_apportionment.sort_unstable();
+        for pair in background_apportionment.windows(2) {
+            if pair[0] == pair[1] {
+                return Err(MacroUnitError::DuplicateBackgroundApportionment { unit: pair[0] });
+            }
+        }
+        for unit in &background_apportionment {
+            if constituents.binary_search(unit).is_ok() {
+                return Err(MacroUnitError::BackgroundOverlapsConstituents { unit: *unit });
+            }
+        }
+
         let complemented = mapping.iter().map(|value| !*value).collect::<Vec<_>>();
         let complement_flipped = complemented < mapping;
         let canonical_mapping = if complement_flipped {
@@ -191,13 +273,18 @@ impl MacroUnitSpec {
             update_grain,
             &canonical_mapping,
         );
-        let spec_sha256 = Self::spec_digest(&mapping_sha256, complement_flipped);
+        let spec_sha256 = Self::spec_digest(
+            &mapping_sha256,
+            complement_flipped,
+            &background_apportionment,
+        );
 
         Ok(Self {
             constituents,
             update_grain,
             sequence_state_bits,
             canonical_mapping,
+            background_apportionment,
             complement_flipped,
             mapping_sha256,
             spec_sha256,
@@ -221,11 +308,19 @@ impl MacroUnitSpec {
         Self::hex_digest(&bytes)
     }
 
-    fn spec_digest(mapping_sha256: &str, complement_flipped: bool) -> String {
+    fn spec_digest(
+        mapping_sha256: &str,
+        complement_flipped: bool,
+        background_apportionment: &[usize],
+    ) -> String {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(MACRO_UNIT_SPEC_MAGIC);
         bytes.extend_from_slice(mapping_sha256.as_bytes());
         bytes.push(u8::from(complement_flipped));
+        bytes.extend_from_slice(&(background_apportionment.len() as u64).to_le_bytes());
+        for unit in background_apportionment {
+            bytes.extend_from_slice(&(*unit as u64).to_le_bytes());
+        }
         Self::hex_digest(&bytes)
     }
 
@@ -257,6 +352,11 @@ impl MacroUnitSpec {
     /// Canonical truth-table representative, shared by a mapping and its complement.
     pub fn canonical_mapping(&self) -> &[bool] {
         &self.canonical_mapping
+    }
+
+    /// Canonically ordered background micro-units apportioned to this macro unit.
+    pub fn background_apportionment(&self) -> &[usize] {
+        &self.background_apportionment
     }
 
     /// Whether the supplied truth table was the complement of the canonical representative.
@@ -512,6 +612,45 @@ mod tests {
                 expected_mapping
             );
         }
+    }
+
+    #[test]
+    fn background_apportionment_is_canonical_disjoint_and_digest_bound() {
+        let mapping = vec![false, false, true, true];
+        let base = MacroUnitSpec::new(vec![0, 1], 1, mapping.clone(), 4).unwrap();
+        let apportioned = MacroUnitSpec::new_with_background(
+            vec![0, 1],
+            1,
+            mapping.clone(),
+            vec![7, 5],
+            4,
+        )
+        .unwrap();
+        let reordered = MacroUnitSpec::new_with_background(
+            vec![0, 1],
+            1,
+            mapping,
+            vec![5, 7],
+            4,
+        )
+        .unwrap();
+
+        assert_eq!(apportioned.background_apportionment(), &[5, 7]);
+        assert_eq!(apportioned.mapping_sha256(), base.mapping_sha256());
+        assert_ne!(apportioned.spec_sha256(), base.spec_sha256());
+        assert_eq!(apportioned.spec_sha256(), reordered.spec_sha256());
+        assert!(matches!(
+            MacroUnitSpec::new_with_background(
+                vec![0, 1], 1, vec![false, false, true, true], vec![5, 5], 4
+            ),
+            Err(MacroUnitError::DuplicateBackgroundApportionment { unit: 5 })
+        ));
+        assert!(matches!(
+            MacroUnitSpec::new_with_background(
+                vec![0, 1], 1, vec![false, false, true, true], vec![1], 4
+            ),
+            Err(MacroUnitError::BackgroundOverlapsConstituents { unit: 1 })
+        ));
     }
 
     #[test]
