@@ -4535,7 +4535,7 @@ impl VisionManifold {
 
 fn visual_hv_blake3(hv: &ContinuousHV) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-vision-hv-v1\\0");
+    hasher.update(b"symthaea-vision-hv-v1\0");
     hasher.update(&(hv.dim() as u64).to_le_bytes());
     for value in hv.as_slice() {
         hasher.update(&value.to_bits().to_le_bytes());
@@ -4547,7 +4547,7 @@ fn visual_hv_blake3(hv: &ContinuousHV) -> String {
 /// This is not a full checkpoint hash; source belief and observation are bound separately.
 fn transition_parameter_blake3(manifold: &VisionManifold) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-vision-cfc-transition-params-v1\\0");
+    hasher.update(b"symthaea-vision-cfc-transition-params-v1\0");
     hasher.update(visual_hv_blake3(&manifold.weight_hv).as_bytes());
     hasher.update(&manifold.tau_base.to_bits().to_le_bytes());
     hasher.update(&manifold.config.input_blend.to_bits().to_le_bytes());
