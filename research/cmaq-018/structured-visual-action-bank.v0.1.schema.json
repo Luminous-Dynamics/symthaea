@@ -81,7 +81,8 @@
         "properties": {
           "channel_id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$"
           },
           "kind": {
             "enum": [
@@ -96,7 +97,8 @@
           },
           "unit": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$"
           },
           "outcome_samples": {
             "type": "array",
