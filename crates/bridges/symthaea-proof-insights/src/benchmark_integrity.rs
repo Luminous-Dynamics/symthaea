@@ -258,6 +258,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     check_relative_path(string(value, "/target/source_path")?)?;
     for pointer in [
         "/target/source_file_sha256",
+        "/target/source_span_sha256",
         "/target/statement_sha256",
         "/environment/lean_binary_sha256",
         "/environment/lake_manifest_sha256",
@@ -487,15 +488,15 @@ fn source_span_sha256(
 
     let mut selected = String::new();
     if first_index == last_index {
-        selected.extend(first_chars[start..end].iter());
+        selected.extend(first_chars[start..end].iter().copied());
     } else {
-        selected.extend(first_chars[start..].iter());
+        selected.extend(first_chars[start..].iter().copied());
         for line in lines.iter().take(last_index).skip(first_index + 1) {
             selected.push('\n');
             selected.push_str(line);
         }
         selected.push('\n');
-        selected.extend(last_chars[..end].iter());
+        selected.extend(last_chars[..end].iter().copied());
     }
     Ok(hex::encode(Sha256::digest(selected.as_bytes())))
 }
@@ -648,4 +649,30 @@ pub fn verify_file_with_evidence_root(
 ) -> Result<IntegritySummary> {
     let bytes = fs::read(path).with_context(|| format!("read integrity receipt {}", path.display()))?;
     verify_bytes_with_evidence_root(&bytes, expected_sha256, evidence_root)
+}
+
+#[cfg(test)]
+mod source_span_tests {
+    use super::*;
+
+    #[test]
+    fn source_span_uses_unicode_codepoint_columns() {
+        let source = "a ∃ β sorry";
+        let expected = hex::encode(Sha256::digest(b"sorry"));
+        assert_eq!(source_span_sha256(source.as_bytes(), 1, 6, 1, 11).unwrap(), expected);
+    }
+
+    #[test]
+    fn source_span_preserves_newline_boundaries_for_multiline_targets() {
+        let source = "alpha\nbeta\ngamma";
+        let expected = hex::encode(Sha256::digest(b"lpha\nbeta\ngam"));
+        assert_eq!(source_span_sha256(source.as_bytes(), 1, 1, 3, 3).unwrap(), expected);
+    }
+
+    #[test]
+    fn source_span_rejects_out_of_range_and_reversed_coordinates() {
+        assert!(source_span_sha256(b"short", 1, 0, 1, 99).is_err());
+        assert!(source_span_sha256(b"short", 1, 4, 1, 2).is_err());
+        assert!(source_span_sha256(b"short", 2, 0, 1, 1).is_err());
+    }
 }
