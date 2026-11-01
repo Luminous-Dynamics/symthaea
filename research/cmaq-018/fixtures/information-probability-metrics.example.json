@@ -1,0 +1,9 @@
+{
+  "schema_version": "cmaq-018-information-probability-metrics-v0.1",
+  "claim_ceiling": "synthetic_known_answer_fixture_only_no_probability_calibration_claim",
+  "sample_count": 2,
+  "mean_multiclass_brier_score": 0.1025,
+  "mean_log_loss": 0.25541281188299536,
+  "zero_probability_events": 0,
+  "top_outcome_accuracy": 1
+}
