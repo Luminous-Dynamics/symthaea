@@ -6,6 +6,7 @@ on:
       - "crates/bridges/symthaea-proof-insights/src/bin/import_sorrydb_snapshot.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/analyze_sorrydb_branch_ledger.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/allocate_proof_search_budget.rs"
+      - "crates/bridges/symthaea-proof-insights/src/proof_search_calibration.rs"
       - "data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/**"
       - "crates/bridges/symthaea-proof-insights/src/snapshot_branch_receipt.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/verify_snapshot_branch_receipt.rs"
@@ -522,7 +523,20 @@ jobs:
           assert fixture["policy"]["calibration_split"] == "validation"
           assert sum(fixture["policy"]["shadow_weights_ppm"].values()) == 1_000_000
           assert len(fixture["actions"]) == 3
-          print("PITB_ADAPTIVE_ALLOCATION_SCHEMA_PASS: validation calibration, frozen policy weights and test decision fixture")
+          calibration_path = Path("data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/fixtures/proof-search-calibration.synthetic.json")
+          calibration = json.loads(calibration_path.read_text())
+          import hashlib
+          receipt_sha = hashlib.sha256(calibration_path.read_bytes()).hexdigest()
+          assert fixture["policy"]["calibration_receipt_sha256"] == receipt_sha
+          assert fixture["policy"]["calibration_manifest_sha256"] == calibration["dataset_manifest_sha256"]
+          assert fixture["policy"]["calibration_sample_count"] == calibration["total_sample_count"]
+          assert fixture["policy"]["calibration_ece_ppm"] == calibration["worst_action_ece_ppm"]
+          assert all(action["calibration_receipt_sha256"] == receipt_sha for action in fixture["actions"])
+          policy = dict(fixture["policy"])
+          claimed_policy_sha = policy.pop("policy_sha256")
+          policy_sha = hashlib.sha256(json.dumps(policy, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+          assert claimed_policy_sha == policy_sha
+          print("PITB_ADAPTIVE_ALLOCATION_SCHEMA_PASS: validation calibration, exact receipt SHA, canonical policy SHA and frozen test decision")
           PY
       - name: Run importer self-tests and hash the exact snapshot twice
         shell: bash
