@@ -1,0 +1,962 @@
+{
+  "schema_version": "pitb.proof-search-calibration-receipt.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "receipt_id": "synthetic-calibration-validation-v0",
+  "split": "validation",
+  "dataset_id": "synthetic-proof-search-trajectory-validation",
+  "dataset_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "prediction_model_id": "synthetic-action-outcome-estimator",
+  "prediction_model_version": "fixture-only",
+  "calibration_method": "equal_width_10_bin_per_action",
+  "minimum_bin_count": 20,
+  "total_sample_count": 1600,
+  "worst_action_ece_ppm": 0,
+  "mean_action_brier_score_ppm": 167500,
+  "source_receipt_manifest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "action_groups": [
+    {
+      "action_kind": "continue_current_target",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "retrieve_context",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "change_decomposition",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "typed_repair",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "tactic_probe",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "spawn_snapshot_branch",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "semantic_check",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "action_kind": "restart_search",
+      "sample_count": 200,
+      "ece_ppm": 0,
+      "brier_score_ppm": 167500,
+      "bins": [
+        {
+          "bin_id": 0,
+          "count": 20,
+          "min_predicted_ppm": 50000,
+          "max_predicted_ppm": 50000,
+          "sum_predicted_ppm": 1000000,
+          "sum_probability_squared_ppm2": 50000000000,
+          "sum_probability_on_success_ppm": 50000,
+          "success_count": 1,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 1,
+          "count": 20,
+          "min_predicted_ppm": 150000,
+          "max_predicted_ppm": 150000,
+          "sum_predicted_ppm": 3000000,
+          "sum_probability_squared_ppm2": 450000000000,
+          "sum_probability_on_success_ppm": 300000,
+          "success_count": 2,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 2,
+          "count": 20,
+          "min_predicted_ppm": 250000,
+          "max_predicted_ppm": 250000,
+          "sum_predicted_ppm": 5000000,
+          "sum_probability_squared_ppm2": 1250000000000,
+          "sum_probability_on_success_ppm": 750000,
+          "success_count": 3,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 3,
+          "count": 20,
+          "min_predicted_ppm": 350000,
+          "max_predicted_ppm": 350000,
+          "sum_predicted_ppm": 7000000,
+          "sum_probability_squared_ppm2": 2450000000000,
+          "sum_probability_on_success_ppm": 1400000,
+          "success_count": 4,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 4,
+          "count": 20,
+          "min_predicted_ppm": 450000,
+          "max_predicted_ppm": 450000,
+          "sum_predicted_ppm": 9000000,
+          "sum_probability_squared_ppm2": 4050000000000,
+          "sum_probability_on_success_ppm": 2250000,
+          "success_count": 5,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 5,
+          "count": 20,
+          "min_predicted_ppm": 550000,
+          "max_predicted_ppm": 550000,
+          "sum_predicted_ppm": 11000000,
+          "sum_probability_squared_ppm2": 6050000000000,
+          "sum_probability_on_success_ppm": 3300000,
+          "success_count": 6,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 6,
+          "count": 20,
+          "min_predicted_ppm": 650000,
+          "max_predicted_ppm": 650000,
+          "sum_predicted_ppm": 13000000,
+          "sum_probability_squared_ppm2": 8450000000000,
+          "sum_probability_on_success_ppm": 4550000,
+          "success_count": 7,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 7,
+          "count": 20,
+          "min_predicted_ppm": 750000,
+          "max_predicted_ppm": 750000,
+          "sum_predicted_ppm": 15000000,
+          "sum_probability_squared_ppm2": 11250000000000,
+          "sum_probability_on_success_ppm": 6000000,
+          "success_count": 8,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 8,
+          "count": 20,
+          "min_predicted_ppm": 850000,
+          "max_predicted_ppm": 850000,
+          "sum_predicted_ppm": 17000000,
+          "sum_probability_squared_ppm2": 14450000000000,
+          "sum_probability_on_success_ppm": 7650000,
+          "success_count": 9,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "bin_id": 9,
+          "count": 20,
+          "min_predicted_ppm": 950000,
+          "max_predicted_ppm": 950000,
+          "sum_predicted_ppm": 19000000,
+          "sum_probability_squared_ppm2": 18050000000000,
+          "sum_probability_on_success_ppm": 9500000,
+          "success_count": 10,
+          "outcome_receipt_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    }
+  ]
+}
