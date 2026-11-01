@@ -4,6 +4,7 @@
 //! bytes and flash map bound to a VerifiedDeployableArtifact. Device identity, probe identity,
 //! tool identity and the acquisition channel are digest-pinned inputs, not authenticated here.
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 
