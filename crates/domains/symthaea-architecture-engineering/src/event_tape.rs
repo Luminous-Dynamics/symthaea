@@ -1336,6 +1336,17 @@ impl EventTape {
             }
         }
 
+        if let Some(contract) = &self.header.objective_contract {
+            if contract.mode == EventTapeObjectiveMode::NoisyReplicates
+                && noisy_candidate_ids.len() > contract.max_candidates.unwrap_or(0)
+            {
+                return Err(EventTapeError::new(
+                    "events.noisy_candidate_count",
+                    "distinct noisy candidates exceed the frozen objective-contract maximum",
+                ));
+            }
+        }
+
         if total_charge > self.header.budget_limit_microunits {
             return Err(EventTapeError::new(
                 "events",
@@ -1371,6 +1382,10 @@ impl EventTape {
         Ok(EventTapeSummary {
             event_count: self.events.len(),
             candidate_evaluations,
+            multi_objective_evaluations,
+            noisy_observation_attempts,
+            successful_noisy_observations,
+            failed_noisy_observations,
             direction_proposals,
             admitted_directions,
             duplicate_proposals,
