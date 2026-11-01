@@ -47,17 +47,17 @@ impl BeatPosition {
         self.denominator
     }
 
-    pub(crate) fn is_canonical(self) -> bool {
+    fn is_canonical(self) -> bool {
         self.denominator > 0
             && gcd_u64(self.numerator, self.denominator as u64) == 1
     }
 
-    pub(crate) fn cmp_exact(self, other: Self) -> Ordering {
+    fn cmp_exact(self, other: Self) -> Ordering {
         ((self.numerator as u128) * (other.denominator as u128))
             .cmp(&((other.numerator as u128) * (self.denominator as u128)))
     }
 
-    pub(crate) fn checked_add(self, other: Self) -> Option<Self> {
+    fn checked_add(self, other: Self) -> Option<Self> {
         let numerator = (self.numerator as u128)
             .checked_mul(other.denominator as u128)?
             .checked_add(
@@ -84,7 +84,7 @@ fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
     left.max(1)
 }
 
-pub(crate) fn is_sha256_hex(value: &str) -> bool {
+fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -324,7 +324,7 @@ impl ScoreNoteIdentityMapV1 {
 
     fn compute_digest(&self) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(b"symthaea:muse:score-note-identity-map:v1\\n");
+        hasher.update(b"symthaea:muse:score-note-identity-map:v1\n");
         hasher.update(self.schema_version.to_be_bytes());
         hash_string(&mut hasher, &self.score_sha256);
         hasher.update((self.note_count as u64).to_be_bytes());
@@ -442,12 +442,10 @@ impl PerformanceGestureTrackV1 {
                                 "event[{index}] instrument identity does not match target note"
                             ));
                         }
-                        if let Some(event_model) = event.source_model_id.as_deref() {
-                            if note.source_model_id.as_deref() != Some(event_model) {
-                                issues.push(format!(
-                                    "event[{index}] source model does not match target note"
-                                ));
-                            }
+                        if note.source_model_id != event.source_model_id {
+                            issues.push(format!(
+                                "event[{index}] source model does not exactly match target note"
+                            ));
                         }
                         if event.at.cmp_exact(note.onset) == Ordering::Less {
                             issues.push(format!("event[{index}] occurs before target note onset"));
@@ -576,12 +574,7 @@ impl PerformanceGestureTrackV1 {
                 ));
             }
 
-            let key = (
-                event.instrument_id.as_str(),
-                &event.target,
-                event.at,
-                event.parameter,
-            );
+            let key = (&event.target, event.at, event.parameter);
             if !cell_keys.insert(key) {
                 issues.push(format!(
                     "{prefix}: duplicate parameter event for the same target and beat position"
@@ -612,7 +605,7 @@ impl PerformanceGestureTrackV1 {
     }
 }
 
-pub(crate) fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) -> bool {
+fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) -> bool {
     match (parameter, value) {
         (
             GestureParameter::BowSpeed
@@ -672,7 +665,7 @@ pub(crate) fn value_matches_parameter(parameter: GestureParameter, value: &Gestu
     }
 }
 
-pub(crate) fn scalar_domain_is_valid(
+fn scalar_domain_is_valid(
     parameter: GestureParameter,
     amount: f64,
     unit: GestureUnit,
@@ -853,6 +846,23 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_target_parameter_cell_rejected_even_with_conflicting_instrument_label() {
+        let mut first = event(
+            "a",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::BowForce,
+            GestureValue::Scalar { amount: 1.0, unit: GestureUnit::Newtons },
+            GestureInterpolation::Step,
+        );
+        let mut second = first.clone();
+        second.event_id = "b".to_string();
+        second.instrument_id = "flute".to_string();
+        let issues = PerformanceGestureTrackV1::new(vec![first, second])
+            .validate().unwrap_err();
+        assert!(issues.iter().any(|issue| issue.contains("duplicate parameter event")));
+    }
+
+    #[test]
     fn events_are_chronological_and_duplicate_cells_are_rejected() {
         let first = event(
             "b",
@@ -1018,11 +1028,20 @@ mod tests {
             GestureInterpolation::Linear,
         );
         gesture.instrument_id = "violin".to_string();
-        gesture.source_model_id = Some("violin.model-a".to_string());
+        gesture.source_model_id = None;
         gesture.target = GestureTarget::Note {
             part_id: 1,
             note_id: "lead-note-1".to_string(),
         };
+        let mut unresolved_model = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
+        unresolved_model.bind_to_score_sha256("a".repeat(64));
+        assert!(unresolved_model
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("source model does not exactly match")));
+
+        gesture.source_model_id = Some("violin.model-a".to_string());
 
         let mut track = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
         track.bind_to_score_sha256("a".repeat(64));
