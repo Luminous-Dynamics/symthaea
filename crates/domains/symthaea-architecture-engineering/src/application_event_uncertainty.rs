@@ -70,6 +70,7 @@ pub struct ApplicationEventRepeatabilityProtocol {
     /// Independent repeat-design hash, also required by the metrology manifest.
     pub replicate_design_sha256: String,
     pub candidate_artifact_sha256: String,
+    pub candidate_configuration_sha256: String,
     pub device_session_sha256: String,
     pub matched_input_sha256: String,
     pub voltage_source_id: String,
@@ -111,6 +112,7 @@ pub fn validate_application_event_repeatability_protocol(
         ("phase_protocol_sha256", protocol.phase_protocol_sha256.as_str()),
         ("replicate_design_sha256", protocol.replicate_design_sha256.as_str()),
         ("candidate_artifact_sha256", protocol.candidate_artifact_sha256.as_str()),
+        ("candidate_configuration_sha256", protocol.candidate_configuration_sha256.as_str()),
         ("device_session_sha256", protocol.device_session_sha256.as_str()),
         ("matched_input_sha256", protocol.matched_input_sha256.as_str()),
         ("voltage_readback_sha256", protocol.voltage_readback_sha256.as_str()),
@@ -142,6 +144,7 @@ pub struct ApplicationEventEnergyUncertaintyReceipt {
     pub repeatability_protocol_sha256: String,
     pub metrology_manifest_sha256: String,
     pub candidate_artifact_sha256: String,
+    pub candidate_configuration_sha256: String,
     pub device_session_sha256: String,
     pub target_id: String,
     pub board_revision: String,
@@ -261,6 +264,7 @@ pub fn evaluate_application_event_energy_uncertainty(
 
     for event in &phase_receipt.events {
         if event.artifact_sha256 != repeatability_protocol.candidate_artifact_sha256
+            || event.configuration_sha256 != repeatability_protocol.candidate_configuration_sha256
             || event.device_session_sha256 != repeatability_protocol.device_session_sha256
         {
             return Err(ApplicationEventUncertaintyError::new(
@@ -360,6 +364,7 @@ pub fn evaluate_application_event_energy_uncertainty(
         repeatability_protocol_sha256: repeatability_protocol.protocol_sha256.clone(),
         metrology_manifest_sha256: metrology_manifest.manifest_sha256.clone(),
         candidate_artifact_sha256: repeatability_protocol.candidate_artifact_sha256.clone(),
+        candidate_configuration_sha256: repeatability_protocol.candidate_configuration_sha256.clone(),
         device_session_sha256: repeatability_protocol.device_session_sha256.clone(),
         target_id: repeatability_protocol.target_id.clone(),
         board_revision: repeatability_protocol.board_revision.clone(),
@@ -408,6 +413,7 @@ pub fn validate_application_event_energy_uncertainty_receipt(
         ("repeatability_protocol_sha256", receipt.repeatability_protocol_sha256.as_str()),
         ("metrology_manifest_sha256", receipt.metrology_manifest_sha256.as_str()),
         ("candidate_artifact_sha256", receipt.candidate_artifact_sha256.as_str()),
+        ("candidate_configuration_sha256", receipt.candidate_configuration_sha256.as_str()),
         ("device_session_sha256", receipt.device_session_sha256.as_str()),
         ("calibration_certificate_sha256", receipt.calibration_certificate_sha256.as_str()),
         ("matched_input_sha256", receipt.matched_input_sha256.as_str()),
@@ -740,6 +746,7 @@ mod tests {
             phase_protocol_sha256: phase_protocol_sha.into(),
             replicate_design_sha256: sha('a'),
             candidate_artifact_sha256: sha(artifact_tag),
+            candidate_configuration_sha256: sha('g'),
             device_session_sha256: sha(device_tag),
             matched_input_sha256: sha('c'),
             voltage_source_id: "calibrated-vdd-source".into(),
