@@ -26,11 +26,14 @@ Every event contains nonzero event/entity/modality/source identifiers,
 source-local sequence index, event time, availability time, unit code,
 measurement status/value and a source digest.
 
-Measurements are typed as:
-- observed fixed-point values, with explicit decimal scale;
+Payloads are typed as:
+- observed fixed-point numeric values, with explicit decimal scale;
 - missing values with an explicit reason (not measured, sensor offline,
   below detection, withheld, unknown);
-- censored intervals with open or closed bounds.
+- censored intervals with open or closed bounds;
+- content-addressed opaque payloads (for example text, audio, images or
+  precomputed embeddings), binding a nonzero payload digest, byte length and
+  encoding ID while keeping the payload bytes outside the event envelope.
 
 Fixed point avoids floating-point equality in the transport contract. Dataset
 adapters must preserve native values/units and document their conversion to
@@ -72,9 +75,9 @@ provenance and preprocessing resource accounting.
 
 ## 6. Test coverage and limits
 
-Fifteen source-authored Rust test functions cover irregular and asynchronous
+Sixteen source-authored Rust test functions cover irregular and asynchronous
 records, delayed arrival, non-retroactive visibility, out-of-order event time,
-missingness/censoring, duplicates, source identity, fixed-point validation,
+missingness/censoring, opaque multimodal payload validation, duplicates, source identity, fixed-point validation,
 known-future covariate publication/validity, entity filtering and tie handling.
 
 No Cargo build, rustfmt, Clippy, tests or real dataset adapter has run. This
