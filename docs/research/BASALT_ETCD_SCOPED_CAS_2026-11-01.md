@@ -118,7 +118,7 @@ Success operations in the same transaction:
 
 The exact production compare semantics must also bind absent/present keys and compare full prior values where mod_revision alone is insufficient under the selected restore threat model. Policy key values are immutable digests/version pointers, and policy mutation must advance the scoped pointer revision.
 
-The successful transaction response's top-level header.revision is the global audit watermark for that commit. All writes in the transaction share that store revision. The newly created receipt key's create_revision is the receipt's original acceptance revision. Do not write a separate global revision key merely to duplicate this etcd-provided logical clock.
+The successful transaction response's top-level header.revision is the global audit watermark for that commit. All writes in the transaction share that store revision. The newly created receipt key's create_revision is the receipt's original acceptance revision. The transaction response header revision is the global store revision at the commit. Do not write a separate global revision key merely to duplicate this etcd-provided logical clock.
 
 ### 4.4 Compare failure
 
@@ -133,7 +133,7 @@ After a timeout or lost transaction response:
 1. Perform a linearizable read of the exact receipt key.
 2. If absent, state is not yet proven committed; retry only after taking a new snapshot and re-verifying.
 3. If present, verify all immutable receipt identity bindings.
-4. Return the original record's create_revision and stored acceptance context.
+4. Return both the original record's create_revision and the current lookup response header revision as separately named fields, alongside the stored acceptance context. The local reference model currently defines AlreadyCommitted.revision as the current state revision; the remote API must distinguish current_authority_revision from receipt_acceptance_revision rather than overload one field.
 5. If the same digest is present with conflicting immutable identity, return collision/equivocation.
 6. Do not report the current store header revision as the original acceptance revision.
 
@@ -166,7 +166,7 @@ No witness quorum should be called BFT without a stated node/adversary model, qu
 | SCAS-001 | Distinct sources and logs start from same snapshot | Both commit; unrelated key changes do not cause artificial conflict |
 | SCAS-002 | Distinct sources share one log cursor | One advances; loser rereads and re-verifies |
 | SCAS-003 | Same source/generation, different receipts | Exactly one can commit; other is equivocation |
-| SCAS-004 | Retry receipt A after unrelated transactions advanced store revision | Return A's original create_revision |
+| SCAS-004 | Retry receipt A after unrelated transactions advanced store revision | Return A's original create_revision and distinct current store revision |
 | SCAS-005 | Existing receipt digest has different immutable source/generation/seal | Reject collision |
 | SCAS-006 | Signer-policy pointer advances after snapshot, before CAS | Compare fails; old policy cannot commit |
 | SCAS-007 | Witness roster/policy pointer advances during verification | Compare fails or result unknown |
