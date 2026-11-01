@@ -159,6 +159,18 @@ impl MacroUnitSpec {
         }
         let (sequence_state_bits, mapping_entries) =
             mapping_domain(constituents.len(), update_grain, limits.max_mapping_entries)?;
+        let mut background_apportionment = background_apportionment;
+        background_apportionment.sort_unstable();
+        for pair in background_apportionment.windows(2) {
+            if pair[0] == pair[1] {
+                return Err(MacroUnitError::DuplicateBackgroundApportionment { unit: pair[0] });
+            }
+        }
+        for unit in &background_apportionment {
+            if constituents.binary_search(unit).is_ok() {
+                return Err(MacroUnitError::BackgroundOverlapsConstituents { unit: *unit });
+            }
+        }
 
         let n = constituents.len();
         let blackbox_mask_count = 1usize
@@ -203,7 +215,7 @@ impl MacroUnitSpec {
         let final_update_offset = (update_grain - 1)
             .checked_mul(n)
             .ok_or(MacroUnitError::SequenceDomainOverflow)?;
-        let mut seen = BTreeSet::<Vec<bool>>::new();
+        let mut seen = BTreeSet::<String>::new();
         let mut candidates = Vec::with_capacity(candidate_upper_bound);
         let mut generated_coarse_grain = 0usize;
         let mut generated_blackbox = 0usize;
@@ -214,7 +226,9 @@ impl MacroUnitSpec {
             } else {
                 mapping
             };
-            if seen.insert(canonical.clone()) {
+            let mapping_sha256 =
+                Self::mapping_digest(&constituents, update_grain, &canonical);
+            if seen.insert(mapping_sha256) {
                 candidates.push(Self::new_with_background(
                     constituents.clone(),
                     update_grain,
@@ -233,29 +247,39 @@ impl MacroUnitSpec {
             let subset_limit = 1usize
                 .checked_shl(count_options as u32)
                 .ok_or(MacroUnitError::CandidateCountOverflow)?;
-            for on_count_mask in 1..subset_limit - 1 {
-                let mut mapping = Vec::with_capacity(mapping_entries);
-                for state in 0..mapping_entries {
-                    let on_count = (state & state_mask).count_ones() as usize;
-                    mapping.push(((on_count_mask >> on_count) & 1) != 0);
+            for subset_size in 1..count_options {
+                for on_count_mask in 1..subset_limit - 1 {
+                    if on_count_mask.count_ones() as usize != subset_size {
+                        continue;
+                    }
+                    let mut mapping = Vec::with_capacity(mapping_entries);
+                    for state in 0..mapping_entries {
+                        let on_count = (state & state_mask).count_ones() as usize;
+                        mapping.push(((on_count_mask >> on_count) & 1) != 0);
+                    }
+                    generated_coarse_grain = generated_coarse_grain
+                        .checked_add(1)
+                        .ok_or(MacroUnitError::CandidateCountOverflow)?;
+                    add_mapping(mapping)?;
                 }
-                generated_coarse_grain = generated_coarse_grain
+            }
+        }
+
+        for output_size in 1..=n {
+            for output_mask in 1..blackbox_mask_count {
+                if output_mask.count_ones() as usize != output_size {
+                    continue;
+                }
+                let mut mapping = Vec::with_capacity(mapping_entries);
+                for sequence_state in 0..mapping_entries {
+                    let final_state = (sequence_state >> final_update_offset) & state_mask;
+                    mapping.push((output_mask & final_state) == output_mask);
+                }
+                generated_blackbox = generated_blackbox
                     .checked_add(1)
                     .ok_or(MacroUnitError::CandidateCountOverflow)?;
                 add_mapping(mapping)?;
             }
-        }
-
-        for output_mask in 1..blackbox_mask_count {
-            let mut mapping = Vec::with_capacity(mapping_entries);
-            for sequence_state in 0..mapping_entries {
-                let final_state = (sequence_state >> final_update_offset) & state_mask;
-                mapping.push((output_mask & final_state) == output_mask);
-            }
-            generated_blackbox = generated_blackbox
-                .checked_add(1)
-                .ok_or(MacroUnitError::CandidateCountOverflow)?;
-            add_mapping(mapping)?;
         }
 
         let duplicates_removed = candidate_upper_bound
@@ -784,6 +808,45 @@ mod tests {
         assert_eq!(grain_two.candidates.len(), 3);
         assert_eq!(grain_two.total_mapping_entries, 48);
         assert!(grain_two.complete);
+    }
+
+    #[test]
+    fn default_mapping_family_digest_binds_background_and_is_order_canonical() {
+        let limits = MacroMappingSearchLimits {
+            max_candidate_upper_bound: 9,
+            max_total_mapping_entries: 36,
+            max_mapping_entries: 4,
+        };
+        let left = MacroUnitSpec::enumerate_default_mapping_families(
+            vec![0, 1], 1, vec![3, 2], limits
+        ).unwrap();
+        let right = MacroUnitSpec::enumerate_default_mapping_families(
+            vec![0, 1], 1, vec![2, 3], limits
+        ).unwrap();
+        assert_eq!(left.candidate_set_sha256, right.candidate_set_sha256);
+        assert!(left
+            .candidates
+            .iter()
+            .all(|candidate| candidate.background_apportionment() == [2, 3]));
+
+        assert_eq!(
+            MacroUnitSpec::enumerate_default_mapping_families(
+                vec![0, 1],
+                1,
+                vec![2, 2],
+                limits,
+            ),
+            Err(MacroUnitError::DuplicateBackgroundApportionment { unit: 2 })
+        );
+        assert_eq!(
+            MacroUnitSpec::enumerate_default_mapping_families(
+                vec![0, 1],
+                1,
+                vec![1],
+                limits,
+            ),
+            Err(MacroUnitError::BackgroundOverlapsConstituents { unit: 1 })
+        );
     }
 
     #[test]
