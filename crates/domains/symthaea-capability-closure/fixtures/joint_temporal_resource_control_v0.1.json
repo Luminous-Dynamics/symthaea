@@ -125,5 +125,43 @@
     "reports_over_budget_context_counts": true,
     "test_functions_authored": 6,
     "shapley_or_universal_causal_claim": false
-  }
+  },
+  "external_benchmark_lanes": [
+    {
+      "name": "Time-IMM / IMM-TSF",
+      "role": "real irregular multimodal forecasting",
+      "companion_issue": 9700
+    },
+    {
+      "name": "APN / TAPA",
+      "role": "adaptive time-aware patching comparator",
+      "paper_claims_require_reproduction": true
+    },
+    {
+      "name": "KAFNet / CPA",
+      "role": "canonical pre-alignment comparator",
+      "paper_vs_release_coverage_audit_required": true
+    },
+    {
+      "name": "GIFT-Eval",
+      "role": "broad zero-shot forecasting",
+      "test_leakage_metadata_required": true
+    },
+    {
+      "name": "CL-Bench / MemoryBench",
+      "role": "agent-level continual learning context",
+      "direct_HDC_LTC_score_comparison": false
+    },
+    {
+      "name": "NeuroBench",
+      "role": "neuromorphic algorithm and system tracks",
+      "compatible_task_only": true
+    },
+    {
+      "name": "MLPerf Tiny",
+      "role": "edge latency/energy",
+      "official_task_and_measurement_method_required": true
+    }
+  ],
+  "event_availability_contract": "research/irregular-event-contract"
 }
