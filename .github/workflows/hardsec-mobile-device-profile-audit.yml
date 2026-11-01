@@ -5,10 +5,15 @@ on:
     paths:
       - "examples/hardsec_mobile_device_profile_audit.rs"
       - "examples/hardsec_android_readonly_inventory.rs"
+      - "examples/hardsec_mobile_policy_compile.rs"
       - "schemas/hardsec-mobile-device-profile-v1.schema.json"
+      - "schemas/hardsec-mobile-policy-v1.schema.json"
+      - "schemas/hardsec-mobile-policy-receipt-v1.schema.json"
+      - "tests/fixtures/hardsec/mobile-policy-v1/**"
       - "tests/fixtures/hardsec/mobile-device-v1/**"
       - "docs/research/HARDSEC_027_MOBILE_DEVICE_SECURITY.md"
       - "docs/research/HARDSEC_028_ANDROID_READONLY_INVENTORY.md"
+      - "docs/research/HARDSEC_029_MOBILE_POLICY_OBLIGATIONS.md"
       - "tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-mobile-device-profile-audit.yml"
   workflow_dispatch:
@@ -34,9 +39,28 @@ jobs:
         with:
           components: rustfmt
       - name: Check mobile profile and Android inventory formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_mobile_device_profile_audit.rs examples/hardsec_android_readonly_inventory.rs
+        run: rustfmt --edition 2024 --check examples/hardsec_mobile_device_profile_audit.rs examples/hardsec_android_readonly_inventory.rs examples/hardsec_mobile_policy_compile.rs
       - name: Run injected-runner Android inventory tests
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-android-readonly-inventory --example hardsec_android_readonly_inventory
+      - name: Run declarative mobile policy obligation tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-policy-compile --example hardsec_mobile_policy_compile
+      - name: Verify synthetic mobile policy receipt
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-policy-compile --example hardsec_mobile_policy_compile > /tmp/hardsec-mobile-policy-receipt.json
+          python3 - <<'PY'
+          import json
+          with open("/tmp/hardsec-mobile-policy-receipt.json", "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "obligations_compiled_verification_not_performed"
+          assert receipt["obligation_count"] == 6
+          assert receipt["satisfied_count"] == 0
+          assert receipt["evidence_incomplete_count"] == 6
+          assert receipt["outstanding_count"] == 6
+          assert receipt["claim_ceiling"]["device_security_proved"] is False
+          assert receipt["claim_ceiling"]["runtime_integrity_verified"] is False
+          print("HARDSEC mobile policy compiler abstention contract verified.")
+          PY
       - name: Run mobile profile privacy and evidence-link tests
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit
       - name: Verify synthetic mobile profile receipt

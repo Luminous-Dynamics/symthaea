@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-mobile-policy-receipt-v1.schema.json",
+  "title": "HARDSEC mobile policy evaluation receipt",
+  "type": "object",
+  "required": ["schema_version", "result", "claim_scope", "policy_sha256", "profile_sha256", "obligations", "claim_ceiling"],
+  "properties": {
+    "schema_version": { "const": "hardsec-mobile-policy-receipt-v1" },
+    "result": { "enum": ["obligations_compiled_verification_not_performed"] },
+    "claim_scope": { "type": "string" },
+    "policy_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "obligations": { "type": "array", "items": { "type": "object" } },
+    "claim_ceiling": {
+      "type": "object",
+      "required": ["device_security_proved", "runtime_integrity_verified", "physical_attack_resistance_established"],
+      "properties": {
+        "device_security_proved": { "const": false },
+        "runtime_integrity_verified": { "const": false },
+        "physical_attack_resistance_established": { "const": false }
+      }
+    }
+  }
+}

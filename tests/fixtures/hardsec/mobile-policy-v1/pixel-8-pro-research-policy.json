@@ -1,0 +1,70 @@
+{
+  "schema_version": "hardsec-mobile-policy-v1",
+  "policy_id": "pixel-8-pro-research-baseline-v1",
+  "target": {
+    "platform": "android",
+    "product_family": "Google Pixel 8 Pro"
+  },
+  "controls": [
+    {
+      "control_id": "boot.verified-boot",
+      "claim_path": "boot_integrity.verified_boot_state",
+      "desired_values": ["verified"],
+      "accepted_evidence_source_types": ["hardware_attestation_verified"],
+      "enforcement_layer": "boot-chain",
+      "verification_action": "Verify fresh KeyMint RootOfTrust and certificate chain for this capture.",
+      "on_unknown": "abstain",
+      "on_unsupported": "incompatible"
+    },
+    {
+      "control_id": "boot.attestation-security-level",
+      "claim_path": "boot_integrity.attestation_security_level",
+      "desired_values": ["trusted_environment", "strongbox"],
+      "accepted_evidence_source_types": ["hardware_attestation_verified"],
+      "enforcement_layer": "KeyMint-or-StrongBox",
+      "verification_action": "Verify attestation security level and linked hardware-enforced authorization list.",
+      "on_unknown": "abstain",
+      "on_unsupported": "incompatible"
+    },
+    {
+      "control_id": "boot.challenge-freshness",
+      "claim_path": "boot_integrity.attestation_challenge_freshness",
+      "desired_values": ["fresh_verified"],
+      "accepted_evidence_source_types": ["hardware_attestation_verified"],
+      "enforcement_layer": "KeyMint-attestation",
+      "verification_action": "Check the one-time unpredictable challenge and capture binding.",
+      "on_unknown": "abstain",
+      "on_unsupported": "incompatible"
+    },
+    {
+      "control_id": "boot.certificate-chain",
+      "claim_path": "boot_integrity.certificate_chain_status",
+      "desired_values": ["trusted"],
+      "accepted_evidence_source_types": ["hardware_attestation_verified"],
+      "enforcement_layer": "attestation-verifier",
+      "verification_action": "Validate chain, trust anchors, revocation policy and certificate constraints.",
+      "on_unknown": "abstain",
+      "on_unsupported": "incompatible"
+    },
+    {
+      "control_id": "memory.mte-runtime",
+      "claim_path": "hardware_protections.memory_tagging.runtime_state",
+      "desired_values": ["enabled_verified"],
+      "accepted_evidence_source_types": ["privileged_device_tool", "physical_lab_measurement"],
+      "enforcement_layer": "kernel-and-protected-processes",
+      "verification_action": "Measure MTE mode and process coverage; do not infer runtime enablement from CPU features.",
+      "on_unknown": "abstain",
+      "on_unsupported": "incompatible"
+    },
+    {
+      "control_id": "monitor.observer-effect",
+      "claim_path": "pmu_acquisition.observer_effect_status",
+      "desired_values": ["within_budget"],
+      "accepted_evidence_source_types": ["physical_lab_measurement"],
+      "enforcement_layer": "runtime-monitor",
+      "verification_action": "Measure observer effect under matched device, cluster and thermal strata.",
+      "on_unknown": "abstain",
+      "on_unsupported": "incompatible"
+    }
+  ]
+}
