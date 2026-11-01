@@ -67,8 +67,8 @@ impl<const DIM: usize, const CLASSES: usize, const SLOTS: usize, const WORDS: us
     pub fn update_liquid_state_from_dt_tau_us(
         &mut self,
         equilibrium: &[i16; DIM],
-        dt_us: u64,
-        tau_us: u64,
+        dt_us: u32,
+        tau_us: u32,
     ) -> Result<(), EdgeCoreUpdateError> {
         let alpha = alpha_from_dt_tau_us(dt_us, tau_us)?;
         self.liquid_state
