@@ -94,7 +94,9 @@
         "confidence_z_hundredths",
         "prediction_model_id",
         "prediction_model_version",
-        "calibration_receipt_sha256"
+        "calibration_receipt_sha256",
+        "evaluation_horizon_id",
+        "continuation_policy_sha256"
       ],
       "properties": {
         "policy_id": {
@@ -185,6 +187,13 @@
         "prediction_model_version": {
           "type": "string",
           "minLength": 1
+        },
+        "evaluation_horizon_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "continuation_policy_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -260,11 +269,6 @@
         },
         "proof_state_sha256": {
           "$ref": "#/$defs/sha256"
-        },
-        "predicted_incremental_success_ppm": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000000
         },
         "standard_error_ppm": {
           "type": "integer",
