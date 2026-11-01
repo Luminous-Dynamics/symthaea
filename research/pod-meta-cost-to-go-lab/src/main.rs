@@ -5,8 +5,9 @@ use pod_meta_cost_to_go_lab::{
     FrontierCostCoefficients, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
     LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
     OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
-    OnlineSelectionLedger, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
-    ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
+    OnlineSelectionLedger, PrefixReplayEvaluator, ProofFrontierFeatures,
+    ReconciliationOutcome, RemainingCostForecast, ReservationId, ResourceVector,
+    SelectedProofCalibrationExample, SelectedProofEnvelope,
     SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
@@ -57,6 +58,51 @@ fn evidence(id: ReservationId, effect: EffectDisposition) -> StateEvidence {
         authoritative: true,
         state_digest: [1; 32],
         effect,
+    }
+}
+
+fn prefix_forecast(
+    id: u64,
+    run_id: u64,
+    decision_sequence: u64,
+    task_family: u32,
+) -> ForecastReceipt {
+    ForecastReceipt {
+        id: ForecastId(id),
+        run_id,
+        decision_sequence,
+        task_family,
+        operation_family: 9,
+        forecast: RemainingCostForecast {
+            pre_state_digest: [11; 32],
+            frontier_digest: [12; 32],
+            model_digest: [13; 32],
+            calibration_digest: [14; 32],
+            completion_probability: 0.95,
+            remaining_q50: ResourceVector::new(10, 2, 3, 4, 5, 6),
+            remaining_q90: ResourceVector::new(20, 3, 5, 7, 8, 9),
+            remaining_q95: ResourceVector::new(25, 4, 6, 8, 9, 10),
+            mandatory_verification_reserve: ResourceVector::new(2, 1, 1, 0, 1, 2),
+            support_count: 64,
+            shift_status: ShiftStatus::InDomain,
+        },
+    }
+}
+
+fn prefix_outcome(
+    forecast_id: u64,
+    observed_sequence: u64,
+    observed_work: ResourceVector,
+    terminal: TerminalOutcome,
+) -> ForecastOutcomeReceipt {
+    ForecastOutcomeReceipt {
+        forecast_id: ForecastId(forecast_id),
+        observed_sequence,
+        observed_work,
+        terminal,
+        evidence_digest: [21; 32],
+        meter_digest: [22; 32],
+        verifier_digest: (terminal == TerminalOutcome::SufficientProof).then_some([23; 32]),
     }
 }
 
@@ -931,4 +977,72 @@ fn main() {
         "ONLINE_FCR_ROW\tcompeting-terminal\t{}\t{}",
         competing_report.competing_terminal, competing_report.resolved_coverage_statements
     );
+    let mut prefix_journal = ForecastJournal::default();
+    prefix_journal
+        .append_forecast(prefix_forecast(1, 901, 1, 7))
+        .unwrap();
+    prefix_journal
+        .append_forecast(prefix_forecast(2, 902, 1, 7))
+        .unwrap();
+    prefix_journal
+        .append_forecast(prefix_forecast(3, 903, 1, 8))
+        .unwrap();
+    prefix_journal
+        .append_forecast(prefix_forecast(4, 904, 1, 8))
+        .unwrap();
+    prefix_journal
+        .append_outcome(prefix_outcome(
+            1,
+            2,
+            ResourceVector::new(12, 2, 4, 4, 6, 6),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
+    prefix_journal
+        .append_outcome(prefix_outcome(
+            2,
+            2,
+            ResourceVector::new(21, 1, 2, 3, 4, 5),
+            TerminalOutcome::RightCensored(
+                pod_meta_cost_to_go_lab::CensorReason::Timeout,
+            ),
+        ))
+        .unwrap();
+    prefix_journal
+        .append_outcome(prefix_outcome(
+            3,
+            2,
+            ResourceVector::new(5, 1, 1, 0, 1, 2),
+            TerminalOutcome::CompetingTerminal(
+                pod_meta_cost_to_go_lab::CompetingReason::PermissionRevoked,
+            ),
+        ))
+        .unwrap();
+    let prefix_evaluation = PrefixReplayEvaluator::evaluate(&prefix_journal).unwrap();
+    let prefix_report = &prefix_evaluation.report;
+    println!(
+        "PREFIX_REPLAY_ROW\tterminal-counts\t{}\t{}\t{}\t{}\t{}",
+        prefix_report.total_forecasts,
+        prefix_report.completed_verified,
+        prefix_report.right_censored,
+        prefix_report.competing_terminal,
+        prefix_report.pending
+    );
+    println!(
+        "PREFIX_REPLAY_ROW\tcompleted-token-metrics\t{:.3}\t{:.3}\t{:.3}",
+        prefix_report.dimensions[0].q50_mean_absolute_error.unwrap(),
+        prefix_report.dimensions[0].q90_marginal_coverage.unwrap(),
+        prefix_report.dimensions[0].q95_marginal_coverage.unwrap()
+    );
+    println!(
+        "PREFIX_REPLAY_ROW\tcensored-token-exceedances\t{}\t{}",
+        prefix_report.dimensions[0].censored_q90_definite_exceedances,
+        prefix_report.dimensions[0].censored_q95_definite_exceedances
+    );
+    println!(
+        "PREFIX_REPLAY_ROW\ttask-family-partition\t{}\t{}",
+        prefix_report.by_task_family.len(),
+        prefix_report.by_task_family[0].task_family
+    );
+
 }
