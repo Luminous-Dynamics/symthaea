@@ -109,6 +109,8 @@ pub struct PhaseEnergyWindowMetrics {
     pub mean_power_uw: f64,
     pub maximum_observed_current_ua: f64,
     pub boundary_alignment_error_bound_ms: f64,
+    /// Worst-case energy impact of both uncertain phase boundaries under the maximum observed current.
+    pub boundary_alignment_energy_uncertainty_uj: f64,
     pub boundary_alignment_energy_uncertainty_uj: f64,
 }
 
@@ -126,6 +128,7 @@ pub struct PhaseEnergyEventMetrics {
     pub total_event_duration_ms: Option<f64>,
     /// Full envelope integral, including any gaps between declared phases.
     pub total_event_energy_uj: Option<f64>,
+    pub maximum_event_current_ua: Option<f64>,
     pub total_event_boundary_alignment_uncertainty_uj: Option<f64>,
     pub declared_phase_energy_sum_uj: f64,
     pub unattributed_duration_ms: Option<f64>,
@@ -666,6 +669,7 @@ pub fn audit_application_phase_energy(
                 event_end_ppk2_time_ms: None,
                 total_event_duration_ms: None,
                 total_event_energy_uj: None,
+                maximum_event_current_ua: None,
                 total_event_boundary_alignment_uncertainty_uj: None,
                 declared_phase_energy_sum_uj,
                 unattributed_duration_ms: None,
@@ -714,6 +718,7 @@ pub fn audit_application_phase_energy(
             event_end_ppk2_time_ms: Some(event_end),
             total_event_duration_ms: Some(total_duration),
             total_event_energy_uj: Some(total_energy),
+            maximum_event_current_ua: Some(maximum_event_current),
             total_event_boundary_alignment_uncertainty_uj: Some(
                 2.0 * maximum_event_current * trace_config.voltage_v
                     * mapping.maximum_alignment_error_ms / 1_000.0,
@@ -869,7 +874,7 @@ mod tests {
         let event = &result.receipt.events[0];
         assert_eq!(event.status, PhaseEnergyEventStatus::CompletePhaseCoverage);
         assert_eq!(event.phase_windows.len(), 3);
-        assert!((event.total_event_energy_uj.unwrap() - 0.000132).abs() < 1e-12);
+        assert!((event.total_event_energy_uj.unwrap() - 0.132).abs() < 1e-12);
         assert!((event.phase_windows.iter().map(|window| window.energy_uj).sum::<f64>() - 0.000132).abs() < 1e-12);
         verify_phase_energy_receipt_against_sources(
             samples(),
@@ -893,7 +898,7 @@ mod tests {
         let event = &result.receipt.events[0];
         assert_eq!(event.status, PhaseEnergyEventStatus::UnattributedIntervalsPresent);
         assert!((event.unattributed_duration_ms.unwrap() - 0.01).abs() < 1e-12);
-        assert!((event.unattributed_energy_uj.unwrap() - 0.000033).abs() < 1e-12);
+        assert!((event.unattributed_energy_uj.unwrap() - 0.033).abs() < 1e-12);
         assert!((event.total_event_energy_uj.unwrap() - 0.000132).abs() < 1e-12);
     }
 
