@@ -610,7 +610,7 @@ mod tests {
         let base = [0.1, -0.3];
         let action = [1.0, -0.5];
         let receipt = model.issue_forecast(
-            &digest('a'), 10, &digest('b'), &digest('c'), 7, 0.5, &base, &action
+            &digest('a'), 10, &digest('b'), &digest('c'), &digest('e'), 7, 0.5, &base, &action
         ).unwrap();
         assert_eq!(receipt.predicted_future_hv, base);
         assert_eq!(receipt.model_version, 0);
@@ -634,7 +634,7 @@ mod tests {
             },
         ];
         let receipts = model.issue_action_set(
-            &digest('a'), 50, &digest('b'), 0.25, &[0.2, -0.1], &candidates
+            &digest('a'), 50, &digest('b'), &digest('e'), 0.25, &[0.2, -0.1], &candidates
         ).unwrap();
         assert_eq!(receipts.len(), 2);
         assert_eq!(receipts[0].action_id, 3);
@@ -663,7 +663,7 @@ mod tests {
             },
         ];
         assert_eq!(
-            model.issue_action_set(&digest('a'), 1, &digest('b'), 1.0, &[0.0, 0.0], &duplicate),
+            model.issue_action_set(&digest('a'), 1, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &duplicate),
             Err(ActionConditionedPredictorError::InvalidConfiguration)
         );
         let malformed = vec![
@@ -679,7 +679,7 @@ mod tests {
             },
         ];
         assert_eq!(
-            model.issue_action_set(&digest('a'), 1, &digest('b'), 1.0, &[0.0, 0.0], &malformed),
+            model.issue_action_set(&digest('a'), 1, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &malformed),
             Err(ActionConditionedPredictorError::InvalidVectorDimension)
         );
         assert_eq!(model.pending_forecast_count(), 0);
@@ -692,10 +692,10 @@ mod tests {
         let action_positive = [1.0, 1.0];
         let action_negative = [-1.0, -1.0];
         let positive = model.issue_forecast(
-            &digest('a'), 10, &digest('b'), &digest('c'), 17, 1.0, &base, &action_positive
+            &digest('a'), 10, &digest('b'), &digest('c'), &digest('e'), 17, 1.0, &base, &action_positive
         ).unwrap();
         let negative = model.issue_forecast(
-            &digest('a'), 10, &digest('b'), &digest('d'), 3, 1.0, &base, &action_negative
+            &digest('a'), 10, &digest('b'), &digest('d'), &digest('e'), 3, 1.0, &base, &action_negative
         ).unwrap();
         let positive_score = model.score_and_learn(positive.forecast_id, &[0.8, 0.6], 11, 1.0).unwrap();
         let negative_score = model.score_and_learn(negative.forecast_id, &[-0.8, -0.6], 11, 1.0).unwrap();
@@ -705,10 +705,10 @@ mod tests {
         assert_eq!(model.training_steps(), 2);
 
         let after_positive = model.issue_forecast(
-            &digest('a'), 11, &digest('b'), &digest('c'), 17, 1.0, &base, &action_positive
+            &digest('a'), 11, &digest('b'), &digest('c'), &digest('e'), 17, 1.0, &base, &action_positive
         ).unwrap();
         let after_negative = model.issue_forecast(
-            &digest('a'), 11, &digest('b'), &digest('d'), 3, 1.0, &base, &action_negative
+            &digest('a'), 11, &digest('b'), &digest('d'), &digest('e'), 3, 1.0, &base, &action_negative
         ).unwrap();
         assert!(after_positive.predicted_future_hv[0] > 0.0);
         assert!(after_negative.predicted_future_hv[0] < 0.0);
@@ -718,7 +718,7 @@ mod tests {
     fn forecasts_are_one_shot_and_observations_must_be_later_and_on_time() {
         let mut model = predictor();
         let receipt = model.issue_forecast(
-            &digest('a'), 10, &digest('b'), &digest('c'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]
+            &digest('a'), 10, &digest('b'), &digest('c'), &digest('e'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]
         ).unwrap();
         assert_eq!(
             model.score_and_learn(receipt.forecast_id, &[0.1, 0.1], 10, 1.0),
@@ -744,15 +744,15 @@ mod tests {
     fn invalid_forecasts_and_checkpoint_mutations_fail_closed() {
         let mut model = predictor();
         assert_eq!(
-            model.issue_forecast("bad", 0, &digest('b'), &digest('c'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]),
+            model.issue_forecast("bad", 0, &digest('b'), &digest('c'), &digest('e'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]),
             Err(ActionConditionedPredictorError::InvalidDigest)
         );
         assert_eq!(
-            model.issue_forecast(&digest('a'), 0, &digest('b'), &digest('c'), 1, 0.0, &[0.0, 0.0], &[1.0, 1.0]),
+            model.issue_forecast(&digest('a'), 0, &digest('b'), &digest('c'), &digest('e'), 1, 0.0, &[0.0, 0.0], &[1.0, 1.0]),
             Err(ActionConditionedPredictorError::InvalidHorizon)
         );
         let receipt = model.issue_forecast(
-            &digest('a'), 0, &digest('b'), &digest('c'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]
+            &digest('a'), 0, &digest('b'), &digest('c'), &digest('e'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]
         ).unwrap();
         let mut state = model.save_state();
         state.pending[0].receipt.predicted_future_hv[0] = f32::NAN;
@@ -768,7 +768,7 @@ mod tests {
     fn checkpoint_roundtrip_preserves_pending_forecasts_and_model_state() {
         let mut model = predictor();
         let receipt = model.issue_forecast(
-            &digest('a'), 20, &digest('b'), &digest('c'), 4, 0.25, &[0.1, 0.2], &[1.0, 0.5]
+            &digest('a'), 20, &digest('b'), &digest('c'), &digest('e'), 4, 0.25, &[0.1, 0.2], &[1.0, 0.5]
         ).unwrap();
         let state = model.save_state();
         let mut restored = predictor();
