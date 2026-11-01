@@ -2,9 +2,9 @@
 #![forbid(unsafe_code)]
 //! Bounded, allocation-free primitives for compact MCU-oriented Symthaea profiles.
 //!
-//! This is not the full Symthaea runtime and does not claim to implement the complete CfC
-//! time-constant policy. The liquid-state kernel consumes an externally computed Q15
-//! interpolation coefficient; packed HDC memory is statically capacity-bounded.
+//! This is not the full Symthaea runtime or a complete CfC implementation. The liquid-state
+//! kernel consumes an explicit Q15 coefficient; an optional bounded Q16.16 dt/tau lookup
+//! supplies a scalar base-tau coefficient. Packed HDC memory is statically capacity-bounded.
 
 #[cfg(test)]
 extern crate std;
