@@ -356,32 +356,43 @@ fn analyze_response_body(
     bundle: &FreshChallengeBundleV1,
 ) -> (SearchExposureClassV1, Vec<String>, SearchFindingMethodV1, u16) {
     let body_words = normalized_words(body);
-    let answer_items = matching_answer_items(body, bundle);
-    if !answer_items.is_empty() {
-        return (
-            SearchExposureClassV1::AnswerBearing,
-            answer_items.into_iter().collect(),
-            SearchFindingMethodV1::ExactMatch,
-            1_000,
-        );
-    }
-
     let mut context_items = BTreeSet::new();
     let mut exact_context = false;
-    let mut fuzzy_context = false;
     for task in &bundle.public_packet.tasks {
         let task_words = normalized_words(&task.task_text);
         if task_words.len() >= 8 && contains_word_sequence(&body_words, &task_words) {
             exact_context = true;
             context_items.insert(task.item_id.clone());
-            continue;
-        }
-        // This conservative lexical rule is only a candidate duplicate detector:
-        // require at least two distinct shared 6-token shingles. It is not semantic.
-        if task_words.len() >= 12 && shared_shingle_count(&body_words, &task_words, 6) >= 2 {
-            fuzzy_context = true;
+        } else if task_words.len() >= 12
+            && shared_shingle_count(&body_words, &task_words, 6) >= 2
+        {
+            // Candidate lexical duplicate only; this is not semantic matching.
             context_items.insert(task.item_id.clone());
         }
+    }
+
+    let mut metadata_items = BTreeSet::new();
+    for task in &bundle.public_packet.tasks {
+        let item_words = normalized_words(&task.item_id);
+        if contains_word_sequence(&body_words, &item_words) {
+            metadata_items.insert(task.item_id.clone());
+        }
+    }
+
+    let answer_items = matching_answer_items(body, bundle);
+    // Integer-pair answers are a small namespace and can occur by chance in
+    // unrelated pages. Require a same-item identifier or task-context match.
+    let associated_answer_items: BTreeSet<String> = answer_items
+        .intersection(&context_items.union(&metadata_items).cloned().collect())
+        .cloned()
+        .collect();
+    if !associated_answer_items.is_empty() {
+        return (
+            SearchExposureClassV1::AnswerBearing,
+            associated_answer_items.into_iter().collect(),
+            SearchFindingMethodV1::ExactMatch,
+            1_000,
+        );
     }
     if !context_items.is_empty() {
         return (
@@ -396,13 +407,6 @@ fn analyze_response_body(
         );
     }
 
-    let mut metadata_items = BTreeSet::new();
-    for task in &bundle.public_packet.tasks {
-        let item_words = normalized_words(&task.item_id);
-        if contains_word_sequence(&body_words, &item_words) {
-            metadata_items.insert(task.item_id.clone());
-        }
-    }
     let metadata_terms = [
         bundle.public_packet.batch_id.as_str(),
         bundle.public_packet.benchmark_id.as_str(),
@@ -428,7 +432,6 @@ fn analyze_response_body(
         0,
     )
 }
-
 /// Deterministically match evaluator-retained response bodies against task
 /// metadata, exact/near-exact task text, and sealed exact-answer objects.
 ///
@@ -1271,7 +1274,11 @@ mod tests {
 
         let cases = [
             (
-                serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap(),
+                format!(
+                    "{} {}",
+                    bundle.public_packet.tasks[0].item_id,
+                    serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap()
+                ),
                 SearchExposureClassV1::AnswerBearing,
             ),
             (
@@ -1316,6 +1323,43 @@ mod tests {
     }
 
     #[test]
+    fn answer_pair_without_matching_item_or_context_is_not_called_answer_leakage() {
+        let config = crate::fresh_instance::FreshChallengeConfigV1 {
+            schema: crate::fresh_instance::FRESH_CONFIG_SCHEMA.to_owned(),
+            batch_id: "fresh-search-negative".to_owned(),
+            benchmark_id: "negative-answer-collision".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            task_family: "linear-system-2x2".to_owned(),
+            requested_item_count: 2,
+            matrix_coefficient_min: -9,
+            matrix_coefficient_max: 9,
+            solution_component_min: -5,
+            solution_component_max: 5,
+            minimum_absolute_determinant: 1,
+            minimum_normalized_determinant_margin_permille: 50,
+            model_checkpoint_sha256: digest("negative-checkpoint"),
+            checkpoint_freeze_receipt_sha256: digest("negative-freeze"),
+            checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
+            challenge_generated_at_utc: "2026-10-31T18:01:00Z".to_owned(),
+            generator_source_sha256: digest("negative-source"),
+            generator_binary_sha256: digest("negative-binary"),
+            runtime_image_sha256: digest("negative-runtime"),
+            generator_config_sha256: String::new(),
+        };
+        let mut config = config;
+        config.generator_config_sha256 =
+            crate::fresh_instance::canonical_config_digest(&config).unwrap();
+        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
+            &config,
+            &[0x94; 32],
+        ).unwrap();
+        let body = serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap();
+        let (class, items, _, _) = analyze_response_body(&body, &bundle);
+        assert_eq!(class, SearchExposureClassV1::Unknown);
+        assert!(items.is_empty());
+    }
+
+    #[test]
     fn nested_answer_objects_are_found_without_publishing_raw_content() {
         let config = crate::fresh_instance::FreshChallengeConfigV1 {
             schema: crate::fresh_instance::FRESH_CONFIG_SCHEMA.to_owned(),
@@ -1347,7 +1391,10 @@ mod tests {
             &[0x93; 32],
         ).unwrap();
         let solution = serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap();
-        let body = format!(r#"{{"tool_result":{{"answer":{solution}}},"other":"metadata"}}"#);
+        let body = format!(
+            "{} {{\"tool_result\":{{\"answer\":{solution}}},\"other\":\"metadata\"}}",
+            bundle.public_packet.tasks[0].item_id
+        );
         let mut trace = trace_fixture();
         trace.challenge_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
         trace.model_checkpoint_sha256 = bundle.public_packet.model_checkpoint_sha256.clone();
