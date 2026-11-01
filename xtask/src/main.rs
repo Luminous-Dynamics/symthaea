@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod basalt_admission;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -14,6 +15,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Evaluate a claim-scoped BASALT evidence capsule against an exact claim binding.
+    /// Prints a machine-readable report and exits non-zero unless every mandatory obligation is valid.
+    BasaltAdmissionCheck {
+        #[arg(long)]
+        input: PathBuf,
+    },
+
     /// Discovery check: flag a new crate that re-implements an existing symthaea-core module.
     /// Fails only on an UNADJUDICATED collision; known ones live in docs/crate-status.toml.
     DuplicateScan {
@@ -113,6 +121,9 @@ fn main() -> anyhow::Result<()> {
                 "Manifest generated at {}",
                 root.join("manifest.json").display()
             );
+        }
+        Commands::BasaltAdmissionCheck { input } => {
+            basalt_admission::check(input)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
