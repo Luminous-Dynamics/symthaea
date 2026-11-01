@@ -1,0 +1,589 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-access-trial-report-v1.json",
+  "title": "Randomized search-time access policy trial report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_checkpoint_sha256",
+    "challenge_packet_sha256",
+    "study_sha256",
+    "run_order_seed_commitment_sha256",
+    "independent_block_count",
+    "minimum_confirmatory_blocks",
+    "block_count_meets_minimum",
+    "every_run_completed_with_matching_budgets",
+    "every_trace_integrity_valid",
+    "every_finding_report_bound_to_trace",
+    "run_state_namespace_identifiers_unique",
+    "run_state_reset_receipts_present",
+    "run_state_isolation_independently_verified",
+    "condition_means",
+    "allowlisted_minus_disabled_accuracy_permille",
+    "unrestricted_minus_disabled_accuracy_permille",
+    "unrestricted_minus_allowlisted_accuracy_permille",
+    "allowlisted_minus_disabled_coverage_permille",
+    "unrestricted_minus_disabled_coverage_permille",
+    "allowlisted_answer_bearing_minus_disabled",
+    "unrestricted_answer_bearing_minus_disabled",
+    "block_effects",
+    "complete_mediation_verified",
+    "independently_verified",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_access_trial_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "challenge_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_order_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "independent_block_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "minimum_confirmatory_blocks": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "block_count_meets_minimum": {
+      "type": "boolean"
+    },
+    "every_run_completed_with_matching_budgets": {
+      "type": "boolean"
+    },
+    "every_trace_integrity_valid": {
+      "type": "boolean"
+    },
+    "every_finding_report_bound_to_trace": {
+      "type": "boolean"
+    },
+    "run_state_namespace_identifiers_unique": {
+      "type": "boolean"
+    },
+    "run_state_reset_receipts_present": {
+      "type": "boolean"
+    },
+    "run_state_isolation_independently_verified": {
+      "const": false
+    },
+    "condition_means": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "condition",
+          "accuracy_over_all_permille",
+          "coverage_permille",
+          "metadata_only_findings_per_run",
+          "context_bearing_findings_per_run",
+          "answer_bearing_findings_per_run",
+          "unknown_findings_per_run"
+        ],
+        "properties": {
+          "condition": {
+            "type": "string",
+            "enum": [
+              "network_disabled",
+              "allowlisted",
+              "unrestricted"
+            ]
+          },
+          "accuracy_over_all_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "coverage_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "metadata_only_findings_per_run": {
+            "type": "number",
+            "minimum": 0
+          },
+          "context_bearing_findings_per_run": {
+            "type": "number",
+            "minimum": 0
+          },
+          "answer_bearing_findings_per_run": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unknown_findings_per_run": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "allowlisted_minus_disabled_accuracy_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "unrestricted_minus_disabled_accuracy_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "unrestricted_minus_allowlisted_accuracy_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "allowlisted_minus_disabled_coverage_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "unrestricted_minus_disabled_coverage_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "allowlisted_answer_bearing_minus_disabled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "unrestricted_answer_bearing_minus_disabled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "block_effects": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "allowlisted_minus_disabled_accuracy_permille",
+          "unrestricted_minus_disabled_accuracy_permille",
+          "unrestricted_minus_allowlisted_accuracy_permille",
+          "allowlisted_minus_disabled_coverage_permille",
+          "unrestricted_minus_disabled_coverage_permille",
+          "allowlisted_answer_bearing_minus_disabled",
+          "unrestricted_answer_bearing_minus_disabled"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "allowlisted_minus_disabled_accuracy_permille": {
+            "type": "number"
+          },
+          "unrestricted_minus_disabled_accuracy_permille": {
+            "type": "number"
+          },
+          "unrestricted_minus_allowlisted_accuracy_permille": {
+            "type": "number"
+          },
+          "allowlisted_minus_disabled_coverage_permille": {
+            "type": "number"
+          },
+          "unrestricted_minus_disabled_coverage_permille": {
+            "type": "number"
+          },
+          "allowlisted_answer_bearing_minus_disabled": {
+            "type": "integer"
+          },
+          "unrestricted_answer_bearing_minus_disabled": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "complete_mediation_verified": {
+      "const": false
+    },
+    "independently_verified": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_blocks",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_blocks": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "conditionMean": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "accuracy_over_all_permille",
+        "coverage_permille",
+        "metadata_only_findings_per_run",
+        "context_bearing_findings_per_run",
+        "answer_bearing_findings_per_run",
+        "unknown_findings_per_run"
+      ],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "enum": [
+            "network_disabled",
+            "allowlisted",
+            "unrestricted"
+          ]
+        },
+        "accuracy_over_all_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "coverage_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "metadata_only_findings_per_run": {
+          "type": "number",
+          "minimum": 0
+        },
+        "context_bearing_findings_per_run": {
+          "type": "number",
+          "minimum": 0
+        },
+        "answer_bearing_findings_per_run": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unknown_findings_per_run": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id",
+        "allowlisted_minus_disabled_accuracy_permille",
+        "unrestricted_minus_disabled_accuracy_permille",
+        "unrestricted_minus_allowlisted_accuracy_permille",
+        "allowlisted_minus_disabled_coverage_permille",
+        "unrestricted_minus_disabled_coverage_permille",
+        "allowlisted_answer_bearing_minus_disabled",
+        "unrestricted_answer_bearing_minus_disabled"
+      ],
+      "properties": {
+        "block_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowlisted_minus_disabled_accuracy_permille": {
+          "type": "number"
+        },
+        "unrestricted_minus_disabled_accuracy_permille": {
+          "type": "number"
+        },
+        "unrestricted_minus_allowlisted_accuracy_permille": {
+          "type": "number"
+        },
+        "allowlisted_minus_disabled_coverage_permille": {
+          "type": "number"
+        },
+        "unrestricted_minus_disabled_coverage_permille": {
+          "type": "number"
+        },
+        "allowlisted_answer_bearing_minus_disabled": {
+          "type": "integer"
+        },
+        "unrestricted_answer_bearing_minus_disabled": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
