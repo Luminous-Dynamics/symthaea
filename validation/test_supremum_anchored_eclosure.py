@@ -1,4 +1,5 @@
 from fractions import Fraction
+from itertools import combinations
 import unittest
 
 from supremum_anchored_eclosure import (
@@ -275,7 +276,7 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
                 for intersection in (
                     frozenset(group)
                     for size in range(1, len(universe) + 1)
-                    for group in __import__("itertools").combinations(universe, size)
+                    for group in combinations(universe, size)
                 )
             }
             exhaustive = select_largest_certified_superset(
