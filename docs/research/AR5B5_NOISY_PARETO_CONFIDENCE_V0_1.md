@@ -133,3 +133,8 @@ The plan caps the frozen candidate family at one million identities. This keeps 
 ## 9. Append and restart complexity
 
 The study uses private candidate/sample/seed indexes. New study construction validates the frozen plan; incremental appends validate only the new replicate and update indexes. A study deserialized from bytes replays its complete contents once before it may append; full \`validate()\` and \`report()\` continue to inspect the complete retained state. This avoids validating the entire sample history on every append. No runtime throughput claim is made.
+
+
+## 10. Schema version note
+
+The expanded noisy observation plan/report schema is `0.2.0`. It binds sampling-protocol and noise-model identifiers/digests and each objective's bounds-certificate digest. Earlier `0.1.0` plans are not equivalent and must not be silently upgraded.
