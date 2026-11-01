@@ -95,6 +95,16 @@
       "id": "TSTATE-MODEL-018",
       "invariant": "A plan prepared against a state snapshot is submitted to a divergent snapshot with the same revision number",
       "expected": "Reject StateSnapshotMismatch and leave the divergent snapshot byte-for-byte/field-for-field unchanged"
+    },
+    {
+      "id": "TSTATE-MODEL-019",
+      "invariant": "Existing source changes its transparency-log origin without continuity evidence",
+      "expected": "Reject UnauthorizedLogOriginTransition and leave source cursor/log cursors unchanged"
+    },
+    {
+      "id": "TSTATE-MODEL-020",
+      "invariant": "Existing source changes log origin with explicit continuity evidence and a separately pinned new-log bootstrap checkpoint",
+      "expected": "Advance the same stable source cursor to the next generation and retain both old and new log checkpoints"
     }
   ],
   "metrics": [
