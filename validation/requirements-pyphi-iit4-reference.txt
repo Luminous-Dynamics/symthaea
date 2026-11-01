@@ -7,7 +7,8 @@ msgspec==0.22.0
 numpy==2.5.4
 pandas==3.1.0
 psutil==7.2.2
-pyphi==2.0.0rc4
+# PyPhi itself is installed from its SHA-256-verified wheel in the workflow.
+# PyPI wheel SHA-256: a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620
 python-dateutil==4.0.0
 PyYAML==6.0.3
 scipy==1.18.1
