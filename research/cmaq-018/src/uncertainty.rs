@@ -6,6 +6,8 @@
 //! pointwise intervals do not automatically remain calibrated after selecting
 //! the most attractive action.
 
+use std::fmt::Write as _;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PredictiveInterval {
     pub lower: f64,
