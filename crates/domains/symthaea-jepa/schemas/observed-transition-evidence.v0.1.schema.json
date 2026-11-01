@@ -13,6 +13,7 @@
     "target_observation_sha256",
     "target_embedding_sha256",
     "action_manifest_sha256",
+    "action_binding_sha256",
     "episode_id",
     "branch_id",
     "forecast_id",
@@ -120,6 +121,11 @@
     "max_target_lateness_seconds": {
       "type": "number",
       "minimum": 0
+    },
+    "action_binding_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Recomputed by JEPA from the action-manifest digest, stable action ID and discrete action index."
     }
   },
   "x-rust-invariants": [
@@ -133,6 +139,7 @@
     "the action index must exist in the configured discrete action space",
     "source_embedding_sha256 and target_embedding_sha256 are recomputed from the exact supplied ContinuousHV values and must match",
     "both embeddings must have configured input dimension and finite f32 values",
-    "action_started_at_seconds <= action_ended_at_seconds <= requested_target_time_seconds"
+    "action_started_at_seconds <= action_ended_at_seconds <= requested_target_time_seconds",
+    "action_binding_sha256 equals the domain-separated SHA-256 of action_manifest_sha256, action_id and action_index"
   ]
 }
