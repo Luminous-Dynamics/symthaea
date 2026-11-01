@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT storage engine qualification benchmark v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "implementation_status",
+    "claim_ceiling",
+    "arms",
+    "scenarios",
+    "metrics",
+    "fault_model",
+    "benchmark_rules",
+    "workload_matrix"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-storage-engine-qualification-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "implementation_status": {
+      "enum": [
+        "specification_only",
+        "harness_implemented",
+        "partial_runs",
+        "qualified"
+      ]
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "engine",
+          "role",
+          "client",
+          "topology",
+          "durability_profile"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{2,64}$"
+          },
+          "engine": {
+            "enum": [
+              "sqlite",
+              "turso",
+              "postgresql",
+              "etcd",
+              "redb"
+            ]
+          },
+          "role": {
+            "enum": [
+              "local_relational",
+              "local_kv",
+              "remote_relational_authority",
+              "remote_coordination_authority"
+            ]
+          },
+          "client": {
+            "type": "string",
+            "minLength": 1
+          },
+          "topology": {
+            "type": "string",
+            "minLength": 1
+          },
+          "durability_profile": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "mutation",
+          "expected",
+          "safety_gate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^STO-[0-9]{3}$"
+          },
+          "class": {
+            "enum": [
+              "durability",
+              "atomicity",
+              "concurrency",
+              "idempotency",
+              "freshness",
+              "restore",
+              "operational",
+              "control"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "enum": [
+              "survive",
+              "atomic_abort",
+              "single_commit",
+              "original_receipt_and_current_revision",
+              "conflict_then_reverify",
+              "unknown_or_reject",
+              "no_false_freshness",
+              "measure_only"
+            ]
+          },
+          "safety_gate": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "safety",
+              "performance",
+              "resource",
+              "operations"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "fault_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_crash_distinct_from_power_loss",
+        "power_loss_discards_unsynced_writes",
+        "tested_store_is_not_its_own_external_witness",
+        "remote_and_local_latencies_separated"
+      ],
+      "properties": {
+        "process_crash_distinct_from_power_loss": {
+          "const": true
+        },
+        "power_loss_discards_unsynced_writes": {
+          "const": true
+        },
+        "tested_store_is_not_its_own_external_witness": {
+          "const": true
+        },
+        "remote_and_local_latencies_separated": {
+          "const": true
+        }
+      }
+    },
+    "benchmark_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety_before_efficiency",
+        "no_composite_score_offsets_safety",
+        "pin_engine_and_client_versions",
+        "publish_raw_fault_schedule_and_durable_image",
+        "external_witness_required_for_rollback_claim",
+        "no_migration_until_safety_gates_pass"
+      ],
+      "properties": {
+        "safety_before_efficiency": {
+          "const": true
+        },
+        "no_composite_score_offsets_safety": {
+          "const": true
+        },
+        "pin_engine_and_client_versions": {
+          "const": true
+        },
+        "publish_raw_fault_schedule_and_durable_image": {
+          "const": true
+        },
+        "external_witness_required_for_rollback_claim": {
+          "const": true
+        },
+        "no_migration_until_safety_gates_pass": {
+          "const": true
+        }
+      }
+    },
+    "workload_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clients",
+        "receipts",
+        "source_lineages",
+        "log_origins",
+        "distributions",
+        "fault_modes"
+      ],
+      "properties": {
+        "clients": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "source_lineages": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "log_origins": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "distributions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fault_modes": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
