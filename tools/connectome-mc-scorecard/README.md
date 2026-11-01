@@ -10,7 +10,7 @@ A metric is a measurement instrument. Before it is used to rank predictive model
 The report includes:
 - Zero-effect false-positive upper Wilson bound.
 - Positive-control win rate and one-sided Wilson lower/upper bounds at each effect magnitude.
-- Mean oriented metric improvement by effect magnitude.
+- Mean oriented metric improvement and dynamic-range fraction (positive-control gain divided by the uninformative-to-perfect control range) by effect magnitude.
 - Monotonicity violations across positive effect sizes.
 - A pass/fail flag limited to the declared control grid and thresholds.
 
