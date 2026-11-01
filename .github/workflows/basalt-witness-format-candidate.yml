@@ -1,0 +1,33 @@
+name: BASALT Witness Rustfmt Candidate
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-witness-verifier/**"
+      - ".github/workflows/basalt-witness-format-candidate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  format-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Format verifier in disposable checkout
+        run: |
+          cargo fmt --manifest-path tools/basalt-witness-verifier/Cargo.toml
+          mkdir -p basalt-witness-formatted/tools/basalt-witness-verifier/src
+          cp tools/basalt-witness-verifier/src/lib.rs basalt-witness-formatted/tools/basalt-witness-verifier/src/lib.rs
+          cp tools/basalt-witness-verifier/src/main.rs basalt-witness-formatted/tools/basalt-witness-verifier/src/main.rs
+      - name: Upload rustfmt candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-witness-rustfmt-${{ github.sha }}
+          path: basalt-witness-formatted/
+          if-no-files-found: error
+          retention-days: 1
