@@ -173,7 +173,7 @@ class PredictableArrivalEclosureTests(unittest.TestCase):
             if e["kind"] == "activation_commit" and e["round"] == 2
         )
         activation["pre_state_sha256"] = "0" * 64
-        with self.assertRaisesRegex(ValueError, "pre-evidence filtration state"):
+        with self.assertRaisesRegex(ValueError, "recorded prefix and context digest"):
             audit_predictable_arrival_ledger(
                 self.hypotheses, bad, len(self.capacity)
             )
