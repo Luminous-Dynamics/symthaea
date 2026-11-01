@@ -485,7 +485,8 @@
           "required": [
             "receipt_sha256",
             "task_id_sha256",
-            "integrity_status"
+            "integrity_status",
+            "reviewer_key_registry_sha256"
           ],
           "properties": {
             "receipt_sha256": {
@@ -496,6 +497,9 @@
             },
             "integrity_status": {
               "const": "eligible"
+            },
+            "reviewer_key_registry_sha256": {
+              "$ref": "#/$defs/sha256"
             }
           }
         }
