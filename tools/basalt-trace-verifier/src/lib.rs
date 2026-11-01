@@ -13,6 +13,7 @@ pub struct Trace {
     pub authority: Authority,
     pub initial_state: InitialState,
     pub operations: Vec<Operation>,
+    #[serde(default)]
     pub reference_linearization_order: Vec<String>,
     pub faults: Vec<Fault>,
     pub witness_observations: Vec<WitnessObservation>,
