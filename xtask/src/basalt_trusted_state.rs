@@ -1683,19 +1683,20 @@ impl SqliteTrustedStateStore {
                 },
             ));
         }
+        let Some(planned_receipt) = plan.next_state.accepted_receipts.get(&plan.receipt_digest) else {
+            return Err(DurableStoreError::Transition(
+                TransitionError::InvalidAdvancePlan,
+            ));
+        };
         if current.log_cursors.len() >= MAX_SQLITE_LOG_CURSORS
-            && !plan.next_state.log_cursors.contains_key(
-                &plan.next_state.accepted_receipts[&plan.receipt_digest].checkpoint.log_id
-            )
+            && !current.log_cursors.contains_key(&planned_receipt.checkpoint.log_id)
         {
             return Err(DurableStoreError::Storage(
                 "BASALT SQLite log-cursor limit reached".to_string(),
             ));
         }
         if current.source_cursors.len() >= MAX_SQLITE_SOURCE_CURSORS
-            && !plan.next_state.source_cursors.contains_key(
-                &plan.next_state.accepted_receipts[&plan.receipt_digest].source
-            )
+            && !current.source_cursors.contains_key(&planned_receipt.source)
         {
             return Err(DurableStoreError::Storage(
                 "BASALT SQLite source-cursor limit reached".to_string(),
