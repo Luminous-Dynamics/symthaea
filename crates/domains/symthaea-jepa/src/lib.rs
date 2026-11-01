@@ -77,6 +77,119 @@ pub struct JepaTelemetry {
     pub variance_penalty: f32,
 }
 
+
+/// Evidence supplied by an observation adapter for one action-conditioned
+/// transition. The digests identify upstream artifacts; this crate validates
+/// their syntax and temporal bindings, but does not authenticate their bytes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObservedTransitionEvidence {
+    pub source_history_sha256: String,
+    pub source_observation_sha256: String,
+    pub target_observation_sha256: String,
+    pub action_manifest_sha256: String,
+    pub source_observation_id: String,
+    pub target_observation_id: String,
+    pub source_sequence: u64,
+    pub target_sequence: u64,
+    pub action_id: u64,
+    pub action_index: u8,
+    pub source_observed_at_seconds: f64,
+    pub action_started_at_seconds: f64,
+    pub action_ended_at_seconds: f64,
+    pub target_observed_at_seconds: f64,
+}
+
+/// Stable candidate identity mapped to the JEPA discrete action embedding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActionCandidate {
+    pub action_id: u64,
+    pub action_index: u8,
+}
+
+/// One deterministic JEPA latent prediction for a candidate action.
+/// This is a point prediction, not a calibrated distribution or joint draw.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActionLatentPrediction {
+    pub action_id: u64,
+    pub action_index: u8,
+    pub predicted_latent: Vec<f32>,
+}
+
+/// Predictions for a frozen action set, all computed from one encoded context.
+/// The manifest/history digests are identifiers supplied by the caller.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OneStepActionSetPrediction {
+    pub source_history_sha256: String,
+    pub action_manifest_sha256: String,
+    pub predictions: Vec<ActionLatentPrediction>,
+}
+
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_observed_transition(
+    config: &JepaConfig,
+    current_hv: &ContinuousHV,
+    next_hv: &ContinuousHV,
+    evidence: &ObservedTransitionEvidence,
+    learning_rate: f32,
+) -> Result<(), String> {
+    for (name, digest) in [
+        ("source_history_sha256", &evidence.source_history_sha256),
+        ("source_observation_sha256", &evidence.source_observation_sha256),
+        ("target_observation_sha256", &evidence.target_observation_sha256),
+        ("action_manifest_sha256", &evidence.action_manifest_sha256),
+    ] {
+        if !is_lower_hex_sha256(digest) {
+            return Err(format!("{name} must be a lowercase SHA-256 digest"));
+        }
+    }
+    if evidence.source_observation_id.trim().is_empty()
+        || evidence.target_observation_id.trim().is_empty()
+        || evidence.source_observation_id == evidence.target_observation_id
+    {
+        return Err("source and target observation IDs must be non-empty and distinct".into());
+    }
+    if evidence.source_sequence >= evidence.target_sequence {
+        return Err("target observation sequence must be later than source sequence".into());
+    }
+    let times = [
+        evidence.source_observed_at_seconds,
+        evidence.action_started_at_seconds,
+        evidence.action_ended_at_seconds,
+        evidence.target_observed_at_seconds,
+    ];
+    if !times.iter().all(|value| value.is_finite())
+        || !(times[0] <= times[1] && times[1] <= times[2] && times[2] < times[3])
+    {
+        return Err("transition times must be finite and satisfy source <= action start <= action end < target observation".into());
+    }
+    if evidence.action_index as usize >= config.num_actions {
+        return Err(format!(
+            "action index {} is outside configured action space {}",
+            evidence.action_index, config.num_actions
+        ));
+    }
+    if current_hv.dim() != config.input_dim || next_hv.dim() != config.input_dim {
+        return Err(format!(
+            "observed transition dimensions must both equal configured input dimension {}",
+            config.input_dim
+        ));
+    }
+    if !current_hv.as_slice().iter().all(|value| value.is_finite())
+        || !next_hv.as_slice().iter().all(|value| value.is_finite())
+    {
+        return Err("observed transition contains non-finite vector values".into());
+    }
+    if !learning_rate.is_finite() || !(0.0..=1.0).contains(&learning_rate) || learning_rate == 0.0 {
+        return Err("learning rate must be finite and in (0, 1]".into());
+    }
+    Ok(())
+}
+
+
 /// JEPA engine: the top-level API composing all components.
 ///
 /// Call `forward()` each cognitive cycle with the current and next HDC states
@@ -186,6 +299,117 @@ impl JepaEngine {
         total_loss
     }
 
+    /// Train JEPA against a separately acquired later observation.
+    ///
+    /// Unlike the low-level train_step API, this path requires explicit
+    /// observation/action provenance and strict temporal ordering. The evidence
+    /// digests are identifiers only: upstream adapters remain responsible for
+    /// authenticating that the vectors correspond to the retained observation
+    /// bytes and that the target was not generated by this model.
+    pub fn train_observed_transition(
+        &mut self,
+        current_hv: &ContinuousHV,
+        next_observed_hv: &ContinuousHV,
+        evidence: &ObservedTransitionEvidence,
+        learning_rate: f32,
+    ) -> Result<f32, String> {
+        validate_observed_transition(
+            &self.config,
+            current_hv,
+            next_observed_hv,
+            evidence,
+            learning_rate,
+        )?;
+        Ok(self.train_step(
+            current_hv,
+            next_observed_hv,
+            evidence.action_index,
+            learning_rate,
+        ))
+    }
+
+    /// Score an observation-grounded transition without updating model weights.
+    pub fn evaluate_observed_transition(
+        &mut self,
+        current_hv: &ContinuousHV,
+        next_observed_hv: &ContinuousHV,
+        evidence: &ObservedTransitionEvidence,
+    ) -> Result<(f32, f64), String> {
+        validate_observed_transition(
+            &self.config,
+            current_hv,
+            next_observed_hv,
+            evidence,
+            self.config.learning_rate.max(f32::MIN_POSITIVE),
+        )?;
+        Ok(self.forward(
+            current_hv,
+            next_observed_hv,
+            evidence.action_index,
+            1.0,
+        ))
+    }
+
+    /// Produce one-step latent predictions for a frozen set of candidate
+    /// actions. The current observation is encoded exactly once; each candidate
+    /// is then evaluated from that same context. Outputs are deterministic
+    /// point predictions and must not be relabelled as uncertainty samples.
+    pub fn predict_action_set_one_step(
+        &self,
+        current_hv: &ContinuousHV,
+        source_history_sha256: &str,
+        action_manifest_sha256: &str,
+        candidates: &[ActionCandidate],
+    ) -> Result<OneStepActionSetPrediction, String> {
+        for (name, digest) in [
+            ("source_history_sha256", source_history_sha256),
+            ("action_manifest_sha256", action_manifest_sha256),
+        ] {
+            if !is_lower_hex_sha256(digest) {
+                return Err(format!("{name} must be a lowercase SHA-256 digest"));
+            }
+        }
+        if current_hv.dim() != self.config.input_dim
+            || !current_hv.as_slice().iter().all(|value| value.is_finite())
+        {
+            return Err("current observation has invalid dimension or non-finite values".into());
+        }
+        if candidates.len() < 2 {
+            return Err("at least two candidate actions are required".into());
+        }
+        for (index, candidate) in candidates.iter().enumerate() {
+            if candidate.action_index as usize >= self.config.num_actions {
+                return Err(format!("candidate {index} has an out-of-range action index"));
+            }
+            if candidates[..index].iter().any(|previous| {
+                previous.action_id == candidate.action_id
+                    || previous.action_index == candidate.action_index
+            }) {
+                return Err("candidate action IDs and action indices must be unique".into());
+            }
+        }
+
+        let context = self.context.encode(current_hv);
+        let predictions = candidates
+            .iter()
+            .map(|candidate| ActionLatentPrediction {
+                action_id: candidate.action_id,
+                action_index: candidate.action_index,
+                predicted_latent: self.predictor.predict(&context, candidate.action_index),
+            })
+            .collect::<Vec<_>>();
+        if predictions.iter().any(|prediction| {
+            !prediction.predicted_latent.iter().all(|value| value.is_finite())
+        }) {
+            return Err("JEPA action-set prediction produced non-finite values".into());
+        }
+        Ok(OneStepActionSetPrediction {
+            source_history_sha256: source_history_sha256.to_string(),
+            action_manifest_sha256: action_manifest_sha256.to_string(),
+            predictions,
+        })
+    }
+
     /// Get the most recent latent prediction error.
     pub fn latent_pe(&self) -> f32 {
         self.state.last_pe
@@ -220,6 +444,130 @@ mod tests {
 
     fn make_engine() -> JepaEngine {
         JepaEngine::new(JepaConfig::default(), 12345)
+    }
+
+    fn observed_evidence(action_index: u8) -> ObservedTransitionEvidence {
+        ObservedTransitionEvidence {
+            source_history_sha256: "a".repeat(64),
+            source_observation_sha256: "b".repeat(64),
+            target_observation_sha256: "c".repeat(64),
+            action_manifest_sha256: "d".repeat(64),
+            source_observation_id: "frame-10".into(),
+            target_observation_id: "frame-11".into(),
+            source_sequence: 10,
+            target_sequence: 11,
+            action_id: 42,
+            action_index,
+            source_observed_at_seconds: 1.0,
+            action_started_at_seconds: 1.01,
+            action_ended_at_seconds: 1.05,
+            target_observed_at_seconds: 1.08,
+        }
+    }
+
+    #[test]
+    fn observed_transition_training_accepts_later_observation_with_bound_action() {
+        let mut engine = make_engine();
+        let current = random_hv(501);
+        let observed_next = random_hv(502);
+        let loss = engine
+            .train_observed_transition(&current, &observed_next, &observed_evidence(2), 0.001)
+            .unwrap();
+        assert!(loss.is_finite());
+        assert!(engine.latent_pe().is_finite());
+    }
+
+    #[test]
+    fn observed_transition_training_rejects_unverifiable_or_misaligned_evidence() {
+        let engine = make_engine();
+        let current = random_hv(511);
+        let next = random_hv(512);
+
+        let mut malformed = observed_evidence(2);
+        malformed.target_observation_sha256 = "not-a-digest".into();
+        let mut candidate = make_engine();
+        assert!(candidate
+            .train_observed_transition(&current, &next, &malformed, 0.001)
+            .is_err());
+
+        let mut malformed = observed_evidence(2);
+        malformed.target_sequence = malformed.source_sequence;
+        assert!(candidate
+            .train_observed_transition(&current, &next, &malformed, 0.001)
+            .is_err());
+
+        let mut malformed = observed_evidence(2);
+        malformed.target_observed_at_seconds = malformed.action_ended_at_seconds;
+        assert!(candidate
+            .train_observed_transition(&current, &next, &malformed, 0.001)
+            .is_err());
+
+        let malformed = observed_evidence(250);
+        assert!(candidate
+            .train_observed_transition(&current, &next, &malformed, 0.001)
+            .is_err());
+
+        let malformed = observed_evidence(2);
+        assert!(candidate
+            .train_observed_transition(&current, &next, &malformed, f32::NAN)
+            .is_err());
+    }
+
+    #[test]
+    fn action_set_predictions_share_one_context_and_preserve_candidate_identity() {
+        let engine = make_engine();
+        let current = random_hv(521);
+        let result = engine
+            .predict_action_set_one_step(
+                &current,
+                &"a".repeat(64),
+                &"b".repeat(64),
+                &[
+                    ActionCandidate { action_id: 700, action_index: 1 },
+                    ActionCandidate { action_id: 300, action_index: 3 },
+                    ActionCandidate { action_id: 900, action_index: 5 },
+                ],
+            )
+            .unwrap();
+        assert_eq!(
+            result.predictions.iter().map(|item| item.action_id).collect::<Vec<_>>(),
+            vec![700, 300, 900]
+        );
+        assert_eq!(
+            result.predictions.iter().map(|item| item.predicted_latent.len()).collect::<Vec<_>>(),
+            vec![engine.config().latent_dim; 3]
+        );
+        assert!(result.predictions.iter().all(|item| {
+            item.predicted_latent.iter().all(|value| value.is_finite())
+        }));
+    }
+
+    #[test]
+    fn action_set_prediction_rejects_duplicate_ids_indices_and_bad_digests() {
+        let engine = make_engine();
+        let current = random_hv(531);
+        let candidates = [
+            ActionCandidate { action_id: 1, action_index: 1 },
+            ActionCandidate { action_id: 1, action_index: 2 },
+        ];
+        assert!(engine
+            .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates)
+            .is_err());
+
+        let candidates = [
+            ActionCandidate { action_id: 1, action_index: 1 },
+            ActionCandidate { action_id: 2, action_index: 1 },
+        ];
+        assert!(engine
+            .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates)
+            .is_err());
+
+        assert!(engine
+            .predict_action_set_one_step(&current, "bad", &"b".repeat(64), &candidates)
+            .is_err());
+        assert!(engine
+            .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates[..1])
+            .is_err());
     }
 
     fn random_hv(seed: u64) -> ContinuousHV {
