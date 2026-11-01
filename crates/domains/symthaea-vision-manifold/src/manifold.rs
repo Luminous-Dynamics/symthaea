@@ -7524,10 +7524,18 @@ mod tests {
             .unwrap();
         let mut evaluator = DelayedHorizonEvaluator::new(vec![(1.0, "far".into())]).unwrap();
         evaluator.observe(&manifold, 0.01).unwrap();
+        let prediction_digest_before = evaluator.pending[0].prediction_blake3.clone();
+        let persistence_digest_before = evaluator.pending[0].persistence_blake3.clone();
         evaluator.dilate(512);
         assert_eq!(evaluator.hdc_dim, Some(512));
         assert_eq!(evaluator.pending[0].predicted.dim(), 512);
         assert_eq!(evaluator.pending[0].persistence.dim(), 512);
+        assert_ne!(evaluator.pending[0].prediction_blake3, prediction_digest_before);
+        assert_ne!(evaluator.pending[0].persistence_blake3, persistence_digest_before);
+        assert_eq!(
+            evaluator.pending[0].prediction_blake3,
+            visual_hv_blake3(&evaluator.pending[0].predicted)
+        );
     }
 
     #[test]
