@@ -255,7 +255,10 @@ mod tests {
             true
         );
         assert_eq!(value["guarantee"]["arbitrary_serial_pmu_pfa_claim"], false);
-        assert_eq!(value["guarantee"]["unknown_transition_matrix_supported"], false);
+        assert_eq!(
+            value["guarantee"]["unknown_transition_matrix_supported"],
+            false
+        );
         assert_eq!(value["guarantee"]["hidden_state_supported"], false);
         assert_eq!(
             value["guarantee"]["effective_sample_size_estimate"],
