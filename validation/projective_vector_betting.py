@@ -18,13 +18,21 @@ def _finite_vector(values: Iterable[float], name: str) -> list[float]:
 
 
 def assert_symmetric_psd(matrix: Sequence[Sequence[float]], tol: float = 1e-10) -> None:
-    """Validate symmetry and PSD using an LDL^T factorization with zero pivots."""
+    """Numerically screen symmetry/PSD using scale-normalized LDL^T.
+
+    This is a floating-point validation helper, not an exact PSD certificate.
+    """
     n = len(matrix)
     if n == 0 or any(len(row) != n for row in matrix):
         raise ValueError("matrix must be non-empty and square")
-    a = [[float(x) for x in row] for row in matrix]
-    if any(not isfinite(x) for row in a for x in row):
+    raw = [[float(x) for x in row] for row in matrix]
+    if any(not isfinite(x) for row in raw for x in row):
         raise ValueError("matrix entries must be finite")
+    scale = max((abs(x) for row in raw for x in row), default=0.0)
+    if scale == 0.0:
+        return
+    # Normalize so the same tolerance works for tiny and very large matrices.
+    a = [[x / scale for x in row] for row in raw]
     for i in range(n):
         for j in range(i):
             if abs(a[i][j] - a[j][i]) > tol:
