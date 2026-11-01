@@ -467,14 +467,16 @@ fn main() {
     ];
     let landmark_calibration = calibrate_landmark_ipcw(
         &landmark_rows,
-        5,
-        0.10,
-        0.05,
-        model_digest,
-        [29; 32],
-        [31; 32],
-        [30; 32],
-        population_digest,
+        LandmarkIpcwConfig {
+            landmark_work_units: 5,
+            miscoverage: 0.10,
+            minimum_censoring_survival_probability: 0.05,
+            model_digest,
+            censor_model_digest: [29; 32],
+            calibration_partition_digest: [31; 32],
+            nuisance_training_partition_digest: [30; 32],
+            population_cohort_digest: population_digest,
+        },
     )
     .unwrap();
     assert_eq!(landmark_calibration.normalized_residual_threshold, 3.0);
@@ -489,14 +491,16 @@ fn main() {
     let positivity_control = make_landmark_completion(205, 7, 1, 0.01);
     let positivity_result = calibrate_landmark_ipcw(
         &[positivity_control],
-        5,
-        0.10,
-        0.05,
-        model_digest,
-        [29; 32],
-        [31; 32],
-        [30; 32],
-        population_digest,
+        LandmarkIpcwConfig {
+            landmark_work_units: 5,
+            miscoverage: 0.10,
+            minimum_censoring_survival_probability: 0.05,
+            model_digest,
+            censor_model_digest: [29; 32],
+            calibration_partition_digest: [31; 32],
+            nuisance_training_partition_digest: [30; 32],
+            population_cohort_digest: population_digest,
+        },
     );
     assert_eq!(
         positivity_result,
@@ -510,14 +514,16 @@ fn main() {
     competing_control.censoring_receipt = None;
     let competing_result = calibrate_landmark_ipcw(
         &[competing_control],
-        5,
-        0.10,
-        0.05,
-        model_digest,
-        [29; 32],
-        [31; 32],
-        [30; 32],
-        population_digest,
+        LandmarkIpcwConfig {
+            landmark_work_units: 5,
+            miscoverage: 0.10,
+            minimum_censoring_survival_probability: 0.05,
+            model_digest,
+            censor_model_digest: [29; 32],
+            calibration_partition_digest: [31; 32],
+            nuisance_training_partition_digest: [30; 32],
+            population_cohort_digest: population_digest,
+        },
     );
     assert_eq!(
         competing_result,
