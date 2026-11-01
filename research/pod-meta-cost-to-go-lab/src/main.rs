@@ -1121,7 +1121,7 @@ fn main() {
             .unwrap();
     let feasibility = budgeted_replay.report.feasibility;
     println!(
-        "PREFIX_REPLAY_ROW\\tbudget-feasibility\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
+        "PREFIX_REPLAY_ROW\tbudget-feasibility\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         feasibility.budgeted_prefixes,
         feasibility.predicted_feasible,
         feasibility.predicted_infeasible,
