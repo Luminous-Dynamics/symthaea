@@ -260,7 +260,7 @@ impl SplitVectorConformalCalibrator {
         calibration_digest: [u8; 32],
         calibration_cohort_digest: [u8; 32],
     ) -> Result<Self, VectorConformalError> {
-        if !miscoverage.is_finite() || !(0.0..1.0).contains(&miscoverage) {
+        if !miscoverage.is_finite() || miscoverage <= 0.0 || miscoverage >= 1.0 {
             return Err(VectorConformalError::InvalidMiscoverage);
         }
         if examples.is_empty() {
@@ -748,6 +748,10 @@ mod tests {
         let row = [example(1, 1)];
         assert_eq!(
             SplitVectorConformalCalibrator::fit(&row, 0.0, MODEL, CALIBRATION, COHORT),
+            Err(VectorConformalError::InvalidMiscoverage)
+        );
+        assert_eq!(
+            SplitVectorConformalCalibrator::fit(&row, 1.0, MODEL, CALIBRATION, COHORT),
             Err(VectorConformalError::InvalidMiscoverage)
         );
         assert_eq!(
