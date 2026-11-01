@@ -73,6 +73,8 @@ This is an exact O(|I_t|) separation test. When the positive-part sum exceeds al
 
 This reduces the cost of checking one proposed rejection set from O(2^n) to O(n). If an outer exact action optimizer still enumerates 2^n candidate rejection sets, its closure-checking component can fall from O(4^n) to O(n 2^n). The action-optimization problem itself is not yet solved by this separator; it still needs an exact branch-and-bound or MILP treatment under cumulative capacity and persistence constraints.
 
+**Guarantee boundary:** this O(n) separator applies to the raw affine intersection certificates used for the stopped-FDR construction. It does not automatically apply after a nonlinear running-maximum adjuster is applied separately to every intersection: the adjusted value A(max_{s<=t} E_s^{S,w}) is no longer an additive function of the current coordinate values. For SupFDR, use the projectivity-preserving adjuster from the #9538 track and keep exhaustive local-constraint checking until a separate valid separator for the adjusted family is derived. The raw-coordinate monotonicity field in the oracle is only a path diagnostic, not evidence that the supplied coordinate paths are valid e-processes; in particular, a nontrivial valid e-process started at one is not generally pathwise nondecreasing.
+
 
 ## 3. SupFDR extension
 
@@ -120,7 +122,7 @@ The finite oracle implements both schemes with exact rational arithmetic and ver
 - `validation/countable_global_projective_eclosure.py` provides exact rational weights, projective certificate evaluation, exhaustive finite local-closure verification, dormant-one checks, full-true-set/active-true-set identity checks, and a pathwise monotonicity diagnostic.
 - `validation/test_countable_global_projective_eclosure.py` covers both weight families, random nested arrivals, dormant padding, empty true sets, local closure, invalid inputs, and the SupFDR condition boundary.
 
-The module is a finite exact oracle. It does not authenticate event timestamps, signatures, catalogues, or filtration completeness. It does not infer E[M_{i,t}|F_{t-1}]<=1 from a realised path. Predictable activation and the conditional e-process contract remain obligations of the upstream evidence producer. The exhaustive differential oracle is exponential and is intentionally test-only. The production-facing local-constraint separator is O(n), but the exact action optimizer still needs a scalable solution; no production-scale claim is made.
+The module is a finite exact oracle. It does not authenticate event timestamps, signatures, catalogues, or filtration completeness. It does not infer E[M_{i,t}|F_{t-1}]<=1 from a realised path. Predictable activation and the conditional e-process contract remain obligations of the upstream evidence producer. Its O(n) separator certifies the raw affine stopped-FDR closure only; the adjusted SupFDR route still needs an all-intersections verifier. The exhaustive differential oracle is exponential and is intentionally test-only. The production-facing local-constraint separator is O(n), but the exact action optimizer still needs a scalable solution; no production-scale claim is made.
 
 Run from the repository root:
 
