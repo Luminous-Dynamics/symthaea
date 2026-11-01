@@ -586,7 +586,7 @@ impl BitemporalEventLedger {
             prior_transaction_time = Some(revision.recorded_at_us);
             candidate.append_unchecked(*revision)?;
         }
-        if candidate.revisions != self.revisions {
+        if candidate != *self {
             return Err(BitemporalEventError::InvalidHistory);
         }
 
@@ -618,26 +618,28 @@ impl BitemporalEventLedger {
         if entity_id == 0 {
             return Err(BitemporalEventError::InvalidQueryEntity);
         }
-        self.verify_consistency()?;
-
-        let mut latest_by_event = BTreeMap::<u64, &EventRevision>::new();
-        for revision in self.revisions.iter().filter(|revision| {
-            revision.recorded_at_us <= known_at_us
-        }) {
-            let replace = latest_by_event.get(&revision.event_id)
-                .is_none_or(|existing| existing.revision_sequence < revision.revision_sequence);
-            if replace {
-                latest_by_event.insert(revision.event_id, revision);
-            }
-        }
-
+        // Indexes are maintained transactionally by append/append_batch.
+        // Per-event revision chains are append-ordered, so partition_point
+        // finds the latest revision known at the requested transaction time.
         let mut visible = Vec::new();
-        for revision in latest_by_event.values() {
+        let Some(event_ids) = self.events_by_entity.get(&entity_id) else {
+            return Ok(visible);
+        };
+        for event_id in event_ids {
+            let Some(chain) = self.revisions_by_event.get(event_id) else {
+                return Err(BitemporalEventError::InvalidHistory);
+            };
+            let known_count = chain.partition_point(|index| {
+                self.revisions[*index].recorded_at_us <= known_at_us
+            });
+            if known_count == 0 {
+                continue;
+            }
+            let revision = &self.revisions[chain[known_count - 1]];
             let Some(record) = revision.record() else {
                 continue;
             };
-            if record.entity_id == entity_id
-                && record.event_time_us <= valid_at_us
+            if record.event_time_us <= valid_at_us
                 && record.available_at_us <= known_at_us
             {
                 visible.push(record);
@@ -969,7 +971,9 @@ mod tests {
                 revision(1, 1, 1, 10, EventRevisionOperation::Assert { record: first }),
                 revision(2, 2, 1, 10, EventRevisionOperation::Assert { record: second }),
             ]),
-            Err(BitemporalEventError::InvalidHistory)
+            Err(BitemporalEventError::DuplicateActiveSourceSequence {
+                entity_id: 1, modality_id: 1, source_id: 1, source_sequence: 0,
+            })
         );
         assert!(ledger.revisions().is_empty());
     }
@@ -985,6 +989,29 @@ mod tests {
             Err(BitemporalEventError::NonIncreasingTransactionTime { previous: 10, actual: 10 })
         );
         assert_eq!(ledger.revisions().len(), 1);
+    }
+
+    #[test]
+    fn index_rebuild_matches_append_only_ledger_after_assert_correct_and_retract() {
+        let mut ledger = BitemporalEventLedger::default();
+        let first = revision_record(1, 10, 10, 1);
+        let second = revision_record(2, 11, 11, 2);
+        ledger.append_batch([
+            revision(1, 1, 1, 20, EventRevisionOperation::Assert { record: first }),
+            revision(2, 2, 1, 20, EventRevisionOperation::Assert { record: second }),
+        ]).unwrap();
+        let corrected = revision_record(1, 10, 30, 3);
+        ledger.append(revision(3, 1, 2, 30, EventRevisionOperation::Supersede {
+            target_revision_id: 1,
+            record: corrected,
+        })).unwrap();
+        ledger.append(revision(4, 2, 2, 40, EventRevisionOperation::Retract {
+            target_revision_id: 2,
+            reason_code: 1,
+        })).unwrap();
+        assert_eq!(ledger.verify_consistency(), Ok(()));
+        assert_eq!(ledger.events_as_known_at(1, 50, 25).unwrap().len(), 2);
+        assert_eq!(ledger.events_as_known_at(1, 50, 45).unwrap().len(), 1);
     }
 
     #[test]
