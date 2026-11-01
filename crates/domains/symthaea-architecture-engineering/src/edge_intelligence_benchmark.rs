@@ -877,6 +877,8 @@ pub struct EdgeBenchmarkManifest {
     pub quality_metric_id: String,
     pub minimum_quality_score: f64,
     pub maximum_false_alarms_per_hour: f64,
+    pub maximum_missed_events_per_hour: f64,
+    pub minimum_coverage: f64,
     pub energy_semantics: EdgeEnergySemantics,
     pub prequential_predict_before_learn: bool,
     pub locked_test_labels: bool,
@@ -952,8 +954,12 @@ pub fn validate_edge_benchmark_manifest(
         || !(0.0..=1.0).contains(&manifest.minimum_quality_score)
         || !manifest.maximum_false_alarms_per_hour.is_finite()
         || manifest.maximum_false_alarms_per_hour < 0.0
+        || !manifest.maximum_missed_events_per_hour.is_finite()
+        || manifest.maximum_missed_events_per_hour < 0.0
+        || !manifest.minimum_coverage.is_finite()
+        || !(0.0..=1.0).contains(&manifest.minimum_coverage)
     {
-        return Err(EdgeBenchmarkError::new("quality_constraints", "quality must be [0,1] and false alarm limit non-negative"));
+        return Err(EdgeBenchmarkError::new("quality_constraints", "quality and minimum coverage must be [0,1]; false/missed event limits must be finite and non-negative"));
     }
     if !manifest.prequential_predict_before_learn || !manifest.locked_test_labels {
         return Err(EdgeBenchmarkError::new("evaluation_policy", "must enforce predict-before-learn and locked test labels"));
@@ -1065,6 +1071,8 @@ mod tests {
             quality_metric_id: "top1_accuracy".into(),
             minimum_quality_score: 0.85,
             maximum_false_alarms_per_hour: 10.0,
+            maximum_missed_events_per_hour: 10.0,
+            minimum_coverage: 0.95,
             energy_semantics: EdgeEnergySemantics::PerInference,
             prequential_predict_before_learn: true,
             locked_test_labels: true,
