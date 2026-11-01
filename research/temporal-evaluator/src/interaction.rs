@@ -115,7 +115,7 @@ pub struct JointInteractionReport {
 /// where both interventions are compatible and within the same hard budgets.
 ///
 /// For pair i,j, interaction is:
-///   [E(S)-E(S+i)] - [E(S+j)-E(S+i+j)]
+///   E(S+i) + E(S+j) - E(S) - E(S+i+j)
 /// A positive value means j increases i's reduction of exposure (synergy).
 ///
 /// Only contexts where all required counterfactual subsets are both compatible
