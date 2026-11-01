@@ -725,6 +725,28 @@
           "evidence_artifacts"
         ]
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "measured_audit"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "evidence_artifacts"
+        ],
+        "properties": {
+          "evidence_artifacts": {
+            "type": "object"
+          }
+        }
+      }
     }
   ],
   "$defs": {
