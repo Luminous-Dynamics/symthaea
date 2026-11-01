@@ -394,12 +394,13 @@ impl PerformanceGestureTrackV1 {
     pub fn validate_against_identity_map(
         &self,
         expected_score_sha256: &str,
+        expected_note_count: usize,
         identity_map: &ScoreNoteIdentityMapV1,
     ) -> Result<(), Vec<String>> {
         let mut issues = self.validate().err().unwrap_or_default();
         if let Err(map_issues) = identity_map.validate_for_score(
             expected_score_sha256,
-            identity_map.note_count,
+            expected_note_count,
         ) {
             issues.extend(map_issues);
         }
@@ -442,14 +443,16 @@ impl PerformanceGestureTrackV1 {
                     }
                 },
                 GestureTarget::Part { part_id } => {
-                    let has_matching_part_instrument = identity_map.notes.iter().any(|note| {
-                        note.part_id == *part_id && note.instrument_id == event.instrument_id
+                    let part_notes: Vec<_> = identity_map.notes.iter()
+                        .filter(|note| note.part_id == *part_id).collect();
+                    let homogeneous_assignment = !part_notes.is_empty() && part_notes.iter().all(|note| {
+                        note.instrument_id == event.instrument_id
                             && event.source_model_id.as_deref()
                                 .is_none_or(|model| note.source_model_id.as_deref() == Some(model))
                     });
-                    if !has_matching_part_instrument {
+                    if !homogeneous_assignment {
                         issues.push(format!(
-                            "event[{index}] part/instrument identity is absent from score map"
+                            "event[{index}] part scope is absent or spans multiple instrument/model assignments; use note-scoped gestures"
                         ));
                     }
                 }
@@ -988,7 +991,7 @@ mod tests {
         let mut track = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
         track.bind_to_score_sha256("a".repeat(64));
         assert!(track
-            .validate_against_identity_map(&"a".repeat(64), &map)
+            .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .is_ok());
 
         gesture.target = GestureTarget::Note {
@@ -1094,6 +1097,25 @@ mod tests {
             .is_err());
     }
 
+    #[test]
+    fn part_scoped_gestures_abstain_when_instrument_changes_within_part() {
+        let mut map = identity_map_fixture();
+        map.notes[1].instrument_id = "flute".to_string();
+        map.identity_map_sha256 = map.compute_digest();
+        let mut gesture = event(
+            "part-wide-control",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::BowSpeed,
+            GestureValue::Scalar { amount: 0.5, unit: GestureUnit::MetersPerSecond },
+            GestureInterpolation::Linear,
+        );
+        gesture.target = GestureTarget::Part { part_id: 1 };
+        gesture.instrument_id = "violin".to_string();
+        let mut track = PerformanceGestureTrackV1::new(vec![gesture]);
+        track.bind_to_score_sha256("a".repeat(64));
+        assert!(track.validate_against_identity_map(&"a".repeat(64), 2, &map)
+            .unwrap_err().iter().any(|issue| issue.contains("spans multiple instrument/model assignments")));
+    }
     #[test]
     fn schema_version_mismatch_is_rejected() {
         let track = PerformanceGestureTrackV1 {
