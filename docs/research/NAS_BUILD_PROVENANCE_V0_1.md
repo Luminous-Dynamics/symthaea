@@ -2,7 +2,7 @@
 
 Tracking: NAS-BUILD-PROVENANCE-001 / #9681  
 Depends on: #9594 / PR #9595  
-Coordinates with: #9598 staged qualification; #9601 physical readback; #9515 cross-layer co-design
+Coordinates with: #9598 staged qualification; #9601 physical readback; #9515 cross-layer co-design; #9683 corrected NATS-Bench-MCU v2 reproduction
 
 ## Thesis
 
