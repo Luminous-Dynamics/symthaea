@@ -175,3 +175,14 @@ See `structured-visual-action-bank.v0.1.schema.json` and `fixtures/structured-vi
 
 
 Structured-channel action selection is now constrained to an explicitly named `TaskUtility` channel. The same bank fixture includes position, contact probability and task utility, and the selector rejects a geometry channel. This prevents heterogeneous visual beliefs from being accidentally treated as one scalar reward.
+
+### Decision-aware evidence acquisition and constrained action selection
+
+The CMAQ-018 metric layer now includes:
+
+- `evaluate_information_acquisition`: EVSI per query, choosing a query only when expected post-information decision utility exceeds the prior best-action utility plus acquisition cost.
+- Canonical EVSI evidence digests binding the exact history, action/query manifests, outcome partition, probabilities, conditional utilities and cost.
+- `evaluate_information_probabilities`: multiclass Brier score, log loss, zero-probability miss count and top-outcome accuracy on held-out query outcomes.
+- `select_constrained_structured_action`: filters actions through explicit channel constraints (e.g. maximum terminal risk or minimum contact probability), then uses task utility only among feasible actions. It reports whether selection rests on sole feasibility or utility dominance, and uses a Bonferroni-adjusted per-interval nominal level across the full action/constraint family.
+
+Schemas and synthetic fixtures: `information-acquisition.v0.1.schema.json`, `fixtures/information-acquisition.example.json`, `information-probability-metrics.v0.1.schema.json`, and `fixtures/information-probability-metrics.example.json`. These are arithmetic/contract fixtures, not evidence of calibrated query probabilities, actual information value or physical safety.
