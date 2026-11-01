@@ -29,7 +29,7 @@ pub struct ReceiptReplayScenario {
 #[derive(Debug, Clone)]
 pub enum PoarScenario {
     Schedule(ScheduleScenario),
-    ReceiptReplay(ReceiptReplayScenario),
+    ReceiptReplay(Box<ReceiptReplayScenario>),
 }
 
 #[derive(Debug, Clone)]
@@ -166,14 +166,14 @@ fn receipt_replay_case() -> PoarFixture {
 
     PoarFixture {
         id: "receipt-replay-after-revocation",
-        scenario: PoarScenario::ReceiptReplay(ReceiptReplayScenario {
+        scenario: PoarScenario::ReceiptReplay(Box::new(ReceiptReplayScenario {
             obligations,
             original_receipt,
             revocation_receipt,
             obligation_id: "claim".into(),
             expected_state: ObligationState::StaleOrRetracted,
             expected_state_identity: "revoked-v2".into(),
-        }),
+        })),
     }
 }
 
