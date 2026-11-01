@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 54,
+    "rust_test_functions_authored": 35,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -197,5 +197,42 @@
       "availability_policy_sha256",
       "timestamp_zone_sha256"
     ]
+  },
+  "bitemporal_event_ledger": {
+    "append_only": true,
+    "transaction_time_field": "recorded_at_us",
+    "valid_time_field": "event_time_us",
+    "operations": [
+      "assert",
+      "supersede",
+      "retract"
+    ],
+    "query_coordinates": [
+      "valid_at_us",
+      "known_at_us"
+    ],
+    "source_identity_preserved": [
+      "entity_id",
+      "modality_id",
+      "source_id",
+      "source_sequence"
+    ],
+    "atomic_batches": true,
+    "deterministic_state_sha256": true,
+    "validity_semantics": "point event_time_us <= valid_at_us",
+    "durable_persistence_implemented": false
+  },
+  "csv_adapter": {
+    "module": "research/irregular-event-contract/src/csv_adapter.rs",
+    "numeric_adapter": "date_time,record_id,feature columns",
+    "text_adapter": "content-addressed opaque UTF-8 payload",
+    "availability_policies": [
+      "explicit_column",
+      "event_time_assumed_immediate"
+    ],
+    "naive_timestamp_requires_explicit_utc_assumption": true,
+    "numeric_representation": "fixed-point millionths",
+    "tests_authored": 8,
+    "benchmark_dataset_loaded": false
   }
 }
