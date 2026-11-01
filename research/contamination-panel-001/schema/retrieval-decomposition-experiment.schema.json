@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/retrieval-decomposition-experiment-v1.json",
+  "title": "Paired retrieval decomposition experiment manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "experiment_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_checkpoint_sha256",
+    "corpus_sha256",
+    "oracle_sha256",
+    "inference_harness_sha256",
+    "prompt_and_decoding_sha256",
+    "budget_policy_sha256",
+    "sample_size_plan_sha256",
+    "arms",
+    "task_ids",
+    "replicates",
+    "randomization_seed_commitment_sha256",
+    "experiment_status",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.retrieval_decomposition.experiment.v1"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "inference_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_and_decoding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "budget_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_size_plan_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "no_evidence",
+          "native_search",
+          "gold_evidence_injection",
+          "gold_plus_hard_distractors",
+          "evidence_complete_stop",
+          "plain_qa_repackaging"
+        ]
+      }
+    },
+    "task_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "replicates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "replicate_id",
+          "paired_seed_commitment_sha256",
+          "arm_order"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "replicate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paired_seed_commitment_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "arm_order": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "no_evidence",
+                "native_search",
+                "gold_evidence_injection",
+                "gold_plus_hard_distractors",
+                "evidence_complete_stop",
+                "plain_qa_repackaging"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "randomization_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "experiment_status": {
+      "enum": [
+        "protocol_only",
+        "exploratory",
+        "confirmatory_preregistered"
+      ]
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
