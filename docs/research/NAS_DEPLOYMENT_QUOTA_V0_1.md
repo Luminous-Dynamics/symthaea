@@ -76,4 +76,4 @@ This is a mathematical consequence of the published population counts, not a mea
 - Use neither mode if the selection policy or success process satisfies neither premise. Stratified/adaptive search needs a corresponding conditional or stratified model.
 - Do not use NATS-Bench-MCU's global 91.4% deployment yield as a success floor for quality-ranked, adaptive, different-target or different-toolchain deployment attempts.
 
-Four additional Rust tests cover the NATS v2 known-answer sample, a small finite-population known answer, impossible quotas/population tampering and unknown-field rejection. An independent Python recurrence check matched direct hypergeometric summation across 88,244 small population/size/quota combinations.
+Four additional Rust tests cover the NATS v2 known-answer sample, a small finite-population known answer, impossible quotas/population tampering and unknown-field rejection. An independent Python recurrence check matched direct hypergeometric summation across 88,244 small population/size/quota combinations. The finite-population implementation currently caps N at 1,000,000 to bound the log-combination computation.
