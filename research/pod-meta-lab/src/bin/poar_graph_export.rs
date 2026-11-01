@@ -1,8 +1,5 @@
 use pod_meta_lab::graph::{
-    encode_oracle_artifact_v1,
-    encode_planner_artifact_v1,
-    generate_poar_graph_suite,
-    DatasetSplit,
+    DatasetSplit, encode_oracle_artifact_v1, encode_planner_artifact_v1, generate_poar_graph_suite,
 };
 use std::env;
 use std::fs;
@@ -14,7 +11,9 @@ fn split_from_str(value: &str) -> Result<DatasetSplit, String> {
         "dev" | "development" => Ok(DatasetSplit::Development),
         "cal" | "calibration" => Ok(DatasetSplit::Calibration),
         "test" => Ok(DatasetSplit::Test),
-        other => Err(format!("unknown split {other:?}; expected dev, cal, or test")),
+        other => Err(format!(
+            "unknown split {other:?}; expected dev, cal, or test"
+        )),
     }
 }
 
@@ -40,7 +39,9 @@ fn sha256_file(path: &Path) -> Result<String, String> {
         || !digest.bytes().all(|byte| byte.is_ascii_hexdigit())
         || digest.bytes().any(|byte| byte.is_ascii_uppercase())
     {
-        return Err(format!("sha256sum returned a non-canonical digest: {digest:?}"));
+        return Err(format!(
+            "sha256sum returned a non-canonical digest: {digest:?}"
+        ));
     }
     Ok(digest.to_string())
 }
@@ -74,8 +75,7 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("failed to write planner artifact: {error}"))?;
 
     let planner_sha256 = sha256_file(planner_path)?;
-    let oracle_artifact =
-        encode_oracle_artifact_v1(&suite, generator_revision, &planner_sha256)?;
+    let oracle_artifact = encode_oracle_artifact_v1(&suite, generator_revision, &planner_sha256)?;
     fs::write(oracle_path, oracle_artifact.as_bytes())
         .map_err(|error| format!("failed to write sealed oracle artifact: {error}"))?;
 
