@@ -1,231 +1,134 @@
-# Irregular Event/Availability Contract (v0.1)
+# Irregular Event, Bitemporal, and Time-Series Adapter Contract (v0.1)
 
 **Tracking:** NEURO-SILICON-011 / #9700  
 **Implementation:** `research/irregular-event-contract/`  
-**Status:** candidate-side typed contract authored; no external data adapter or test execution
+**Status:** source and test functions authored; no Rust build or test execution
 
-## 1. Why two clocks?
+## 1. Event-time and availability-time contract
 
-Irregular datasets frequently contain delayed observations, asynchronous
-channels and different source clocks. Sorting everything by event time and
-then filtering at the forecast origin can leak observations that were not
-actually available to the system yet.
+Every observation keeps distinct:
+- event time: when the phenomenon or measurement occurred;
+- availability time: when the candidate could first access the record.
 
-The contract distinguishes:
-- event time: when the underlying event/measurement occurred;
-- availability time: when the candidate could first observe it.
+At forecast origin t, an observation is eligible only when
+`available_at_us <= t`. A delayed observation whose event time is before t
+but availability time is after t remains hidden. Source-local sequence numbers
+are preserved independently of event-time ordering.
 
-For forecast origin (t), observations are visible only when
-`available_at_us <= t`. If an event occurred before (t) but arrived after
-(t), it remains hidden until arrival. The candidate view preserves source
-order; no silent event-time sorting takes place.
+Observations cannot claim availability before event time. Pre-published planned
+information uses the separate `KnownFutureCovariate` type and is usable only
+when it was published by the forecast origin and its validity interval covers
+the target timestamp.
 
-## 2. Observation schema
+## 2. Measurement and provenance envelope
 
-Every event contains nonzero event/entity/modality/source identifiers,
-source-local sequence index, event time, availability time, unit code,
-measurement status/value and a source digest.
+The event contract carries nonzero event/entity/modality/source IDs, source
+sequence, event/availability timestamps, unit code and a source SHA-256.
+Measurements are typed as observed fixed-point values, missing with explicit
+reason, censored interval, or opaque content-addressed payload. Text/audio/
+image/embedding bytes remain outside the event envelope and are referenced by
+digest, byte length and encoding ID.
 
-Payloads are typed as:
-- observed fixed-point numeric values, with explicit decimal scale;
-- missing values with an explicit reason (not measured, sensor offline,
-  below detection, withheld, unknown);
-- censored intervals with open or closed bounds;
-- content-addressed opaque payloads (for example text, audio, images or
-  precomputed embeddings), binding a nonzero payload digest, byte length and
-  encoding ID while keeping the payload bytes outside the event envelope.
+The base validation rejects duplicate event IDs and duplicate active source
+sequences within (entity, modality, source). It preserves caller order and
+never silently sorts, resamples, interpolates, forward-fills, zero-imputes or
+regularizes data.
 
-Fixed point avoids floating-point equality in the transport contract. Dataset
-adapters must preserve native values/units and document their conversion to
-integer scale; no lossy conversion is allowed without an explicit error bound.
+## 3. Microsecond bitemporal source-event revisions
 
-An observation record cannot claim availability before its event time. Planned
-or prepublished context must use the separate future-covariate type.
+`BitemporalEventLedger` is an append-only event revision store. It models
+point-event validity at microsecond resolution:
+- world-time coordinate: `event_time_us`;
+- knowledge/transaction-time coordinate: `recorded_at_us`.
 
-## 3. Known-future covariates
+Operations are Assert, Supersede and Retract. Each event has a contiguous
+revision sequence. Corrections/retractions append new records; previous
+revisions remain in the ordered SHA-256 history. A record must have been
+available by the transaction that records it. Corrections preserve entity,
+modality, source and source-sequence identity and must target the latest active
+revision.
 
-`KnownFutureCovariate` is deliberately not an `EventRecord`. It is visible
-for a target timestamp only when:
-- the entity matches;
-- `published_at_us <= forecast_origin_us`;
-- the target lies inside its declared validity interval.
+Queries use (valid_at_us, known_at_us): choose the latest revision committed by
+the knowledge-time cutoff and then apply the world-time cutoff. Later
+corrections or retractions cannot rewrite an earlier as-known view.
 
-This distinction is essential for contextual-forecast benchmarks. Future-derived
-labels or annotations reconstructed from the realized target trajectory do not
-become candidate-visible merely because they are attached to a benchmark sample.
+The ledger maintains indexes for revision ID, event-to-revision chains, latest
+revision per event, active source-sequence uniqueness and entity-to-event
+membership. A single append preflights then commits without cloning the full
+log. A multi-event transaction clones once and commits only after every
+revision validates. As-known queries binary-search each entity event's
+transaction-time-ordered revision chain. The explicit consistency audit
+reconstructs and compares the indexes from the append-only log.
 
-## 4. Source identity and duplicates
+This is a point-event extension, not a replacement for Broca's day-granularity
+valid-interval ledger in PR #9109 or the proof-composition runtime in PR #9292.
+Durable WAL persistence, source authentication, authorization and derived-proof
+integration are not implemented here.
 
-Source sequence uniqueness is scoped to
-`(entity_id, modality_id, source_id, source_sequence)`. Different sensors or
-upstream sources may each have sequence zero. Event IDs and known-future
-covariate IDs are globally unique within the supplied batch. The batch validator
-does not rewrite, reorder or regularize records.
+## 4. Purged chronological forecast splits
 
-## 5. Explicitly out of scope
+The `splits` module partitions windows by entity and distinct forecast origin,
+keeping tied origins together. It purges training windows whose target interval
+crosses validation and validation windows whose targets cross test; optional
+embargoes shrink both boundaries. Historical input windows may overlap, but
+target labels cannot cross the next partition boundary.
 
-- Benchmark-specific chronological/entity split generation.
-- Resampling, interpolation, imputation, forward fill and zero fill.
-- Physical source-digest recomputation from raw source payload bytes.
-- Unit conversion beyond explicit fixed-point scale metadata.
-- Future-label/evaluator target storage in the candidate package.
+This is a clean comparison split, not an automatic replacement for official
+Time-IMM / IMM-TSF splits. Report official-path reproduction and the
+leakage-controlled split separately.
 
-Those operations belong in pinned adapters/evaluator code with separate
-provenance and preprocessing resource accounting.
+## 5. Train-only standardization
 
-## 6. Test coverage and limits
+The `scaler` module fits per-entity/per-feature Welford moments using only
+training-window values from the generated split plan. It deduplicates raw
+observations reused by overlapping history windows. Conflicting duplicate
+values fail closed. Validation, test and purged-window values are skipped
+before their numeric values are read. The scaler revalidates per-entity
+boundaries and purge assignments. No imputation is performed.
 
-Thirty-five source-authored Rust test functions cover irregular and asynchronous
-records, delayed arrival, non-retroactive visibility, out-of-order event time,
-missingness/censoring, opaque multimodal payload validation, duplicates, source identity, fixed-point validation,
-known-future covariate publication/validity, entity filtering and tie handling.
+For fair reproduction, preserve and disclose IMM-TSF's released full-record
+normalization path separately; do not call the clean train-only result an
+official benchmark reproduction.
 
-No Cargo build, rustfmt, Clippy, tests or real dataset adapter has run. This
-contract is a candidate-side causality guard, not proof of correct ingestion
-from an external benchmark.
+## 6. Time-IMM per-entity CSV adapter
 
+The canonical `time_imm` module parses the repository's numeric
+`time_series.csv` and unstructured `text.csv` formats.
 
-## 7. Microsecond bitemporal revision history
+- Exact feature-column-to-modality/unit/scale configuration; unknown columns
+  and duplicate feature mappings are rejected.
+- Exact source-file SHA-256 and canonical parsed-row digests.
+- Numeric values use configurable fixed-point scales in [-9, 0], round
+  nearest with ties away from zero, and return a half-unit error bound.
+- Empty/NA/NaN numeric cells remain Missing; text whitespace is preserved and
+  text payloads are content-addressed.
+- RFC3339 timestamps are accepted directly. Naive timestamps require an
+  explicit fixed UTC offset or IANA timezone. Ambiguous/nonexistent DST local
+  times fail closed.
+- Availability policy is explicit and digest-bound: synchronous-at-event-time
+  assumption or fixed delay. Neither is represented as observed physical
+  arrival time.
+- Adapter configuration digest binds dataset/entity identity and a
+  feature-sorted mapping. Timezone and availability policies have separate
+  digests.
 
-The crate includes an append-only `BitemporalEventLedger` for streaming
-observations. `event_time_us` is valid/world time; `recorded_at_us` is
-transaction/knowledge time. Each event has contiguous revision numbering.
-Corrections append Supersede operations and retractions append Retract
-operations; previous revisions are never mutated.
+The sample manifest identifies EPA-Air/Bexar schemas as
+`date_time,record_id,temp,pm2_5,aqi,ozone` for numeric data and
+`date_time,record_id,text` for text. The source repository's Git blob OIDs
+are object identifiers, not SHA-256 file digests; the adapter recomputes
+SHA-256 over the exact input bytes.
 
-Queries use both coordinates: a revision is considered only if recorded by the
-knowledge-time cutoff, its latest event revision is not retracted, its event
-time is no later than the valid-time cutoff, and the record was available by
-the knowledge time. This makes "what happened by V, according to what we knew
-at T?" independently testable at microsecond resolution.
+## 7. Authored test inventory and limits
 
-Transactions require one shared timestamp and strictly increasing timestamps
-between commits. A failed multi-event batch leaves the original ledger
-unchanged. Active source sequence uniqueness is checked at commit. The history
-has a domain-separated SHA-256 digest.
+The current source contains 55 authored Rust test functions:
+- 16 event-contract tests in `lib.rs`;
+- 12 bitemporal ledger tests in `lib.rs`;
+- 8 purged-split tests;
+- 9 train-only-scaler tests;
+- 10 Time-IMM adapter tests.
 
-This is a precision extension to, not a replacement for, the existing
-Broca source ledger in `crates/domains/symthaea-broca/src/memory_bitemporal.rs`
-(PR #9109) and combined bitemporal/alternative-proof runtime (PR #9292).
-Broca's source valid-time uses `NaiveDate`; this streaming extension uses
-microsecond timestamps and does not yet join the derived justification graph.
-
-The crate now has 27 source-authored test functions: 16 event contract tests
-and 11 bitemporal source-revision tests. No Rust build or test has run.
-
-
-## 8. Purged chronological window splits
-
-The `splits` module partitions per entity using distinct forecast origins.
-Windows sharing an origin cannot be divided between train/validation/test.
-Training windows are retained only when the exclusive end of their target
-interval is no later than the validation forecast-origin boundary (minus an
-optional embargo). Validation windows obey the analogous test boundary.
-Windows that cross a boundary are counted as purged rather than silently
-relabelled. Historical input overlap is allowed; future target-label overlap is
-not.
-
-Eight source-authored tests cover overlapping forecast windows, exact boundary
-semantics, embargoes, tied origins, input-order invariance, per-entity
-boundaries, invalid intervals/ratios, duplicate IDs and insufficient/empty
-partitions. The package now has 35 source-authored test functions total.
-
-
-## 9. Train-only feature standardization
-
-The `scaler` module binds standardization to a `PurgedSplitPlan`. Only raw
-observations attached to eligible training windows contribute to the moments.
-Validation, test and purged-window values are not read. Repeated observations
-from overlapping training windows are deduplicated by entity/feature/raw
-observation ID; conflicting duplicate values are rejected.
-
-Statistics use deterministic Welford accumulation and sample standard
-deviation (ddof=1). A zero standard deviation is handled by mean subtraction
-without division. Fitted observation counts, means and standard deviations
-are queryable for provenance. The scaler validates that each window is in the
-partition required by the split boundaries and the target-horizon purge; it
-rejects forged or inconsistent split plans.
-
-The scaler does not impute missing data or compute a physical arrival time.
-Adapters must supply only legitimate training observations and preserve
-missingness separately. This is the clean comparison path; the official
-benchmark code path must be separately reproduced and labeled when it uses
-different normalization.
-
-
-## 10. Time-IMM CSV adapter
-
-The `time_imm` module parses one entity's numeric and text CSV files.
-
-It requires an exact numeric feature mapping: column name, modality ID, unit
-code and fixed-point exponent. Unknown, missing or duplicate columns fail
-closed. Source-file SHA-256 binds exact input bytes; event source digests bind
-canonical parsed rows. Text is content-addressed without whitespace trimming.
-
-RFC3339 timestamps are unambiguous. Naive timestamps require an explicit fixed
-UTC offset or IANA timezone; DST-ambiguous/nonexistent local times are rejected
-rather than silently shifted. The timestamp-zone configuration is digest-bound. A separate canonical adapter-config SHA-256 binds dataset/entity identity, availability policy, and a feature-sorted mapping of every numeric column to modality, unit and decimal scale; feature declaration order does not change this digest.
-
-The adapter also requires a caller-selected availability policy (synchronous
-at event time as an explicit assumption, or a fixed delay). Its digest is
-reported independently. The Time-IMM CSV does not contain a separate observed
-system-arrival timestamp, so the adapter makes no claim that either policy
-reconstructs actual acquisition latency.
-
-Numeric values are converted to per-feature fixed-point scales in [-9, 0].
-Rounding is nearest, ties away from zero, and the maximum half-unit error bound
-is returned. Empty/NA/NaN measurements become Missing records; text is stored
-as an opaque payload reference. No interpolation, imputation or resampling is
-performed.
-
-The parser is a dataset adapter, not a timezone/availability oracle. Dataset
-maintainers must verify the correct IANA timezone and the benchmark's intended
-availability semantics before using a configuration for claims.
-
-
-The parsed table returns dataset ID, record ID, stable entity ID, exact source
-file digest, timestamp-zone digest, availability-policy digest and the
-canonical adapter-configuration digest. These values should be copied into the
-benchmark run manifest alongside the split and train-only scaler digests.
-
-
-## 7. Microsecond bitemporal event revisions
-
-The crate adds `BitemporalEventLedger` for append-only Assert/Supersede/Retract
-revisions at microsecond resolution. Each revision binds a global revision ID,
-event ID, per-event sequence, event record and transaction timestamp
-(`recorded_at_us`). A correction must preserve entity, modality, source and
-source-local sequence. Its record must have been available no later than the
-transaction that records it.
-
-Queries at `(valid_at_us, known_at_us)` choose the latest revision committed
-by the knowledge-time coordinate and return it only when its event time is no
-later than the valid-time coordinate. Later corrections and retractions never
-rewrite an earlier as-known view. Transactions use one shared timestamp,
-strictly increasing across committed batches, and clone/validate/commit
-atomicity. The deterministic state digest commits to ordered revision history.
-
-This models point events, not arbitrary valid-time intervals. It complements
-the existing Broca daily valid-interval ledger (#9109) and composed proof
-runtime (#9292); it does not replace or yet integrate with those APIs. Durable
-WAL persistence, source authentication and authorization remain out of scope.
-
-## 8. Strict CSV adapter
-
-`csv_adapter` reads numeric `date_time,record_id,feature...` CSV and separate
-opaque text CSV modalities. It has an explicit availability policy:
-`ExplicitColumn(name)` reads actual arrival time from a supplied column;
-`EventTimeAssumedImmediate` is a visible approximation recorded in the
-adapter manifest. The latter must not be used for causal claims unless the
-dataset's semantics justify immediate availability.
-
-Naive date/time strings are rejected unless the caller explicitly allows the
-UTC interpretation. Numeric values are parsed as fixed-point millionths
-without floating-point conversion; missing values remain missing, not zero.
-Opaque UTF-8 text is content-addressed by SHA-256 and referenced by byte length
-and encoding ID. Feature names receive stable modality IDs; hash collisions
-fail closed.
-
-No Time-IMM dataset was loaded, and no Cargo build, formatting, Clippy or test
-has run. The CSV adapter is a first parser, not yet an official-split or
-benchmark evaluator implementation.
+No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
+benchmark has run in this environment. The source and fixture inventory is
+not evidence of passing tests. The Time-IMM sample metadata records the
+repository's released file shape, but the Rust parser has not been executed
+against the files. No real-data performance result or SOTA claim is made.
