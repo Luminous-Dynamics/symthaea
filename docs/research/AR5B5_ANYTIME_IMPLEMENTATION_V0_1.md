@@ -212,3 +212,17 @@ The synthetic cost model is no longer accepted by a substring in its human-reada
 ## 10. Schema version note
 
 The expanded anytime event/header/receipt contract is `0.2.0` (nullable clock semantics, source commit and exact search configuration binding). The target-plan sub-schema remains `0.1.0`. Evidence manifests and byte receipts are `0.2.0`; noisy-observation plans/reports are `0.2.0`. Consumers must reject or explicitly migrate earlier schemas rather than silently deserialize under the expanded contract.
+### Noisy-history preregistration and replay integration — schema 0.3.0
+
+The anytime header now optionally binds `noisy_observation_plan_sha256` before any event is appended. A noisy event must match this exact digest; a deterministic evaluation cannot enter a history preregistered for noisy observations, and a noisy event cannot enter a deterministic history. The deterministic synthetic optimizer recorder refuses noisy-mode headers.
+
+`analyze_noisy_anytime_history(plan, history)` now:
+- validates the complete hash-chained history;
+- requires the header's preregistered noisy-plan digest to match;
+- requires objective IDs, order and directions to match the frozen plan;
+- reconstructs the noisy study from successful `CandidateNoisyObservation` events;
+- excludes failed, invalid and timed-out observations from means/confidence intervals;
+- retains and charges all failed attempts through the generic anytime receipt;
+- emits a joint digest binding the noisy report, anytime resource receipt, run ID and history tip.
+
+The generic anytime attempt counter includes both deterministic and noisy objective attempts. Artifact byte resolution is still a separate step: event evidence digests are retained, but this adapter does not claim to have fetched or independently verified the external raw artifact bytes. Noisy replicate-specific verifier promotion is also still outstanding.
