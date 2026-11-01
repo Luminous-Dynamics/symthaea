@@ -707,8 +707,7 @@ mod tests {
         );
 
         let mut evidence = observed_evidence(&current, &next, 2);
-        evidence.action_ended_at_seconds =
-            evidence.requested_target_time_seconds + 0.001;
+        evidence.action_ended_at_seconds = evidence.requested_target_time_seconds + 0.001;
         assert!(
             engine
                 .train_observed_transition(&current, &next, &evidence, 0.001)
