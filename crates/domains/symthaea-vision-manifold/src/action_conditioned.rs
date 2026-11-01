@@ -23,6 +23,7 @@ pub struct ActionConditionedForecastReceipt {
     pub action_descriptor_sha256: String,
     pub model_checkpoint_sha256: String,
     pub action_id: u64,
+    pub action_set_size: usize,
     pub horizon_seconds: f32,
     /// Number of supervised updates completed before this forecast was issued.
     pub model_version: u64,
@@ -74,6 +75,7 @@ pub struct ActionConditionedForecastScore {
     pub observed_future_hv_sha256: String,
     pub score_sha256: String,
     pub action_id: u64,
+    pub forecast_model_version: u64,
     pub source_frame_sequence: u64,
     pub observed_frame_sequence: u64,
     pub observation_delay_seconds: f32,
@@ -221,6 +223,7 @@ impl ActionConditionedVisualResidualPredictor {
             action_descriptor_sha256: action_descriptor_sha256.to_owned(),
             model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
             action_id,
+            action_set_size: 1,
             horizon_seconds,
             model_version: self.training_steps,
             autonomous_base_prediction_sha256: hash_f32_vector(
@@ -333,6 +336,7 @@ impl ActionConditionedVisualResidualPredictor {
                 action_descriptor_sha256: candidate.action_descriptor_sha256.clone(),
                 model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
                 action_id: candidate.action_id,
+                action_set_size: candidates.len(),
                 horizon_seconds,
                 model_version,
                 autonomous_base_prediction_sha256: hash_f32_vector(
@@ -391,6 +395,9 @@ impl ActionConditionedVisualResidualPredictor {
         }
 
         let first = &pending_records[0].receipt;
+        if first.action_set_size != outcomes.len() {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
         let mut action_ids = Vec::with_capacity(pending_records.len());
         for pending in &pending_records {
             let receipt = &pending.receipt;
@@ -399,6 +406,7 @@ impl ActionConditionedVisualResidualPredictor {
                 || receipt.source_frame_sequence != first.source_frame_sequence
                 || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
                 || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+                || receipt.action_set_size != first.action_set_size
                 || receipt.model_version != first.model_version
                 || receipt.model_version != self.training_steps
             {
@@ -480,6 +488,7 @@ impl ActionConditionedVisualResidualPredictor {
                 ),
                 score_sha256: String::new(),
                 action_id: pending.receipt.action_id,
+                forecast_model_version: pending.receipt.model_version,
                 source_frame_sequence: pending.receipt.source_frame_sequence,
                 observed_frame_sequence: outcome.observed_frame_sequence,
                 observation_delay_seconds,
@@ -587,6 +596,7 @@ impl ActionConditionedVisualResidualPredictor {
             observed_future_hv_sha256,
             score_sha256: String::new(),
             action_id: pending.receipt.action_id,
+            forecast_model_version: pending.receipt.model_version,
             source_frame_sequence: pending.receipt.source_frame_sequence,
             observed_frame_sequence,
             observation_delay_seconds,
@@ -665,6 +675,7 @@ impl ActionConditionedVisualResidualPredictor {
             if receipt.schema_version != ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION
                 || receipt.forecast_id == 0
                 || receipt.forecast_id >= state.next_forecast_id
+                || receipt.action_set_size == 0
                 || receipt.model_version > state.training_steps
                 || !is_lower_hex_sha256(&receipt.model_checkpoint_sha256)
                 || !is_lower_hex_sha256(&receipt.autonomous_base_prediction_sha256)
@@ -746,6 +757,7 @@ fn hash_forecast_receipt(receipt: &ActionConditionedForecastReceipt) -> String {
     hash_text(&mut hasher, &receipt.action_descriptor_sha256);
     hash_text(&mut hasher, &receipt.model_checkpoint_sha256);
     hasher.update(receipt.action_id.to_le_bytes());
+    hasher.update((receipt.action_set_size as u64).to_le_bytes());
     hasher.update(receipt.horizon_seconds.to_bits().to_le_bytes());
     hasher.update(receipt.model_version.to_le_bytes());
     hash_text(&mut hasher, &receipt.autonomous_base_prediction_sha256);
@@ -766,6 +778,7 @@ fn hash_forecast_score(score: &ActionConditionedForecastScore) -> String {
     hash_text(&mut hasher, &score.forecast_sha256);
     hash_text(&mut hasher, &score.observed_future_hv_sha256);
     hasher.update(score.action_id.to_le_bytes());
+    hasher.update(score.forecast_model_version.to_le_bytes());
     hasher.update(score.source_frame_sequence.to_le_bytes());
     hasher.update(score.observed_frame_sequence.to_le_bytes());
     hasher.update(score.observation_delay_seconds.to_bits().to_le_bytes());
@@ -916,6 +929,7 @@ mod tests {
             },
         ]).unwrap();
         assert_eq!(scores.len(), 2);
+        assert!(scores.iter().all(|score| score.forecast_model_version == 0));
         assert!(scores.iter().all(|score| score.model_version_before == 0));
         assert!(scores.iter().all(|score| score.model_version_after == 1));
         assert!(scores.iter().all(|score| score.history_sha256 == digest('a')));
@@ -968,6 +982,18 @@ mod tests {
             model.score_action_set_and_learn(&incomplete),
             Err(ActionConditionedPredictorError::ActionSetMismatch)
         );
+        assert_eq!(model.pending_forecast_count(), 2);
+        let incomplete_distinct = [duplicate[0].clone(), ActionConditionedObservedOutcome {
+            forecast_id: receipts[1].forecast_id,
+            actual_future_hv: vec![0.1, 0.0],
+            observed_frame_sequence: 101,
+            observation_delay_seconds: 1.0,
+        }];
+        assert_eq!(
+            model.score_action_set_and_learn(&incomplete_distinct),
+            Err(ActionConditionedPredictorError::ActionSetMismatch)
+        );
+        assert_eq!(model.training_steps(), 0);
         assert_eq!(model.pending_forecast_count(), 2);
     }
 
