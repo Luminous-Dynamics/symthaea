@@ -125,3 +125,8 @@ Added `benchmark-integrity-receipt-v0.schema.json`, a synthetic no-run fixture, 
 ### Two-level proof graph scheduler (2026-11-01)
 
 Added a structural proof-graph contract and Rust verifier: per-declaration AND/OR hypergraph, cross-declaration helper DAG, stable/provisional/discarded lifecycle, symbolic ready-frontier recomputation, selected-goal subset validation and multi-resource router/specialist/Lean ledger. The synthetic fixture has two root targets sharing one stable helper and batches both root goals in one specialist action. No live Lean graph or performance result exists yet. Competitive motivation: CoCo-Prover reports up to 30.9% lower monetary cost on five Lean program-verification benchmarks through essentially this two-level graph/specialist architecture; it also documents a wall-clock latency trade-off and limited repository-level cohort. EasyProver/Aegis gives us a harder implementation-derived benchmark target. See `docs/research/pitb-proof-graph-scheduler-2026-11-01.md`.
+
+
+### Content-addressed benchmark evidence bundle (2026-11-01)
+
+Added an explicit evidence_artifacts manifest to benchmark-integrity receipts. Measured runs must provide the eleven source/toolchain/elaboration/axiom/probe/reviewer files under a pinned evidence root. benchmark_integrity.rs verifies exact bytes, rejects traversal and symlink escapes, and recomputes the source span using 1-based lines and Unicode-codepoint columns against source_span_sha256. verify_sorrydb_run_integrity now requires the evidence root before a measured run can pass. Its synthetic self-test mutates source bytes and the recorded source coordinates and requires both to fail. Reviewer attestations are hash-bound but not yet signature-authenticated; no real cohort has been audited.
