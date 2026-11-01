@@ -110,6 +110,9 @@ fn prefix_outcome(
 }
 
 fn trajectory_features(unresolved: u64) -> ProofFrontierFeatures {
+    if unresolved == 0 {
+        return ProofFrontierFeatures::default();
+    }
     ProofFrontierFeatures {
         unresolved_obligations: unresolved,
         mandatory_obligations: unresolved,
