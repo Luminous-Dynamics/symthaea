@@ -707,7 +707,10 @@ pub fn validate_evaluator_result_receipt(
     }
     let allowed: HashSet<&str> = definition.metrics.iter().map(|metric| metric.metric_id).collect();
     let mut present = HashSet::<&str>::new();
+    let mut present_all = HashSet::<&str>::new();
     for (index, metric) in receipt.metrics.iter().enumerate() {
+        let metric_definition = definition.metrics.iter()
+            .find(|item| item.metric_id == metric.metric_id);
         if metric.metric_id.trim().is_empty()
             || metric.stratum_id.trim().is_empty()
             || metric.sample_count == 0
@@ -716,13 +719,30 @@ pub fn validate_evaluator_result_receipt(
         {
             return Err(EdgeAdapterError::new(format!("evaluator_receipt.metrics[{index}]"), "metric is unknown, empty, negative or has no sample denominator"));
         }
-        present.insert(metric.metric_id.as_str());
-    }
-    for definition in definition.metrics {
-        if !present.contains(definition.metric_id) {
+        if metric_definition.is_some_and(|item| item.unit == "ppm")
+            && metric.value_scaled > 1_000_000
+        {
             return Err(EdgeAdapterError::new(
-                format!("evaluator_receipt.metrics.{}", definition.metric_id),
+                format!("evaluator_receipt.metrics[{index}].value_scaled"),
+                "parts-per-million metrics must be in [0, 1,000,000]",
+            ));
+        }
+        present.insert(metric.metric_id.as_str());
+        if metric.stratum_id == "all" {
+            present_all.insert(metric.metric_id.as_str());
+        }
+    }
+    for metric_definition in definition.metrics {
+        if !present.contains(metric_definition.metric_id) {
+            return Err(EdgeAdapterError::new(
+                format!("evaluator_receipt.metrics.{}", metric_definition.metric_id),
                 "required task metric is missing",
+            ));
+        }
+        if !present_all.contains(metric_definition.metric_id) {
+            return Err(EdgeAdapterError::new(
+                format!("evaluator_receipt.metrics.{}.all", metric_definition.metric_id),
+                "required overall metric stratum 'all' is missing",
             ));
         }
     }
@@ -885,6 +905,7 @@ pub fn validate_system_measurement_receipt(
         || receipt.mean_energy_per_successful_event_uj <= 0.0
         || receipt.successful_event_count == 0
         || receipt.energy_repeat_count < 2
+        || receipt.energy_repeat_count > receipt.successful_event_count
         || !receipt.expanded_energy_uncertainty_uj.is_finite()
         || receipt.expanded_energy_uncertainty_uj < 0.0
     {
@@ -1067,6 +1088,48 @@ mod tests {
         missing_metric.metrics.pop();
         missing_metric.evaluator_receipt_sha256 = compute_evaluator_result_receipt_sha256(&missing_metric);
         assert!(validate_evaluator_result_receipt(&manifest, &candidate, &missing_metric).is_err());
+    }
+
+    #[test]
+    fn evaluator_metrics_require_overall_stratum_and_valid_ppm_range() {
+        let manifest = manifest(BenchmarkTrack::Algorithm);
+        let candidate = candidate_receipt(&manifest);
+        let mut evaluator = evaluator_receipt(&candidate);
+
+        let overall = evaluator.metrics.iter_mut()
+            .find(|metric| metric.metric_id == "recall_accuracy_ppm")
+            .unwrap();
+        overall.stratum_id = "delay_64".into();
+        evaluator.metrics.sort_by(|left, right| {
+            (&left.metric_id, &left.stratum_id).cmp(&(&right.metric_id, &right.stratum_id))
+        });
+        evaluator.evaluator_receipt_sha256 = compute_evaluator_result_receipt_sha256(&evaluator);
+        assert!(validate_evaluator_result_receipt(&manifest, &candidate, &evaluator).is_err());
+
+        let mut out_of_range = evaluator_receipt(&candidate);
+        let accuracy = out_of_range.metrics.iter_mut()
+            .find(|metric| metric.metric_id == "recall_accuracy_ppm")
+            .unwrap();
+        accuracy.value_scaled = 1_000_001;
+        out_of_range.evaluator_receipt_sha256 = compute_evaluator_result_receipt_sha256(&out_of_range);
+        assert!(validate_evaluator_result_receipt(&manifest, &candidate, &out_of_range).is_err());
+    }
+
+    #[test]
+    fn evaluator_receipt_revalidates_tampered_candidate_output() {
+        let manifest = manifest(BenchmarkTrack::Algorithm);
+        let mut candidate = candidate_receipt(&manifest);
+        let evaluator = evaluator_receipt(&candidate);
+        candidate.prediction_output_sha256 = hash(99);
+        assert!(validate_evaluator_result_receipt(&manifest, &candidate, &evaluator).is_err());
+    }
+
+    #[test]
+    fn manifest_rejects_missing_task_specific_baseline() {
+        let mut manifest = manifest(BenchmarkTrack::Algorithm);
+        manifest.candidates.retain(|candidate| candidate.family != BaselineFamily::BrainTracePpProp);
+        manifest.manifest_sha256 = compute_temporal_benchmark_manifest_sha256(&manifest);
+        assert!(validate_temporal_benchmark_manifest(&manifest).is_err());
     }
 
     #[test]
