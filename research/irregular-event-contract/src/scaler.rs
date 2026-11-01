@@ -17,6 +17,8 @@ pub struct WindowFeatureValue {
     pub feature_id: u32,
     /// Stable raw observation identity across overlapping windows.
     pub observation_id: u64,
+    /// Timestamp of this historical input observation, not a target label.
+    pub observation_time_us: i64,
     pub value: f64,
 }
 
@@ -41,6 +43,7 @@ pub enum ScalerError {
     ZeroEntityId,
     ZeroFeatureId,
     ZeroObservationId,
+    ObservationOutsideHistoryWindow { window_id: u64, observation_id: u64, observation_time_us: i64, history_start_us: i64, forecast_origin_us: i64 },
     NonFiniteTrainingValue { window_id: u64 },
     ConflictingDuplicateObservation { entity_id: u64, feature_id: u32, observation_id: u64 },
     EmptyTrainingData,
@@ -59,6 +62,7 @@ impl fmt::Display for ScalerError {
             Self::ZeroEntityId => write!(f, "feature sample entity ID must be nonzero"),
             Self::ZeroFeatureId => write!(f, "feature ID must be nonzero"),
             Self::ZeroObservationId => write!(f, "raw observation ID must be nonzero"),
+            Self::ObservationOutsideHistoryWindow { window_id, observation_id, observation_time_us, history_start_us, forecast_origin_us } => write!(f, "observation {observation_id} at {observation_time_us} is outside input history [{history_start_us}, {forecast_origin_us}) for window {window_id}"),
             Self::NonFiniteTrainingValue { window_id } => write!(f, "training value in window {window_id} is not finite"),
             Self::ConflictingDuplicateObservation { entity_id, feature_id, observation_id } => write!(f, "duplicate raw observation {observation_id} has conflicting values for entity {entity_id}, feature {feature_id}"),
             Self::EmptyTrainingData => write!(f, "no unique numeric observations were found in train windows"),
@@ -123,7 +127,7 @@ impl TrainOnlyStandardizer {
         plan: &PurgedSplitPlan,
         samples: &[WindowFeatureValue],
     ) -> Result<Self, ScalerError> {
-        let mut window_by_id = BTreeMap::<u64, u64>::new();
+        let mut window_by_id = BTreeMap::<u64, (u64, i64, i64)>::new();
         for window in windows {
             if window.window_id == 0
                 || window.entity_id == 0
@@ -132,7 +136,7 @@ impl TrainOnlyStandardizer {
             {
                 return Err(ScalerError::InvalidSplitPlan);
             }
-            if window_by_id.insert(window.window_id, window.entity_id).is_some() {
+            if window_by_id.insert(window.window_id, (window.entity_id, window.history_start_us, window.forecast_origin_us)).is_some() {
                 return Err(ScalerError::DuplicateWindowId { window_id: window.window_id });
             }
         }
@@ -211,7 +215,7 @@ impl TrainOnlyStandardizer {
         let train_ids: BTreeSet<u64> = plan.train_window_ids.iter().copied().collect();
         let mut unique_values = BTreeMap::<(u64, u32, u64), f64>::new();
         for sample in samples {
-            let expected_entity = window_by_id.get(&sample.window_id)
+            let (expected_entity, history_start_us, forecast_origin_us) = window_by_id.get(&sample.window_id)
                 .ok_or(ScalerError::UnknownWindowId { window_id: sample.window_id })?;
             if *expected_entity != sample.entity_id {
                 return Err(ScalerError::WindowEntityMismatch { window_id: sample.window_id });
@@ -219,6 +223,15 @@ impl TrainOnlyStandardizer {
             if !train_ids.contains(&sample.window_id) {
                 // Deliberately do not inspect val/test/purged numeric values.
                 continue;
+            }
+            if sample.observation_time_us < *history_start_us || sample.observation_time_us >= *forecast_origin_us {
+                return Err(ScalerError::ObservationOutsideHistoryWindow {
+                    window_id: sample.window_id,
+                    observation_id: sample.observation_id,
+                    observation_time_us: sample.observation_time_us,
+                    history_start_us: *history_start_us,
+                    forecast_origin_us: *forecast_origin_us,
+                });
             }
             if sample.entity_id == 0 {
                 return Err(ScalerError::ZeroEntityId);
@@ -314,7 +327,11 @@ mod tests {
     }
 
     fn sample(window_id: u64, entity_id: u64, feature_id: u32, observation_id: u64, value: f64) -> WindowFeatureValue {
-        WindowFeatureValue { window_id, entity_id, feature_id, observation_id, value }
+        WindowFeatureValue { window_id, entity_id, feature_id, observation_id, observation_time_us: i64::try_from(window_id).unwrap() * 10 - 1, value }
+    }
+
+    fn sample_at(window_id: u64, entity_id: u64, feature_id: u32, observation_id: u64, observation_time_us: i64, value: f64) -> WindowFeatureValue {
+        WindowFeatureValue { window_id, entity_id, feature_id, observation_id, observation_time_us, value }
     }
 
     #[test]
@@ -330,6 +347,40 @@ mod tests {
                 &[sample(moved, 1, 1, 1, 1.0)]
             ),
             Err(ScalerError::InvalidSplitPlan)
+        );
+    }
+
+    #[test]
+    fn future_or_out_of_window_observations_cannot_fit_the_context_scaler() {
+        let windows = windows();
+        let plan = plan(&windows);
+        assert_eq!(
+            TrainOnlyStandardizer::fit(
+                &windows,
+                &plan,
+                &[sample_at(1, 1, 1, 1, 11, 1.0)]
+            ),
+            Err(ScalerError::ObservationOutsideHistoryWindow {
+                window_id: 1,
+                observation_id: 1,
+                observation_time_us: 11,
+                history_start_us: 0,
+                forecast_origin_us: 10,
+            })
+        );
+        assert_eq!(
+            TrainOnlyStandardizer::fit(
+                &windows,
+                &plan,
+                &[sample_at(1, 1, 1, 1, -1, 1.0)]
+            ),
+            Err(ScalerError::ObservationOutsideHistoryWindow {
+                window_id: 1,
+                observation_id: 1,
+                observation_time_us: -1,
+                history_start_us: 0,
+                forecast_origin_us: 10,
+            })
         );
     }
 
