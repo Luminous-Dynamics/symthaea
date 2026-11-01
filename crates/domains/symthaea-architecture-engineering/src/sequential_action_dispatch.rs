@@ -618,6 +618,32 @@ mod tests {
     }
 
     #[test]
+    fn no_information_policy_emits_explicit_stop_authorization() {
+        let (tape,mut problem,_,_,_,_)=prepared();
+        for action in &mut problem.actions {
+            for outcome in &mut action.outcomes {
+                for likelihood in &mut outcome.likelihoods_by_world {
+                    likelihood.probability=0.5;
+                }
+            }
+        }
+        let problem=problem.canonicalize().unwrap();
+        let policy=solve_sequential_policy(&problem,1).unwrap();
+        assert!(policy.root.selected_action_id.is_none());
+        let binding=SequentialPosteriorBinding::new(&tape,&problem,H5).unwrap();
+        let recommendation=bind_sequential_recommendation(&tape,&problem,&policy,&binding).unwrap();
+        let map=mapping(&problem,&tape);
+        let decision=authorize_sequential_decision(&tape,&problem,&policy,&binding,&recommendation,&map).unwrap();
+        match decision {
+            AuthorizedSequentialDecision::Stop { authorization } => {
+                assert_eq!(authorization.terminal_decision_id,policy.root.terminal_decision_id.unwrap());
+                assert_eq!(authorization.observed_through_sequence,1);
+            }
+            AuthorizedSequentialDecision::Measure { .. } => panic!("uninformative actions must not be dispatched"),
+        }
+    }
+
+    #[test]
     fn budget_overrun_and_already_attempted_measurement_are_rejected() {
         let (tape,problem,policy,binding,recommendation,mut map)=prepared();
         map.cost_unit_microunits=101;
