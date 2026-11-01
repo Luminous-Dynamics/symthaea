@@ -341,6 +341,9 @@ pub fn verify_witness_envelope(
         }
     }
 
+    if quorum_kind == QuorumKind::Member && strict.signatures.len() != 1 {
+        return Err("member response must contain exactly one signature".to_string());
+    }
     let envelope = Envelope {
         payload: strict.payload,
         payload_type: strict.payload_type,
@@ -359,9 +362,6 @@ pub fn verify_witness_envelope(
         .iter()
         .map(|verifier| verifier as &dyn Verifier)
         .collect();
-    if quorum_kind == QuorumKind::Member && strict.signatures.len() != 1 {
-        return Err("member response must contain exactly one signature".to_string());
-    }
     let threshold = match quorum_kind {
         QuorumKind::Member => 1,
         QuorumKind::Read => prepared.threshold_read,
