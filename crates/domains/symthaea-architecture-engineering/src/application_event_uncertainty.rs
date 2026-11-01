@@ -746,7 +746,7 @@ mod tests {
             phase_protocol_sha256: phase_protocol_sha.into(),
             replicate_design_sha256: sha('a'),
             candidate_artifact_sha256: sha(artifact_tag),
-            candidate_configuration_sha256: sha('g'),
+            candidate_configuration_sha256: sha('e'),
             device_session_sha256: sha(device_tag),
             matched_input_sha256: sha('c'),
             voltage_source_id: "calibrated-vdd-source".into(),
