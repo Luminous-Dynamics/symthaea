@@ -949,7 +949,7 @@ mod tests {
 
         for path_index in 0..PATHS {
             let mut rng = 0x9e37_79b9_7f4a_7c15u64
-                .wrapping_add(path_index as u64 * 0x9e37_79b9_7f4a_7c15);
+                .wrapping_add((path_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
             if rng == 0 {
                 rng = 1;
             }
