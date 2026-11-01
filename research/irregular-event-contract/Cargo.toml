@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-irregular-event-contract"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Causality-preserving event and availability-time contract for irregular temporal benchmarks"
+
+[workspace]
