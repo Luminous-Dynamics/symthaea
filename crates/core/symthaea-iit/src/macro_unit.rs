@@ -637,6 +637,10 @@ mod tests {
 
         assert_eq!(apportioned.background_apportionment(), &[5, 7]);
         assert_eq!(apportioned.mapping_sha256(), base.mapping_sha256());
+        assert_eq!(
+            apportioned.spec_sha256(),
+            "7fc8c0021bad05add5a99d56ee8eb5765d745623317497737a480b84856337dd"
+        );
         assert_ne!(apportioned.spec_sha256(), base.spec_sha256());
         assert_eq!(apportioned.spec_sha256(), reordered.spec_sha256());
         assert!(matches!(
