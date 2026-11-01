@@ -80,6 +80,25 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
         self.assertAlmostEqual(math.exp(value), 5.0)
         self.assertLess(value, math.log(8.0))
 
+    def test_accepts_rank_deficient_psd_covariance_at_multiple_scales(self):
+        # Outer products are PSD but can be rank-deficient and badly scaled.
+        for scale in (1e-9, 1.0, 1e9):
+            matrix = [
+                [scale, 2.0 * scale, 0.0],
+                [2.0 * scale, 4.0 * scale, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+            self.assertIsNone(assert_symmetric_psd(matrix))
+
+    def test_rejects_scaled_indefinite_covariance(self):
+        for scale in (1e-9, 1.0, 1e9):
+            matrix = [
+                [scale, 2.0 * scale],
+                [2.0 * scale, scale],
+            ]
+            with self.assertRaises(ValueError):
+                assert_symmetric_psd(matrix)
+
     def test_rejects_invalid_bets_and_bad_covariance(self):
         with self.assertRaises(ValueError):
             vector_log_factor([1.0], [-0.1], [True], [[1.0]])
