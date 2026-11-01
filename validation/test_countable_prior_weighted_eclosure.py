@@ -131,6 +131,20 @@ class CountablePriorWeightedEclosureTests(unittest.TestCase):
         bad = verify_finite_prior_budget((1, 2), bad_prior)
         self.assertFalse(bad["valid"])
         self.assertIn("prior_mass_budget_exceeded", [x[0] for x in bad["failures"]])
+        local = verify_local_closure(
+            (1, 2), (), 0, self.processes, self.alpha, prior=bad_prior
+        )
+        self.assertFalse(local["certified"])
+        self.assertIn(
+            "active_intersection_prior_budget_invalid",
+            [x[0] for x in local["failures"]],
+        )
+
+    def test_rejection_ids_must_be_positive_integers(self):
+        with self.assertRaisesRegex(ValueError, "positive integers"):
+            verify_local_closure(
+                (1, 2), (1.0,), 0, self.processes, self.alpha
+            )
 
     def test_boundary_case_uses_exact_rational_comparison(self):
         # One hypothesis: FDP=1, alpha=1/2, pi=1/4, E=8 gives equality.
