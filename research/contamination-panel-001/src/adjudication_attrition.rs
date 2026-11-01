@@ -816,7 +816,9 @@ pub fn analyze_adjudication_attrition(
                 .filter(|candidate| {
                     decisions
                         .get(&candidate.candidate_id)
-                        .is_some_and(|record| record.terminal_decision == TerminalDecisionV1::Accepted)
+                        .is_some_and(|record| {
+                            record.terminal_decision == TerminalDecisionV1::Accepted
+                        })
                 })
                 .map(|candidate| candidate.candidate_id.clone())
                 .collect();
