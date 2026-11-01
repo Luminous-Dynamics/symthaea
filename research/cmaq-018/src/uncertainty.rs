@@ -653,9 +653,7 @@ pub enum ConstrainedActionDecision {
         basis: ConstrainedSelectionBasis,
         per_interval_nominal_coverage: f64,
     },
-    Abstain {
-        reason: AbstainReason,
-    },
+    Abstain { reason: AbstainReason },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -727,7 +725,6 @@ pub struct InformationAcquisitionEvaluation {
     pub choice: InformationAcquisitionChoice,
     pub selected_query_id: Option<String>,
 }
-
 
 /// Select using only one explicitly named TaskUtility channel. Geometry,
 /// contact and risk channels remain constraints/diagnostics; this function
@@ -824,7 +821,10 @@ pub fn select_constrained_structured_action(
     action_rows.sort_unstable_by_key(|(id, _)| *id);
 
     let interval_families = constraints.len().saturating_add(1);
-    let interval_count = bank.action_ids.len().checked_mul(interval_families)
+    let interval_count = bank
+        .action_ids
+        .len()
+        .checked_mul(interval_families)
         .ok_or(IntervalError::NonFiniteDerivedMetric)?;
     let adjusted_nominal = 1.0 - (1.0 - nominal_coverage) / interval_count as f64;
     validate_nominal_coverage(adjusted_nominal)?;
@@ -833,7 +833,9 @@ pub fn select_constrained_structured_action(
     for (action_id, row) in action_rows {
         let mut action_is_feasible = true;
         for constraint in constraints {
-            let channel = bank.channels.iter()
+            let channel = bank
+                .channels
+                .iter()
                 .find(|channel| channel.channel_id == constraint.channel_id)
                 .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
             let interval = central_interval(&channel.outcome_samples[row], adjusted_nominal)?;
@@ -864,7 +866,8 @@ pub fn select_constrained_structured_action(
         });
     }
 
-    let intervals = feasible.iter()
+    let intervals = feasible
+        .iter()
         .map(|(_, row)| central_interval(&utility.outcome_samples[*row], adjusted_nominal))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(match select_interval_dominant_action(&intervals)? {
@@ -911,7 +914,9 @@ pub fn evaluate_information_probabilities(
     }
     let mut known_ids = first.outcome_ids.clone();
     known_ids.sort_unstable();
-    if known_ids.iter().any(|id| id.trim().is_empty() || id.trim() != id)
+    if known_ids
+        .iter()
+        .any(|id| id.trim().is_empty() || id.trim() != id)
         || known_ids.windows(2).any(|pair| pair[0] == pair[1])
     {
         return Err(IntervalError::InvalidInformationOption);
@@ -940,7 +945,8 @@ pub fn evaluate_information_probabilities(
         if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > 1e-9 {
             return Err(IntervalError::InvalidOutcomeProbabilities);
         }
-        let realized_index = observation.outcome_ids
+        let realized_index = observation
+            .outcome_ids
             .iter()
             .position(|id| id == &observation.realized_outcome_id)
             .ok_or(IntervalError::InvalidInformationOption)?;
@@ -980,7 +986,10 @@ pub fn evaluate_information_probabilities(
         metrics.mean_multiclass_brier_score,
         metrics.mean_log_loss,
         metrics.top_outcome_accuracy,
-    ].iter().any(|value| !value.is_finite()) {
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+    {
         return Err(IntervalError::NonFiniteDerivedMetric);
     }
     Ok(Some(metrics))
@@ -1173,10 +1182,12 @@ pub fn evaluate_information_acquisition(
         evaluations.push(evaluate_information_option(option)?);
     }
     evaluations.sort_by(|left, right| left.query_id.cmp(&right.query_id));
-    let best = evaluations.iter()
+    let best = evaluations
+        .iter()
         .filter(|evaluation| evaluation.net_information_value > 0.0)
         .max_by(|left, right| {
-            left.net_information_value.total_cmp(&right.net_information_value)
+            left.net_information_value
+                .total_cmp(&right.net_information_value)
                 .then_with(|| right.query_id.cmp(&left.query_id))
         });
     let selected_query_id = best.map(|evaluation| evaluation.query_id.clone());
@@ -2008,7 +2019,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn constrained_structured_selection_keeps_risk_separate_from_utility() {
         let mut bank = structured_visual_bank_fixture();
@@ -2108,7 +2118,9 @@ mod tests {
             query_manifest_sha256: "c".repeat(64),
             query_id: query_id.into(),
             action_ids: vec![17, 3],
-            outcome_ids: (0..probabilities.len()).map(|i| format!("outcome-{i}")).collect(),
+            outcome_ids: (0..probabilities.len())
+                .map(|i| format!("outcome-{i}"))
+                .collect(),
             outcome_probabilities: probabilities,
             conditional_action_utilities: utilities,
             acquisition_cost: cost,
@@ -2133,14 +2145,26 @@ mod tests {
             vec![vec![6.0, 3.0], vec![2.0, 7.0]],
         );
         let evaluation = evaluate_information_acquisition(&[expensive, informative]).unwrap();
-        assert_eq!(evaluation.choice, InformationAcquisitionChoice::AcquireBestQuery);
+        assert_eq!(
+            evaluation.choice,
+            InformationAcquisitionChoice::AcquireBestQuery
+        );
         assert_eq!(evaluation.selected_query_id.as_deref(), Some("camera_peek"));
         assert_eq!(evaluation.options[0].query_id, "camera_peek");
         assert_eq!(evaluation.options[0].prior_best_action_id, 3);
         assert_eq!(evaluation.options[0].best_action_by_outcome, vec![17, 3]);
-        assert_eq!(evaluation.options[0].expected_utility_without_information, 5.0);
-        assert_eq!(evaluation.options[0].expected_utility_after_information, 6.5);
-        assert_eq!(evaluation.options[0].expected_value_of_sample_information, 1.5);
+        assert_eq!(
+            evaluation.options[0].expected_utility_without_information,
+            5.0
+        );
+        assert_eq!(
+            evaluation.options[0].expected_utility_after_information,
+            6.5
+        );
+        assert_eq!(
+            evaluation.options[0].expected_value_of_sample_information,
+            1.5
+        );
         assert_eq!(evaluation.options[0].net_information_value, 0.5);
         assert_eq!(evaluation.options[1].net_information_value, -0.5);
     }
@@ -2163,7 +2187,6 @@ mod tests {
         assert_eq!(evaluation.selected_query_id, None);
     }
 
-
     #[test]
     fn information_probability_scoring_uses_multiclass_brier_and_log_loss() {
         let observations = vec![
@@ -2178,7 +2201,9 @@ mod tests {
                 realized_outcome_id: "slip".into(),
             },
         ];
-        let metrics = evaluate_information_probabilities(&observations).unwrap().unwrap();
+        let metrics = evaluate_information_probabilities(&observations)
+            .unwrap()
+            .unwrap();
         assert_eq!(metrics.sample_count, 2);
         assert!((metrics.mean_multiclass_brier_score - 0.1025).abs() < 1e-12);
         assert!((metrics.mean_log_loss - ((-0.8f64.ln() - 0.75f64.ln()) / 2.0)).abs() < 1e-12);
@@ -2193,7 +2218,9 @@ mod tests {
             probabilities: vec![1.0, 0.0],
             realized_outcome_id: "slip".into(),
         }];
-        let metrics = evaluate_information_probabilities(&zero_miss).unwrap().unwrap();
+        let metrics = evaluate_information_probabilities(&zero_miss)
+            .unwrap()
+            .unwrap();
         assert_eq!(metrics.zero_probability_events, 1);
         assert!((metrics.mean_log_loss - -((1e-15f64).ln())).abs() < 1e-12);
 
