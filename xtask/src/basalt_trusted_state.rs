@@ -111,6 +111,10 @@ struct AcceptedReceipt {
 
 impl AcceptedReceipt {
     fn matches(&self, candidate: &Candidate) -> bool {
+        // The checkpoint and policy values are the original acceptance context,
+        // not the immutable receipt identity. A retry may carry refreshed proof
+        // material or a newer policy view; it must discover the prior decision
+        // without advancing either cursor again.
         self.source == candidate.source
             && self.generation == candidate.generation
             && self.previous_seal_digest == candidate.previous_seal_digest
