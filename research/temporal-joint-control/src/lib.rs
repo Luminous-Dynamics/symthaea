@@ -92,7 +92,7 @@ pub struct JointBudget {
     pub maximum_observation_gap_us: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JointPlan {
     pub plan_id: u64,
     /// Action IDs must be strictly increasing. The same action ID must retain
@@ -104,7 +104,7 @@ pub struct JointPlan {
     pub predicted_maximum_observation_gap_us: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ExposureAxis {
     WrongBelief,
     Abstention,
@@ -222,7 +222,7 @@ pub fn select_joint_plan(
             > budget.maximum_observation_gap_us)
             .then_some(plan.predicted_maximum_observation_gap_us);
         if resource_overruns.is_empty() && gap_overrun.is_none() {
-            feasible.push(*plan);
+            feasible.push(plan.clone());
         } else {
             rejected.push(RejectedPlan {
                 plan_id: plan.plan_id,
@@ -239,12 +239,13 @@ pub fn select_joint_plan(
 
     let mut pareto = feasible
         .iter()
-        .copied()
+        .iter()
         .filter(|candidate| {
             !feasible.iter().any(|other| {
                 other.plan_id != candidate.plan_id && dominates(other, candidate)
             })
         })
+        .cloned()
         .collect::<Vec<_>>();
 
     pareto.sort_by(|left, right| compare_selection(left, right, exposure_priority));
