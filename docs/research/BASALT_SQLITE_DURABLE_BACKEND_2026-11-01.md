@@ -56,7 +56,7 @@ The current code's reopen + exact-retry test covers recovery after a committed r
 
 ## Local state digest and trust boundary
 
-The database stores a domain-separated SHA-256 digest over the normalized state. It is recomputed on every read and detects accidental or inconsistent database edits, partial out-of-band edits, and serialization/row mismatches. Schema version 1 is explicitly stored and checked. Each accepted receipt also stores its monotonic acceptance revision and all transition-evidence digest references, so reopening can verify the complete immutable history rather than only the latest cursor. The v1 reader rejects non-canonical decimal encodings, revision gaps, missing transition evidence, per-source generation gaps/predecessor mismatches, policy rollback and a source cursor that no longer points to the latest accepted generation.
+The database stores a domain-separated SHA-256 digest over the normalized state. It is recomputed on every read and detects accidental or inconsistent database edits, partial out-of-band edits, and serialization/row mismatches. Schema version 1 is explicitly stored and checked. Each accepted receipt also stores its monotonic acceptance revision, profile/boot/log-origin/policy transition-evidence references, and checkpoint evidence class/reference (pinned bootstrap, same-tree refresh, or consistent extension). Reopening checks the complete acceptance history: contiguous revisions, source-generation/predecessor continuity, explicit transition evidence, monotonic policy history, per-log checkpoint progression, and latest source/log cursors. These are checks of the stored admission record and evidence references; they do not re-run DSSE or Merkle proof verification. The v1 reader rejects non-canonical decimal encodings, revision gaps, missing transition evidence, per-source generation gaps/predecessor mismatches, policy rollback and a source cursor that no longer points to the latest accepted generation.
 
 This digest is **unkeyed**. An attacker who can restore an older database or rewrite every row and recompute the digest can still create an internally consistent stale state. Therefore:
 - local snapshot digest consistency is not anti-rollback;
@@ -108,7 +108,7 @@ The module now contains 24 Rust unit tests, including:
 - two independent connections racing the same prepared plan;
 - same-revision but divergent database snapshots;
 - eight independent SQLite connections racing the same state plan;
-- source-generation uniqueness and cross-table foreign-key constraints exercised by the SQLite schema;
+- source-generation uniqueness, acceptance-revision uniqueness, deferred source-to-log foreign-key behavior and checkpoint-evidence history exercised by the SQLite schema;
 - unkeyed state-digest mismatch rejection.
 
 These tests are authored, not executed in this environment. The deterministic write-boundary injection checks SQLite transaction rollback, not real power-loss behavior, filesystem locking under every platform, VFS durability, or hardware flush integrity. The DDL was separately executed with SQLite 3.46.1: all four tables created; deferred source-to-log foreign-key insertion passed; duplicate source-generation and acceptance-revision constraints rejected duplicates. This was schema-only validation, not execution of the Rust adapter.
