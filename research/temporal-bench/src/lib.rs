@@ -12,6 +12,7 @@ use digest::CanonicalHasher;
 
 pub mod digest;
 pub mod edge_adapter;
+pub mod real_dataset_manifest;
 pub mod dms;
 pub mod evidence;
 pub mod fast_event;
