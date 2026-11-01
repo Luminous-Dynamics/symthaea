@@ -430,6 +430,7 @@ impl ActionConditionedVisualResidualPredictor {
                 || receipt.source_frame_sequence != first.source_frame_sequence
                 || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
                 || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+                || receipt.model_weights_sha256 != first.model_weights_sha256
                 || receipt.model_version != first.model_version
             {
                 return Err(ActionConditionedPredictorError::ActionSetMismatch);
@@ -870,6 +871,8 @@ impl ActionConditionedVisualResidualPredictor {
             if receipt.schema_version != ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION
                 || receipt.forecast_id == 0
                 || receipt.forecast_id >= state.next_forecast_id
+                || receipt.action_set_id == 0
+                || receipt.action_set_id > receipt.forecast_id
                 || receipt.action_set_size == 0
                 || receipt.model_version > state.training_steps
                 || !is_lower_hex_sha256(&receipt.model_checkpoint_sha256)
@@ -948,6 +951,8 @@ impl ActionConditionedVisualResidualPredictor {
                     || forecast.receipt.action_set_sha256 != first.action_set_sha256
                     || forecast.receipt.history_sha256 != first.history_sha256
                     || forecast.receipt.action_manifest_sha256 != first.action_manifest_sha256
+                    || forecast.receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+                    || forecast.receipt.model_weights_sha256 != first.model_weights_sha256
                     || forecast.receipt.model_version != first.model_version
                     || forecast.receipt.source_frame_sequence != first.source_frame_sequence
                     || forecast.receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
