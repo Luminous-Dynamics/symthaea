@@ -119,7 +119,10 @@ pub fn decompose_higher_order_interactions(
         if run.context.action_registry_sha256 != registry_digest {
             return Err(JointBudgetError::ContextMismatch);
         }
-        if run.run_id == 0 || !run_ids.insert(run.run_id) {
+        if run.run_id == 0 {
+            return Err(JointBudgetError::ZeroRunId);
+        }
+        if !run_ids.insert(run.run_id) {
             return Err(JointBudgetError::DuplicateRunId { run_id: run.run_id });
         }
         if let Some(reference) = context_reference {
@@ -482,6 +485,17 @@ mod tests {
         assert_eq!(pair.dividend, None);
         assert_eq!(pair.excluded_incompatible_subsets, 1);
         assert_eq!(pair.eligible_counterfactual_subsets, 3);
+    }
+
+    #[test]
+    fn zero_run_id_is_rejected_with_a_specific_error() {
+        let reg = registry(&[0, 0]);
+        let mut runs = full_table(&reg, |_| [1_000, 1_000, 1_000]);
+        runs[0].run_id = 0;
+        assert_eq!(
+            decompose_higher_order_interactions(&reg, &runs),
+            Err(JointBudgetError::ZeroRunId)
+        );
     }
 
     #[test]
