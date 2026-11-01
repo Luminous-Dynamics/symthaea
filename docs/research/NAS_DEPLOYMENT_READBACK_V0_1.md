@@ -19,7 +19,8 @@ A successful compiler or flashing-tool exit code does not prove that a target co
 6. Compare every readback byte directly with the exact source binary slice; digest equality is additional evidence, not a substitute for byte equality.
 7. Require complete, gap-free and non-overlapping coverage of both model and firmware binaries, the capture payload, and target flash address ranges.
 8. Issue a non-serializable VerifiedDeploymentReadback capability and canonical receipt only after all byte checks pass.
-9. Bind subsequent physical measurements to both the exact deployable-artifact digest and exact readback-receipt digest.
+9. Append only that capability to a per-device hash-chained session ledger; require unique session IDs and strictly increasing session sequences.
+10. Bind subsequent physical measurements to both the exact deployable-artifact digest and exact readback-receipt digest.
 
 ## Capture representation
 
@@ -27,13 +28,13 @@ The capture is a compact concatenation of region bytes in the offsets supplied b
 
 ## Claim ceiling
 
-This validates the *supplied readback bytes* against supplied source bytes and declared mapping. It does not authenticate the physical probe, device serial, flash tool, acquisition channel or caller. Device identity evidence is digest-pinned but not cryptographically validated here. Session IDs/sequences are bound, but there is no global anti-replay ledger or trusted monotonic clock in v0.1.
+This validates the *supplied readback bytes* against supplied source bytes and declared mapping. It does not authenticate the physical probe, device serial, flash tool, acquisition channel or caller. Device identity evidence is digest-pinned but not cryptographically validated here. The local serialized session ledger detects duplicate IDs and non-monotonic sequences relative to its supplied history, but it is not a durable atomic store, trusted monotonic clock, hardware-backed anti-rollback mechanism or externally witnessed global ledger. A party able to rewrite the entire ledger and recompute its hashes can replace its history unless an external checkpoint is retained.
 
 Protected/encrypted flash needs a separately qualified measured-boot attestation path; do not call that ordinary byte readback. Secure-element evidence, trust roots, keys, probe custody, actual hardware acquisition and independent operator verification remain separate.
 
 ## Negative controls
 
-Nine Rust tests are authored for exact match, altered readback byte, altered address even after rehashing the region map, truncated capture, source-coverage gaps, overlapping flash regions, target/profile mismatch, replayed receipt recomputation, exact readback-bound measurement, and unknown receipt fields. Tests are authored, not compiled or run in this environment.
+Twelve Rust tests are authored for exact match, altered readback byte, altered address even after rehashing the region map, truncated capture, source-coverage gaps, overlapping flash regions, target/profile mismatch, receipt recomputation, exact readback-bound measurement, unknown receipt fields, duplicate/non-monotonic session rejection and session-ledger tamper detection. Tests are authored, not compiled or run in this environment.
 
 ## Benchmark integration
 
