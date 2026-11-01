@@ -109,7 +109,7 @@
     "hardware_energy_measured": false,
     "benchmark_executed": false,
     "evaluator_interaction_test_functions_authored": 6,
-    "evaluator_higher_order_interaction_test_functions_authored": 8
+    "evaluator_higher_order_interaction_test_functions_authored": 9
   },
   "evaluator_attribution": {
     "module": "research/temporal-evaluator/src/interaction.rs",
@@ -144,7 +144,7 @@
       "algorithm": "subset_mobius_and_zeta_transforms",
     "complexity": "O(n*2^n)",
       "shapley_or_population_causal_claim": false,
-      "test_functions_authored": 8
+      "test_functions_authored": 9
     }
   },
   "external_benchmark_lanes": [
