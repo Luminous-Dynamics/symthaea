@@ -367,8 +367,8 @@ fn validate_and_analyze(
         {
             bail!("outcome {run_id} model identity/version differs from frozen trial plan");
         }
-        if string(outcome, "/arm_policy_sha256")? != arm_policy_sha256[&arm_id]
-            || string(outcome, "/arm_config_sha256")? != arm_config_sha256[&arm_id]
+        if string(outcome, "/arm_policy_sha256")? != arm_policy_sha256[&arm_id].as_str()
+            || string(outcome, "/arm_config_sha256")? != arm_config_sha256[&arm_id].as_str()
         {
             bail!("outcome {run_id} arm policy/configuration differs from frozen arm definition");
         }
