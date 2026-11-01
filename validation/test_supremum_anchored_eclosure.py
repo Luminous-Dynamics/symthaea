@@ -87,6 +87,36 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
         )
         self.assertTrue(frozenset({"a", "b"}) <= chosen)
 
+    def test_old_intersection_certificate_is_invariant_to_dormant_extension(self):
+        old_universe = ("a", "b")
+        extended_universe = ("a", "b", "new")
+        old_baseline = [("a",), ("a", "b"), ("b",)]
+        extended_baseline = [
+            ("a", "new"), ("a", "b", "new"), ("b", "new")
+        ]
+        old_q = {"a": Fraction(1, 4), "b": Fraction(1, 4)}
+        extended_q = {
+            "a": Fraction(1, 4), "b": Fraction(1, 4), "new": Fraction(1, 4)
+        }
+        old_local = build_supremum_anchored_certificates(
+            universe=old_universe,
+            baseline_path=old_baseline,
+            coordinate_budgets=old_q,
+            alpha=Fraction(1, 5),
+            adjusted_auxiliary=all_auxiliary(old_universe, 3, Fraction(2)),
+        )
+        extended_local = build_supremum_anchored_certificates(
+            universe=extended_universe,
+            baseline_path=extended_baseline,
+            coordinate_budgets=extended_q,
+            alpha=Fraction(1, 5),
+            adjusted_auxiliary=all_auxiliary(
+                extended_universe, 3, Fraction(2)
+            ),
+        )
+        for old_intersection, old_values in old_local.items():
+            self.assertEqual(old_values, extended_local[old_intersection])
+
     def test_rejects_overallocated_or_negative_coordinate_budgets(self):
         for q in (
             {"a": Fraction(3, 4), "b": Fraction(1, 2)},
