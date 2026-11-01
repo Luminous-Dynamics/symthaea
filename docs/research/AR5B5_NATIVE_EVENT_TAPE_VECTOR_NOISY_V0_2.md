@@ -62,13 +62,12 @@ Candidate decision identity cannot change within a campaign. Replicate IDs and s
 
 ## 4. Byte-verified replay adapter
 
-The new event_tape_noisy module consumes a map of caller-resolved evidence bundles keyed by EventTape event ID. Each successful replicate requires exactly one bundle containing:
+The noisy EventTape outcome pins an exact `EvidenceArtifactReference` (role, media type, content-addressed locator, byte length, and SHA-256) on every successful replicate. The new `event_tape_noisy` module exposes two replay paths:
 
-- replicate-scoped evidence manifest;
-- exact raw observation artifact bytes;
-- byte-verification receipt with verifier ID and build digest.
+- `replay_noisy_event_tape`: accepts an already-resolved evidence-bundle map, useful for offline imports and tests.
+- `replay_noisy_event_tape_with_resolver` / `reconcile_noisy_event_tape_with_resolver`: preferred production path; accepts the existing `EvidenceArtifactResolver` and `EvidenceArtifactResolvePolicy` abstractions.
 
-The adapter does not perform I/O. A content-addressed storage resolver must enforce locator namespace and byte ceilings before passing bytes to this function.
+The resolver-backed path validates allowed locator prefixes, per-artifact and total byte ceilings, resolves the bytes, checks byte length and digest, reconstructs the replicate manifest directly from the exact EventTape reference and sample, constructs the byte receipt with the caller-declared verifier ID and header-pinned verifier build digest, and checks the reconstructed manifest/receipt digests against the event before aggregation. No new storage interface was invented. The concrete resolver implementation remains deployment-specific.
 
 For each successful event, replay verifies:
 
@@ -105,7 +104,7 @@ A verifier-rejected EventTape attempt maps to AnytimeHistory's Invalid outcome b
 
 This tranche does not yet implement:
 
-1. An external content-addressed artifact resolver. The adapter receives bytes as input and must be placed behind a bounded resolver.
+1. A concrete deployment resolver implementation and its storage-specific adversarial tests. The generic bounded EvidenceArtifactResolver/policy path is now wired; deployments still need to supply the adapter for their CAS/object store.
 2. Signed verifier attestations or trusted verifier identity. Build digests are recorded and checked against the header, but are not cryptographically signed here.
 3. A matched-campaign multi-policy adapter for vector/noisy replicate actions. The current matched-campaign reconciler still handles scalar evaluation and proposal actions only; it should not be used to claim matched noisy-MOO results.
 4. A deterministic-vector Pareto/Anytime archive adapter. v0.2 validates and records deterministic vectors, while this adapter currently handles noisy Pareto replay.
