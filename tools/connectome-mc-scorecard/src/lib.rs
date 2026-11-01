@@ -1433,6 +1433,9 @@ mod tests {
         ).unwrap();
         assert!(!result.null_is_true);
         assert_eq!(result.rejection_difference.planned_pairs, 2);
+        assert_eq!(result.rejection_difference.baseline_record_count, 2);
+        assert_eq!(result.rejection_difference.candidate_record_count, 2);
+        assert_eq!(result.rejection_difference.matched_record_pairs, 2);
         assert_eq!(result.rejection_difference.complete_rejection_pairs, 2);
         assert_eq!(result.rejection_difference.observed_complete_pair_mean, Some(1.0));
         assert_eq!(result.rejection_difference.unknown_pairs, 0);
@@ -1473,6 +1476,8 @@ mod tests {
             &rows, &plan, "alt", "baseline", "candidate", PairedComparisonConfig::default()
         ).unwrap();
         assert_eq!(result.rejection_difference.planned_pairs, 3);
+        assert_eq!(result.rejection_difference.baseline_record_count, 2);
+        assert_eq!(result.rejection_difference.candidate_record_count, 1);
         assert_eq!(result.rejection_difference.matched_record_pairs, 1);
         assert_eq!(result.rejection_difference.complete_rejection_pairs, 1);
         assert_eq!(result.rejection_difference.unknown_pairs, 2);
