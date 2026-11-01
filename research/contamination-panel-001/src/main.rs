@@ -3,11 +3,11 @@ use contamination_panel_bench::{
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
     conformal_by::{ConformalByConfigV1, analyze_conformal_by},
-    conformal_by::{ConformalByConfigV1, analyze_conformal_by},
     detector_calibration::{
         DetectorCalibrationReportV1, DetectorCalibrationStudyV1, analyze_detector_calibration,
     },
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
+    conformal_by::{ConformalByConfigV1, analyze_conformal_by},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
         FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
