@@ -37,11 +37,13 @@ The symthaea-vision-hv-v1 domain is followed by:
 This yields fingerprints for:
 - the encoded source observation hypervector;
 - the source visual-manifold latent state;
-- the issued prediction hypervector;
-- the persistence prediction hypervector;
+- the prediction hypervector compared by the evaluator;
+- the persistence hypervector compared by the evaluator;
 - the actual target observation hypervector.
 
 These fingerprints bind the encoded vectors, not the raw RGB/depth frame bytes, camera device, sensor calibration, or storage object. The raw observation's exact byte digest is not currently included in this evaluator receipt.
+
+Pending forecasts are deterministically dilated if the owning manifold changes HDC dimension before the forecast matures. In that case, the prediction and persistence fingerprints are recomputed immediately after the dilation, so the receipt identifies the exact vectors the evaluator compares. It does not retain a second digest of the pre-dilation representation; the source frame/belief and source transition-parameter fingerprints remain bound to issuance time.
 
 ### Transition parameter fingerprint
 
