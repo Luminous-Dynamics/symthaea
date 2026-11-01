@@ -31,7 +31,7 @@ const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-S
 pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
     "symthaea-iit/sparse-iit4-2023-system-search/0.6.0";
 const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.3\0";
-pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.4.0";
+pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.5.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
     "symthaea-iit/sparse-iit4-partition-score/0.4.0";
 
@@ -289,7 +289,6 @@ struct SparseIit4ScoringBaseline {
     posterior: SparseEq4PosteriorContext,
     cause_forward: SparseEq4Report,
     cause_forward_receipt_sha256: String,
-    cause_selectivity: Vec<f64>,
     cause_log_selectivity: Vec<f64>,
     effect_selectivity: Vec<f64>,
 }
@@ -722,10 +721,6 @@ impl SparseBinaryCausalModel {
                 }
             })
             .collect::<Vec<_>>();
-        let cause_selectivity = cause_log_selectivity
-            .iter()
-            .map(|value| value.exp())
-            .collect::<Vec<_>>();
         let effect_selectivity = self.effect_repertoire_iit4(
             candidate_system,
             candidate_system,
@@ -737,7 +732,6 @@ impl SparseBinaryCausalModel {
             posterior,
             cause_forward,
             cause_forward_receipt_sha256,
-            cause_selectivity,
             cause_log_selectivity,
             effect_selectivity,
         })
@@ -2640,6 +2634,64 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn sparse_eq4_preserves_finite_joint_log_likelihood_below_probability_underflow() {
+        let rare_event = 1e-200;
+        let model = SparseBinaryCausalModel::new(
+            2,
+            vec![
+                SparseMechanismCpt::new(0, vec![], vec![rare_event]).unwrap(),
+                SparseMechanismCpt::new(1, vec![], vec![rare_event]).unwrap(),
+            ],
+        )
+        .unwrap();
+
+        let report = model
+            .forward_cause_likelihood_iit4(&[0, 1], &[true, true], 4)
+            .unwrap();
+
+        assert_eq!(report.forward_likelihood, vec![0.0; 4]);
+        assert_eq!(report.forward_log_likelihood.len(), 4);
+        let expected_log = 2.0 * rare_event.ln();
+        for value in report.forward_log_likelihood.iter().copied() {
+            assert!(value.is_finite());
+            assert!((value - expected_log).abs() <= 1e-10);
+        }
+        assert!(report.receipt_sha256().is_ok());
+    }
+
+    #[test]
+    fn sparse_log_sum_exp_normalizes_rare_events_without_underflow() {
+        let log_mass = sparse_log_sum_exp(&[-800.0, -801.0, f64::NEG_INFINITY]).unwrap();
+        assert!(log_mass.is_finite());
+        let normalized = [-800.0, -801.0, f64::NEG_INFINITY]
+            .map(|value| (value - log_mass).exp());
+        assert!((normalized.iter().sum::<f64>() - 1.0).abs() <= 1e-15);
+        assert_eq!(sparse_log_sum_exp(&[f64::NEG_INFINITY; 3]).unwrap(), f64::NEG_INFINITY);
+    }
+
+    #[test]
+    fn sparse_cause_score_distinguishes_finite_underflow_from_structural_zero() {
+        let score = sparse_direction_score_from_logs(
+            CausalDirection::Cause,
+            -700.0,
+            -800.0,
+            -1_700.0,
+        );
+        assert_eq!(score.forward_probability, 0.0);
+        assert_eq!(score.partitioned_forward_probability, 0.0);
+        assert!(score.signed_phi > 0.0);
+        assert!(score.signed_phi.is_finite());
+
+        let structural_zero = sparse_direction_score_from_logs(
+            CausalDirection::Cause,
+            -700.0,
+            f64::NEG_INFINITY,
+            -1_700.0,
+        );
+        assert_eq!(structural_zero.signed_phi, 0.0);
     }
 
     #[test]
