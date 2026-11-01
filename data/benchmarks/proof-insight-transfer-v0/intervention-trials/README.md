@@ -11,7 +11,7 @@ The synthetic plan fixture defines four arms:
 - A2: oracle minimal support from an exhaustive small-context lattice (diagnostic upper bound only).
 - A3: size-matched random support subset (negative control).
 
-Each pair freezes the task, project component, repository commit, Lean environment, exact initial proof-state and target-statement digests, model seed and six-dimensional resource envelope. Arm execution order is deterministically randomized. Every arm uses a fresh process and independent copy of the same initial state; mutable Lean caches are not shared.
+Each pair freezes the task, project component, repository commit, Lean environment, exact initial proof-state and target-statement digests, model seed and six-dimensional resource envelope. Each arm additionally binds model ID/version and its policy/configuration SHA-256; checker, run and successor receipts repeat that identity, and the run configuration digest must equal the frozen arm config digest. Arm execution order is deterministically randomized. Every arm uses a fresh process and independent copy of the same initial state; mutable Lean caches are not shared.
 
 ## Contracts
 
