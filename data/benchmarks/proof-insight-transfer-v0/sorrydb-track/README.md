@@ -186,3 +186,10 @@ The Rust importer and source verifier are committed. The focused workflow is des
 PITB's R0–R4 runtime comparison is recorded in a branch ledger. Branches may return retrieval routes, partial lemmas, repair plans, counterexamples, or complete proof candidates, but all remain untrusted. A proof candidate is represented by a SHA-256 of the exact candidate bytes. Promotion must bind that digest to the source branch, the sorry-only patch digest, the original target-type digest, a checker identity/receipt, and a distinct independent replay identity/receipt. The checker and replay must attest the same candidate bytes. Changing the target statement, promoting a different branch artifact, adding unapproved axioms, or escaping the sorry span blocks success.
 
 Resource accounting separates elapsed wall-clock from summed branch wall-work. Parallel branches may accumulate 180 branch-ms while completing in 120 elapsed-ms; that is not an accounting contradiction. Token count, model calls, Lean CPU and cost remain additive. The Rust `analyze_sorrydb_branch_ledger` binary validates these joins and budget invariants and has a synthetic negative-control suite. The fixture is contract-only and does not record an executed branch or proof.
+
+
+## Structural expression identity (2026-11-01)
+
+PITB now has a separate v1 structural Lean-expression wire contract and an independent Rust verifier. It binds target expressions to exact source/task and Lean/Lake environment metadata, maps FVarIds to ordered local-context indices, preserves the local-instance registry, and keeps transparent-let dependencies separate from nondependent-have value provenance. The contract deliberately uses an environment-scoped structural digest rather than claiming a cross-version semantic theorem ID. See docs/research/pitb-lean-expr-wire-v1-2026-11-01.md.
+
+The checked-in example is synthetic. The Rust verifier has not yet been compiled in this environment, and the Lean v1 exporter has not yet been implemented or run; no real capture or proof result is claimed.
