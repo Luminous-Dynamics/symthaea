@@ -206,6 +206,11 @@ pub struct ScoreNoteIdentityV1 {
 }
 
 /// Complete score-bound identity map for one immutable score serialization.
+///
+/// The map digest detects accidental or adversarial mutation of the sidecar's
+/// contents, but is not an author signature. The expected score digest must
+/// come from the score owner's canonical serializer; capability promotion
+/// remains subject to the independent signed verifier used by #9586.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScoreNoteIdentityMapV1 {
