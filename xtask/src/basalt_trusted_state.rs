@@ -796,9 +796,9 @@ pub fn run_conformance() -> ConformanceReport {
     let bootstrap_passed = initial_plan
         .and_then(|plan| concurrent_state.commit(plan).ok())
         .is_some();
-    let concurrent_candidate = successor_candidate(&concurrent_state, 2, 28);
-    let concurrent_plan = concurrent_state.preview(&concurrent_candidate);
     let thread_race_passed = if bootstrap_passed {
+        let concurrent_candidate = successor_candidate(&concurrent_state, 2, 28);
+        let concurrent_plan = concurrent_state.preview(&concurrent_candidate);
         match concurrent_plan {
             Ok(TransitionDecision::Advance(plan)) => {
                 let shared = Arc::new(Mutex::new(concurrent_state));
