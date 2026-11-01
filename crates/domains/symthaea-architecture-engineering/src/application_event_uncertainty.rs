@@ -72,6 +72,9 @@ pub struct ApplicationEventRepeatabilityProtocol {
     pub candidate_artifact_sha256: String,
     pub device_session_sha256: String,
     pub matched_input_sha256: String,
+    pub voltage_source_id: String,
+    /// Digest of the calibrated voltage readback/evidence for this repeat session.
+    pub voltage_readback_sha256: String,
     pub minimum_replicates: usize,
     pub protocol_sha256: String,
 }
@@ -98,6 +101,7 @@ pub fn validate_application_event_repeatability_protocol(
         ("repeatability_id", protocol.repeatability_id.as_str()),
         ("target_id", protocol.target_id.as_str()),
         ("board_revision", protocol.board_revision.as_str()),
+        ("voltage_source_id", protocol.voltage_source_id.as_str()),
     ] {
         if value.trim().is_empty() {
             return Err(ApplicationEventUncertaintyError::new(field, "must be non-empty"));
@@ -109,6 +113,7 @@ pub fn validate_application_event_repeatability_protocol(
         ("candidate_artifact_sha256", protocol.candidate_artifact_sha256.as_str()),
         ("device_session_sha256", protocol.device_session_sha256.as_str()),
         ("matched_input_sha256", protocol.matched_input_sha256.as_str()),
+        ("voltage_readback_sha256", protocol.voltage_readback_sha256.as_str()),
         ("protocol_sha256", protocol.protocol_sha256.as_str()),
     ] {
         if !is_sha256(value) {
@@ -141,6 +146,8 @@ pub struct ApplicationEventEnergyUncertaintyReceipt {
     pub current_range_id: String,
     pub calibration_certificate_sha256: String,
     pub matched_input_sha256: String,
+    pub voltage_source_id: String,
+    pub voltage_readback_sha256: String,
     pub voltage_v: f64,
     pub matched_attempt_count: usize,
     pub successful_complete_replicate_count: usize,
@@ -358,6 +365,8 @@ pub fn evaluate_application_event_energy_uncertainty(
         current_range_id: metrology_manifest.current_range_id.clone(),
         calibration_certificate_sha256: metrology_manifest.calibration_certificate_sha256.clone(),
         matched_input_sha256: repeatability_protocol.matched_input_sha256.clone(),
+        voltage_source_id: repeatability_protocol.voltage_source_id.clone(),
+        voltage_readback_sha256: repeatability_protocol.voltage_readback_sha256.clone(),
         voltage_v: phase_receipt.voltage_v,
         matched_attempt_count,
         successful_complete_replicate_count: replicate_count,
@@ -399,6 +408,7 @@ pub fn validate_application_event_energy_uncertainty_receipt(
         ("device_session_sha256", receipt.device_session_sha256.as_str()),
         ("calibration_certificate_sha256", receipt.calibration_certificate_sha256.as_str()),
         ("matched_input_sha256", receipt.matched_input_sha256.as_str()),
+        ("voltage_readback_sha256", receipt.voltage_readback_sha256.as_str()),
         ("receipt_sha256", receipt.receipt_sha256.as_str()),
     ] {
         if !is_sha256(value) {
@@ -409,6 +419,7 @@ pub fn validate_application_event_energy_uncertainty_receipt(
         || receipt.board_revision.trim().is_empty()
         || receipt.instrument_serial.trim().is_empty()
         || receipt.current_range_id.trim().is_empty()
+        || receipt.voltage_source_id.trim().is_empty()
         || receipt.replicate_count < 2
         || receipt.replicate_count != receipt.successful_complete_replicate_count
         || receipt.replicate_event_ids.len() != receipt.replicate_count
@@ -441,7 +452,11 @@ pub fn validate_application_event_energy_uncertainty_receipt(
         || receipt.type_b_standard_uncertainty_uj < 0.0
         || receipt.coverage_factor <= 0.0
         || receipt.maximum_boundary_alignment_bound_uj < 0.0
-        || receipt.matched_attempt_count < receipt.replicate_count
+        || receipt.matched_attempt_count != receipt.successful_complete_replicate_count
+            .saturating_add(receipt.rejected_outcome_count)
+            .saturating_add(receipt.rejected_deadline_count)
+            .saturating_add(receipt.rejected_coverage_count)
+            .saturating_add(receipt.rejected_missing_energy_count)
     {
         return Err(ApplicationEventUncertaintyError::new("receipt.values", "uncertainty values or counts are outside valid bounds"));
     }
@@ -487,6 +502,8 @@ pub fn compare_application_event_energy(
         ("instrument_serial", candidate.instrument_serial.as_str(), reference.instrument_serial.as_str()),
         ("current_range_id", candidate.current_range_id.as_str(), reference.current_range_id.as_str()),
         ("calibration_certificate_sha256", candidate.calibration_certificate_sha256.as_str(), reference.calibration_certificate_sha256.as_str()),
+        ("voltage_source_id", candidate.voltage_source_id.as_str(), reference.voltage_source_id.as_str()),
+        ("voltage_readback_sha256", candidate.voltage_readback_sha256.as_str(), reference.voltage_readback_sha256.as_str()),
     ] {
         if left != right {
             return Err(ApplicationEventUncertaintyError::new(
