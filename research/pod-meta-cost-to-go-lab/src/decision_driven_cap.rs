@@ -10,6 +10,7 @@ use crate::{OnlineCostDimension, ResourceVector};
 pub struct CapCalibrationPoint {
     pub example_id: u64,
     pub holdout_partition_digest: [u8; 32],
+    pub training_partition_digest: [u8; 32],
     pub model_digest: [u8; 32],
     pub score_model_digest: [u8; 32],
     pub feature_cohort_digest: [u8; 32],
@@ -86,6 +87,8 @@ pub struct DecisionDrivenCapResult {
 pub enum DecisionDrivenCapError {
     InvalidAlpha,
     MissingHoldoutPartitionDigest,
+    MissingTrainingPartitionDigest,
+    OverlappingTrainingAndHoldoutPartitions,
     MissingModelDigest,
     MissingScoreModelDigest,
     MissingSelectionPolicyDigest,
@@ -220,6 +223,12 @@ fn validate_config(config: DecisionDrivenCapConfig) -> Result<(), DecisionDriven
     if is_zero(config.holdout_partition_digest) {
         return Err(DecisionDrivenCapError::MissingHoldoutPartitionDigest);
     }
+    if is_zero(config.training_partition_digest) {
+        return Err(DecisionDrivenCapError::MissingTrainingPartitionDigest);
+    }
+    if config.training_partition_digest == config.holdout_partition_digest {
+        return Err(DecisionDrivenCapError::OverlappingTrainingAndHoldoutPartitions);
+    }
     if is_zero(config.model_digest) {
         return Err(DecisionDrivenCapError::MissingModelDigest);
     }
@@ -345,6 +354,7 @@ mod tests {
             base_threshold: 5,
             threshold_increment_per_selected: 2,
             holdout_partition_digest: [1; 32],
+            training_partition_digest: [9; 32],
             model_digest: [2; 32],
             score_model_digest: [7; 32],
             selection_policy_digest: [8; 32],
