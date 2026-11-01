@@ -301,6 +301,8 @@ fn build_systemd_run_arguments(
         "--property=MemorySwapMax=0".into(),
         format!("--property=CPUQuota={}%", spec.cpu_quota_percent),
         format!("--property=TasksMax={}", spec.tasks_max),
+        "--property=OOMPolicy=kill".into(),
+        "--property=KillMode=control-group".into(),
         format!("--property=RuntimeMaxSec={}ms", spec.wall_timeout_ms),
         "--".into(),
         spec.bubblewrap_executable.clone(),
@@ -474,6 +476,8 @@ mod tests {
             "--property=MemorySwapMax=0",
             "--property=CPUQuota=100%",
             "--property=TasksMax=16",
+            "--property=OOMPolicy=kill",
+            "--property=KillMode=control-group",
             "--property=RuntimeMaxSec=30000ms",
         ] {
             assert!(plan.systemd_run_arguments.iter().any(|arg| arg == required));
