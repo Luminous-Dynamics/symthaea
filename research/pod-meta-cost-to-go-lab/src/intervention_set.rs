@@ -19,7 +19,7 @@ pub enum InterventionAssignmentEvidence {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InterventionInterpretation {
     SimulatedContrast,
-    RandomizedAssignmentEffect,
+    RandomizedTrialContrast,
     ObservationalAssociationOnly,
 }
 
@@ -56,6 +56,7 @@ pub struct InterventionAlternativeOutcome {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InterventionParetoSummary {
+    pub interpretation: InterventionInterpretation,
     /// Sorted by operation-family ID for deterministic reporting.
     pub alternatives: Vec<InterventionAlternativeOutcome>,
     /// Non-dominated alternatives. Resource dimensions are never scalarized.
@@ -118,7 +119,7 @@ impl MatchedInterventionSet {
                 InterventionInterpretation::SimulatedContrast
             }
             InterventionAssignmentEvidence::RandomizedLiveTrial { .. } => {
-                InterventionInterpretation::RandomizedAssignmentEffect
+                InterventionInterpretation::RandomizedTrialContrast
             }
             InterventionAssignmentEvidence::ObservationalMatchedRuns { .. } => {
                 InterventionInterpretation::ObservationalAssociationOnly
@@ -272,6 +273,7 @@ impl MatchedInterventionSet {
         }
 
         Ok(InterventionParetoSummary {
+            interpretation: self.interpretation(),
             alternatives,
             frontier_operation_families,
         })
@@ -603,7 +605,7 @@ mod tests {
                 allocation_receipt_digest: [9; 32],
             })
             .interpretation(),
-            InterventionInterpretation::RandomizedAssignmentEffect
+            InterventionInterpretation::RandomizedTrialContrast
         );
         assert_eq!(
             set(InterventionAssignmentEvidence::ObservationalMatchedRuns {
