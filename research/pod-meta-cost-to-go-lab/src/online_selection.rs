@@ -487,6 +487,7 @@ mod tests {
 
     fn exact(value: u128) -> OnlineFeedbackDisposition {
         OnlineFeedbackDisposition::ExactVerifiedCost {
+            action_id_digest: [9; 32],
             observed_remaining_to_verified_proof: ResourceVector::new(value, 0, 0, 0, 0, 0),
             meter_receipt_digest: [6; 32],
             completion_verifier_digest: [7; 32],
@@ -495,6 +496,7 @@ mod tests {
 
     fn bit(covered: bool) -> OnlineFeedbackDisposition {
         OnlineFeedbackDisposition::CoverageBitOnly {
+            action_id_digest: [9; 32],
             covered,
             meter_receipt_digest: [6; 32],
             evaluator_receipt_digest: [7; 32],
@@ -553,6 +555,7 @@ mod tests {
                 1,
                 2,
                 OnlineFeedbackDisposition::RightCensored {
+                    action_id_digest: [9; 32],
                     observed_resource_lower_bound: ResourceVector::new(21, 0, 0, 0, 0, 0),
                     meter_receipt_digest: [6; 32],
                 },
@@ -586,6 +589,7 @@ mod tests {
                 1,
                 2,
                 OnlineFeedbackDisposition::CompetingTerminal {
+                    action_id_digest: [9; 32],
                     terminal: OnlineCompetingTerminal::PermissionRevoked,
                     evaluator_receipt_digest: [6; 32],
                 },
@@ -620,8 +624,50 @@ mod tests {
             )),
             Err(OnlineSelectionError::RepeatedUnknownFeedback)
         );
-        ledger.append_feedback(receipt(2, 1, 4, exact(12))).unwrap();
+        ledger
+            .append_feedback(receipt(
+                2,
+                1,
+                4,
+                OnlineFeedbackDisposition::ExactVerifiedCost {
+                    action_id_digest: [6; 32],
+                    observed_remaining_to_verified_proof: ResourceVector::new(12, 0, 0, 0, 0, 0),
+                    meter_receipt_digest: [7; 32],
+                    completion_verifier_digest: [8; 32],
+                },
+            ))
+            .unwrap();
         assert_eq!(ledger.report(4).observed_fcr, Some(0.0));
+    }
+
+    #[test]
+    fn reconciliation_rejects_a_different_action_identity() {
+        let mut ledger = OnlineSelectionLedger::new();
+        ledger.append_statement(statement(1, 10, 1, 1)).unwrap();
+        ledger
+            .append_feedback(receipt(
+                1,
+                1,
+                2,
+                OnlineFeedbackDisposition::ActionOutcomeUnknown {
+                    action_id_digest: [6; 32],
+                },
+            ))
+            .unwrap();
+        assert_eq!(
+            ledger.append_feedback(receipt(
+                2,
+                1,
+                3,
+                OnlineFeedbackDisposition::ExactVerifiedCost {
+                    action_id_digest: [8; 32],
+                    observed_remaining_to_verified_proof: ResourceVector::new(12, 0, 0, 0, 0, 0),
+                    meter_receipt_digest: [7; 32],
+                    completion_verifier_digest: [9; 32],
+                },
+            )),
+            Err(OnlineSelectionError::ActionIdentityMismatch)
+        );
     }
 
     #[test]
