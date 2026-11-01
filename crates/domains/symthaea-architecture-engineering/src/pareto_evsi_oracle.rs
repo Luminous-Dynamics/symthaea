@@ -138,8 +138,10 @@ pub struct ExactEvsiProblem {
 pub struct EvsiOutcomeValue {
     pub outcome_id: String,
     pub predictive_probability: f64,
-    pub posterior_bayes_risk: f64,
-    pub posterior_optimal_decision_id: String,
+    /// None when this outcome has zero predictive probability under the current posterior.
+    pub posterior_bayes_risk: Option<f64>,
+    /// None when this outcome has zero predictive probability and hence no posterior decision.
+    pub posterior_optimal_decision_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -509,20 +511,24 @@ pub fn analyze_exact_evsi(
 
             let (posterior_bayes_risk, posterior_optimal_decision_id) =
                 if predictive_probability <= 0.0 {
-                    (0.0, "zero-probability-outcome".to_owned())
+                    (None, None)
                 } else {
                     let posterior_after_outcome: Vec<f64> = posterior
                         .iter()
                         .zip(&likelihood_vector)
                         .map(|(prior, likelihood)| prior * likelihood / predictive_probability)
                         .collect();
-                    minimum_bayes_risk(problem, &posterior_after_outcome)?
+                    let (risk, decision_id) =
+                        minimum_bayes_risk(problem, &posterior_after_outcome)?;
+                    (Some(risk), Some(decision_id))
                 };
-            kahan_add(
-                &mut expected_posterior_bayes_risk,
-                &mut risk_compensation,
-                predictive_probability * posterior_bayes_risk,
-            );
+            if let Some(posterior_bayes_risk) = posterior_bayes_risk {
+                kahan_add(
+                    &mut expected_posterior_bayes_risk,
+                    &mut risk_compensation,
+                    predictive_probability * posterior_bayes_risk,
+                );
+            }
             outcome_values.push(EvsiOutcomeValue {
                 outcome_id: outcome.outcome_id.clone(),
                 predictive_probability,
@@ -818,6 +824,20 @@ mod tests {
         let report = analyze_exact_evsi(&model).unwrap();
         assert!(report.ranked_actions.iter().any(|item| item.action_id == "uninformative"
             && item.expected_value_of_sample_information > 0.0));
+    }
+
+    #[test]
+    fn zero_predictive_probability_outcomes_have_no_fabricated_posterior() {
+        let mut model = problem();
+        model.worlds.iter_mut().find(|world| world.world_id == "world-a").unwrap().posterior_probability = 1.0;
+        model.worlds.iter_mut().find(|world| world.world_id == "world-b").unwrap().posterior_probability = 0.0;
+        let model = model.canonicalize().unwrap();
+        let report = analyze_exact_evsi(&model).unwrap();
+        let action = report.ranked_actions.iter().find(|item| item.action_id == "measure-a-quality").unwrap();
+        let impossible = action.outcome_values.iter().find(|item| item.outcome_id == "observed-b").unwrap();
+        assert_eq!(impossible.predictive_probability, 0.0);
+        assert_eq!(impossible.posterior_bayes_risk, None);
+        assert_eq!(impossible.posterior_optimal_decision_id, None);
     }
 
     #[test]
