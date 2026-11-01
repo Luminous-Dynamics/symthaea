@@ -78,11 +78,9 @@ pub struct JepaTelemetry {
     pub variance_penalty: f32,
 }
 
-
 pub const OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION: &str =
     "symthaea-jepa-observed-transition-evidence-v0.1";
-pub const ONE_STEP_ACTION_SET_SCHEMA_VERSION: &str =
-    "symthaea-jepa-one-step-action-set-v0.1";
+pub const ONE_STEP_ACTION_SET_SCHEMA_VERSION: &str = "symthaea-jepa-one-step-action-set-v0.1";
 
 /// Evidence supplied by an observation adapter for one action-conditioned
 /// transition. Embedding digests are recomputed here; raw-observation, history
@@ -143,7 +141,9 @@ pub struct OneStepActionSetPrediction {
 
 fn is_lower_hex_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 /// Canonical digest of the finite HDC embedding values consumed by JEPA.
@@ -213,9 +213,15 @@ fn validate_observed_transition(
     }
     for (name, digest) in [
         ("source_history_sha256", &evidence.source_history_sha256),
-        ("source_observation_sha256", &evidence.source_observation_sha256),
+        (
+            "source_observation_sha256",
+            &evidence.source_observation_sha256,
+        ),
         ("source_embedding_sha256", &evidence.source_embedding_sha256),
-        ("target_observation_sha256", &evidence.target_observation_sha256),
+        (
+            "target_observation_sha256",
+            &evidence.target_observation_sha256,
+        ),
         ("target_embedding_sha256", &evidence.target_embedding_sha256),
         ("action_manifest_sha256", &evidence.action_manifest_sha256),
     ] {
@@ -267,7 +273,6 @@ fn validate_observed_transition(
     }
     Ok(())
 }
-
 
 /// JEPA engine: the top-level API composing all components.
 ///
@@ -392,13 +397,11 @@ impl JepaEngine {
         evidence: &ObservedTransitionEvidence,
         learning_rate: f32,
     ) -> Result<f32, String> {
-        validate_observed_transition(
-            &self.config,
-            current_hv,
-            next_observed_hv,
-            evidence,
-        )?;
-        if !learning_rate.is_finite() || !(0.0..=1.0).contains(&learning_rate) || learning_rate == 0.0 {
+        validate_observed_transition(&self.config, current_hv, next_observed_hv, evidence)?;
+        if !learning_rate.is_finite()
+            || !(0.0..=1.0).contains(&learning_rate)
+            || learning_rate == 0.0
+        {
             return Err("learning rate must be finite and in (0, 1]".into());
         }
         Ok(self.train_step(
@@ -416,18 +419,8 @@ impl JepaEngine {
         next_observed_hv: &ContinuousHV,
         evidence: &ObservedTransitionEvidence,
     ) -> Result<(f32, f64), String> {
-        validate_observed_transition(
-            &self.config,
-            current_hv,
-            next_observed_hv,
-            evidence,
-        )?;
-        Ok(self.forward(
-            current_hv,
-            next_observed_hv,
-            evidence.action_index,
-            1.0,
-        ))
+        validate_observed_transition(&self.config, current_hv, next_observed_hv, evidence)?;
+        Ok(self.forward(current_hv, next_observed_hv, evidence.action_index, 1.0))
     }
 
     /// Produce one-step latent predictions for a frozen set of candidate
@@ -459,7 +452,9 @@ impl JepaEngine {
         }
         for (index, candidate) in candidates.iter().enumerate() {
             if candidate.action_index as usize >= self.config.num_actions {
-                return Err(format!("candidate {index} has an out-of-range action index"));
+                return Err(format!(
+                    "candidate {index} has an out-of-range action index"
+                ));
             }
             if candidates[..index].iter().any(|previous| {
                 previous.action_id == candidate.action_id
@@ -481,7 +476,10 @@ impl JepaEngine {
             })
             .collect::<Vec<_>>();
         if predictions.iter().any(|prediction| {
-            !prediction.predicted_latent.iter().all(|value| value.is_finite())
+            !prediction
+                .predicted_latent
+                .iter()
+                .all(|value| value.is_finite())
         }) {
             return Err("JEPA action-set prediction produced non-finite values".into());
         }
@@ -563,7 +561,12 @@ mod tests {
         let current = random_hv(501);
         let observed_next = random_hv(502);
         let loss = engine
-            .train_observed_transition(&current, &observed_next, &observed_evidence(&current, &observed_next, 2), 0.001)
+            .train_observed_transition(
+                &current,
+                &observed_next,
+                &observed_evidence(&current, &observed_next, 2),
+                0.001,
+            )
             .unwrap();
         assert!(loss.is_finite());
         assert!(engine.latent_pe().is_finite());
@@ -577,9 +580,11 @@ mod tests {
         let mut malformed = observed_evidence(&current, &next, 2);
         malformed.target_observation_sha256 = "not-a-digest".into();
         let mut candidate = make_engine();
-        assert!(candidate
-            .train_observed_transition(&current, &next, &malformed, 0.001)
-            .is_err());
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
 
         let mut malformed = observed_evidence(&current, &next, 2);
         malformed.target_sequence = malformed.source_sequence;
@@ -611,9 +616,11 @@ mod tests {
         let next = random_hv(516);
         let mut evidence = observed_evidence(&current, &next, 2);
         evidence.target_embedding_sha256 = "c".repeat(64);
-        assert!(engine
-            .train_observed_transition(&current, &next, &evidence, 0.001)
-            .is_err());
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
     }
 
     #[test]
@@ -632,8 +639,14 @@ mod tests {
     fn candidate_set_digest_is_row_order_invariant_and_binds_action_mapping() {
         let manifest = "b".repeat(64);
         let left = [
-            ActionCandidate { action_id: 700, action_index: 1 },
-            ActionCandidate { action_id: 300, action_index: 3 },
+            ActionCandidate {
+                action_id: 700,
+                action_index: 1,
+            },
+            ActionCandidate {
+                action_id: 300,
+                action_index: 3,
+            },
         ];
         let right = [left[1], left[0]];
         assert_eq!(
@@ -641,8 +654,14 @@ mod tests {
             candidate_set_sha256(&manifest, &right).unwrap()
         );
         let changed = [
-            ActionCandidate { action_id: 700, action_index: 2 },
-            ActionCandidate { action_id: 300, action_index: 3 },
+            ActionCandidate {
+                action_id: 700,
+                action_index: 2,
+            },
+            ActionCandidate {
+                action_id: 300,
+                action_index: 3,
+            },
         ];
         assert_ne!(
             candidate_set_sha256(&manifest, &left).unwrap(),
@@ -660,23 +679,43 @@ mod tests {
                 &"a".repeat(64),
                 &"b".repeat(64),
                 &[
-                    ActionCandidate { action_id: 700, action_index: 1 },
-                    ActionCandidate { action_id: 300, action_index: 3 },
-                    ActionCandidate { action_id: 900, action_index: 5 },
+                    ActionCandidate {
+                        action_id: 700,
+                        action_index: 1,
+                    },
+                    ActionCandidate {
+                        action_id: 300,
+                        action_index: 3,
+                    },
+                    ActionCandidate {
+                        action_id: 900,
+                        action_index: 5,
+                    },
                 ],
             )
             .unwrap();
         assert_eq!(
-            result.predictions.iter().map(|item| item.action_id).collect::<Vec<_>>(),
+            result
+                .predictions
+                .iter()
+                .map(|item| item.action_id)
+                .collect::<Vec<_>>(),
             vec![700, 300, 900]
         );
         assert_eq!(
-            result.predictions.iter().map(|item| item.predicted_latent.len()).collect::<Vec<_>>(),
+            result
+                .predictions
+                .iter()
+                .map(|item| item.predicted_latent.len())
+                .collect::<Vec<_>>(),
             vec![engine.config().latent_dim; 3]
         );
-        assert!(result.predictions.iter().all(|item| {
-            item.predicted_latent.iter().all(|value| value.is_finite())
-        }));
+        assert!(
+            result
+                .predictions
+                .iter()
+                .all(|item| { item.predicted_latent.iter().all(|value| value.is_finite()) })
+        );
     }
 
     #[test]
@@ -687,24 +726,42 @@ mod tests {
         let manifest = "b".repeat(64);
         let forward = engine
             .predict_action_set_one_step(
-                &current, &history, &manifest,
+                &current,
+                &history,
+                &manifest,
                 &[
-                    ActionCandidate { action_id: 70, action_index: 2 },
-                    ActionCandidate { action_id: 20, action_index: 4 },
+                    ActionCandidate {
+                        action_id: 70,
+                        action_index: 2,
+                    },
+                    ActionCandidate {
+                        action_id: 20,
+                        action_index: 4,
+                    },
                 ],
             )
             .unwrap();
         let reversed = engine
             .predict_action_set_one_step(
-                &current, &history, &manifest,
+                &current,
+                &history,
+                &manifest,
                 &[
-                    ActionCandidate { action_id: 20, action_index: 4 },
-                    ActionCandidate { action_id: 70, action_index: 2 },
+                    ActionCandidate {
+                        action_id: 20,
+                        action_index: 4,
+                    },
+                    ActionCandidate {
+                        action_id: 70,
+                        action_index: 2,
+                    },
                 ],
             )
             .unwrap();
         for expected in &forward.predictions {
-            let actual = reversed.predictions.iter()
+            let actual = reversed
+                .predictions
+                .iter()
                 .find(|candidate| candidate.action_id == expected.action_id)
                 .unwrap();
             assert_eq!(actual.action_index, expected.action_index);
@@ -717,27 +774,55 @@ mod tests {
         let engine = make_engine();
         let current = random_hv(531);
         let candidates = [
-            ActionCandidate { action_id: 1, action_index: 1 },
-            ActionCandidate { action_id: 1, action_index: 2 },
+            ActionCandidate {
+                action_id: 1,
+                action_index: 1,
+            },
+            ActionCandidate {
+                action_id: 1,
+                action_index: 2,
+            },
         ];
-        assert!(engine
-            .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates)
-            .is_err());
+        assert!(
+            engine
+                .predict_action_set_one_step(
+                    &current,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    &candidates
+                )
+                .is_err()
+        );
 
         let candidates = [
-            ActionCandidate { action_id: 1, action_index: 1 },
-            ActionCandidate { action_id: 2, action_index: 1 },
+            ActionCandidate {
+                action_id: 1,
+                action_index: 1,
+            },
+            ActionCandidate {
+                action_id: 2,
+                action_index: 1,
+            },
         ];
         assert!(engine
             .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates)
             .is_err());
 
-        assert!(engine
-            .predict_action_set_one_step(&current, "bad", &"b".repeat(64), &candidates)
-            .is_err());
-        assert!(engine
-            .predict_action_set_one_step(&current, &"a".repeat(64), &"b".repeat(64), &candidates[..1])
-            .is_err());
+        assert!(
+            engine
+                .predict_action_set_one_step(&current, "bad", &"b".repeat(64), &candidates)
+                .is_err()
+        );
+        assert!(
+            engine
+                .predict_action_set_one_step(
+                    &current,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    &candidates[..1]
+                )
+                .is_err()
+        );
     }
 
     fn random_hv(seed: u64) -> ContinuousHV {
