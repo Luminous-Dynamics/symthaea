@@ -30,7 +30,18 @@
         "CRU",
         "APN",
         "KAFNet"
-      ]
+      ],
+      "data_commit": "593a1ef31c9a5354f7b672fb2e8711b0aa8e2a24",
+      "redistribution_note": "Eight datasets included; MIMIC-IV processed data not redistributed due to data-use agreement; authorized users must preprocess locally.",
+      "timestamp_caveat": "time_series.csv and text.csv provide date_time; verify event-time versus actual availability-time semantics by modality before causal evaluation."
+    },
+    {
+      "id": "imm_tsf",
+      "role": "official_irregular_benchmark_library",
+      "track": "irregular_forecasting",
+      "code_url": "https://github.com/blacksnail789521/IMM-TSF",
+      "code_commit": "99be43c391e21cef8247a138fa0b479d041a2b22",
+      "resource_caveat": "README requires 24 GB total GPU RAM for LLaMA 3.1/DeepSeek embedding paths; treat text-embedding/model-size arms separately from structured-only runs."
     },
     {
       "id": "apn",
@@ -39,7 +50,13 @@
       "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/view/39563",
       "code_url": "https://github.com/decisionintelligence/APN",
       "method": "adaptive time-aware patch aggregation plus query/MLP head",
-      "paper_claim_only": "accuracy and efficiency competitive; reproduce before asserting"
+      "paper_claim_only": "accuracy and efficiency competitive; reproduce before asserting",
+      "code_commit": "cd952af7fe60448d9bd826423d0b57944d178060",
+      "reproduction_environment": {
+        "python": "3.11.13",
+        "pytorch": "2.6.0+cu124"
+      },
+      "optimizer_audit": "README states paper describes AdamW but released experiments used Adam; reproduce Adam release path first, then AdamW as a separate ablation."
     },
     {
       "id": "kafnet",
@@ -48,7 +65,9 @@
       "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/view/40149",
       "code_url": "https://github.com/zhouziyu02/KAFNet",
       "method": "canonical pre-alignment, pre-convolution, temporal kernel aggregation, frequency linear attention",
-      "paper_claim_only": "7.2x parameter reduction and 8.4x training-inference acceleration reported by authors"
+      "paper_claim_only": "7.2x parameter reduction and 8.4x training-inference acceleration reported by authors",
+      "code_commit": "1cb7280b05dd851dbd30c17f7a46fa7f6c5318e6",
+      "reproduction_coverage_audit": "README exposes test.sh for HumanActivity; paper reports four datasets. Audit all release scripts before claiming full paper reproduction."
     },
     {
       "id": "gift_eval",
@@ -63,7 +82,9 @@
         "seven_domains",
         "ten_frequencies"
       ],
-      "not_equivalent_to": "Time-IMM irregular forecasting"
+      "not_equivalent_to": "Time-IMM irregular forecasting",
+      "code_commit": "8895d8600d33983949916694047b372f6731a64c",
+      "zero_shot_rule": "no GIFT-Eval training split and no test-data leakage; preserve official TestData Leakage and Zero-shot metadata."
     },
     {
       "id": "gift_eval_ctx",
