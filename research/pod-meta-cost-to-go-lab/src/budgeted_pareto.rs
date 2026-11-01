@@ -379,8 +379,8 @@ mod tests {
             forecast(
                 5,
                 ResourceVector::new(5, 1, 1, 0, 2, 2),
-                ResourceVector::new(7, 2, 2, 1, 3, 3),
-                ResourceVector::new(9, 3, 3, 2, 4, 4),
+                ResourceVector::new(7, 2, 2, 4, 3, 3),
+                ResourceVector::new(9, 3, 3, 5, 4, 4),
                 ResourceVector::ZERO,
                 2,
             ),
