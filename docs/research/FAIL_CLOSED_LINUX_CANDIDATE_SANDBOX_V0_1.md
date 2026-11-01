@@ -40,13 +40,13 @@ Load a versioned seccomp BPF filter through Bubblewrap's documented FD interface
 
 ## Cgroup/resource plan
 
-Use a transient systemd unit and cgroup v2 for external enforcement:
+Use a transient **scope** and cgroup v2 for external enforcement. A scope runs the command in the caller's execution environment while the system manager controls its cgroup; this is useful because the trusted launcher must pre-open and pass the seccomp descriptor to Bubblewrap. Use `systemd-run --user --scope --pipe` (not `--scope --wait`: systemd documents those switches as incompatible; `--pipe` already waits synchronously). Scope-level controls are:
 - `MemoryMax` and `MemorySwapMax=0`;
 - `CPUQuota` (plus external wall-clock timeout);
 - `TasksMax`;
 - read back the effective systemd properties and actual cgroup control files before starting/accepting the candidate result.
 
-Official systemd resource-control documentation maps these properties to cgroup v2 controllers and describes CPU quotas. Availability, delegation and controller activation are host-dependent; a requested property string is not evidence that the effective resource limit was enforced. Verify actual values and fail closed. [systemd.resource-control](https://freedesktop.org/software/systemd/man/latest/systemd.resource-control.html).
+Official systemd resource-control documentation maps these properties to cgroup v2 controllers and describes CPU quotas. Scope units are externally created processes and expose resource controls; service execution properties such as `ProtectSystem`, `ProtectHome` and `PrivateNetwork` are not included in this scope argv. Bubblewrap provides the namespace and filesystem isolation. Availability, delegation and controller activation are host-dependent; a requested property string is not evidence that the effective resource limit was enforced. Verify actual values and fail closed. The launcher must prove by integration test that fd 3 (the seccomp program) survives the scope/pipe handoff and reaches Bubblewrap unchanged. [systemd.resource-control](https://freedesktop.org/software/systemd/man/latest/systemd.resource-control.html).
 
 The supervisor should cap stdout/stderr and frame I/O independently, kill on wall-clock deadline, malformed frame, unexpected extra bytes, resource termination or supervisor error, and record the exact reason.
 
