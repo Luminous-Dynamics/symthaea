@@ -298,8 +298,12 @@ currently expose a complete IIT 4.0 (2026) system-phi analysis path.
 The targeted GitHub Actions workflow writes a commit-bound evidence bundle for
 each run. It includes runner/toolchain identity, the locked Rust test log, Clippy
 output, and the CSV/log output of every partition, factor-elimination, cutset,
-Eq. 4, and full sparse system-search sweep. The artifact name includes the exact
-commit SHA and is retained for 30 days. Benchmark commands stream through
+Eq. 4, and full sparse system-search sweep. Examples are built once in release
+mode and then executed directly, so compilation is outside the measured binary
+interval. Each benchmark also has a separate GNU `time -v` record containing
+process-level maximum resident set size; this is a whole-process peak for that
+sweep, not a per-row allocation measurement. The artifact name includes the
+exact commit SHA and is retained for 30 days. Benchmark commands stream through
 `tee` under the runner's fail-fast shell, so capturing output does not turn a
 failed command into a successful step.
 
