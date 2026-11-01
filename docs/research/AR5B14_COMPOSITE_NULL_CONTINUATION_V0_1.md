@@ -131,6 +131,24 @@ This is a reference-oracle and auditability increment, not an assertion of state
 
 The paper also develops sequentialized z- and t-tests and stopping-time continuation. Those should be separate follow-on implementations and compared on matched data-generating processes rather than conflated with this finite reference.
 
+### Concrete comparator implementations
+
+| Comparator | What to reproduce | Why it matters |
+|---|---|---|
+| Fixed-horizon NP / sequentialized z and t | Same terminal test, same horizon, same null and alternative | Establishes whether induction preserves terminal power while enabling interim decisions |
+| E-variables / test martingales | Exact sequential k-sample tests with optional stopping and continuation | A serious anytime-valid comparator, including flexible data-stream continuation |
+| Group-sequential alpha spending | O'Brien–Fleming, Pocock, Hwang–Shih–DeCani / Lan–DeMets boundaries | Mature, widely used designs with explicit operating-characteristic calculations |
+| Adaptive combination / conditional error | Inverse-normal and Fisher combination tests; conditional rejection probability adaptation | Industry-grade baseline when interim results alter sample size or trial design |
+| Online-experiment AVI | Always-valid inference under streaming and uncertain sample size | Appropriate for continuous monitoring; compare against variance-reduced group-sequential designs where historical data exist |
+
+Useful maintained references:
+- Turner, Ly & Grünwald, “Generic E-variables for exact sequential k-sample tests that allow for optional stopping” (2024), https://doi.org/10.1016/j.jspi.2023.106116
+- rpact documentation for group-sequential and adaptive confirmatory designs, combination tests, and conditional rejection probability: https://docs.rpact.org/reference/rpact.html
+- gsDesign technical manual for alpha/beta spending, O'Brien–Fleming, Pocock and related group-sequential procedures: https://keaven.github.io/gsd-tech-manual/
+- Spotify Engineering's practical comparison of sequential testing frameworks: https://engineering.atspotify.com/2023/3/choosing-sequential-testing-framework-comparisons-and-discussions
+
+The practical lesson from Spotify's comparison is that always-valid inference is a strong default for early detection when the sample horizon is uncertain, while group-sequential designs can be more powerful when the sample size and historical variance structure are well understood. The benchmark should therefore be stratified by operating regime rather than declare one universal winner.
+
 ## 8. Exact-head validation
 
 Run from the PR head after obtaining a Rust toolchain:
