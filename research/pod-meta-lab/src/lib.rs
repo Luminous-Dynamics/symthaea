@@ -44,12 +44,13 @@ pub struct Obligation {
 }
 
 impl Obligation {
-    pub fn new(
-        id: impl Into<String>,
-        state: ObligationState,
-        consequence_priority: u8,
-    ) -> Self {
-        Self { id: id.into(), state, consequence_priority, state_identity: String::new() }
+    pub fn new(id: impl Into<String>, state: ObligationState, consequence_priority: u8) -> Self {
+        Self {
+            id: id.into(),
+            state,
+            consequence_priority,
+            state_identity: String::new(),
+        }
     }
 
     /// Binds this obligation to an exact pre-operation workspace/evidence state.
@@ -77,23 +78,31 @@ pub enum OperationKind {
 impl OperationKind {
     fn can_address(self, state: ObligationState) -> bool {
         match state {
-            ObligationState::Open =>
-                matches!(self, Self::Retrieve | Self::RequestExternalEvidence),
-            ObligationState::CandidateEvidenceAvailable =>
-                matches!(self, Self::Verify | Self::CompareAlternatives),
+            ObligationState::Open => matches!(self, Self::Retrieve | Self::RequestExternalEvidence),
+            ObligationState::CandidateEvidenceAvailable => {
+                matches!(self, Self::Verify | Self::CompareAlternatives)
+            }
             ObligationState::SupportedUnderProfile => false,
-            ObligationState::Contested =>
-                matches!(self, Self::SeekIndependentEvidence | Self::CompareAlternatives),
-            ObligationState::Contradicted | ObligationState::VerifierRejected =>
-                matches!(self, Self::RepairDerivation | Self::SeekIndependentEvidence),
-            ObligationState::StaleOrRetracted =>
-                matches!(self, Self::RefreshEvidence | Self::Retrieve),
-            ObligationState::OutOfScope | ObligationState::Unauthorized =>
-                matches!(self, Self::Retrieve | Self::RequestClarification),
-            ObligationState::UnresolvableWithoutExternalInput =>
-                matches!(self, Self::RequestExternalEvidence | Self::RequestClarification),
-            ObligationState::BudgetInsufficient =>
-                matches!(self, Self::CompareAlternatives | Self::Retrieve),
+            ObligationState::Contested => matches!(
+                self,
+                Self::SeekIndependentEvidence | Self::CompareAlternatives
+            ),
+            ObligationState::Contradicted | ObligationState::VerifierRejected => {
+                matches!(self, Self::RepairDerivation | Self::SeekIndependentEvidence)
+            }
+            ObligationState::StaleOrRetracted => {
+                matches!(self, Self::RefreshEvidence | Self::Retrieve)
+            }
+            ObligationState::OutOfScope | ObligationState::Unauthorized => {
+                matches!(self, Self::Retrieve | Self::RequestClarification)
+            }
+            ObligationState::UnresolvableWithoutExternalInput => matches!(
+                self,
+                Self::RequestExternalEvidence | Self::RequestClarification
+            ),
+            ObligationState::BudgetInsufficient => {
+                matches!(self, Self::CompareAlternatives | Self::Retrieve)
+            }
         }
     }
 
@@ -236,11 +245,16 @@ struct EligibleOperation {
 }
 
 pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
-    let competitive_work_limit = context.remaining_work_units
+    let competitive_work_limit = context
+        .remaining_work_units
         .saturating_sub(context.mandatory_reserve_units);
 
     let mut seen_obligations = BTreeSet::new();
-    if context.obligations.iter().any(|o| o.id.is_empty() || !seen_obligations.insert(o.id.as_str())) {
+    if context
+        .obligations
+        .iter()
+        .any(|o| o.id.is_empty() || !seen_obligations.insert(o.id.as_str()))
+    {
         return SelectionDecision {
             selection: Selection::Stop(StopReason::InvalidInput),
             rejected: Vec::new(),
@@ -255,7 +269,10 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
             || operation.progress_key.is_empty()
             || operation.obligation_ids.is_empty()
             || !seen_operations.insert(operation.id.as_str())
-            || operation.obligation_ids.iter().any(|id| id.is_empty() || !seen_targets.insert(id.as_str()))
+            || operation
+                .obligation_ids
+                .iter()
+                .any(|id| id.is_empty() || !seen_targets.insert(id.as_str()))
         {
             return SelectionDecision {
                 selection: Selection::Stop(StopReason::InvalidInput),
@@ -265,7 +282,8 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
         }
     }
 
-    let by_id: BTreeMap<&str, &Obligation> = context.obligations
+    let by_id: BTreeMap<&str, &Obligation> = context
+        .obligations
         .iter()
         .map(|o| (o.id.as_str(), o))
         .collect();
@@ -295,12 +313,16 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
             continue;
         }
         if operation.obligation_ids.is_empty()
-            || operation.obligation_ids.iter().any(|id| !by_id.contains_key(id.as_str()))
+            || operation
+                .obligation_ids
+                .iter()
+                .any(|id| !by_id.contains_key(id.as_str()))
         {
             rejected.push(reject(RejectionReason::UnknownObligation));
             continue;
         }
-        if context.attempted_without_progress
+        if context
+            .attempted_without_progress
             .contains(&(operation.id.clone(), operation.progress_key.clone()))
         {
             repeat_rejections += 1;
@@ -328,8 +350,7 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
 
         let work_limit = match operation.scheduling_class {
             SchedulingClass::Mandatory => context.remaining_work_units,
-            SchedulingClass::Competitive | SchedulingClass::Opportunistic =>
-                competitive_work_limit,
+            SchedulingClass::Competitive | SchedulingClass::Opportunistic => competitive_work_limit,
         };
         if operation.estimated_work_units > work_limit {
             budget_rejections += 1;
@@ -352,11 +373,15 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
     }
 
     rejected.sort_by(|a, b| {
-        a.operation_id.cmp(&b.operation_id).then_with(|| a.reason.cmp(&b.reason))
+        a.operation_id
+            .cmp(&b.operation_id)
+            .then_with(|| a.reason.cmp(&b.reason))
     });
 
     if mandatory_unaffordable
-        && eligible.iter().all(|op| op.scheduling_class != SchedulingClass::Mandatory)
+        && eligible
+            .iter()
+            .all(|op| op.scheduling_class != SchedulingClass::Mandatory)
     {
         return SelectionDecision {
             selection: Selection::Stop(StopReason::MandatoryWorkCannotFit),
@@ -370,7 +395,9 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
             StopReason::NoSemanticProgress
         } else if budget_rejections > 0 {
             StopReason::BudgetExhausted
-        } else if context.obligations.iter()
+        } else if context
+            .obligations
+            .iter()
             .filter(|o| o.state.unresolved())
             .all(|o| o.state == ObligationState::UnresolvableWithoutExternalInput)
         {
@@ -386,7 +413,9 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
     }
 
     eligible.sort_by(|a, b| {
-        a.scheduling_class.rank().cmp(&b.scheduling_class.rank())
+        a.scheduling_class
+            .rank()
+            .cmp(&b.scheduling_class.rank())
             .then_with(|| b.max_priority.cmp(&a.max_priority))
             .then_with(|| b.obligation_ids.len().cmp(&a.obligation_ids.len()))
             .then_with(|| a.work_units.cmp(&b.work_units))
@@ -530,7 +559,9 @@ pub fn apply_operation_receipt(
             return Err(ReceiptError::UnknownObligation(String::new()));
         }
         if !existing_ids.insert(obligation.id.as_str()) {
-            return Err(ReceiptError::DuplicateExistingObligation(obligation.id.clone()));
+            return Err(ReceiptError::DuplicateExistingObligation(
+                obligation.id.clone(),
+            ));
         }
     }
     for id in &receipt.obligation_ids {
@@ -541,9 +572,14 @@ pub fn apply_operation_receipt(
 
     // Bind the receipt to the current state, not merely to a verifier receipt
     // that repeats the same caller-supplied key. This is the anti-replay gate.
-    for obligation in obligations.iter().filter(|o| receipt.obligation_ids.contains(&o.id)) {
+    for obligation in obligations
+        .iter()
+        .filter(|o| receipt.obligation_ids.contains(&o.id))
+    {
         if obligation.state_identity.is_empty() {
-            return Err(ReceiptError::MissingCurrentStateIdentity(obligation.id.clone()));
+            return Err(ReceiptError::MissingCurrentStateIdentity(
+                obligation.id.clone(),
+            ));
         }
         if obligation.state_identity != receipt.progress_key {
             return Err(ReceiptError::ProgressBindingMismatch);
@@ -561,10 +597,12 @@ pub fn apply_operation_receipt(
             (EvidenceVerdict::StaleOrRetracted, _) => ObligationState::StaleOrRetracted,
             (EvidenceVerdict::OutOfScope, _) => ObligationState::OutOfScope,
             (EvidenceVerdict::Unauthorized, _) => ObligationState::Unauthorized,
-            (EvidenceVerdict::Admissible, ProofVerdict::Valid) =>
-                ObligationState::SupportedUnderProfile,
-            (EvidenceVerdict::Admissible, ProofVerdict::Invalid) =>
-                ObligationState::VerifierRejected,
+            (EvidenceVerdict::Admissible, ProofVerdict::Valid) => {
+                ObligationState::SupportedUnderProfile
+            }
+            (EvidenceVerdict::Admissible, ProofVerdict::Invalid) => {
+                ObligationState::VerifierRejected
+            }
             _ => obligation.state,
         };
         if obligation.state != next {
@@ -592,15 +630,22 @@ mod tests {
     }
 
     fn op(
-        id: &str, kind: OperationKind, targets: &[&str],
-        class: SchedulingClass, work: u64, progress: &str,
+        id: &str,
+        kind: OperationKind,
+        targets: &[&str],
+        class: SchedulingClass,
+        work: u64,
+        progress: &str,
     ) -> CandidateOperation {
         CandidateOperation::new(id, kind, targets.iter().copied(), class, work, progress)
     }
 
     fn choose(
-        obligations: &[Obligation], operations: &[CandidateOperation],
-        attempts: &BTreeSet<(String, String)>, budget: u64, reserve: u64,
+        obligations: &[Obligation],
+        operations: &[CandidateOperation],
+        attempts: &BTreeSet<(String, String)>,
+        budget: u64,
+        reserve: u64,
     ) -> SelectionDecision {
         choose_next(&SelectionContext {
             obligations,
@@ -612,8 +657,10 @@ mod tests {
     }
 
     fn receipt_verifier(
-        operation_id: &str, ids: &[&str],
-        proof: ProofVerdict, evidence: EvidenceVerdict,
+        operation_id: &str,
+        ids: &[&str],
+        proof: ProofVerdict,
+        evidence: EvidenceVerdict,
     ) -> VerifierReceipt {
         VerifierReceipt {
             verifier_id: "checker-v1".into(),
@@ -632,24 +679,56 @@ mod tests {
     fn missing_premise_routes_to_retrieval_not_verification() {
         let obligations = [o("a", ObligationState::Open, 4)];
         let operations = [
-            op("retrieve-a", OperationKind::Retrieve, &["a"], SchedulingClass::Competitive, 2, "s1"),
-            op("verify-a", OperationKind::Verify, &["a"], SchedulingClass::Competitive, 1, "s1"),
+            op(
+                "retrieve-a",
+                OperationKind::Retrieve,
+                &["a"],
+                SchedulingClass::Competitive,
+                2,
+                "s1",
+            ),
+            op(
+                "verify-a",
+                OperationKind::Verify,
+                &["a"],
+                SchedulingClass::Competitive,
+                1,
+                "s1",
+            ),
         ];
         let decision = choose(&obligations, &operations, &BTreeSet::new(), 10, 1);
         assert!(matches!(decision.selection,
             Selection::Run { ref operation_id, kind: OperationKind::Retrieve, .. }
                 if operation_id == "retrieve-a"));
-        assert!(decision.rejected.iter().any(|r|
-            r.operation_id == "verify-a"
-                && r.reason == RejectionReason::OperationDoesNotAddressState));
+        assert!(
+            decision
+                .rejected
+                .iter()
+                .any(|r| r.operation_id == "verify-a"
+                    && r.reason == RejectionReason::OperationDoesNotAddressState)
+        );
     }
 
     #[test]
     fn verifier_rejection_routes_to_repair_not_repeated_verification() {
         let obligations = [o("claim", ObligationState::VerifierRejected, 8)];
         let operations = [
-            op("verify-again", OperationKind::Verify, &["claim"], SchedulingClass::Competitive, 1, "s1"),
-            op("repair", OperationKind::RepairDerivation, &["claim"], SchedulingClass::Competitive, 3, "s1"),
+            op(
+                "verify-again",
+                OperationKind::Verify,
+                &["claim"],
+                SchedulingClass::Competitive,
+                1,
+                "s1",
+            ),
+            op(
+                "repair",
+                OperationKind::RepairDerivation,
+                &["claim"],
+                SchedulingClass::Competitive,
+                3,
+                "s1",
+            ),
         ];
         let decision = choose(&obligations, &operations, &BTreeSet::new(), 10, 0);
         assert!(matches!(decision.selection,
@@ -664,8 +743,22 @@ mod tests {
             o("important", ObligationState::Open, 9),
         ];
         let operations = [
-            op("competitive", OperationKind::Retrieve, &["important"], SchedulingClass::Competitive, 1, "s1"),
-            op("mandatory-op", OperationKind::Retrieve, &["mandatory"], SchedulingClass::Mandatory, 4, "s1"),
+            op(
+                "competitive",
+                OperationKind::Retrieve,
+                &["important"],
+                SchedulingClass::Competitive,
+                1,
+                "s1",
+            ),
+            op(
+                "mandatory-op",
+                OperationKind::Retrieve,
+                &["mandatory"],
+                SchedulingClass::Mandatory,
+                4,
+                "s1",
+            ),
         ];
         let decision = choose(&obligations, &operations, &BTreeSet::new(), 10, 4);
         assert!(matches!(decision.selection,
@@ -677,26 +770,51 @@ mod tests {
     #[test]
     fn competitive_work_cannot_spend_reserved_capacity() {
         let obligations = [o("claim", ObligationState::Open, 9)];
-        let operations = [
-            op("too-expensive", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 7, "s1"),
-        ];
+        let operations = [op(
+            "too-expensive",
+            OperationKind::Retrieve,
+            &["claim"],
+            SchedulingClass::Competitive,
+            7,
+            "s1",
+        )];
         let decision = choose(&obligations, &operations, &BTreeSet::new(), 10, 4);
-        assert_eq!(decision.selection, Selection::Stop(StopReason::BudgetExhausted));
+        assert_eq!(
+            decision.selection,
+            Selection::Stop(StopReason::BudgetExhausted)
+        );
     }
 
     #[test]
     fn unchanged_repeat_stops_for_no_semantic_progress() {
         let obligations = [o("claim", ObligationState::Open, 4)];
-        let operations = [op("retrieve", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 1, "state-7")];
+        let operations = [op(
+            "retrieve",
+            OperationKind::Retrieve,
+            &["claim"],
+            SchedulingClass::Competitive,
+            1,
+            "state-7",
+        )];
         let attempts = BTreeSet::from([("retrieve".into(), "state-7".into())]);
         let decision = choose(&obligations, &operations, &attempts, 10, 0);
-        assert_eq!(decision.selection, Selection::Stop(StopReason::NoSemanticProgress));
+        assert_eq!(
+            decision.selection,
+            Selection::Stop(StopReason::NoSemanticProgress)
+        );
     }
 
     #[test]
     fn changed_evidence_state_allows_a_new_attempt() {
         let obligations = [o("claim", ObligationState::Open, 4)];
-        let operations = [op("retrieve", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 1, "state-8")];
+        let operations = [op(
+            "retrieve",
+            OperationKind::Retrieve,
+            &["claim"],
+            SchedulingClass::Competitive,
+            1,
+            "state-8",
+        )];
         let attempts = BTreeSet::from([("retrieve".into(), "state-7".into())]);
         assert!(matches!(
             choose(&obligations, &operations, &attempts, 10, 0).selection,
@@ -716,7 +834,10 @@ mod tests {
             verifier: None,
         };
         assert_eq!(apply_operation_receipt(&mut obligations, &receipt), Ok(0));
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
     }
 
     #[test]
@@ -733,7 +854,10 @@ mod tests {
             obligation_ids: BTreeSet::from(["a".into(), "b".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify-pair", &["a", "b"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+                "verify-pair",
+                &["a", "b"],
+                ProofVerdict::Valid,
+                EvidenceVerdict::Admissible,
             )),
         };
         assert_eq!(apply_operation_receipt(&mut obligations, &receipt), Ok(2));
@@ -752,14 +876,20 @@ mod tests {
             obligation_ids: BTreeSet::from(["a".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify", &["b"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+                "verify",
+                &["b"],
+                ProofVerdict::Valid,
+                EvidenceVerdict::Admissible,
             )),
         };
         assert_eq!(
             apply_operation_receipt(&mut obligations, &receipt),
             Err(ReceiptError::ObligationBindingMismatch)
         );
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
     }
 
     #[test]
@@ -772,7 +902,10 @@ mod tests {
             obligation_ids: BTreeSet::from(["claim".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::StaleOrRetracted,
+                "verify",
+                &["claim"],
+                ProofVerdict::Valid,
+                EvidenceVerdict::StaleOrRetracted,
             )),
         };
         assert_eq!(apply_operation_receipt(&mut obligations, &receipt), Ok(1));
@@ -789,7 +922,10 @@ mod tests {
             obligation_ids: BTreeSet::from(["claim".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify", &["claim"], ProofVerdict::Invalid, EvidenceVerdict::Admissible,
+                "verify",
+                &["claim"],
+                ProofVerdict::Invalid,
+                EvidenceVerdict::Admissible,
             )),
         };
         assert_eq!(apply_operation_receipt(&mut obligations, &receipt), Ok(1));
@@ -807,35 +943,75 @@ mod tests {
                 obligation_ids: BTreeSet::from(["claim".into()]),
                 status,
                 verifier: Some(receipt_verifier(
-                    "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+                    "verify",
+                    &["claim"],
+                    ProofVerdict::Valid,
+                    EvidenceVerdict::Admissible,
                 )),
             };
             assert_eq!(apply_operation_receipt(&mut obligations, &receipt), Ok(0));
-            assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+            assert_eq!(
+                obligations[0].state,
+                ObligationState::CandidateEvidenceAvailable
+            );
         }
     }
 
     #[test]
     fn no_information_case_stops_for_external_evidence() {
-        let obligations = [o("physical-fact", ObligationState::UnresolvableWithoutExternalInput, 8)];
+        let obligations = [o(
+            "physical-fact",
+            ObligationState::UnresolvableWithoutExternalInput,
+            8,
+        )];
         let decision = choose(&obligations, &[], &BTreeSet::new(), 10, 0);
-        assert_eq!(decision.selection, Selection::Stop(StopReason::NeedsExternalEvidence));
+        assert_eq!(
+            decision.selection,
+            Selection::Stop(StopReason::NeedsExternalEvidence)
+        );
     }
 
     #[test]
     fn complete_query_stops_without_extra_reasoning() {
         let obligations = [o("claim", ObligationState::SupportedUnderProfile, 8)];
-        let operations = [op("extra-work", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 99, "s1")];
+        let operations = [op(
+            "extra-work",
+            OperationKind::Retrieve,
+            &["claim"],
+            SchedulingClass::Competitive,
+            99,
+            "s1",
+        )];
         let decision = choose(&obligations, &operations, &BTreeSet::new(), 100, 0);
-        assert_eq!(decision.selection, Selection::Stop(StopReason::AllObligationsDischarged));
+        assert_eq!(
+            decision.selection,
+            Selection::Stop(StopReason::AllObligationsDischarged)
+        );
     }
 
     #[test]
     fn selection_is_deterministic_under_candidate_permutation() {
-        let obligations = [o("a", ObligationState::Open, 5), o("b", ObligationState::Open, 5)];
+        let obligations = [
+            o("a", ObligationState::Open, 5),
+            o("b", ObligationState::Open, 5),
+        ];
         let first = [
-            op("retrieve-b", OperationKind::Retrieve, &["b"], SchedulingClass::Competitive, 2, "s1"),
-            op("retrieve-a", OperationKind::Retrieve, &["a"], SchedulingClass::Competitive, 2, "s1"),
+            op(
+                "retrieve-b",
+                OperationKind::Retrieve,
+                &["b"],
+                SchedulingClass::Competitive,
+                2,
+                "s1",
+            ),
+            op(
+                "retrieve-a",
+                OperationKind::Retrieve,
+                &["a"],
+                SchedulingClass::Competitive,
+                2,
+                "s1",
+            ),
         ];
         let second = [first[1].clone(), first[0].clone()];
         let left = choose(&obligations, &first, &BTreeSet::new(), 10, 0);
@@ -845,13 +1021,33 @@ mod tests {
 
     #[test]
     fn unaffordable_mandatory_work_blocks_competitive_spend() {
-        let obligations = [o("must", ObligationState::Open, 1), o("optional", ObligationState::Open, 9)];
+        let obligations = [
+            o("must", ObligationState::Open, 1),
+            o("optional", ObligationState::Open, 9),
+        ];
         let operations = [
-            op("mandatory-heavy", OperationKind::Retrieve, &["must"], SchedulingClass::Mandatory, 11, "s1"),
-            op("optional-cheap", OperationKind::Retrieve, &["optional"], SchedulingClass::Competitive, 1, "s1"),
+            op(
+                "mandatory-heavy",
+                OperationKind::Retrieve,
+                &["must"],
+                SchedulingClass::Mandatory,
+                11,
+                "s1",
+            ),
+            op(
+                "optional-cheap",
+                OperationKind::Retrieve,
+                &["optional"],
+                SchedulingClass::Competitive,
+                1,
+                "s1",
+            ),
         ];
         let decision = choose(&obligations, &operations, &BTreeSet::new(), 10, 2);
-        assert_eq!(decision.selection, Selection::Stop(StopReason::MandatoryWorkCannotFit));
+        assert_eq!(
+            decision.selection,
+            Selection::Stop(StopReason::MandatoryWorkCannotFit)
+        );
     }
     #[test]
     fn duplicate_obligation_or_operation_ids_fail_closed() {
@@ -866,8 +1062,22 @@ mod tests {
 
         let obligations = [o("claim", ObligationState::Open, 1)];
         let duplicate_operations = [
-            op("same-op", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 1, "s1"),
-            op("same-op", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 1, "s1"),
+            op(
+                "same-op",
+                OperationKind::Retrieve,
+                &["claim"],
+                SchedulingClass::Competitive,
+                1,
+                "s1",
+            ),
+            op(
+                "same-op",
+                OperationKind::Retrieve,
+                &["claim"],
+                SchedulingClass::Competitive,
+                1,
+                "s1",
+            ),
         ];
         assert_eq!(
             choose(&obligations, &duplicate_operations, &BTreeSet::new(), 10, 0).selection,
@@ -879,7 +1089,10 @@ mod tests {
     fn verifier_must_be_declared_distinct_from_operation_producer() {
         let mut obligations = vec![o("claim", ObligationState::CandidateEvidenceAvailable, 5)];
         let mut verifier = receipt_verifier(
-            "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            "verify",
+            &["claim"],
+            ProofVerdict::Valid,
+            EvidenceVerdict::Admissible,
         );
         verifier.verifier_id = "planner-v1".into();
         let receipt = OperationReceipt {
@@ -894,7 +1107,10 @@ mod tests {
             apply_operation_receipt(&mut obligations, &receipt),
             Err(ReceiptError::VerifierNotDistinctFromProducer)
         );
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
     }
 
     #[test]
@@ -904,7 +1120,10 @@ mod tests {
                 .with_state_identity("current-state"),
         ];
         let mut verifier = receipt_verifier(
-            "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            "verify",
+            &["claim"],
+            ProofVerdict::Valid,
+            EvidenceVerdict::Admissible,
         );
         verifier.progress_key = "old-state".into();
         let receipt = OperationReceipt {
@@ -919,11 +1138,16 @@ mod tests {
             apply_operation_receipt(&mut obligations, &receipt),
             Err(ReceiptError::ProgressBindingMismatch)
         );
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
 
-        let mut unversioned = vec![
-            Obligation::new("claim", ObligationState::CandidateEvidenceAvailable, 5),
-        ];
+        let mut unversioned = vec![Obligation::new(
+            "claim",
+            ObligationState::CandidateEvidenceAvailable,
+            5,
+        )];
         let unversioned_receipt = OperationReceipt {
             producer_id: "planner-v1".into(),
             operation_id: "verify".into(),
@@ -931,7 +1155,10 @@ mod tests {
             obligation_ids: BTreeSet::from(["claim".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+                "verify",
+                &["claim"],
+                ProofVerdict::Valid,
+                EvidenceVerdict::Admissible,
             )),
         };
         assert_eq!(
@@ -944,7 +1171,10 @@ mod tests {
     fn state_changing_receipt_must_advance_state_identity() {
         let mut obligations = vec![o("claim", ObligationState::CandidateEvidenceAvailable, 5)];
         let mut verifier = receipt_verifier(
-            "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            "verify",
+            &["claim"],
+            ProofVerdict::Valid,
+            EvidenceVerdict::Admissible,
         );
         verifier.result_state_identity = "state-1".into();
         let receipt = OperationReceipt {
@@ -959,7 +1189,10 @@ mod tests {
             apply_operation_receipt(&mut obligations, &receipt),
             Err(ReceiptError::ResultStateIdentityUnchanged)
         );
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
         assert_eq!(obligations[0].state_identity, "state-1");
     }
 
@@ -970,7 +1203,10 @@ mod tests {
                 .with_state_identity("evidence-v1"),
         ];
         let mut initial_verifier = receipt_verifier(
-            "verify-v1", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            "verify-v1",
+            &["claim"],
+            ProofVerdict::Valid,
+            EvidenceVerdict::Admissible,
         );
         initial_verifier.progress_key = "evidence-v1".into();
         initial_verifier.result_state_identity = "verified-v1".into();
@@ -987,7 +1223,10 @@ mod tests {
         assert_eq!(obligations[0].state_identity, "verified-v1");
 
         let mut revocation_verifier = receipt_verifier(
-            "refresh-v2", &["claim"], ProofVerdict::Valid, EvidenceVerdict::StaleOrRetracted,
+            "refresh-v2",
+            &["claim"],
+            ProofVerdict::Valid,
+            EvidenceVerdict::StaleOrRetracted,
         );
         revocation_verifier.progress_key = "verified-v1".into();
         revocation_verifier.result_state_identity = "revoked-v2".into();
@@ -999,7 +1238,10 @@ mod tests {
             status: OperationStatus::Completed,
             verifier: Some(revocation_verifier),
         };
-        assert_eq!(apply_operation_receipt(&mut obligations, &revocation), Ok(1));
+        assert_eq!(
+            apply_operation_receipt(&mut obligations, &revocation),
+            Ok(1)
+        );
         assert_eq!(obligations[0].state, ObligationState::StaleOrRetracted);
         assert_eq!(obligations[0].state_identity, "revoked-v2");
 
@@ -1026,16 +1268,24 @@ mod tests {
             obligation_ids: BTreeSet::from(["fresh".into(), "stale".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify-pair", &["fresh", "stale"],
-                ProofVerdict::Valid, EvidenceVerdict::Admissible,
+                "verify-pair",
+                &["fresh", "stale"],
+                ProofVerdict::Valid,
+                EvidenceVerdict::Admissible,
             )),
         };
         assert_eq!(
             apply_operation_receipt(&mut obligations, &receipt),
             Err(ReceiptError::ProgressBindingMismatch)
         );
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
-        assert_eq!(obligations[1].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
+        assert_eq!(
+            obligations[1].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
         assert_eq!(obligations[0].state_identity, "state-1");
         assert_eq!(obligations[1].state_identity, "state-2");
     }
@@ -1043,11 +1293,18 @@ mod tests {
     #[test]
     fn mixed_external_and_internal_obligations_do_not_claim_full_external_stop() {
         let obligations = [
-            o("external", ObligationState::UnresolvableWithoutExternalInput, 8),
+            o(
+                "external",
+                ObligationState::UnresolvableWithoutExternalInput,
+                8,
+            ),
             o("open", ObligationState::Open, 4),
         ];
         let decision = choose(&obligations, &[], &BTreeSet::new(), 10, 0);
-        assert_eq!(decision.selection, Selection::Stop(StopReason::NoApplicableOperation));
+        assert_eq!(
+            decision.selection,
+            Selection::Stop(StopReason::NoApplicableOperation)
+        );
     }
 
     #[test]
@@ -1063,15 +1320,20 @@ mod tests {
             obligation_ids: BTreeSet::from(["claim".into()]),
             status: OperationStatus::Completed,
             verifier: Some(receipt_verifier(
-                "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+                "verify",
+                &["claim"],
+                ProofVerdict::Valid,
+                EvidenceVerdict::Admissible,
             )),
         };
         assert_eq!(
             apply_operation_receipt(&mut obligations, &receipt),
             Err(ReceiptError::DuplicateExistingObligation("claim".into()))
         );
-        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(
+            obligations[0].state,
+            ObligationState::CandidateEvidenceAvailable
+        );
         assert_eq!(obligations[1].state, ObligationState::Open);
     }
-
 }
