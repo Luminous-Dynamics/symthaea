@@ -38,7 +38,7 @@ The receipt pins:
 7. Semantic-review status, scope, reviewer identity and attestation digest.
 8. A derived integrity status (not_attempted, pending, eligible or ineligible).
 
-The Rust verifier recomputes the sorted axiom-list digests and unexpected-axiom count; it derives the integrity status rather than trusting the claimed status; checks source-path safety and exact target identity; and can verify the receipt's exact byte SHA-256.
+The Rust verifier recomputes the sorted axiom-list digests and unexpected-axiom count; it derives the integrity status rather than trusting the claimed status; checks source-path safety and exact target identity; and can verify the receipt's exact byte SHA-256. It now also requires a measured evidence-artifact manifest and, for eligible targets, opens and hashes eleven concrete files under an explicit evidence root: source file, intended informal statement, Lean binary, Lake manifest, root module, elaboration receipt, used-axiom manifest, axiom allowlist, counterexample receipt, vacuity receipt and reviewer attestation. Artifact paths are repository-relative to the evidence root; canonicalized paths must remain inside that root, so traversal and symlink escapes fail closed. The verifier recomputes the selected source-span digest from the pinned file using 1-based lines and Unicode-codepoint columns, then checks it against the registered source_span_sha256.
 
 ### What eligibility means—and does not mean
 
@@ -131,7 +131,7 @@ The strongest defensible initial result is not necessarily a higher solve rate. 
 
 ## Remaining blockers
 
-1. The current receipt contains reviewer/probe digests but does not yet authenticate those external artifact bytes or reviewer signatures.
+1. The evidence bundle now authenticates exact artifact bytes, but reviewer identity/signatures are not yet cryptographically authenticated against an independently governed reviewer-key registry. The attestation file is hash-bound, not yet a trusted digital signature.
 2. The verifier checks source/target identities and the claimed sorted axiom closure, but the measured capture pipeline that obtains the full transitive axiom closure must still be implemented and independently tested.
 3. Counterexample and vacuity probes are evidence, not formal completeness proofs. Their algorithms, bounds and failure modes must be pinned.
 4. A complete source-to-informal-statement audit needs reviewer guidance, adjudication and disagreement handling.
@@ -149,4 +149,4 @@ The strongest defensible initial result is not necessarily a higher solve rate. 
 
 ## SorryDB score-path integration
 
-The SorryDB task-run receipt now includes a required `task_integrity` field. Synthetic no-run fixtures set it to `null`; measured runs must bind the exact eligible receipt bytes. The new `verify_sorrydb_run_integrity` Rust binary joins the receipt to the source task ID, fixed SorryDB_2601 cohort/snapshot, repository remote/branch/commit, source coordinates, Lean version and Lake manifest. The focused workflow also includes negative controls for missing/pending eligibility and source/environment substitutions. This does not yet replace proof-attempt checker/replay receipt verification or claim a measured SorryDB result.
+The SorryDB task-run receipt now includes a required `task_integrity` field. Synthetic no-run fixtures set it to `null`; measured runs must bind exact eligible receipt bytes and materialized evidence artifacts. verify_sorrydb_run_integrity --verify RUN INTEGRITY EVIDENCE_ROOT opens the eleven required evidence files, checks their SHA-256 links, rejects symlink/path escapes, verifies that the source coordinates select the registered source-span bytes, and then joins the task ID, SorryDB_2601 cohort/snapshot, repository remote/branch/commit, Lean version and Lake manifest. Its self-test mutates source bytes and coordinates to prove that the bundle gate fails closed. This still does not cryptographically authenticate reviewer identity/signatures, nor replace proof-attempt checker/replay receipt verification or claim a measured SorryDB result.
