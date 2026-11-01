@@ -254,6 +254,223 @@ fn fingerprint_from_history(
     }))
 }
 
+/// Resolve every successful replicate through the existing bounded EvidenceArtifactResolver,
+/// reconstruct its replicate manifest and byte receipt, and return bundles for replay.
+///
+/// The caller supplies a verifier identity. The verifier build digest is pinned to the
+/// EventTape header. The resolver policy enforces allowed locator prefixes and per/total
+/// byte ceilings before bytes enter the report reconstruction path.
+pub fn resolve_noisy_event_tape_evidence_bundles<R: EvidenceArtifactResolver>(
+    tape: &EventTape,
+    verifier_id: &str,
+    policy: &EvidenceArtifactResolvePolicy,
+    resolver: &R,
+) -> Result<BTreeMap<String, EventTapeNoisyEvidenceBundle>, EventTapeNoisyError> {
+    policy.validate().map_err(|error| EventTapeNoisyError::new("resolve_policy", error.to_string()))?;
+    let (_, _, plan) = contract_and_plan(tape)?;
+    let header = tape.header();
+    let mut total_bytes = 0u64;
+    let mut bundles = BTreeMap::new();
+
+    for (index, envelope) in tape.events().iter().enumerate() {
+        let payload = &envelope.payload;
+        let (
+            candidate_id,
+            decision_sha256,
+            replicate_id,
+            sample_seed,
+            objective_values,
+            evidence_sha256,
+            manifest_sha256,
+            byte_receipt_sha256,
+            artifact_reference,
+        ) = match (&payload.intent, &payload.outcome) {
+            (
+                ActionIntent::ObserveCandidateReplicate {
+                    candidate_sha256,
+                    decision_sha256,
+                    replicate_id,
+                    sample_seed,
+                    ..
+                },
+                ActionOutcome::CandidateNoisyObservation {
+                    disposition: NoisyObservationDisposition::Succeeded,
+                    objective_values: Some(objective_values),
+                    evidence_sha256: Some(evidence_sha256),
+                    evidence_manifest_sha256: Some(manifest_sha256),
+                    evidence_byte_receipt_sha256: Some(byte_receipt_sha256),
+                    evidence_artifact: Some(artifact_reference),
+                    ..
+                },
+            ) => (
+                candidate_sha256,
+                decision_sha256,
+                replicate_id,
+                sample_seed,
+                objective_values,
+                evidence_sha256,
+                manifest_sha256,
+                byte_receipt_sha256,
+                artifact_reference,
+            ),
+            (
+                ActionIntent::ObserveCandidateReplicate { .. },
+                ActionOutcome::CandidateNoisyObservation {
+                    disposition: NoisyObservationDisposition::Succeeded,
+                    ..
+                },
+            ) => {
+                return Err(EventTapeNoisyError::new(
+                    format!("events[{index}]"),
+                    "successful noisy event is missing one or more evidence fields",
+                ));
+            }
+            _ => continue,
+        };
+
+        let path = format!("events[{index}]");
+        if artifact_reference.byte_length > policy.max_artifact_bytes {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.evidence_artifact.byte_length"),
+                "artifact exceeds the configured per-artifact byte ceiling",
+            ));
+        }
+        if !policy.allowed_locator_prefixes.iter().any(|prefix| {
+            artifact_reference.storage_locator.starts_with(prefix)
+        }) {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.evidence_artifact.storage_locator"),
+                "artifact locator is outside the configured namespaces",
+            ));
+        }
+        total_bytes = total_bytes.checked_add(artifact_reference.byte_length).ok_or_else(|| {
+            EventTapeNoisyError::new("resolve_policy.max_total_bytes", "total byte count overflow")
+        })?;
+        if total_bytes > policy.max_total_bytes {
+            return Err(EventTapeNoisyError::new(
+                "resolve_policy.max_total_bytes",
+                "successful replicate artifacts exceed the configured total byte ceiling",
+            ));
+        }
+
+        let artifact_bytes = resolver
+            .resolve(&artifact_reference.storage_locator, policy.max_artifact_bytes)
+            .map_err(|message| EventTapeNoisyError::new(
+                format!("{path}.evidence_artifact.storage_locator"),
+                format!("artifact resolution failed: {message}"),
+            ))?;
+        let actual_length = u64::try_from(artifact_bytes.len()).map_err(|_| {
+            EventTapeNoisyError::new(
+                format!("{path}.evidence_artifact.byte_length"),
+                "resolved byte length exceeds u64",
+            )
+        })?;
+        if actual_length > policy.max_artifact_bytes
+            || actual_length != artifact_reference.byte_length
+        {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.evidence_artifact.byte_length"),
+                "resolved artifact length differs from the event or exceeds the configured byte ceiling",
+            ));
+        }
+        if sha256(&artifact_bytes) != artifact_reference.sha256
+            || artifact_reference.sha256 != *evidence_sha256
+        {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.evidence_artifact.sha256"),
+                "resolved raw bytes do not match the event-pinned artifact digest",
+            ));
+        }
+
+        let replicate = NoisyReplicate {
+            replicate_id: replicate_id.clone(),
+            sample_seed: *sample_seed,
+            objective_values: objective_values.clone(),
+            evidence_sha256: evidence_sha256.clone(),
+        };
+        let context = NoisyReplicateEvidenceContext {
+            run_id: &header.campaign_id,
+            source_commit: &header.source_commit,
+            candidate_id,
+            decision_sha256,
+        };
+        let manifest = NoisyReplicateEvidenceManifest::new(
+            header.campaign_id.clone(),
+            candidate_id.clone(),
+            header.source_commit.clone(),
+            decision_sha256.clone(),
+            &plan,
+            &replicate,
+            artifact_reference.clone(),
+        )
+        .map_err(|error| EventTapeNoisyError::new(format!("{path}.manifest"), error.to_string()))?;
+        if manifest.manifest_sha256().map_err(|error| {
+            EventTapeNoisyError::new(format!("{path}.manifest"), error.to_string())
+        })? != *manifest_sha256 {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.evidence_manifest_sha256"),
+                "reconstructed replicate manifest digest differs from EventTape",
+            ));
+        }
+
+        let receipt = super::noisy_replicate_evidence::verify_noisy_replicate_artifact_bytes(
+            &manifest,
+            &plan,
+            context,
+            &replicate,
+            &artifact_bytes,
+            verifier_id.to_owned(),
+            header.verifier_sha256.clone(),
+        )
+        .map_err(|error| EventTapeNoisyError::new(format!("{path}.byte_receipt"), error.to_string()))?;
+        if receipt.receipt_sha256 != *byte_receipt_sha256 {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.evidence_byte_receipt_sha256"),
+                "reconstructed byte-receipt digest differs from EventTape",
+            ));
+        }
+
+        if bundles.insert(
+            payload.event_id.clone(),
+            EventTapeNoisyEvidenceBundle {
+                manifest,
+                artifact_bytes,
+                receipt,
+            },
+        ).is_some() {
+            return Err(EventTapeNoisyError::new(
+                format!("{path}.event_id"),
+                "duplicate EventTape event ID while resolving replicate evidence",
+            ));
+        }
+    }
+    Ok(bundles)
+}
+
+/// Fully resolver-backed EventTape replay. This is the preferred entry point when a
+/// bounded content-addressed resolver is available.
+pub fn replay_noisy_event_tape_with_resolver<R: EvidenceArtifactResolver>(
+    tape: &EventTape,
+    verifier_id: &str,
+    policy: &EvidenceArtifactResolvePolicy,
+    resolver: &R,
+) -> Result<EventTapeNoisyReplayReport, EventTapeNoisyError> {
+    let bundles = resolve_noisy_event_tape_evidence_bundles(tape, verifier_id, policy, resolver)?;
+    replay_noisy_event_tape(tape, &bundles)
+}
+
+/// Fully resolver-backed reconciliation with AnytimeHistory.
+pub fn reconcile_noisy_event_tape_with_resolver<R: EvidenceArtifactResolver>(
+    tape: &EventTape,
+    verifier_id: &str,
+    policy: &EvidenceArtifactResolvePolicy,
+    resolver: &R,
+    history: &AnytimeHistory,
+) -> Result<EventTapeNoisyReconciliation, EventTapeNoisyError> {
+    let bundles = resolve_noisy_event_tape_evidence_bundles(tape, verifier_id, policy, resolver)?;
+    reconcile_noisy_event_tape_with_anytime_history(tape, &bundles, history)
+}
+
 /// Rebuild the noisy Pareto report from EventTape, verifying one raw-byte receipt for every
 /// successful replicate. The evidence map must contain exactly the successful event IDs.
 pub fn replay_noisy_event_tape(
