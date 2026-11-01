@@ -375,7 +375,7 @@ fn validate_replicate_matrix(
         validate_digest(&row.item_set_sha256, "item_set_sha256")?;
         if computed_item_digest != row.item_set_sha256 {
             return Err(format!(
-                "item-set digest mismatch for {}/{}/{}",
+                "item-set digest mismatch for {}/{}/{:?}",
                 row.task_family, row.difficulty_band, row.relation
             ));
         }
