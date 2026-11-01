@@ -12,7 +12,7 @@ use std::io::BufRead;
 use super::digest::CanonicalHasher;
 
 const NOMINAL_SAMPLE_PERIOD_NS: i128 = 20_000_000;
-const GAP_THRESHOLD_NS: i128 = 30_000_000;
+const GAP_THRESHOLD_NS: i128 = NOMINAL_SAMPLE_PERIOD_NS * 3 / 2;
 
 const EXPECTED_HEADERS: [&str; 8] = [
     "timestamp",
@@ -223,7 +223,7 @@ fn parse_timestamp_ns(value: &str, line: u64) -> Result<i128, HarthCsvError> {
     if bytes.len() < 19
         || bytes.get(4) != Some(&b'-')
         || bytes.get(7) != Some(&b'-')
-        || !matches!(bytes.get(10), Some(b' ') | Some(b'T'))
+        || !matches!(bytes.get(10), Some(&b' ') | Some(&b'T'))
         || bytes.get(13) != Some(&b':')
         || bytes.get(16) != Some(&b':')
     {
@@ -413,7 +413,6 @@ where
     let mut row_count = 0_u64;
     let mut hasher = CanonicalHasher::new(b"symthaea.temporal.harth-normalized-rows.v1");
     hasher.bytes(&source_family_sha256);
-    hasher.u8(u8::from(has_export_index_column));
 
     loop {
         line_buffer.clear();
@@ -575,7 +574,8 @@ mod tests {
     #[test]
     fn optional_leading_export_index_is_checked_and_not_treated_as_a_sensor() {
         let input = format!(
-            "Unnamed: 0,{header}0,{}1,{}",
+            "Unnamed: 0,{}0,{}1,{}",
+            header(),
             row("2024-01-01 00:00:00.000000", "6"),
             row("2024-01-01 00:00:00.020000", "7")
         );
@@ -664,7 +664,8 @@ mod tests {
     #[test]
     fn optional_export_index_must_be_contiguous() {
         let input = format!(
-            "index,{header}0,{}2,{}",
+            "index,{}0,{}2,{}",
+            header(),
             row("2024-01-01 00:00:00.000000", "1"),
             row("2024-01-01 00:00:00.020000", "2")
         );
