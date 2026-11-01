@@ -37,14 +37,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          out_dir="$(mktemp -d)"
-          echo "$out_dir" > "$RUNNER_TEMP/prm-output-dir"
+          context_dir="$(mktemp -d)"
+          receipt_dir="$(mktemp -d)"
+          echo "$context_dir" > "$RUNNER_TEMP/prm-context-dir"
+          echo "$receipt_dir" > "$RUNNER_TEMP/prm-receipt-dir"
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
             --policy tests/fixtures/hardsec/prm-v1/context-policy.json \
             --assignments tests/fixtures/hardsec/prm-v1/context-assignments.json \
             --truth tests/fixtures/hardsec/prm-v1/context-truth-oracle.json \
-            --receipt "$out_dir/context-assignment-receipt.json"
-          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+            --receipt "$context_dir/context-assignment-receipt.json"
+          python3 - "$context_dir/context-assignment-receipt.json" <<'PY'
           import json, sys
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)
@@ -63,13 +65,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          out_dir="$(cat "$RUNNER_TEMP/prm-output-dir")"
+          context_dir="$(cat "$RUNNER_TEMP/prm-context-dir")"
+          receipt_dir="$(cat "$RUNNER_TEMP/prm-receipt-dir")"
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-predictive-rank-martingale --example hardsec_predictive_rank_martingale -- \
             --plan tests/fixtures/hardsec/prm-v1/plan.json \
             --data tests/fixtures/hardsec/prm-v1/data.json \
-            --context-receipt "$out_dir/context-assignment-receipt.json" \
-            --receipt "$out_dir/prm-receipt.json"
-          python3 - "$out_dir/prm-receipt.json" <<'PY'
+            --context-receipt "$context_dir/context-assignment-receipt.json" \
+            --receipt "$receipt_dir/prm-receipt.json"
+          python3 - "$receipt_dir/prm-receipt.json" <<'PY'
           import json, sys
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)
@@ -99,11 +102,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          out_dir="$(cat "$RUNNER_TEMP/prm-output-dir")"
-          python3 - <<'PY'
-          import json
+          context_dir="$(cat "$RUNNER_TEMP/prm-context-dir")"
+          negative_input_dir="$(mktemp -d)"
+          negative_output_dir="$(mktemp -d)"
+          python3 - "$negative_input_dir/prm-invalid-sensor-data.json" <<'PY'
+          import json, sys
           source = "tests/fixtures/hardsec/prm-v1/data.json"
-          target = "/tmp/prm-invalid-sensor-data.json"
+          target = sys.argv[1]
           with open(source, "r", encoding="utf-8") as handle:
               data = json.load(handle)
           data["online_records"][0]["sensor_state"] = "untrusted"
@@ -113,13 +118,13 @@ jobs:
           PY
           if cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-predictive-rank-martingale --example hardsec_predictive_rank_martingale -- \
             --plan tests/fixtures/hardsec/prm-v1/plan.json \
-            --data /tmp/prm-invalid-sensor-data.json \
-            --context-receipt "$out_dir/context-assignment-receipt.json" \
-            --receipt "$out_dir/invalid-sensor-receipt.json"; then
+            --data "$negative_input_dir/prm-invalid-sensor-data.json" \
+            --context-receipt "$context_dir/context-assignment-receipt.json" \
+            --receipt "$negative_output_dir/invalid-sensor-receipt.json"; then
             echo "untrusted sensor negative control unexpectedly succeeded" >&2
             exit 1
           fi
-          test ! -e "$out_dir/invalid-sensor-receipt.json"
+          test ! -e "$negative_output_dir/invalid-sensor-receipt.json"
       - name: Enforce PRM benchmark claim contract
         run: |
           python3 - <<'PY'

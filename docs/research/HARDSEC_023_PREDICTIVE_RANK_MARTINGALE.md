@@ -60,7 +60,7 @@ The receipt binds the plan, data, and HARDSEC-020 runtime assignment receipt byt
 
 The runtime parser now validates the ONS contract rather than merely checking that an ons object exists. Its update formula, initialization, projection-radius rule, and minimum betting factor must match the implemented constants. This prevents a plan from declaring a different optimizer while the executable silently runs the hard-coded one.
 
-An exact rank-tree unit test enumerates every Pólya-urn rank path for n=2 and horizon 8, including the adaptive ONS updates and Order/Dispersion mixture. It verifies total null path mass is one and the probability of ever crossing the 1/alpha boundary is no greater than alpha. This is a finite-state arithmetic qualification of the implementation under the specified predictive rank law—not evidence that real PMU observations follow that law.
+An exact rank-tree unit test enumerates every Pólya-urn rank path for n=2 and horizon 8, including the adaptive ONS updates and Order/Dispersion mixture. It verifies total null path mass is one and the probability of ever crossing the 1/alpha boundary is no greater than alpha. The conditional-centering unit test also uses a reachable history whose rank counts sum to t−1; this is important because arbitrary count vectors can make the nominal predictive probabilities fail to normalize. This is a finite-state arithmetic qualification of the implementation under the specified predictive rank law—not evidence that real PMU observations follow that law.
 
 ## 4. Assumptions and claim ceiling
 
