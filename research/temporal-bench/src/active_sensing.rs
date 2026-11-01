@@ -143,6 +143,8 @@ pub struct ActiveSensingActionValue {
     pub kind: ActiveSensingActionKind,
     pub resource_cost: ActiveSensingResourceCost,
     pub claimed_entropy_reduction_ppm: u32,
+    /// Forecast outcome distribution used to reproduce the expected task-loss estimate.
+    pub outcome_estimates: Vec<ObservationOutcomeEstimate>,
     pub expected_loss_without_observation_ppm: u32,
     pub expected_loss_after_observation_ppm: u32,
     /// Positive is beneficial, zero is decision-irrelevant, negative is harmful.
@@ -242,6 +244,11 @@ pub fn compute_active_sensing_plan_sha256(receipt: &ActiveSensingPlanReceipt) ->
         hasher.u8(action.kind as u8);
         action.resource_cost.hash_into(&mut hasher);
         hasher.u32(action.claimed_entropy_reduction_ppm);
+        hasher.usize(action.outcome_estimates.len());
+        for outcome in &action.outcome_estimates {
+            hasher.u32(outcome.probability_ppm);
+            hasher.u32(outcome.posterior_decision_loss_ppm);
+        }
         hasher.u32(action.expected_loss_without_observation_ppm);
         hasher.u32(action.expected_loss_after_observation_ppm);
         hasher.u64(action.expected_task_loss_reduction_ppm as u64);
@@ -309,6 +316,7 @@ pub fn plan_active_sensing_actions(
             kind: action.kind,
             resource_cost: action.resource_cost,
             claimed_entropy_reduction_ppm: action.claimed_entropy_reduction_ppm,
+            outcome_estimates: action.outcomes.clone(),
             expected_loss_without_observation_ppm: context.current_expected_decision_loss_ppm,
             expected_loss_after_observation_ppm: expected_after,
             expected_task_loss_reduction_ppm:
@@ -369,12 +377,31 @@ pub fn validate_active_sensing_plan_receipt(
     {
         return Err(ActiveSensingError::new("plan.order", "frontier and rejected lists must be sorted by unique action ID"));
     }
+    let mut all_action_ids = HashSet::with_capacity(
+        receipt.pareto_frontier.len() + receipt.rejected_actions.len()
+    );
     for action in &receipt.pareto_frontier {
+        if !all_action_ids.insert(action.action_id.as_str()) {
+            return Err(ActiveSensingError::new("plan.action_ids", "duplicate action ID across plan receipt"));
+        }
+    }
+    for rejected in &receipt.rejected_actions {
+        if rejected.action_id.trim().is_empty()
+            || !all_action_ids.insert(rejected.action_id.as_str())
+        {
+            return Err(ActiveSensingError::new("plan.rejected_actions", "rejected action IDs must be non-empty and unique across frontier/rejections"));
+        }
+    }
+    for action in &receipt.pareto_frontier {
+        let reproduced_loss = compute_expected_loss_ppm(&action.outcome_estimates)?;
         if action.action_id.trim().is_empty()
             || !action.resource_cost.consumes_anything()
+            || action.claimed_entropy_reduction_ppm > PROBABILITY_SCALE as u32
+            || action.outcome_estimates.is_empty()
             || action.expected_task_loss_reduction_ppm <= 0
             || action.expected_loss_without_observation_ppm != receipt.current_expected_decision_loss_ppm
             || action.expected_loss_after_observation_ppm > PROBABILITY_SCALE as u32
+            || action.expected_loss_after_observation_ppm != reproduced_loss
             || i64::from(action.expected_loss_without_observation_ppm)
                 - i64::from(action.expected_loss_after_observation_ppm)
                 != action.expected_task_loss_reduction_ppm
