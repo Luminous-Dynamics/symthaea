@@ -132,9 +132,7 @@ pub fn estimate_time_to_proof(
     let selected = observations
         .iter()
         .copied()
-        .filter(|observation| {
-            task_family.is_none_or(|family| observation.task_family == family)
-        })
+        .filter(|observation| task_family.is_none_or(|family| observation.task_family == family))
         .collect::<Vec<_>>();
     if selected.is_empty() {
         return Err(SurvivalError::NoObservationsForFamily);
@@ -203,9 +201,8 @@ pub fn estimate_time_to_proof(
             completion_cumulative_incidence,
         });
 
-        at_risk = at_risk.saturating_sub(
-            counts.completed + counts.competing + counts.right_censored,
-        );
+        at_risk =
+            at_risk.saturating_sub(counts.completed + counts.competing + counts.right_censored);
     }
 
     let median_net_work_units = net_quantile(&curve, 0.50);
@@ -238,11 +235,7 @@ fn net_quantile(curve: &[SurvivalPoint], quantile: f64) -> Option<u64> {
 mod tests {
     use super::*;
 
-    fn observation(
-        family: u32,
-        work: u64,
-        terminal: TerminalOutcome,
-    ) -> TimeToProofObservation {
+    fn observation(family: u32, work: u64, terminal: TerminalOutcome) -> TimeToProofObservation {
         TimeToProofObservation::new(family, work, terminal).unwrap()
     }
 
@@ -309,11 +302,7 @@ mod tests {
     fn family_filtering_prevents_cross_family_pooling() {
         let observations = [
             observation(10, 1, TerminalOutcome::SufficientProof),
-            observation(
-                11,
-                1,
-                TerminalOutcome::RightCensored(CensorReason::Timeout),
-            ),
+            observation(11, 1, TerminalOutcome::RightCensored(CensorReason::Timeout)),
         ];
         let success = estimate_time_to_proof(&observations, Some(10)).unwrap();
         let timeout = estimate_time_to_proof(&observations, Some(11)).unwrap();
