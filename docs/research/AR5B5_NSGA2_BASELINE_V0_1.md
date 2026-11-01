@@ -67,10 +67,10 @@ COCO's recommended fixed-target framing is a better primary comparison than a si
 
 ## External reference coverage
 
-PlatEMO 4.16, released July 19, 2026, reports 360 algorithms and 630 problems, including large-scale, expensive constrained and multimodal multi-objective methods. This baseline is intentionally a starting point, not a proxy for that platform's full breadth: https://github.com/BIMK/PlatEMO/releases/tag/v4.16
+PlatEMO's latest release note is v4.17 (November 2026), listing 374 algorithms and 660 problems, including constrained, expensive, sparse and multimodal methods. Use the exact v4.17 tag/source SHA for external cross-checks; this compact baseline is only a tiny subset of that platform's breadth: https://github.com/BIMK/PlatEMO/blob/master/Doc/releasenote.md
 
 Next baselines, in order:
-1. NSGA-II cross-check against PlatEMO 4.16 on ZDT1/DTLZ2 with pinned parameter parity.
+1. NSGA-II cross-check against PlatEMO v4.17 on ZDT1/DTLZ2 with pinned parameter parity.
 2. MOEA/D and SMS-EMOA on two/three-objective cases.
 3. NSGA-III and RVEA as objective count grows.
 4. Constrained DTLZ and WFG, including deceptive/nonseparable fronts.
