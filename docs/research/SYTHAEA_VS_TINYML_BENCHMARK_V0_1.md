@@ -189,6 +189,23 @@ The auditor enforces one prediction and one delayed-label release per event, pre
 
 This is a chronology/provenance check, not a sandbox that proves a candidate binary could not read the evaluator's memory. In a physical benchmark, the observation process and label evaluator should be isolated (separate processes/MCU or data interface) and the execution/action trace independently collected. State hashes bind claims but do not prove that the recorded model state was honestly produced.
 
+## Matched application-event energy uncertainty and evidence replay
+
+The phase-energy receipt now binds each task outcome to both `artifact_sha256` and `device_session_sha256`, in addition to the matched input/output, success, quality, deadline and retry evidence.
+
+A separate application-event uncertainty module is being added; do not reuse the per-inference PPK2 uncertainty receipt for this measurand. It selects repeated events only when they are complete, accepted by the frozen success policy, on time, and matched to the exact same input, artifact and physical device session. It computes Type A repeatability over those event energies, combines it with the calibration-derived Type B energy uncertainty, then adds the worst-case clock-boundary energy bound linearly. The repeatability protocol binds target, board, phase contract, voltage source/readback and independent repeat design. Candidate/reference comparison requires matched target, board, input, instrument, current range, calibration certificate and voltage-readback evidence; it does not assume systematic error cancels.
+
+The new candidate evidence evaluator requires:
+- a prequential execution trace and independently replayed audit receipt;
+- full phase-energy receipt and phase protocol;
+- matched-event repeatability protocol and metrology manifest;
+- recomputed application-event energy uncertainty receipt;
+- a hardware receipt binding artifact and configuration digests, compiler, firmware, linker map, measurement protocol, device session, per-event latency samples, peak SRAM and flash.
+
+It replays the predict → label-release → update chronology, recomputes event-energy uncertainty from its source receipt/manifest inputs, derives p95 latency by nearest-rank, and enforces hard limits on quality, false alarms, missed events, minimum coverage, p95 latency, protected SRAM reserve and flash. It returns all candidates with rejection reasons and a non-dominated Pareto frontier over quality, false/missed events, latency, event-energy upper bound, memory, flash, coverage and Brier score. Unlike a single weighted score, it does not trade a missed critical event against a few microjoules.
+
+This evidence evaluator is for temporal-adaptation and active-sensing tracks. Static inference remains a separate MLPerf Tiny-compatible track with CPU-only and accelerator/NPU tiers kept distinct.
+
 ## Current implementation status
 
 The new Rust module currently provides:
@@ -200,7 +217,7 @@ The new Rust module currently provides:
 - prequential execution-trace auditing with prediction-before-label availability, delayed label release, post-label update ordering, a continuous model-state SHA-256 chain, and event-level accuracy, balanced accuracy, coverage, selective accuracy, Brier score, false alarms/hour, missed events/hour and prediction latency;
 - exact hash commitments from the prequential trace to per-run energy and metrology receipts.
 
-The CLI reports HDC-LTC memory preflight. The next increment is to verify the contents of the bound phase-energy and metrology receipts from #9755/#9744, compute adaptation/recovery and retention metrics by regime, and evaluate all candidates on matched tracks to return a multi-objective Pareto frontier. Fourteen synthetic tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
+The CLI reports HDC-LTC memory preflight. The next increment is to compute drift-recovery/retention and open-set metrics from the evaluator-owned regime labels, add target-specific cycle/flash/SRAM measurements, and exercise the full evidence bundle on physical target hardware. Fourteen synthetic tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
 
 ## Sources
 
