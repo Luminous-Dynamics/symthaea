@@ -139,7 +139,31 @@ This comparison highlights the trade-off: a fixed prior over eta avoids selectin
 
 The simulation used independent local NumPy code and seeds 9776, 9806 and 9836 for rho=.2,.5,.8. It was not produced by the checked-in benchmark runner and not by CI. The runner now uses the global projective kernel and emits Wilson intervals so the result can be reproduced in the repository environment.
 
-## 6. Earlier fixed-dimension envelope experiments (historical)
+## 6. Structured O(d) covariance operator
+
+The projective kernel is a diagonal-plus-rank-one operator. Let sigma2=1-rho_min and rho_c=rho_max. Then:
+
+    V lambda = sigma2 * lambda + rho_c * 1 * sum(lambda)
+    lambda^T V lambda = sigma2 * ||lambda||_2^2
+                       + rho_c * (sum(lambda))^2
+    diag(V) = sigma2 + rho_c.
+
+Therefore the preconditioned gradient update and e-factor penalty can be computed in O(d) time and O(d) storage rather than multiplying a dense d-by-d covariance matrix. The code now provides ProjectiveEquicorrelationKernel with O(d) matvec/quadratic methods, and CovariancePreconditionedBet accepts this operator directly. Dense-matrix implementations remain as a differential reference in the tests.
+
+The benchmark runner also uses the exact common-factor representation for Gaussian equicorrelation sampling and maintains running score sums rather than recomputing the entire history mean at each round. The simulation hot path is now linear in dimension per round (aside from the number of experts/streams).
+
+Independent local NumPy differential checks matched the dense quadratic and matvec formulas for dimensions 1–100. A single local vectorized microbenchmark with 128 vectors measured approximately:
+
+| d | Structured O(d) quadratic | Dense reference | Dense/structured |
+|---:|---:|---:|---:|
+| 10 | 0.055 ms | 0.230 ms | 4.2x |
+| 100 | 0.033 ms | 0.263 ms | 8.0x |
+| 1,000 | 0.534 ms | 4.624 ms | 8.7x |
+| 5,000 | 2.011 ms | not run | — |
+
+These are one-environment, single-pass microbenchmark observations, not p50/p95 Rust results or a claim of general speedup. The checked-in benchmark should be run with warmups, repeats, pinned CPU/core limits, and peak-memory reporting before using performance claims externally.
+
+## 7. Earlier fixed-dimension envelope experiments (historical)
 
 The next tables preserve the earlier experiment for comparison only. Those results use `Sigma(0.5)+1.2I) at d=5. That envelope is valid for the fixed d=5 covariance family, but changing d changes its diagonal correction, so it is **not** a dimension-extension/projectivity result. Do not use the earlier tables as evidence for future-universe projectivity.
 
@@ -183,7 +207,7 @@ For the fixed-prior eta mixture under Rademacher factor noise, 10,000-stream all
 
 These simulated crossing rates are not the validity proof. They do not establish closed-FDR, stopped-FDR, FWER or SupFDR. A proper confirmatory run must use frozen seeds, at least 50,000 streams per cell, and the matched guarantee protocol in #9717.
 
-## 7. Reproducible runner
+## 8. Reproducible runner
 
 Run:
 
@@ -197,13 +221,13 @@ The runner includes Gaussian and Rademacher-factor noise; static rho=.2/.5/.8 an
 
 Tests are authored but have not been executed from a repository checkout in this environment. No CI pass is claimed.
 
-## 8. Prior art and benchmark relationship
+## 9. Prior art and benchmark relationship
 
 Predictable adaptive betting is established. The `seqcomp` adaptive-betting vignette describes aGRAPA and ONS-m-style bet selection for bounded score-difference martingales and emphasizes that temporal structure changes which betting rule is best. Those procedures are useful bet-selection comparators, but their null and increment assumptions are not automatically identical to this multivariate conditional-mgf setting.
 
 The 2026 UAI online e-closure/compound-e-value work reports arbitrary-dependence online FDR improvements and O(log t) decision algorithms for a single-pass streaming problem. Our dynamic target additionally requires the prefix/projectivity property when existing hypotheses continue accruing evidence after later arrivals. Compare on a separate matched leaderboard; do not claim superiority from these intersection-level simulations.
 
-## 9. Files
+## 10. Files
 
 - validation/projective_vector_betting.py
 - validation/test_projective_vector_betting.py
