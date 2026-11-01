@@ -1,13 +1,51 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, CensoringWeightReceipt, CompletedCalibrationExample, EffectDisposition,
-    ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
-    JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
-    LinearProofFrontierCostModel, ProofFrontierFeatures, ReconciliationOutcome,
-    RemainingCostForecast, ReservationId, ResourceVector, SelectedProofCalibrationExample,
-    SelectedProofEnvelope, SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
+    BudgetLedger, CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt,
+    CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState,
+    EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt,
+    FrontierCostCoefficients, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
+    LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
+    OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
+    OnlineSelectionLedger, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
+    ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
+    SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
+
+fn online_statement(id: u64, episode: u64, decision: u64, tick: u64) -> OnlinePredictionStatement {
+    OnlinePredictionStatement {
+        statement_id: id,
+        selection: SelectionReceipt {
+            episode_id: episode,
+            decision_sequence: decision,
+            candidate_pool_digest: [1; 32],
+            selection_policy_digest: [2; 32],
+            selected_population_digest: [3; 32],
+            pre_state_digest: [4; 32],
+            frontier_digest: [5; 32],
+            selected_operation_id: format!("op-{id}"),
+            selected_operation_family: 7,
+        },
+        dimension: OnlineCostDimension::Tokens,
+        lower_bound: 10,
+        upper_bound: 20,
+        issued_at_tick: tick,
+    }
+}
+
+fn online_feedback(
+    sequence: u64,
+    statement_id: u64,
+    tick: u64,
+    disposition: OnlineFeedbackDisposition,
+) -> OnlineFeedbackReceipt {
+    OnlineFeedbackReceipt {
+        receipt_sequence: sequence,
+        statement_id,
+        received_at_tick: tick,
+        disposition,
+    }
+}
 
 fn tokens(value: u128) -> ResourceVector {
     ResourceVector::new(value, 0, 0, 0, 0, 0)
@@ -626,4 +664,271 @@ fn main() {
         SelectedProofEnvelope::Unbounded { .. }
     ));
     println!("SELECTION_CONFORMAL_ROW\tselected-sample-too-small\tunbounded");
+
+    let cap_config = DecisionDrivenCapConfig {
+        resource_dimension: OnlineCostDimension::Tokens,
+        alpha_numerator: 1,
+        alpha_denominator: 4,
+        base_threshold: 5,
+        threshold_increment_per_selected: 2,
+        holdout_partition_digest: [61; 32],
+        training_partition_digest: [60; 32],
+        model_digest: [62; 32],
+        score_model_digest: [63; 32],
+        selection_policy_digest: [64; 32],
+        feature_cohort_digest: [65; 32],
+    };
+    let cap_holdout = [
+        CapCalibrationPoint {
+            example_id: 1,
+            holdout_partition_digest: [61; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            selection_policy_digest: [64; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 4,
+            predicted_cost: 10,
+            observed_remaining_to_verified_proof: ResourceVector::new(11, 0, 0, 0, 0, 0),
+            meter_receipt_digest: [66; 32],
+            completion_verifier_digest: [67; 32],
+        },
+        CapCalibrationPoint {
+            example_id: 2,
+            holdout_partition_digest: [61; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            selection_policy_digest: [64; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 5,
+            predicted_cost: 10,
+            observed_remaining_to_verified_proof: ResourceVector::new(12, 0, 0, 0, 0, 0),
+            meter_receipt_digest: [68; 32],
+            completion_verifier_digest: [69; 32],
+        },
+        CapCalibrationPoint {
+            example_id: 3,
+            holdout_partition_digest: [61; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            selection_policy_digest: [64; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 5,
+            predicted_cost: 10,
+            observed_remaining_to_verified_proof: ResourceVector::new(13, 0, 0, 0, 0, 0),
+            meter_receipt_digest: [70; 32],
+            completion_verifier_digest: [71; 32],
+        },
+    ];
+    let mut cap_state = DecisionDrivenCapState::new();
+    let cap_first = pod_meta_cost_to_go_lab::apply_decision_driven_cap(
+        cap_config,
+        &mut cap_state,
+        &cap_holdout,
+        CapCurrentPrediction {
+            example_id: 700,
+            frontier_digest: [72; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            selection_policy_digest: [64; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 5,
+            predicted_cost: 20,
+        },
+    )
+    .unwrap();
+    println!(
+        "CAP_DECISION_ROW\tfixed-holdout\t{}\t{}\t{}\t{}",
+        cap_first.selected,
+        cap_first.selection_threshold,
+        cap_first.calibration_example_ids.len(),
+        cap_first.residual_quantile.unwrap_or(u128::MAX)
+    );
+    let cap_second = pod_meta_cost_to_go_lab::apply_decision_driven_cap(
+        cap_config,
+        &mut cap_state,
+        &cap_holdout,
+        CapCurrentPrediction {
+            example_id: 701,
+            frontier_digest: [73; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            selection_policy_digest: [64; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 6,
+            predicted_cost: 20,
+        },
+    )
+    .unwrap();
+    println!(
+        "CAP_DECISION_ROW\tprior-selection-state\t{}\t{}\t{}\t{}",
+        cap_second.selected,
+        cap_second.selection_threshold,
+        cap_second.calibration_example_ids.len(),
+        cap_second.residual_quantile.unwrap_or(u128::MAX)
+    );
+    let cap_unbounded = pod_meta_cost_to_go_lab::apply_decision_driven_cap(
+        cap_config,
+        &mut cap_state,
+        &[],
+        CapCurrentPrediction {
+            example_id: 702,
+            frontier_digest: [74; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            selection_policy_digest: [64; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 9,
+            predicted_cost: 20,
+        },
+    )
+    .unwrap();
+    println!(
+        "CAP_DECISION_ROW\tinsufficient-holdout\t{}\t{}\t{}",
+        cap_unbounded.selected,
+        cap_unbounded
+            .interval
+            .is_some_and(|interval| interval.upper.is_none()),
+        cap_unbounded.calibration_example_ids.len()
+    );
+
+    let mut online_full = OnlineSelectionLedger::new();
+    online_full
+        .append_statement(online_statement(1, 601, 1, 1))
+        .unwrap();
+    online_full
+        .append_statement(online_statement(2, 602, 1, 2))
+        .unwrap();
+    online_full
+        .append_feedback(online_feedback(
+            1,
+            1,
+            3,
+            OnlineFeedbackDisposition::ExactVerifiedCost {
+                action_id_digest: [41; 32],
+                observed_remaining_to_verified_proof: ResourceVector::new(15, 0, 0, 0, 0, 0),
+                meter_receipt_digest: [41; 32],
+                completion_verifier_digest: [42; 32],
+            },
+        ))
+        .unwrap();
+    online_full
+        .append_feedback(online_feedback(
+            2,
+            2,
+            4,
+            OnlineFeedbackDisposition::CoverageBitOnly {
+                action_id_digest: [43; 32],
+                covered: false,
+                meter_receipt_digest: [43; 32],
+                evaluator_receipt_digest: [44; 32],
+            },
+        ))
+        .unwrap();
+    let full_report = online_full.report(4);
+    println!(
+        "ONLINE_FCR_ROW\tfull-feedback\t{}\t{}\t{:.3}",
+        full_report.resolved_coverage_statements,
+        full_report.coverage_misses,
+        full_report.observed_fcr.unwrap()
+    );
+
+    let mut online_delayed = OnlineSelectionLedger::new();
+    online_delayed
+        .append_statement(online_statement(1, 603, 1, 1))
+        .unwrap();
+    online_delayed
+        .append_feedback(online_feedback(
+            1,
+            1,
+            5,
+            OnlineFeedbackDisposition::CoverageBitOnly {
+                action_id_digest: [45; 32],
+                covered: true,
+                meter_receipt_digest: [45; 32],
+                evaluator_receipt_digest: [46; 32],
+            },
+        ))
+        .unwrap();
+    let delayed_report = online_delayed.report(3);
+    println!(
+        "ONLINE_FCR_ROW\tdelayed-prefix\t{}\t{}",
+        delayed_report.pending_feedback, delayed_report.resolved_coverage_statements
+    );
+
+    let mut online_unknown = OnlineSelectionLedger::new();
+    online_unknown
+        .append_statement(online_statement(1, 604, 1, 1))
+        .unwrap();
+    online_unknown
+        .append_feedback(online_feedback(
+            1,
+            1,
+            2,
+            OnlineFeedbackDisposition::ActionOutcomeUnknown {
+                action_id_digest: [47; 32],
+            },
+        ))
+        .unwrap();
+    online_unknown
+        .append_feedback(online_feedback(
+            2,
+            1,
+            4,
+            OnlineFeedbackDisposition::ExactVerifiedCost {
+                action_id_digest: [47; 32],
+                observed_remaining_to_verified_proof: ResourceVector::new(12, 0, 0, 0, 0, 0),
+                meter_receipt_digest: [48; 32],
+                completion_verifier_digest: [49; 32],
+            },
+        ))
+        .unwrap();
+    let unknown_report = online_unknown.report(4);
+    println!(
+        "ONLINE_FCR_ROW\tunknown-reconciled\t{}\t{}",
+        unknown_report.action_outcome_unknown, unknown_report.resolved_coverage_statements
+    );
+
+    let mut online_censored = OnlineSelectionLedger::new();
+    online_censored
+        .append_statement(online_statement(1, 605, 1, 1))
+        .unwrap();
+    online_censored
+        .append_feedback(online_feedback(
+            1,
+            1,
+            2,
+            OnlineFeedbackDisposition::RightCensored {
+                action_id_digest: [50; 32],
+                observed_resource_lower_bound: ResourceVector::new(21, 0, 0, 0, 0, 0),
+                meter_receipt_digest: [50; 32],
+            },
+        ))
+        .unwrap();
+    let censored_report = online_censored.report(2);
+    println!(
+        "ONLINE_FCR_ROW\tcensored-definite-miss\t{}\t{}",
+        censored_report.coverage_misses, censored_report.right_censored_unresolved
+    );
+
+    let mut online_competing = OnlineSelectionLedger::new();
+    online_competing
+        .append_statement(online_statement(1, 606, 1, 1))
+        .unwrap();
+    online_competing
+        .append_feedback(online_feedback(
+            1,
+            1,
+            2,
+            OnlineFeedbackDisposition::CompetingTerminal {
+                action_id_digest: [51; 32],
+                terminal: OnlineCompetingTerminal::PermissionRevoked,
+                evaluator_receipt_digest: [51; 32],
+            },
+        ))
+        .unwrap();
+    let competing_report = online_competing.report(2);
+    println!(
+        "ONLINE_FCR_ROW\tcompeting-terminal\t{}\t{}",
+        competing_report.competing_terminal, competing_report.resolved_coverage_statements
+    );
 }
