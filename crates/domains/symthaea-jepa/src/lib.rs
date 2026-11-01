@@ -96,6 +96,7 @@ pub struct ObservedTransitionEvidence {
     pub target_observation_sha256: String,
     pub target_embedding_sha256: String,
     pub action_manifest_sha256: String,
+    pub action_binding_sha256: String,
     pub episode_id: String,
     pub branch_id: String,
     pub forecast_id: String,
@@ -165,6 +166,24 @@ pub fn embedding_sha256(hv: &ContinuousHV) -> String {
     digest_to_hex(&hasher.finalize())
 }
 
+/// Canonical binding of one stable action ID and its discrete JEPA index to
+/// the caller-supplied digest of the full action manifest.
+pub fn action_binding_sha256(
+    action_manifest_sha256: &str,
+    action_id: u64,
+    action_index: u8,
+) -> Result<String, String> {
+    if !is_lower_hex_sha256(action_manifest_sha256) {
+        return Err("action_manifest_sha256 must be a lowercase SHA-256 digest".into());
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-jepa-action-binding-v0.1\0");
+    hasher.update(action_manifest_sha256.as_bytes());
+    hasher.update(action_id.to_le_bytes());
+    hasher.update([action_index]);
+    Ok(digest_to_hex(&hasher.finalize()))
+}
+
 /// Canonical digest of the frozen action IDs and their discrete JEPA indices.
 /// The action-manifest digest remains the upstream binding to full descriptors.
 pub fn candidate_set_sha256(
@@ -231,6 +250,7 @@ fn validate_observed_transition(
         ),
         ("target_embedding_sha256", &evidence.target_embedding_sha256),
         ("action_manifest_sha256", &evidence.action_manifest_sha256),
+        ("action_binding_sha256", &evidence.action_binding_sha256),
     ] {
         if !is_lower_hex_sha256(digest) {
             return Err(format!("{name} must be a lowercase SHA-256 digest"));
@@ -279,6 +299,14 @@ fn validate_observed_transition(
         > evidence.max_target_lateness_seconds
     {
         return Err("target observation exceeds the declared maximum forecast lateness".into());
+    }
+    if action_binding_sha256(
+        &evidence.action_manifest_sha256,
+        evidence.action_id,
+        evidence.action_index,
+    )? != evidence.action_binding_sha256
+    {
+        return Err("action ID/index binding digest mismatch".into());
     }
     if evidence.action_index as usize >= config.num_actions {
         return Err(format!(
@@ -573,6 +601,7 @@ mod tests {
             target_observation_sha256: "c".repeat(64),
             target_embedding_sha256: embedding_sha256(next_hv),
             action_manifest_sha256: "d".repeat(64),
+            action_binding_sha256: action_binding_sha256(&"d".repeat(64), 42, action_index).unwrap(),
             episode_id: "episode-1".into(),
             branch_id: "branch-action-42".into(),
             forecast_id: "forecast-10-a42".into(),
@@ -688,6 +717,20 @@ mod tests {
 
         let mut evidence = observed_evidence(&current, &next, 2);
         evidence.requested_target_time_seconds = evidence.target_observed_at_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn observed_transition_rejects_action_id_index_binding_mismatch() {
+        let current = random_hv(519);
+        let next = random_hv(520);
+        let mut engine = make_engine();
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.action_id = 43;
         assert!(
             engine
                 .train_observed_transition(&current, &next, &evidence, 0.001)
