@@ -376,7 +376,10 @@ fn main() {
         tokens(5),
         &BudgetLedger::new(ResourceVector::new(1000, 1000, 1000, 1000, 1000, 1000)),
     );
-    assert_eq!(joint_fit, pod_meta_cost_to_go_lab::JointBudgetDecision::Fits);
+    assert_eq!(
+        joint_fit,
+        pod_meta_cost_to_go_lab::JointBudgetDecision::Fits
+    );
     println!(
         "VECTOR_CONFORMAL_ROW\tjoint-max-score-envelope\t{:.2}\t{}\t{}\t{}",
         joint_bound.target_coverage,
@@ -393,9 +396,7 @@ fn main() {
             ShiftStatus::SuspectedShift,
         )
         .unwrap();
-    let shifted_envelope = vector_calibrator
-        .predict_upper(shifted_prediction)
-        .unwrap();
+    let shifted_envelope = vector_calibrator.predict_upper(shifted_prediction).unwrap();
     assert!(matches!(
         shifted_envelope,
         JointCostEnvelope::Unbounded { .. }
@@ -415,5 +416,4 @@ fn main() {
         JointCostEnvelope::Unbounded { .. }
     ));
     println!("VECTOR_CONFORMAL_ROW\tfinite-sample-rank-overflow\tunbounded");
-
 }
