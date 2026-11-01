@@ -671,4 +671,43 @@ mod tests {
             .iter()
             .any(|reason| reason.code == "missing_evidence_reference"));
     }
+    #[test]
+    fn strong_kleene_conjunction_matches_all_nine_truth_table_pairs() {
+        let cases = [
+            (ObligationOutcome::Valid, ObligationOutcome::Valid, AdmissionStatus::Valid),
+            (ObligationOutcome::Valid, ObligationOutcome::Unknown, AdmissionStatus::Unknown),
+            (ObligationOutcome::Valid, ObligationOutcome::Invalid, AdmissionStatus::Invalid),
+            (ObligationOutcome::Unknown, ObligationOutcome::Valid, AdmissionStatus::Unknown),
+            (ObligationOutcome::Unknown, ObligationOutcome::Unknown, AdmissionStatus::Unknown),
+            (ObligationOutcome::Unknown, ObligationOutcome::Invalid, AdmissionStatus::Invalid),
+            (ObligationOutcome::Invalid, ObligationOutcome::Valid, AdmissionStatus::Invalid),
+            (ObligationOutcome::Invalid, ObligationOutcome::Unknown, AdmissionStatus::Invalid),
+            (ObligationOutcome::Invalid, ObligationOutcome::Invalid, AdmissionStatus::Invalid),
+        ];
+
+        for (left, right, expected) in cases {
+            let mut input = valid_input();
+            input.capsule.obligations = vec![
+                evaluation("payload-binding", left, "table-left"),
+                evaluation("signer-authorization", right, "table-right"),
+            ];
+            let result = evaluate(&input);
+            assert_eq!(result.status, expected, "left={left:?}, right={right:?}");
+            assert_eq!(result.admission_allowed, expected == AdmissionStatus::Valid);
+        }
+    }
+
+    #[test]
+    fn changed_policy_digest_requires_reverification_without_claiming_tampering() {
+        let mut input = valid_input();
+        input.capsule.binding.policy_digest = "sha256:new-policy".to_string();
+        let result = evaluate(&input);
+        assert_eq!(result.status, AdmissionStatus::Unknown);
+        assert!(!result.admission_allowed);
+        assert!(result
+            .reasons
+            .iter()
+            .any(|reason| reason.code == "claim_reverification_required"));
+    }
+
 }
