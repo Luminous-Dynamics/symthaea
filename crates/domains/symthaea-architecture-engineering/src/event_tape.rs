@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+use super::evidence_artifact::{EvidenceArtifactReference, EvidenceArtifactRole};
 use super::pareto_objectives::ObjectiveDirection;
 
 const TAPE_SCHEMA: &str = "symthaea.ar5b4.event-tape";
@@ -622,6 +623,8 @@ pub enum ActionOutcome {
         evidence_sha256: Option<String>,
         evidence_manifest_sha256: Option<String>,
         evidence_byte_receipt_sha256: Option<String>,
+        /// Exact content-addressed raw observation reference, required on success.
+        evidence_artifact: Option<EvidenceArtifactReference>,
         failure_reason: Option<String>,
     },
 }
@@ -1129,6 +1132,11 @@ impl EventTape {
                                 evidence_byte_receipt_sha256.as_deref(),
                                 &format!("{path}.outcome"),
                             )?;
+                            validate_noisy_artifact_reference(
+                                evidence_artifact.as_ref(),
+                                evidence_sha256.as_deref(),
+                                &format!("{path}.outcome"),
+                            )?;
                             if failure_reason.is_some() {
                                 return Err(EventTapeError::new(format!("{path}.outcome.failure_reason"), "verified evaluations cannot have a failure reason"));
                             }
@@ -1249,6 +1257,7 @@ impl EventTape {
                         | NoisyObservationDisposition::VerifierRejected => {
                             if objective_values.is_some() || evidence_sha256.is_some()
                                 || evidence_manifest_sha256.is_some() || evidence_byte_receipt_sha256.is_some()
+                                || evidence_artifact.is_some()
                             {
                                 return Err(EventTapeError::new(format!("{path}.outcome"), "unsuccessful noisy attempts cannot publish objective values or successful artifact receipts"));
                             }
@@ -1891,6 +1900,40 @@ fn validate_objective_attempt_metadata<'a>(
         &format!("{path}.resources.verifier_calls"),
     )?;
     Ok(contract)
+}
+
+fn validate_noisy_artifact_reference(
+    artifact: Option<&EvidenceArtifactReference>,
+    evidence_sha256: Option<&str>,
+    path: &str,
+) -> Result<(), EventTapeError> {
+    let artifact = artifact.ok_or_else(|| EventTapeError::new(
+        format!("{path}.evidence_artifact"),
+        "successful noisy observations require an exact raw artifact reference",
+    ))?;
+    if artifact.artifact_id.trim().is_empty() || artifact.storage_locator.trim().is_empty() {
+        return Err(EventTapeError::new(
+            format!("{path}.evidence_artifact"),
+            "artifact ID and content-addressed locator must be non-empty",
+        ));
+    }
+    if artifact.role != EvidenceArtifactRole::EvaluationOutput
+        || artifact.media_type != "application/json"
+        || artifact.byte_length == 0
+    {
+        return Err(EventTapeError::new(
+            format!("{path}.evidence_artifact"),
+            "noisy observation artifact must be non-empty evaluation_output application/json",
+        ));
+    }
+    validate_sha256(&artifact.sha256, &format!("{path}.evidence_artifact.sha256"))?;
+    if evidence_sha256 != Some(artifact.sha256.as_str()) {
+        return Err(EventTapeError::new(
+            format!("{path}.evidence_artifact.sha256"),
+            "raw artifact reference digest must equal the event evidence digest",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_successful_objective_evidence(
