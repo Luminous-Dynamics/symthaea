@@ -14,6 +14,9 @@ on:
       - "validation/generate_pyphi_primitive_corpus.py"
       - "validation/test_pyphi_primitive_corpus_contract.py"
       - "validation/fixtures/pyphi-iit4-2023-primitive-corpus-v0.1.schema.json"
+      - "validation/generate_pyphi_macro_mapping_corpus.py"
+      - "validation/test_pyphi_macro_mapping_corpus_contract.py"
+      - "validation/fixtures/pyphi-macro-mapping-corpus-v0.1.schema.json"
       - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
       - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
       - ".github/workflows/phi-digest-contract.yml"
@@ -43,7 +46,7 @@ jobs:
           python-version: "3.13.17"
 
       - name: Run dependency-free contract and fixture tests
-        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract -v
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract -v
 
   pyphi-reference:
     name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
@@ -157,6 +160,45 @@ jobs:
                   assert len(result["request_sha256"]) == 64
                   assert len(result["vector_sha256"]) == 64
           print("PASS: 12 primitive cases / 36 vectors; same pinned model, state, formalism and wheel")
+          PY
+
+      - name: Generate PyPhi macro mapping-family reference corpus
+        shell: bash
+        run: |
+          python validation/generate_pyphi_macro_mapping_corpus.py \
+            --output target/pyphi-reference/PYPHI_MACRO_MAPPING_REFERENCE.json
+
+      - name: Verify macro mapping corpus completeness and digest bindings
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, struct
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_MACRO_MAPPING_REFERENCE.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-macro-mapping-corpus-v0.1"
+          assert data["qualification_scope"] == "pinned_pyphi_macro_mapping_reference_only"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          assert data["summary"]["computed_case_count"] == 6
+          assert data["summary"]["total_mapping_entries"] == 112
+          for case in data["cases"]:
+              assert case["mapping_entries"] == len(case["mapping"])
+              assert case["mapping"] != case["canonical_mapping"] or not case["complement_flipped"]
+              expected = 1 << (len(case["constituents"]) * case["update_grain"])
+              assert expected == len(case["mapping"])
+              encoded = bytearray(b"SYMTHAEA-IIT-MACRO-MAPPING\\0v0.1\\0")
+              encoded.extend(struct.pack("<Q", len(case["constituents"])))
+              for unit in case["constituents"]:
+                  encoded.extend(struct.pack("<Q", unit))
+              encoded.extend(struct.pack("<Q", case["update_grain"]))
+              encoded.extend(struct.pack("<Q", len(case["canonical_mapping"])))
+              encoded.extend(bytes(case["canonical_mapping"]))
+              assert hashlib.sha256(encoded).hexdigest() == case["mapping_sha256"]
+              spec = b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\\0v0.1\\0" + case["mapping_sha256"].encode("ascii") + bytes([int(case["complement_flipped"])])
+              assert hashlib.sha256(spec).hexdigest() == case["spec_sha256"]
+          print("PASS: six macro mapping cases / 112 truth-table entries; pinned PyPhi wheel")
           PY
 
       - name: Upload pinned PyPhi reference evidence
