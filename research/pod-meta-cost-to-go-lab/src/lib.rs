@@ -1,3 +1,6 @@
+pub mod budgeted_pareto;
+pub use budgeted_pareto::*;
+
 pub mod intervention_set;
 pub use intervention_set::*;
 
