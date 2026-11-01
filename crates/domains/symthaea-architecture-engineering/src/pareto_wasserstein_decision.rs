@@ -287,7 +287,9 @@ fn solve_finite_transport(
     for lambda in breakpoints {
         let value = dual_objective(nominal, losses, costs, radius, lambda);
         if !value.is_finite() { return Err(WassersteinDecisionError::new("transport.dual", "non-finite dual objective")); }
-        if value < best_dual - 1e-11 * best_dual.abs().max(value.abs()).max(1.0) {
+        if !best_dual.is_finite()
+            || value < best_dual - 1e-11 * best_dual.abs().max(value.abs()).max(1.0)
+        {
             best_dual = value;
             best_lambda = lambda;
         }
