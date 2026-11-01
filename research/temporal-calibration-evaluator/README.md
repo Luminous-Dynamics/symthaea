@@ -29,5 +29,5 @@ Causal action-value claims still require randomized paired interventions; this d
 ## Local checks
 
 ```sh
-cargo test --manifest-path research/temporal-calibration-evaluator/Cargo.toml --locked
+cargo test --manifest-path research/temporal-calibration-evaluator/Cargo.toml
 ```
