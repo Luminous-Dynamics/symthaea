@@ -672,6 +672,7 @@ fn main() {
         base_threshold: 5,
         threshold_increment_per_selected: 2,
         holdout_partition_digest: [61; 32],
+        training_partition_digest: [60; 32],
         model_digest: [62; 32],
         score_model_digest: [63; 32],
         selection_policy_digest: [64; 32],
