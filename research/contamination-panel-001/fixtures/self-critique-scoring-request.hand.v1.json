@@ -1,0 +1,69 @@
+{
+  "schema": "symthaea.self_critique_scoring_request.v1",
+  "sample_id": "self-critique-fixture-001",
+  "model_checkpoint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "tokenizer_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "chat_template_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "initial_prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "critique_instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "initial_response_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "critique_prompt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "entropy_extractor_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "entropy_source": "vllm_top_k_raw_partial",
+  "requested_top_k": 2,
+  "vocabulary_size": 4,
+  "initial_decode": {
+    "greedy": true,
+    "temperature": 0,
+    "max_new_tokens": 8,
+    "generation_config_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "critique_decode": {
+    "greedy": true,
+    "temperature": 0,
+    "max_new_tokens": 8,
+    "generation_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "initial_generated_token_count": 3,
+  "critique_generated_token_count": 3,
+  "initial_entropy_nats": [
+    0.7077654315777535,
+    0.7077654315777535,
+    0.7077654315777535
+  ],
+  "critique_entropy_nats": [
+    0.7077654315777535,
+    0.7077654315777535,
+    0.7077654315777535
+  ],
+  "initial_topk_probability_steps": [
+    [
+      0.5,
+      0.3
+    ],
+    [
+      0.5,
+      0.3
+    ],
+    [
+      0.5,
+      0.3
+    ]
+  ],
+  "critique_topk_probability_steps": [
+    [
+      0.5,
+      0.3
+    ],
+    [
+      0.5,
+      0.3
+    ],
+    [
+      0.5,
+      0.3
+    ]
+  ],
+  "initial_full_vocab_probability_steps": null,
+  "critique_full_vocab_probability_steps": null
+}

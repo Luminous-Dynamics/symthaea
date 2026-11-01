@@ -1,0 +1,81 @@
+{
+  "schema": "symthaea.self_critique_scoring_request.v1",
+  "sample_id": "self-critique-full-vocab-fixture-001",
+  "model_checkpoint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "tokenizer_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "chat_template_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "initial_prompt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "critique_instruction_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "initial_response_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "critique_prompt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "entropy_extractor_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "entropy_source": "full_vocab_softmax_exact",
+  "requested_top_k": null,
+  "vocabulary_size": 4,
+  "initial_decode": {
+    "greedy": true,
+    "temperature": 0,
+    "max_new_tokens": 8,
+    "generation_config_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "critique_decode": {
+    "greedy": true,
+    "temperature": 0,
+    "max_new_tokens": 8,
+    "generation_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "initial_generated_token_count": 3,
+  "critique_generated_token_count": 3,
+  "initial_entropy_nats": [
+    1.2130075659799042,
+    1.2130075659799042,
+    1.2130075659799042
+  ],
+  "critique_entropy_nats": [
+    1.2130075659799042,
+    1.2130075659799042,
+    1.2130075659799042
+  ],
+  "initial_topk_probability_steps": null,
+  "critique_topk_probability_steps": null,
+  "initial_full_vocab_probability_steps": [
+    [
+      0.5,
+      0.25,
+      0.125,
+      0.125
+    ],
+    [
+      0.5,
+      0.25,
+      0.125,
+      0.125
+    ],
+    [
+      0.5,
+      0.25,
+      0.125,
+      0.125
+    ]
+  ],
+  "critique_full_vocab_probability_steps": [
+    [
+      0.5,
+      0.25,
+      0.125,
+      0.125
+    ],
+    [
+      0.5,
+      0.25,
+      0.125,
+      0.125
+    ],
+    [
+      0.5,
+      0.25,
+      0.125,
+      0.125
+    ]
+  ]
+}
