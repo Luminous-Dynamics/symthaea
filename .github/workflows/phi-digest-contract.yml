@@ -22,6 +22,8 @@ on:
       - "validation/fixtures/pyphi-iit4-2023-gid-operator-v0.1.schema.json"
       - "validation/generate_pyphi_landscape_reference.py"
       - "validation/test_pyphi_landscape_reference_contract.py"
+      - "validation/compare_iit4_landscape_reference.py"
+      - "validation/test_compare_iit4_landscape_reference.py"
       - "validation/fixtures/pyphi-iit4-2023-landscape-reference-v0.1.schema.json"
       - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
       - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
@@ -52,7 +54,7 @@ jobs:
           python-version: "3.13.17"
 
       - name: Run dependency-free contract and fixture tests
-        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract -v
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract validation.test_compare_iit4_landscape_reference -v
 
   pyphi-reference:
     name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
