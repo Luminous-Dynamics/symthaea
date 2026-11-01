@@ -20,6 +20,7 @@ hardsec-context-cctm-monitor = []
 hardsec-context-assignment-audit = []
 hardsec-context-restarted-cctm-monitor = []
 hardsec-temporal-dependence-audit = []
+hardsec-markov-conditional-rank-oracle = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -64,3 +65,8 @@ required-features = ["hardsec-context-restarted-cctm-monitor"]
 name = "hardsec_temporal_dependence_audit"
 path = "../../examples/hardsec_temporal_dependence_audit.rs"
 required-features = ["hardsec-temporal-dependence-audit"]
+
+[[example]]
+name = "hardsec_markov_conditional_rank_oracle"
+path = "../../examples/hardsec_markov_conditional_rank_oracle.rs"
+required-features = ["hardsec-markov-conditional-rank-oracle"]

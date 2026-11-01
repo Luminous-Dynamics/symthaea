@@ -1,0 +1,59 @@
+name: HARDSEC-024 finite-state Markov conditional-rank oracle
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_markov_conditional_rank_oracle.rs"
+      - "docs/research/HARDSEC_024_MARKOV_CONDITIONAL_RANK_ORACLE.md"
+      - "tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml"
+      - ".github/workflows/hardsec-markov-conditional-rank-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-markov-rank-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-markov-oracle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Run exact rational path tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-conditional-rank-oracle --example hardsec_markov_conditional_rank_oracle
+      - name: Verify emitted exact receipt
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-conditional-rank-oracle --example hardsec_markov_conditional_rank_oracle > /tmp/markov-oracle.json
+          python3 - <<'PY'
+          import json
+          with open("/tmp/markov-oracle.json", "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "exact_enumeration_passed"
+          assert receipt["claim_scope"] == "known_fully_observed_finite_state_markov_null_only"
+          assert receipt["transition_model"]["transition_numerators"] == [[9, 1], [2, 8]]
+          assert receipt["horizon"] == 12
+          assert receipt["target_alpha"] == {"numerator": 1, "denominator": 10}
+          assert receipt["conditional_expectation_identity"]["initial_state_0_equals_one"] is True
+          assert receipt["conditional_expectation_identity"]["initial_state_1_equals_one"] is True
+          episodes = receipt["episodes"]
+          assert [row["initial_state"] for row in episodes] == [0, 1]
+          assert all(row["enumerated_path_count"] == 4096 for row in episodes)
+          assert all(row["path_probability_mass_is_one"] is True for row in episodes)
+          assert [row["crossing_probability_numerator"] for row in episodes] == [52840309168, 55866239952]
+          assert all(row["pfa_at_or_below_alpha"] is True for row in episodes)
+          assert receipt["guarantee"]["time_uniform_pfa_claim_for_this_markov_model"] is True
+          assert receipt["guarantee"]["arbitrary_serial_pmu_pfa_claim"] is False
+          assert receipt["guarantee"]["unknown_transition_matrix_supported"] is False
+          assert receipt["guarantee"]["hidden_state_supported"] is False
+          assert receipt["guarantee"]["effective_sample_size_estimate"] is None
+          print("HARDSEC-024 exact Markov oracle receipt qualified.")
+          PY
