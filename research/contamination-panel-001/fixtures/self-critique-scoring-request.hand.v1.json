@@ -63,5 +63,7 @@
       0.5,
       0.3
     ]
-  ]
+  ],
+  "initial_full_vocab_probability_steps": null,
+  "critique_full_vocab_probability_steps": null
 }
