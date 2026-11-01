@@ -32,6 +32,7 @@ pub mod pareto_noisy_observations;
 pub mod noisy_replicate_evidence;
 pub mod pareto_evsi_oracle;
 pub mod pareto_sequential_policy;
+pub mod sequential_policy_event_tape;
 pub mod pareto_robust_decision;
 pub mod correlated_noise_benchmark;
 pub mod pareto_benchmarks;
