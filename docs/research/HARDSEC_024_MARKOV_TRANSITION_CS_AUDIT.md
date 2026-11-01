@@ -64,7 +64,7 @@ The example examples/hardsec_markov_transition_cs_audit.rs builds Beta-mixture r
 - 256 paths per episode;
 - exact integer path-probability numerators and denominator 5^8.
 
-For every episode it verifies total path mass exactly one and computes the exact probability that either row confidence sequence excludes its true grid parameter at any time. This is a finite grid diagnostic of the implementation, not a universal proof. It also checks that the upper envelope dominates each grid conditional outcome probability whenever the true row parameter remains inside the interval.
+For every episode it verifies total path mass exactly one and computes the exact probability that either row confidence sequence excludes its true grid parameter at any time. This is a finite grid diagnostic of the implementation, not a universal proof. It also checks that the upper envelope dominates each grid conditional outcome probability and that a non-uniform predictable betting vector has conditional expected factor at most one whenever the true row parameter remains inside the interval.
 
 The implementation uses 96-step bisection and 64-ULP endpoint padding. That is a conservative engineering attempt, not a machine-checked outward-rounding proof for platform libm. Receipt field floating_point_runtime_claim therefore remains not_established_until_outward_interval_arithmetic_is_certified. Before runtime PFA claims, use directed-rounding interval arithmetic or rational root bracketing that provides certified outer endpoints.
 

@@ -383,6 +383,35 @@ mod tests {
     }
 
     #[test]
+    fn predictable_upper_envelope_bounds_conditional_expected_betting_factor() {
+        let table = confidence_sequence_table(HORIZON, ROW_DELTA);
+        let q = [0.3_f64, 0.7_f64];
+        for p_numerator in GRID_NUMERATORS {
+            let p = p_numerator as f64 / GRID_DENOMINATOR as f64;
+            for successes in 0..=HORIZON {
+                for failures in 0..=(HORIZON - successes) {
+                    let interval = table[successes as usize][failures as usize];
+                    if p + 1e-12 < interval.lower || p > interval.upper + 1e-12 {
+                        continue;
+                    }
+                    let u_zero = 1.0 - interval.lower;
+                    let u_one = interval.upper;
+                    let conditional_expectation =
+                        (1.0 - p) * q[0] / u_zero + p * q[1] / u_one;
+                    assert!(
+                        conditional_expectation <= 1.0 + 1e-12,
+                        "conditional expected factor {} exceeded one for p={}, counts=({}, {})",
+                        conditional_expectation,
+                        p,
+                        successes,
+                        failures
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn receipt_preserves_numeric_and_model_claim_ceiling() {
         let value = report();
         assert_eq!(value["result"], "finite_grid_exact_path_audit_passed");
