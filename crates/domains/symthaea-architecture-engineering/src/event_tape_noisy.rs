@@ -383,10 +383,10 @@ pub fn resolve_noisy_event_tape_evidence_bundles<R: EvidenceArtifactResolver>(
         }
 
         let replicate = NoisyReplicate {
-            replicate_id: replicate_id.clone(),
+            replicate_id: replicate_id.to_owned(),
             sample_seed: *sample_seed,
-            objective_values: objective_values.clone(),
-            evidence_sha256: evidence_sha256.clone(),
+            objective_values: objective_values.to_vec(),
+            evidence_sha256: evidence_sha256.to_owned(),
         };
         let context = NoisyReplicateEvidenceContext {
             run_id: &header.campaign_id,
@@ -396,12 +396,12 @@ pub fn resolve_noisy_event_tape_evidence_bundles<R: EvidenceArtifactResolver>(
         };
         let manifest = NoisyReplicateEvidenceManifest::new(
             header.campaign_id.clone(),
-            candidate_id.clone(),
+            candidate_id.to_owned(),
             header.source_commit.clone(),
-            decision_sha256.clone(),
+            decision_sha256.to_owned(),
             &plan,
             &replicate,
-            artifact_reference.clone(),
+            artifact_reference.to_owned(),
         )
         .map_err(|error| EventTapeNoisyError::new(format!("{path}.manifest"), error.to_string()))?;
         if manifest.manifest_sha256().map_err(|error| {
