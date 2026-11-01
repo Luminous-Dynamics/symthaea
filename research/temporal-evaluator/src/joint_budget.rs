@@ -218,9 +218,6 @@ pub fn qualify_joint_subsets(
             if !selected.insert(*action_id) {
                 return Err(JointBudgetError::UnsortedOrDuplicateSelection);
             }
-            if selected.len() > 1 && selected.iter().next_back() == Some(action_id) {
-                // Ordering is checked below against the original vector.
-            }
             let index = *item_index
                 .get(action_id)
                 .ok_or(JointBudgetError::UnknownActionId { action_id: *action_id })?;
@@ -248,20 +245,20 @@ pub fn qualify_joint_subsets(
         }
     }
 
-    let candidate_mask = mask_for_actions(candidate_selected_action_ids, &item_index)?;
-    let (candidate, candidate_feasible) = by_mask
-        .get(&candidate_mask)
-        .ok_or(JointBudgetError::CandidateSubsetMissing)?;
-    if !candidate_feasible {
-        return Err(JointBudgetError::CandidateSubsetInfeasible);
-    }
-
     let feasible: Vec<JointSubsetSummary> = by_mask
         .values()
         .filter_map(|(summary, is_feasible)| if *is_feasible { Some(summary.clone()) } else { None })
         .collect();
     if feasible.is_empty() {
         return Err(JointBudgetError::NoFeasibleSubset);
+    }
+
+    let candidate_mask = mask_for_actions(candidate_selected_action_ids, &item_index)?;
+    let (candidate, candidate_feasible) = by_mask
+        .get(&candidate_mask)
+        .ok_or(JointBudgetError::CandidateSubsetMissing)?;
+    if !candidate_feasible {
+        return Err(JointBudgetError::CandidateSubsetInfeasible);
     }
 
     let best_wrong_belief = choose_minimum(&feasible, |outcome| outcome.wrong_belief_us);
