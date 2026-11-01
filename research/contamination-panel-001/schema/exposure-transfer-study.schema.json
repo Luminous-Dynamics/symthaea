@@ -127,7 +127,10 @@
         "adjudication_report_sha256",
         "base",
         "treatment",
-        "placebo"
+        "placebo",
+        "adjudication_reviewer_ids",
+        "minimum_item_agreement_permille",
+        "adjudication_decision"
       ],
       "properties": {
         "task_family": {
@@ -191,6 +194,31 @@
         },
         "placebo": {
           "$ref": "#/$defs/score"
+        },
+        "adjudication_reviewer_ids": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          }
+        },
+        "minimum_item_agreement_permille": {
+          "type": "integer",
+          "minimum": 800,
+          "maximum": 1000
+        },
+        "adjudication_decision": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "indeterminate",
+            "rejected"
+          ]
         }
       }
     }
