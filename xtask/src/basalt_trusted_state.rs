@@ -302,10 +302,12 @@ impl TrustedState {
 }
 
 fn validate_candidate(candidate: &Candidate) -> Result<(), TransitionError> {
+    if candidate.generation == 0 {
+        return Err(TransitionError::GenerationZero);
+    }
     if !valid_id(&candidate.source.provisioned_host_id)
         || !valid_id(&candidate.source.source_id)
         || !valid_id(&candidate.source.partition_id)
-        || candidate.generation == 0
         || !valid_digest(&candidate.seal_digest)
         || !valid_digest(&candidate.receipt_digest)
         || !valid_digest(&candidate.observer_profile_digest)
@@ -633,10 +635,23 @@ pub fn run_conformance() -> ConformanceReport {
     };
     record_case(&mut cases, "TSTATE-MODEL-003", "racing identical plans produce one commit and one CAS conflict", format!("{cas_passed}"), cas_passed);
 
+    let retry_after_conflict = state.preview(&next);
+    let retry_after_conflict_passed = matches!(
+        retry_after_conflict,
+        Ok(TransitionDecision::AlreadyCommitted { revision: 2 })
+    );
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-004",
+        "exact retry after a stale CAS discovers the durable accepted receipt",
+        format!("{retry_after_conflict:?}"),
+        retry_after_conflict_passed,
+    );
+
     let gap = successor_candidate(&state, 4, 10);
     let gap_result = state.preview(&gap);
     let gap_passed = matches!(gap_result, Err(TransitionError::GenerationGap { .. }));
-    record_case(&mut cases, "TSTATE-MODEL-004", "generation gaps fail closed", format!("{gap_result:?}"), gap_passed);
+    record_case(&mut cases, "TSTATE-MODEL-005", "generation gaps fail closed", format!("{gap_result:?}"), gap_passed);
 
     let mut fork = successor_candidate(&state, 3, 11);
     fork.checkpoint.tree_size = 10;
@@ -644,7 +659,7 @@ pub fn run_conformance() -> ConformanceReport {
     fork.checkpoint_evidence = CheckpointEvidence::VerifiedSameTree;
     let fork_result = state.preview(&fork);
     let fork_passed = matches!(fork_result, Err(TransitionError::CheckpointFork { .. }));
-    record_case(&mut cases, "TSTATE-MODEL-005", "same-size different-root checkpoint is rejected", format!("{fork_result:?}"), fork_passed);
+    record_case(&mut cases, "TSTATE-MODEL-006", "same-size different-root checkpoint is rejected", format!("{fork_result:?}"), fork_passed);
 
     let mut stale = successor_candidate(&state, 3, 12);
     stale.checkpoint.tree_size = 9;
@@ -653,7 +668,7 @@ pub fn run_conformance() -> ConformanceReport {
     };
     let stale_result = state.preview(&stale);
     let stale_passed = matches!(stale_result, Err(TransitionError::StaleCheckpoint { .. }));
-    record_case(&mut cases, "TSTATE-MODEL-006", "smaller checkpoint is rejected", format!("{stale_result:?}"), stale_passed);
+    record_case(&mut cases, "TSTATE-MODEL-007", "smaller checkpoint is rejected", format!("{stale_result:?}"), stale_passed);
 
     let mut missing_consistency = successor_candidate(&state, 3, 14);
     missing_consistency.checkpoint.tree_size = 11;
@@ -664,47 +679,47 @@ pub fn run_conformance() -> ConformanceReport {
     };
     let consistency_result = state.preview(&missing_consistency);
     let consistency_passed = matches!(consistency_result, Err(TransitionError::InvalidConsistencyProofReference));
-    record_case(&mut cases, "TSTATE-MODEL-007", "malformed consistency proof reference is rejected", format!("{consistency_result:?}"), consistency_passed);
+    record_case(&mut cases, "TSTATE-MODEL-008", "malformed consistency proof reference is rejected", format!("{consistency_result:?}"), consistency_passed);
 
     let mut profile_change = successor_candidate(&state, 3, 17);
     profile_change.observer_profile_digest = test_digest(18);
     let profile_result = state.preview(&profile_change);
     let profile_rejected = matches!(profile_result, Err(TransitionError::UnauthorizedProfileTransition));
-    record_case(&mut cases, "TSTATE-MODEL-008", "profile change without authorization is rejected", format!("{profile_result:?}"), profile_rejected);
+    record_case(&mut cases, "TSTATE-MODEL-009", "profile change without authorization is rejected", format!("{profile_result:?}"), profile_rejected);
 
     profile_change.profile_transition_evidence_digest = Some(test_digest(19));
     let authorized_profile_result = state.preview(&profile_change);
     let authorized_profile_passed = matches!(authorized_profile_result, Ok(TransitionDecision::Advance(_)));
-    record_case(&mut cases, "TSTATE-MODEL-009", "authorized profile change preserves successor generation", format!("{authorized_profile_result:?}"), authorized_profile_passed);
+    record_case(&mut cases, "TSTATE-MODEL-010", "authorized profile change preserves successor generation", format!("{authorized_profile_result:?}"), authorized_profile_passed);
 
     let mut boot_change = successor_candidate(&state, 3, 21);
     boot_change.boot_incarnation_digest = test_digest(22);
     let boot_result = state.preview(&boot_change);
     let boot_rejected = matches!(boot_result, Err(TransitionError::UnauthorizedBootTransition));
-    record_case(&mut cases, "TSTATE-MODEL-010", "boot change without authorization is rejected", format!("{boot_result:?}"), boot_rejected);
+    record_case(&mut cases, "TSTATE-MODEL-011", "boot change without authorization is rejected", format!("{boot_result:?}"), boot_rejected);
 
     boot_change.boot_transition_evidence_digest = Some(test_digest(23));
     let authorized_boot_result = state.preview(&boot_change);
     let authorized_boot_passed = matches!(authorized_boot_result, Ok(TransitionDecision::Advance(_)));
-    record_case(&mut cases, "TSTATE-MODEL-011", "authorized boot transition preserves successor generation", format!("{authorized_boot_result:?}"), authorized_boot_passed);
+    record_case(&mut cases, "TSTATE-MODEL-012", "authorized boot transition preserves successor generation", format!("{authorized_boot_result:?}"), authorized_boot_passed);
 
     let mut policy_rollback = successor_candidate(&state, 3, 24);
     policy_rollback.policy_versions.signer = 1;
     let policy_result = state.preview(&policy_rollback);
     let policy_passed = matches!(policy_result, Err(TransitionError::PolicyRollback));
-    record_case(&mut cases, "TSTATE-MODEL-012", "policy versions cannot decrease", format!("{policy_result:?}"), policy_passed);
+    record_case(&mut cases, "TSTATE-MODEL-013", "policy versions cannot decrease", format!("{policy_result:?}"), policy_passed);
 
     let mut receipt_collision = successor_candidate(&state, 3, 25);
     receipt_collision.receipt_digest = initial.receipt_digest.clone();
     let collision_result = state.preview(&receipt_collision);
     let collision_passed = matches!(collision_result, Err(TransitionError::ReceiptDigestCollision));
-    record_case(&mut cases, "TSTATE-MODEL-013", "receipt digest reuse with different semantics is rejected", format!("{collision_result:?}"), collision_passed);
+    record_case(&mut cases, "TSTATE-MODEL-014", "receipt digest reuse with different semantics is rejected", format!("{collision_result:?}"), collision_passed);
 
     let mut stale_revision = successor_candidate(&state, 3, 26);
     stale_revision.expected_revision = 1;
     let revision_result = state.preview(&stale_revision);
     let revision_passed = matches!(revision_result, Err(TransitionError::CompareConflict { .. }));
-    record_case(&mut cases, "TSTATE-MODEL-014", "candidate checked against stale revision is rejected", format!("{revision_result:?}"), revision_passed);
+    record_case(&mut cases, "TSTATE-MODEL-015", "candidate checked against stale revision is rejected", format!("{revision_result:?}"), revision_passed);
 
     let passed = cases.iter().all(|case| case.passed);
     let scenarios_run = cases.len();
@@ -786,6 +801,74 @@ mod tests {
         );
         candidate.policy_transition_evidence_digest = Some(test_digest(47));
         assert!(matches!(state.preview(&candidate), Ok(TransitionDecision::Advance(_))));
+    }
+
+    #[test]
+    fn source_generation_equivocation_is_rejected() {
+        let state = bootstrap();
+        let mut candidate = fixture_candidate();
+        candidate.receipt_digest = test_digest(52);
+        candidate.seal_digest = test_digest(53);
+        candidate.expected_revision = state.revision();
+        assert_eq!(
+            state.preview(&candidate),
+            Err(TransitionError::GenerationEquivocation { generation: 1 })
+        );
+    }
+
+    #[test]
+    fn older_generation_is_rejected_after_a_successor_commits() {
+        let mut state = bootstrap();
+        let successor = successor_candidate(&state, 2, 54);
+        let plan = match state.preview(&successor).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("successor is new"),
+        };
+        state.commit(plan).unwrap();
+        let mut old = successor_candidate(&state, 1, 55);
+        old.previous_seal_digest = None;
+        assert!(matches!(
+            state.preview(&old),
+            Err(TransitionError::StaleGeneration { .. })
+        ));
+    }
+
+    #[test]
+    fn verified_log_extension_advances_checkpoint_with_source_cursor() {
+        let state = bootstrap();
+        let mut candidate = successor_candidate(&state, 2, 56);
+        candidate.checkpoint.tree_size = 11;
+        candidate.checkpoint.root_digest = test_digest(57);
+        candidate.checkpoint.checkpoint_digest = test_digest(58);
+        candidate.checkpoint_evidence = CheckpointEvidence::VerifiedConsistentExtension {
+            consistency_proof_digest: test_digest(59),
+        };
+        assert!(matches!(
+            state.preview(&candidate),
+            Ok(TransitionDecision::Advance(_))
+        ));
+    }
+
+    #[test]
+    fn policy_bundle_cannot_change_without_a_version_transition() {
+        let state = bootstrap();
+        let mut candidate = successor_candidate(&state, 2, 60);
+        candidate.policy_versions.bundle_digest = test_digest(61);
+        assert_eq!(
+            state.preview(&candidate),
+            Err(TransitionError::PolicyVersionEquivocation)
+        );
+    }
+
+    #[test]
+    fn new_log_requires_an_explicit_pinned_checkpoint() {
+        let mut state = TrustedState::new();
+        let mut candidate = fixture_candidate();
+        candidate.checkpoint_evidence = CheckpointEvidence::VerifiedSameTree;
+        assert_eq!(
+            state.preview(&candidate),
+            Err(TransitionError::LogBootstrapRequired)
+        );
     }
 
     #[test]
