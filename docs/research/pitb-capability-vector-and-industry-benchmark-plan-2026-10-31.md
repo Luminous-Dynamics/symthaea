@@ -147,3 +147,17 @@ Freeze hosted API responses, service revision/date, query rewriting prompts, ind
 ### LeanLean qualification targets (separate from SorryDB)
 
 The official paper baseline is 48.3% average compression. PITB's proposed stretch is ≥50% on the exact named 64-repository snapshot, 100% protected-declaration comparator preservation, and ≥20% lower cost per comparator-preserving token removed than the strongest matched baseline. Also require ≥25% average compression on the >250k stripped-token size band, no unapproved axiom/trust changes, and a same-direction replication on a later or independently governed repository cohort. These are targets, not results. See docs/research/pitb-leanlean-evaluation-2026-11-01.md.
+
+
+## Adaptive proof-search allocation
+
+Published control-plane baselines should be treated as a distinct capability, not hidden inside proof generation. A 2026 Lean action-routing paper reports 25.8% lower average cost than fixed-step proving at preserved performance on a PutnamBench subset. A separate dynamic-compute study reports +7.9% cost-quality AUC and 28.9% lower budget to a target accuracy in a 64-seed simulation on 85 tasks. These are different protocols, not direct PITB targets.
+
+PITB now has an executable deterministic controller with:
+- an action set covering continuation, retrieval, redecomposition, typed repair, tactic probes, snapshot branches, semantic checks and restart;
+- a 1.96-SE lower confidence bound on marginal verified-success probability;
+- strict feasibility against all remaining token, call, tool, wall, Lean CPU and monetary caps;
+- fixed preregistered shadow weights and deterministic tie-breaks;
+- a conservative stop action when no feasible action clears the LCB threshold.
+
+Initial targets are ≥30% lower cost per verified proof and ≥10% cost-quality AUC improvement against a matched fixed-step baseline, with non-inferior success at equal total budget. Those targets intentionally clear the published 25.8% cost and 7.9% AUC results by a small margin; they are not achieved results. The design, schema, synthetic fixture and executable are in `docs/research/pitb-adaptive-proof-search-allocation-2026-11-01.md` and `data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/`.
