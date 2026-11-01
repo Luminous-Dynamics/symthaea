@@ -638,8 +638,7 @@ mod tests {
         let raw_partial_entropy = -(0.5_f64 * 0.5_f64.ln() + 0.3_f64 * 0.3_f64.ln());
         let topk_mode = matches!(source, EntropySourceV1::VllmTopKRawPartial);
         let probabilities = vec![vec![0.5, 0.3]; 3];
-        let full_probabilities: Vec<Vec<f64>> =
-            vec![vec![0.5_f64, 0.25, 0.125, 0.125]; 3];
+        let full_probabilities: Vec<Vec<f64>> = vec![vec![0.5_f64, 0.25, 0.125, 0.125]; 3];
         let full_entropy = full_probabilities[0]
             .iter()
             .filter(|p| **p > 0.0)
