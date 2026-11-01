@@ -503,7 +503,18 @@ jobs:
           ledger = json.loads(ledger_path.read_text())
           receipt["task"]["task_id"] = ledger["task"]["task_id"]
           receipt["task"]["repository_commit"] = ledger["task"]["repository_commit"]
-          receipt["proof_state"]["proof_state_sha256"] = ledger["task"]["proof_state_sha256"]
+          component_digests = (
+              receipt["environment"]["environment_sha256"],
+              receipt["proof_state"]["goal_metadata_sha256"],
+              receipt["proof_state"]["target_expr_sha256"],
+              receipt["proof_state"]["local_context_sha256"],
+              receipt["proof_state"]["metavar_context_sha256"]
+          )
+          receipt["proof_state"]["proof_state_sha256"] = hashlib.sha256(
+              b"PITB-LIVE-PROOF-STATE-V0\\0"
+              + b"".join(bytes.fromhex(digest) for digest in component_digests)
+          ).hexdigest()
+          ledger["task"]["proof_state_sha256"] = receipt["proof_state"]["proof_state_sha256"]
           receipt_path_copy = Path(__import__("os").environ["RUNNER_TEMP"]) / "pitb-r5-receipt.synthetic.json"
           receipt_path_copy.write_text(json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n")
           ledger["arm_id"] = "R5"
