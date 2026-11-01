@@ -14,6 +14,16 @@ class CovariancePreconditionedBenchmarkTests(unittest.TestCase):
         proxy = covariance_envelope(5)
         self.assertGreaterEqual(float(np.linalg.eigvalsh(proxy).min()), 0.0)
 
+    def test_covariance_envelope_is_dimension_projective(self):
+        import numpy as np
+
+        for small, large in ((2, 3), (2, 8), (3, 8), (5, 8)):
+            small_v = covariance_envelope(small)
+            large_v = covariance_envelope(large)
+            self.assertTrue(
+                np.array_equal(large_v[:small, :small], small_v)
+            )
+
     def test_gaussian_and_rademacher_scenarios_emit_matched_rows(self):
         for noise in ("gaussian", "rademacher_factor"):
             rows = simulate_cell(
