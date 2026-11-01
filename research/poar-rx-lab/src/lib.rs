@@ -40,8 +40,9 @@ impl FaultSchedule {
         match self {
             Self::NoFault => (true, true),
             Self::TimeoutBeforeCommit => (false, false),
-            Self::CommitThenLoseAcknowledgement
-            | Self::CommitThenReadbackUnavailable => (true, false),
+            Self::CommitThenLoseAcknowledgement | Self::CommitThenReadbackUnavailable => {
+                (true, false)
+            }
         }
     }
 
@@ -131,7 +132,9 @@ impl EffectStore {
         acknowledged: bool,
     ) -> DispatchReceipt {
         if !commit {
-            return DispatchReceipt { acknowledged: false };
+            return DispatchReceipt {
+                acknowledged: false,
+            };
         }
 
         match intent.dispatch_semantics {
@@ -218,16 +221,20 @@ pub fn run_trial(
             }
         }
         ControllerPolicy::StopOnUnknown => {
-            let mut lifecycle = ActionLifecycle::new(intent.clone())
-                .expect("fixed simulator intent must be valid");
-            lifecycle.dispatch().expect("initial dispatch transition is valid");
+            let mut lifecycle =
+                ActionLifecycle::new(intent.clone()).expect("fixed simulator intent must be valid");
+            lifecycle
+                .dispatch()
+                .expect("initial dispatch transition is valid");
             dispatch_attempts += 1;
 
             let (commit, acknowledged) = fault.first_dispatch();
             let receipt = store.dispatch(&intent, commit, acknowledged);
 
             if receipt.acknowledged {
-                lifecycle.acknowledge().expect("acknowledgement transition is valid");
+                lifecycle
+                    .acknowledge()
+                    .expect("acknowledgement transition is valid");
                 // This baseline deliberately does not perform authoritative read-back.
                 TerminalOutcome::AcknowledgedUnverified
             } else {
@@ -239,16 +246,20 @@ pub fn run_trial(
             }
         }
         ControllerPolicy::ReconcileFirst => {
-            let mut lifecycle = ActionLifecycle::new(intent.clone())
-                .expect("fixed simulator intent must be valid");
-            lifecycle.dispatch().expect("initial dispatch transition is valid");
+            let mut lifecycle =
+                ActionLifecycle::new(intent.clone()).expect("fixed simulator intent must be valid");
+            lifecycle
+                .dispatch()
+                .expect("initial dispatch transition is valid");
             dispatch_attempts += 1;
 
             let (commit, acknowledged) = fault.first_dispatch();
             let first = store.dispatch(&intent, commit, acknowledged);
 
             if first.acknowledged {
-                lifecycle.acknowledge().expect("acknowledgement transition is valid");
+                lifecycle
+                    .acknowledge()
+                    .expect("acknowledgement transition is valid");
                 readback_calls += 1;
                 let observation = store.observe(&intent, false);
                 match lifecycle.reconcile(observation) {
@@ -267,9 +278,10 @@ pub fn run_trial(
                     .acknowledgement_lost()
                     .expect("ambiguous outcome transition is valid");
                 readback_calls += 1;
-                let observation =
-                    store.observe(&intent, fault.readback_unavailable());
-                let phase = lifecycle.reconcile(observation).unwrap_or(lifecycle.phase());
+                let observation = store.observe(&intent, fault.readback_unavailable());
+                let phase = lifecycle
+                    .reconcile(observation)
+                    .unwrap_or(lifecycle.phase());
 
                 match phase {
                     ActionPhase::ReconciledCommitted => {
@@ -279,9 +291,7 @@ pub fn run_trial(
                     }
                     ActionPhase::ReconciledNotCommitted => {
                         // Retry is permitted only after authoritative non-commit evidence.
-                        if lifecycle.authorize_retry().is_err()
-                            || lifecycle.dispatch().is_err()
-                        {
+                        if lifecycle.authorize_retry().is_err() || lifecycle.dispatch().is_err() {
                             let _ = lifecycle.stop();
                             TerminalOutcome::Failed
                         } else {
@@ -309,8 +319,7 @@ pub fn run_trial(
                             }
                         }
                     }
-                    ActionPhase::UnknownOutcome
-                    | ActionPhase::StoppedUnknownOutcome => {
+                    ActionPhase::UnknownOutcome | ActionPhase::StoppedUnknownOutcome => {
                         let _ = lifecycle.stop();
                         TerminalOutcome::UnknownOutcome
                     }
