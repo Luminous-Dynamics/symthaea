@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-temporal-calibration-evaluator"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Evaluator-only audit of temporal action-value calibration"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
