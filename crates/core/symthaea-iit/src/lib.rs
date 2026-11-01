@@ -3390,19 +3390,6 @@ pub(crate) fn pyphi_sia_partition_tie_indices(
     tied
 }
 
-/// Default PyPhi IIT 4.0 sia_tie_resolution representative: the first
-/// canonical cut in the complete tied MIP family.
-fn select_pyphi_sia_partition(
-    partitions: &[DirectedSystemPartition],
-    scores: &[SystemPhiPartitionScore],
-    epsilon: f64,
-) -> usize {
-    pyphi_sia_partition_tie_indices(partitions, scores, epsilon)
-        .first()
-        .copied()
-        .unwrap_or(0)
-}
-
 fn system_phi_direction_score(
     direction: CausalDirection,
     selectivity: f64,
