@@ -1,0 +1,158 @@
+{
+  "schema": "symthaea.real_irregular_benchmark_registry.v0.1",
+  "tracking_issue": 9700,
+  "parent_research": [
+    "NEURO-SILICON-009",
+    "NEURO-SILICON-010"
+  ],
+  "assets": [
+    {
+      "id": "time_imm",
+      "role": "primary_irregular_multimodal",
+      "track": "irregular_forecasting",
+      "paper_url": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/4199594d3c15736df2bf5274fa3155f4-Abstract-Datasets_and_Benchmarks_Track.html",
+      "data_url": "https://github.com/blacksnail789521/Time-IMM",
+      "benchmark_url": "https://github.com/blacksnail789521/IMM-TSF",
+      "properties": [
+        "nine_irregularity_types",
+        "asynchronous_modalities",
+        "cause_driven_irregularity"
+      ],
+      "official_split": "chronological entity-specific 60/20/20; verify current released harness",
+      "required_baselines": [
+        "Informer",
+        "DLinear",
+        "PatchTST",
+        "TimesNet",
+        "TimeMixer",
+        "TimeLLM",
+        "TTM",
+        "CRU",
+        "APN",
+        "KAFNet"
+      ]
+    },
+    {
+      "id": "apn",
+      "role": "strong_irregular_forecast_baseline",
+      "track": "irregular_forecasting",
+      "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/view/39563",
+      "code_url": "https://github.com/decisionintelligence/APN",
+      "method": "adaptive time-aware patch aggregation plus query/MLP head",
+      "paper_claim_only": "accuracy and efficiency competitive; reproduce before asserting"
+    },
+    {
+      "id": "kafnet",
+      "role": "strong_irregular_forecast_baseline",
+      "track": "irregular_forecasting",
+      "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/view/40149",
+      "code_url": "https://github.com/zhouziyu02/KAFNet",
+      "method": "canonical pre-alignment, pre-convolution, temporal kernel aggregation, frequency linear attention",
+      "paper_claim_only": "7.2x parameter reduction and 8.4x training-inference acceleration reported by authors"
+    },
+    {
+      "id": "gift_eval",
+      "role": "broad_zero_shot_forecasting",
+      "track": "general_forecasting",
+      "paper_url": "https://arxiv.org/abs/2410.10393",
+      "code_url": "https://github.com/SalesforceAIResearch/gift-eval",
+      "properties": [
+        "23_datasets",
+        "144000_series",
+        "177m_points",
+        "seven_domains",
+        "ten_frequencies"
+      ],
+      "not_equivalent_to": "Time-IMM irregular forecasting"
+    },
+    {
+      "id": "gift_eval_ctx",
+      "role": "future_context_value_analysis",
+      "track": "contextual_forecasting",
+      "paper_url": "https://arxiv.org/abs/2610.17794",
+      "properties": [
+        "10000_instances",
+        "20_datasets",
+        "future_derived_macro_micro_effect_annotations"
+      ],
+      "leakage_guard": "future-derived realized trajectory annotations are evaluator-only unless equivalent context is known before forecast origin"
+    },
+    {
+      "id": "neurobench",
+      "role": "neuromorphic_cross_validation",
+      "track": "algorithm_and_system",
+      "paper_url": "https://www.nature.com/articles/s41467-025-56739-4",
+      "code_url": "https://github.com/NeuroBench/neurobench",
+      "tasks": [
+        "few_shot_class_incremental_keyword",
+        "chaotic_function_prediction"
+      ],
+      "measurement_caveat": "algorithm v1.0 excludes some pre/postprocessing costs; full system path needed"
+    },
+    {
+      "id": "continualai_avalanche",
+      "role": "continual_learning_replay_baselines",
+      "track": "task_domain_class_incremental",
+      "code_url": "https://github.com/ContinualAI/continual-learning-baselines",
+      "methods": [
+        "ER",
+        "reservoir_replay",
+        "GEM",
+        "AGEM",
+        "EWC",
+        "SI",
+        "LwF",
+        "iCaRL",
+        "GDumb",
+        "ER_ACE"
+      ]
+    },
+    {
+      "id": "cl_bench",
+      "role": "stateful_agent_evaluation_context",
+      "track": "LLM_agent",
+      "url": "https://continual-learning-bench.com/",
+      "not_directly_comparable_to": "HDC/LTC forecasting model"
+    },
+    {
+      "id": "memorybench",
+      "role": "user_feedback_agent_evaluation_context",
+      "track": "LLM_agent",
+      "paper_url": "https://proceedings.mlr.press/v306/ai26e.html",
+      "not_directly_comparable_to": "HDC/LTC forecasting model"
+    }
+  ],
+  "event_contract": [
+    "entity_id",
+    "modality_id",
+    "event_time",
+    "availability_time",
+    "source_sequence",
+    "observation_status",
+    "value",
+    "unit_scale",
+    "source_sha256"
+  ],
+  "forecast_causality": "candidate may consume only records with availability_time <= forecast_origin",
+  "preprocessing": "resampling/imputation/interpolation must be separately versioned and charged",
+  "metric_groups": [
+    "point_forecast",
+    "probabilistic_forecast",
+    "calibration",
+    "wrong_belief_exposure",
+    "abstention_exposure",
+    "missing_output_exposure",
+    "recovery_latency",
+    "model_footprint",
+    "peak_memory",
+    "end_to_end_latency",
+    "physical_energy",
+    "replay_byte_time"
+  ],
+  "validation_status": {
+    "dataset_adapter_implemented": false,
+    "baseline_reproductions_executed": false,
+    "benchmark_executed": false,
+    "sota_claim": false
+  }
+}
