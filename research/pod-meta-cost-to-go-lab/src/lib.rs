@@ -1,3 +1,6 @@
+pub mod survival;
+pub use survival::*;
+
 use std::collections::BTreeMap;
 
 /// Integer-valued resource units. Spend dimensions are never scalarized.
