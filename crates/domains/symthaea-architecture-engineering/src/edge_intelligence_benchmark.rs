@@ -469,6 +469,10 @@ pub struct PrequentialExecutionTrace {
 pub struct PrequentialMetrics {
     pub event_count: usize,
     pub correct_count: usize,
+    pub true_positive_count: usize,
+    pub true_negative_count: usize,
+    pub false_positive_count: usize,
+    pub false_negative_count: usize,
     pub abstention_count: usize,
     pub accuracy: f64,
     pub balanced_accuracy: Option<f64>,
@@ -772,6 +776,10 @@ pub fn audit_prequential_execution(
     let metrics = PrequentialMetrics {
         event_count: count,
         correct_count: correct,
+        true_positive_count: true_positive,
+        true_negative_count: true_negative,
+        false_positive_count: false_positive,
+        false_negative_count: false_negative,
         abstention_count: abstentions,
         accuracy: correct as f64 / count as f64,
         balanced_accuracy,
