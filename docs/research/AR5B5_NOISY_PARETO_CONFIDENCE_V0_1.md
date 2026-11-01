@@ -117,3 +117,19 @@ References:
 - Noisy scaled DTLZ2 ten-objective baseline discovery page: https://www.sota2.com/research/sota/multiobjective-optimization-on-scaled-dtlz2-10-objectives-hv
 
 The leaderboard pages are baseline-discovery aids, not a substitute for reproducing exact task, scaling, noise, budgets, and reference data. No Symthaea benchmark win or SOTA claim is established.
+
+
+## 8. Sampling, noise, and bound provenance
+
+The plan also freezes:
+- a non-empty sampling-protocol ID and SHA-256 digest;
+- a non-empty noise-model ID and SHA-256 digest;
+- a SHA-256 certificate reference for each objective's observation bounds.
+
+These digests make the assumptions inspectable and prevent protocol/noise/bound metadata from changing without changing the plan digest. They do not authenticate the certificate bytes or prove the assumptions; the separate evidence-artifact resolver and a domain-specific independent reviewer must resolve and assess those certificates.
+
+The plan caps the frozen candidate family at one million identities. This keeps the family allocation within a controlled floating-point range. It rejects per-coordinate or per-prefix alpha allocations that underflow.
+
+## 9. Append and restart complexity
+
+The study uses private candidate/sample/seed indexes. New study construction validates the frozen plan; incremental appends validate only the new replicate and update indexes. A study deserialized from bytes replays its complete contents once before it may append; full \`validate()\` and \`report()\` continue to inspect the complete retained state. This avoids validating the entire sample history on every append. No runtime throughput claim is made.
