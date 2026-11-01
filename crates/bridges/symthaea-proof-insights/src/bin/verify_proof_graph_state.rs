@@ -101,10 +101,6 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["declarations"][0]["lifecycle_state"] = json!("stable");
     bad["declarations"][0]["proof_receipt_sha256"] = json!("1".repeat(64));
     bad["declarations"][0]["kernel_verified"] = Value::Bool(true);
-    bad["goal_nodes"][1]["status"] = json!("open");
-    bad["goal_nodes"][1]["closure_proof_sha256"] = Value::Null;
-    bad["goal_nodes"][1]["closure_receipt_sha256"] = Value::Null;
-    bad["goal_nodes"][1]["closure_kernel_verified"] = Value::Bool(false);
     must_reject("stable target depends on unfinished goal", bad)?;
 
     println!("PITB_PROOF_GRAPH_SELF_TEST_PASS");
