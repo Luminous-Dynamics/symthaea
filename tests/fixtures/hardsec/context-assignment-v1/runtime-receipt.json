@@ -153,5 +153,19 @@
     "mapping_digest_bound_to_assignment_input": true
   },
   "anomaly_score_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-  "assignment_mode": "frozen_classifier"
+  "assignment_mode": "frozen_classifier",
+  "assignment_integrity": {
+    "assignment_record_count": 19,
+    "accepted_count": 16,
+    "abstained_count": 3,
+    "accepted_coverage": 0.8421052631578947,
+    "accepted_accuracy": 1,
+    "accepted_accuracy_denominator": 16,
+    "end_to_end_correct_context_coverage": 0.8421052631578947,
+    "incorrect_accepted_count": 0,
+    "abstention_counts_by_reason": {
+      "invalid_sensor": 2,
+      "unknown_context": 1
+    }
+  }
 }

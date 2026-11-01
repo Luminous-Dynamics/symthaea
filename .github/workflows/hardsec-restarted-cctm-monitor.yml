@@ -45,13 +45,14 @@ jobs:
         run: |
           set -euo pipefail
           out_dir="$(mktemp -d)"
+          mkdir -p "$out_dir/input" "$out_dir/output"
           echo "$out_dir" > "$RUNNER_TEMP/restarted-cctm-output-dir"
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
             --policy tests/fixtures/hardsec/context-restarted-v1/context-policy.json \
             --assignments tests/fixtures/hardsec/context-restarted-v1/context-assignments.json \
             --truth tests/fixtures/hardsec/context-restarted-v1/context-truth-oracle.json \
-            --receipt "$out_dir/context-assignment-receipt.json"
-          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+            --receipt "$out_dir/input/context-assignment-receipt.json"
+          python3 - "$out_dir/input/context-assignment-receipt.json" <<'PY'
           import json, sys
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)
@@ -75,9 +76,9 @@ jobs:
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-restarted-cctm-monitor --example hardsec_context_restarted_cctm_monitor -- \
             --plan tests/fixtures/hardsec/context-restarted-v1/plan.json \
             --stream tests/fixtures/hardsec/context-restarted-v1/stream.json \
-            --context-receipt "$out_dir/context-assignment-receipt.json" \
-            --receipt "$out_dir/restarted-cctm-receipt.json"
-          python3 - "$out_dir/restarted-cctm-receipt.json" <<'PY'
+            --context-receipt "$out_dir/input/context-assignment-receipt.json" \
+            --receipt "$out_dir/output/restarted-cctm-receipt.json"
+          python3 - "$out_dir/output/restarted-cctm-receipt.json" <<'PY'
           import json, sys, math
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)

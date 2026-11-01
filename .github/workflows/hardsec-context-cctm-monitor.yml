@@ -47,12 +47,13 @@ jobs:
         run: |
           set -euo pipefail
           out_dir="$(mktemp -d)"
+          mkdir -p "$out_dir/input" "$out_dir/output"
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
             --policy tests/fixtures/hardsec/context-assignment-v1/policy.json \
             --assignments tests/fixtures/hardsec/context-assignment-v1/assignments.json \
             --truth tests/fixtures/hardsec/context-assignment-v1/truth-oracle.json \
-            --receipt "$out_dir/context-assignment-receipt.json"
-          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+            --receipt "$out_dir/input/context-assignment-receipt.json"
+          python3 - "$out_dir/input/context-assignment-receipt.json" <<'PY'
           import json, sys
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               assignment = json.load(handle)
@@ -65,9 +66,9 @@ jobs:
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-cctm-monitor --example hardsec_context_cctm_monitor -- \
             --plan tests/fixtures/hardsec/context-cctm-v1/plan.json \
             --stream tests/fixtures/hardsec/context-cctm-v1/stream.json \
-            --context-receipt "$out_dir/context-assignment-receipt.json" \
-            --receipt "$out_dir/cctm-receipt.json"
-          python3 - "$out_dir/cctm-receipt.json" <<'PY'
+            --context-receipt "$out_dir/input/context-assignment-receipt.json" \
+            --receipt "$out_dir/output/cctm-receipt.json"
+          python3 - "$out_dir/output/cctm-receipt.json" <<'PY'
           import json, sys
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)

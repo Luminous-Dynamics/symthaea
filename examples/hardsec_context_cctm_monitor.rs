@@ -569,7 +569,7 @@ fn parse_context_assignment_receipt(
         || !(0.0..=1.0).contains(&reported_end_to_end)
     {
         return Err(
-            "context assignment receipt aggregate counts/coverage do not match its runtime mapping"
+            "context assignment receipt aggregate counts do not match its runtime mapping or coverage"
                 .to_owned(),
         );
     }
@@ -1248,7 +1248,7 @@ mod tests {
             decisions[1]["abstention_reason"],
             "context_assignment_not_accepted"
         );
-        assert_eq!(decisions[1]["log_wealth_context"], 0.0);
+        assert_eq!(decisions[1]["log_wealth_context"], Value::Null);
         assert_eq!(decisions[2]["abstention_reason"], Value::Null);
     }
 

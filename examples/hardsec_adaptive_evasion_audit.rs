@@ -1765,7 +1765,7 @@ mod tests {
     #[test]
     fn rejects_benign_case_tagged_with_attack_family() {
         let (p, mut m, t, pb, _, tb) = fixture_values();
-        m["cases"][5]["attack_family_id"] = json!("evasive-spectre");
+        m["cases"][7]["attack_family_id"] = json!("evasive-spectre");
         let mb = serde_json::to_vec(&m).unwrap();
         assert!(
             audit_values(&p, &m, &t, &pb, &mb, &tb)
@@ -2273,8 +2273,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(delta["status"], "available_paired_group_bootstrap_interval");
-        assert_eq!(delta["candidate_macro_estimate"], 0.7);
-        assert_eq!(delta["baseline_macro_estimate"], 0.7);
+        assert!((delta["candidate_macro_estimate"].as_f64().unwrap() - 0.7).abs() < 1e-12);
+        assert!((delta["baseline_macro_estimate"].as_f64().unwrap() - 0.7).abs() < 1e-12);
         assert_eq!(delta["improvement_point_estimate"], 0.0);
         assert_eq!(delta["improvement_lower_percentile_95"], 0.0);
         assert_eq!(delta["improvement_upper_percentile_95"], 0.0);
