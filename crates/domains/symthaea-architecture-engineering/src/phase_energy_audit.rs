@@ -1508,7 +1508,7 @@ mod tests {
         // Required first/last phases keep event boundaries observable, but an omitted declared
         // optional phase remains explicitly unattributed rather than producing a complete label.
         let result = audit_application_phase_energy(
-            samples(), &without_optional, trace_config(), &mapping(), &protocol,
+            samples(), &without_optional, &outcomes("correct", true), trace_config(), &mapping(), &protocol,
         ).unwrap();
         let event = &result.receipt.events[0];
         assert_eq!(event.status, PhaseEnergyEventStatus::UnattributedIntervalsPresent);
@@ -1519,7 +1519,7 @@ mod tests {
     #[test]
     fn receipt_validator_rejects_rehashed_energy_substitution() {
         let result = audit_application_phase_energy(
-            samples(), &markers(10_000, 10_000), trace_config(), &mapping(), &protocol(0.0),
+            samples(), &markers(10_000, 10_000), &outcomes("correct", true), trace_config(), &mapping(), &protocol(0.0),
         ).unwrap();
         validate_phase_energy_audit_receipt(&result.receipt).unwrap();
 
@@ -1549,6 +1549,47 @@ mod tests {
     }
 
     #[test]
+    fn incorrect_or_late_event_does_not_count_as_successful_energy_event() {
+        let incorrect = audit_application_phase_energy(
+            samples(),
+            &markers(10_000, 10_000),
+            &outcomes("incorrect", true),
+            trace_config(),
+            &mapping(),
+            &protocol(0.0),
+        ).unwrap();
+        assert_eq!(incorrect.receipt.successful_completed_events, 0);
+        assert!(incorrect.receipt.mean_energy_per_successful_event_uj.is_none());
+        assert!(!incorrect.receipt.events[0].accepted_success_outcome);
+
+        let late = audit_application_phase_energy(
+            samples(),
+            &markers(10_000, 10_000),
+            &outcomes("correct", false),
+            trace_config(),
+            &mapping(),
+            &protocol(0.0),
+        ).unwrap();
+        assert_eq!(late.receipt.successful_completed_events, 0);
+        assert!(late.receipt.mean_energy_per_successful_event_uj.is_none());
+        assert!(late.receipt.events[0].accepted_success_outcome);
+        assert!(!late.receipt.events[0].deadline_met);
+    }
+
+    #[test]
+    fn rejects_missing_or_duplicate_outcome_records() {
+        let empty = "event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n";
+        assert!(audit_application_phase_energy(
+            samples(), &markers(10_000, 10_000), empty, trace_config(), &mapping(), &protocol(0.0),
+        ).is_err());
+
+        let duplicate = format!("{}{}", outcomes("correct", true), outcomes("correct", true).lines().skip(1).collect::<Vec<_>>().join("\n") + "\n");
+        assert!(audit_application_phase_energy(
+            samples(), &markers(10_000, 10_000), &duplicate, trace_config(), &mapping(), &protocol(0.0),
+        ).unwrap_err().to_string().contains("duplicate outcome record"));
+    }
+
+    #[test]
     fn rejects_overlapping_phase_windows() {
         let result = audit_application_phase_energy(
             samples(),
@@ -1565,7 +1606,7 @@ mod tests {
     fn rejects_clock_domain_substitution() {
         let marker = markers(10_000, 10_000).replace("logic-analyzer-clock", "untrusted-clock");
         assert!(audit_application_phase_energy(
-            samples(), &marker, trace_config(), &mapping(), &protocol(0.0),
+            samples(), &marker, &outcomes("correct", true), trace_config(), &mapping(), &protocol(0.0),
         ).unwrap_err().to_string().contains("clock domain"));
     }
 }
