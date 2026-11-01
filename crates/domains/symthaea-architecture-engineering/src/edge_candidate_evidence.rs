@@ -214,6 +214,14 @@ pub struct EdgeCandidateParetoMetrics {
     pub missed_events_per_hour: f64,
     pub coverage: f64,
     pub brier_score: f64,
+    pub worst_regime_accuracy: f64,
+    pub open_set_auprc: f64,
+    pub mean_drift_recovery_samples: f64,
+    pub drift_transition_count: usize,
+    pub recovered_drift_transition_count: usize,
+    pub unrecovered_drift_transitions: usize,
+    pub maximum_regime_retention_loss_pp: f64,
+    pub retention_compared_regime_count: usize,
     pub p95_latency_ms: f64,
     pub mean_energy_per_successful_event_uj: f64,
     pub expanded_energy_uncertainty_uj: f64,
@@ -252,6 +260,11 @@ fn quality_score(
         "balanced_accuracy" => prequential.metrics.balanced_accuracy,
         "selective_accuracy" => prequential.metrics.selective_accuracy,
         "coverage" => Some(prequential.metrics.coverage),
+        "worst_regime_accuracy" => prequential.metrics.worst_regime_accuracy,
+        "open_set_auprc" => prequential.metrics.open_set_auprc,
+        "drift_recovery_samples" => prequential.metrics.mean_drift_recovery_samples.map(|value| {
+            1.0 / (1.0 + value)
+        }),
         other => return Err(EdgeEvidenceError::new(
             "quality_metric_id",
             format!("unsupported prequential metric {other:?}; use accuracy, balanced_accuracy, selective_accuracy or coverage"),
@@ -324,6 +337,18 @@ fn validate_candidate_bundle(
     }
 
     let score = quality_score(&manifest.quality_metric_id, &prequential)?;
+    let worst_regime_accuracy = prequential.metrics.worst_regime_accuracy.ok_or_else(|| {
+        EdgeEvidenceError::new("prequential.regime_metrics", "worst-regime accuracy is undefined; benchmark stream must contain multiple regimes")
+    })?;
+    let open_set_auprc = prequential.metrics.open_set_auprc.ok_or_else(|| {
+        EdgeEvidenceError::new("prequential.open_set_auprc", "OOD AUPRC is undefined; benchmark stream must contain both OOD and in-distribution examples")
+    })?;
+    let mean_drift_recovery_samples = prequential.metrics.mean_drift_recovery_samples.ok_or_else(|| {
+        EdgeEvidenceError::new("prequential.drift_recovery", "drift recovery is undefined; benchmark stream must contain a measurable regime transition")
+    })?;
+    let maximum_regime_retention_loss_pp = prequential.metrics.maximum_regime_retention_loss_pp.ok_or_else(|| {
+        EdgeEvidenceError::new("prequential.retention", "retention is undefined; benchmark stream must contain a recurring prior regime")
+    })?;
     let latency = p95_latency_ms(&hardware.latency_samples_us)?;
     let mut rejection_reasons = Vec::new();
     let available_sram = manifest.target.sram_budget_bytes
@@ -340,6 +365,23 @@ fn validate_candidate_bundle(
     }
     if prequential.metrics.coverage < manifest.minimum_coverage {
         rejection_reasons.push("coverage_below_minimum".to_owned());
+    }
+    if worst_regime_accuracy < manifest.minimum_worst_regime_accuracy {
+        rejection_reasons.push("worst_regime_accuracy_below_minimum".to_owned());
+    }
+    if open_set_auprc < manifest.minimum_open_set_auprc {
+        rejection_reasons.push("open_set_auprc_below_minimum".to_owned());
+    }
+    if prequential.metrics.drift_transition_count == 0
+        || prequential.metrics.unrecovered_drift_transitions > 0
+        || mean_drift_recovery_samples > manifest.maximum_drift_recovery_samples as f64
+    {
+        rejection_reasons.push("drift_recovery_gate_failed".to_owned());
+    }
+    if prequential.metrics.retention_compared_regime_count == 0
+        || maximum_regime_retention_loss_pp > manifest.maximum_regime_retention_loss_pp
+    {
+        rejection_reasons.push("regime_retention_gate_failed".to_owned());
     }
     if latency > manifest.target.p95_deadline_ms as f64 {
         rejection_reasons.push("p95_deadline_missed".to_owned());
@@ -361,6 +403,14 @@ fn validate_candidate_bundle(
         missed_events_per_hour: prequential.metrics.missed_events_per_hour,
         coverage: prequential.metrics.coverage,
         brier_score: prequential.metrics.brier_score,
+        worst_regime_accuracy,
+        open_set_auprc,
+        mean_drift_recovery_samples,
+        drift_transition_count: prequential.metrics.drift_transition_count,
+        recovered_drift_transition_count: prequential.metrics.recovered_drift_transition_count,
+        unrecovered_drift_transitions: prequential.metrics.unrecovered_drift_transitions,
+        maximum_regime_retention_loss_pp,
+        retention_compared_regime_count: prequential.metrics.retention_compared_regime_count,
         p95_latency_ms: latency,
         mean_energy_per_successful_event_uj: rebuilt_event_energy.mean_energy_uj,
         expanded_energy_uncertainty_uj: rebuilt_event_energy.expanded_total_uncertainty_uj,
@@ -378,7 +428,7 @@ fn validate_candidate_bundle(
     })
 }
 
-fn objectives(metrics: &EdgeCandidateParetoMetrics) -> [f64; 9] {
+fn objectives(metrics: &EdgeCandidateParetoMetrics) -> [f64; 13] {
     [
         metrics.quality_score,
         -metrics.false_alarms_per_hour,
@@ -389,9 +439,13 @@ fn objectives(metrics: &EdgeCandidateParetoMetrics) -> [f64; 9] {
         -(metrics.flash_bytes as f64),
         metrics.coverage,
         -metrics.brier_score,
+        metrics.worst_regime_accuracy,
+        metrics.open_set_auprc,
+        -metrics.mean_drift_recovery_samples,
+        -metrics.maximum_regime_retention_loss_pp,
     ]
 }
-fn dominates(left: &[f64; 9], right: &[f64; 9]) -> bool {
+fn dominates(left: &[f64; 13], right: &[f64; 13]) -> bool {
     let no_worse = left.iter().zip(right).all(|(l, r)| l >= r);
     let strictly_better = left.iter().zip(right).any(|(l, r)| l > r);
     no_worse && strictly_better
