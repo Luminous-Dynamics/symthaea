@@ -34,9 +34,8 @@ A joint planner sees candidate-authored forecasts and candidate-visible
 resource costs only. It does not see the hidden future, event intervals, exact
 outcomes or evaluator subset oracle.
 
-Keep resource dimensions distinct: persistent bytes, retained byte-time,
-I/O bytes, compute units, observation count, measured energy and verification
-units. Do not convert one unit into another implicitly. Explicit dual prices
+Keep resource dimensions distinct: persistent bytes, retained byte-time, I/O bytes, serial critical-path latency,
+compute units, observation count, measured energy and verification units. Do not convert one unit into another implicitly. Explicit dual prices
 are policy inputs and adaptation state, not universal exchange rates. Hard
 ceilings are independently enforced.
 
@@ -50,7 +49,8 @@ The initial Rust crate implements a deterministic greedy policy:
 - greedy selection under every hard resource ceiling;
 - deterministic tie-breaking by action ID;
 - mutually exclusive alternatives represented by conflict groups;
-- bounded per-resource price update based on measured episode utilization.
+- bounded per-resource price update based on measured episode utilization;
+- explicit serial critical-path latency ceiling, priced independently from compute.
 
 This is a baseline to challenge. It is not globally optimal for multidimensional
 knapsack, does not infer action complementarity and does not guarantee stable
@@ -67,7 +67,10 @@ bundles actually work.
 ## 4. Evaluator-only exact oracle
 
 The separate evaluator module enumerates every subset of up to 16 declared
-atomic action IDs. Each run binds identical:
+action IDs using an evaluator-owned action registry. Nonzero conflict-group IDs
+mark mutually exclusive alternatives; subsets containing two members of the
+same group are enumerated but excluded from the feasible frontier and cannot be
+qualified as candidate plans. Each run binds identical:
 - episode and task commitment;
 - hidden future-stream commitment;
 - model digest;
@@ -82,7 +85,7 @@ are not qualified.
 
 The scorer returns separate componentwise best subsets and a componentwise
 regret vector. These best subsets may differ. The Pareto frontier is computed
-over all three exposure values **and all resource dimensions**. No opaque
+over all three exposure values **and all resource dimensions**, including the declared latency ceiling. No opaque
 weighted average is used. The oracle is an upper bound for small fixtures and
 must never be made available to the candidate.
 
@@ -218,7 +221,7 @@ do not lower them after seeing results.
 ## 11. Implementation status and limits
 
 Candidate controller: 12 Rust test functions authored.  
-Evaluator oracle: 11 Rust test functions authored.  
+Evaluator oracle: 12 Rust test functions authored.  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
 The controller and oracle are research prototypes, not production schedulers.
