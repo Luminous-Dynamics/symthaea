@@ -328,6 +328,8 @@ pub struct AnytimeHistoryHeader {
     pub schema: String,
     pub version: String,
     pub run_id: String,
+    /// Exact source commit for the optimizer/evaluator harness.
+    pub source_commit: String,
     pub algorithm_id: String,
     pub algorithm_build_sha256: String,
     pub evaluator_id: String,
@@ -350,6 +352,7 @@ impl AnytimeHistoryHeader {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         run_id: impl Into<String>,
+        source_commit: impl Into<String>,
         algorithm_id: impl Into<String>,
         algorithm_build_sha256: impl Into<String>,
         evaluator_id: impl Into<String>,
@@ -371,6 +374,7 @@ impl AnytimeHistoryHeader {
             schema: SCHEMA.to_owned(),
             version: VERSION.to_owned(),
             run_id: run_id.into(),
+            source_commit: source_commit.into(),
             algorithm_id: algorithm_id.into(),
             algorithm_build_sha256: algorithm_build_sha256.into(),
             evaluator_id: evaluator_id.into(),
@@ -408,6 +412,7 @@ impl AnytimeHistoryHeader {
                 return Err(AnytimeError::new(format!("header.{path}"), "value must be non-empty"));
             }
         }
+        validate_git_commit(&self.source_commit, "header.source_commit")?;
         validate_sha256(&self.algorithm_build_sha256, "header.algorithm_build_sha256")?;
         validate_sha256(&self.evaluator_build_sha256, "header.evaluator_build_sha256")?;
         validate_sha256(&self.verifier_build_sha256, "header.verifier_build_sha256")?;
@@ -1582,6 +1587,15 @@ fn same_vector(left: &[f64], right: &[f64]) -> bool {
     left.len() == right.len() && left.iter().zip(right).all(|(a, b)| a == b)
 }
 
+fn validate_git_commit(value: &str, path: &str) -> Result<(), AnytimeError> {
+    if !matches!(value.len(), 40 | 64)
+        || !value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(AnytimeError::new(path, "expected lowercase 40- or 64-character source commit"));
+    }
+    Ok(())
+}
+
 fn validate_sha256(value: &str, path: &str) -> Result<(), AnytimeError> {
     if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
         return Err(AnytimeError::new(path, "expected lowercase 64-character SHA-256 digest"));
@@ -1629,7 +1643,7 @@ mod tests {
             },
         ], vec![vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
         AnytimeHistoryHeader::new(
-            "test-run", "test-optimizer", H1,
+            "test-run", "0123456789abcdef0123456789abcdef01234567", "test-optimizer", H1,
             "fixed-evaluator", H2, "independent-verifier", H3, H4,
             "zdt1", 7,
             vec![
