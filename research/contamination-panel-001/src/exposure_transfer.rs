@@ -497,9 +497,7 @@ fn validate_replicate_matrix(
     if let Some(expected) = expected_families
         && &families != expected
     {
-        return Err(
-            "task-family set differs across independent model-pair replicates".to_owned(),
-        );
+        return Err("task-family set differs across independent model-pair replicates".to_owned());
     }
 
     let mut family_bands = BTreeMap::<String, BTreeSet<String>>::new();
