@@ -1369,3 +1369,5 @@ pub mod fresh_instance;
 pub mod fresh_scoring;
 
 pub mod search_time;
+
+pub mod retrieval_decomposition;
