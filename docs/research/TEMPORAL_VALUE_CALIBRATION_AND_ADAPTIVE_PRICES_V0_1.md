@@ -40,7 +40,7 @@ Prices do not relax or replace hard resource limits. #9828's complete-plan selec
 
 ### Persistence
 
-The package exports a bounded state snapshot and validates a restored snapshot against the active configuration. Production persistence must bind that snapshot to the evaluator's signed receipt/checkpoint history. This package does not authenticate its own storage.
+The package exports a bounded state snapshot records the exact active configuration and validates restored prices, utilization and config identity. An unannounced config change is rejected; a deliberate change needs a migration. Production persistence must bind that snapshot to the evaluator's signed receipt/checkpoint history. This package does not authenticate its own storage.
 
 ## 3. New evaluator-side calibration implementation
 
@@ -58,7 +58,7 @@ Each record also binds a nonzero paired-intervention commitment and finalized-re
 
 ### Causality / time boundary
 
-Every record binds a forecast issue time and a later feedback-availability time. The evaluator rejects the audit unless:
+Every record binds a forecast issue time, later feedback-availability time, paired-intervention commitment and finalized-receipt digest. The evaluator rejects missing or repeated evidence commitments. The audit rejects unless:
 
 - model digests match;
 - feedback sequences and forecast times are strictly ordered;
