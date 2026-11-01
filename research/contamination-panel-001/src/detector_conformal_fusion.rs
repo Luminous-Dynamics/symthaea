@@ -448,12 +448,6 @@ pub fn calibrate_detector_panel(
     {
         return Err("calibration-A and calibration-B must cover the same groups".to_owned());
     }
-    if group_a_rows.keys().collect::<BTreeSet<_>>()
-        != evaluation_rows.keys().collect::<BTreeSet<_>>()
-    {
-        return Err("every evaluation group must have matching A and B calibration groups; unsupported groups are rejected in v1".to_owned());
-    }
-
     let mut group_calibrations_a = BTreeMap::<GroupKey, GroupCalibrationA>::new();
     let mut group_calibrations_b = BTreeMap::<GroupKey, GroupCalibrationB>::new();
     for (key, rows_a) in &group_a_rows {
@@ -514,16 +508,97 @@ pub fn calibrate_detector_panel(
     let mut score_rows = Vec::with_capacity(request.evaluation.len());
     let mut group_summaries = Vec::new();
     for (key, rows) in &evaluation_rows {
-        let calibration_a = group_calibrations_a
-            .get(key)
-            .ok_or_else(|| "calibration-A group missing".to_owned())?;
-        let calibration_b = group_calibrations_b
-            .get(key)
-            .ok_or_else(|| "calibration-B group missing".to_owned())?;
+        let Some(calibration_a) = group_calibrations_a.get(key) else {
+            let labelled = rows.iter().filter(|row| row.ground_truth_contaminated.is_some()).count() as u64;
+            let clean = rows.iter().filter(|row| row.ground_truth_contaminated == Some(false)).count() as u64;
+            let contaminated = rows.iter().filter(|row| row.ground_truth_contaminated == Some(true)).count() as u64;
+            for row in rows {
+                score_rows.push(SelectiveFusionScoreV1 {
+                    evaluation_unit_id: row.evaluation_unit_id.clone(),
+                    task_family: row.task_family.clone(),
+                    model_regime: row.model_regime.clone(),
+                    detector_p_values: Vec::new(),
+                    fused_nonconformity: None,
+                    final_p_rank_numerator: None,
+                    final_p_rank_denominator: None,
+                    final_p_value: None,
+                    minimum_attainable_p_value: None,
+                    decision: SelectiveDecisionV1::AbstainUnsupportedGroup,
+                    ground_truth_contaminated: row.ground_truth_contaminated,
+                });
+            }
+            group_summaries.push(ConformalGroupSummaryV1 {
+                task_family: key.task_family.clone(),
+                model_regime: key.model_regime.clone(),
+                detector_ids: Vec::new(),
+                calibration_a_unit_count: 0,
+                calibration_b_unit_count: 0,
+                evaluation_unit_count: rows.len() as u64,
+                labelled_evaluation_unit_count: labelled,
+                flagged_count: 0,
+                no_flag_count: 0,
+                abstained_count: rows.len() as u64,
+                clean_labelled_count: clean,
+                contaminated_labelled_count: contaminated,
+                false_positive_count: 0,
+                true_positive_count: 0,
+                false_negative_count: contaminated,
+                empirical_fpr_permille: None,
+                empirical_tpr_permille: if contaminated == 0 { None } else { Some(0.0) },
+                decision_coverage_permille: 0.0,
+                minimum_attainable_p_value: 1.0,
+                target_alpha_permille: request.target_alpha_permille,
+            });
+            continue;
+        };
+        let Some(calibration_b) = group_calibrations_b.get(key) else {
+            let labelled = rows.iter().filter(|row| row.ground_truth_contaminated.is_some()).count() as u64;
+            let clean = rows.iter().filter(|row| row.ground_truth_contaminated == Some(false)).count() as u64;
+            let contaminated = rows.iter().filter(|row| row.ground_truth_contaminated == Some(true)).count() as u64;
+            for row in rows {
+                score_rows.push(SelectiveFusionScoreV1 {
+                    evaluation_unit_id: row.evaluation_unit_id.clone(),
+                    task_family: row.task_family.clone(),
+                    model_regime: row.model_regime.clone(),
+                    detector_p_values: Vec::new(),
+                    fused_nonconformity: None,
+                    final_p_rank_numerator: None,
+                    final_p_rank_denominator: None,
+                    final_p_value: None,
+                    minimum_attainable_p_value: None,
+                    decision: SelectiveDecisionV1::AbstainUnsupportedGroup,
+                    ground_truth_contaminated: row.ground_truth_contaminated,
+                });
+            }
+            group_summaries.push(ConformalGroupSummaryV1 {
+                task_family: key.task_family.clone(),
+                model_regime: key.model_regime.clone(),
+                detector_ids: calibration_a.detector_ids.clone(),
+                calibration_a_unit_count: group_a_rows.get(key).map_or(0, |v| v.len() as u64),
+                calibration_b_unit_count: 0,
+                evaluation_unit_count: rows.len() as u64,
+                labelled_evaluation_unit_count: labelled,
+                flagged_count: 0,
+                no_flag_count: 0,
+                abstained_count: rows.len() as u64,
+                clean_labelled_count: clean,
+                contaminated_labelled_count: contaminated,
+                false_positive_count: 0,
+                true_positive_count: 0,
+                false_negative_count: contaminated,
+                empirical_fpr_permille: None,
+                empirical_tpr_permille: if contaminated == 0 { None } else { Some(0.0) },
+                decision_coverage_permille: 0.0,
+                minimum_attainable_p_value: 1.0,
+                target_alpha_permille: request.target_alpha_permille,
+            });
+            continue;
+        };
         let b_count = calibration_b.fused_scores.len() as u64;
         let min_p = 1.0 / (b_count as f64 + 1.0);
+        let b_denominator = u128::from(b_count) + 1;
         let alpha_resolvable =
-            f64::from(request.target_alpha_permille) / 1_000.0 >= min_p;
+            u128::from(request.target_alpha_permille) * b_denominator >= 1_000;
 
         let mut flagged = 0_u64;
         let mut no_flag = 0_u64;
@@ -569,8 +644,8 @@ pub fn calibrate_detector_panel(
                             Some(p_value),
                             SelectiveDecisionV1::AbstainInsufficientCalibrationResolution,
                         )
-                    } else if numerator as f64 / denominator as f64
-                        <= f64::from(request.target_alpha_permille) / 1_000.0
+                    } else if u128::from(numerator) * 1_000
+                        <= u128::from(request.target_alpha_permille) * u128::from(denominator)
                     {
                         flagged += 1;
                         (
@@ -596,7 +671,9 @@ pub fn calibrate_detector_panel(
                 labelled += 1;
                 if label {
                     contaminated += 1;
-                    if decision == SelectiveDecisionV1::NoContaminationFlag {
+                    if decision == SelectiveDecisionV1::FlagContaminated {
+                        tp += 1;
+                    } else {
                         fn_count += 1;
                     }
                 } else {
@@ -640,7 +717,7 @@ pub fn calibrate_detector_panel(
             clean_labelled_count: clean,
             contaminated_labelled_count: contaminated,
             false_positive_count: fp,
-            true_positive_count: contaminated - fn_count,
+            true_positive_count: tp,
             false_negative_count: fn_count,
             empirical_fpr_permille: fpr,
             empirical_tpr_permille: tpr,
@@ -794,12 +871,12 @@ mod tests {
         let (n, d, p) = detector_rank_p_value(
             &[0.1, 0.2, 0.3],
             DetectorScoreDirectionV1::LowerMeansContaminated,
-            0.1,
+            0.05,
         )
         .unwrap();
-        assert_eq!(n, 4);
+        assert_eq!(n, 1);
         assert_eq!(d, 4);
-        assert_eq!(p, 1.0);
+        assert_eq!(p, 0.25);
     }
 
     #[test]
@@ -853,6 +930,32 @@ mod tests {
             report.score_rows[0].decision,
             SelectiveDecisionV1::AbstainInsufficientCalibrationResolution
         );
+    }
+
+    #[test]
+    fn unsupported_evaluation_group_abstains_instead_of_using_another_group() {
+        let mut request = sample_request();
+        request.evaluation[0].task_family = "code".to_owned();
+        let report = calibrate_detector_panel(&request).unwrap();
+        let row = report
+            .score_rows
+            .iter()
+            .find(|row| row.evaluation_unit_id == "t-1")
+            .unwrap();
+        assert_eq!(row.decision, SelectiveDecisionV1::AbstainUnsupportedGroup);
+        assert!(row.final_p_value.is_none());
+    }
+
+    #[test]
+    fn abstentions_count_as_false_negatives_for_labelled_contamination() {
+        let mut request = sample_request();
+        request.evaluation[0].features.pop();
+        let report = calibrate_detector_panel(&request).unwrap();
+        let summary = &report.group_summaries[0];
+        assert_eq!(summary.contaminated_labelled_count, 1);
+        assert_eq!(summary.true_positive_count, 0);
+        assert_eq!(summary.false_negative_count, 1);
+        assert_eq!(summary.empirical_tpr_permille, Some(0.0));
     }
 
     #[test]
