@@ -253,7 +253,6 @@ pub struct DetectorCalibrationReportV1 {
     pub claim_boundary: String,
 }
 
-
 fn valid_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -276,7 +275,9 @@ fn valid_id(value: &str, label: &str) -> Result<(), String> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:-/".contains(&byte))
     {
-        Err(format!("{label} must be a nonempty opaque ASCII identifier <= {MAX_ID_LENGTH} bytes"))
+        Err(format!(
+            "{label} must be a nonempty opaque ASCII identifier <= {MAX_ID_LENGTH} bytes"
+        ))
     } else {
         Ok(())
     }
@@ -378,10 +379,7 @@ fn log_gamma(value: f64) -> f64 {
         accumulator += coefficient / (shifted + index as f64 + 1.0);
     }
     let t = shifted + 7.5;
-    0.918_938_533_204_672_7
-        + (shifted + 0.5) * t.ln()
-        - t
-        + accumulator.ln()
+    0.918_938_533_204_672_7 + (shifted + 0.5) * t.ln() - t + accumulator.ln()
 }
 
 fn beta_continued_fraction(a: f64, b: f64, x: f64) -> f64 {
@@ -441,9 +439,8 @@ fn regularized_incomplete_beta(x: f64, a: f64, b: f64) -> f64 {
     if x >= 1.0 {
         return 1.0;
     }
-    let log_beta_factor = log_gamma(a + b) - log_gamma(a) - log_gamma(b)
-        + a * x.ln()
-        + b * (-x).ln_1p();
+    let log_beta_factor =
+        log_gamma(a + b) - log_gamma(a) - log_gamma(b) + a * x.ln() + b * (-x).ln_1p();
     let factor = log_beta_factor.exp();
     let result = if x < (a + 1.0) / (a + b + 2.0) {
         factor * beta_continued_fraction(a, b, x) / a
@@ -515,7 +512,10 @@ fn validate_group(group: &CalibrationGroupV1) -> Result<(), String> {
     )?;
     valid_id(&group.identity.task_family, "task_family")?;
     valid_id(&group.identity.language, "language")?;
-    valid_id(&group.identity.training_replicate_id, "training_replicate_id")?;
+    valid_id(
+        &group.identity.training_replicate_id,
+        "training_replicate_id",
+    )?;
     let expected = compute_calibration_group_sha256(&group.identity)?;
     require_digest(&group.group_sha256, "calibration group")?;
     if group.group_sha256 != expected {
@@ -567,7 +567,11 @@ fn make_cost_summary(
     for observation in observations {
         checked_add(&mut calls, observation.inference_calls, "inference calls")?;
         checked_add(&mut input_tokens, observation.input_tokens, "input token")?;
-        checked_add(&mut output_tokens, observation.output_tokens, "output token")?;
+        checked_add(
+            &mut output_tokens,
+            observation.output_tokens,
+            "output token",
+        )?;
         total_wall_time = total_wall_time
             .checked_add(u128::from(observation.wall_time_micros))
             .ok_or_else(|| "wall-time counter overflows u128".to_owned())?;
@@ -601,8 +605,7 @@ fn analyze_group(
 ) -> Result<Vec<DetectorCalibrationCellV1>, String> {
     let mut observations_by_key =
         BTreeMap::<(ObservationSplitV1, &str, &str, &str), &DetectorObservationV1>::new();
-    let mut sample_metadata =
-        BTreeMap::<(ObservationSplitV1, &str), (GroundTruthV1, &str)>::new();
+    let mut sample_metadata = BTreeMap::<(ObservationSplitV1, &str), (GroundTruthV1, &str)>::new();
     for observation in observations {
         let key = (
             observation.split,
@@ -621,7 +624,10 @@ fn analyze_group(
         if let Some(previous) = sample_metadata.insert(meta_key, metadata)
             && previous != metadata
         {
-            return Err("ground truth or source cluster differs across detectors for the same sample".to_owned());
+            return Err(
+                "ground truth or source cluster differs across detectors for the same sample"
+                    .to_owned(),
+            );
         }
     }
 
@@ -630,14 +636,8 @@ fn analyze_group(
     let mut calibration_clusters = BTreeSet::<&str>::new();
     let mut test_clusters = BTreeSet::<&str>::new();
     let mut test_cluster_truth = BTreeMap::<&str, GroundTruthV1>::new();
-    let mut cluster_truth_by_split = BTreeMap::<
-        (ObservationSplitV1, &str),
-        GroundTruthV1,
-    >::new();
-    let mut cluster_size_by_split = BTreeMap::<
-        (ObservationSplitV1, &str),
-        u64,
-    >::new();
+    let mut cluster_truth_by_split = BTreeMap::<(ObservationSplitV1, &str), GroundTruthV1>::new();
+    let mut cluster_size_by_split = BTreeMap::<(ObservationSplitV1, &str), u64>::new();
     for ((split, sample_id), (truth, cluster_id)) in &sample_metadata {
         valid_id(sample_id, "sample_id")?;
         valid_id(cluster_id, "source_cluster_id")?;
@@ -654,7 +654,10 @@ fn analyze_group(
         match split {
             ObservationSplitV1::CleanCalibration => {
                 if *truth != GroundTruthV1::Clean {
-                    return Err("clean calibration split may contain only adjudicated clean observations".to_owned());
+                    return Err(
+                        "clean calibration split may contain only adjudicated clean observations"
+                            .to_owned(),
+                    );
                 }
                 calibration_ids.insert(*sample_id);
                 calibration_clusters.insert(*cluster_id);
@@ -667,12 +670,19 @@ fn analyze_group(
         }
     }
     if calibration_ids.is_empty() || test_ids.is_empty() {
-        return Err("each calibration group requires nonempty clean-calibration and locked-test splits".to_owned());
+        return Err(
+            "each calibration group requires nonempty clean-calibration and locked-test splits"
+                .to_owned(),
+        );
     }
     if calibration_ids.intersection(&test_ids).next().is_some() {
         return Err("sample IDs overlap between clean calibration and locked test".to_owned());
     }
-    if calibration_clusters.intersection(&test_clusters).next().is_some() {
+    if calibration_clusters
+        .intersection(&test_clusters)
+        .next()
+        .is_some()
+    {
         return Err("source clusters overlap between clean calibration and locked test".to_owned());
     }
     let calibration_cluster_sizes: BTreeSet<u64> = cluster_size_by_split
@@ -721,11 +731,12 @@ fn analyze_group(
         }
     }
     if observations_by_key.len() != (calibration_ids.len() + test_ids.len()) * definitions.len() {
-        return Err("observation grid contains unknown detector identities or unmatched samples".to_owned());
+        return Err(
+            "observation grid contains unknown detector identities or unmatched samples".to_owned(),
+        );
     }
 
-    let mut sorted_clean_by_detector =
-        BTreeMap::<(&str, &str), Vec<f64>>::new();
+    let mut sorted_clean_by_detector = BTreeMap::<(&str, &str), Vec<f64>>::new();
     let mut cluster_pvalues_by_detector =
         BTreeMap::<(&str, &str), BTreeMap<&str, ConformalPValueV1>>::new();
     for detector in definitions {
@@ -747,7 +758,10 @@ fn analyze_group(
         let mut clean_scores: Vec<f64> = clean_max_by_cluster.values().copied().collect();
         clean_scores.sort_by(f64::total_cmp);
         sorted_clean_by_detector.insert(
-            (detector.detector_id.as_str(), detector.detector_version.as_str()),
+            (
+                detector.detector_id.as_str(),
+                detector.detector_version.as_str(),
+            ),
             clean_scores.clone(),
         );
 
@@ -807,7 +821,10 @@ fn analyze_group(
             });
         }
         cluster_pvalues_by_detector.insert(
-            (detector.detector_id.as_str(), detector.detector_version.as_str()),
+            (
+                detector.detector_id.as_str(),
+                detector.detector_version.as_str(),
+            ),
             cluster_pvalues,
         );
         cost_output.push(make_cost_summary(&group.group_sha256, detector, &costs)?);
@@ -817,11 +834,17 @@ fn analyze_group(
     let mut predictions = BTreeMap::<(u16, &str, &str, &str), bool>::new();
     for detector in definitions {
         let clean_support = sorted_clean_by_detector
-            .get(&(detector.detector_id.as_str(), detector.detector_version.as_str()))
+            .get(&(
+                detector.detector_id.as_str(),
+                detector.detector_version.as_str(),
+            ))
             .map(Vec::len)
             .unwrap_or(0) as u64;
         let cluster_pvalues = cluster_pvalues_by_detector
-            .get(&(detector.detector_id.as_str(), detector.detector_version.as_str()))
+            .get(&(
+                detector.detector_id.as_str(),
+                detector.detector_version.as_str(),
+            ))
             .ok_or_else(|| "detector cluster p-value map is missing".to_owned())?;
         for target in targets {
             let target_supported = clean_support >= minimum_calibration_support(*target)?;
@@ -999,7 +1022,9 @@ pub fn analyze_detector_calibration(
     if targets != study.target_fpr_permille
         || targets.iter().any(|target| !(1..=1_000).contains(target))
     {
-        return Err("target FPR permille values must be unique, ascending and in [1, 1000]".to_owned());
+        return Err(
+            "target FPR permille values must be unique, ascending and in [1, 1000]".to_owned(),
+        );
     }
 
     let mut definitions = BTreeMap::<(&str, &str), &DetectorDefinitionV1>::new();
@@ -1007,7 +1032,10 @@ pub fn analyze_detector_calibration(
         validate_detector(definition)?;
         if definitions
             .insert(
-                (definition.detector_id.as_str(), definition.detector_version.as_str()),
+                (
+                    definition.detector_id.as_str(),
+                    definition.detector_version.as_str(),
+                ),
                 definition,
             )
             .is_some()
@@ -1029,7 +1057,10 @@ pub fn analyze_detector_calibration(
     for observation in &study.observations {
         valid_id(&observation.sample_id, "sample_id")?;
         valid_id(&observation.source_cluster_id, "source_cluster_id")?;
-        require_digest(&observation.calibration_group_sha256, "calibration_group_sha256")?;
+        require_digest(
+            &observation.calibration_group_sha256,
+            "calibration_group_sha256",
+        )?;
         valid_id(&observation.detector_id, "detector_id")?;
         valid_id(&observation.detector_version, "detector_version")?;
         if !observation.raw_score.is_finite() {
@@ -1093,11 +1124,10 @@ pub fn analyze_detector_calibration(
                 .filter(|cell| {
                     cell.detector_id == definition.detector_id
                         && cell.detector_version == definition.detector_version
-                        && cell
-                            .operating_points
-                            .iter()
-                            .any(|point| point.target_fpr_permille == *target
-                                && point.calibration_resolution_sufficient)
+                        && cell.operating_points.iter().any(|point| {
+                            point.target_fpr_permille == *target
+                                && point.calibration_resolution_sufficient
+                        })
                 })
                 .collect();
             let fprs: Vec<f64> = eligible
@@ -1133,10 +1163,7 @@ pub fn analyze_detector_calibration(
                 target_fpr_permille: *target,
                 eligible_calibration_group_count: eligible.len() as u64,
                 mean_test_false_positive_rate: mean_optional(&fprs),
-                worst_group_fpr_upper_95_one_sided: upper_bounds
-                    .iter()
-                    .copied()
-                    .reduce(f64::max),
+                worst_group_fpr_upper_95_one_sided: upper_bounds.iter().copied().reduce(f64::max),
                 mean_test_true_positive_rate: mean_optional(&tprs),
             });
         }
@@ -1353,7 +1380,9 @@ mod tests {
                     ground_truth: GroundTruthV1::Clean,
                     detector_id: detector.detector_id.clone(),
                     detector_version: detector.detector_version.clone(),
-                    raw_score: if detector.score_direction == ScoreDirectionV1::HigherMeansContaminated {
+                    raw_score: if detector.score_direction
+                        == ScoreDirectionV1::HigherMeansContaminated
+                    {
                         f64::from(index) / 100.0
                     } else {
                         -f64::from(index) / 100.0
@@ -1374,11 +1403,12 @@ mod tests {
             .into_iter()
             .enumerate()
             {
-                let raw_score = if detector.score_direction == ScoreDirectionV1::HigherMeansContaminated {
-                    score
-                } else {
-                    -score
-                };
+                let raw_score =
+                    if detector.score_direction == ScoreDirectionV1::HigherMeansContaminated {
+                        score
+                    } else {
+                        -score
+                    };
                 observations.push(DetectorObservationV1 {
                     sample_id: format!("test-{index:03}"),
                     source_cluster_id: format!("test-source-{index:03}"),
