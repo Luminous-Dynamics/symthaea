@@ -278,6 +278,18 @@ pub struct LatencyMeasurement {
     pub throughput_milli_per_second: u64,
     pub deadline_us: Option<u64>,
     pub deadline_misses: u64,
+    pub peak_memory_bytes: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrainingMeasurement {
+    pub boundary: ResourceBoundary,
+    pub optimizer_id: String,
+    pub epochs: u64,
+    pub update_count: u64,
+    pub training_example_count: u64,
+    pub wall_clock_us: u64,
+    pub peak_memory_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -342,6 +354,8 @@ pub struct BenchmarkRunManifest {
     pub model: ModelIdentity,
     pub environment: ExecutionEnvironment,
     pub latency: LatencyMeasurement,
+    /// None is appropriate for zero-shot or externally pretrained models.
+    pub training: Option<TrainingMeasurement>,
     /// None means energy was not measured for this run.
     pub energy: Option<EnergyMeasurement>,
     pub artifacts: ResultArtifacts,
@@ -363,6 +377,7 @@ pub enum ManifestError {
     DuplicatePipelineStage,
     InvalidResourceBoundary,
     InvalidLatencyStatistics,
+    InvalidTrainingStatistics,
     InvalidEnergyStatistics,
     InvalidEnergyEvidence,
     ArithmeticOverflow,
@@ -384,7 +399,8 @@ impl fmt::Display for ManifestError {
             Self::EmptyResourceBoundary => write!(f, "resource boundary must contain at least one stage"),
             Self::DuplicatePipelineStage => write!(f, "resource boundary contains a duplicate stage"),
             Self::InvalidResourceBoundary => write!(f, "resource scope is inconsistent with its declared pipeline stages"),
-            Self::InvalidLatencyStatistics => write!(f, "latency samples, quantiles, throughput or deadline counts are invalid"),
+            Self::InvalidLatencyStatistics => write!(f, "latency samples, quantiles, throughput, memory or deadline counts are invalid"),
+            Self::InvalidTrainingStatistics => write!(f, "training boundary, optimizer or training-cost counts are invalid"),
             Self::InvalidEnergyStatistics => write!(f, "energy sample count or gross/idle/net arithmetic is invalid"),
             Self::InvalidEnergyEvidence => write!(f, "energy method evidence/calibration fields are inconsistent"),
             Self::ArithmeticOverflow => write!(f, "manifest canonical encoding overflow"),
@@ -525,10 +541,24 @@ impl BenchmarkRunManifest {
             || self.latency.p50_us > self.latency.p95_us
             || self.latency.p95_us > self.latency.p99_us
             || self.latency.throughput_milli_per_second == 0
+            || self.latency.peak_memory_bytes == 0
             || self.latency.deadline_misses > self.latency.measured_sample_count
             || (self.latency.deadline_us.is_none() && self.latency.deadline_misses != 0)
         {
             return Err(ManifestError::InvalidLatencyStatistics);
+        }
+        if let Some(training) = &self.training {
+            training.boundary.validate()?;
+            require_text(&training.optimizer_id)?;
+            if training.boundary.scope != MeasurementScope::TrainingPipeline
+                || training.epochs == 0
+                || training.update_count == 0
+                || training.training_example_count == 0
+                || training.wall_clock_us == 0
+                || training.peak_memory_bytes == 0
+            {
+                return Err(ManifestError::InvalidTrainingStatistics);
+            }
         }
         if let Some(energy) = &self.energy {
             energy.boundary.validate()?;
@@ -627,6 +657,20 @@ impl BenchmarkRunManifest {
         h.update(self.environment.environment_sha256);
 
         hash_latency(&mut h, &self.latency)?;
+        match &self.training {
+            None => { h.update([0]); }
+            Some(training) => {
+                h.update([1]);
+                hash_boundary(&mut h, &training.boundary)?;
+                hash_text(&mut h, &training.optimizer_id)?;
+                h.update(training.epochs.to_le_bytes());
+                h.update(training.update_count.to_le_bytes());
+                h.update(training.training_example_count.to_le_bytes());
+                h.update(training.wall_clock_us.to_le_bytes());
+                h.update(training.peak_memory_bytes.to_le_bytes());
+            }
+        }
+
         match &self.energy {
             None => { h.update([0]); }
             Some(energy) => {
@@ -812,7 +856,9 @@ mod tests {
                 throughput_milli_per_second: 50_000,
                 deadline_us: Some(3_000),
                 deadline_misses: 0,
+                peak_memory_bytes: 4_000_000,
             },
+            training: None,
             energy: None,
             artifacts: ResultArtifacts {
                 predictions_sha256: digest(18),
@@ -948,6 +994,26 @@ mod tests {
         });
         assert_eq!(manifest.validate(), Ok(()));
         assert!(!manifest.energy.as_ref().unwrap().is_calibrated_external_meter());
+    }
+
+    #[test]
+    fn training_cost_is_explicit_and_scope_checked() {
+        let mut manifest = valid_manifest();
+        manifest.training = Some(TrainingMeasurement {
+            boundary: boundary(MeasurementScope::TrainingPipeline),
+            optimizer_id: "Adam".into(),
+            epochs: 200,
+            update_count: 10_000,
+            training_example_count: 100_000,
+            wall_clock_us: 50_000_000,
+            peak_memory_bytes: 2_000_000_000,
+        });
+        assert_eq!(manifest.validate(), Ok(()));
+        let first = manifest.canonical_sha256().unwrap();
+        manifest.training.as_mut().unwrap().wall_clock_us += 1;
+        assert_ne!(first, manifest.canonical_sha256().unwrap());
+        manifest.training.as_mut().unwrap().boundary = boundary(MeasurementScope::ModelOnly);
+        assert_eq!(manifest.validate(), Err(ManifestError::InvalidTrainingStatistics));
     }
 
     #[test]
