@@ -172,3 +172,15 @@ arrivals and replay/index digest parity.
 This is a source-provided progress contract, not proof that a sensor's claim is
 authentic or physically true. Signature verification, source authorization,
 durable WAL and a trusted progress-policy registry remain out of scope.
+
+
+## 10. Source watermark benchmark fixture
+
+The machine-readable fixture
+`crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`
+pins fourteen adversarial scenarios and required metrics. False-complete rate is
+the primary safety metric; false-incomplete rate and completeness lag are
+reported separately so an always-incomplete strategy cannot pass. Late-arrival
+detection recall/latency, source watermark skew, and historical as-known
+mutation count are also recorded. The zero-false-complete and exact-replay gates
+are preregistered targets, not benchmark results.
