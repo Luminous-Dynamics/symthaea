@@ -290,8 +290,8 @@ pub fn run_workflow(
                 let injected_failure = fault == WorkflowFault::CompensationFailure;
                 if world.compensate_first(true, injected_failure) {
                     readback_calls += 1;
-                    compensation_verified = world.first == "first-before"
-                        && world.second_agent_writes == 0;
+                    compensation_verified =
+                        world.first == "first-before" && world.second_agent_writes == 0;
                     terminal = if compensation_verified {
                         WorkflowTerminal::CompensatedVerified
                     } else {
