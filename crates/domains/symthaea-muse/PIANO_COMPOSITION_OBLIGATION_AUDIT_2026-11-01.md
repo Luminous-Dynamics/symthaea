@@ -37,7 +37,7 @@ The MIREX 2026 piano-continuation task asks systems to continue a four-measure p
 | PhraseSplitGen | 2.95 ± 0.18 | 2.74 ± 0.15 | 2.89 ± 0.15 | 2.61 ± 0.14 |
 | MuseCoco (1.2B) | 2.79 ± 0.17 | 2.76 ± 0.15 | 3.42 ± 0.12 | 2.68 ± 0.16 |
 
-The reported values are means ± standard error. The report describes eight prompts across pop, classical and jazz; 12 participants; 38 ratings per model; and a process in which eight candidates per prompt were returned for cherry-picking. These results give us a concrete current comparison set, but the small prompt/participant panel and best-of-eight selection mean they should be treated as a task-specific reference, not a ranking of general compositional ability.
+The reported values are means ± standard error. Under the report's corrected Wilcoxon comparison, DAMN and Anticipatory Music Transformer share the higher significance group for prompt coherence, structure and musicality; all four systems share the same significance group for creativity. The evaluation used eight prompts across pop, classical and jazz, 12 participants, 38 ratings per model, and a process in which one candidate was cherry-picked from eight per prompt. These results give us a concrete task-matched comparison set, but the small prompt/participant panel and best-of-eight selection mean they should be treated as a task-specific reference, not a ranking of general compositional ability.
 
 **Implication:** Symthaea should reproduce this task with disclosed candidate budgets and report both first-candidate and best-of-N performance. It must also run a separate no-cherry-picking, long-form study. A 16-bar continuation score cannot establish 32/64-bar thematic development.
 
