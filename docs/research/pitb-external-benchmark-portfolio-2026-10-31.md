@@ -211,7 +211,7 @@ PITB's first implementation is a conservative deterministic LCB/shadow-price act
 
 ### Benchmark integrity is a separate capability axis
 
-The ICML 2026 audit of five Lean theorem-proving benchmarks/forks reported 4,833 findings, including 398 mechanically certified defects such as counterexamples, vacuity and unsound axioms. PITB has added a per-target target-integrity receipt and Rust verifier. This is not a solve-rate metric; it determines whether a task is eligible for a performance denominator. No public benchmark cohort has been audited by PITB yet. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md` and https://proceedings.mlr.press/v306/ammanamanchi26a.html.
+The ICML 2026 audit of five Lean theorem-proving benchmarks/forks reported 4,833 findings, including 398 mechanically certified defects such as counterexamples, vacuity and unsound axioms. PITB has added a per-target target-integrity receipt and Rust verifier. This is not a solve-rate metric; it determines whether a task is eligible for a performance denominator. No public benchmark cohort has been audited by PITB yet. Measured eligibility now requires exact evidence artifacts and an Ed25519 reviewer attestation checked against an externally pinned registry digest; no production reviewer keys are committed. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md` and https://proceedings.mlr.press/v306/ammanamanchi26a.html.
 
 
 ### Frontier update: graph-based cost-efficient orchestration (1 November 2026)
