@@ -5148,12 +5148,27 @@ impl DelayedHorizonEvaluator {
                     ("prediction", forecast.prediction_blake3.as_deref()),
                     ("persistence", forecast.persistence_blake3.as_deref()),
                 ] {
-                    if !digest.is_some_and(is_lower_hex_blake3) {
+                    if matches!(name, "prediction" | "persistence")
+                        && !digest.is_some_and(is_lower_hex_blake3)
+                    {
+                        return Err(format!("pending forecast {index} has an invalid {name} fingerprint"));
+                    }
+                    if !matches!(name, "prediction" | "persistence")
+                        && digest.is_some_and(|value| !is_lower_hex_blake3(value))
+                    {
                         return Err(format!("pending forecast {index} has an invalid {name} fingerprint"));
                     }
                 }
-                if forecast.source_frame_sequence.is_none() {
-                    return Err(format!("pending forecast {index} is missing its source frame sequence"));
+                let source_lineage_complete = forecast.source_frame_sequence.is_some()
+                    && forecast.source_observation_blake3.is_some()
+                    && forecast.source_belief_blake3.is_some()
+                    && forecast.predictor_parameter_blake3.is_some();
+                let source_lineage_absent = forecast.source_frame_sequence.is_none()
+                    && forecast.source_observation_blake3.is_none()
+                    && forecast.source_belief_blake3.is_none()
+                    && forecast.predictor_parameter_blake3.is_none();
+                if !source_lineage_complete && !source_lineage_absent {
+                    return Err(format!("pending forecast {index} has partial source provenance"));
                 }
             }
         }
