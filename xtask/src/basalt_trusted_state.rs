@@ -367,11 +367,14 @@ fn validate_source_transition(
             if candidate.generation != 1 || candidate.previous_seal_digest.is_some() {
                 return Err(TransitionError::GenerationBootstrapInvalid);
             }
-            if candidate.profile_transition_evidence_digest.is_some()
-                || candidate.boot_transition_evidence_digest.is_some()
-                || candidate.log_origin_transition_evidence_digest.is_some()
-            {
+            if candidate.profile_transition_evidence_digest.is_some() {
                 return Err(TransitionError::UnexpectedProfileTransitionEvidence);
+            }
+            if candidate.boot_transition_evidence_digest.is_some() {
+                return Err(TransitionError::UnexpectedBootTransitionEvidence);
+            }
+            if candidate.log_origin_transition_evidence_digest.is_some() {
+                return Err(TransitionError::UnexpectedLogOriginTransitionEvidence);
             }
         }
         Some(current) => {
@@ -1410,6 +1413,51 @@ mod tests {
         );
         drop(first);
         drop(second);
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_persists_authorized_source_log_origin_transition() {
+        let path = temporary_sqlite_path("log-origin");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let first = fixture_candidate();
+            let first_plan = match store.preview(&first).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(first_plan).unwrap();
+
+            let current = store.read_state().unwrap();
+            let mut migrated = successor_candidate(&current, 2, 114);
+            migrated.checkpoint.log_id = "basalt-log-alt".to_string();
+            migrated.checkpoint.tree_size = 5;
+            migrated.checkpoint.root_digest = test_digest(115);
+            migrated.checkpoint.checkpoint_digest = test_digest(116);
+            migrated.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+                pinned_checkpoint_digest: test_digest(116),
+            };
+            assert_eq!(
+                store.preview(&migrated).unwrap_err().to_string().contains("UnauthorizedLogOriginTransition"),
+                true
+            );
+
+            migrated.log_origin_transition_evidence_digest = Some(test_digest(117));
+            let plan = match store.preview(&migrated).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("migration receipt is new"),
+            };
+            store.commit_plan(plan).unwrap();
+        }
+
+        let reopened = SqliteTrustedStateStore::open(&path).unwrap();
+        let state = reopened.read_state().unwrap();
+        let cursor = state.source_cursor(&fixture_source_key()).unwrap();
+        assert_eq!(cursor.generation, 2);
+        assert_eq!(cursor.log_id, "basalt-log-alt");
+        assert!(state.log_cursor("basalt-log-prod").is_some());
+        assert!(state.log_cursor("basalt-log-alt").is_some());
+        drop(reopened);
         cleanup_sqlite_path(&path);
     }
 
