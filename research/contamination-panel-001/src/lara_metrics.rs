@@ -293,14 +293,18 @@ fn vector_pair_stats(
     let (neighbor_mean_norm, neighbor_sample_std) =
         sample_mean_and_std(&neighbor_norms, "neighbour shift magnitudes")?;
     let stats = VectorPairStats {
-        original_norm: vector_norm(&pair.original_shift),
+        original_norm: vector_norm(&original_shift),
         neighbor_mean_norm,
         neighbor_sample_std,
     };
     if !stats.original_norm.is_finite() {
         return Err("original shift magnitude is non-finite".to_owned());
     }
-    Ok(VectorPairResult { stats, original_shift, neighbor_shifts })
+    Ok(VectorPairResult {
+        stats,
+        original_shift,
+        neighbor_shifts,
+    })
 }
 
 /// Compute LaRA's paper-defined RSM, DC and RSI for one transformer layer.
@@ -328,13 +332,14 @@ pub fn compute_layer_metrics(input: &LayerProbeInputV1) -> Result<LayerMetricsV1
     if pair.original_shift.len() != mean_neighbor_shift.len() {
         return Err("original and semantic-neighbour hidden dimensions differ".to_owned());
     }
-    let dot = pair.original_shift
+    let dot = pair
+        .original_shift
         .iter()
         .zip(&mean_neighbor_shift)
         .map(|(a, b)| a * b)
         .sum::<f64>();
     let dc = dot
-        / ((vector_norm(&original_shift) + LARA_EPSILON)
+        / ((vector_norm(&pair.original_shift) + LARA_EPSILON)
             * (vector_norm(&mean_neighbor_shift) + LARA_EPSILON));
 
     if input.neighbor_paraphrase_representations.len() != pair.neighbor_shifts.len() {
@@ -387,7 +392,7 @@ pub fn compute_layer_metrics(input: &LayerProbeInputV1) -> Result<LayerMetricsV1
         rsm,
         dc,
         rsi,
-        semantic_neighbor_count: neighbor_shifts.len() as u64,
+        semantic_neighbor_count: pair.neighbor_shifts.len() as u64,
         original_paraphrase_count: input.original_paraphrase_representations.len() as u64,
     })
 }
