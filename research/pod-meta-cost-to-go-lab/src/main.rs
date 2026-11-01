@@ -598,7 +598,7 @@ fn main() {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         println!(
-            "FRONTIER_ADAPTER_ROW\\t{}\\t{}\\t{}\\t{}\\t{}",
+            "FRONTIER_ADAPTER_ROW\t{}\\t{}\\t{}\\t{}\\t{}",
             node_count,
             snapshot.features.dependency_edges,
             snapshot.features.maximum_dependency_depth,
