@@ -1,0 +1,52 @@
+name: VIS-005 delayed visual forecast receipts
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-vision-manifold/**"
+      - "Cargo.lock"
+      - ".github/workflows/vis005-delayed-forecast-receipts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-vision-manifold/**"
+      - "Cargo.lock"
+      - ".github/workflows/vis005-delayed-forecast-receipts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vis005-delayed-receipts-\${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  delayed-receipts:
+    name: Delayed forecast receipt contract
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format touched vision modules
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-vision-manifold/src/manifold.rs \
+            crates/domains/symthaea-vision-manifold/src/types.rs \
+            crates/domains/symthaea-vision-manifold/src/lib.rs
+
+      - name: Test vision manifold and delayed forecast receipts
+        run: cargo test --locked -p symthaea-vision-manifold --lib
+
+      - name: Clippy vision manifold
+        run: cargo clippy --locked -p symthaea-vision-manifold --lib --tests -- -D warnings
