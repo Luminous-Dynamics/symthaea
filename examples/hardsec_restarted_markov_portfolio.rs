@@ -2,8 +2,14 @@ use serde_json::{Value, json};
 
 const HORIZON: usize = 6;
 const PROBABILITY_DENOMINATOR: u128 = 4;
-const ALPHA: Rational = Rational { numerator: 1, denominator: 2 };
-const THRESHOLD: Rational = Rational { numerator: 2, denominator: 1 };
+const ALPHA: Rational = Rational {
+    numerator: 1,
+    denominator: 2,
+};
+const THRESHOLD: Rational = Rational {
+    numerator: 2,
+    denominator: 1,
+};
 
 // P = [[3/4, 1/4], [1/2, 1/2]].
 // Each row is indexed by the current state; each column is the next state.
@@ -154,11 +160,7 @@ fn transition_probability(current_state: usize, next_state: usize) -> Rational {
 }
 
 // Return from a unit-capital portfolio holding [cash, state-0 asset, state-1 asset].
-fn outcome_factor(
-    portfolio: [Rational; 3],
-    current_state: usize,
-    next_state: usize,
-) -> Rational {
+fn outcome_factor(portfolio: [Rational; 3], current_state: usize, next_state: usize) -> Rational {
     portfolio[0].add(portfolio[next_state + 1].div(upper_probability(current_state, next_state)))
 }
 
@@ -207,8 +209,7 @@ fn restart_mixture_for_path(path: &[usize], initial_state: usize) -> Vec<Rationa
                 .copied()
                 .fold(Rational::zero(), Rational::add)
                 .div(Rational::new(grid.len() as u128, 1));
-            mixture_wealth =
-                mixture_wealth.add(start_weight.mul(mean_portfolio_wealth));
+            mixture_wealth = mixture_wealth.add(start_weight.mul(mean_portfolio_wealth));
         }
 
         assert_eq!(
@@ -237,8 +238,7 @@ fn enumerate_episode(initial_state: usize) -> EpisodeResult {
 
         for time_index in 0..HORIZON {
             let next_state = ((encoded_path >> time_index) & 1) as usize;
-            path_probability_numerator *=
-                TRANSITION_NUMERATORS[current_state][next_state];
+            path_probability_numerator *= TRANSITION_NUMERATORS[current_state][next_state];
             path.push(next_state);
             current_state = next_state;
         }
@@ -379,9 +379,7 @@ mod tests {
     fn every_predictable_simplex_portfolio_has_conditional_expected_factor_at_most_one() {
         for portfolio in portfolios() {
             for current_state in 0..2 {
-                assert!(
-                    conditional_expected_factor(current_state, portfolio).le(Rational::one())
-                );
+                assert!(conditional_expected_factor(current_state, portfolio).le(Rational::one()));
             }
         }
     }
@@ -439,6 +437,9 @@ mod tests {
         );
         assert_eq!(value["guarantee"]["arbitrary_serial_pmu_pfa_claim"], false);
         assert_eq!(value["guarantee"]["physical_hardware_evidence"], false);
-        assert_eq!(value["guarantee"]["effective_sample_size_estimate"], Value::Null);
+        assert_eq!(
+            value["guarantee"]["effective_sample_size_estimate"],
+            Value::Null
+        );
     }
 }
