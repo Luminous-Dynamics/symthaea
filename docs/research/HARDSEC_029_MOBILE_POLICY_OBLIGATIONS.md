@@ -70,10 +70,8 @@ For each obligation, the compiler:
 
 Statuses:
 - `evidence_incomplete`: the claim is unknown or not measured; action is abstain.
-- `incompatible`: the target explicitly lacks the required capability.
-- `unqualified_evidence`: a desired value is present but no claim-linked evidence comes from an accepted source.
-- `policy_violated`: the observed claim contradicts the desired values.
-- `independent_verifier_required`: a non-synthetic claim has a desired value and accepted source-type link, but an authenticated independent verifier receipt is absent; the action remains abstain.
+- `unqualified_evidence`: a known claim has no linked evidence from a policy-accepted source type; action is abstain.
+- `independent_verifier_required`: an accepted-looking source type is linked, but an authenticated independent verifier receipt is absent; action is abstain. This applies both to matching claims and to claims that conflict with policy or report unsupported capability.
 
 The prototype deliberately never marks a control satisfied. Source-type labels are untrusted metadata, even when a label reads `hardware_attestation_verified` or `physical_lab_measurement`. A separate independent verifier must authenticate the source, freshness, scope, quality and exact profile/evidence digests before a later qualification layer can report a passed obligation.
 
