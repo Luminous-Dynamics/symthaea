@@ -123,6 +123,8 @@
           "model_sha256",
           "evaluation_sha256",
           "analysis_request_sha256",
+          "mip_cut_sha256",
+          "mip_cut_removed_edges",
           "phi",
           "signed_phi",
           "normalized_phi",
@@ -187,6 +189,29 @@
           "analysis_request_sha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "mip_cut_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "mip_cut_removed_edges": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              }
+            }
           },
           "phi": {
             "type": [
