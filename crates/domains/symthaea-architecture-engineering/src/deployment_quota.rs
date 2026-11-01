@@ -922,8 +922,8 @@ mod tests {
         let population = finite_population_manifest();
         let encoded = serde_json::to_string(&population).unwrap();
         let injected = encoded.replacen(
-            "\\"population_sha256\\"",
-            "\\"unknown\\":true,\\"population_sha256\\"",
+            "\"population_sha256\"",
+            "\"unknown\":true,\"population_sha256\"",
             1,
         );
         assert!(serde_json::from_str::<FinitePopulationDeploymentManifest>(&injected).is_err());
@@ -931,8 +931,8 @@ mod tests {
         let plan = plan_finite_population_deployment_quota(&population, 20, 0.05).unwrap();
         let encoded_plan = serde_json::to_string(&plan).unwrap();
         let injected_plan = encoded_plan.replacen(
-            "\\"plan_sha256\\"",
-            "\\"unknown\\":true,\\"plan_sha256\\"",
+            "\"plan_sha256\"",
+            "\"unknown\":true,\"plan_sha256\"",
             1,
         );
         assert!(serde_json::from_str::<FinitePopulationQuotaPlan>(&injected_plan).is_err());
