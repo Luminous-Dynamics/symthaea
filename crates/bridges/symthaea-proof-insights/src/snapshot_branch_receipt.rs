@@ -27,6 +27,7 @@ pub struct ReceiptSummary {
     pub proof_state_sha256: String,
     pub snapshot_id_sha256: Option<String>,
     pub branch_count: u64,
+    pub branch_ids: Vec<String>,
     pub run_status: String,
 }
 
@@ -225,6 +226,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<ReceiptSu
             {
                 bail!("R5 branch IDs must be unique lowercase kebab-case identifiers");
             }
+            ordered_branch_ids.push(branch_id.to_owned());
             let branch_snapshot =
                 string(branch, &format!("/branches/{index}/base_snapshot_sha256"))?;
             if branch_snapshot != snapshot_id {
@@ -266,6 +268,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<ReceiptSu
         proof_state_sha256: string(value, "/proof_state/proof_state_sha256")?.to_owned(),
         snapshot_id_sha256: snapshot_id,
         branch_count,
+        branch_ids: ordered_branch_ids,
         run_status: run_status.to_owned(),
     })
 }
