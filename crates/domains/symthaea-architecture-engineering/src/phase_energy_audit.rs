@@ -97,6 +97,10 @@ impl ApplicationEventOutcome {
 pub struct ApplicationEventOutcomeEvidence {
     pub event_id: String,
     pub outcome: ApplicationEventOutcome,
+    /// Exact candidate deployment artifact that produced this event.
+    pub artifact_sha256: String,
+    /// Authenticated physical device/session receipt identifier.
+    pub device_session_sha256: String,
     pub input_sha256: String,
     pub output_sha256: Option<String>,
     pub quality_metric_id: Option<String>,
@@ -146,7 +150,6 @@ pub struct PhaseEnergyWindowMetrics {
     pub boundary_alignment_error_bound_ms: f64,
     /// Worst-case energy impact of both uncertain phase boundaries under the maximum observed current.
     pub boundary_alignment_energy_uncertainty_uj: f64,
-    pub boundary_alignment_energy_uncertainty_uj: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -157,6 +160,8 @@ pub struct PhaseEnergyEventMetrics {
     pub status: PhaseEnergyEventStatus,
     pub outcome: ApplicationEventOutcome,
     pub outcome_evidence_sha256: String,
+    pub artifact_sha256: String,
+    pub device_session_sha256: String,
     pub input_sha256: String,
     pub output_sha256: Option<String>,
     pub quality_metric_id: Option<String>,
@@ -450,6 +455,8 @@ fn parse_event_outcomes(
         &[
             "event_id",
             "outcome",
+            "artifact_sha256",
+            "device_session_sha256",
             "input_sha256",
             "output_sha256",
             "quality_metric_id",
@@ -486,6 +493,20 @@ fn parse_event_outcomes(
                 format!("unknown application outcome {other:?}"),
             )),
         };
+        let artifact_sha256 = field(&row, &columns, "artifact_sha256", row_number, "outcomes")?.to_owned();
+        if !is_sha256(&artifact_sha256) {
+            return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].artifact_sha256"),
+                "must be lowercase SHA-256 hex",
+            ));
+        }
+        let device_session_sha256 = field(&row, &columns, "device_session_sha256", row_number, "outcomes")?.to_owned();
+        if !is_sha256(&device_session_sha256) {
+            return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].device_session_sha256"),
+                "must be lowercase SHA-256 hex",
+            ));
+        }
         let input_sha256 = field(&row, &columns, "input_sha256", row_number, "outcomes")?.to_owned();
         if !is_sha256(&input_sha256) {
             return Err(PhaseEnergyAuditError::new(
@@ -556,6 +577,8 @@ fn parse_event_outcomes(
         let evidence = ApplicationEventOutcomeEvidence {
             event_id: event_id.clone(),
             outcome,
+            artifact_sha256,
+            device_session_sha256,
             input_sha256,
             output_sha256,
             quality_metric_id,
@@ -886,6 +909,8 @@ pub fn audit_application_phase_energy(
                 status: PhaseEnergyEventStatus::MissingRequiredPhase,
                 outcome: outcome_evidence.outcome,
                 outcome_evidence_sha256: outcome_evidence_sha256.clone(),
+                artifact_sha256: outcome_evidence.artifact_sha256.clone(),
+                device_session_sha256: outcome_evidence.device_session_sha256.clone(),
                 input_sha256: outcome_evidence.input_sha256.clone(),
                 output_sha256: outcome_evidence.output_sha256.clone(),
                 quality_metric_id: outcome_evidence.quality_metric_id.clone(),
@@ -944,6 +969,8 @@ pub fn audit_application_phase_energy(
             status,
             outcome: outcome_evidence.outcome,
             outcome_evidence_sha256: outcome_evidence_sha256.clone(),
+            artifact_sha256: outcome_evidence.artifact_sha256.clone(),
+            device_session_sha256: outcome_evidence.device_session_sha256.clone(),
             input_sha256: outcome_evidence.input_sha256.clone(),
             output_sha256: outcome_evidence.output_sha256.clone(),
             quality_metric_id: outcome_evidence.quality_metric_id.clone(),
@@ -1075,6 +1102,8 @@ pub fn validate_phase_energy_audit_receipt(
         let canonical_outcome = ApplicationEventOutcomeEvidence {
             event_id: event.event_id.clone(),
             outcome: event.outcome,
+            artifact_sha256: event.artifact_sha256.clone(),
+            device_session_sha256: event.device_session_sha256.clone(),
             input_sha256: event.input_sha256.clone(),
             output_sha256: event.output_sha256.clone(),
             quality_metric_id: event.quality_metric_id.clone(),
@@ -1090,6 +1119,8 @@ pub fn validate_phase_energy_audit_receipt(
         })?;
         if !is_sha256(&event.outcome_evidence_sha256)
             || digest(OUTCOME_DOMAIN, &canonical_outcome_bytes) != event.outcome_evidence_sha256
+            || !is_sha256(&event.artifact_sha256)
+            || !is_sha256(&event.device_session_sha256)
             || !is_sha256(&event.input_sha256)
             || event.output_sha256.as_deref().is_some_and(|value| !is_sha256(value))
             || event.accepted_success_outcome && event.outcome.is_intrinsically_unsuccessful()
@@ -1444,7 +1475,9 @@ mod tests {
             String::new()
         };
         format!(
-            "event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n             e1,{outcome},{},{},accuracy,1.0,{},0\n",
+            "event_id,outcome,artifact_sha256,device_session_sha256,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n             e1,{outcome},{},{},{},{},accuracy,1.0,{},0\n",
+            sha('c'),
+            sha('d'),
             sha('a'),
             output_digest,
             if deadline_met { "true" } else { "false" },
@@ -1637,7 +1670,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_or_duplicate_outcome_records() {
-        let empty = "event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n";
+        let empty = "event_id,outcome,artifact_sha256,device_session_sha256,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n";
         assert!(audit_application_phase_energy(
             samples(), &markers(10_000, 10_000), empty, trace_config(), &mapping(), &protocol(0.0),
         ).is_err());
