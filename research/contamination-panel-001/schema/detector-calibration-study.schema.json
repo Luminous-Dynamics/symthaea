@@ -117,7 +117,8 @@
               "language",
               "exposure_stage",
               "probe_config_sha256",
-              "training_replicate_id"
+              "training_replicate_id",
+              "cluster_unit_definition_sha256"
             ],
             "properties": {
               "model_checkpoint_sha256": {
@@ -160,6 +161,10 @@
                 "minLength": 1,
                 "maxLength": 128,
                 "pattern": "^[A-Za-z0-9._:/-]+$"
+              },
+              "cluster_unit_definition_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
               }
             }
           }
