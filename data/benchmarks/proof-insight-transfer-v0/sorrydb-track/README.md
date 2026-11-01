@@ -190,6 +190,6 @@ Resource accounting separates elapsed wall-clock from summed branch wall-work. P
 
 ## Structural expression identity (2026-11-01)
 
-PITB now has a separate v1 structural Lean-expression wire contract and an independent Rust verifier. It binds target expressions to exact source/task and Lean/Lake environment metadata, maps FVarIds to ordered local-context indices, preserves the local-instance registry, and keeps transparent-let dependencies separate from nondependent-have value provenance. The contract deliberately uses an environment-scoped structural digest rather than claiming a cross-version semantic theorem ID. See docs/research/pitb-lean-expr-wire-v1-2026-11-01.md.
+PITB now has a separate v1 structural Lean-expression wire contract and an independent Rust verifier. It binds target expressions to exact source/task, Lean runtime-artifact, imported OLean-closure, and Lake environment metadata, maps FVarIds to ordered local-context indices, preserves the local-instance registry, and keeps transparent-let dependencies separate from nondependent-have value provenance. The contract deliberately uses an environment-scoped structural digest rather than claiming a cross-version semantic theorem ID. See docs/research/pitb-lean-expr-wire-v1-2026-11-01.md.
 
 The checked-in example is synthetic. The Rust verifier has not yet been compiled in this environment, and the Lean v1 exporter has not yet been implemented or run; no real capture or proof result is claimed.
