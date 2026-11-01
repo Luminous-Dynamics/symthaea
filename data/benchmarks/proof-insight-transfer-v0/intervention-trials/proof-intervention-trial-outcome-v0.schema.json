@@ -26,18 +26,18 @@
     "execution_order_index",
     "status",
     "checker_passed",
-    "semantic_gate_passed",
+    "target_integrity_passed",
     "successor_gate_status",
     "checked_target_statement_sha256",
     "proof_sha256",
     "checker_receipt_sha256",
-    "semantic_gate_receipt_sha256",
+    "target_integrity_receipt_sha256",
     "successor_gate_receipt_sha256",
     "run_receipt_sha256",
     "actual_resources",
     "proof_path",
     "checker_receipt_path",
-    "semantic_gate_receipt_path",
+    "target_integrity_receipt_path",
     "successor_gate_receipt_path",
     "run_receipt_path"
   ],
@@ -121,7 +121,7 @@
     "checker_passed": {
       "type": "boolean"
     },
-    "semantic_gate_passed": {
+    "target_integrity_passed": {
       "type": "boolean"
     },
     "successor_gate_status": {
@@ -264,14 +264,13 @@
       "then": {
         "required": [
           "proof_sha256",
-          "checker_receipt_sha256",
-          "semantic_gate_receipt_sha256"
+          "checker_receipt_sha256"
         ],
         "properties": {
           "checker_passed": {
             "const": true
           },
-          "semantic_gate_passed": {
+          "target_integrity_passed": {
             "const": true
           },
           "successor_gate_status": {
@@ -321,8 +320,8 @@
           "checker_passed": {
             "const": false
           },
-          "semantic_gate_passed": {
-            "const": false
+          "target_integrity_passed": {
+            "const": true
           },
           "successor_gate_status": {
             "const": "not_run"
@@ -334,9 +333,6 @@
             "type": "null"
           },
           "checker_receipt_sha256": {
-            "type": "null"
-          },
-          "semantic_gate_receipt_sha256": {
             "type": "null"
           },
           "successor_gate_receipt_sha256": {
@@ -379,21 +375,19 @@
           },
           {
             "properties": {
-              "status": {
-                "const": "verified_success"
+              "successor_gate_status": {
+                "const": "passed"
               }
             },
             "required": [
-              "status"
+              "successor_gate_status"
             ]
           }
         ]
       },
       "then": {
         "required": [
-          "proof_path",
-          "checker_receipt_path",
-          "semantic_gate_receipt_path"
+          "successor_receipt_path"
         ]
       }
     },
@@ -412,19 +406,20 @@
           },
           {
             "properties": {
-              "successor_gate_status": {
-                "const": "passed"
+              "status": {
+                "const": "verified_success"
               }
             },
             "required": [
-              "successor_gate_status"
+              "status"
             ]
           }
         ]
       },
       "then": {
         "required": [
-          "successor_receipt_path"
+          "proof_path",
+          "checker_receipt_path"
         ]
       }
     }
