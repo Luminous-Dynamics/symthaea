@@ -289,6 +289,11 @@ pub struct ConfidenceSetDiagnostics {
     pub topology_counts: TopologyCounts,
     pub unbounded_count: usize,
     pub unbounded_rate: Option<f64>,
+    /// Finite bounded sets that exclude the known structural beta.
+    /// In a zero/weak-first-stage scenario these are the explicit false-narrow-set count.
+    pub finite_noncovering_set_count: usize,
+    /// Proportion of reported finite bounded sets that exclude the true beta.
+    pub finite_noncovering_set_rate: Option<f64>,
     /// Width is defined only for non-empty bounded sets.
     pub finite_width_count: usize,
     pub finite_width_median: Option<f64>,
@@ -478,9 +483,14 @@ fn confidence_set_diagnostics(
     let unbounded_count = sets.iter().filter(|set| set.is_unbounded()).count();
     let mut topology_counts = TopologyCounts::default();
     let mut widths = Vec::new();
+    let mut finite_noncovering_set_count = 0usize;
 
     for set in &sets {
-        topology_counts.add(set.topology());
+        let topology = set.topology();
+        topology_counts.add(topology);
+        if topology == ConfidenceSetTopology::FiniteBounded && !set.contains(beta) {
+            finite_noncovering_set_count += 1;
+        }
         if let Some(width) = set.finite_total_width()? {
             widths.push(width);
         }
@@ -507,6 +517,10 @@ fn confidence_set_diagnostics(
         topology_counts,
         unbounded_count,
         unbounded_rate: (available > 0).then_some(unbounded_count as f64 / available as f64),
+        finite_noncovering_set_count,
+        finite_noncovering_set_rate: (topology_counts.finite_bounded > 0).then_some(
+            finite_noncovering_set_count as f64 / topology_counts.finite_bounded as f64,
+        ),
         finite_width_count: widths.len(),
         finite_width_median: quantile(&widths, 0.50),
         finite_width_p90: quantile(&widths, 0.90),
@@ -1335,6 +1349,29 @@ mod tests {
         assert!((score.confidence_sets.conservative_coverage_upper_bound.unwrap() - 2.0 / 3.0).abs() < 1e-12);
         assert_eq!(score.confidence_sets.topology_counts.empty, 1);
         assert_eq!(score.confidence_sets.topology_counts.disconnected_multi_component, 1);
+    }
+
+    #[test]
+    fn finite_bounded_sets_excluding_truth_are_reported_as_false_narrow() {
+        let mut narrow_miss = record("zero-relevance", "m", "1", 0.0, true, ExecutionStatus::Completed, Some(0.5));
+        narrow_miss.confidence_set = Some(ConfidenceSet {
+            components: vec![Interval { lower: Some(1.0), upper: Some(1.1) }],
+        });
+        let mut valid_bounded = record("zero-relevance", "m", "2", 0.0, true, ExecutionStatus::Completed, Some(0.5));
+        valid_bounded.confidence_set = Some(ConfidenceSet {
+            components: vec![Interval { lower: Some(-1.0), upper: Some(1.0) }],
+        });
+        let mut whole_line = record("zero-relevance", "m", "3", 0.0, true, ExecutionStatus::Completed, Some(0.5));
+        whole_line.confidence_set = Some(ConfidenceSet {
+            components: vec![Interval { lower: None, upper: None }],
+        });
+        let score = evaluate(
+            &[narrow_miss, valid_bounded, whole_line],
+            EvaluatorConfig::default(),
+        ).unwrap().remove(0);
+        assert_eq!(score.confidence_sets.finite_noncovering_set_count, 1);
+        assert_eq!(score.confidence_sets.finite_noncovering_set_rate, Some(0.5));
+        assert_eq!(score.confidence_sets.unbounded_count, 1);
     }
 
     #[test]
