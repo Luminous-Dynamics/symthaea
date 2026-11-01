@@ -1,0 +1,86 @@
+# Agricultural Platform Benchmark (AGRI-ROBOTICS-BENCH-V1)
+
+A standalone, standard-library-only Rust screening kernel for comparing farm-work approaches against one declared task and site. It is a first research tranche, not an autonomous farm planner.
+
+## Run
+
+From the repository root:
+
+```sh
+cargo run --manifest-path crates/agri-platform-bench/Cargo.toml --bin verify-manifest
+cargo test --manifest-path crates/agri-platform-bench/Cargo.toml --all-targets
+cargo run --manifest-path crates/agri-platform-bench/Cargo.toml --release
+```
+
+The crate defines its own Cargo workspace to avoid pulling the full Symthaea workspace into this small benchmark. It has no third-party dependencies.
+
+## What it does
+
+- Screens task compatibility and explicit service units.
+- Checks declared slope, terrain roughness, row clearance, turning radius, navigation assumptions, daily capacity, safety-case presence, and human override.
+- Separates site/task evidence from each candidate's capability, navigation, safety, cost, and serviceability evidence; candidates cannot inherit one another's capability claims, quotes, or repair claims.
+- Binds verified synthetic evidence to the retained `fixtures/synthetic_evidence_source.v1.txt` bytes; the focused workflow checks its SHA-256 sidecar before tests.
+- Requires an explicit uppercase currency code and blocks cross-currency cost comparisons unless a future, separately evidenced conversion contract is added.
+- Distinguishes verified, estimated, missing, stale, and conflicting evidence.
+- Fails closed on missing/invalid evidence records and checked-arithmetic overflow.
+- Computes transparent annualized-capital plus operating cost, supervision time, maintenance time, and repair lead time when the inputs permit it.
+- Returns component-wise assessments only; it does not choose a cross-candidate winner or implement a second Pareto optimizer. Symtropy's canonical [portfolio/Pareto work](https://github.com/Luminous-Dynamics/symtropy/pull/1669) owns that comparison after candidates have been assessed.
+- Keeps manual/current practice as a first-class candidate. A robot can be rejected while the no-robot option remains feasible.
+
+The independent `verify-manifest` binary does not import or call the screening kernel. It pins the raw manifest to a non-cryptographic FNV-1a regression fingerprint, checks header/row shape, duplicate IDs, status domain, required negative controls, and the named farm-task archetypes. Its `STRUCTURE_VALID_ONLY` output is a corpus-integrity result—not a claim that platform assessments or real farm data are correct.\n\nThe frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 53 expected-disposition cases: 43 adversarial/evidence-boundary cases around a synthetic scouting fixture and 10 additional farm-task archetypes covering broad-acre tractor treatment, orchard scouting, greenhouse harvest, nursery handling, livestock monitoring, packhouse transport, fixed sensors, aerial survey, smallholder mechanical weeding, and an agrivoltaic access rejection. These are synthetic reference cases—not 10 real field validations—and expansion to 30+ distinct site/task families is still required.
+
+## Important limitations
+
+- The included values are synthetic fixture values. They are not measured conditions for Johannesburg, the Highveld, or any real farm.
+- The kernel validates evidence-state and digest *shape*; it does not fetch sources or independently recompute source-artifact SHA-256 values.
+- Estimated evidence yields a provisional result, not qualification. Missing/stale/conflicting evidence blocks ranking.
+- “Feasible” is a result within this narrow profile contract. It is not machinery safety certification, food-safety evidence, agronomic validation, commercial viability, a procurement recommendation, or authority to operate an actuator.
+- No live devices, network APIs, irrigation, spraying, seeding, harvest, payments, or inventory are touched.
+- Cost is a transparent screening estimate. It is not an ROI/payback model and does not include every possible lifecycle cost; the missing cost fields must be added before any purchase or adoption decision.
+- The fixed scenario/profile types intentionally make units explicit, but do not replace a general physical-unit library or calibrated site data.
+
+## Benchmark philosophy
+
+The comparison should optimize the task-level service, not autonomy as a goal. Always compare manual/current practice, fixed sensing, existing equipment/implements, and candidate robotics where applicable. A candidate that cannot fit hard constraints is rejected; missing evidence is not interpreted as a zero or a favorable default.
+
+Targets for this research tranche:
+- 100% agreement with the frozen expected-disposition manifest.
+- Zero acceptance of known hard-constraint violations represented in the corpus.
+- Deterministic output for identical inputs.
+- Candidate-specific metrics remain separate; no composite score hides trade-offs.
+- Expansion to 30+ distinct site/task scenario families (including orchards, greenhouses, broad-acre fields, nursery, livestock, and packhouse contexts), plus field calibration, precedes any claim about real-world performance.
+
+## Research leads
+
+- Digital Agriculture Datasets — curated list for agriculture AI/robotics data: https://github.com/ricber/digital-agriculture-datasets
+- Agri-OpenCore — open agricultural robotics components and project outcomes: https://agri-opencore.org/outcomes/
+- Agrivoltaic systems review and meta-analysis: https://www.annualreviews.org/content/journals/10.1146/annurev-environ-121224-073319
+- Scientific frontiers of agrivoltaic cropping systems: https://www.nature.com/articles/s44359-025-00110-9
+
+External dataset availability is not permission to ingest or redistribute its data. Any future data addition must pin provenance, rights, scope, units, geography/time coverage, and the exact referenced artifacts.
+
+## Safety and evaluation references (reviewed 2026-10-17)
+
+The next qualification layer should use the current agricultural autonomy safety guidance as a design input, not claim compliance by citation alone:
+
+- ISO 18497-1:2024, machine design principles and residual-risk/safe-work information for partially automated, semi-autonomous and autonomous agricultural machinery: https://www.iso.org/standard/82684.html
+- ISO 18497-4:2024, verification methods and validation principles for such machinery: https://www.iso.org/standard/82688.html
+- Almtireen & Ryalat, *Robotics in Precision Agriculture: Task-, Platform-, and Evaluation-Oriented Review* (2026): https://www.mdpi.com/2218-6581/15/4/81
+- Polanía et al., *Control System for the Navigation of the Agricultural Robots: A Review* (2026): https://onlinelibrary.wiley.com/doi/10.1002/rob.70199
+- Barros et al., *Agrivoltaic Systems: Systematic Review and Meta-Analysis Relating to Energy, Soil, and Crop Parameters* (2026): https://www.annualreviews.org/content/journals/10.1146/annurev-environ-121224-073319
+
+The 2026 field-robotics review explicitly separates lab, greenhouse, single-season open-field and multi-season/multi-site evaluation. It also highlights task-specific throughput/quality metrics, uptime, failure recovery and near-miss/human-proximity reporting. Therefore a result from one setting must not be compared as equivalent to a result from another without protocol/domain alignment. A navigation tracking-error target such as 5 cm may be useful for some tasks, but is not a universal acceptance target: tolerances must derive from tool geometry, crop damage, site and risk.
+
+The 2026 agrivoltaics meta-analysis includes 66 studies and reports heterogeneous configurations and crop outcomes. Use crop output and energy output together with site-specific LER, water/microclimate, machinery access, ecology and whole-life cost; do not assume panel density or yield in a different climate transfers to a local site.
+
+A standards reference does not establish legal compliance, safety certification, or readiness. A real-machine safety case must be reviewed by appropriately qualified agricultural machinery and functional-safety specialists, with South African legal requirements assessed before any field operation.
+
+## Cross-stack ownership
+
+This crate is a small, independent screening/benchmark surface. It composes with, but does not replace:
+- Symthaea's existing Agribot and hydroponic-analysis work;
+- Symtropy's agricultural value-of-information and scenario modelling;
+- Sol-Atlas's geospatial/site-suitability evidence;
+- Mycelix's food-cooperative, shared-asset, and logistics records.
+
+Next steps are to add more task/site families, use an independent verifier over retained corpus artifacts, and compare against exhaustive oracle cases before considering any operational integration.
