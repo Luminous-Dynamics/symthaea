@@ -2304,7 +2304,11 @@ mod tests {
             &problem,
         ).unwrap();
         assert_eq!(ranked[0].experiment_id, "outcome-discriminator");
-        assert!(ranked[0].score.worst_case_evsi > 0.0);
+        assert!((ranked[0].score.worst_case_evsi - 0.47).abs() < 1.0e-12);
+        assert!((ranked[0].score.scenario_values[0].current_expected_utility - 0.5).abs() < 1.0e-12);
+        assert!((ranked[0].score.scenario_values[0].expected_post_experiment_utility - 0.97).abs() < 1.0e-12);
+        assert_eq!(ranked[0].score.scenario_values[0].outcome_decisions[0].selected_action_id, "intervene");
+        assert_eq!(ranked[0].score.scenario_values[0].outcome_decisions[1].selected_action_id, "do-not-intervene");
         assert_eq!(ranked[1].score.worst_case_evsi, 0.0);
     }
 
