@@ -17,12 +17,18 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
-SOMA_CRATE="$WORKSPACE/crates/symthaea-soma"
+SOMA_CRATE="$WORKSPACE/crates/domains/symthaea-soma"
 ANDROID_DIR="$SOMA_CRATE/android"
 TARGET="aarch64-linux-android"
 PROFILE="release"
 DEPLOY=false
 HOLON_IP=""
+
+# Fail early if the workspace layout has changed.
+if [[ ! -d "$ANDROID_DIR" || ! -x "$ANDROID_DIR/build-jni.sh" ]]; then
+    echo "ERROR: SOMA Android build directory is missing or incomplete: $ANDROID_DIR" >&2
+    exit 1
+fi
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -30,14 +36,21 @@ while [[ $# -gt 0 ]]; do
         --deploy) DEPLOY=true; shift ;;
         --debug) PROFILE="debug"; shift ;;
         --release) PROFILE="release"; shift ;;
-        --holon) HOLON_IP="$2"; shift 2 ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        --holon)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --holon requires an IP address." >&2
+                exit 2
+            fi
+            HOLON_IP="$2"
+            shift 2
+            ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 
 # Verify we're in the mobile nix shell
 if [[ -z "${ANDROID_NDK_HOME:-}" ]]; then
-    echo "ERROR: Not in mobile nix shell. Run: nix develop .#mobile"
+    echo "ERROR: Not in mobile nix shell. Run: nix develop .#mobile" >&2
     exit 1
 fi
 

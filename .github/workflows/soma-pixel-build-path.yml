@@ -1,0 +1,44 @@
+name: SOMA Pixel Android build path contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/build-soma-pixel8.sh"
+      - "crates/domains/symthaea-soma/android/build-jni.sh"
+      - ".github/workflows/soma-pixel-build-path.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: soma-pixel-build-path-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-path-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check shell syntax and expected crate paths
+        run: |
+          set -euo pipefail
+          bash -n scripts/build-soma-pixel8.sh
+          test -d crates/domains/symthaea-soma/android
+          test -x crates/domains/symthaea-soma/android/build-jni.sh
+          ! grep -Fq 'crates/symthaea-soma/android' scripts/build-soma-pixel8.sh
+          grep -Fq 'crates/domains/symthaea-soma' scripts/build-soma-pixel8.sh
+      - name: Prove the script reaches the mobile-shell prerequisite
+        run: |
+          set -euo pipefail
+          set +e
+          output="$(env -u ANDROID_NDK_HOME bash scripts/build-soma-pixel8.sh 2>&1)"
+          status=$?
+          set -e
+          test "$status" -eq 1
+          grep -Fq 'Not in mobile nix shell' <<<"$output"
+          printf '%s\n' 'SOMA Android path resolved; script stopped at the expected NDK prerequisite.'
