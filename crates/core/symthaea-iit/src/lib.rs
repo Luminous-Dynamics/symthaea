@@ -3059,7 +3059,7 @@ pub fn primitive_repertoire_request_sha256(
     let mut candidate = candidate_system.to_vec();
     candidate.sort_unstable();
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"SYMTHAEA-IIT-PRIMITIVE-REQUEST\\0v0.1\\0");
+    bytes.extend_from_slice(b"SYMTHAEA-IIT-PRIMITIVE-REQUEST\0v0.1\0");
     bytes.extend_from_slice(&model.canonical_bytes());
     bytes.extend(state.iter().map(|on| u8::from(*on)));
     bytes.extend_from_slice(&(candidate.len() as u32).to_le_bytes());
