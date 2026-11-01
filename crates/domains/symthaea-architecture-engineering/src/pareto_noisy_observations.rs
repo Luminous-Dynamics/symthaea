@@ -207,9 +207,12 @@ struct NoisyReportPayload<'a> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NoisyParetoStudy {
-    pub plan: NoisyObservationPlan,
+    plan: NoisyObservationPlan,
     candidates: BTreeMap<String, CandidateSamples>,
     decision_owners: BTreeMap<String, String>,
+    /// Rebuilt once after deserialization; immutable private state makes subsequent appends incremental.
+    #[serde(skip)]
+    validated: bool,
 }
 
 impl NoisyParetoStudy {
@@ -219,7 +222,12 @@ impl NoisyParetoStudy {
             plan,
             candidates: BTreeMap::new(),
             decision_owners: BTreeMap::new(),
+            validated: true,
         })
+    }
+
+    pub fn plan(&self) -> &NoisyObservationPlan {
+        &self.plan
     }
 
     pub fn append(
@@ -228,7 +236,10 @@ impl NoisyParetoStudy {
         decision_sha256: impl Into<String>,
         replicate: NoisyReplicate,
     ) -> Result<(), NoisyParetoError> {
-        self.validate()?;
+        if !self.validated {
+            self.validate()?;
+            self.validated = true;
+        }
         let candidate_id = candidate_id.into();
         let decision_sha256 = decision_sha256.into();
         if candidate_id.trim().is_empty() {
@@ -607,6 +618,24 @@ mod tests {
         assert_eq!(study.candidates["a"].samples.len(), 1);
         assert!(!study.candidates.contains_key("b"));
         study.validate().unwrap();
+    }
+
+    #[test]
+    fn deserialized_study_rebuilds_validation_cache_and_resumes_deterministically() {
+        let mut uninterrupted = NoisyParetoStudy::new(plan()).unwrap();
+        for i in 0..20 {
+            uninterrupted.append("a", H1, sample(i, i as u64 + 1, [0.7, 0.3])).unwrap();
+        }
+        let encoded = serde_json::to_vec(&uninterrupted).unwrap();
+        let mut resumed: NoisyParetoStudy = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(resumed.report().unwrap(), uninterrupted.report().unwrap());
+        for i in 20..40 {
+            let replicate = sample(i, i as u64 + 1, [0.7, 0.3]);
+            uninterrupted.append("a", H1, replicate.clone()).unwrap();
+            resumed.append("a", H1, replicate).unwrap();
+        }
+        assert_eq!(resumed.report().unwrap(), uninterrupted.report().unwrap());
+        resumed.validate().unwrap();
     }
 
     #[test]
