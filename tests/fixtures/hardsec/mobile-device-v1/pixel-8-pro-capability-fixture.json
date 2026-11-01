@@ -1,0 +1,118 @@
+{
+  "schema_version": "hardsec-mobile-device-profile-v1",
+  "profile_id": "pixel-8-pro-mobile-security-capability-fixture-v1",
+  "evidence_domain": "synthetic_fixture",
+  "device": {
+    "platform": "android",
+    "product_family": "Google Pixel 8 Pro",
+    "soc_family": "Google Tensor G3",
+    "isa_family": "aarch64",
+    "os_version": null,
+    "security_patch_level": null,
+    "build_fingerprint_sha256": null
+  },
+  "boot_integrity": {
+    "bootloader_locked": "not_measured",
+    "verified_boot_state": "not_measured",
+    "rollback_protection_state": "not_measured",
+    "attestation_security_level": "not_measured",
+    "attestation_challenge_freshness": "not_measured",
+    "certificate_chain_status": "not_measured",
+    "patch_level_binding_status": "not_measured"
+  },
+  "hardware_protections": {
+    "memory_tagging": {
+      "hardware_support": "vendor_documented",
+      "runtime_state": "not_measured",
+      "mode": null,
+      "protected_scope": null,
+      "evidence_ids": [
+        "google-android-mte-device-list",
+        "google-pixel-security-certifications"
+      ]
+    },
+    "pointer_authentication": {
+      "hardware_support": "unknown",
+      "runtime_state": "not_measured",
+      "mode": null,
+      "protected_scope": null,
+      "evidence_ids": []
+    },
+    "branch_target_protection": {
+      "hardware_support": "unknown",
+      "runtime_state": "not_measured",
+      "mode": null,
+      "protected_scope": null,
+      "evidence_ids": []
+    },
+    "secure_element": {
+      "hardware_support": "vendor_documented",
+      "runtime_state": "not_measured",
+      "mode": "Titan M2 listed by vendor; security-level attestation not sampled",
+      "protected_scope": null,
+      "evidence_ids": [
+        "google-pixel-security-certifications"
+      ]
+    },
+    "tee": {
+      "hardware_support": "vendor_documented",
+      "runtime_state": "not_measured",
+      "mode": "Trusty TEE listed by vendor",
+      "protected_scope": null,
+      "evidence_ids": [
+        "google-pixel-security-certifications"
+      ]
+    }
+  },
+  "pmu_acquisition": {
+    "interface": "unknown",
+    "access_status": "not_measured",
+    "available_events": [],
+    "privilege_context": "not_measured",
+    "multiplexing_status": "not_measured",
+    "time_enabled_ns": null,
+    "time_running_ns": null,
+    "read_overhead_status": "not_measured",
+    "sample_loss_status": "not_measured",
+    "observer_effect_status": "not_measured"
+  },
+  "environment": {
+    "thermal_status": "not_measured",
+    "power_state": "not_measured",
+    "charging_state": "not_measured",
+    "radio_activity_class": "not_measured",
+    "screen_state": "not_measured"
+  },
+  "evidence": [
+    {
+      "evidence_id": "google-pixel-security-certifications",
+      "source_type": "vendor_documentation",
+      "source_uri": "https://support.google.com/pixelphone/answer/11062200",
+      "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parser_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "captured_at": null,
+      "claim_scope": "vendor documentation lists Titan M2, Tensor security core and Trusty TEE for Pixel 8 Pro; establishes model-family capability only"
+    },
+    {
+      "evidence_id": "google-android-mte-device-list",
+      "source_type": "vendor_documentation",
+      "source_uri": "https://developer.android.com/ndk/guides/arm-mte",
+      "input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "parser_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "captured_at": null,
+      "claim_scope": "Android developer documentation lists Pixel 8 Pro among MTE-capable devices; does not establish MTE enabled on a particular handset build"
+    }
+  ],
+  "claim_ceiling": {
+    "runtime_integrity_verified": false,
+    "pmu_measurement_qualified": false,
+    "physical_attack_resistance_established": false,
+    "limitations": [
+      "Synthetic capability fixture; no device was queried.",
+      "Model support does not establish runtime protection enablement.",
+      "No KeyMint attestation challenge or certificate chain was collected or verified.",
+      "No PMU event availability, privilege, multiplexing, or observer-effect measurement was made.",
+      "No IMEI, serial number, unique device ID, location, or raw attestation material is present."
+    ]
+  }
+}
