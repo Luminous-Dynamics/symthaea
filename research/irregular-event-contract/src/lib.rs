@@ -527,6 +527,20 @@ impl BitemporalEventLedger {
         if candidate.revisions != self.revisions {
             return Err(BitemporalEventError::InvalidHistory);
         }
+
+        let mut latest_by_event = BTreeMap::<u64, &EventRevision>::new();
+        for revision in &self.revisions {
+            let replace = latest_by_event.get(&revision.event_id)
+                .is_none_or(|existing| existing.revision_sequence < revision.revision_sequence);
+            if replace {
+                latest_by_event.insert(revision.event_id, revision);
+            }
+        }
+        let active_records: Vec<EventRecord> = latest_by_event.values()
+            .filter_map(|revision| revision.record().copied())
+            .collect();
+        validate_event_batch(&active_records)
+            .map_err(|_| BitemporalEventError::InvalidHistory)?;
         Ok(())
     }
 
@@ -780,9 +794,12 @@ mod tests {
         assert_eq!(
             ledger.append_batch([
                 revision(1, 1, 1, 20, EventRevisionOperation::Assert { record: first }),
-                revision(2, 2, 1, 21, EventRevisionOperation::Assert { record: second }),
+                revision(2, 2, 1, 20, EventRevisionOperation::Retract {
+                    target_revision_id: 999,
+                    reason_code: 1,
+                }),
             ]),
-            Err(BitemporalEventError::BatchTimestampMismatch)
+            Err(BitemporalEventError::UnknownTargetRevision { revision_id: 999 })
         );
         assert!(ledger.revisions().is_empty());
         assert_eq!(ledger.state_sha256(), before);
@@ -862,6 +879,35 @@ mod tests {
             record: corrected,
         })).unwrap();
         assert_ne!(left.state_sha256(), before);
+    }
+
+    #[test]
+    fn active_source_sequence_collision_is_rejected_at_commit() {
+        let mut ledger = BitemporalEventLedger::default();
+        let first = revision_record(1, 10, 10, 1);
+        let mut second = revision_record(2, 11, 11, 2);
+        second.source_sequence = first.source_sequence;
+        assert_eq!(
+            ledger.append_batch([
+                revision(1, 1, 1, 10, EventRevisionOperation::Assert { record: first }),
+                revision(2, 2, 1, 11, EventRevisionOperation::Assert { record: second }),
+            ]),
+            Err(BitemporalEventError::InvalidHistory)
+        );
+        assert!(ledger.revisions().is_empty());
+    }
+
+    #[test]
+    fn transaction_clock_must_advance_between_batches() {
+        let mut ledger = BitemporalEventLedger::default();
+        let first = revision_record(1, 10, 10, 1);
+        ledger.append(revision(1, 1, 1, 10, EventRevisionOperation::Assert { record: first })).unwrap();
+        let second = revision_record(2, 11, 11, 2);
+        assert_eq!(
+            ledger.append(revision(2, 2, 1, 10, EventRevisionOperation::Assert { record: second })),
+            Err(BitemporalEventError::NonIncreasingTransactionTime { previous: 10, actual: 10 })
+        );
+        assert_eq!(ledger.revisions().len(), 1);
     }
 
     #[test]
