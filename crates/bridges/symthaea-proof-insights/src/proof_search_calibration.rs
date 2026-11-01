@@ -34,6 +34,8 @@ struct Receipt {
     evidence_class: String,
     receipt_id: String,
     split: String,
+    evaluation_horizon_id: String,
+    continuation_policy_sha256: String,
     dataset_id: String,
     dataset_manifest_sha256: String,
     prediction_model_id: String,
@@ -75,6 +77,8 @@ struct Bin {
 pub struct CalibrationSummary {
     pub receipt_sha256: String,
     pub dataset_manifest_sha256: String,
+    pub evaluation_horizon_id: String,
+    pub continuation_policy_sha256: String,
     pub prediction_model_id: String,
     pub prediction_model_version: String,
     pub total_sample_count: u64,
@@ -208,6 +212,7 @@ pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>, allow_synthetic
     let receipt: Receipt = serde_json::from_slice(bytes).context("decode strict calibration receipt")?;
     if receipt.schema_version != VERSION
         || receipt.split != "validation"
+        || receipt.evaluation_horizon_id.trim().is_empty()
         || receipt.calibration_method != "equal_width_10_bin_per_action"
         || receipt.minimum_bin_count != MIN_BIN_COUNT
         || receipt.receipt_id.trim().is_empty()
@@ -224,6 +229,7 @@ pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>, allow_synthetic
         bail!("synthetic calibration receipt is not eligible for production selection");
     }
     check_sha(&receipt.dataset_manifest_sha256, "calibration dataset manifest")?;
+    check_sha(&receipt.continuation_policy_sha256, "calibration continuation policy")?;
     check_sha(&receipt.source_receipt_manifest_sha256, "source outcome receipt manifest")?;
     if receipt.action_groups.len() != ACTION_KINDS.len() {
         bail!("calibration receipt must cover all eight registered action kinds");
@@ -261,6 +267,8 @@ pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>, allow_synthetic
     Ok(CalibrationSummary {
         receipt_sha256,
         dataset_manifest_sha256: receipt.dataset_manifest_sha256,
+        evaluation_horizon_id: receipt.evaluation_horizon_id,
+        continuation_policy_sha256: receipt.continuation_policy_sha256,
         prediction_model_id: receipt.prediction_model_id,
         prediction_model_version: receipt.prediction_model_version,
         total_sample_count,
