@@ -1503,6 +1503,88 @@ fn validate_event_versions(
     Ok(())
 }
 
+fn validate_objective_contract_for_action<'a>(
+    header: &'a EventTapeHeader,
+    event_contract_sha256: &str,
+    expected_mode: EventTapeObjectiveMode,
+    path: &str,
+) -> Result<&'a EventTapeObjectiveContract, EventTapeError> {
+    if header.version != TAPE_VERSION {
+        return Err(EventTapeError::new(
+            format!("{path}.intent.objective_contract_sha256"),
+            "multi-objective events require EventTape v0.2.0",
+        ));
+    }
+    let contract = header.objective_contract.as_ref().ok_or_else(|| {
+        EventTapeError::new(
+            format!("{path}.intent.objective_contract_sha256"),
+            "multi-objective event requires a frozen header objective contract",
+        )
+    })?;
+    let header_digest = header.objective_contract_sha256.as_deref().ok_or_else(|| {
+        EventTapeError::new(
+            "header.objective_contract_sha256",
+            "objective contract digest is missing",
+        )
+    })?;
+    let actual_digest = contract.contract_sha256()?;
+    if header_digest != actual_digest || event_contract_sha256 != actual_digest {
+        return Err(EventTapeError::new(
+            format!("{path}.intent.objective_contract_sha256"),
+            "event objective-contract digest differs from the frozen header contract",
+        ));
+    }
+    if contract.mode != expected_mode {
+        return Err(EventTapeError::new(
+            format!("{path}.intent.objective_contract_sha256"),
+            "event mode differs from the frozen deterministic/noisy campaign mode",
+        ));
+    }
+    Ok(contract)
+}
+
+fn validate_objective_vector(
+    values: &[f64],
+    contract: &EventTapeObjectiveContract,
+    path: &str,
+) -> Result<(), EventTapeError> {
+    if values.len() != contract.objective_specs.len() {
+        return Err(EventTapeError::new(
+            path,
+            "objective-vector length differs from the frozen objective contract",
+        ));
+    }
+    for (index, (value, spec)) in values.iter().zip(&contract.objective_specs).enumerate() {
+        if !value.is_finite() {
+            return Err(EventTapeError::new(
+                format!("{path}[{index}]"),
+                "objective values must be finite",
+            ));
+        }
+        if contract.mode == EventTapeObjectiveMode::NoisyReplicates {
+            let lower = spec.observation_lower_bound.ok_or_else(|| {
+                EventTapeError::new(
+                    format!("{path}[{index}]"),
+                    "noisy objective lower bound is missing from the frozen contract",
+                )
+            })?;
+            let upper = spec.observation_upper_bound.ok_or_else(|| {
+                EventTapeError::new(
+                    format!("{path}[{index}]"),
+                    "noisy objective upper bound is missing from the frozen contract",
+                )
+            })?;
+            if *value < lower || *value > upper {
+                return Err(EventTapeError::new(
+                    format!("{path}[{index}]"),
+                    "noisy objective observation is outside the frozen single-replicate bounds",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
     if header.schema != TAPE_SCHEMA {
         return Err(EventTapeError::new(
