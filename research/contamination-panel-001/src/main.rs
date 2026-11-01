@@ -1,9 +1,11 @@
 use contamination_panel_bench::{
-    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
-    DetectorSpecV1, GeneratorConfigV1, PublicChallengePacketV1, SealedChallengeKeyV1,
+    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
+    PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
-    detectors::{evaluate_detector_run, score_public_packet},
+    detectors::{
+        DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet,
+    },
     fresh_instance::{
         FreshChallengeBundleV1, FreshChallengeConfigV1, FreshChallengeManifestV1,
         FreshPublicChallengePacketV1, SealedFreshOraclePacketV1, audit_fresh_challenge_bundle,
