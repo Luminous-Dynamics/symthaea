@@ -74,6 +74,13 @@ fn self_test(path: &PathBuf) -> Result<()> {
             goal["closure_contains_sorry_ax"] = Value::Bool(false);
         }
     }
+    provisional["proof_steps"][0]["status"] = json!("candidate");
+    provisional["proof_steps"][0]["transition_checker_id"] = Value::Null;
+    provisional["proof_steps"][0]["transition_receipt_sha256"] = Value::Null;
+    provisional["proof_steps"][0]["terminal_proof_sha256"] = Value::Null;
+    provisional["proof_steps"][0]["terminal_receipt_sha256"] = Value::Null;
+    provisional["proof_steps"][0]["terminal_kernel_verified"] = Value::Bool(false);
+    provisional["proof_steps"][0]["terminal_contains_sorry_ax"] = Value::Bool(false);
     provisional["scheduler_decision"]["ready_frontier_goal_ids"] = json!(["goal-helper-root"]);
     provisional["scheduler_decision"]["selected_goal_ids"] = json!(["goal-helper-root"]);
     let provisional_summary = proof_graph::validate_value(&provisional)?;
