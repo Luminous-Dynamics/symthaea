@@ -5,22 +5,22 @@ const PROFILE_BYTES: &[u8] = include_bytes!(
     "../tests/fixtures/hardsec/mobile-device-v1/pixel-8-pro-capability-fixture.json"
 );
 
-const FORBIDDEN_KEYS: &[&str] = &[
+const FORBIDDEN_KEYS_NORMALIZED: &[&str] = &[
     "imei",
     "meid",
     "imsi",
     "iccid",
     "serial",
-    "serial_number",
-    "hardware_unique_id",
-    "unique_id",
-    "raw_attestation_certificate",
-    "attestation_certificate_der",
-    "phone_number",
-    "subscriber_id",
+    "serialnumber",
+    "hardwareuniqueid",
+    "uniqueid",
+    "rawattestationcertificate",
+    "attestationcertificateder",
+    "phonenumber",
+    "subscriberid",
     "latitude",
     "longitude",
-    "precise_location",
+    "preciselocation",
 ];
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -34,8 +34,12 @@ fn find_forbidden_key(value: &Value, path: &str) -> Option<String> {
     match value {
         Value::Object(object) => {
             for (key, child) in object {
-                let normalized = key.to_ascii_lowercase();
-                if FORBIDDEN_KEYS.contains(&normalized.as_str()) {
+                let normalized: String = key
+                    .to_ascii_lowercase()
+                    .chars()
+                    .filter(|character| character.is_ascii_alphanumeric())
+                    .collect();
+                if FORBIDDEN_KEYS_NORMALIZED.contains(&normalized.as_str()) {
                     return Some(format!("{path}.{key}"));
                 }
                 if let Some(found) = find_forbidden_key(child, &format!("{path}.{key}")) {
@@ -59,6 +63,31 @@ fn evidence_sources(profile: &Value) -> Vec<&str> {
         .flatten()
         .filter_map(|item| item["source_type"].as_str())
         .collect()
+}
+
+fn evidence_sources_for_ids<'a>(profile: &'a Value, evidence_ids: &Value) -> Vec<&'a str> {
+    let Some(ids) = evidence_ids.as_array() else {
+        return Vec::new();
+    };
+    let Some(evidence) = profile["evidence"].as_array() else {
+        return Vec::new();
+    };
+
+    ids.iter()
+        .filter_map(Value::as_str)
+        .filter_map(|id| evidence.iter().find(|item| item["evidence_id"] == id))
+        .filter_map(|item| item["source_type"].as_str())
+        .collect()
+}
+
+fn has_linked_evidence_source(
+    profile: &Value,
+    evidence_ids: &Value,
+    allowed_sources: &[&str],
+) -> bool {
+    evidence_sources_for_ids(profile, evidence_ids)
+        .iter()
+        .any(|source| allowed_sources.contains(source))
 }
 
 fn validate_profile(profile: &Value) -> Result<(), String> {
@@ -100,7 +129,11 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     }
 
     if profile["boot_integrity"]["certificate_chain_status"] == "trusted"
-        && !sources.contains(&"hardware_attestation_verified")
+        && !has_linked_evidence_source(
+            profile,
+            &profile["boot_integrity"]["evidence_ids"],
+            &["hardware_attestation_verified"],
+        )
     {
         return Err(
             "trusted attestation chain requires a hardware_attestation_verified evidence source"
@@ -109,7 +142,11 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     }
 
     if profile["boot_integrity"]["attestation_challenge_freshness"] == "fresh_verified"
-        && !sources.contains(&"hardware_attestation_verified")
+        && !has_linked_evidence_source(
+            profile,
+            &profile["boot_integrity"]["evidence_ids"],
+            &["hardware_attestation_verified"],
+        )
     {
         return Err(
             "fresh attestation challenge requires a hardware_attestation_verified evidence source"
@@ -118,7 +155,11 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     }
 
     if profile["pmu_acquisition"]["read_overhead_status"] == "qualified"
-        && !sources.contains(&"physical_lab_measurement")
+        && !has_linked_evidence_source(
+            profile,
+            &profile["pmu_acquisition"]["evidence_ids"],
+            &["physical_lab_measurement"],
+        )
     {
         return Err(
             "qualified PMU read overhead requires physical_lab_measurement evidence".to_owned(),
@@ -126,7 +167,11 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     }
 
     if profile["pmu_acquisition"]["observer_effect_status"] == "within_budget"
-        && !sources.contains(&"physical_lab_measurement")
+        && !has_linked_evidence_source(
+            profile,
+            &profile["pmu_acquisition"]["evidence_ids"],
+            &["physical_lab_measurement"],
+        )
     {
         return Err(
             "within-budget observer effect requires physical_lab_measurement evidence".to_owned(),
@@ -134,8 +179,11 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     }
 
     if profile["pmu_acquisition"]["access_status"] == "permitted"
-        && !sources.contains(&"privileged_device_tool")
-        && !sources.contains(&"physical_lab_measurement")
+        && !has_linked_evidence_source(
+            profile,
+            &profile["pmu_acquisition"]["evidence_ids"],
+            &["privileged_device_tool", "physical_lab_measurement"],
+        )
     {
         return Err(
             "PMU access claim requires privileged device-tool or physical measurement evidence"
@@ -147,15 +195,16 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
         && profile["hardware_protections"]["memory_tagging"]["hardware_support"]
             == "vendor_documented"
         && profile["hardware_protections"]["memory_tagging"]["runtime_state"] == "enabled_verified"
-        && !sources.iter().any(|source| {
-            matches!(
-                *source,
-                "on_device_property"
-                    | "hardware_attestation_verified"
-                    | "privileged_device_tool"
-                    | "physical_lab_measurement"
-            )
-        })
+        && !has_linked_evidence_source(
+            profile,
+            &profile["hardware_protections"]["memory_tagging"]["evidence_ids"],
+            &[
+                "on_device_property",
+                "hardware_attestation_verified",
+                "privileged_device_tool",
+                "physical_lab_measurement",
+            ],
+        )
     {
         return Err(
             "Android MTE runtime enablement cannot be inferred from vendor documentation alone"
@@ -279,6 +328,41 @@ mod tests {
     fn pmu_measurement_qualification_requires_physical_measurement_evidence() {
         let mut profile = fixture();
         profile["pmu_acquisition"]["observer_effect_status"] = json!("within_budget");
+        let error = validate_profile(&profile).unwrap_err();
+        assert!(error.contains("within-budget observer effect requires"));
+    }
+
+    #[test]
+    fn unrelated_runtime_evidence_cannot_qualify_mte_enablement() {
+        let mut profile = fixture();
+        profile["hardware_protections"]["memory_tagging"]["runtime_state"] =
+            json!("enabled_verified");
+        profile["evidence"].as_array_mut().unwrap().push(json!({
+            "evidence_id": "unrelated-on-device-property",
+            "source_type": "on_device_property",
+            "source_uri": "https://example.invalid/unrelated",
+            "input_sha256": "d".repeat(64),
+            "parser_sha256": "b".repeat(64),
+            "captured_at": null,
+            "claim_scope": "unrelated fixture evidence"
+        }));
+        let error = validate_profile(&profile).unwrap_err();
+        assert!(error.contains("cannot be inferred from vendor documentation"));
+    }
+
+    #[test]
+    fn unrelated_lab_measurement_cannot_qualify_pmu_observer_effect() {
+        let mut profile = fixture();
+        profile["pmu_acquisition"]["observer_effect_status"] = json!("within_budget");
+        profile["evidence"].as_array_mut().unwrap().push(json!({
+            "evidence_id": "unrelated-lab-measurement",
+            "source_type": "physical_lab_measurement",
+            "source_uri": "https://example.invalid/unrelated",
+            "input_sha256": "e".repeat(64),
+            "parser_sha256": "b".repeat(64),
+            "captured_at": null,
+            "claim_scope": "unrelated fixture measurement"
+        }));
         let error = validate_profile(&profile).unwrap_err();
         assert!(error.contains("within-budget observer effect requires"));
     }
