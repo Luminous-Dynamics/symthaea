@@ -12,6 +12,8 @@
 mod proof_intervention_trial;
 #[path = "../benchmark_integrity.rs"]
 mod benchmark_integrity;
+#[path = "../proof_intervention_evidence.rs"]
+mod proof_intervention_evidence;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -143,6 +145,23 @@ fn authenticate_artifact(
             Ok(true)
         }
     }
+}
+
+fn read_verified_artifact(
+    root: &Path,
+    relative: &str,
+    expected_sha256: &str,
+    label: &str,
+) -> Result<Vec<u8>> {
+    digest(expected_sha256, label)?;
+    let resolved = safe_artifact_path(root, relative)?;
+    let bytes = fs::read(&resolved)
+        .with_context(|| format!("read {label} {}", resolved.display()))?;
+    let actual = hex::encode(Sha256::digest(&bytes));
+    if actual != expected_sha256 {
+        bail!("{label} bytes do not match the paired outcome SHA-256");
+    }
+    Ok(bytes)
 }
 
 fn resource_values(value: &Value, prefix: &str) -> Result<Vec<u64>> {
@@ -402,6 +421,86 @@ fn validate_and_analyze(
                 authenticate_artifact(evidence_root, evidence_class, path, expected, label)?;
             if evidence_class == "measured_outcome" && !authenticated {
                 measured_artifacts_authenticated = false;
+            }
+        }
+
+        if evidence_class == "measured_outcome" {
+            let root = evidence_root.context("measured evidence requires a canonical evidence root")?;
+            let expected_identity = proof_intervention_evidence::ExpectedIdentity {
+                trial_id,
+                pair_id: &pair_id,
+                arm_id: &arm_id,
+                run_id: &run_id,
+                task_id: string(outcome, "/task_id")?,
+                component_id: string(outcome, "/component_id")?,
+                repository_commit: string(outcome, "/repository_commit")?,
+                lean_toolchain: string(outcome, "/lean_toolchain")?,
+                environment_sha256: string(outcome, "/environment_sha256")?,
+                initial_proof_state_sha256: string(outcome, "/initial_proof_state_sha256")?,
+                target_statement_sha256: string(outcome, "/target_statement_sha256")?,
+                model_seed_sha256: string(outcome, "/model_seed_sha256")?,
+                evaluation_horizon_id: horizon,
+                continuation_policy_sha256: continuation,
+                execution_order_index: expected_index as u64,
+            };
+
+            let checker_path = match field(outcome, "/checker_receipt_path")? {
+                Value::Null => None,
+                Value::String(value) => Some(value.as_str()),
+                _ => bail!("checker_receipt_path must be a relative path or null"),
+            };
+            let checker_digest = optional_digest(outcome, "/checker_receipt_sha256")?;
+            match (checker_path, checker_digest.as_deref()) {
+                (Some(relative), Some(expected_sha)) => {
+                    let bytes = read_verified_artifact(root, relative, expected_sha, "checker receipt")?;
+                    let proof_sha = optional_digest(outcome, "/proof_sha256")?;
+                    let checked_target = match field(outcome, "/checked_target_statement_sha256")? {
+                        Value::Null => None,
+                        Value::String(value) => Some(value.as_str()),
+                        _ => bail!("checked target statement must be a digest or null"),
+                    };
+                    proof_intervention_evidence::verify_checker_receipt(
+                        &bytes,
+                        expected_sha,
+                        expected_identity,
+                        status,
+                        proof_sha.as_deref(),
+                        checked_target,
+                    )?;
+                }
+                (None, None) if status != "verified_success" => {}
+                _ => bail!("checker receipt path/digest is incomplete or missing for a verified success"),
+            }
+
+            let run_relative = match field(outcome, "/run_receipt_path")? {
+                Value::String(value) => value.as_str(),
+                _ => bail!("measured outcome requires a run_receipt_path"),
+            };
+            let run_digest = string(outcome, "/run_receipt_sha256")?;
+            let run_bytes = read_verified_artifact(root, run_relative, run_digest, "run receipt")?;
+            proof_intervention_evidence::verify_run_receipt(
+                &run_bytes,
+                run_digest,
+                expected_identity,
+                outcome,
+                field(pair, "/resource_budget")?,
+            )?;
+
+            let successor_status = string(outcome, "/successor_gate_status")?;
+            if successor_status == "passed" {
+                let relative = match field(outcome, "/successor_gate_receipt_path")? {
+                    Value::String(value) => value.as_str(),
+                    _ => bail!("passed successor gate requires a successor receipt path"),
+                };
+                let expected = string(outcome, "/successor_gate_receipt_sha256")?;
+                let proof_sha = string(outcome, "/proof_sha256")?;
+                let bytes = read_verified_artifact(root, relative, expected, "successor receipt")?;
+                proof_intervention_evidence::verify_successor_receipt(
+                    &bytes,
+                    expected,
+                    expected_identity,
+                    proof_sha,
+                )?;
             }
         }
 
