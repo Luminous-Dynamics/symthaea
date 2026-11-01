@@ -420,8 +420,17 @@ mod tests {
             .filter(|arg| arg.as_str() == "--ro-bind")
             .count();
         assert_eq!(bind_count, 3);
-        assert!(!plan.bubblewrap_arguments.iter().any(|arg| arg == "/nix/store"));
-        assert!(!plan.bubblewrap_arguments.iter().any(|arg| arg == "/home"));
+        for (index, argument) in plan.bubblewrap_arguments.iter().enumerate() {
+            if argument == "--ro-bind" {
+                assert_ne!(plan.bubblewrap_arguments[index + 1], "/nix/store");
+                assert_ne!(plan.bubblewrap_arguments[index + 1], "/home");
+                assert!(plan.bubblewrap_arguments[index + 1].starts_with("/nix/store/"));
+                assert_eq!(
+                    plan.bubblewrap_arguments[index + 1],
+                    plan.bubblewrap_arguments[index + 2]
+                );
+            }
+        }
         assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == "--clearenv"));
         assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == "--seccomp"));
     }
