@@ -189,8 +189,8 @@ fn make_eligible_integrity(
 
     value["environment"]["lean_toolchain"] = json!(lean_version);
 
-    let mut source_bytes = vec![b'\\n'; 11];
-    source_bytes.extend_from_slice(b"     sorry\\n");
+    let mut source_bytes = vec![b'\n'; 11];
+    source_bytes.extend_from_slice(b"     sorry\n");
     let informal_bytes = b"A synthetic proposition used only to test the evidence bundle.\n";
     let lean_bytes = b"synthetic-lean-binary-v0";
     let lake_bytes = b"{\"version\":1}\n";
