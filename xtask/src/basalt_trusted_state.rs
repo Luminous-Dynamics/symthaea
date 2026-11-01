@@ -2349,6 +2349,17 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                     bundle_digest,
                 },
             };
+            let retained_log = state
+                .log_cursors
+                .get(&receipt.checkpoint.log_id)
+                .ok_or_else(|| anyhow::anyhow!("accepted receipt references an unretained log origin"))?;
+            if receipt.checkpoint.tree_size > retained_log.tree_size
+                || (receipt.checkpoint.tree_size == retained_log.tree_size
+                    && receipt.checkpoint.root_digest != retained_log.root_digest)
+            {
+                anyhow::bail!("accepted receipt checkpoint is ahead of or forks the retained log cursor");
+            }
+
             if !valid_digest(&receipt_digest)
                 || !valid_id(&receipt.source.provisioned_host_id)
                 || !valid_id(&receipt.source.source_id)
