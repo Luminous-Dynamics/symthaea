@@ -486,6 +486,24 @@ jobs:
               raise SystemExit("isolated PITB package resolved packages absent from reviewed workspace lock: " + repr(unexpected))
           print("PITB_SORRYDB_LOCK_PASS: all isolated registry package versions exist in the reviewed workspace lock")
           PY
+          "$RUNNER_TEMP/pitb-sorrydb-jsonschema/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/proof-search-calibration-receipt-v0.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/fixtures/proof-search-calibration.synthetic.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+          schema_path, fixture_path = map(Path, sys.argv[1:])
+          schema = json.loads(schema_path.read_text())
+          fixture = json.loads(fixture_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+          if fixture["evidence_class"] != "synthetic_contract_fixture" or fixture["split"] != "validation":
+              raise SystemExit("calibration example must remain synthetic validation data")
+          if fixture["total_sample_count"] != sum(group["sample_count"] for group in fixture["action_groups"]):
+              raise SystemExit("calibration total sample count does not reconcile")
+          if fixture["worst_action_ece_ppm"] != max(group["ece_ppm"] for group in fixture["action_groups"]):
+              raise SystemExit("calibration worst-action ECE does not reconcile")
+          print("PITB_CALIBRATION_RECEIPT_SCHEMA_PASS: eight action groups and ten bins each; synthetic data only")
+          PY
       - name: Validate adaptive proof-search allocation schema and fixture
         shell: bash
         run: |
@@ -515,7 +533,8 @@ jobs:
           cargo run --locked --bin analyze_sorrydb_branch_ledger -- --self-test \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json"
           cargo run --locked --bin allocate_proof_search_budget -- --self-test \
-            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/fixtures/proof-search-allocation.synthetic.json"
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/fixtures/proof-search-allocation.synthetic.json" \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/fixtures/proof-search-calibration.synthetic.json"
           snapshot_fixture="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/snapshot-branch-receipt.synthetic.json"
           cargo run --locked --bin verify_snapshot_branch_receipt -- --self-test "$snapshot_fixture"
           python - "$snapshot_fixture" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json" "$RUNNER_TEMP/pitb-r5-ledger.synthetic.json" <<'PY'
