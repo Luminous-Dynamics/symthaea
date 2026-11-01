@@ -572,6 +572,20 @@ mod tests {
             schemas[3]["properties"]["schema"]["const"].as_str(),
             Some(AUDIT_SCHEMA)
         );
+        let calculation_properties: BTreeSet<String> =
+            schemas[1]["properties"]["calculation"]["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+        let actual_calculation: BTreeSet<String> =
+            serde_json::to_value(&bundle.oracle.calculation).unwrap()
+                .as_object().unwrap().keys().cloned().collect();
+        assert_eq!(calculation_properties, actual_calculation);
+        let distractor_properties: BTreeSet<String> =
+            schemas[1]["properties"]["distractor_scenarios"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_distractor: BTreeSet<String> =
+            serde_json::to_value(&bundle.oracle.distractor_scenarios[0]).unwrap()
+                .as_object().unwrap().keys().cloned().collect();
+        assert_eq!(distractor_properties, actual_distractor);
     }
 
     #[test]
@@ -596,6 +610,8 @@ mod tests {
     fn evidence_span_rejects_rebound_or_out_of_range_bytes() {
         let mut bundle = fixture();
         bundle.oracle.required_claims[0].supporting_spans[0].end_byte += 1;
+        bundle.oracle.oracle_sha256 =
+            digest_normalized(&bundle.oracle, |value| value.oracle_sha256.clear()).unwrap();
         let audit = audit_retrieval_decomposition_bundle(&bundle).unwrap();
         assert!(!audit.valid);
         assert!(!audit.evidence_spans_match);
