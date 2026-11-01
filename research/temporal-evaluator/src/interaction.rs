@@ -56,22 +56,22 @@ impl ExposureAttribution {
         with_i_with_j: JointExposure,
     ) -> Result<(), JointBudgetError> {
         self.wrong_belief_reduction.push(
-            i128::from(without_i.wrong_belief_us)
-                - i128::from(with_i.wrong_belief_us)
-                - i128::from(without_i_with_j.wrong_belief_us)
-                + i128::from(with_i_with_j.wrong_belief_us)
+            i128::from(with_i.wrong_belief_us)
+                + i128::from(without_i_with_j.wrong_belief_us)
+                - i128::from(without_i.wrong_belief_us)
+                - i128::from(with_i_with_j.wrong_belief_us)
         )?;
         self.abstention_reduction.push(
-            i128::from(without_i.abstention_us)
-                - i128::from(with_i.abstention_us)
-                - i128::from(without_i_with_j.abstention_us)
-                + i128::from(with_i_with_j.abstention_us)
+            i128::from(with_i.abstention_us)
+                + i128::from(without_i_with_j.abstention_us)
+                - i128::from(without_i.abstention_us)
+                - i128::from(with_i_with_j.abstention_us)
         )?;
         self.missing_output_reduction.push(
-            i128::from(without_i.missing_output_us)
-                - i128::from(with_i.missing_output_us)
-                - i128::from(without_i_with_j.missing_output_us)
-                + i128::from(with_i_with_j.missing_output_us)
+            i128::from(with_i.missing_output_us)
+                + i128::from(without_i_with_j.missing_output_us)
+                - i128::from(without_i.missing_output_us)
+                - i128::from(with_i_with_j.missing_output_us)
         )?;
         Ok(())
     }
