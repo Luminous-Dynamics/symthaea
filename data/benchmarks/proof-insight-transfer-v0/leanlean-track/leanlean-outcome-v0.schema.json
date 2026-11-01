@@ -302,6 +302,8 @@
         "repository_license",
         "token_band",
         "baseline_stripped_tokens",
+        "cohort_manifest_sha256",
+        "cohort_protected_declaration_total",
         "protected_declaration_count",
         "protected_declarations_sha256"
       ],
@@ -342,6 +344,13 @@
         },
         "protected_declarations_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "cohort_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cohort_protected_declaration_total": {
+          "const": 620,
+          "description": "Cohort-level total across all 64 repositories; not a per-repository count."
         }
       }
     },
