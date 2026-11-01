@@ -5,6 +5,7 @@ from itertools import combinations, product
 from affine_projective_closure_milp import (
     build_affine_closure_milp,
     minimal_auxiliary_values,
+    render_cplex_lp,
     verify_affine_closure_milp_solution,
 )
 from countable_global_projective_eclosure import projective_certificate
@@ -141,6 +142,23 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
                             brute = False
                             break
                     self.assertEqual(certificate["valid"], brute, (n, evidence, rejection))
+
+    def test_lp_export_scales_rational_rows_to_exact_integers(self):
+        model = build_affine_closure_milp(
+            (1, 2),
+            {1: Fraction(8), 2: Fraction(0)},
+            Fraction(1, 2),
+            values={1: Fraction(3, 2), 2: Fraction(2)},
+        )
+        lp = render_cplex_lp(model)
+        self.assertIn("Maximize", lp)
+        self.assertIn("obj: 3 x_1 + 4 x_2", lp)
+        self.assertIn("aux_1: 4 y_1 - 4 x_1 + 7 r >= 0", lp)
+        self.assertIn("aux_2: 8 y_2 - 8 x_2 - r >= 0", lp)
+        self.assertIn("closure_sum: 2 y_1 + 2 y_2 - r <= 0", lp)
+        self.assertIn("Binaries", lp)
+        self.assertIn("Generals", lp)
+        self.assertTrue(lp.endswith("End\\n"))
 
     def test_bad_model_inputs_fail_closed(self):
         with self.assertRaisesRegex(ValueError, "alpha"):
