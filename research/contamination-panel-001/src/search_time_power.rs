@@ -423,10 +423,39 @@ fn t_critical_975(df: usize) -> f64 {
         (26, 2.056), (27, 2.052), (28, 2.048), (29, 2.045), (30, 2.042),
         (40, 2.021), (60, 2.000), (120, 1.980), (usize::MAX, 1.980),
     ];
-    TABLE.iter()
+    TABLE
+        .iter()
         .find(|(upper_df, _)| df <= *upper_df)
         .map(|(_, value)| *value)
         .unwrap_or(1.98)
+}
+
+fn t_critical_bonferroni_three(df: usize) -> f64 {
+    // Conservative upper-rounded critical values for a two-sided alpha/3
+    // test (alpha=0.05, three planned pairwise contrasts).
+    const TABLE: &[(usize, f64)] = &[
+        (1, 64.0), (2, 10.0), (3, 5.9), (4, 4.66), (5, 4.04),
+        (6, 3.71), (7, 3.50), (8, 3.36), (9, 3.25), (10, 3.17),
+        (11, 3.11), (12, 3.06), (13, 3.02), (14, 2.98), (15, 2.95),
+        (16, 2.93), (17, 2.90), (18, 2.88), (19, 2.87), (20, 2.85),
+        (21, 2.84), (22, 2.82), (23, 2.81), (24, 2.80), (25, 2.79),
+        (26, 2.78), (27, 2.78), (28, 2.77), (29, 2.76), (30, 2.75),
+        (40, 2.71), (60, 2.68), (120, 2.65), (usize::MAX, 2.65),
+    ];
+    TABLE
+        .iter()
+        .find(|(upper_df, _)| df <= *upper_df)
+        .map(|(_, value)| *value)
+        .unwrap_or(2.65)
+}
+
+fn detection_critical_value(config: &SearchTimePowerConfigV1, df: usize) -> f64 {
+    match config.multiplicity_method {
+        SearchPowerMultiplicityV1::SinglePrimary => t_critical_975(df),
+        SearchPowerMultiplicityV1::BonferroniThreeContrasts => {
+            t_critical_bonferroni_three(df)
+        }
+    }
 }
 
 fn sample_mean(values: &[f64]) -> Result<f64, String> {
@@ -457,6 +486,7 @@ fn sample_sd(values: &[f64], center: f64) -> Result<f64, String> {
 #[derive(Debug, Clone, Copy)]
 struct SimulatedBlock {
     difference_permille: f64,
+    scores: [f64; 3],
     clipped_scores: u64,
 }
 
@@ -466,15 +496,21 @@ fn simulate_block(
     rng: &mut DeterministicRng,
 ) -> SimulatedBlock {
     // 0 = network-disabled, 1 = allowlisted, 2 = unrestricted.
-    let treated_index = match config.primary_contrast {
-        SearchPowerPrimaryContrastV1::AllowlistedMinusNetworkDisabled => 1,
-        SearchPowerPrimaryContrastV1::UnrestrictedMinusNetworkDisabled => 2,
+    let (treated_index, control_index) = match config.primary_contrast {
+        SearchPowerPrimaryContrastV1::AllowlistedMinusNetworkDisabled => (1, 0),
+        SearchPowerPrimaryContrastV1::UnrestrictedMinusNetworkDisabled => (2, 0),
+        SearchPowerPrimaryContrastV1::UnrestrictedMinusAllowlisted => (2, 1),
     };
     let mut order = [0_usize, 1, 2];
     rng.shuffle_three(&mut order);
     let mut positions = [0_usize; 3];
+    let mut prior_network_accesses = [0_usize; 3];
     for (position, condition) in order.iter().copied().enumerate() {
         positions[condition] = position;
+        prior_network_accesses[condition] = order[..position]
+            .iter()
+            .filter(|prior| **prior != 0)
+            .count();
     }
 
     let shared_block_noise =
@@ -500,19 +536,28 @@ fn simulate_block(
             0.0
         };
         let position_offset = positions[condition] as f64 - 1.0;
+        let carryover = config.carryover_after_network_access_permille
+            * prior_network_accesses[condition] as f64;
         let raw_score = config.baseline_score_permille
             + shared_block_noise
             + residual_noise
             + heterogeneity
             + treatment_effect
-            + config.run_order_effect_permille * position_offset;
-        if !(0.0..=1_000.0).contains(&raw_score) {
+            + config.run_order_effect_permille * position_offset
+            + carryover;
+        if raw_score < f64::from(config.score_floor_permille)
+            || raw_score > f64::from(config.score_ceiling_permille)
+        {
             clipped_scores += 1;
         }
-        scores[condition] = raw_score.clamp(0.0, 1_000.0);
+        scores[condition] = raw_score.clamp(
+            f64::from(config.score_floor_permille),
+            f64::from(config.score_ceiling_permille),
+        );
     }
     SimulatedBlock {
-        difference_permille: scores[treated_index] - scores[0],
+        difference_permille: scores[treated_index] - scores[control_index],
+        scores,
         clipped_scores,
     }
 }
