@@ -909,8 +909,8 @@ mod tests {
             objective_specs,
             vec![-0.1; dimensions],
             target_plan,
-            "synthetic-objective-evaluation-unit-v0.1",
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            super::super::pareto_anytime::SYNTHETIC_OBJECTIVE_COST_MODEL_ID,
+            super::super::pareto_anytime::synthetic_objective_evaluation_cost_model_sha256().unwrap(),
             budget as u64,
             vec![
                 super::super::pareto_anytime::ResourceMeter::EvaluatorCalls,
