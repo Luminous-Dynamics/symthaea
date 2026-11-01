@@ -116,6 +116,8 @@
           "document_id",
           "adjacent_query",
           "distractor_answer",
+          "billable_days",
+          "overnight_stays",
           "confusion_mechanism"
         ],
         "properties": {
@@ -133,6 +135,14 @@
           "confusion_mechanism": {
             "type": "string",
             "minLength": 1
+          },
+          "billable_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "overnight_stays": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
