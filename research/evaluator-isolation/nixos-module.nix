@@ -49,7 +49,7 @@ let
   };
 
   commonInvisiblePaths = [
-    # PrivateNetwork does not by itself hide host AF_UNIX sockets.
+    # PrivateNetwork isolates the host abstract AF_UNIX namespace, but filesystem-path sockets remain visible unless hidden below.
     "-/run/dbus/system_bus_socket"
     "-/run/systemd/private"
     "-/run/systemd/journal/socket"
