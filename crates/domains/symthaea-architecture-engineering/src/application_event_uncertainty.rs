@@ -564,6 +564,7 @@ pub fn compare_application_event_energy(
         ("repeatability_id", candidate.repeatability_id.as_str(), reference.repeatability_id.as_str()),
         ("phase_protocol_sha256", candidate.phase_protocol_sha256.as_str(), reference.phase_protocol_sha256.as_str()),
         ("replicate_design_sha256", candidate.replicate_design_sha256.as_str(), reference.replicate_design_sha256.as_str()),
+        ("metrology_manifest_sha256", candidate.metrology_manifest_sha256.as_str(), reference.metrology_manifest_sha256.as_str()),
         ("matched_input_sha256", candidate.matched_input_sha256.as_str(), reference.matched_input_sha256.as_str()),
         ("target_id", candidate.target_id.as_str(), reference.target_id.as_str()),
         ("board_revision", candidate.board_revision.as_str(), reference.board_revision.as_str()),
@@ -807,6 +808,7 @@ mod tests {
         let result = compare_application_event_energy(&candidate, &reference).unwrap();
         assert_eq!(result.decision, ApplicationEventEnergyDecision::CandidateStrictlyLower);
         assert!(is_sha256(&result.comparison_sha256));
+        validate_application_event_energy_comparison(&result).unwrap();
     }
 
     #[test]
