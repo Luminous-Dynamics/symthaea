@@ -485,13 +485,13 @@ fn audit_values(
     let data=parse_data(data_value,&plan)?;
     let assignments=parse_context_receipt(context_value,&plan,&data)?;
     let n=data.calibration_samples.len();
-    let mut counts=vec![0_u64;n+1];
+    let counts=vec![0_u64;n+1];
     let mut features:Vec<FeatureState>=plan.features.iter().map(|(id,kind,weight)|FeatureState{
         feature_id:id.clone(),feature_type:kind.clone(),portfolio_weight:*weight,
         feature_values:feature_values(kind,n),lambda:0.0,accumulator:1.0,log_wealth:0.0,first_crossing_index:None
     }).collect();
     let mut output=Vec::with_capacity(data.online_records.len());
-    let threshold=(-plan.target_alpha.ln());
+    let threshold=-plan.target_alpha.ln();
     let mut portfolio_first_crossing=None;
     let mut last_portfolio_log=0.0;
     let mut min_component_factor=f64::INFINITY;
@@ -802,8 +802,8 @@ mod tests {
     fn predictive_law_updates_repeated_rank_counts_polya_urn_style(){
         let (p,mut d,c)=fixture();
         let rank=rank_against_reference(&{
-            let mut x=Vec::new();for i in 0..600{x.push(Sample{unit_id:i.to_string(),score:(i as f64+.5)/600.0,tie_uniform:.5});}x
-        },0.4,.5);
+            let mut x=Vec::new();for i in 0..600{x.push(Sample{unit_id:i.to_string(),score:(i as f64+0.5)/600.0,tie_uniform:0.5});}x
+        },0.4,0.5);
         let score=0.4;
         d["online_records"]=json!([
             {"sequence_index":1,"window_id":"a","context_id":"compute","sample_unit_id":"a","anomaly_score":score,"tie_break_uniform":0.3,"sensor_state":"valid","pmu_qualification_result":QUALIFIED_PMU},
