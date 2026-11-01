@@ -73,22 +73,22 @@ Statuses:
 - `incompatible`: the target explicitly lacks the required capability.
 - `unqualified_evidence`: a desired value is present but no claim-linked evidence comes from an accepted source.
 - `policy_violated`: the observed claim contradicts the desired values.
-- `claim_satisfied_for_declared_scope`: the claim matches and has linked evidence of an accepted source type.
+- `independent_verifier_required`: a non-synthetic claim has a desired value and accepted source-type link, but an authenticated independent verifier receipt is absent; the action remains abstain.
 
-The last status is intentionally not named “secure” or “verified.” This prototype checks a profile claim and source-type linkage. It does not cryptographically verify certificate material, validate freshness itself, prove a physical measurement, test OS enforcement, or authenticate the evidence ledger's author. Those are separate verifier obligations.
+The prototype deliberately never marks a control satisfied. Source-type labels are untrusted metadata, even when a label reads `hardware_attestation_verified` or `physical_lab_measurement`. A separate independent verifier must authenticate the source, freshness, scope, quality and exact profile/evidence digests before a later qualification layer can report a passed obligation.
 
 Synthetic fixtures are categorically prevented from satisfying a policy control, even if a test mutates a field to say `enabled_verified`.
 
 ## 5. Current expected result
 
-The supplied Pixel 8 Pro fixture is synthetic. It documents model-family MTE capability but leaves boot, attestation, process-level MTE runtime and PMU observer-effect states unmeasured.
+The supplied Pixel 8 Pro fixture is synthetic. It documents model-family MTE capability but leaves boot, attestation, process-level MTE runtime and PMU observer-effect states unmeasured. Even a mutated non-synthetic profile with accepted-looking source labels cannot satisfy a control: this compiler has no independent receipt authentication module.
 
 Therefore the deterministic policy receipt should report:
 
 | Result field | Expected |
 |---|---:|
 | Total obligations | 6 |
-| Claim-satisfied | 0 |
+| Claim-satisfied | 0 (the compiler never issues this verdict) |
 | Evidence incomplete | 6 |
 | Device security proved | false |
 | Runtime integrity verified | false |
