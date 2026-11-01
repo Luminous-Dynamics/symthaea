@@ -179,16 +179,6 @@ struct RateTriplet {
     placebo: f64,
 }
 
-impl RateTriplet {
-    fn minus(self, other: Self) -> Self {
-        Self {
-            base: self.base - other.base,
-            treatment: self.treatment - other.treatment,
-            placebo: self.placebo - other.placebo,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct FamilyRelationValues {
     rates: RateTriplet,
@@ -344,6 +334,7 @@ fn validate_replicate_matrix(
         (String, String, TransferRelationV1),
         (String, String, String, String, u64, u64),
     >,
+    expected_matrix_keys: &mut Option<BTreeSet<(String, String, TransferRelationV1)>>,
 ) -> Result<BTreeSet<String>, String> {
     if replicate.replicate_id.trim().is_empty() || replicate.replicate_id.len() > 128 {
         return Err("transfer replicate_id must be nonempty and at most 128 bytes".to_owned());
@@ -367,6 +358,7 @@ fn validate_replicate_matrix(
     let mut families = BTreeSet::new();
     let mut cells = BTreeMap::<(String, String), BTreeMap<TransferRelationV1, &TransferStratumOutcomeV1>>::new();
     let mut global_items = BTreeSet::new();
+    let mut matrix_keys = BTreeSet::new();
 
     for row in &replicate.strata {
         if row.task_family.trim().is_empty()
@@ -384,7 +376,7 @@ fn validate_replicate_matrix(
         if computed_item_digest != row.item_set_sha256 {
             return Err(format!(
                 "item-set digest mismatch for {}/{}/{}",
-                row.task_family, row.difficulty_band, row.relation as u8
+                row.task_family, row.difficulty_band, row.relation
             ));
         }
         validate_digest(
@@ -412,6 +404,7 @@ fn validate_replicate_matrix(
         }
 
         let key = (row.task_family.clone(), row.difficulty_band.clone());
+        matrix_keys.insert((row.task_family.clone(), row.difficulty_band.clone(), row.relation));
         let relation_map = cells.entry(key).or_default();
         if relation_map.insert(row.relation, row).is_some() {
             return Err("duplicate task_family/difficulty_band/relation cell".to_owned());
@@ -476,6 +469,13 @@ fn validate_replicate_matrix(
         .ok_or_else(|| "no task-family difficulty bands were supplied".to_owned())?;
     if family_bands.values().any(|bands| bands != first_bands) {
         return Err("every task family must use the same matched difficulty-band set".to_owned());
+    }
+    if let Some(expected) = expected_matrix_keys.as_ref() {
+        if expected != &matrix_keys {
+            return Err("the complete task-family/difficulty/relation matrix must match across model-pair replicates".to_owned());
+        }
+    } else {
+        *expected_matrix_keys = Some(matrix_keys);
     }
     Ok(families)
 }
@@ -603,6 +603,7 @@ pub fn analyze_exposure_transfer(
 
     let mut transfer_ids = BTreeSet::new();
     let mut expected_cells = BTreeMap::new();
+    let mut expected_matrix_keys = None;
     let mut expected_families: Option<BTreeSet<String>> = None;
     let mut pair_values = BTreeMap::<
         (String, TransferRelationV1),
@@ -638,6 +639,7 @@ pub fn analyze_exposure_transfer(
             transfer_replicate,
             expected_families.as_ref(),
             &mut expected_cells,
+            &mut expected_matrix_keys,
         )?;
         if let Some(existing) = &expected_families {
             if existing != &families {
@@ -903,6 +905,114 @@ mod tests {
     fn transfer_ladder_contains_six_distinct_relations() {
         let unique: BTreeSet<_> = TransferRelationV1::ALL.into_iter().collect();
         assert_eq!(unique.len(), 6);
+    }
+
+    fn sample_transfer_replicate() -> TransferReplicateV1 {
+        let mut strata = Vec::new();
+        for family in ["mathematics", "code"] {
+            for relation in TransferRelationV1::ALL {
+                let item_ids = vec![format!("{family}_{relation:?}")];
+                let item_set_sha256 = canonical_item_set_digest(&item_ids).unwrap();
+                let score = ScoreCountV1 {
+                    success_count: 1,
+                    observed_count: 1,
+                };
+                strata.push(TransferStratumOutcomeV1 {
+                    task_family: family.to_owned(),
+                    difficulty_band: "medium".to_owned(),
+                    relation,
+                    cluster_count: 1,
+                    item_ids,
+                    item_set_sha256,
+                    source_lineage_manifest_sha256: "a".repeat(64),
+                    recipe_lineage_manifest_sha256: "b".repeat(64),
+                    adjudication_report_sha256: "c".repeat(64),
+                    base: score.clone(),
+                    treatment: score.clone(),
+                    placebo: score,
+                });
+            }
+        }
+        TransferReplicateV1 {
+            replicate_id: "pair-001".to_owned(),
+            evaluation_evidence_sha256: "d".repeat(64),
+            training_receipt_audit_sha256: "e".repeat(64),
+            strata,
+        }
+    }
+
+    #[test]
+    fn complete_six_relation_matrix_is_accepted() {
+        let replicate = sample_transfer_replicate();
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        let families = validate_replicate_matrix(
+            &replicate,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .unwrap();
+        assert_eq!(families.len(), 2);
+        assert_eq!(expected_matrix_keys.unwrap().len(), 12);
+    }
+
+    #[test]
+    fn incomplete_relation_matrix_is_rejected() {
+        let mut replicate = sample_transfer_replicate();
+        replicate.strata.pop();
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        assert!(validate_replicate_matrix(
+            &replicate,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn duplicate_item_across_relation_strata_is_rejected() {
+        let mut replicate = sample_transfer_replicate();
+        replicate.strata[1].item_ids = replicate.strata[0].item_ids.clone();
+        replicate.strata[1].item_set_sha256 =
+            canonical_item_set_digest(&replicate.strata[1].item_ids).unwrap();
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        assert!(validate_replicate_matrix(
+            &replicate,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn cell_matrix_must_match_across_replicates() {
+        let first = sample_transfer_replicate();
+        let mut second = sample_transfer_replicate();
+        second.replicate_id = "pair-002".to_owned();
+        for row in &mut second.strata {
+            row.difficulty_band = "hard".to_owned();
+        }
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        validate_replicate_matrix(
+            &first,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .unwrap();
+        assert!(validate_replicate_matrix(
+            &second,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .is_err());
     }
 
     #[test]
