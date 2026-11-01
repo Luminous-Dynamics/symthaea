@@ -698,20 +698,69 @@ fn hash_measurements(hasher: &mut Sha256, measurements: &[FeatureMeasurement]) {
     }
 }
 
+// Hash codes are explicit and append-only. Never derive these from Rust enum
+// declaration order: inserting/reordering a variant must not reinterpret old
+// version-1 receipts.
 fn parameter_code(parameter: GestureParameter) -> u8 {
-    parameter as u8
+    match parameter {
+        GestureParameter::BowSpeed => 0,
+        GestureParameter::BowForce => 1,
+        GestureParameter::BowContactPoint => 2,
+        GestureParameter::BreathPressure => 3,
+        GestureParameter::TonguingMode => 4,
+        GestureParameter::PluckForce => 5,
+        GestureParameter::PluckPosition => 6,
+        GestureParameter::DampingAmount => 7,
+        GestureParameter::MalletProfile => 8,
+        GestureParameter::StrikePosition => 9,
+        GestureParameter::DamperPedal => 10,
+        GestureParameter::VibraphoneMotorEnabled => 11,
+        GestureParameter::TromboneSlidePosition => 12,
+        GestureParameter::BellowsPressure => 13,
+        GestureParameter::BellowsDirection => 14,
+        GestureParameter::RegisterStop => 15,
+        GestureParameter::VowelIdentity => 16,
+        GestureParameter::FormantShift => 17,
+        GestureParameter::OscillatorFrequency => 18,
+        GestureParameter::FilterCutoff => 19,
+        GestureParameter::EnvelopeLevel => 20,
+        GestureParameter::PitchBend => 21,
+        GestureParameter::VibratoRate => 22,
+        GestureParameter::VibratoDepth => 23,
+    }
 }
 
 fn gesture_unit_code(unit: GestureUnit) -> u8 {
-    unit as u8
+    match unit {
+        GestureUnit::MetersPerSecond => 0,
+        GestureUnit::Newtons => 1,
+        GestureUnit::Pascals => 2,
+        GestureUnit::Normalized => 3,
+        GestureUnit::Millimeters => 4,
+        GestureUnit::Hertz => 5,
+        GestureUnit::Cents => 6,
+    }
 }
 
 fn feature_unit_code(unit: FeatureUnit) -> u8 {
-    unit as u8
+    match unit {
+        FeatureUnit::Decibels => 0,
+        FeatureUnit::Hertz => 1,
+        FeatureUnit::Seconds => 2,
+        FeatureUnit::Milliseconds => 3,
+        FeatureUnit::Cents => 4,
+        FeatureUnit::Normalized => 5,
+        FeatureUnit::Ratio => 6,
+        FeatureUnit::Samples => 7,
+    }
 }
 
 fn direction_code(direction: ExpectedDirection) -> u8 {
-    direction as u8
+    match direction {
+        ExpectedDirection::Increase => 0,
+        ExpectedDirection::Decrease => 1,
+        ExpectedDirection::Either => 2,
+    }
 }
 
 #[cfg(test)]
