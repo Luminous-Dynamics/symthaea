@@ -11,10 +11,12 @@
 //!
 //! Exactness is conditional on the declared model, formalism, partition family,
 //! numeric policy, and caller-supplied work/resource budgets. A budget failure
-//! is not an exact result. Composition-level tie escalation, the complete
-//! cause-effect structure and relations, and the separate IIT 4.0 (2026)
-//! intrinsic-information requirement are not implemented. No output is a
-//! consciousness determination.
+//! is not an exact result. Macro-unit identity and mapping-family descriptors
+//! are available, but macro TPM construction, intrinsic-unit validation, and
+//! cross-grain exclusion search are not implemented. Composition-level tie
+//! escalation, the complete cause-effect structure and relations, and the
+//! separate IIT 4.0 (2026) intrinsic-information requirement are also not
+//! implemented. No output is a consciousness determination.
 //!
 //! # Model contract
 //!
