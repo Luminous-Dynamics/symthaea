@@ -193,7 +193,7 @@ The first frontier-conditioned structural model and split-conformal six-resource
 
 The landmark proof-completion calibrator is separately specified in [LANDMARK_IPCW_V1.md](LANDMARK_IPCW_V1.md). It conditions on a predeclared work landmark and the current proof-frontier prediction, then solves a weighted estimating equation using cross-fitted censoring-survival receipts evaluated at observed proof completion. It reports effective sample size and positivity diagnostics. It does not claim exact finite-sample coverage or inherit the HAPS theorem automatically; conditional independent censoring, positivity, nuisance estimation, and the simultaneous-vector extension require separate validation. Competing terminal events are rejected in V1.
 
-## 16. External comparators and claim limits
+## 17. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.
@@ -201,3 +201,9 @@ The landmark proof-completion calibrator is separately specified in [LANDMARK_IP
 - [Conformal Prediction Under Covariate Shift](https://arxiv.org/abs/1904.06019): weighted conformal under specified covariate-shift assumptions.
 
 This lab is a research simulator and typed protocol. It is not a reproduction of those works, a production scheduler, a physical resource enforcer, or a state-of-the-art result.
+
+## 16. Canonical proof-frontier extraction
+
+The graph-to-feature adapter is specified in [FRONTIER_ADAPTER_V1.md](FRONTIER_ADAPTER_V1.md). It derives structural features from target-reachable unresolved claim nodes, their AND/OR alternatives, referenced evidence metadata, and exact scheduler obligation states. V1 requires claim IDs to align with obligation IDs, fails closed on duplicate or unresolved references and dependency cycles, and binds canonical bytes to query context, graph structure, evidence metadata, obligation states, and explicit execution context. Permutation invariance and unreachable-node invariance are tested as identity properties.
+
+The V1 identity checksum is deliberately non-cryptographic. It does not authenticate the planner snapshot, attest live execution state, or prove evidence truth. Evidence-admissibility counts check temporal, scope, authority, integrity, lifecycle, and independence metadata only; independent proof verification remains a separate authority. The first scaling matrix targets 8 through 100,000 reachable nodes. The benchmark must separately compare canonical graph-derived features with manually supplied features on held-out task families before any forecasting improvement is claimed.
