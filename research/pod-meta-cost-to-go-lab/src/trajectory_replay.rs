@@ -577,7 +577,7 @@ mod tests {
         }
     }
 
-    fn action(
+    struct ActionSpec {
         sequence: u64,
         kind: TrajectoryActionKind,
         family: u32,
@@ -586,58 +586,60 @@ mod tests {
         cost: ResourceVector,
         frontier: ProofFrontierFeatures,
         candidates: Vec<u32>,
-    ) -> TrajectoryActionReceipt {
+    }
+
+    fn action(spec: ActionSpec) -> TrajectoryActionReceipt {
         TrajectoryActionReceipt {
-            decision_sequence: sequence,
-            kind,
-            operation_id: format!("operation-{sequence}"),
-            operation_family: family,
-            candidate_pool_digest: [30 + sequence as u8; 32],
-            admissible_operation_families: candidates,
-            pre_state_digest: [pre; 32],
-            post_state_digest: [post; 32],
-            frontier_digest: [40 + sequence as u8; 32],
-            frontier_features: frontier,
-            measured_cost: cost,
-            meter_receipt_digest: [50 + sequence as u8; 32],
+            decision_sequence: spec.sequence,
+            kind: spec.kind,
+            operation_id: format!("operation-{}", spec.sequence),
+            operation_family: spec.family,
+            candidate_pool_digest: [30 + spec.sequence as u8; 32],
+            admissible_operation_families: spec.candidates,
+            pre_state_digest: [spec.pre; 32],
+            post_state_digest: [spec.post; 32],
+            frontier_digest: [40 + spec.sequence as u8; 32],
+            frontier_features: spec.frontier,
+            measured_cost: spec.cost,
+            meter_receipt_digest: [50 + spec.sequence as u8; 32],
         }
     }
 
     fn trace(outcome: Option<TerminalOutcome>) -> ActionTrajectory {
         let success = outcome == Some(TerminalOutcome::SufficientProof);
         let mut actions = vec![
-            action(
-                1,
-                TrajectoryActionKind::ProofOperation,
-                2,
-                1,
-                2,
-                ResourceVector::new(10, 1, 2, 0, 3, 4),
-                features(2),
-                vec![2, 3],
-            ),
-            action(
-                2,
-                TrajectoryActionKind::ProofOperation,
-                3,
-                2,
-                3,
-                ResourceVector::new(20, 1, 4, 1, 5, 6),
-                features(1),
-                vec![3, 4],
-            ),
+            action(ActionSpec {
+                sequence: 1,
+                kind: TrajectoryActionKind::ProofOperation,
+                family: 2,
+                pre: 1,
+                post: 2,
+                cost: ResourceVector::new(10, 1, 2, 0, 3, 4),
+                frontier: features(2),
+                candidates: vec![2, 3],
+            }),
+            action(ActionSpec {
+                sequence: 2,
+                kind: TrajectoryActionKind::ProofOperation,
+                family: 3,
+                pre: 2,
+                post: 3,
+                cost: ResourceVector::new(20, 1, 4, 1, 5, 6),
+                frontier: features(1),
+                candidates: vec![3, 4],
+            }),
         ];
         if success {
-            actions.push(action(
-                3,
-                TrajectoryActionKind::IndependentVerifier,
-                90,
-                3,
-                4,
-                ResourceVector::new(5, 1, 1, 0, 2, 3),
-                ProofFrontierFeatures::default(),
-                vec![90],
-            ));
+            actions.push(action(ActionSpec {
+                sequence: 3,
+                kind: TrajectoryActionKind::IndependentVerifier,
+                family: 90,
+                pre: 3,
+                post: 4,
+                cost: ResourceVector::new(5, 1, 1, 0, 2, 3),
+                frontier: ProofFrontierFeatures::default(),
+                candidates: vec![90],
+            }));
         }
         ActionTrajectory {
             run_id: 100,
