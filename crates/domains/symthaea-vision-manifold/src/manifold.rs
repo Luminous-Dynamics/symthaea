@@ -5009,6 +5009,14 @@ impl DelayedHorizonEvaluator {
                     due_time: forecast.due_time,
                     predicted: forecast.predicted.as_slice().to_vec(),
                     persistence: forecast.persistence.as_slice().to_vec(),
+                    forecast_id: forecast.forecast_id,
+                    source_frame_sequence: forecast.source_frame_sequence,
+                    issued_at_seconds: forecast.issued_at_seconds,
+                    source_observation_blake3: forecast.source_observation_blake3.clone(),
+                    source_belief_blake3: forecast.source_belief_blake3.clone(),
+                    predictor_parameter_blake3: forecast.predictor_parameter_blake3.clone(),
+                    prediction_blake3: Some(forecast.prediction_blake3.clone()),
+                    persistence_blake3: Some(forecast.persistence_blake3.clone()),
                 })
                 .collect(),
             accumulators: self
@@ -5027,6 +5035,10 @@ impl DelayedHorizonEvaluator {
                 .collect(),
             max_pending_per_horizon: self.max_pending_per_horizon,
             max_lateness_factor: self.max_lateness_factor,
+            next_forecast_id: self.next_forecast_id,
+            score_receipts: self.score_receipts.clone(),
+            max_score_receipts: self.max_score_receipts,
+            evicted_score_receipts: self.evicted_score_receipts,
         }
     }
 
@@ -5048,6 +5060,17 @@ impl DelayedHorizonEvaluator {
         }
         if state.max_pending_per_horizon == 0 {
             return Err("delayed-horizon pending limit must be > 0".to_string());
+        }
+        if state.schema_version >= 4 {
+            if state.max_score_receipts == 0 {
+                return Err("delayed-horizon score receipt limit must be > 0".to_string());
+            }
+            if state.score_receipts.len() > state.max_score_receipts {
+                return Err("delayed-horizon score receipt ledger exceeds its configured bound".to_string());
+            }
+            if state.next_forecast_id == 0 {
+                return Err("delayed-horizon next forecast ID must be non-zero".to_string());
+            }
         }
         if !state.max_lateness_factor.is_finite() || state.max_lateness_factor <= 0.0 {
             return Err("delayed-horizon max lateness factor must be finite and > 0".to_string());
@@ -5071,6 +5094,8 @@ impl DelayedHorizonEvaluator {
             previous = horizon;
         }
         let mut pending_counts = vec![0usize; state.horizons.len()];
+        let mut seen_forecast_ids = std::collections::HashSet::new();
+        let mut maximum_forecast_id = 0u64;
         for (index, forecast) in state.pending.iter().enumerate() {
             if forecast.horizon_index >= state.horizons.len() {
                 return Err(format!(
@@ -5099,6 +5124,129 @@ impl DelayedHorizonEvaluator {
                         "pending forecast {index} {name} is malformed for dimension {dim}"
                     ));
                 }
+            }
+            if state.schema_version >= 4 {
+                if forecast.forecast_id == 0 || !seen_forecast_ids.insert(forecast.forecast_id) {
+                    return Err(format!("pending forecast {index} has a zero or duplicate forecast ID"));
+                }
+                maximum_forecast_id = maximum_forecast_id.max(forecast.forecast_id);
+                if !forecast.issued_at_seconds.is_finite()
+                    || forecast.issued_at_seconds < 0.0
+                    || forecast.issued_at_seconds > state.elapsed_seconds
+                {
+                    return Err(format!("pending forecast {index} has an invalid issue time"));
+                }
+                let horizon = state.horizons[forecast.horizon_index] as f64;
+                let due_error = (forecast.due_time - forecast.issued_at_seconds - horizon).abs();
+                if due_error > 1e-9 * (1.0 + forecast.due_time.abs()) {
+                    return Err(format!("pending forecast {index} due time does not match its horizon"));
+                }
+                for (name, digest) in [
+                    ("source observation", forecast.source_observation_blake3.as_deref()),
+                    ("source belief", forecast.source_belief_blake3.as_deref()),
+                    ("predictor parameters", forecast.predictor_parameter_blake3.as_deref()),
+                    ("prediction", forecast.prediction_blake3.as_deref()),
+                    ("persistence", forecast.persistence_blake3.as_deref()),
+                ] {
+                    if !digest.is_some_and(is_lower_hex_blake3) {
+                        return Err(format!("pending forecast {index} has an invalid {name} fingerprint"));
+                    }
+                }
+                if forecast.source_frame_sequence.is_none() {
+                    return Err(format!("pending forecast {index} is missing its source frame sequence"));
+                }
+            }
+        }
+        if state.schema_version >= 4 {
+            for (index, receipt) in state.score_receipts.iter().enumerate() {
+                if receipt.forecast_id == 0 || !seen_forecast_ids.insert(receipt.forecast_id) {
+                    return Err(format!("score receipt {index} has a zero or duplicate forecast ID"));
+                }
+                maximum_forecast_id = maximum_forecast_id.max(receipt.forecast_id);
+                if receipt.horizon_index >= state.horizons.len() {
+                    return Err(format!("score receipt {index} has an invalid horizon index"));
+                }
+                let horizon = state.horizons[receipt.horizon_index];
+                if !receipt.issued_at_seconds.is_finite()
+                    || receipt.issued_at_seconds < 0.0
+                    || !receipt.due_at_seconds.is_finite()
+                    || !receipt.observed_at_seconds.is_finite()
+                    || !receipt.lateness_seconds.is_finite()
+                    || receipt.lateness_seconds < 0.0
+                    || !receipt.requested_horizon_seconds.is_finite()
+                    || receipt.requested_horizon_seconds.to_bits() != horizon.to_bits()
+                    || !receipt.max_lateness_factor_used.is_finite()
+                    || receipt.max_lateness_factor_used <= 0.0
+                {
+                    return Err(format!("score receipt {index} has invalid timing or horizon fields"));
+                }
+                let due_error = (receipt.due_at_seconds - receipt.issued_at_seconds - horizon as f64).abs();
+                let lateness_error = (receipt.observed_at_seconds - receipt.due_at_seconds - receipt.lateness_seconds).abs();
+                let tolerance = 1e-9 * (1.0 + receipt.observed_at_seconds.abs());
+                if due_error > tolerance || lateness_error > tolerance || receipt.observed_at_seconds < receipt.due_at_seconds {
+                    return Err(format!("score receipt {index} has inconsistent forecast timing"));
+                }
+                if let Some(source) = receipt.source_frame_sequence {
+                    if receipt.target_frame_sequence <= source {
+                        return Err(format!("score receipt {index} target frame does not follow its source frame"));
+                    }
+                }
+                for (name, digest) in [
+                    ("prediction", receipt.prediction_blake3.as_str()),
+                    ("persistence", receipt.persistence_blake3.as_str()),
+                    ("target observation", receipt.target_observation_blake3.as_str()),
+                ] {
+                    if !is_lower_hex_blake3(digest) {
+                        return Err(format!("score receipt {index} has invalid {name} fingerprint"));
+                    }
+                }
+                for (name, digest) in [
+                    ("source observation", receipt.source_observation_blake3.as_deref()),
+                    ("source belief", receipt.source_belief_blake3.as_deref()),
+                    ("predictor parameters", receipt.predictor_parameter_blake3.as_deref()),
+                ] {
+                    if digest.is_some_and(|value| !is_lower_hex_blake3(value)) {
+                        return Err(format!("score receipt {index} has invalid {name} fingerprint"));
+                    }
+                }
+                if receipt.source_frame_sequence.is_some()
+                    != (receipt.source_observation_blake3.is_some()
+                        && receipt.source_belief_blake3.is_some()
+                        && receipt.predictor_parameter_blake3.is_some())
+                {
+                    return Err(format!("score receipt {index} has partial source provenance"));
+                }
+                let expired_by_policy = receipt.lateness_seconds
+                    > horizon as f64 * receipt.max_lateness_factor_used as f64;
+                match receipt.status {
+                    HorizonForecastReceiptStatus::Scored => {
+                        if expired_by_policy
+                            || receipt.prediction_error.is_none()
+                            || receipt.persistence_error.is_none()
+                        {
+                            return Err(format!("score receipt {index} has inconsistent scored status"));
+                        }
+                    }
+                    HorizonForecastReceiptStatus::Expired => {
+                        if !expired_by_policy
+                            || receipt.prediction_error.is_some()
+                            || receipt.persistence_error.is_some()
+                        {
+                            return Err(format!("score receipt {index} has inconsistent expired status"));
+                        }
+                    }
+                }
+                for (name, error) in [
+                    ("prediction", receipt.prediction_error),
+                    ("persistence", receipt.persistence_error),
+                ] {
+                    if error.is_some_and(|value| !value.is_finite() || !(0.0..=2.0).contains(&value)) {
+                        return Err(format!("score receipt {index} has invalid {name} error"));
+                    }
+                }
+            }
+            if state.next_forecast_id <= maximum_forecast_id {
+                return Err("delayed-horizon next forecast ID does not exceed retained IDs".to_string());
             }
         }
         if state.hdc_dim == Some(0) {
@@ -5156,14 +5304,49 @@ impl DelayedHorizonEvaluator {
         self.labels = state.labels.clone();
         self.elapsed_seconds = state.elapsed_seconds;
         self.hdc_dim = state.hdc_dim;
+        let mut next_forecast_id = if state.schema_version >= 4 {
+            state.next_forecast_id
+        } else {
+            1
+        };
         self.pending = state
             .pending
             .iter()
-            .map(|forecast| PendingHorizonForecast {
-                horizon_index: forecast.horizon_index,
-                due_time: forecast.due_time,
-                predicted: ContinuousHV::from_vec(forecast.predicted.clone()),
-                persistence: ContinuousHV::from_vec(forecast.persistence.clone()),
+            .map(|forecast| {
+                let forecast_id = if state.schema_version >= 4 {
+                    forecast.forecast_id
+                } else {
+                    let assigned = next_forecast_id;
+                    next_forecast_id = next_forecast_id.saturating_add(1);
+                    assigned
+                };
+                let issued_at_seconds = if state.schema_version >= 4 {
+                    forecast.issued_at_seconds
+                } else {
+                    (forecast.due_time - state.horizons[forecast.horizon_index] as f64).max(0.0)
+                };
+                let predicted = ContinuousHV::from_vec(forecast.predicted.clone());
+                let persistence = ContinuousHV::from_vec(forecast.persistence.clone());
+                PendingHorizonForecast {
+                    forecast_id,
+                    horizon_index: forecast.horizon_index,
+                    source_frame_sequence: forecast.source_frame_sequence,
+                    issued_at_seconds,
+                    due_time: forecast.due_time,
+                    source_observation_blake3: forecast.source_observation_blake3.clone(),
+                    source_belief_blake3: forecast.source_belief_blake3.clone(),
+                    predictor_parameter_blake3: forecast.predictor_parameter_blake3.clone(),
+                    prediction_blake3: forecast
+                        .prediction_blake3
+                        .clone()
+                        .unwrap_or_else(|| visual_hv_blake3(&predicted)),
+                    persistence_blake3: forecast
+                        .persistence_blake3
+                        .clone()
+                        .unwrap_or_else(|| visual_hv_blake3(&persistence)),
+                    predicted,
+                    persistence,
+                }
             })
             .collect();
         self.accumulators = state
@@ -5201,6 +5384,26 @@ impl DelayedHorizonEvaluator {
             .collect();
         self.max_pending_per_horizon = state.max_pending_per_horizon;
         self.max_lateness_factor = state.max_lateness_factor;
+        self.next_forecast_id = if state.schema_version >= 4 {
+            state.next_forecast_id
+        } else {
+            next_forecast_id.max(1)
+        };
+        self.score_receipts = if state.schema_version >= 4 {
+            state.score_receipts.clone()
+        } else {
+            Vec::new()
+        };
+        self.max_score_receipts = if state.schema_version >= 4 {
+            state.max_score_receipts
+        } else {
+            DEFAULT_MAX_HORIZON_FORECAST_RECEIPTS
+        };
+        self.evicted_score_receipts = if state.schema_version >= 4 {
+            state.evicted_score_receipts
+        } else {
+            0
+        };
         Ok(())
     }
 
@@ -5215,6 +5418,9 @@ impl DelayedHorizonEvaluator {
         self.hdc_dim = None;
         self.pending.clear();
         self.accumulators.fill(HorizonAccumulator::default());
+        self.next_forecast_id = 1;
+        self.score_receipts.clear();
+        self.evicted_score_receipts = 0;
     }
 }
 
