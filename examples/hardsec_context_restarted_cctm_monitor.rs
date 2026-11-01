@@ -1871,8 +1871,17 @@ mod tests {
                 single_accumulator = accumulator_next;
             }
 
-            update_restarted_processes(&mut context, p_value, epsilon, k, scale, 1.0 / 3.0, 256, index)
-                .unwrap();
+            update_restarted_processes(
+                &mut context,
+                p_value,
+                epsilon,
+                k,
+                scale,
+                1.0 / 3.0,
+                256,
+                index,
+            )
+            .unwrap();
         }
 
         let mut restarted_delay = None;
@@ -1886,8 +1895,17 @@ mod tests {
                 single_eta = eta_next;
                 single_accumulator = accumulator_next;
             }
-            update_restarted_processes(&mut context, 1.0, epsilon, k, scale, 1.0 / 3.0, 256, 10_000 + delay)
-                .unwrap();
+            update_restarted_processes(
+                &mut context,
+                1.0,
+                epsilon,
+                k,
+                scale,
+                1.0 / 3.0,
+                256,
+                10_000 + delay,
+            )
+            .unwrap();
 
             if restarted_delay.is_none() && context.restart_log_e_value >= threshold {
                 restarted_delay = Some(delay);
