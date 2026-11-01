@@ -86,7 +86,34 @@ This is the research opportunity: construct powerful online/SupFDR procedures wi
 
 A global SupFDR statement alone need not provide useful c_S<1 for arbitrary S. If only the global bound is known, the safe generic assignment may be c_S=1, leaving zero augmentation budget. Do not invent per-coordinate slack.
 
-## 4. Countable dynamic hypothesis families
+## 4. A concrete auxiliary path from admissible running-maximum adjusters
+
+The auxiliary path F_S,t need not remain an abstract assumption when a valid raw intersection e-process E_S,t is available. Let
+
+    M_S,t = max_{u<=t} E_S,u
+
+be its running maximum. Tavyrikov, Goeman and de Heide (2026) show that A(M_S,t) is again an e-process whenever A is an admissible adjuster: increasing/right-continuous, diverging at infinity and satisfying
+
+    integral_1^infinity A(x)/x^2 dx = 1.
+
+Because A(M_S,t) is nondecreasing, its expected path supremum is at most one by monotone convergence. Thus it is a concrete choice for the auxiliary F_S,t.
+
+A normalized family is
+
+    A_beta(x) = ((1-beta)/beta) * (x^beta - 1),  0 < beta < 1,
+
+with beta=0 continuous limit A_0(x)=log(x). Its normalization is exact:
+
+    integral_1^infinity A_beta(x)/x^2 dx
+      = ((1-beta)/beta) * (1/(1-beta)-1) = 1.
+
+At beta=1/2, A(x)=sqrt(x)-1. A fixed ex-ante mixture over beta values is also an e-process; selecting the pointwise best beta after observing the same data is not. This makes it possible to attach a power-adaptive but valid auxiliary path to each #9695 projective intersection e-process or to a #9712/#9758 intersection process under its stated model assumptions.
+
+The deterministic implementation supports both ordinary values and log-domain paths to avoid overflow for large capital. See SUPREMUM_EPROCESS_ADJUSTERS_2026-11-01.md. The theorem does not supply the coordinate baseline budgets q_i, prove the raw intersection processes valid, or establish the countable-family composition.
+
+Source: Tavyrikov, Goeman & de Heide, Carefree multiple testing with e-processes, EJS 20(2), 2026, https://doi.org/10.1214/26-EJS2546.
+
+## 5. Countable dynamic hypothesis families
 
 For a countable universe, the construction requires:
 - a fixed ex-ante sequence q_i >= 0 with sum_i q_i <= 1;
@@ -97,7 +124,7 @@ For a countable universe, the construction requires:
 
 The finite Python checker below enumerates all nonempty subsets. It does not establish the countably infinite theorem or provide a scalable separation oracle. The global-projective affine construction (#9695) and persistent adjuster still require a careful composition proof.
 
-## 5. Exact-rational reference checker
+## 6. Exact-rational reference checker
 
 Files:
 - validation/supremum_anchored_eclosure.py computes running coordinate contributions and local path certificates.
@@ -105,7 +132,7 @@ Files:
 
 This checker verifies deterministic inequalities only. It cannot establish the stochastic q_i or auxiliary running-supremum assumptions. Inputs called "adjusted auxiliary" must already be supported by a theorem/adjuster and source receipts.
 
-## 6. Additive auxiliary special case: exact e-BH reduction
+## 7. Additive auxiliary special case: exact e-BH reduction
 
 There is a faster restricted construction when the auxiliary evidence is allocated coordinate by coordinate. Choose fixed nonnegative auxiliary budgets v_i such that
 
@@ -181,7 +208,7 @@ The reference checker now includes:
 
 Tests compare the constructed intersection paths with the sums of coordinate paths, compare e-BH against the exhaustive finite closure selector, verify every resulting closure inequality, and exercise residual-zero/invalid-budget/empty-horizon cases. These tests are authored but have not been executed from a repository checkout; no CI pass is claimed.
 
-## 7. Benchmark targets
+## 8. Benchmark targets
 
 Compare separately:
 1. weighted e-Bonferroni baseline (known coordinate budgets);
@@ -201,7 +228,7 @@ Report:
 
 No SOTA claim is justified until the theorem, countable extension and matched confirmatory benchmark are complete.
 
-## 8. Prior art
+## 9. Prior art
 
 - Ramdas, Anchored multiple testing (October 2026): https://arxiv.org/abs/2610.11279
 - Tavyrikov, Goeman & de Heide, Carefree multiple testing with e-processes, EJS 20(2), 2026: https://doi.org/10.1214/26-EJS2546
