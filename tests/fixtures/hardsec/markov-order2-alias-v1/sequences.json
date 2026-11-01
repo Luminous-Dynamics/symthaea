@@ -1,0 +1,50 @@
+{
+  "schema_version": "hardsec-markov-order2-alias-fixture-v1",
+  "fixture_id": "same-one-step-counts-different-lag2-conditionals-v1",
+  "state_alphabet": [
+    0,
+    1
+  ],
+  "sequence_semantics": "finite_observed_sequence; transitions count adjacent elements; lag2 triplets are [previous_previous,current,next]; no wraparound transitions",
+  "first_order_control": [
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0
+  ],
+  "order2_alias": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0
+  ],
+  "intended_known_answer": {
+    "one_step_transition_counts": [
+      [
+        3,
+        2
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "control_when_current_0": {
+      "next_one_given_previous_previous_0": "1/2",
+      "next_one_given_previous_previous_1": "1/2"
+    },
+    "order2_alias_when_current_0": {
+      "next_one_given_previous_previous_0": "1/1",
+      "next_one_given_previous_previous_1": "0/1"
+    }
+  },
+  "claim_scope": "deterministic_falsification_fixture_only; not a calibrated statistical test"
+}
