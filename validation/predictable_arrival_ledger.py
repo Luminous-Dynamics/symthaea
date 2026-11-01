@@ -239,6 +239,76 @@ def build_predictable_arrival_ledger(
     )
 
 
+def build_predictable_arrival_ledger_from_source(
+    score_source,
+    rounds: int,
+    hypothesis_ids: Sequence[str],
+    *,
+    initial_active_count: int = 1,
+    min_observations: int = 5,
+    mean_threshold: float = 0.0,
+) -> dict[str, Any]:
+    """Request scores only after that round's predictable active set is fixed.
+
+    score_source(round_index, active_ids) must return a mapping containing
+    exactly the active IDs and their current scores. The callback is not called
+    for dormant hypotheses. This streaming interface gives callers an
+    observable decision-before-observation execution order. The returned
+    ledger is still independently replayed by verify_predictable_arrival_ledger.
+    """
+    ids = _validate_ids(hypothesis_ids, "hypothesis_ids")
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or rounds < 1:
+        raise ValueError("rounds must be a positive integer")
+    if (
+        isinstance(initial_active_count, bool)
+        or not isinstance(initial_active_count, int)
+        or not 1 <= initial_active_count <= len(ids)
+    ):
+        raise ValueError("initial_active_count must be within the universe")
+    if isinstance(min_observations, bool) or not isinstance(min_observations, int) or min_observations < 1:
+        raise ValueError("min_observations must be a positive integer")
+    threshold = float(mean_threshold)
+    if not math.isfinite(threshold):
+        raise ValueError("mean_threshold must be finite")
+
+    histories: dict[str, list[float]] = {hypothesis_id: [] for hypothesis_id in ids}
+    active = ids[:initial_active_count]
+    rows: list[list[float]] = []
+    for round_index in range(rounds):
+        # The decision is made using only previously returned score values.
+        activated = _expected_activation(
+            ids,
+            active,
+            histories,
+            min_observations=min_observations,
+            mean_threshold=threshold,
+        )
+        active = active + activated
+        # Only after the active set is frozen do we request current evidence.
+        current = score_source(round_index, tuple(active))
+        if not isinstance(current, Mapping):
+            raise ValueError("score_source must return a mapping from active ID to score")
+        if set(current) != set(active):
+            raise ValueError("score_source must return exactly the active hypothesis IDs")
+        row = [0.0] * len(ids)
+        for hypothesis_id in active:
+            value = float(current[hypothesis_id])
+            if not math.isfinite(value):
+                raise ValueError("score_source returned a non-finite score")
+            row[ids.index(hypothesis_id)] = value
+            histories[hypothesis_id].append(value)
+        rows.append(row)
+
+    return _build_ledger(
+        rows,
+        ids,
+        initial_active_count=initial_active_count,
+        min_observations=min_observations,
+        mean_threshold=threshold,
+        use_same_round_score=False,
+    )
+
+
 def build_same_round_lookahead_negative_control(
     scores_by_round: Sequence[Sequence[float]],
     hypothesis_ids: Sequence[str],
