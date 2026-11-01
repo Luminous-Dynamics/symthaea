@@ -1475,7 +1475,9 @@ mod tests {
             String::new()
         };
         format!(
-            "event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n             e1,{outcome},{},{},accuracy,1.0,{},0\n",
+            "event_id,outcome,artifact_sha256,device_session_sha256,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n             e1,{outcome},{},{},{},{},accuracy,1.0,{},0\n",
+            sha('c'),
+            sha('d'),
             sha('a'),
             output_digest,
             if deadline_met { "true" } else { "false" },
