@@ -779,6 +779,14 @@ impl EventTape {
         let mut charge_is_complete = true;
         let mut fully_metered = true;
         let mut candidate_evaluations = 0usize;
+        let mut multi_objective_evaluations = 0usize;
+        let mut noisy_observation_attempts = 0usize;
+        let mut successful_noisy_observations = 0usize;
+        let mut failed_noisy_observations = 0usize;
+        let mut noisy_candidate_decisions = BTreeMap::<String, String>::new();
+        let mut noisy_replicate_ids = BTreeSet::<(String, String)>::new();
+        let mut noisy_replicate_seeds = BTreeSet::<(String, u64)>::new();
+        let mut noisy_candidate_ids = BTreeSet::<String>::new();
         let mut direction_proposals = 0usize;
         let mut admitted_directions = 0usize;
         let mut duplicate_proposals = 0usize;
