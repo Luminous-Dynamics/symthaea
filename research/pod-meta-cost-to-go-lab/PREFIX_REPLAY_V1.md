@@ -1,6 +1,6 @@
 # Progressive Forecast Prefix Replay V1
 
-**Status:** first deterministic evaluator slice for [#9752](https://github.com/Luminous-Dynamics/symthaea/issues/9752). It is not yet a full BAGEN reproduction, a feasibility classifier, or a simultaneous-vector calibration result.
+**Status:** deterministic evaluator and budget-bound feasibility slice for [#9752](https://github.com/Luminous-Dynamics/symthaea/issues/9752). It is not yet a full BAGEN reproduction or simultaneous-vector calibration result.
 
 ## Data contract
 
@@ -20,6 +20,16 @@ One forecast receipt is one frozen prefix. The evaluator emits all rows sorted b
 - Pending: no outcome receipt exists at replay time; retain as pending and exclude from exact-label denominators.
 
 Task-family reports expose counts and all six per-dimension metrics. The aggregate joint q90 coverage is purely empirical; marginal q90 guarantees do not imply joint coverage.
+
+## Budget-bound feasibility
+
+An optional `PrefixBudgetReceipt` binds a remaining six-resource hard-budget vector to the exact `(run_id, decision_sequence, pre_state_digest)` for the same forecast. Duplicate, unknown, missing-digest, or pre-state-mismatched receipts are rejected.
+
+A prediction is declared feasible only when the forecast is `InDomain`, support is nonzero, the completion-probability threshold passes, and q90 remaining-cost plus mandatory verification reserve fits all six budget dimensions. A suspected or unsupported shift abstains rather than issuing a binary feasibility claim. This is a conservative engineering heuristic using marginal q90 values; it is not a joint six-resource coverage guarantee.
+
+Actual feasibility is known when an independently verified sufficient proof completed and measured remaining work fit or exceeded the bound budget, or when a right-censored lower bound already exceeds at least one budget dimension (which proves infeasibility). A censoring lower bound that still fits the budget does not establish completion feasibility. Competing terminals and pending observations remain unknown. Abstentions and unknown outcomes do not enter false-feasible or false-infeasible denominators.
+
+The evaluator reports confusion counts, abstentions, resolved false-feasible rate, and resolved false-infeasible rate. The deterministic fixture includes true feasible, true infeasible, false feasible, false infeasible, competing/pending unknown, and out-of-domain abstention cases. These are implementation checks, not population performance estimates.
 
 ## Current metrics
 
@@ -46,7 +56,7 @@ V1 does not yet include:
 
 ## Next increments
 
-1. Add a prefix-level remaining-budget receipt bound to the exact pre-state digest, then report false-feasible and false-infeasible outcomes without relabelling unresolved terminals.
+1. Expand the budget-sidecar replay to paired task-family and chronological holdouts, add cluster-aware confidence intervals, and include forecast-query overhead in all-in cost.
 2. Add a frozen rollout/replay fixture that generates multiple forecasts from one trajectory and verifies no future label leaks into earlier prefixes.
 3. Add paired baseline predictions on identical frozen prefixes (static, last-observed-cost, linear frontier model, split-vector conformal, and the supported scalar CAP protocol).
 4. Record forecast-query overhead and include it in all-in cost.
@@ -54,4 +64,4 @@ V1 does not yet include:
 
 ## Claim limits
 
-This first slice validates journal replay and metric accounting only. It does not demonstrate better forecast accuracy, feasible-budget detection, improved task success, or superiority over BAGEN/industry baselines. Those claims require the paired prefix benchmark, disjoint task-family and chronological holdouts, and externally reviewable raw receipts.
+This slice validates journal replay and deterministic feasibility accounting. It does not demonstrate better forecast accuracy, lower false-feasible rates, improved task success, or superiority over BAGEN/industry baselines. Those claims require the paired prefix benchmark, disjoint task-family and chronological holdouts, and externally reviewable raw receipts.
