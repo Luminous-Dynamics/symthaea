@@ -227,3 +227,10 @@ Source: https://arxiv.org/abs/2607.11699
 MAESTRO v3.0.0 is the recommended aligned piano-performance corpus baseline where its CC BY-NC-SA 4.0 terms are compatible. Pin the exact release and split; v3 reports 1,276 performances, 198.7 hours and 7.04 million notes. MAESTRO v2 added sostenuto (CC 66) and una-corda (CC 67) alongside sustain (CC 64), which makes it especially important not to collapse expressive piano performance to note-only MIDI.
 
 Source: https://magenta.withgoogle.com/datasets/maestro
+### Physical-model renderer conformance
+
+Pianoteq 9's official manual documents progressive partial sustain-pedal travel, distinct sostenuto and una-corda pedals, a renderer-specific harmonic pedal, sympathetic string resonance, repedaling, continuous velocity response, hammer-hardness/voicing and physical parameters. The harmonic pedal is a modeled effect, not a universal acoustic-piano control. Treat each control as a renderer-specific capability cell; never infer it from the generic piano identity.
+
+Sources:
+- https://www.modartt.com/user_manual?product=pianoteq
+- https://www.modartt.com/pianoteq_features
