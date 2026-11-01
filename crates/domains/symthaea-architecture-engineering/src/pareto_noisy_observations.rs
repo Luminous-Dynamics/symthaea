@@ -24,6 +24,8 @@ const SCHEMA: &str = "symthaea.architecture-engineering.noisy-pareto-observation
 const VERSION: &str = "0.2.0";
 const JOINT_REPORT_SCHEMA: &str = "symthaea.architecture-engineering.noisy-anytime-campaign-report";
 const JOINT_REPORT_VERSION: &str = "0.1.0";
+/// Current report classification is pairwise O(N^2 d); keep the accepted family bounded.
+const MAX_NOISY_PARETO_CANDIDATES: usize = 1_024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoisyParetoError {
@@ -124,8 +126,14 @@ impl NoisyObservationPlan {
         if !self.familywise_alpha.is_finite() || !(0.0..1.0).contains(&self.familywise_alpha) {
             return Err(NoisyParetoError::new("plan.familywise_alpha", "family-wise alpha must be finite and strictly between zero and one"));
         }
-        if self.max_candidates == 0 || self.max_candidates > 1_000_000 || self.minimum_replicates == 0 {
-            return Err(NoisyParetoError::new("plan", "candidate limit must be in 1..=1,000,000 and minimum replicates must be positive"));
+        if self.max_candidates == 0
+            || self.max_candidates > MAX_NOISY_PARETO_CANDIDATES
+            || self.minimum_replicates == 0
+        {
+            return Err(NoisyParetoError::new(
+                "plan",
+                format!("candidate limit must be in 1..={MAX_NOISY_PARETO_CANDIDATES} and minimum replicates must be positive"),
+            ));
         }
         let alpha_coordinate = self.familywise_alpha
             / (self.max_candidates as f64 * self.objective_specs.len() as f64);
@@ -856,7 +864,7 @@ mod tests {
             plan.noise_model_sha256.clone(),
             plan.objective_specs.clone(),
             0.05,
-            1_000_001,
+            MAX_NOISY_PARETO_CANDIDATES + 1,
             2,
         ).is_err());
     }
