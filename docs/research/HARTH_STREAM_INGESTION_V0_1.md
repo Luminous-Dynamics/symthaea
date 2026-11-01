@@ -24,10 +24,10 @@ The six acceleration values are expressed in g. The documented activity codes ar
 | 6 | Standing |
 | 7 | Sitting |
 | 8 | Lying |
-| 13 | Cycling seated |
-| 14 | Cycling standing |
-| 130 | Cycling seated, inactive |
-| 140 | Cycling standing, inactive |
+| 13 | Cycling (seated) |
+| 14 | Cycling (standing) |
+| 130 | Transport (sitting) |
+| 140 | Transport (standing) |
 
 ## Parser contract
 
@@ -59,7 +59,7 @@ The parser's normalized time key is only an ordering/interval representation. Si
 
 ## Initial comparison target
 
-The original HARTH work includes a leave-one-subject-out SVM baseline with reported mean F1 around 0.81 ± 0.18. That number is a literature reference, not a reproduced comparator; reproduce the exact features, label handling, subject split and scoring before using it as an SOTA comparison.
+The original HARTH paper reports two different label protocols. With all **12 annotated labels**, its SVM leave-one-subject-out mean F1 is **0.66 ± 0.32** (Table 2). The frequently cited **0.81 ± 0.18** is the SVM result after the paper merges those 12 labels into **nine physical activities** (Table 3): shuffling, transport-standing and standing are merged into standing; sitting and transport-sitting are merged into sitting. These are different tasks and must never be presented as one baseline. Reproduce both protocols with the exact paper features, participant folds, confusion-matrix aggregation and scoring before making an SOTA comparison.
 
 The next matched comparison should include:
 - majority/stratified prior and simple threshold/feature baselines;
@@ -91,14 +91,14 @@ References:
 
 ### Proposed gates (aspirational, not measured)
 
-1. **Reproducibility:** independently reproduce the HARTH SVM LOSO baseline with exact data archive, preprocessing, label policy and participant folds. Publish all 22 participant-fold results, not just pooled windows.
+1. **Reproducibility:** independently reproduce both HARTH SVM LOSO protocols: (a) the strict 12-label result (reported F1 0.66 ± 0.32) and (b) the explicitly merged nine-activity result (reported F1 0.81 ± 0.18). Publish all 22 participant-fold results, not just pooled windows, and preserve the exact confusion-matrix aggregation.
 2. **Quality:** aim for at least +3 percentage points in participant-mean macro-F1 over the reproduced SVM, with a participant-paired confidence interval above zero and no material regression in the worst-subject tail. Treat +3 pp as a research target, not a claim or guaranteed threshold.
 3. **Active sensing:** at a preregistered non-inferiority margin of -1 pp macro-F1, target at least 25% fewer sensor samples and report transition-event recall and p95 transition-detection delay. Do not infer these metrics from a randomly windowed classification split.
 4. **Edge feasibility:** report full application-event p50/p95/p99 latency, peak SRAM after reserve, flash, sensor/wake/compute/update/communication costs and physical complete-event energy. For 50 Hz streaming, p95 end-to-end processing below the 20 ms sample period is a useful target where the selected board and workload make it meaningful; it is not a universal requirement for lower-rate active sensing.
 5. **Energy superiority:** target at least 10% lower measured complete-event energy than the strongest matched baseline at the same preregistered quality and deadline constraints, with uncertainty reported. A modeled energy estimate or model-only inference measurement does not qualify.
 6. **Robustness:** report subject-held-out, sensor-subset, missingness, time-jitter, abrupt and gradual shift strata separately. Use participant as the independent statistical unit; multiple windows from one participant do not create independent subjects.
 
-Do not target the 96–99% figures from other datasets as a HARTH requirement. The first hard milestone is a faithful reproduction of the HARTH baseline under participant-held-out evaluation.
+Do not target the 96–99% figures from other datasets as a HARTH requirement. The first hard milestone is a faithful reproduction of both HARTH label protocols under participant-held-out evaluation. Use the nine-class 0.81 ± 0.18 comparator only for the nine-class track; use the 12-class 0.66 ± 0.32 comparator for the full-label track.
 
 ## Claim ceiling and status
 
