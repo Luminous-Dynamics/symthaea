@@ -225,7 +225,7 @@ pub fn validate_resource_registry(
 pub fn remaining_resource_headroom(
     registry: &ResourceRegistry,
     budget: &ResourceBudget,
-) -> Result<Vec<ResourceBudgetLimit>, ResourceBudgetError> {
+) -> Result<Vec<ResourceHeadroom>, ResourceBudgetError> {
     validate_resource_registry(registry)?;
     if budget.resource_registry_sha256 != registry.registry_sha256 {
         return Err(ResourceBudgetError::new(
