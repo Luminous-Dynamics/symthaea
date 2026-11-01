@@ -305,3 +305,39 @@ The defensible competitive claim is not “we rewrote both phone operating syste
 ## Claim ceiling
 
 This document records a research decision and proposed benchmark. No Android OTA semantic adapter, IPSW provider integration, mobile REA ingestion crate, physical iPhone acquisition, or cross-platform comparative result is implemented or claimed here.
+
+## 10. Industry application-security baselines
+
+Do not invent a substitute for the OWASP Mobile Application Security programme. Use:
+- **MASVS** as the cross-platform control baseline (storage, cryptography, authentication, network, platform, code, resilience and privacy).
+- **MASWE** as the mobile weakness taxonomy.
+- **MASTG** as the test/technique catalogue used to verify controls.
+
+Pin the exact repository revision, checklist and test identifiers for every run. A MASVS control without a corresponding MASTG test should be explicitly marked as an oracle gap; do not silently invent equivalence. A static heuristic cannot pass a control whose verification requires runtime behavior.
+
+### Tool comparisons
+
+- **REA**: evidence-driven MCP investigations over APKs, bundles, native artifacts and selected runtime/provider operations.
+- **MobSF**: an established cross-platform mobile app-security platform with static analysis for APK/IPA and dynamic testing paths. Its dynamic paths have environment constraints: the documented iOS lane uses Corellium or jailbroken iOS; Android may use rooted targets or Frida Gadget mode. Those results cannot be pooled with tests on stock, non-jailbroken devices.
+- **JADX / Apktool / Ghidra / JEB**: treat as underlying specialist engines and isolate them as ablations where the question is which evidence producer adds value. Do not count a feature of an engine as a REA feature unless the exact selected REA operation exposes it.
+
+### Required ablations
+
+A. MobSF alone.  
+B. REA alone.  
+C. REA + Symthaea.  
+D. Symthaea with equivalent raw observations but no REA output, where the input conditions can be made fair.
+
+Compare seeded weakness detection, control coverage, false positives, false negatives, evidence citation quality, time-to-correct finding and analyst correction rate. Report Android and iOS separately. Do not claim certification from a scanner report.
+
+### Android platform compatibility
+
+For a system-level AOSP-derived build, use CTS for framework API/behavior compatibility and VTS for HAL/kernel/vendor-facing compatibility, in addition to focused platform tests. CTS/VTS are compatibility suites, not substitutes for the security evidence and threat-model scorecards in this plan. Preserve test plan, device/build identity and exact result artifacts. A failure must be triaged; never remove or skip a compatibility gate merely to improve the headline score.
+
+References:
+- OWASP MASVS: https://mas.owasp.org/MASVS/
+- OWASP MASTG: https://mas.owasp.org/MASTG/
+- OWASP MASWE: https://mas.owasp.org/MASWE/
+- MobSF: https://github.com/MobSF/Mobile-Security-Framework-MobSF
+- AOSP CTS/VTS: https://source.android.com/docs/core/tests
+- Related implementation benchmark: [MOBILE-REA-005 / #9842](https://github.com/Luminous-Dynamics/symthaea/issues/9842)
