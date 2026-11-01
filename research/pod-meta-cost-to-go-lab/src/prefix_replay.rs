@@ -642,6 +642,106 @@ mod tests {
     }
 
     #[test]
+    fn budget_bound_prefixes_score_false_feasible_and_false_infeasible() {
+        let mut journal = ForecastJournal::default();
+        for id in 1..=4 {
+            journal
+                .append_forecast(forecast(id, 100 + id, 1, 7))
+                .unwrap();
+        }
+        journal
+            .append_outcome(outcome(
+                1,
+                2,
+                ResourceVector::new(12, 2, 4, 4, 6, 6),
+                TerminalOutcome::SufficientProof,
+            ))
+            .unwrap();
+        journal
+            .append_outcome(outcome(
+                2,
+                2,
+                ResourceVector::new(26, 1, 1, 1, 1, 1),
+                TerminalOutcome::RightCensored(CensorReason::Timeout),
+            ))
+            .unwrap();
+        journal
+            .append_outcome(outcome(
+                3,
+                2,
+                ResourceVector::new(9, 1, 2, 3, 4, 5),
+                TerminalOutcome::SufficientProof,
+            ))
+            .unwrap();
+        journal
+            .append_outcome(outcome(
+                4,
+                2,
+                ResourceVector::new(1, 1, 1, 1, 1, 1),
+                TerminalOutcome::CompetingTerminal(CompetingReason::PermissionRevoked),
+            ))
+            .unwrap();
+
+        let generous = ResourceVector::new(25, 4, 6, 8, 9, 10);
+        let tight = ResourceVector::new(10, 2, 3, 4, 5, 6);
+        let budgets = (1..=4)
+            .map(|id| PrefixBudgetReceipt {
+                run_id: 100 + id,
+                decision_sequence: 1,
+                pre_state_digest: [1; 32],
+                remaining_budget: if id <= 2 { generous } else { tight },
+                evidence_digest: [8; 32],
+            })
+            .collect::<Vec<_>>();
+
+        let report = PrefixReplayEvaluator::evaluate_with_budgets(&journal, &budgets, 0.8)
+            .unwrap()
+            .report;
+        assert_eq!(report.feasibility.budgeted_prefixes, 4);
+        assert_eq!(report.feasibility.predicted_feasible, 2);
+        assert_eq!(report.feasibility.predicted_infeasible, 2);
+        assert_eq!(report.feasibility.actual_feasibility_known, 3);
+        assert_eq!(report.feasibility.actual_feasible, 2);
+        assert_eq!(report.feasibility.true_feasible, 1);
+        assert_eq!(report.feasibility.false_feasible, 1);
+        assert_eq!(report.feasibility.false_infeasible, 1);
+        assert_eq!(report.feasibility.unknown_actual_outcomes, 1);
+        assert_eq!(report.feasibility.false_feasible_rate, Some(0.5));
+        assert_eq!(report.feasibility.false_infeasible_rate, Some(0.5));
+    }
+
+    #[test]
+    fn budget_receipts_must_bind_to_exact_forecast_state_and_prefix() {
+        let mut journal = ForecastJournal::default();
+        journal.append_forecast(forecast(1, 10, 1, 7)).unwrap();
+        let wrong_state = [99; 32];
+        let budget = PrefixBudgetReceipt {
+            run_id: 10,
+            decision_sequence: 1,
+            pre_state_digest: wrong_state,
+            remaining_budget: ResourceVector::new(100, 100, 100, 100, 100, 100),
+            evidence_digest: [8; 32],
+        };
+        assert_eq!(
+            PrefixReplayEvaluator::evaluate_with_budgets(&journal, &[budget], 0.8),
+            Err(PrefixReplayError::BudgetPreStateMismatch)
+        );
+
+        let duplicate = PrefixBudgetReceipt {
+            pre_state_digest: [1; 32],
+            ..budget
+        };
+        assert_eq!(
+            PrefixReplayEvaluator::evaluate_with_budgets(
+                &journal,
+                &[duplicate, duplicate],
+                0.8
+            ),
+            Err(PrefixReplayError::DuplicateBudgetReceipt)
+        );
+    }
+
+    #[test]
     fn task_family_summaries_and_row_order_are_deterministic() {
         let mut journal = ForecastJournal::default();
         journal.append_forecast(forecast(2, 20, 2, 8)).unwrap();
