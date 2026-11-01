@@ -286,6 +286,28 @@ mod tests {
     }
 
     #[test]
+    fn round_robin_replacement_advances_one_slot_per_overflow() {
+        let mut memory = PackedHdcMemory::<1, 2, 1>::new().unwrap();
+        let first = PackedHv::<1>::from_words([1]);
+        let second = PackedHv::<1>::from_words([3]);
+        let third = PackedHv::<1>::from_words([7]);
+        let fourth = PackedHv::<1>::from_words([15]);
+        memory.insert(0, first).unwrap();
+        memory.insert(0, second).unwrap();
+        assert_eq!(memory.insert_or_replace_oldest(0, third), Ok(InsertOutcome::Replaced));
+        assert_eq!(memory.insert_or_replace_oldest(0, fourth), Ok(InsertOutcome::Replaced));
+        assert_eq!(memory.predict(&fourth).unwrap().exemplar_index, 1);
+        assert_eq!(memory.predict(&third).unwrap().exemplar_index, 0);
+    }
+
+    #[test]
+    fn large_static_memory_payload_is_exact() {
+        // 4 * 16 exemplars * 2,048 bytes/vector, plus two per-class usize arrays.
+        let expected = 131_072 + 8 * core::mem::size_of::<usize>();
+        assert_eq!(PackedHdcMemory::<4, 16, 256>::payload_bytes(), Some(expected));
+    }
+
+    #[test]
     fn nearest_exemplar_prediction_is_deterministic() {
         let mut memory = PackedHdcMemory::<2, 2, 1>::new().unwrap();
         let left = PackedHv::<1>::from_words([0]);
