@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Forty-four Rust test functions are authored (16 event contract, 11 bitemporal revision, 8 purged-split, 9 train-only-scaler tests) for delayed-observation non-leakage,
+Fifty-four Rust test functions are authored (16 event contract, 11 bitemporal revision, 8 purged-split, 9 train-only-scaler, 10 Time-IMM adapter tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -112,6 +112,8 @@ and emits the event contract above.
   closed. The timezone configuration receives its own digest.
 - Requires an explicit availability policy: synchronous-at-event-time
   assumption or a declared fixed delay. The policy receives its own digest.
+  A canonical adapter-config digest also binds dataset/entity identity and the
+  feature-sorted mapping of numeric columns to modality, unit and scale.
   Neither option is evidence of physical acquisition or arrival time.
 - Numeric decimal strings are converted to configured fixed-point scale in
   [-9, 0], rounding nearest with ties away from zero. A half-unit quantization
