@@ -33,7 +33,12 @@
     "successor_receipt_sha256",
     "run_config_sha256",
     "started_from_fresh_process",
-    "mutable_caches_isolated"
+    "mutable_caches_isolated",
+    "initial_state_receipt_sha256",
+    "model_id",
+    "model_version",
+    "arm_policy_sha256",
+    "arm_config_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -163,6 +168,23 @@
           "type": "null"
         }
       ]
+    },
+    "initial_state_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arm_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "arm_config_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "allOf": [
