@@ -38,7 +38,7 @@ A trace binds:
 3. **Initial state:** authority revision, canonical state digest, active policy digest, source cursors and log-origin cursors.
 4. **Operations:** runner ID, client ID and program order; source/log scope; invocation and completion times; complete compare conditions; receipt identity; typed outcome; immutable receipt acceptance revision; current authority revision.
 5. **Fault schedule:** typed fault, target operation, deterministic injection point and action.
-6. **Witness observations:** witness identity and sequence, authority/incarnation, state digest, predecessor witness digest and signed-record digest.
+6. **Witness observations:** witness identity and sequence, authority/incarnation, authority revision, state digest, predecessor witness digest and signed-record digest.
 7. **Final observation:** complete cursor state, accepted receipt set, policy digest, current authority revision and canonical state digest.
 8. **Expected invariants and negative controls:** assertions the verifier must establish, plus seeded faulty implementations it must reject.
 
@@ -97,6 +97,7 @@ Every scenario declares its fault model. A SIGKILL test cannot be reported as a 
 The witness must be independent of the database being qualified. Its authenticated record binds at least:
 
 - authority ID and incarnation ID;
+- the authority revision observed by the witness (kept distinct from the database's locally restored revision);
 - monotonically increasing witness sequence;
 - canonical accepted-state digest;
 - predecessor witness-record digest;
@@ -105,7 +106,7 @@ The witness must be independent of the database being qualified. Its authenticat
 
 The verifier checks the witness chain under a separately configured trust root. Merely storing a witness pointer inside the candidate database is insufficient: snapshot rollback would roll back both.
 
-If a restored authority snapshot cannot prove continuity with the current independently witnessed head, the result is `rejected_anti_rollback` or `anti_rollback_unknown`. It is never fresh merely because its rows are internally consistent or its local integer revision looks large.
+If a restored authority snapshot cannot prove continuity with the current independently witnessed head, the result is `rejected_anti_rollback` or `anti_rollback_unknown`. The trace records the restored store's observed revision separately from the witness head's authority revision; neither can be substituted for the other. It is never fresh merely because its rows are internally consistent or its local integer revision looks large.
 
 ## Verifier design
 
