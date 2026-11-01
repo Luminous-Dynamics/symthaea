@@ -636,6 +636,7 @@ pub fn audit_prequential_execution(
                 timestamp_us,
                 predicted_class,
                 positive_probability_q15,
+                novelty_score_q15,
                 model_state_sha256,
             } => {
                 if *event_index >= count {
@@ -674,6 +675,7 @@ pub fn audit_prequential_execution(
                     timestamp_us: *timestamp_us,
                     predicted_class: *predicted_class,
                     positive_probability_q15: *positive_probability_q15,
+                    novelty_score_q15: *novelty_score_q15,
                 });
             }
             PrequentialAction::LabelReleased { event_index, timestamp_us, label } => {
