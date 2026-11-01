@@ -494,12 +494,12 @@ fn validate_replicate_matrix(
             "at least {MIN_TRANSFER_FAMILIES} distinct task families are required"
         ));
     }
-    if let Some(expected) = expected_families {
-        if &families != expected {
-            return Err(
-                "task-family set differs across independent model-pair replicates".to_owned(),
-            );
-        }
+    if let Some(expected) = expected_families
+        && &families != expected
+    {
+        return Err(
+            "task-family set differs across independent model-pair replicates".to_owned(),
+        );
     }
 
     let mut family_bands = BTreeMap::<String, BTreeSet<String>>::new();
