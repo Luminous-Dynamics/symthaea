@@ -163,7 +163,7 @@ fn parse_arm_ids(value: &Value) -> Result<(Vec<String>, BTreeMap<String, String>
             string(arm, &format!("{pointer}/config_sha256"))?,
             "arm.config_sha256",
         )?;
-        role_by_id.insert(id.clone(), role.to_owned());
+        let _ = role_by_id.insert(id.clone(), role.to_owned());
         arm_ids.push(id);
     }
     if control_count != 1 || intervention_count == 0 {
