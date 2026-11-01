@@ -201,6 +201,19 @@ Compare at least three solvers where available (HiGHS, SCIP, CBC, and Gurobi/CP-
 
 The affine closure MILP has O(n) variables and rows, but the binary utility/capacity/persistence problem remains combinatorial. Do not equate compact formulation size with polynomial-time optimization.
 
+### Structured dependence and update-cost scorecard
+
+For the projective equicorrelation envelope V_d=(1-rho_min)I+rho_max*11^T, do not benchmark only the dense matrix form. Compare:
+- dense O(d^2) matrix-vector and quadratic operations;
+- structured diagonal-plus-rank-one O(d) operations;
+- a generic low-rank factor representation for rank-k envelopes (target O(kd) work);
+- incremental/batched update and factor evaluation across active-set sizes and activation rates.
+
+Sweep d=2, 5, 10, 32, 100, 1,000, 10,000, 100,000 where memory permits. Report operator construction, factor evaluation, preconditioned update, peak memory, p50/p95 latency, and exact dense-reference parity at smaller d. Test principal-submatrix equality across all universe extensions. Time the sampling/generator path separately from the statistical method.
+
+For closure separation, pair the O(log n) sparse-update index (#9748) with the O(n) scan at change densities k/n from 0.001% through 100%. Report index build/rebuild cost separately; identify and measure the crossover where a scan is faster. The authenticated receipt (#9763) gets a separate proof-size/verifier scorecard.
+
+
 ## 7. Immutable manifest and seed derivation
 
 The new \`validation/dynamic_eclosure_benchmark_manifest.py\` provides:
