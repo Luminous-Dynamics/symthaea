@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-mobile-device-profile-v1.schema.json",
+  "title": "HARDSEC mobile device capability and evidence profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "evidence_domain",
+    "device",
+    "boot_integrity",
+    "hardware_protections",
+    "pmu_acquisition",
+    "environment",
+    "evidence",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-mobile-device-profile-v1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "physical_device_lab"
+      ]
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "product_family",
+        "soc_family",
+        "isa_family",
+        "os_version",
+        "security_patch_level",
+        "build_fingerprint_sha256"
+      ],
+      "properties": {
+        "platform": {
+          "enum": [
+            "android",
+            "ios"
+          ]
+        },
+        "product_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "soc_family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isa_family": {
+          "enum": [
+            "aarch64",
+            "arm64e",
+            "other",
+            "not_measured"
+          ]
+        },
+        "os_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "security_patch_level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "build_fingerprint_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([0-9a-f]{64})?$"
+        }
+      }
+    },
+    "boot_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bootloader_locked",
+        "verified_boot_state",
+        "rollback_protection_state",
+        "attestation_security_level",
+        "attestation_challenge_freshness",
+        "certificate_chain_status",
+        "patch_level_binding_status"
+      ],
+      "properties": {
+        "bootloader_locked": {
+          "enum": [
+            "locked",
+            "unlocked",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "verified_boot_state": {
+          "enum": [
+            "verified",
+            "self_signed",
+            "unverified",
+            "failed",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        },
+        "rollback_protection_state": {
+          "enum": [
+            "present_verified",
+            "present_unverified",
+            "absent",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        },
+        "attestation_security_level": {
+          "enum": [
+            "software",
+            "trusted_environment",
+            "strongbox",
+            "secure_enclave",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        },
+        "attestation_challenge_freshness": {
+          "enum": [
+            "fresh_verified",
+            "stale",
+            "replayed",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        },
+        "certificate_chain_status": {
+          "enum": [
+            "trusted",
+            "untrusted",
+            "revoked",
+            "invalid",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        },
+        "patch_level_binding_status": {
+          "enum": [
+            "hardware_bound_verified",
+            "software_reported",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "hardware_protections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_tagging",
+        "pointer_authentication",
+        "branch_target_protection",
+        "secure_element",
+        "tee"
+      ],
+      "properties": {
+        "memory_tagging": {
+          "$ref": "#/$defs/protection"
+        },
+        "pointer_authentication": {
+          "$ref": "#/$defs/protection"
+        },
+        "branch_target_protection": {
+          "$ref": "#/$defs/protection"
+        },
+        "secure_element": {
+          "$ref": "#/$defs/protection"
+        },
+        "tee": {
+          "$ref": "#/$defs/protection"
+        }
+      }
+    },
+    "pmu_acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interface",
+        "access_status",
+        "available_events",
+        "privilege_context",
+        "multiplexing_status",
+        "time_enabled_ns",
+        "time_running_ns",
+        "read_overhead_status",
+        "sample_loss_status",
+        "observer_effect_status"
+      ],
+      "properties": {
+        "interface": {
+          "enum": [
+            "simpleperf",
+            "perf_event_open",
+            "vendor_api",
+            "none",
+            "unknown"
+          ]
+        },
+        "access_status": {
+          "enum": [
+            "permitted",
+            "denied",
+            "privileged_only",
+            "not_measured",
+            "not_available"
+          ]
+        },
+        "available_events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "privilege_context": {
+          "enum": [
+            "unprivileged_app",
+            "shell",
+            "root",
+            "system",
+            "vendor_service",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "multiplexing_status": {
+          "enum": [
+            "not_multiplexed",
+            "multiplexed",
+            "unknown",
+            "not_measured",
+            "not_available"
+          ]
+        },
+        "time_enabled_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "time_running_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "read_overhead_status": {
+          "enum": [
+            "qualified",
+            "unqualified",
+            "not_measured",
+            "not_available"
+          ]
+        },
+        "sample_loss_status": {
+          "enum": [
+            "zero_verified",
+            "loss_observed",
+            "unknown",
+            "not_measured",
+            "not_available"
+          ]
+        },
+        "observer_effect_status": {
+          "enum": [
+            "within_budget",
+            "over_budget",
+            "not_measured",
+            "not_available"
+          ]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "thermal_status",
+        "power_state",
+        "charging_state",
+        "radio_activity_class",
+        "screen_state"
+      ],
+      "properties": {
+        "thermal_status": {
+          "enum": [
+            "none",
+            "light",
+            "moderate",
+            "severe",
+            "critical",
+            "emergency",
+            "shutdown",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "power_state": {
+          "enum": [
+            "normal",
+            "battery_saver",
+            "performance_mode",
+            "low_battery",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "charging_state": {
+          "enum": [
+            "charging",
+            "discharging",
+            "full",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "radio_activity_class": {
+          "enum": [
+            "idle",
+            "cellular_active",
+            "wifi_active",
+            "multiple_active",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "screen_state": {
+          "enum": [
+            "on",
+            "off",
+            "doze",
+            "unknown",
+            "not_measured"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_type",
+          "source_uri",
+          "input_sha256",
+          "parser_sha256",
+          "captured_at",
+          "claim_scope"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_type": {
+            "enum": [
+              "vendor_documentation",
+              "on_device_property",
+              "hardware_attestation_verified",
+              "privileged_device_tool",
+              "physical_lab_measurement",
+              "synthetic_fixture"
+            ]
+          },
+          "source_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "input_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "parser_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "captured_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "claim_scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_integrity_verified",
+        "pmu_measurement_qualified",
+        "physical_attack_resistance_established",
+        "limitations"
+      ],
+      "properties": {
+        "runtime_integrity_verified": {
+          "const": false
+        },
+        "pmu_measurement_qualified": {
+          "const": false
+        },
+        "physical_attack_resistance_established": {
+          "const": false
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "protection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hardware_support",
+        "runtime_state",
+        "mode",
+        "protected_scope",
+        "evidence_ids"
+      ],
+      "properties": {
+        "hardware_support": {
+          "enum": [
+            "vendor_documented",
+            "attested",
+            "unsupported",
+            "unknown",
+            "not_measured"
+          ]
+        },
+        "runtime_state": {
+          "enum": [
+            "enabled_verified",
+            "disabled_verified",
+            "unknown",
+            "not_measured",
+            "not_applicable"
+          ]
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protected_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
