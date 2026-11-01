@@ -233,7 +233,7 @@ fn median_duration(samples: &mut [Duration]) -> Duration {
 
 fn run() -> Result<(), String> {
     println!(
-        "topology,variables,edges,repeats,legacy_median_ns,optimized_median_ns,median_speedup,legacy_width,optimized_width,optimized_fill_score_evaluations,optimized_fill_adjacency_visits,optimized_leaf_updates,order_digest,validated"
+        "topology,variables,edges,repeats,legacy_median_ns,optimized_median_ns,median_speedup,legacy_width,optimized_width,optimized_fill_score_evaluations,optimized_fill_adjacency_visits,optimized_leaf_updates,predicted_peak_factor_entries,order_digest,validated"
     );
 
     for fixture in FIXTURES {
@@ -337,6 +337,7 @@ fn run() -> Result<(), String> {
             optimized_warmup.planner_work.fill_score_evaluations,
             optimized_warmup.planner_work.fill_score_adjacency_visits,
             optimized_warmup.planner_work.leaf_fast_path_updates,
+            optimized_warmup.predicted_peak_factor_entries,
             order_digest,
         );
     }
