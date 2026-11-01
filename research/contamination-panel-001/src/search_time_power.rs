@@ -569,26 +569,62 @@ fn simulate_repetitions(
     true_effect_permille: f64,
     scenario_id: u8,
 ) -> Result<SimulationSummary, String> {
-    let mut summary = SimulationSummary::new(config.monte_carlo_repetitions);
+    let mut summary =
+        SimulationSummary::new(config.monte_carlo_repetitions, candidate_blocks);
     for repetition in 0..config.monte_carlo_repetitions {
         let mut rng = DeterministicRng::new(seed, candidate_blocks, repetition, scenario_id);
         let mut differences = Vec::with_capacity(candidate_blocks as usize);
+        let mut repetition_incomplete = false;
         for _ in 0..candidate_blocks {
-            let missing_draw = rng.uniform_open() * 1_000.0;
-            if missing_draw < f64::from(config.missing_block_rate_permille) {
-                continue;
-            }
+            // Generate the complete three-arm block before applying missingness;
+            // this records clipping and failure mechanisms without promoting a
+            // partially observed block into the estimator.
             let block = simulate_block(config, true_effect_permille, &mut rng);
-            differences.push(block.difference_permille);
-            summary.clipped_scores = summary.clipped_scores.saturating_add(block.clipped_scores);
+            summary.clipped_scores =
+                summary.clipped_scores.saturating_add(block.clipped_scores);
             summary.total_scores = summary.total_scores.saturating_add(3);
+
+            let mcar_failure = rng.uniform_open() * 1_000.0
+                < f64::from(config.missing_block_rate_permille);
+            let budget_failure = rng.uniform_open() * 1_000.0
+                < f64::from(config.budget_truncation_rate_permille);
+            let outcome_is_low =
+                block.scores.iter().any(|score| *score < f64::from(config.failure_score_threshold_permille));
+            let outcome_dependent_failure = outcome_is_low
+                && rng.uniform_open() * 1_000.0
+                    < f64::from(config.outcome_dependent_failure_rate_permille);
+
+            let failed = mcar_failure || budget_failure || outcome_dependent_failure;
+            if mcar_failure {
+                summary.total_missing_blocks =
+                    summary.total_missing_blocks.saturating_add(1);
+            }
+            if budget_failure {
+                summary.total_budget_truncated_blocks =
+                    summary.total_budget_truncated_blocks.saturating_add(1);
+            }
+            if outcome_dependent_failure {
+                summary.total_outcome_dependent_failures =
+                    summary.total_outcome_dependent_failures.saturating_add(1);
+            }
+            if failed {
+                repetition_incomplete = true;
+            } else {
+                differences.push(block.difference_permille);
+            }
         }
+
         let completed_blocks = differences.len();
-        if completed_blocks < 2 {
+        summary.completed_blocks_sum += completed_blocks as f64;
+        // The preregistered estimator is complete-block only. Any missing arm
+        // invalidates the entire Monte Carlo repetition; never re-estimate from
+        // the surviving subset, even when many blocks remain.
+        if repetition_incomplete || completed_blocks != candidate_blocks as usize {
             summary.inconclusive_repetitions =
                 summary.inconclusive_repetitions.saturating_add(1);
             continue;
         }
+
         let estimate = sample_mean(&differences)?;
         let sd = sample_sd(&differences, estimate)?;
         let standard_error = sd / (completed_blocks as f64).sqrt();
@@ -597,13 +633,20 @@ fn simulate_repetitions(
                 summary.inconclusive_repetitions.saturating_add(1);
             continue;
         }
-        let critical = t_critical_975(completed_blocks - 1);
+        let critical = detection_critical_value(config, completed_blocks - 1);
         let margin = critical * standard_error;
         let lower = estimate - margin;
         let upper = estimate + margin;
         let rejects_null = lower > 0.0 || upper < 0.0;
-        let covers_truth = lower <= true_effect_permille && true_effect_permille <= upper;
-        summary.estimable_repetitions = summary.estimable_repetitions.saturating_add(1);
+        // Coverage always uses the ordinary 95% interval, independent of a
+        // Bonferroni-adjusted primary detection threshold.
+        let coverage_margin = t_critical_975(completed_blocks - 1) * standard_error;
+        let coverage_lower = estimate - coverage_margin;
+        let coverage_upper = estimate + coverage_margin;
+        let covers_truth =
+            coverage_lower <= true_effect_permille && true_effect_permille <= coverage_upper;
+        summary.estimable_repetitions =
+            summary.estimable_repetitions.saturating_add(1);
         if rejects_null {
             summary.rejections = summary.rejections.saturating_add(1);
         }
@@ -613,7 +656,6 @@ fn simulate_repetitions(
         summary.estimate_sum += estimate;
         summary.bias_sum += estimate - true_effect_permille;
         summary.standard_error_sum += standard_error;
-        summary.completed_blocks_sum += completed_blocks as f64;
     }
     Ok(summary)
 }
