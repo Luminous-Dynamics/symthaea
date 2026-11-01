@@ -670,7 +670,7 @@ fn qualification_failures(
     let positive_outcome = positive.finish();
     let negative_outcome = negative.finish();
     let mut failures = Vec::new();
-    match null_outcome.rejection_rate.upper_95_permille {
+    match null_outcome.estimable_rejection_rate.upper_95_permille {
         Some(value) if value <= f64::from(config.maximum_type_i_upper_permille) => {}
         Some(value) => failures.push(format!(
             "null type-I Wilson upper bound {:.1}‰ exceeds maximum {}‰",
@@ -701,17 +701,13 @@ fn qualification_failures(
             )),
             _ => failures.push(format!("{name} interval coverage is not estimable")),
         }
-        let inconclusive_rate = if result.planned_repetitions == 0 {
-            1_000.0
-        } else {
-            result.inconclusive_repetitions as f64 * 1_000.0
-                / result.planned_repetitions as f64
-        };
-        if inconclusive_rate > f64::from(config.maximum_inconclusive_rate_permille) {
-            failures.push(format!(
-                "{name} inconclusive simulation rate {:.1}‰ exceeds maximum {}‰",
-                inconclusive_rate, config.maximum_inconclusive_rate_permille
-            ));
+        match result.inconclusive_rate.upper_95_permille {
+            Some(value) if value <= f64::from(config.maximum_inconclusive_rate_permille) => {}
+            Some(value) => failures.push(format!(
+                "{name} inconclusive Wilson upper bound {:.1}‰ exceeds maximum {}‰",
+                value, config.maximum_inconclusive_rate_permille
+            )),
+            None => failures.push(format!("{name} inconclusive rate is not estimable")),
         }
         if let Some(clipped) = result.clipped_score_fraction_permille {
             if clipped > f64::from(config.maximum_clipped_score_fraction_permille) {
@@ -738,7 +734,7 @@ pub fn configuration_digest(config: &SearchTimePowerConfigV1) -> Result<String, 
     Ok(hash_domain(b"search-time-power-config.v1", &bytes))
 }
 
-fn qualify_search_time_trial_design(
+pub fn qualify_search_time_trial_design(
     config: &SearchTimePowerConfigV1,
 ) -> Result<SearchTimePowerReportV1, String> {
     let seed = validate_config(config)?;
@@ -783,6 +779,14 @@ fn qualify_search_time_trial_design(
         schema: SEARCH_POWER_REPORT_SCHEMA.to_owned(),
         design_id: config.design_id.clone(),
         primary_contrast: config.primary_contrast,
+        multiplicity_method: config.multiplicity_method,
+        effective_test_alpha_permille: match config.multiplicity_method {
+            SearchPowerMultiplicityV1::SinglePrimary => config.alpha_permille,
+            SearchPowerMultiplicityV1::BonferroniThreeContrasts => config.alpha_permille / 3,
+        },
+        score_floor_permille: config.score_floor_permille,
+        score_ceiling_permille: config.score_ceiling_permille,
+        carryover_after_network_access_permille: config.carryover_after_network_access_permille,
         configuration_sha256,
         simulation_seed_commitment_sha256,
         monte_carlo_repetitions: config.monte_carlo_repetitions,
