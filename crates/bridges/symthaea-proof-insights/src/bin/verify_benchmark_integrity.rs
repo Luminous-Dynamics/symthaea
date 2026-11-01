@@ -36,6 +36,7 @@ fn digest_list(value: &Value, path: &str) -> Result<String> {
 
 fn make_measured_eligible(mut value: Value) -> Result<Value> {
     value["evidence_class"] = json!("measured_audit");
+    value["dataset"]["cohort_id"] = json!("SorryDB_2601");
     let source_task_id = value["dataset"]["source_task_id"]
         .as_str()
         .context("synthetic source task ID missing")?;
@@ -86,6 +87,10 @@ fn self_test(path: &PathBuf) -> Result<()> {
         bail!("fully qualified synthetic semantic review did not derive eligible status");
     }
     println!("PITB_BENCHMARK_INTEGRITY_ELIGIBILITY_PASS: derived status from elaboration, axioms, probes and semantic review");
+
+    let mut bad = eligible.clone();
+    bad["dataset"]["cohort_id"] = json!("OtherCohort");
+    must_reject("measured receipt claims the wrong benchmark cohort", bad)?;
 
     let mut bad = eligible.clone();
     bad["target"]["statement_sha256"] = json!("0".repeat(64));
