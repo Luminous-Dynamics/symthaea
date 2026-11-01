@@ -152,3 +152,9 @@ Noisy candidate actions are now replayable through `AnytimeHistory`. The frozen 
 The adapter checks objective ID, order and direction equality between the noisy plan and history header. Deterministic and noisy evaluation modes cannot be mixed. The generic anytime attempt counter counts both modes.
 
 **Important limitation:** the event chain retains objective vectors and evidence digests, but this adapter does not resolve external raw artifact bytes or independently verify their contents. A later replicate-specific byte-verification path must bind every sample digest to immutable bytes and a verifier receipt. The current joint report is reproducible from the event chain, not a claim of external artifact authenticity.
+
+## 12. Joint receipt schema
+
+The noisy-plan/report schema is `0.2.0`; the noisy/anytime joint campaign report has its own schema `symthaea.architecture-engineering.noisy-anytime-campaign-report` at `0.1.0`. It contains the exact anytime resource receipt, noisy Pareto report, history-tip digest, frozen plan digest and attempted/successful/failed replicate counts. The nested anytime receipt is schema `0.4.0`.
+
+The generic anytime receipt marks deterministic archive target metrics `NotApplicableInNoisyMode` for noisy runs. It does not report them as missed targets. The noisy confidence classifications remain in the nested noisy Pareto report.
