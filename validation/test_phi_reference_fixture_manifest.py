@@ -63,8 +63,12 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
         self.assertEqual(
             pass_guard["properties"]["summary"]["properties"]["passed_anchor_count"]["const"], 6
         )
-        self.assertIn("evaluation_sha256", self.schema["properties"]["provenance"]["required"])
-        self.assertIn("reference_manifest_sha256", self.schema["properties"]["provenance"]["required"])
+        provenance = self.schema["properties"]["provenance"]
+        self.assertIn("evaluation_sha256", provenance["required"])
+        self.assertIn("reference_manifest_sha256", provenance["required"])
+        self.assertIn("upstream_builder_tpm_max_abs_deviation", provenance["required"])
+        self.assertIn("upstream_builder_tpm_tolerance", provenance["required"])
+        self.assertIn("model_input_semantics", provenance["required"])
         self.assertIn(
             "analysis_request_sha256",
             self.schema["properties"]["comparisons"]["items"]["required"],
