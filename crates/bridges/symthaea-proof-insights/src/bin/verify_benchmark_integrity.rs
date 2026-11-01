@@ -45,7 +45,7 @@ fn make_measured_eligible(mut value: Value) -> Result<Value> {
     value["vacuity_audit"]["method_id"] = json!("synthetic-vacuity-probe-v0");
     value["vacuity_audit"]["receipt_sha256"] = json!("e".repeat(64));
     value["semantic_review"]["status"] = json!("approved");
-    value["semantic_review"]["reviewer_scope"] = json!("combined");
+    value["semantic_review"]["review_scope"] = json!("combined");
     value["semantic_review"]["reviewer_identity"] = json!("synthetic-reviewer-not-real");
     value["semantic_review"]["reviewer_attestation_sha256"] = json!("f".repeat(64));
     let used_digest = digest_list(&value, "/axioms/used_axioms")?;
@@ -113,10 +113,16 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["integrity_status"] = json!("ineligible");
     must_reject("vacuity probe exposes a counterexample", bad)?;
 
-    let mut bad = eligible.clone();
-    bad["semantic_review"]["status"] = json!("needs_revision");
-    bad["integrity_status"] = json!("pending");
-    must_reject("semantic review did not approve target meaning", bad)?;
+    let mut pending_review = eligible.clone();
+    pending_review["semantic_review"]["status"] = json!("needs_revision");
+    pending_review["integrity_status"] = json!("pending");
+    let pending_bytes = serde_json::to_vec(&pending_review)?;
+    let pending_summary = benchmark_integrity::verify_bytes(&pending_bytes, None)?;
+    if pending_summary.integrity_status != "pending" {
+        bail!("target without semantic approval was not held pending");
+    }
+    println!("PITB_BENCHMARK_INTEGRITY_PENDING_PASS: compiler success without semantic approval is not eligible");
+
 
     let mut bad = eligible.clone();
     bad["semantic_review"]["reviewer_attestation_sha256"] = Value::Null;
