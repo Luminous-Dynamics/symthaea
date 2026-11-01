@@ -47,6 +47,9 @@ fn verify_binding(run: &Value, integrity: &benchmark_integrity::IntegritySummary
     if integrity.integrity_status != "eligible" {
         bail!("benchmark target is not eligible: {}", integrity.integrity_status);
     }
+    if !integrity.reviewer_signature_verified {
+        bail!("benchmark target has no verified Ed25519 reviewer attestation");
+    }
     if string(run, "/task_integrity/integrity_status")? != "eligible" {
         bail!("measured SorryDB run does not declare an eligible task-integrity status");
     }
@@ -331,6 +334,11 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     if integrity_summary.integrity_status != "eligible" {
         bail!("synthetic eligible integrity fixture did not derive eligible status");
     }
+    if !integrity_summary.reviewer_signature_verified
+        || integrity_summary.verified_evidence_artifact_count != 11
+    {
+        bail!("synthetic signed integrity fixture did not verify all eleven artifacts and reviewer signature");
+    }
     run["evidence_class"] = json!("measured_run");
     run["task_integrity"] = json!({
         "receipt_sha256":sha256_hex(&integrity_bytes),
@@ -340,7 +348,54 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     });
     let run_bytes = json_bytes(&run)?;
     verify_pair(&run_bytes, &integrity_bytes, &evidence_root, &registry_bytes, &registry_sha256)?;
-    println!("PITB_SORRYDB_INTEGRITY_JOIN_PASS: exact integrity receipt and eleven evidence artifacts joined to task, source span and Lean environment");
+    println!("PITB_SORRYDB_INTEGRITY_JOIN_PASS: exact integrity receipt, eleven evidence artifacts and Ed25519 reviewer signature joined");
+
+    // Mutate the reviewer signature, update both content-addressed parent
+    // references, and require the cryptographic verifier itself to reject it.
+    let reviewer_artifact_path = evidence_root.join("review/reviewer-attestation.json");
+    let original_attestation_bytes = fs::read(&reviewer_artifact_path)?;
+    let mut bad_attestation: Value = serde_json::from_slice(&original_attestation_bytes)?;
+    bad_attestation["signature_ed25519_hex"] = json!("00".repeat(64));
+    let bad_attestation_bytes = json_bytes(&bad_attestation)?;
+    fs::write(&reviewer_artifact_path, &bad_attestation_bytes)?;
+    let mut bad_integrity: Value = serde_json::from_slice(&integrity_bytes)?;
+    bad_integrity["semantic_review"]["reviewer_attestation_sha256"] =
+        json!(sha256_hex(&bad_attestation_bytes));
+    bad_integrity["evidence_artifacts"]["reviewer_attestation"]["sha256"] =
+        json!(sha256_hex(&bad_attestation_bytes));
+    let bad_integrity_bytes = json_bytes(&bad_integrity)?;
+    let mut bad_run: Value = serde_json::from_slice(&run_bytes)?;
+    bad_run["task_integrity"]["receipt_sha256"] = json!(sha256_hex(&bad_integrity_bytes));
+    let bad_run_bytes = json_bytes(&bad_run)?;
+    if verify_pair(&bad_run_bytes, &bad_integrity_bytes, &evidence_root, &registry_bytes, &registry_sha256).is_ok() {
+        bail!("signature mutation with updated content hashes unexpectedly passed reviewer authentication");
+    }
+    fs::write(&reviewer_artifact_path, &original_attestation_bytes)?;
+    println!("PITB_SORRYDB_REVIEWER_NEGATIVE_PASS: invalid Ed25519 signature rejected after all parent hashes were updated");
+
+    // Revocation is applied through the out-of-band registry. Updating the
+    // receipt and run pins to the new registry must not reactivate a revoked key.
+    let mut revoked_registry: Value = serde_json::from_slice(&registry_bytes)?;
+    revoked_registry["keys"][0]["status"] = json!("revoked");
+    let revoked_registry_bytes = json_bytes(&revoked_registry)?;
+    let revoked_registry_sha256 = sha256_hex(&revoked_registry_bytes);
+    let mut revoked_integrity: Value = serde_json::from_slice(&integrity_bytes)?;
+    revoked_integrity["reviewer_key_registry_sha256"] = json!(revoked_registry_sha256);
+    let revoked_integrity_bytes = json_bytes(&revoked_integrity)?;
+    let mut revoked_run: Value = serde_json::from_slice(&run_bytes)?;
+    revoked_run["task_integrity"]["receipt_sha256"] = json!(sha256_hex(&revoked_integrity_bytes));
+    revoked_run["task_integrity"]["reviewer_key_registry_sha256"] = json!(revoked_registry_sha256);
+    let revoked_run_bytes = json_bytes(&revoked_run)?;
+    if verify_pair(&revoked_run_bytes, &revoked_integrity_bytes, &evidence_root, &revoked_registry_bytes, &revoked_registry_sha256).is_ok() {
+        bail!("revoked reviewer key unexpectedly passed benchmark integrity admission");
+    }
+    println!("PITB_SORRYDB_REVIEWER_NEGATIVE_PASS: revoked reviewer key rejected despite updated registry and receipt pins");
+
+    if verify_pair(&run_bytes, &integrity_bytes, &evidence_root, &registry_bytes, &"0".repeat(64)).is_ok() {
+        bail!("mismatched external reviewer registry pin unexpectedly passed");
+    }
+    println!("PITB_SORRYDB_REVIEWER_NEGATIVE_PASS: externally pinned reviewer registry digest mismatch");
+
 
     let source_artifact = evidence_root.join("source/Synthetic/Example.lean");
     let original_source = fs::read(&source_artifact)?;
