@@ -160,8 +160,8 @@ def build_additive_anchored_auxiliary(
         for i in ids
     }
     horizons = {len(path) for path in paths.values()}
-    if len(horizons) != 1:
-        raise ValueError("coordinate auxiliary paths must share one horizon")
+    if len(horizons) != 1 or not horizons or next(iter(horizons)) == 0:
+        raise ValueError("coordinate auxiliary paths must share a nonempty horizon")
     if any(x < 0 for path in paths.values() for x in path):
         raise ValueError("coordinate auxiliary path values must be nonnegative")
     subsets = nonempty_subsets(ids)
