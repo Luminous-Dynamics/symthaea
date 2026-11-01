@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 53,
+    "rust_test_functions_authored": 54,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -48,7 +48,7 @@
     "bitemporal_test_functions_authored": 11,
     "purged_split_test_functions_authored": 8,
     "train_only_scaler_test_functions_authored": 9,
-    "time_imm_adapter_test_functions_authored": 9
+    "time_imm_adapter_test_functions_authored": 10
   },
   "opaque_payload_contract": {
     "fields": [
@@ -186,6 +186,16 @@
     "text_payload": {
       "whitespace_preserved": true,
       "content_addressed": true
-    }
+    },
+    "test_functions_authored": 10,
+    "parsed_table_provenance_fields": [
+      "dataset_id",
+      "record_id",
+      "entity_id",
+      "adapter_config_sha256",
+      "source_file_sha256",
+      "availability_policy_sha256",
+      "timestamp_zone_sha256"
+    ]
   }
 }
