@@ -2524,7 +2524,7 @@ fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
                         anyhow::bail!("accepted checkpoint history contains a same-size fork");
                     }
                     if !matches!(
-                        receipt.checkpoint_evidence,
+                        &receipt.checkpoint_evidence,
                         CheckpointEvidence::VerifiedSameTree
                     ) {
                         anyhow::bail!("same-tree checkpoint refresh lacks same-tree evidence");
