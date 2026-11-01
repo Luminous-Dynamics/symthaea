@@ -634,7 +634,6 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
     let mut base_rates = Vec::new();
     let mut treatment_rates = Vec::new();
     let mut placebo_rates = Vec::new();
-    let mut item_base_success = 0_u64;
     let mut item_treatment_success = 0_u64;
     let mut item_placebo_success = 0_u64;
     let mut item_total = 0_u64;
@@ -649,9 +648,6 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
         base_rates.push(base);
         treatment_rates.push(treatment);
         placebo_rates.push(placebo);
-        item_base_success = item_base_success
-            .checked_add(outcome.base.success_count)
-            .ok_or_else(|| "base item success count overflows".to_owned())?;
         item_treatment_success = item_treatment_success
             .checked_add(outcome.treatment.success_count)
             .ok_or_else(|| "treatment item success count overflows".to_owned())?;
