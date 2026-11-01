@@ -486,6 +486,7 @@ impl BitemporalEventLedger {
                 if old_record.entity_id != record.entity_id
                     || old_record.modality_id != record.modality_id
                     || old_record.source_id != record.source_id
+                    || old_record.source_sequence != record.source_sequence
                 {
                     return Err(BitemporalEventError::RevisionIdentityChanged {
                         event_id: revision.event_id,
@@ -784,6 +785,15 @@ mod tests {
         ledger.append(revision(1, 1, 1, 10, EventRevisionOperation::Assert { record: original })).unwrap();
         let mut corrected = revision_record(1, 10, 20, 2);
         corrected.entity_id = 2;
+        assert_eq!(
+            ledger.append(revision(2, 1, 2, 20, EventRevisionOperation::Supersede {
+                target_revision_id: 1,
+                record: corrected,
+            })),
+            Err(BitemporalEventError::RevisionIdentityChanged { event_id: 1 })
+        );
+        let mut corrected = revision_record(1, 10, 20, 2);
+        corrected.source_sequence = 99;
         assert_eq!(
             ledger.append(revision(2, 1, 2, 20, EventRevisionOperation::Supersede {
                 target_revision_id: 1,
