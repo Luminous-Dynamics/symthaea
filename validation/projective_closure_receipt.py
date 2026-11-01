@@ -172,13 +172,19 @@ def _node_hash(
     )
 
 
-def _build_balanced(entries: list[tuple[Fraction, str, bool]]) -> Optional[_Node]:
-    if not entries:
+def _build_balanced(
+    entries: list[tuple[Fraction, str, bool]],
+    start: int = 0,
+    end: Optional[int] = None,
+) -> Optional[_Node]:
+    if end is None:
+        end = len(entries)
+    if start >= end:
         return None
-    mid = len(entries) // 2
+    mid = (start + end) // 2
     key, hypothesis_id, selected = entries[mid]
-    left = _build_balanced(entries[:mid])
-    right = _build_balanced(entries[mid + 1 :])
+    left = _build_balanced(entries, start, mid)
+    right = _build_balanced(entries, mid + 1, end)
     left_agg = left.aggregate if left else _empty_aggregate()
     right_agg = right.aggregate if right else _empty_aggregate()
     aggregate = _combine_aggregate(
@@ -406,6 +412,15 @@ def make_score_receipt(
     for name, value in (("weight_digest", weight_digest), ("evidence_version", evidence_version)):
         if not isinstance(value, str) or not value:
             raise ValueError(f"{name} must be a non-empty string")
+    config_alpha = snapshot.configuration.get("alpha")
+    config_weight_digest = snapshot.configuration.get("weight_digest")
+    config_evidence_version = snapshot.configuration.get("evidence_version")
+    if config_alpha is None or _fraction(config_alpha) != alpha_value:
+        raise ValueError("alpha is not bound to the committed snapshot configuration")
+    if config_weight_digest != weight_digest:
+        raise ValueError("weight digest is not bound to the committed snapshot configuration")
+    if config_evidence_version != evidence_version:
+        raise ValueError("evidence version is not bound to the committed snapshot configuration")
     agg = snapshot.aggregate
     r = agg.selected_count
     if r == 0:
@@ -494,6 +509,19 @@ def verify_score_receipt(
     alpha = _frac_from_obj(receipt.get("alpha"))
     if alpha <= 0 or (expected_alpha is not None and alpha != expected_alpha):
         raise ValueError("alpha mismatch or invalid alpha")
+    configuration = snapshot.get("configuration")
+    if not isinstance(configuration, dict):
+        raise ValueError("snapshot configuration missing")
+    try:
+        committed_alpha = _fraction(configuration.get("alpha"))
+    except (TypeError, ValueError, ZeroDivisionError) as exc:
+        raise ValueError("invalid committed alpha") from exc
+    if committed_alpha != alpha:
+        raise ValueError("receipt alpha is not bound to snapshot configuration")
+    if configuration.get("weight_digest") != weight_digest:
+        raise ValueError("receipt weight digest is not bound to snapshot configuration")
+    if configuration.get("evidence_version") != evidence_version:
+        raise ValueError("receipt evidence version is not bound to snapshot configuration")
 
     r = receipt.get("rejection_count")
     if isinstance(r, bool) or not isinstance(r, int) or r <= 0:
