@@ -88,7 +88,8 @@
           "mapping_sha256",
           "spec_sha256",
           "mapping_entries",
-          "sequence_state_bits"
+          "sequence_state_bits",
+          "background_apportionment"
         ],
         "properties": {
           "case_id": {
@@ -177,6 +178,11 @@
             "type": "integer",
             "minimum": 2,
             "maximum": 6
+          },
+          "background_apportionment": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "uniqueItems": true
           }
         },
         "allOf": [
