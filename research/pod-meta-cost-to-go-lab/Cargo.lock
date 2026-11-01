@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "pod-meta-cost-to-go-lab"
 version = "0.1.0"
+dependencies = [
+ "pod-meta-lab",
+]
+
+[[package]]
+name = "pod-meta-lab"
+version = "0.1.0"
