@@ -225,8 +225,8 @@ impl PrefixReplayEvaluator {
                     })
                     .transpose()?
                     .flatten();
-                let actual_feasible = budget
-                    .and_then(|receipt| actual_feasible(outcome, receipt.remaining_budget));
+                let actual_feasible =
+                    budget.and_then(|receipt| actual_feasible(outcome, receipt.remaining_budget));
                 Ok(PrefixReplayRow {
                     forecast_id: forecast.id,
                     run_id: forecast.run_id,
@@ -236,9 +236,7 @@ impl PrefixReplayEvaluator {
                     forecast: forecast.forecast,
                     observed_work: outcome.map(|value| value.observed_work),
                     terminal: outcome.map(|value| value.terminal),
-                    verifier_present: outcome
-                        .and_then(|value| value.verifier_digest)
-                        .is_some(),
+                    verifier_present: outcome.and_then(|value| value.verifier_digest).is_some(),
                     remaining_budget: budget.map(|value| value.remaining_budget),
                     predicted_feasible,
                     actual_feasible,
@@ -262,10 +260,7 @@ impl PrefixReplayEvaluator {
             right_censored: overall.right_censored,
             competing_terminal: overall.competing_terminal,
             pending: overall.pending,
-            empirical_joint_q90_coverage: ratio(
-                overall.joint_q90_hits,
-                overall.completed_verified,
-            ),
+            empirical_joint_q90_coverage: ratio(overall.joint_q90_hits, overall.completed_verified),
             dimensions: dimension_metrics(overall.dimensions),
             by_task_family: by_family
                 .into_iter()
@@ -314,10 +309,9 @@ fn actual_feasible(
 ) -> Option<bool> {
     let outcome = outcome?;
     match outcome.terminal {
-        TerminalOutcome::SufficientProof => Some(within_budget(
-            outcome.observed_work,
-            remaining_budget,
-        )),
+        TerminalOutcome::SufficientProof => {
+            Some(within_budget(outcome.observed_work, remaining_budget))
+        }
         TerminalOutcome::RightCensored(_) => {
             let lower_bound = outcome.observed_work;
             (!within_budget(lower_bound, remaining_budget)).then_some(false)
@@ -383,10 +377,8 @@ fn update_feasibility(
         (false, false) => increment(&mut metrics.true_infeasible)?,
     }
 
-    metrics.false_feasible_rate = ratio(
-        metrics.false_feasible,
-        metrics.resolved_predicted_feasible,
-    );
+    metrics.false_feasible_rate =
+        ratio(metrics.false_feasible, metrics.resolved_predicted_feasible);
     metrics.false_infeasible_rate = ratio(
         metrics.false_infeasible,
         metrics.resolved_predicted_infeasible,
@@ -532,10 +524,7 @@ fn dimension_metrics(
         let value = values[index];
         DimensionReplayMetrics {
             completed_labels: value.completed_count,
-            q50_mean_absolute_error: mean_u128(
-                value.absolute_error_sum,
-                value.completed_count,
-            ),
+            q50_mean_absolute_error: mean_u128(value.absolute_error_sum, value.completed_count),
             q50_mean_signed_bias: mean_i128(value.signed_error_sum, value.completed_count),
             q90_marginal_coverage: ratio(value.q90_hits, value.completed_count),
             q95_marginal_coverage: ratio(value.q95_hits, value.completed_count),
@@ -611,8 +600,7 @@ mod tests {
             terminal,
             evidence_digest: [5; 32],
             meter_digest: [6; 32],
-            verifier_digest: (terminal == TerminalOutcome::SufficientProof)
-                .then_some([7; 32]),
+            verifier_digest: (terminal == TerminalOutcome::SufficientProof).then_some([7; 32]),
         }
     }
 
@@ -764,11 +752,7 @@ mod tests {
             ..budget
         };
         assert_eq!(
-            PrefixReplayEvaluator::evaluate_with_budgets(
-                &journal,
-                &[duplicate, duplicate],
-                0.8
-            ),
+            PrefixReplayEvaluator::evaluate_with_budgets(&journal, &[duplicate, duplicate], 0.8),
             Err(PrefixReplayError::DuplicateBudgetReceipt)
         );
     }
@@ -794,13 +778,9 @@ mod tests {
             remaining_budget: ResourceVector::new(100, 100, 100, 100, 100, 100),
             evidence_digest: [8; 32],
         };
-        let report = PrefixReplayEvaluator::evaluate_with_budgets(
-            &journal,
-            &[budget],
-            0.8,
-        )
-        .unwrap()
-        .report;
+        let report = PrefixReplayEvaluator::evaluate_with_budgets(&journal, &[budget], 0.8)
+            .unwrap()
+            .report;
         assert_eq!(report.feasibility.budgeted_prefixes, 1);
         assert_eq!(report.feasibility.abstained_predictions, 1);
         assert_eq!(report.feasibility.abstained_with_known_actual, 1);
