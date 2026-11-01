@@ -43,8 +43,9 @@ pub mod types;
 pub use action_conditioned::{
     ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION, ActionConditionedCandidateAction,
     ActionConditionedForecastReceipt, ActionConditionedForecastScore,
-    ActionConditionedPredictorState, ActionConditionedPredictorError,
-    ActionConditionedVisualResidualPredictor, PendingActionConditionedForecastState,
+    ActionConditionedObservedOutcome, ActionConditionedPredictorState,
+    ActionConditionedPredictorError, ActionConditionedVisualResidualPredictor,
+    PendingActionConditionedForecastState,
 };
 pub use attention::SurpriseMap;
 pub use bridge::{
