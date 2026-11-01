@@ -186,6 +186,9 @@ jobs:
           for case in data["cases"]:
               assert case["mapping_entries"] == len(case["mapping"])
               assert case["mapping"] != case["canonical_mapping"] or not case["complement_flipped"]
+              background = case["background_apportionment"]
+              assert background == sorted(set(background))
+              assert set(background).isdisjoint(case["constituents"])
               expected = 1 << (len(case["constituents"]) * case["update_grain"])
               assert expected == len(case["mapping"])
               encoded = bytearray(b"SYMTHAEA-IIT-MACRO-MAPPING\0v0.1\0")
@@ -203,7 +206,9 @@ jobs:
               for unit in case["background_apportionment"]:
                   spec.extend(struct.pack("<Q", unit))
               assert hashlib.sha256(spec).hexdigest() == case["spec_sha256"]
-          print("PASS: six macro mapping cases / 112 truth-table entries; pinned PyPhi wheel")
+          assert any(case["background_apportionment"] for case in data["cases"])
+          assert next(case for case in data["cases"] if case["case_id"] == "coarse-2-on-count-2")["background_apportionment"] == [3]
+          print("PASS: six macro mapping cases / 112 truth-table entries; pinned PyPhi wheel; background apportionment bound")
           PY
 
       - name: Upload pinned PyPhi reference evidence
