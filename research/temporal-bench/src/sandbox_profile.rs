@@ -1,0 +1,574 @@
+//! Pure, fail-closed planning for a Linux candidate sandbox.
+//!
+//! This module only validates inputs and builds exact argv vectors. It does not
+//! execute Bubblewrap/systemd, deliver the seccomp FD, probe namespaces, or read
+//! cgroup files. A plan is not evidence that the host enforced it.
+
+use std::error::Error;
+use std::fmt;
+
+use super::digest::CanonicalHasher;
+
+const MAX_CLOSURE_ENTRIES: usize = 512;
+const MIN_MEMORY_MAX_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_MEMORY_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_SCRATCH_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_STDIO_BYTES: u64 = 1024 * 1024;
+const MAX_TASKS: u32 = 128;
+
+const NIX_BASE32: &str = "0123456789abcdfghijklmnpqrsvwxyz";
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SandboxPlanError {
+    InvalidPath(&'static str),
+    InvalidStorePath(String),
+    CandidateNotInClosure,
+    EmptyClosure,
+    TooManyClosureEntries,
+    DuplicateClosureEntry(String),
+    ZeroDigest(&'static str),
+    InvalidLimit(&'static str),
+    InvalidSeccompDescriptor,
+    InvalidBubblewrapPath,
+}
+
+impl fmt::Display for SandboxPlanError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidPath(field) => write!(f, "{field} is not a safe absolute path"),
+            Self::InvalidStorePath(path) => write!(f, "invalid Nix store entry: {path}"),
+            Self::CandidateNotInClosure => {
+                write!(f, "candidate executable is not inside a pinned runtime closure entry")
+            }
+            Self::EmptyClosure => write!(f, "runtime closure must not be empty"),
+            Self::TooManyClosureEntries => write!(f, "runtime closure exceeds the entry limit"),
+            Self::DuplicateClosureEntry(path) => {
+                write!(f, "duplicate runtime closure entry: {path}")
+            }
+            Self::ZeroDigest(field) => write!(f, "{field} digest must be nonzero"),
+            Self::InvalidLimit(field) => write!(f, "invalid sandbox resource limit: {field}"),
+            Self::InvalidSeccompDescriptor => {
+                write!(f, "seccomp descriptor must be pre-opened and normalized to fd 3")
+            }
+            Self::InvalidBubblewrapPath => {
+                write!(f, "Bubblewrap executable must be an absolute pinned Nix store path")
+            }
+        }
+    }
+}
+impl Error for SandboxPlanError {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeClosureEntry {
+    /// Exact top-level Nix store path, not /nix/store or one of its parents.
+    pub store_path: String,
+    /// Digest of the store object/tree computed before launch.
+    pub artifact_sha256: [u8; 32],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateSandboxSpec {
+    pub candidate_executable: String,
+    pub candidate_sha256: [u8; 32],
+    pub runtime_closure: Vec<RuntimeClosureEntry>,
+    pub bubblewrap_executable: String,
+    pub bubblewrap_sha256: [u8; 32],
+    /// Already-open, pinned architecture-specific seccomp BPF program.
+    /// The launcher must ensure this exact descriptor survives exec as fd 3.
+    pub seccomp_fd: i32,
+    pub seccomp_sha256: [u8; 32],
+    pub memory_max_bytes: u64,
+    pub cpu_quota_percent: u32,
+    pub tasks_max: u32,
+    pub wall_timeout_ms: u64,
+    pub scratch_max_bytes: u64,
+    pub stdout_max_bytes: u64,
+    pub stderr_max_bytes: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CandidateSandboxPlan {
+    pub bubblewrap_arguments: Vec<String>,
+    pub systemd_run_arguments: Vec<String>,
+    pub candidate_executable: String,
+    pub runtime_closure_sha256: [u8; 32],
+    pub plan_sha256: [u8; 32],
+}
+
+fn safe_absolute_path(value: &str) -> bool {
+    if !value.starts_with('/')
+        || value.starts_with("//")
+        || value.contains('\0')
+        || value.ends_with('/')
+    {
+        return false;
+    }
+    let mut parts = value.split('/');
+    let _root = parts.next();
+    parts.all(|part| !part.is_empty() && part != "." && part != "..")
+}
+
+fn nix_store_entry_name(path: &str) -> Option<&str> {
+    if !safe_absolute_path(path) {
+        return None;
+    }
+    let remainder = path.strip_prefix("/nix/store/")?;
+    if remainder.contains('/') {
+        return None;
+    }
+    let (hash, name) = remainder.split_once('-')?;
+    if hash.len() != 32
+        || !hash.chars().all(|character| NIX_BASE32.contains(character))
+        || name.is_empty()
+    {
+        return None;
+    }
+    Some(name)
+}
+
+fn candidate_store_root(candidate_executable: &str) -> Option<String> {
+    if !safe_absolute_path(candidate_executable) {
+        return None;
+    }
+    let remainder = candidate_executable.strip_prefix("/nix/store/")?;
+    let (entry, suffix) = match remainder.split_once('/') {
+        Some((entry, suffix)) => (entry, Some(suffix)),
+        None => (remainder, None),
+    };
+    if entry.is_empty() || suffix.is_some_and(|value| value.is_empty()) {
+        return None;
+    }
+    let root = format!("/nix/store/{entry}");
+    nix_store_entry_name(&root).map(|_| root)
+}
+
+fn validate_spec(spec: &CandidateSandboxSpec) -> Result<Vec<RuntimeClosureEntry>, SandboxPlanError> {
+    if spec.candidate_sha256 == [0; 32] {
+        return Err(SandboxPlanError::ZeroDigest("candidate"));
+    }
+    if spec.bubblewrap_sha256 == [0; 32] {
+        return Err(SandboxPlanError::ZeroDigest("Bubblewrap"));
+    }
+    if spec.seccomp_sha256 == [0; 32] {
+        return Err(SandboxPlanError::ZeroDigest("seccomp"));
+    }
+    if spec.seccomp_fd != 3 {
+        return Err(SandboxPlanError::InvalidSeccompDescriptor);
+    }
+    if candidate_store_root(&spec.candidate_executable).is_none() {
+        return Err(SandboxPlanError::InvalidPath("candidate_executable"));
+    }
+    if candidate_store_root(&spec.bubblewrap_executable).is_none() {
+        return Err(SandboxPlanError::InvalidBubblewrapPath);
+    }
+    if spec.runtime_closure.is_empty() {
+        return Err(SandboxPlanError::EmptyClosure);
+    }
+    if spec.runtime_closure.len() > MAX_CLOSURE_ENTRIES {
+        return Err(SandboxPlanError::TooManyClosureEntries);
+    }
+    if !(MIN_MEMORY_MAX_BYTES..=MAX_MEMORY_MAX_BYTES).contains(&spec.memory_max_bytes) {
+        return Err(SandboxPlanError::InvalidLimit("memory_max_bytes"));
+    }
+    if !(1..=1_600).contains(&spec.cpu_quota_percent) {
+        return Err(SandboxPlanError::InvalidLimit("cpu_quota_percent"));
+    }
+    if !(1..=MAX_TASKS).contains(&spec.tasks_max) {
+        return Err(SandboxPlanError::InvalidLimit("tasks_max"));
+    }
+    if !(10..=3_600_000).contains(&spec.wall_timeout_ms) {
+        return Err(SandboxPlanError::InvalidLimit("wall_timeout_ms"));
+    }
+    if !(4_096..=MAX_SCRATCH_BYTES).contains(&spec.scratch_max_bytes) {
+        return Err(SandboxPlanError::InvalidLimit("scratch_max_bytes"));
+    }
+    if spec.stdout_max_bytes == 0 || spec.stdout_max_bytes > MAX_STDIO_BYTES {
+        return Err(SandboxPlanError::InvalidLimit("stdout_max_bytes"));
+    }
+    if spec.stderr_max_bytes == 0 || spec.stderr_max_bytes > MAX_STDIO_BYTES {
+        return Err(SandboxPlanError::InvalidLimit("stderr_max_bytes"));
+    }
+
+    let candidate_root = candidate_store_root(&spec.candidate_executable)
+        .ok_or(SandboxPlanError::InvalidPath("candidate_executable"))?;
+    let mut closure = spec.runtime_closure.clone();
+    closure.sort_by(|left, right| left.store_path.cmp(&right.store_path));
+    let mut previous: Option<&str> = None;
+    let mut contains_candidate = false;
+    for entry in &closure {
+        if nix_store_entry_name(&entry.store_path).is_none() {
+            return Err(SandboxPlanError::InvalidStorePath(entry.store_path.clone()));
+        }
+        if entry.artifact_sha256 == [0; 32] {
+            return Err(SandboxPlanError::ZeroDigest("runtime closure entry"));
+        }
+        if previous == Some(entry.store_path.as_str()) {
+            return Err(SandboxPlanError::DuplicateClosureEntry(entry.store_path.clone()));
+        }
+        previous = Some(entry.store_path.as_str());
+        if entry.store_path == candidate_root {
+            contains_candidate = true;
+        }
+    }
+    if !contains_candidate {
+        return Err(SandboxPlanError::CandidateNotInClosure);
+    }
+    Ok(closure)
+}
+
+fn closure_digest(entries: &[RuntimeClosureEntry]) -> [u8; 32] {
+    let mut hasher = CanonicalHasher::new(b"symthaea.temporal.candidate-runtime-closure.v1");
+    hasher.usize(entries.len());
+    for entry in entries {
+        hasher.bytes(entry.store_path.as_bytes());
+        hasher.bytes(&entry.artifact_sha256);
+    }
+    hasher.finish()
+}
+
+fn build_bubblewrap_arguments(
+    spec: &CandidateSandboxSpec,
+    closure: &[RuntimeClosureEntry],
+) -> Vec<String> {
+    let mut args = vec![
+        "--unshare-user".into(),
+        "--unshare-pid".into(),
+        "--unshare-net".into(),
+        "--unshare-ipc".into(),
+        "--unshare-uts".into(),
+        "--unshare-cgroup".into(),
+        "--die-with-parent".into(),
+        "--new-session".into(),
+        "--cap-drop".into(),
+        "ALL".into(),
+        "--clearenv".into(),
+        "--dir".into(),
+        "/nix".into(),
+        "--dir".into(),
+        "/nix/store".into(),
+    ];
+    for entry in closure {
+        args.push("--ro-bind".into());
+        args.push(entry.store_path.clone());
+        args.push(entry.store_path.clone());
+    }
+    args.extend([
+        "--remount-ro".into(),
+        "/nix".into(),
+        "--proc".into(),
+        "/proc".into(),
+        "--dev".into(),
+        "/dev".into(),
+        "--size".into(),
+        spec.scratch_max_bytes.to_string(),
+        "--tmpfs".into(),
+        "/tmp".into(),
+        "--dir".into(),
+        "/home".into(),
+        "--dir".into(),
+        "/home/candidate".into(),
+        "--chdir".into(),
+        "/tmp".into(),
+        "--setenv".into(),
+        "HOME".into(),
+        "/home/candidate".into(),
+        "--setenv".into(),
+        "TMPDIR".into(),
+        "/tmp".into(),
+        "--setenv".into(),
+        "LANG".into(),
+        "C".into(),
+        "--setenv".into(),
+        "LC_ALL".into(),
+        "C".into(),
+        "--seccomp".into(),
+        spec.seccomp_fd.to_string(),
+        "--".into(),
+        spec.candidate_executable.clone(),
+    ]);
+    args
+}
+
+fn build_systemd_run_arguments(
+    spec: &CandidateSandboxSpec,
+    bwrap_args: &[String],
+) -> Vec<String> {
+    let mut args = vec![
+        "--user".into(),
+        "--scope".into(),
+        "--pipe".into(),
+        format!("--property=MemoryMax={}", spec.memory_max_bytes),
+        "--property=MemorySwapMax=0".into(),
+        format!("--property=CPUQuota={}%", spec.cpu_quota_percent),
+        format!("--property=TasksMax={}", spec.tasks_max),
+        "--property=OOMPolicy=kill".into(),
+        "--property=KillMode=control-group".into(),
+        format!("--property=RuntimeMaxSec={}ms", spec.wall_timeout_ms),
+        "--".into(),
+        spec.bubblewrap_executable.clone(),
+    ];
+    args.extend_from_slice(bwrap_args);
+    args
+}
+
+/// Validate the requested profile and create deterministic, exact argv vectors.
+///
+/// The caller must separately verify executable/store tree digests, ensure
+/// seccomp_fd is inherited as fd 3, launch under the system manager, verify
+/// actual namespaces and cgroup limits, and enforce wall/stdio limits.
+pub fn build_candidate_sandbox_plan(
+    spec: &CandidateSandboxSpec,
+) -> Result<CandidateSandboxPlan, SandboxPlanError> {
+    let closure = validate_spec(spec)?;
+    let closure_sha256 = closure_digest(&closure);
+    let bwrap_args = build_bubblewrap_arguments(spec, &closure);
+    let systemd_args = build_systemd_run_arguments(spec, &bwrap_args);
+
+    let mut hasher = CanonicalHasher::new(b"symthaea.temporal.candidate-sandbox-plan.v1");
+    hasher.bytes(spec.candidate_executable.as_bytes());
+    hasher.bytes(&spec.candidate_sha256);
+    hasher.bytes(spec.bubblewrap_executable.as_bytes());
+    hasher.bytes(&spec.bubblewrap_sha256);
+    hasher.bytes(&spec.seccomp_sha256);
+    hasher.u64(spec.memory_max_bytes);
+    hasher.u32(spec.cpu_quota_percent);
+    hasher.u32(spec.tasks_max);
+    hasher.u64(spec.wall_timeout_ms);
+    hasher.u64(spec.scratch_max_bytes);
+    hasher.u64(spec.stdout_max_bytes);
+    hasher.u64(spec.stderr_max_bytes);
+    hasher.bytes(&closure_sha256);
+    hasher.usize(bwrap_args.len());
+    for argument in &bwrap_args {
+        hasher.bytes(argument.as_bytes());
+    }
+    hasher.usize(systemd_args.len());
+    for argument in &systemd_args {
+        hasher.bytes(argument.as_bytes());
+    }
+
+    Ok(CandidateSandboxPlan {
+        bubblewrap_arguments: bwrap_args,
+        systemd_run_arguments: systemd_args,
+        candidate_executable: spec.candidate_executable.clone(),
+        runtime_closure_sha256: closure_sha256,
+        plan_sha256: hasher.finish(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn store_path(name: &str, hash_character: char) -> String {
+        format!("/nix/store/{}-{name}", hash_character.to_string().repeat(32))
+    }
+
+    fn spec() -> CandidateSandboxSpec {
+        let candidate_store = store_path("candidate", '0');
+        let bwrap_store = store_path("bubblewrap", '1');
+        CandidateSandboxSpec {
+            candidate_executable: format!("{candidate_store}/bin/edge-candidate"),
+            candidate_sha256: [1; 32],
+            runtime_closure: vec![
+                RuntimeClosureEntry {
+                    store_path: store_path("libc", '2'),
+                    artifact_sha256: [2; 32],
+                },
+                RuntimeClosureEntry {
+                    store_path: candidate_store,
+                    artifact_sha256: [3; 32],
+                },
+                RuntimeClosureEntry {
+                    store_path: bwrap_store.clone(),
+                    artifact_sha256: [4; 32],
+                },
+            ],
+            bubblewrap_executable: format!("{bwrap_store}/bin/bwrap"),
+            bubblewrap_sha256: [5; 32],
+            seccomp_fd: 3,
+            seccomp_sha256: [6; 32],
+            memory_max_bytes: 128 * 1024 * 1024,
+            cpu_quota_percent: 100,
+            tasks_max: 16,
+            wall_timeout_ms: 30_000,
+            scratch_max_bytes: 1024 * 1024,
+            stdout_max_bytes: 64 * 1024,
+            stderr_max_bytes: 64 * 1024,
+        }
+    }
+
+    #[test]
+    fn profile_requires_explicit_mandatory_namespaces_and_never_try_flags() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        for required in [
+            "--unshare-user",
+            "--unshare-pid",
+            "--unshare-net",
+            "--unshare-ipc",
+            "--unshare-uts",
+            "--unshare-cgroup",
+        ] {
+            assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == required));
+        }
+        assert!(!plan.bubblewrap_arguments.iter().any(|arg| arg == "--unshare-all"));
+        assert!(!plan.bubblewrap_arguments.iter().any(|arg| arg.ends_with("-try")));
+    }
+
+    #[test]
+    fn only_exact_runtime_store_entries_are_individually_read_only_bound() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        let bind_count = plan.bubblewrap_arguments.iter()
+            .filter(|arg| arg.as_str() == "--ro-bind")
+            .count();
+        assert_eq!(bind_count, 3);
+        for (index, argument) in plan.bubblewrap_arguments.iter().enumerate() {
+            if argument == "--ro-bind" {
+                assert_ne!(plan.bubblewrap_arguments[index + 1], "/nix/store");
+                assert_ne!(plan.bubblewrap_arguments[index + 1], "/home");
+                assert!(plan.bubblewrap_arguments[index + 1].starts_with("/nix/store/"));
+                assert_eq!(
+                    plan.bubblewrap_arguments[index + 1],
+                    plan.bubblewrap_arguments[index + 2]
+                );
+            }
+        }
+        assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == "--clearenv"));
+        assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == "--seccomp"));
+    }
+
+    #[test]
+    fn scope_mode_uses_pipe_without_invalid_wait_or_service_only_properties() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--scope"));
+        assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--pipe"));
+        assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == "--wait"));
+        for service_only in [
+            "--property=NoNewPrivileges=yes",
+            "--property=PrivateNetwork=yes",
+            "--property=ProtectHome=yes",
+            "--property=ProtectSystem=strict",
+        ] {
+            assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == service_only));
+        }
+    }
+
+    #[test]
+    fn seccomp_descriptor_is_normalized_to_fd_three() {
+        let mut invalid = spec();
+        invalid.seccomp_fd = 4;
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::InvalidSeccompDescriptor
+        );
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        let index = plan.bubblewrap_arguments.iter()
+            .position(|arg| arg == "--seccomp")
+            .unwrap();
+        assert_eq!(plan.bubblewrap_arguments[index + 1], "3");
+    }
+
+    #[test]
+    fn systemd_scope_plan_binds_memory_swap_cpu_task_and_runtime_limits() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        for required in [
+            "--property=MemoryMax=134217728",
+            "--property=MemorySwapMax=0",
+            "--property=CPUQuota=100%",
+            "--property=TasksMax=16",
+            "--property=OOMPolicy=kill",
+            "--property=KillMode=control-group",
+            "--property=RuntimeMaxSec=30000ms",
+        ] {
+            assert!(plan.systemd_run_arguments.iter().any(|arg| arg == required));
+        }
+    }
+
+    #[test]
+    fn runtime_closure_input_order_does_not_change_the_plan_digest() {
+        let mut first = spec();
+        let mut second = spec();
+        second.runtime_closure.reverse();
+        let a = build_candidate_sandbox_plan(&first).unwrap();
+        let b = build_candidate_sandbox_plan(&second).unwrap();
+        assert_eq!(a.plan_sha256, b.plan_sha256);
+        assert_eq!(a.runtime_closure_sha256, b.runtime_closure_sha256);
+    }
+
+    #[test]
+    fn changing_any_resource_limit_changes_the_plan_commitment() {
+        let first = build_candidate_sandbox_plan(&spec()).unwrap();
+        let mut changed = spec();
+        changed.memory_max_bytes += 4096;
+        let second = build_candidate_sandbox_plan(&changed).unwrap();
+        assert_ne!(first.plan_sha256, second.plan_sha256);
+    }
+
+    #[test]
+    fn candidate_must_be_inside_an_exact_pinned_store_closure_entry() {
+        let mut invalid = spec();
+        invalid.candidate_executable = "/nix/store/00000000000000000000000000000000-other/bin/candidate".into();
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::CandidateNotInClosure
+        );
+    }
+
+    #[test]
+    fn parent_traversal_and_the_whole_nix_store_are_rejected() {
+        let mut invalid = spec();
+        invalid.candidate_executable = "/nix/store/../etc/passwd".into();
+        assert!(matches!(
+            build_candidate_sandbox_plan(&invalid),
+            Err(SandboxPlanError::InvalidPath(_))
+        ));
+        invalid = spec();
+        invalid.runtime_closure[0].store_path = "/nix/store".into();
+        assert!(matches!(
+            build_candidate_sandbox_plan(&invalid),
+            Err(SandboxPlanError::InvalidStorePath(_))
+        ));
+    }
+
+    #[test]
+    fn duplicate_store_entries_fail_closed() {
+        let mut invalid = spec();
+        invalid.runtime_closure.push(invalid.runtime_closure[0].clone());
+        assert!(matches!(
+            build_candidate_sandbox_plan(&invalid),
+            Err(SandboxPlanError::DuplicateClosureEntry(_))
+        ));
+    }
+
+    #[test]
+    fn zero_seccomp_digest_and_invalid_fd_are_rejected() {
+        let mut invalid = spec();
+        invalid.seccomp_sha256 = [0; 32];
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::ZeroDigest("seccomp")
+        );
+        invalid = spec();
+        invalid.seccomp_fd = 0;
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::InvalidSeccompDescriptor
+        );
+    }
+
+    #[test]
+    fn resource_limits_fail_closed_outside_declared_ranges() {
+        let mut invalid = spec();
+        invalid.memory_max_bytes = 1;
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::InvalidLimit("memory_max_bytes")
+        );
+        invalid = spec();
+        invalid.stdout_max_bytes = 0;
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::InvalidLimit("stdout_max_bytes")
+        );
+    }
+}
