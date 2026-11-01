@@ -111,7 +111,7 @@ If a restored authority snapshot cannot prove continuity with the current indepe
 
 ## Verifier design
 
-Implement the verifier as a pure Rust reference reducer with no DB driver dependency. The runner adapters should only:
+The initial reference verifier is implemented as a pure Rust reducer with no DB driver dependency. It checks a deterministic reference linearization. The next increment must extend it to consume actual observed event logs and check whether arbitrary concurrent histories admit a legal linearization, without forcing them to match the fixture's chosen tie-break. It must also verify witness signatures and trust-root context before allowing a real restore-freshness claim. The runner adapters should only:
 
 1. instantiate the declared backend and schema;
 2. apply operations in the trace under the declared schedule;
@@ -203,7 +203,7 @@ The first target is not a specific p99. It is zero safety violations plus reprod
 
 ## Implementation status and non-claims
 
-This PR adds a versioned trace schema, one deterministic reference fixture and this protocol. It does **not** add the Rust trace runner, pure reference reducer, SQLx/SQLite/Turso/etcd adapters, Jepsen integration, simulation engine, physical failure tests, or verifier. It does not qualify any storage engine. Those remain follow-on implementation work tracked under #9764 and #9792.
+This increment now includes a standalone pure Rust reference reducer at `tools/basalt-trace-verifier`, a strict typed CLI, six executable negative controls, and a focused exact-head workflow. It replays the fixture's declared deterministic linearization and checks source/log/policy/receipt transitions, retry behavior, witness-chain linkage, restore sequence, final state and digest preimages. It does **not** yet parse live backend observation files, find legal linearizations for arbitrary concurrent histories, run Jepsen, simulate a cluster, verify cryptographic witness signatures, test physical failure behavior, or qualify a storage engine. Those remain follow-on work tracked under #9792, #9800 and #9764.
 
 
 ## Expected versus observed evidence
