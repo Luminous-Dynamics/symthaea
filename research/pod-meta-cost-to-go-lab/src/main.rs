@@ -1,10 +1,11 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, CompletedCalibrationExample, EffectDisposition, ForecastId, ForecastJournal,
-    ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients, JointCostEnvelope,
+    BudgetLedger, CensoringWeightReceipt, CompletedCalibrationExample, EffectDisposition,
+    ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
+    JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
     LinearProofFrontierCostModel, ProofFrontierFeatures, ReconciliationOutcome,
     RemainingCostForecast, ReservationId, ResourceVector, ShiftStatus,
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
-    assess_joint_resource_fit,
+    assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
 
 fn tokens(value: u128) -> ResourceVector {
@@ -416,4 +417,118 @@ fn main() {
         JointCostEnvelope::Unbounded { .. }
     ));
     println!("VECTOR_CONFORMAL_ROW\tfinite-sample-rank-overflow\tunbounded");
+    let make_landmark_completion = |episode_id: u64, endpoint: u64, score: u128, g: f64| {
+        let residual = ResourceVector::new(
+            score * frontier_prediction.uncertainty_scale.tokens,
+            score * frontier_prediction.uncertainty_scale.tool_calls,
+            score * frontier_prediction.uncertainty_scale.cpu_ms,
+            score * frontier_prediction.uncertainty_scale.gpu_ms,
+            score * frontier_prediction.uncertainty_scale.wall_ms,
+            score * frontier_prediction.uncertainty_scale.micro_usd,
+        );
+        LandmarkEpisode {
+            episode_id,
+            landmark_work_units: 5,
+            observed_endpoint_work_units: endpoint,
+            prediction: frontier_prediction,
+            observed_history_digest: [27; 32],
+            terminal: LandmarkTerminal::ProofCompleted {
+                remaining_resource_cost: frontier_prediction
+                    .point_cost
+                    .checked_add(residual)
+                    .unwrap(),
+                verifier_digest: [28; 32],
+            },
+            censoring_receipt: Some(CensoringWeightReceipt {
+                censor_model_digest: [29; 32],
+                nuisance_training_partition_digest: [30; 32],
+                calibration_partition_digest: [31; 32],
+                observed_history_digest: [27; 32],
+                population_cohort_digest: population_digest,
+                censoring_survival_probability: g,
+            }),
+        }
+    };
+    let make_landmark_censor = |episode_id: u64| LandmarkEpisode {
+        episode_id,
+        landmark_work_units: 5,
+        observed_endpoint_work_units: 10,
+        prediction: frontier_prediction,
+        observed_history_digest: [32; 32],
+        terminal: LandmarkTerminal::RightCensored {
+            observed_resource_lower_bound: ResourceVector::new(4, 2, 3, 0, 9, 0),
+        },
+        censoring_receipt: None,
+    };
+    let landmark_rows = [
+        make_landmark_completion(201, 6, 1, 1.0),
+        make_landmark_completion(202, 8, 2, 0.5),
+        make_landmark_completion(203, 9, 3, 0.25),
+        make_landmark_censor(204),
+    ];
+    let landmark_calibration = calibrate_landmark_ipcw(
+        &landmark_rows,
+        LandmarkIpcwConfig {
+            landmark_work_units: 5,
+            miscoverage: 0.10,
+            minimum_censoring_survival_probability: 0.05,
+            model_digest,
+            censor_model_digest: [29; 32],
+            calibration_partition_digest: [31; 32],
+            nuisance_training_partition_digest: [30; 32],
+            population_cohort_digest: population_digest,
+        },
+    )
+    .unwrap();
+    assert_eq!(landmark_calibration.normalized_residual_threshold, 3.0);
+    assert_eq!(landmark_calibration.at_risk_count, 4);
+    println!(
+        "LANDMARK_IPCW_ROW\tweighted-survivor-calibration\t{}\t{}\t{:.3}\t{:.3}",
+        landmark_calibration.proof_events_observed_after_landmark,
+        landmark_calibration.right_censored_after_landmark,
+        landmark_calibration.normalized_residual_threshold,
+        landmark_calibration.effective_sample_size
+    );
+    let positivity_control = make_landmark_completion(205, 7, 1, 0.01);
+    let positivity_result = calibrate_landmark_ipcw(
+        &[positivity_control],
+        LandmarkIpcwConfig {
+            landmark_work_units: 5,
+            miscoverage: 0.10,
+            minimum_censoring_survival_probability: 0.05,
+            model_digest,
+            censor_model_digest: [29; 32],
+            calibration_partition_digest: [31; 32],
+            nuisance_training_partition_digest: [30; 32],
+            population_cohort_digest: population_digest,
+        },
+    );
+    assert_eq!(
+        positivity_result,
+        Err(pod_meta_cost_to_go_lab::LandmarkIpcwError::PositivityViolation)
+    );
+    println!("LANDMARK_IPCW_ROW\tpositivity-violation\tabstain");
+    let mut competing_control = make_landmark_completion(206, 7, 1, 1.0);
+    competing_control.terminal = LandmarkTerminal::CompetingTerminal(
+        pod_meta_cost_to_go_lab::CompetingProofTerminal::PermissionRevoked,
+    );
+    competing_control.censoring_receipt = None;
+    let competing_result = calibrate_landmark_ipcw(
+        &[competing_control],
+        LandmarkIpcwConfig {
+            landmark_work_units: 5,
+            miscoverage: 0.10,
+            minimum_censoring_survival_probability: 0.05,
+            model_digest,
+            censor_model_digest: [29; 32],
+            calibration_partition_digest: [31; 32],
+            nuisance_training_partition_digest: [30; 32],
+            population_cohort_digest: population_digest,
+        },
+    );
+    assert_eq!(
+        competing_result,
+        Err(pod_meta_cost_to_go_lab::LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator)
+    );
+    println!("LANDMARK_IPCW_ROW\tcompeting-terminal\trequires-separate-estimator");
 }
