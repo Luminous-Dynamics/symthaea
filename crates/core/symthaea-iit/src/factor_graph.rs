@@ -1172,11 +1172,20 @@ fn min_fill_order_scopes(
         }
     }
 
-    let mut active: BTreeSet<usize> = eliminate.iter().copied().collect();
+    let active: BTreeSet<usize> = eliminate.iter().copied().collect();
+    let planner_work = MinFillPlannerWork::default();
+
+    // The incremental score cache is valuable when a high-degree hub shares
+    // many degree-one neighbours. On chains, rings, and ordinary grids, the
+    // original heap/full-rescan strategy avoids the extra score-map updates.
+    if !has_hub_leaf_frontier(&adjacency, &active) {
+        return min_fill_order_scopes_full_rescan(adjacency, active, planner_work);
+    }
+
     let mut versions = BTreeMap::<usize, u64>::new();
     let mut scores = BTreeMap::<usize, (usize, usize)>::new();
     let mut queue = BinaryHeap::<Reverse<(usize, usize, usize, u64)>>::new();
-    let mut planner_work = MinFillPlannerWork::default();
+    let mut planner_work = planner_work;
 
     for variable in active.iter().copied() {
         versions.insert(variable, 0);
@@ -1330,6 +1339,166 @@ fn min_fill_order_scopes(
     }
 
     Ok((order, induced_width, planner_work))
+}
+
+fn has_hub_leaf_frontier(
+    adjacency: &BTreeMap<usize, BTreeSet<usize>>,
+    active: &BTreeSet<usize>,
+) -> bool {
+    const MIN_HUB_ACTIVE_DEGREE: usize = 16;
+    const MIN_SHARED_LEAVES: usize = 8;
+
+    for neighbours in adjacency.values() {
+        let active_degree = neighbours
+            .iter()
+            .filter(|neighbour| active.contains(neighbour))
+            .count();
+        if active_degree < MIN_HUB_ACTIVE_DEGREE {
+            continue;
+        }
+        let active_leaves = neighbours
+            .iter()
+            .filter(|neighbour| active.contains(neighbour))
+            .filter(|leaf| {
+                adjacency.get(leaf).is_some_and(|leaf_neighbours| {
+                    leaf_neighbours
+                        .iter()
+                        .filter(|candidate| active.contains(candidate))
+                        .count()
+                        == 1
+                })
+            })
+            .count();
+        if active_leaves >= MIN_SHARED_LEAVES
+            && active_leaves >= active_degree.saturating_add(1) / 2
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn min_fill_order_scopes_full_rescan(
+    mut adjacency: BTreeMap<usize, BTreeSet<usize>>,
+    mut active: BTreeSet<usize>,
+    mut planner_work: MinFillPlannerWork,
+) -> Result<(Vec<usize>, usize, MinFillPlannerWork), FactorGraphError> {
+    let mut versions = BTreeMap::<usize, u64>::new();
+    let mut queue = BinaryHeap::<Reverse<(usize, usize, usize, u64)>>::new();
+    for variable in active.iter().copied() {
+        versions.insert(variable, 0);
+        let (fill_edges, degree) =
+            fill_score_full_rescan(variable, &adjacency, &mut planner_work)?;
+        queue.push(Reverse((fill_edges, degree, variable, 0)));
+    }
+
+    let mut order = Vec::with_capacity(active.len());
+    let mut induced_width = 0usize;
+    while !active.is_empty() {
+        let variable = loop {
+            let Reverse((_, degree, variable, version)) =
+                queue.pop().ok_or(FactorGraphError::EmptyFactorGraph)?;
+            if active.contains(&variable)
+                && versions.get(&variable).copied() == Some(version)
+            {
+                induced_width = induced_width.max(degree);
+                break variable;
+            }
+            checked_increment(&mut planner_work.stale_queue_entries_discarded)?;
+        };
+
+        let neighbours = adjacency
+            .get(&variable)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|neighbour| adjacency.contains_key(neighbour))
+            .collect::<Vec<_>>();
+
+        let mut affected = BTreeSet::new();
+        let mut neighbour_hits = BTreeMap::<usize, usize>::new();
+        for neighbour in &neighbours {
+            if active.contains(neighbour) {
+                affected.insert(*neighbour);
+            }
+            if let Some(edges) = adjacency.get(neighbour) {
+                for candidate in edges.iter().copied() {
+                    checked_increment(&mut planner_work.affected_adjacency_visits)?;
+                    if candidate != variable && active.contains(&candidate) {
+                        let hits = neighbour_hits.entry(candidate).or_default();
+                        *hits = hits.checked_add(1).ok_or(FactorGraphError::IndexOverflow)?;
+                    }
+                }
+            }
+        }
+        for (candidate, hits) in neighbour_hits {
+            if hits >= 2 {
+                affected.insert(candidate);
+            }
+        }
+
+        for (left_index, left) in neighbours.iter().copied().enumerate() {
+            for right in neighbours.iter().copied().skip(left_index + 1) {
+                checked_increment(&mut planner_work.clique_pair_checks)?;
+                adjacency.entry(left).or_default().insert(right);
+                adjacency.entry(right).or_default().insert(left);
+            }
+        }
+        for neighbour in &neighbours {
+            if let Some(edges) = adjacency.get_mut(neighbour) {
+                edges.remove(&variable);
+            }
+        }
+        adjacency.remove(&variable);
+        active.remove(&variable);
+        order.push(variable);
+
+        for candidate in affected {
+            if !active.contains(&candidate) {
+                continue;
+            }
+            let version = versions
+                .get(&candidate)
+                .copied()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or(FactorGraphError::IndexOverflow)?;
+            versions.insert(candidate, version);
+            let (fill_edges, degree) =
+                fill_score_full_rescan(candidate, &adjacency, &mut planner_work)?;
+            checked_increment(&mut planner_work.affected_candidates_refreshed)?;
+            queue.push(Reverse((fill_edges, degree, candidate, version)));
+        }
+    }
+
+    Ok((order, induced_width, planner_work))
+}
+
+fn fill_score_full_rescan(
+    variable: usize,
+    adjacency: &BTreeMap<usize, BTreeSet<usize>>,
+    planner_work: &mut MinFillPlannerWork,
+) -> Result<(usize, usize), FactorGraphError> {
+    checked_increment(&mut planner_work.fill_score_evaluations)?;
+    let neighbours = adjacency
+        .get(&variable)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|neighbour| adjacency.contains_key(neighbour))
+        .collect::<Vec<_>>();
+    let mut fill_edges = 0usize;
+    for (left_index, left) in neighbours.iter().copied().enumerate() {
+        for right in neighbours.iter().copied().skip(left_index + 1) {
+            checked_increment(&mut planner_work.fill_score_adjacency_visits)?;
+            if !adjacency[&left].contains(&right) {
+                fill_edges = fill_edges
+                    .checked_add(1)
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+            }
+        }
+    }
+    Ok((fill_edges, neighbours.len()))
 }
 
 fn fill_score(
