@@ -710,6 +710,12 @@ fn verify_reviewer_signature(
         ("/audit_id", "/audit_id"),
         ("/task_id_sha256", "/dataset/task_id"),
         ("/statement_sha256", "/target/statement_sha256"),
+        ("/cohort_id", "/dataset/cohort_id"),
+        ("/snapshot_id", "/dataset/snapshot_id"),
+        ("/repository_commit", "/target/repository_commit"),
+        ("/source_path", "/target/source_path"),
+        ("/source_file_sha256", "/target/source_file_sha256"),
+        ("/source_span_sha256", "/target/source_span_sha256"),
         ("/review_scope", "/semantic_review/review_scope"),
     ] {
         if string(&attestation, attestation_path)? != string(receipt, receipt_path)? {
