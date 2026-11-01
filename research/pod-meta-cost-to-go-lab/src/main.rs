@@ -301,4 +301,4 @@ fn main() {
             .outcome(ForecastId(102))
             .is_some_and(|outcome| matches!(outcome.terminal, TerminalOutcome::RightCensored(_)))
     );
-
+}
