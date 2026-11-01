@@ -381,3 +381,18 @@ Source: https://aclanthology.org/2026.realm-1.65/
 - append-time validation that is incremental after one full reconstruction for deserialized studies.
 
 The module's confidence guarantee is conditional on independent bounded observations and an honest sampling process. Unique seed IDs are not proof of independence; correlated noise, drift and shared physical samples need explicit models. Tests remain authored/unexecuted. EventTape/Anytime resource integration and matched qNEHVI/ParEGO/JES/TS-TCH baselines are tracked in #9659. No benchmark result or SOTA claim is established.
+
+### Updated competitive landscape — 2026-11-01
+
+**PlatEMO has moved on from the prior v4.16 comparison point.** Its release notes now list v4.17 (November 2026) with 374 algorithms and 660 problems, including new constrained, expensive, sparse and multimodal methods/problems. Our in-repo NSGA-II, MOEA/D-DE and SMS-EMOA references on ZDT1 and three-objective DTLZ2 remain a very narrow, unexecuted subset. The immediate external validation task is to pin PlatEMO v4.17's release/tag/source SHA and cross-check objective outputs, evaluation counts and archive indicators before interpreting any comparative result. Source: https://github.com/BIMK/PlatEMO/blob/master/Doc/releasenote.md
+
+**Repository-level optimization now has three relevant 2026 external benchmarks:**
+- FormulaCode: 957 performance bottlenecks from scientific Python repositories, expert patches, and roughly 264.6 community workloads per task. Use the original suite as an external stratum, and a separately reported Rust/Nix adaptation. Source: https://proceedings.mlr.press/v306/sehgal26a.html
+- SWE-Perf: 140 real-repository performance tasks with expert patches, performance tests, and executable environments. Source: https://proceedings.mlr.press/v306/he26y.html
+- SWE-fficiency: 498 workload-driven tasks across nine Python repositories. The paper reports top systems averaging less than 0.23x expert speedup. This is a stark reminder that code-generation pass rates are not an engineering-performance metric. Source: https://proceedings.mlr.press/v306/ma26l.html
+
+**Noisy Bayesian MOO:** BoTorch's documented qEHVI/qNEHVI/qNParEGO tutorial recommends qNEHVI for noisy or batched settings, while showing qNParEGO and qEHVI comparators. Compare against qNEHVI, qNParEGO, TS-TCH/NParEGO, JES and Sobol under the same evaluator, batch, objective-observation and all-in resource budgets. Source: https://botorch.org/docs/v0.17.2/tutorials/multi_objective_bo
+
+**COCO remains the reproducibility backbone for black-box optimization.** Its official archives include noisy single-objective BBOB, bi-objective BBOB, large-scale, mixed-integer and constrained suites, with machine-readable data. Use COCO-compatible fixed-target and fixed-budget result reporting; do not limit comparisons to final hypervolume. Source: https://coco-platform.org/data-archive/index.html
+
+**Updated claim boundary:** PlatEMO's current inventory is a breadth indicator, not evidence that all 374 algorithms are suitable baselines for every task. We must select and reproduce the strongest relevant baselines per problem regime, preserve original configurations and report failed or unavailable reproduction attempts. Our current algorithms have not been cross-validated against v4.17 and have no executed comparative results.
