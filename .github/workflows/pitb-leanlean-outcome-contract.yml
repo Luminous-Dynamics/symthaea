@@ -47,6 +47,8 @@ jobs:
               raise SystemExit("LeanLean fixture must remain a no-run synthetic record")
           if fixture["task"]["protected_declaration_count"] == 620:
               raise SystemExit("fixture must represent a per-repository protected-declaration count, not the cohort total")
+          if fixture["task"]["cohort_protected_declaration_total"] != 620:
+              raise SystemExit("LeanLean cohort-level protected declaration total drifted")
           print("PITB_LEANLEAN_FIXTURE_PASS: one synthetic repository; no evaluation claim")
 
           def schema_reject(label, value):
