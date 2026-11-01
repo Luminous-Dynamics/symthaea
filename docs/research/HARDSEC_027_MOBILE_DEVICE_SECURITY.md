@@ -61,7 +61,7 @@ The profile explicitly separates:
 
 The sample is a **synthetic fixture**, not a dump from the user's handset. It includes no IMEI, serial number, unique hardware identifier, location, raw attestation certificate, or user data. MTE is marked \`vendor_documented\` for product-family support but \`not_measured\` for runtime state. Boot/attestation and PMU acquisition are also \`not_measured\`.
 
-The Rust auditor rejects sensitive identifier fields recursively. It refuses to promote a vendor-documentation statement into verified runtime enablement, a trusted attestation chain, or qualified PMU measurement. Boot-integrity, PMU, and protection claims are linked to explicit evidence IDs. The auditor resolves those IDs against the evidence ledger and checks the source type for that specific claim, so an unrelated attestation or lab receipt cannot qualify another subsystem.
+The Rust auditor rejects sensitive identifier fields recursively. It refuses to promote a vendor-documentation statement into verified runtime enablement, a trusted attestation chain, or qualified PMU measurement. Boot-integrity, PMU, and protection claims are linked to explicit evidence IDs. The auditor resolves those IDs against the evidence ledger and checks the source type for that specific claim, so an unrelated attestation or lab receipt cannot qualify another subsystem. Boot-integrity, PMU, and protection claims are linked to explicit evidence IDs. The auditor resolves those IDs against the evidence ledger and checks the source type for that specific claim, so an unrelated attestation or lab receipt cannot qualify another subsystem.
 
 ## 4. Mobile threat model and research lanes
 
