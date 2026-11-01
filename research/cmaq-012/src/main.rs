@@ -1023,29 +1023,30 @@ fn render_report(report: &Report) -> String {
             let m = &group.arms[arm];
             let comma = if arm_index + 1 == ARMS.len() { "" } else { "," };
             writeln!(&mut out,
-                concat!("        \"{}\": {{\"mean_return\": {}, \"success_rate\": {}, ",
-                "\"success_count\": {}, \"failed_count\": {}, \"timed_out_count\": {}, ",
-                "\"mean_latency_ms\": {}, \"p50_latency_ms\": {}, \"p95_latency_ms\": {}, ",
-                "\"resource_metrics\": {{\"mean_compute_work_units\": {}, \"p50_compute_work_units\": {}, \"p95_compute_work_units\": {}, ",
-                "\"p95_peak_memory_bytes\": {}, \"mean_energy_millijoules\": {}, \"energy_measured_episode_count\": {}, ",
-                "\"mean_direct_value_calls\": {}, \"mean_world_model_forward_calls\": {}, \"mean_world_model_transition_calls\": {}, ",
-                "\"mean_oracle_transition_calls\": {}, \"mean_environment_transition_calls\": {}, \"mean_optimizer_iterations\": {}}}}{}"),
-                arm.name(), number(m.mean_return), number(m.success_rate), m.success_count,
-                m.failed_count, m.timed_out_count, number(m.mean_latency_ms),
-                number(m.p50_latency_ms), number(m.p95_latency_ms),
-                optional_number(m.resources.mean_compute_work_units),
-                optional_number(m.resources.p50_compute_work_units),
-                optional_number(m.resources.p95_compute_work_units),
-                optional_number(m.resources.p95_peak_memory_bytes),
-                optional_number(m.resources.mean_energy_millijoules),
-                m.resources.energy_measured_episode_count,
-                number(m.resources.mean_direct_value_calls),
-                number(m.resources.mean_world_model_forward_calls),
-                number(m.resources.mean_world_model_transition_calls),
-                number(m.resources.mean_oracle_transition_calls),
-                number(m.resources.mean_environment_transition_calls),
-                number(m.resources.mean_optimizer_iterations), comma
-            ).unwrap();
+            writeln!(&mut out, "        \"{}\": {{", arm.name()).unwrap();
+            writeln!(&mut out, "          \"mean_return\": {},", number(m.mean_return)).unwrap();
+            writeln!(&mut out, "          \"success_rate\": {},", number(m.success_rate)).unwrap();
+            writeln!(&mut out, "          \"success_count\": {},", m.success_count).unwrap();
+            writeln!(&mut out, "          \"failed_count\": {},", m.failed_count).unwrap();
+            writeln!(&mut out, "          \"timed_out_count\": {},", m.timed_out_count).unwrap();
+            writeln!(&mut out, "          \"mean_latency_ms\": {},", number(m.mean_latency_ms)).unwrap();
+            writeln!(&mut out, "          \"p50_latency_ms\": {},", number(m.p50_latency_ms)).unwrap();
+            writeln!(&mut out, "          \"p95_latency_ms\": {},", number(m.p95_latency_ms)).unwrap();
+            writeln!(&mut out, "          \"resource_metrics\": {{").unwrap();
+            writeln!(&mut out, "            \"mean_compute_work_units\": {},", optional_number(m.resources.mean_compute_work_units)).unwrap();
+            writeln!(&mut out, "            \"p50_compute_work_units\": {},", optional_number(m.resources.p50_compute_work_units)).unwrap();
+            writeln!(&mut out, "            \"p95_compute_work_units\": {},", optional_number(m.resources.p95_compute_work_units)).unwrap();
+            writeln!(&mut out, "            \"p95_peak_memory_bytes\": {},", optional_number(m.resources.p95_peak_memory_bytes)).unwrap();
+            writeln!(&mut out, "            \"mean_energy_millijoules\": {},", optional_number(m.resources.mean_energy_millijoules)).unwrap();
+            writeln!(&mut out, "            \"energy_measured_episode_count\": {},", m.resources.energy_measured_episode_count).unwrap();
+            writeln!(&mut out, "            \"mean_direct_value_calls\": {},", number(m.resources.mean_direct_value_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_world_model_forward_calls\": {},", number(m.resources.mean_world_model_forward_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_world_model_transition_calls\": {},", number(m.resources.mean_world_model_transition_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_oracle_transition_calls\": {},", number(m.resources.mean_oracle_transition_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_environment_transition_calls\": {},", number(m.resources.mean_environment_transition_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_optimizer_iterations\": {}", number(m.resources.mean_optimizer_iterations)).unwrap();
+            writeln!(&mut out, "          }},").unwrap();
+            writeln!(&mut out, "        }}{}", comma).unwrap();
         }
         writeln!(&mut out, "      }},").unwrap();
         writeln!(&mut out, "      \"contrasts\": [").unwrap();
@@ -1747,7 +1748,7 @@ mod tests {
     fn receipt_byte_tampering_is_rejected_even_when_tsv_digest_is_unchanged() {
         let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
         let (root, enriched) = artifact_fixture(&input);
-        let first_row = enriched.lines().nth(1).unwrap();
+        let receipt_digest = first_row.split('\t').nth(20).unwrap();
         let receipt_digest = first_row.split('\t').nth(20).unwrap();
         let path = root.join("receipts").join(format!("{receipt_digest}.json"));
         let mut bytes = fs::read(&path).unwrap();
