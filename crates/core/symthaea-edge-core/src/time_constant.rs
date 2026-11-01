@@ -95,14 +95,16 @@ pub fn alpha_from_ratio_q16(ratio_q16: u32) -> u16 {
 /// The ratio is floored to Q16.16 before lookup. A zero tau is always rejected;
 /// very large ratios are saturated by alpha_from_ratio_q16.
 pub fn alpha_from_dt_tau_us(
-    dt_us: u64,
-    tau_us: u64,
+    dt_us: u32,
+    tau_us: u32,
 ) -> Result<u16, TimeConstantError> {
     if tau_us == 0 {
         return Err(TimeConstantError::ZeroTau);
     }
-    let ratio_q16 = ((dt_us as u128) << 16) / tau_us as u128;
-    let capped = ratio_q16.min(MAX_RATIO_Q16 as u128) as u32;
+    // u32 microsecond inputs shifted by 16 fit in u64. This avoids u128 division
+    // on 32-bit targets; callers with larger time values can supply a precomputed ratio.
+    let ratio_q16 = ((dt_us as u64) << 16) / tau_us as u64;
+    let capped = ratio_q16.min(MAX_RATIO_Q16 as u64) as u32;
     Ok(alpha_from_ratio_q16(capped))
 }
 
@@ -153,7 +155,7 @@ mod tests {
 
     #[test]
     fn large_microsecond_inputs_do_not_overflow_ratio_math() {
-        assert_eq!(alpha_from_dt_tau_us(u64::MAX, 1), Ok(Q15_ONE));
-        assert_eq!(alpha_from_dt_tau_us(u64::MAX, u64::MAX), Ok(20_713));
+        assert_eq!(alpha_from_dt_tau_us(u32::MAX, 1), Ok(Q15_ONE));
+        assert_eq!(alpha_from_dt_tau_us(u32::MAX, u32::MAX), Ok(20_713));
     }
 }
