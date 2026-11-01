@@ -61,11 +61,14 @@ Do not collapse these into one boolean. A locally committed source cursor with a
 ### Stable source key
 
 Use a stable provisioned host/device identity plus:
-- source ID;
-- observer-profile digest;
-- partition ID.
+- logical source ID;
+- logical partition-lineage ID.
 
-The boot incarnation is required per epoch and binds kernel/build identity, boot ID, and a boot-attestation or provisioning reference where available. Do not use a mutable boot ID to reset durable source generation. A reboot changes the monotonic-clock origin, so monotonic timestamps are comparable only within the same boot incarnation. A boot transition requires a policy-authorized transition or remains unknown.
+The logical partition-lineage ID identifies a sequence domain, not a transient CPU/core assignment. CPU migration must not mint a new cursor. A deliberate partition-lineage re-key requires an independently authorized migration/continuity record; a new independent partition may bootstrap only as a separately provisioned stream.
+
+The observer-profile digest and boot-incarnation digest are cursor attributes, not key fields. Putting the profile or boot identity in the cursor key would permit a profile change or reboot to create a fresh cursor and silently restart the generation history. A profile or boot change therefore requires explicit policy/attestation evidence and must advance the existing source generation with the exact predecessor seal.
+
+The boot incarnation is required per epoch and binds kernel/build identity, boot ID, and a boot-attestation or provisioning reference where available. Do not use a mutable boot ID to reset durable source generation. A reboot changes the monotonic-clock origin, so monotonic timestamps are comparable only within the same boot incarnation. A boot transition requires a policy-authorized transition or remains unknown; a numeric boot ID is not itself authentication.
 
 Key rotation, observer restart, kernel upgrade, host reboot and partition remapping do not silently create a fresh trust lineage. If policy authorizes a changed observer profile or boot, the transition must bind the old and new identities and preserve the durable generation history.
 
@@ -200,6 +203,27 @@ If the local database is restored to an older snapshot:
 - never infer protection from a local backup, journal, file lock, hash chain or signed checkpoint alone.
 
 A TPM counter and a filesystem/database commit are two separate durability domains. Do not assume they form one atomic transaction. Hardware-backed deployment requires explicit recovery for counter-first and data-first interruption; absent a proven protocol, the hardware mode remains unqualified.
+
+## Executable reference model
+
+The pure Rust transition model is implemented in `xtask/src/basalt_trusted_state.rs` and exposed through:
+
+```sh
+cargo run -p xtask -- basalt-trusted-state-model-check
+cargo test -p xtask basalt_trusted_state
+```
+
+The model uses a stable source cursor key across observer-profile and boot changes. It requires explicit transition evidence for either change while preserving the next generation and predecessor link. It also models:
+- revision-bound prepare/commit (CAS) semantics;
+- exact-receipt idempotency and receipt-digest collision rejection;
+- source-generation gap, stale-generation, equivocation and overflow rejection;
+- pinned log bootstrap, same-size fork rejection, stale checkpoint rejection and consistency-proof reference requirements;
+- monotonic signer/witness policy versions and policy-bundle binding;
+- one model transition that advances source cursor, log cursor, policy versions and accepted-receipt record together.
+
+The built-in command emits a JSON report with per-case outcomes and explicit hard-false fields for anti-rollback qualification, signature verification and storage durability qualification. Unit tests add edge cases beyond the 15-case command conformance set.
+
+**Model boundary:** the model consumes evidence classifications supplied by upstream adapters. It checks their shape and state-transition linkage, not their cryptographic truth. The model is in-memory; assignment after a successful revision comparison models the atomic state transition but does not establish filesystem crash consistency, linearizability of a real backend, protection against snapshot restoration, checkpoint freshness, or production anti-rollback. No such claim is promoted.
 
 ## API and backend conformance
 
