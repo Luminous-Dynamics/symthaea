@@ -348,6 +348,24 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     verify_pair(&run_bytes, &integrity_bytes, &evidence_root, &registry_bytes, &registry_sha256)?;
     println!("PITB_SORRYDB_INTEGRITY_JOIN_PASS: exact integrity receipt, eleven evidence artifacts and Ed25519 reviewer signature joined");
 
+    let mut other_cohort_integrity: Value = serde_json::from_slice(&integrity_bytes)?;
+    other_cohort_integrity["dataset"]["cohort_id"] = json!("OtherCohort");
+    let other_cohort_integrity_bytes = json_bytes(&other_cohort_integrity)?;
+    let mut other_cohort_run: Value = serde_json::from_slice(&run_bytes)?;
+    other_cohort_run["task_integrity"]["receipt_sha256"] =
+        json!(sha256_hex(&other_cohort_integrity_bytes));
+    let other_cohort_run_bytes = json_bytes(&other_cohort_run)?;
+    if verify_pair(
+        &other_cohort_run_bytes,
+        &other_cohort_integrity_bytes,
+        &evidence_root,
+        &registry_bytes,
+        &registry_sha256,
+    ).is_ok() {
+        bail!("SorryDB adapter accepted an integrity receipt from a different cohort");
+    }
+    println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: SorryDB adapter rejects other benchmark cohorts");
+
     // Mutate the reviewer signature, update both content-addressed parent
     // references, and require the cryptographic verifier itself to reject it.
     let reviewer_artifact_path = evidence_root.join("review/reviewer-attestation.json");
