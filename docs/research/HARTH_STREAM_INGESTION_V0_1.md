@@ -78,7 +78,7 @@ Published edge-HAR systems provide useful architecture and system-cost anchors, 
 
 | Reference | Reported result | How to use it |
 |---|---|---|
-| HARTH original paper | SVM mean F1 0.81 ± 0.18 in leave-one-subject-out evaluation | Primary HARTH literature baseline; reproduce the exact split/features and label aggregation before comparison |
+| HARTH original paper | 12-label SVM F1 0.66 ± 0.32; merged nine-activity SVM F1 0.81 ± 0.18 (LOSO) | Two distinct protocols; reproduce both and never compare across different label spaces |
 | TinyHAR-Net (STM32F446RE) | F1 96.75–99.76% across WISDM, MotionSense and MHEALTH; 30.12 KiB RAM; 43.78–51.30 KiB flash; 41.31–51.57 ms inference | MCU footprint/deployment anchor only; do not compare those cross-dataset scores directly with HARTH |
 | STORM (X-HEEP + streaming CGRA) | 19.7k parameters; 0.801 macro-F1 on its own 8-class cross-source benchmark; 67.4 ms at 100 MHz; 632.4 µJ activity-based energy estimate | Cross-source co-design and energy-accounting anchor; its dataset, hardware, task and power methodology differ from HARTH |
 | L-HAR (2026 deployment study) | Three IMUs from one participant; quantized TCN Raspberry Pi streaming 9.066 ms E2E / 69.928 Hz and 49.933 mJ software-estimated energy per inference | Streaming methodology and backend-dependence warning, not cross-subject evidence; energy is an estimate rather than a direct physical power-trace result |
@@ -92,7 +92,7 @@ References:
 ### Proposed gates (aspirational, not measured)
 
 1. **Reproducibility:** independently reproduce both HARTH SVM LOSO protocols: (a) the strict 12-label result (reported F1 0.66 ± 0.32) and (b) the explicitly merged nine-activity result (reported F1 0.81 ± 0.18). Publish all 22 participant-fold results, not just pooled windows, and preserve the exact confusion-matrix aggregation.
-2. **Quality:** aim for at least +3 percentage points in participant-mean macro-F1 over the reproduced SVM, with a participant-paired confidence interval above zero and no material regression in the worst-subject tail. Treat +3 pp as a research target, not a claim or guaranteed threshold.
+2. **Quality:** aim for at least +3 percentage points in participant-mean macro-F1 over the reproduced SVM within each fixed label protocol, with a participant-paired confidence interval above zero and no material regression in the worst-subject tail. Treat +3 pp as a research target, not a claim or guaranteed threshold.
 3. **Active sensing:** at a preregistered non-inferiority margin of -1 pp macro-F1, target at least 25% fewer sensor samples and report transition-event recall and p95 transition-detection delay. Do not infer these metrics from a randomly windowed classification split.
 4. **Edge feasibility:** report full application-event p50/p95/p99 latency, peak SRAM after reserve, flash, sensor/wake/compute/update/communication costs and physical complete-event energy. For 50 Hz streaming, p95 end-to-end processing below the 20 ms sample period is a useful target where the selected board and workload make it meaningful; it is not a universal requirement for lower-rate active sensing.
 5. **Energy superiority:** target at least 10% lower measured complete-event energy than the strongest matched baseline at the same preregistered quality and deadline constraints, with uncertainty reported. A modeled energy estimate or model-only inference measurement does not qualify.
