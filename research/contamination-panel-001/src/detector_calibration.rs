@@ -662,7 +662,7 @@ fn analyze_group(
         for sample_id in &test_ids {
             if !observations_by_key.contains_key(&(
                 ObservationSplitV1::LockedTest,
-                sample_id,
+                *sample_id,
                 detector.detector_id.as_str(),
                 detector.detector_version.as_str(),
             )) {
@@ -756,7 +756,7 @@ fn analyze_group(
                     .get(&(
                         detector.detector_id.as_str(),
                         detector.detector_version.as_str(),
-                        sample_id,
+                        *sample_id,
                     ))
                     .ok_or_else(|| "calibrated test p-value is missing".to_owned())?;
                 let predicted = target_supported
@@ -766,7 +766,7 @@ fn analyze_group(
                         *target,
                         group.group_sha256.as_str(),
                         detector.detector_id.as_str(),
-                        sample_id,
+                        *sample_id,
                     ),
                     predicted,
                 );
