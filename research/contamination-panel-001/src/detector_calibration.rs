@@ -207,6 +207,7 @@ pub struct DetectorDisagreementCellV1 {
     pub target_fpr_permille: u16,
     pub detector_left: String,
     pub detector_right: String,
+    pub calibration_resolution_sufficient: bool,
     pub comparable_test_support: u64,
     pub disagree_count: u64,
     pub both_flag_contaminated: u64,
@@ -832,6 +833,7 @@ fn analyze_group(
 
     let mut cells = Vec::with_capacity(definitions.len() * targets.len());
     let mut predictions = BTreeMap::<(u16, &str, &str, &str), bool>::new();
+    let mut target_eligibility = BTreeMap::<(u16, &str, &str), bool>::new();
     for detector in definitions {
         let clean_support = sorted_clean_by_detector
             .get(&(
@@ -848,6 +850,14 @@ fn analyze_group(
             .ok_or_else(|| "detector cluster p-value map is missing".to_owned())?;
         for target in targets {
             let target_supported = clean_support >= minimum_calibration_support(*target)?;
+            target_eligibility.insert(
+                (
+                    *target,
+                    detector.detector_id.as_str(),
+                    detector.detector_version.as_str(),
+                ),
+                target_supported,
+            );
             let mut test_clean = 0_u64;
             let mut test_contaminated = 0_u64;
             let mut false_positive = 0_u64;
@@ -859,15 +869,17 @@ fn analyze_group(
                     .get(*cluster_id)
                     .ok_or_else(|| "test cluster conformal p-value is missing".to_owned())?;
                 let predicted = target_supported && conformal_rejects(p_value, *target);
-                predictions.insert(
-                    (
-                        *target,
-                        group.group_sha256.as_str(),
-                        detector.detector_id.as_str(),
-                        *cluster_id,
-                    ),
-                    predicted,
-                );
+                if target_supported {
+                    predictions.insert(
+                        (
+                            *target,
+                            group.group_sha256.as_str(),
+                            detector.detector_id.as_str(),
+                            *cluster_id,
+                        ),
+                        predicted,
+                    );
+                }
                 match test_cluster_truth
                     .get(*cluster_id)
                     .ok_or_else(|| "test cluster ground truth is missing".to_owned())?
@@ -946,7 +958,8 @@ fn analyze_group(
                     target_fpr_permille: *target,
                     detector_left: left.detector_id.clone(),
                     detector_right: right.detector_id.clone(),
-                    comparable_test_support: test_clusters.len() as u64,
+                    calibration_resolution_sufficient: false,
+                    comparable_test_support: 0,
                     disagree_count: 0,
                     both_flag_contaminated: 0,
                     left_only_flag_contaminated: 0,
@@ -954,33 +967,43 @@ fn analyze_group(
                     neither_flag_contaminated: 0,
                     disagreement_rate: None,
                 };
-                for cluster_id in &test_clusters {
-                    let left_flag = predictions[&(
-                        *target,
-                        group.group_sha256.as_str(),
-                        left.detector_id.as_str(),
-                        cluster_id,
-                    )];
-                    let right_flag = predictions[&(
-                        *target,
-                        group.group_sha256.as_str(),
-                        right.detector_id.as_str(),
-                        cluster_id,
-                    )];
-                    match (left_flag, right_flag) {
-                        (true, true) => disagreement.both_flag_contaminated += 1,
-                        (true, false) => {
-                            disagreement.left_only_flag_contaminated += 1;
-                            disagreement.disagree_count += 1;
+                let left_eligible = target_eligibility
+                    .get(&(*target, left.detector_id.as_str(), left.detector_version.as_str()))
+                    .copied()
+                    .unwrap_or(false);
+                let right_eligible = target_eligibility
+                    .get(&(*target, right.detector_id.as_str(), right.detector_version.as_str()))
+                    .copied()
+                    .unwrap_or(false);
+                disagreement.calibration_resolution_sufficient = left_eligible && right_eligible;
+                if disagreement.calibration_resolution_sufficient {
+                    disagreement.comparable_test_support = test_clusters.len() as u64;
+                    for cluster_id in &test_clusters {
+                        let left_flag = predictions[&(
+                            *target,
+                            group.group_sha256.as_str(),
+                            left.detector_id.as_str(),
+                            *cluster_id,
+                        )];
+                        let right_flag = predictions[&(
+                            *target,
+                            group.group_sha256.as_str(),
+                            right.detector_id.as_str(),
+                            *cluster_id,
+                        )];
+                        match (left_flag, right_flag) {
+                            (true, true) => disagreement.both_flag_contaminated += 1,
+                            (true, false) => {
+                                disagreement.left_only_flag_contaminated += 1;
+                                disagreement.disagree_count += 1;
+                            }
+                            (false, true) => {
+                                disagreement.right_only_flag_contaminated += 1;
+                                disagreement.disagree_count += 1;
+                            }
+                            (false, false) => disagreement.neither_flag_contaminated += 1,
                         }
-                        (false, true) => {
-                            disagreement.right_only_flag_contaminated += 1;
-                            disagreement.disagree_count += 1;
-                        }
-                        (false, false) => disagreement.neither_flag_contaminated += 1,
                     }
-                }
-                if disagreement.comparable_test_support > 0 {
                     disagreement.disagreement_rate = Some(
                         disagreement.disagree_count as f64
                             / disagreement.comparable_test_support as f64,
@@ -1530,6 +1553,25 @@ mod tests {
         let point = &cell.operating_points[0];
         assert_eq!(point.test_clean_support, 1);
         assert_eq!(point.test_contaminated_support, 1);
+    }
+
+    #[test]
+    fn disagreement_is_not_reported_when_either_detector_is_under_resolved() {
+        let mut study = minimal_study();
+        study.observations.retain(|observation| {
+            observation.split != ObservationSplitV1::CleanCalibration
+                || observation.sample_id.as_str() <= "cal-019"
+        });
+        let report = analyze_detector_calibration(&study).unwrap();
+        let point = report
+            .disagreement_matrix
+            .iter()
+            .find(|point| point.target_fpr_permille == 10)
+            .unwrap();
+        assert!(!point.calibration_resolution_sufficient);
+        assert_eq!(point.comparable_test_support, 0);
+        assert_eq!(point.disagree_count, 0);
+        assert!(point.disagreement_rate.is_none());
     }
 
     #[test]
