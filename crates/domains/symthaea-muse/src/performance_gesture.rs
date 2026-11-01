@@ -1022,7 +1022,7 @@ mod tests {
         };
         gesture.at = BeatPosition::new(3, 1).unwrap();
         let mut second_note_target = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
-        wrong_time.bind_to_score_sha256("a".repeat(64));
+        second_note_target.bind_to_score_sha256("a".repeat(64));
         // A time inside the second note is valid; the ID is never reconstructed
         // from pitch, timing or its position in the event stream.
         assert!(second_note_target
