@@ -2,7 +2,7 @@
 
 **Package:** `symthaea-temporal-calibration-evaluator`  
 **Tracking:** NEURO-SILICON-010 / #9872  
-**Status:** research evaluator; eight Rust test functions authored, not executed.
+**Status:** research evaluator; ten Rust test functions authored, not executed.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Compare candidate-predicted reductions in wrong-belief, abstention and missing-o
 - Each sample binds the candidate model digest, evaluator feedback sequence, episode ID, forecast issue time, time feedback became available, the validated paired-intervention digest and the finalized receipt digest.
 - Model digest must match across fit and holdout partitions.
 - Sequence IDs and forecast issue times must strictly increase within each partition.
-- Episode IDs cannot repeat.
+- Episode IDs, paired-intervention commitments and finalized receipt commitments cannot repeat.
 - Every outcome must become available strictly after its forecast.
 - The latest fit feedback availability must be strictly earlier than the earliest holdout forecast origin.
 - The evaluator reports a correction and holdout metrics; it does not release hidden current-episode outcomes to candidate code.
