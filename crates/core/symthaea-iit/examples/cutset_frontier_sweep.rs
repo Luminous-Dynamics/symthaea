@@ -279,7 +279,7 @@ fn run() -> Result<(), String> {
             }
         }
 
-        for (index, plan) in plans.iter().enumerate() {
+        for plan in &plans {
             let variables = plan
                 .variables
                 .iter()
