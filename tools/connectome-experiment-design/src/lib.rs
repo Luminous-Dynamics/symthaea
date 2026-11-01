@@ -369,6 +369,13 @@ pub struct AdequacyCalibrator {
     pub usable: bool,
 }
 
+/// Versioned serializable shape for an adequacy calibration result.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdequacyCalibrationReport {
+    pub schema_version: &'static str,
+    pub calibrator: AdequacyCalibrator,
+}
+
 /// A high nonconformity score indicates that the candidate set plus its
 /// observation model is inadequate or shifted under the declared calibration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -532,6 +539,22 @@ pub fn calibrate_model_adequacy(
         false_adequacy_probability_bound,
         in_scope_acceptance,
         usable,
+    })
+}
+
+/// Build the versioned output shape for an adequacy calibration.
+pub fn calibrate_model_adequacy_report(
+    in_scope_units: &[AdequacyCalibrationUnit],
+    omitted_mechanism_units: &[AdequacyCalibrationUnit],
+    config: AdequacyGateConfig,
+) -> Result<AdequacyCalibrationReport, DesignError> {
+    Ok(AdequacyCalibrationReport {
+        schema_version: "connectome-open-world-adequacy-v1",
+        calibrator: calibrate_model_adequacy(
+            in_scope_units,
+            omitted_mechanism_units,
+            config,
+        )?,
     })
 }
 
@@ -1449,6 +1472,19 @@ mod tests {
             })
             .collect();
         (in_scope, omitted)
+    }
+
+    #[test]
+    fn adequacy_report_wrapper_is_versioned() {
+        let (in_scope, omitted) = adequacy_calibration_example();
+        let report = calibrate_model_adequacy_report(
+            &in_scope,
+            &omitted,
+            AdequacyGateConfig::default(),
+        ).unwrap();
+        assert_eq!(report.schema_version, "connectome-open-world-adequacy-v1");
+        assert_eq!(report.calibrator.lower_order_statistic_k, 1);
+        assert!(report.calibrator.usable);
     }
 
     #[test]
