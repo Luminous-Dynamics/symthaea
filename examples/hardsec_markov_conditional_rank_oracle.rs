@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const TRANSITION_NUMERATORS: [[u128; 2]; 2] = [[9, 1], [2, 8]];
 const TRANSITION_DENOMINATOR: u128 = 10;
@@ -67,8 +67,8 @@ fn exact_episode(initial_state: usize) -> ExactEpisode {
             // = 5 / transition_numerator.
             wealth_numerator *= 5;
 
-            let crossed_now = wealth_numerator * ALPHA_NUMERATOR
-                >= wealth_denominator * ALPHA_DENOMINATOR;
+            let crossed_now =
+                wealth_numerator * ALPHA_NUMERATOR >= wealth_denominator * ALPHA_DENOMINATOR;
             crossed |= crossed_now;
             state = next_state;
         }
@@ -107,8 +107,7 @@ fn conditional_expected_factor_is_one(current_state: usize) -> bool {
             return false;
         }
         // (a/10) * (1/2) / (a/10) = 1/2 = 5/10.
-        numerator_sum += BET_NUMERATOR
-            * (TRANSITION_DENOMINATOR / BET_DENOMINATOR);
+        numerator_sum += BET_NUMERATOR * (TRANSITION_DENOMINATOR / BET_DENOMINATOR);
     }
     // Both next-state branches contribute 5/10, so their sum is exactly 10/10.
     numerator_sum == TRANSITION_DENOMINATOR
@@ -176,7 +175,10 @@ fn report() -> Value {
 }
 
 fn main() {
-    println!("{}", serde_json::to_string_pretty(&report()).expect("JSON report serialization"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report()).expect("JSON report serialization")
+    );
 }
 
 #[cfg(test)]
@@ -198,10 +200,7 @@ mod tests {
                 episode.total_probability_numerator,
                 episode.total_probability_denominator
             );
-            assert_eq!(
-                episode.total_probability_denominator,
-                1_000_000_000_000
-            );
+            assert_eq!(episode.total_probability_denominator, 1_000_000_000_000);
         }
     }
 
@@ -255,12 +254,12 @@ mod tests {
             value["guarantee"]["time_uniform_pfa_claim_for_this_markov_model"],
             true
         );
-        assert_eq!(
-            value["guarantee"]["arbitrary_serial_pmu_pfa_claim"],
-            false
-        );
+        assert_eq!(value["guarantee"]["arbitrary_serial_pmu_pfa_claim"], false);
         assert_eq!(value["guarantee"]["unknown_transition_matrix_supported"], false);
         assert_eq!(value["guarantee"]["hidden_state_supported"], false);
-        assert_eq!(value["guarantee"]["effective_sample_size_estimate"], Value::Null);
+        assert_eq!(
+            value["guarantee"]["effective_sample_size_estimate"],
+            Value::Null
+        );
     }
 }
