@@ -677,7 +677,13 @@ pub struct InformationAcquisitionOption {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct InformationOptionEvaluation {
+    pub history_sha256: String,
+    pub action_manifest_sha256: String,
+    pub query_manifest_sha256: String,
+    pub evidence_sha256: String,
     pub query_id: String,
+    pub action_ids: Vec<u64>,
+    pub outcome_ids: Vec<String>,
     pub prior_best_action_id: u64,
     pub best_action_by_outcome: Vec<u64>,
     pub expected_utility_without_information: f64,
@@ -1007,7 +1013,13 @@ fn evaluate_information_option(
         return Err(IntervalError::NonFiniteDerivedMetric);
     }
     Ok(InformationOptionEvaluation {
+        history_sha256: option.history_sha256.clone(),
+        action_manifest_sha256: option.action_manifest_sha256.clone(),
+        query_manifest_sha256: option.query_manifest_sha256.clone(),
+        evidence_sha256: option.evidence_sha256.clone(),
         query_id: option.query_id.clone(),
+        action_ids: option.action_ids.clone(),
+        outcome_ids: option.outcome_ids.clone(),
         prior_best_action_id: option.action_ids[prior_best_index],
         best_action_by_outcome,
         expected_utility_without_information,
@@ -2024,6 +2036,34 @@ mod tests {
             }
         );
         assert_eq!(evaluation.selected_query_id, None);
+    }
+
+    #[test]
+    fn evsi_digest_binds_history_manifests_outcomes_probabilities_utilities_and_cost() {
+        let mut option = info_option(
+            "camera_peek",
+            1.0,
+            vec![0.5, 0.5],
+            vec![vec![6.0, 3.0], vec![2.0, 7.0]],
+        );
+        option.outcome_ids = vec!["grasp_success".into(), "slip_detected".into()];
+        option.evidence_sha256 = compute_information_option_sha256(&option).unwrap();
+        assert_eq!(
+            option.evidence_sha256,
+            "80f500f511bff1bccfd0ca03aa164de21ea84a64e8c924a4b2385132e62257e8"
+        );
+        let mut tampered = option.clone();
+        tampered.conditional_action_utilities[0][0] += 0.01;
+        assert_eq!(
+            evaluate_information_acquisition(&[tampered]),
+            Err(IntervalError::JointDrawBankDigestMismatch)
+        );
+        let mut changed_history = option.clone();
+        changed_history.history_sha256 = "e".repeat(64);
+        assert_ne!(
+            compute_information_option_sha256(&changed_history).unwrap(),
+            option.evidence_sha256
+        );
     }
 
     #[test]
