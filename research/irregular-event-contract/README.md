@@ -125,8 +125,8 @@ The concrete Time-IMM EPA-Air/Bexar release has the documented headers
 the actual timezone and availability policy; it does not infer either from
 these CSV columns.
 
-Nine source-authored adapter tests cover timezone and DST, missing numeric
+Ten source-authored adapter tests cover timezone and DST, missing numeric
 cells, explicit availability delay, text payload hashing/whitespace,
 fixed-point quantization, file/row provenance, record identity and schema
-failures. The crate now has 53 source-authored test functions total. No build or
+failures. The crate now has 54 source-authored test functions total. No build or
 test has run.
