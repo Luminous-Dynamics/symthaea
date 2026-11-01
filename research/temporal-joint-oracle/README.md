@@ -35,7 +35,7 @@ It reports a separate optimum and candidate regret for each exposure axis and th
 From the repository root:
 
 ```sh
-cargo test --manifest-path research/temporal-joint-oracle/Cargo.toml --locked
+cargo test --manifest-path research/temporal-joint-oracle/Cargo.toml
 ```
 
-The package has a path dependency on the candidate plan contract, but not vice versa. A successful test run is still required before any test is described as passing.
+The package has a path dependency on the candidate plan contract, but not vice versa. This research workspace does not yet contain a committed Cargo.lock; before confirmatory use, generate and commit the lockfile, then run with --locked. A successful test run is still required before any test is described as passing.
