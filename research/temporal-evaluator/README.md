@@ -24,3 +24,22 @@ No Cargo build, format, Clippy or test execution is claimed until a Rust toolcha
 The `witness` module adds pure canonical checkpoint and witness-attestation types plus a strict verifier. Evaluator checkpoints bind the accepted receipt-chain head and previous checkpoint digest. Witness attestations bind the checkpoint digest to a fresh evaluator challenge. The verifier requires a Byzantine fault-tolerant quorum satisfying n >= 3f+1 and 2f+1 <= q <= n-f. Exact retransmissions are deduplicated; conflicting responses from one witness, malformed/invalid signatures, unknown identities and stale challenges cannot count as votes or poison a valid quorum.
 
 This package does not implement a remote witness service, durable anti-equivocation database, TPM counter, challenge CSPRNG, RPC protocol, key rotation or recovery ceremony. A witness service must persist its high-water head outside the evaluator rollback domain and refuse to sign two different digests for the same evaluator epoch. The pure verifier is not proof that a deployed witness is independent or durable. See `docs/research/ROLLBACK_RESISTANT_RECEIPT_WITNESS_V0_1.md` and #9631.
+
+
+## Joint temporal resource-control attribution
+
+The evaluator-only `joint_budget` module enumerates complete action subsets
+(up to 16) using a canonical digest of the evaluator-owned action registry.
+It validates eight hard resource dimensions and excludes incompatible
+conflict-group combinations from the feasible frontier.
+
+The evaluator-only `interaction` module derives exact paired marginal
+reductions and pairwise difference-in-differences for the three non-compensatory
+temporal exposure dimensions. It reports eligible-context, incompatible-context
+and over-budget-context counts. Positive interaction is synergy; negative
+interaction is antagonism. Values are exact signed integer sums and sample
+counts, not floating-point estimates. This is a feasibility-filtered conditional
+interaction measure, not a Shapley value.
+
+Six interaction test functions and fourteen exact-oracle test functions are
+authored; no Rust build or test has run for this draft.
