@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT trusted-state reference-model conformance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "title",
+    "claim_ceiling",
+    "model_command",
+    "implementation_path",
+    "scenarios",
+    "metrics",
+    "benchmark_policy"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-trusted-state-reference-model-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_command": {
+      "const": "cargo run -p xtask -- basalt-trusted-state-model-check"
+    },
+    "implementation_path": {
+      "const": "xtask/src/basalt_trusted_state.rs"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "invariant",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TSTATE-MODEL-[0-9]{3}$"
+          },
+          "invariant": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "const": "safety"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "benchmark_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_model_only",
+        "no_external_proofs_verified",
+        "no_storage_durability_claim",
+        "anti_rollback_always_unqualified",
+        "deterministic_case_coverage"
+      ],
+      "properties": {
+        "reference_model_only": {
+          "const": true
+        },
+        "no_external_proofs_verified": {
+          "const": true
+        },
+        "no_storage_durability_claim": {
+          "const": true
+        },
+        "anti_rollback_always_unqualified": {
+          "const": true
+        },
+        "deterministic_case_coverage": {
+          "const": true
+        }
+      }
+    }
+  }
+}
