@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/authority-state-manifest.v1.schema.json",
+  "title": "BASALT canonical authority state manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state_schema",
+    "authority_id",
+    "authority_incarnation_id",
+    "authority_epoch",
+    "authority_revision",
+    "policy_revision",
+    "policy_digest",
+    "source_cursors",
+    "log_cursors",
+    "accepted_receipts",
+    "signer_policy_version",
+    "witness_policy_version",
+    "policy_bundle_digest"
+  ],
+  "properties": {
+    "state_schema": {
+      "const": "basalt.authority-state.v1"
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_incarnation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_epoch": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "authority_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "policy_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "source_cursors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provisioned_host_id",
+          "source_id",
+          "partition_id",
+          "generation",
+          "seal_digest",
+          "receipt_digest",
+          "observer_profile_digest",
+          "boot_incarnation_digest",
+          "log_origin_id"
+        ],
+        "properties": {
+          "provisioned_host_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "partition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "generation": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "seal_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "receipt_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "observer_profile_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "boot_incarnation_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "log_origin_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "log_cursors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "log_origin_id",
+          "tree_size",
+          "root_digest",
+          "checkpoint_digest"
+        ],
+        "properties": {
+          "log_origin_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "tree_size": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "root_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "checkpoint_digest": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    "accepted_receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receipt_digest",
+          "receipt_acceptance_revision",
+          "provisioned_host_id",
+          "source_id",
+          "partition_id",
+          "generation",
+          "previous_seal_digest",
+          "seal_digest",
+          "observer_profile_digest",
+          "boot_incarnation_digest",
+          "profile_transition_evidence_digest",
+          "boot_transition_evidence_digest",
+          "log_origin_transition_evidence_digest",
+          "policy_transition_evidence_digest",
+          "checkpoint_evidence_kind",
+          "checkpoint_evidence_digest",
+          "log_origin_id",
+          "tree_size",
+          "root_digest",
+          "checkpoint_digest",
+          "signer_policy_version",
+          "witness_policy_version",
+          "policy_bundle_digest"
+        ],
+        "properties": {
+          "receipt_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "receipt_acceptance_revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "provisioned_host_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "partition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "previous_seal_digest": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/digest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seal_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "observer_profile_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "boot_incarnation_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "profile_transition_evidence_digest": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/digest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "boot_transition_evidence_digest": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/digest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "log_origin_transition_evidence_digest": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/digest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy_transition_evidence_digest": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/digest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkpoint_evidence_kind": {
+            "enum": [
+              "pinned_bootstrap",
+              "same_tree",
+              "consistent_extension"
+            ]
+          },
+          "checkpoint_evidence_digest": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/digest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "log_origin_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "tree_size": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "root_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "checkpoint_digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "signer_policy_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "witness_policy_version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "policy_bundle_digest": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    "signer_policy_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "witness_policy_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "policy_bundle_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/witness-dsse-envelope.v1.schema.json",
+  "title": "BASALT DSSE witness envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "payloadType",
+    "payload",
+    "signatures"
+  ],
+  "properties": {
+    "payloadType": {
+      "enum": [
+        "application/vnd.luminous.basalt.witness-checkpoint.v1+json",
+        "application/vnd.luminous.basalt.witness-head-response.v1+json",
+        "application/vnd.luminous.basalt.witness-set-metadata.v1+json",
+        "application/vnd.luminous.basalt.witness-trust-root.v1+json"
+      ]
+    },
+    "payload": {
+      "type": "string",
+      "minLength": 4,
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyid",
+          "sig"
+        ],
+        "properties": {
+          "keyid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sig": {
+            "type": "string",
+            "minLength": 4,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+          }
+        }
+      }
+    }
+  }
+}

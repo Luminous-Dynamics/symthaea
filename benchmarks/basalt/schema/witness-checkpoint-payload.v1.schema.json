@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/witness-checkpoint-payload.v1.schema.json",
+  "title": "BASALT authority witness checkpoint payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "schema_version",
+    "authority_id",
+    "authority_incarnation_id",
+    "authority_epoch",
+    "sequence",
+    "authority_revision",
+    "state_schema",
+    "state_digest",
+    "policy_revision",
+    "policy_digest",
+    "previous_checkpoint_digest",
+    "witness_set_id",
+    "witness_set_version",
+    "trust_root_version",
+    "transition_bundle_digest"
+  ],
+  "properties": {
+    "record_type": {
+      "const": "basalt.authority.witness-checkpoint"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_incarnation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_epoch": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "sequence": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "authority_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "state_schema": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "state_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "policy_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "previous_checkpoint_digest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "witness_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "witness_set_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "trust_root_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "transition_bundle_digest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

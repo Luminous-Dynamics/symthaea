@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/witness-head-response-payload.v1.schema.json",
+  "title": "BASALT challenge-bound witness head response payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "schema_version",
+    "challenge_nonce",
+    "authority_id",
+    "authority_incarnation_id",
+    "authority_epoch",
+    "witness_set_id",
+    "witness_set_version",
+    "trust_root_version",
+    "head_sequence",
+    "head_checkpoint_digest",
+    "head_authority_revision",
+    "head_state_digest",
+    "head_policy_digest"
+  ],
+  "properties": {
+    "record_type": {
+      "const": "basalt.authority.witness-head-response"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "challenge_nonce": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 43,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_incarnation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority_epoch": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "witness_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "witness_set_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "trust_root_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "head_sequence": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "head_checkpoint_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "head_authority_revision": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "head_state_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "head_policy_digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

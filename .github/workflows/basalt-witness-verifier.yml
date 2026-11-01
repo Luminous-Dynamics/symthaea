@@ -1,0 +1,31 @@
+name: BASALT Witness Crypto Verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-witness-verifier/**"
+      - "benchmarks/basalt/schema/witness-*.schema.json"
+      - "benchmarks/basalt/witness-crypto-test-vectors.v1.json"
+      - ".github/workflows/basalt-witness-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  witness-crypto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/basalt-witness-verifier/Cargo.toml -- --check
+      - name: Test DSSE, JCS and threshold verification
+        run: cargo test --locked --manifest-path tools/basalt-witness-verifier/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path tools/basalt-witness-verifier/Cargo.toml --all-targets -- -D warnings

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/witness-verifier-trust-store.v1.schema.json",
+  "title": "BASALT pinned verifier trust store v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "authority_id",
+    "witness_set_id",
+    "witness_set_version",
+    "trust_root_version",
+    "fault_tolerance",
+    "member_count",
+    "write_quorum",
+    "read_quorum",
+    "members"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "authority_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "witness_set_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "witness_set_version": { "type": "integer", "minimum": 1 },
+    "trust_root_version": { "type": "integer", "minimum": 1 },
+    "fault_tolerance": { "type": "integer", "minimum": 0 },
+    "member_count": { "type": "integer", "minimum": 1 },
+    "write_quorum": { "type": "integer", "minimum": 1 },
+    "read_quorum": { "type": "integer", "minimum": 1 },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "member_id",
+          "keyid",
+          "algorithm",
+          "public_key",
+          "administrative_domain",
+          "status"
+        ],
+        "properties": {
+          "member_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "keyid": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "algorithm": { "const": "ed25519" },
+          "public_key": {
+            "type": "string",
+            "minLength": 44,
+            "maxLength": 44,
+            "pattern": "^[A-Za-z0-9+/]{43}=$"
+          },
+          "administrative_domain": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "status": { "enum": ["active", "revoked"] }
+        }
+      }
+    }
+  }
+}
