@@ -638,7 +638,7 @@ mod tests {
         let raw_partial_entropy = -(0.5_f64 * 0.5_f64.ln() + 0.3_f64 * 0.3_f64.ln());
         let topk_mode = matches!(source, EntropySourceV1::VllmTopKRawPartial);
         let probabilities = vec![vec![0.5_f64, 0.3_f64]; 3];
-        let full_probabilities = vec![vec![0.5, 0.25, 0.125, 0.125]; 3];
+        let full_probabilities = vec![vec![0.5_f64, 0.25_f64, 0.125_f64, 0.125_f64]; 3];
         let full_entropy = full_probabilities[0]
             .iter()
             .filter(|p| **p > 0.0)
@@ -832,7 +832,7 @@ mod tests {
     #[test]
     fn exact_full_vocabulary_entropy_is_recomputed_from_complete_distribution() {
         let mut r = request(EntropySourceV1::FullVocabSoftmaxExact);
-        let steps = vec![vec![0.5, 0.25, 0.125, 0.125]; 3];
+        let steps: Vec<Vec<f64>> = vec![vec![0.5_f64, 0.25, 0.125, 0.125]; 3];
         let entropy = steps[0].iter().map(|p| -*p * (*p).ln()).sum::<f64>();
         r.vocabulary_size = Some(4);
         r.initial_entropy_nats = vec![entropy; 3];
