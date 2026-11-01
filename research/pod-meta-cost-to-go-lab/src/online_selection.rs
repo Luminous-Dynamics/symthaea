@@ -47,7 +47,9 @@ pub enum OnlineCompetingTerminal {
 /// Unknown is an interim state. One later final receipt may reconcile it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OnlineFeedbackDisposition {
-    ActionOutcomeUnknown { action_id_digest: [u8; 32] },
+    ActionOutcomeUnknown {
+        action_id_digest: [u8; 32],
+    },
     ExactVerifiedCost {
         observed_remaining_to_verified_proof: ResourceVector,
         meter_receipt_digest: [u8; 32],
@@ -104,12 +106,18 @@ impl OnlineFeedbackDisposition {
                     return Err(OnlineSelectionError::MissingEvaluatorReceipt);
                 }
             }
-            Self::RightCensored { meter_receipt_digest, .. } => {
+            Self::RightCensored {
+                meter_receipt_digest,
+                ..
+            } => {
                 if is_zero(meter_receipt_digest) {
                     return Err(OnlineSelectionError::MissingMeterReceipt);
                 }
             }
-            Self::CompetingTerminal { evaluator_receipt_digest, .. } => {
+            Self::CompetingTerminal {
+                evaluator_receipt_digest,
+                ..
+            } => {
                 if is_zero(evaluator_receipt_digest) {
                     return Err(OnlineSelectionError::MissingEvaluatorReceipt);
                 }
@@ -299,7 +307,9 @@ impl OnlineSelectionLedger {
                     observed_remaining_to_verified_proof,
                     ..
                 } => {
-                    let observed_cost = statement.dimension.value(observed_remaining_to_verified_proof);
+                    let observed_cost = statement
+                        .dimension
+                        .value(observed_remaining_to_verified_proof);
                     record_coverage(
                         &mut report,
                         observed_cost >= statement.lower_bound
@@ -313,7 +323,8 @@ impl OnlineSelectionLedger {
                     observed_resource_lower_bound,
                     ..
                 } => {
-                    let observed_lower_bound = statement.dimension.value(observed_resource_lower_bound);
+                    let observed_lower_bound =
+                        statement.dimension.value(observed_resource_lower_bound);
                     if observed_lower_bound > statement.upper_bound {
                         record_coverage(&mut report, false);
                     } else {
@@ -326,9 +337,8 @@ impl OnlineSelectionLedger {
             }
         }
         if report.resolved_coverage_statements > 0 {
-            report.observed_fcr = Some(
-                report.coverage_misses as f64 / report.resolved_coverage_statements as f64,
-            );
+            report.observed_fcr =
+                Some(report.coverage_misses as f64 / report.resolved_coverage_statements as f64);
         }
         report
     }
@@ -342,9 +352,7 @@ impl OnlineSelectionLedger {
     }
 }
 
-fn validate_statement(
-    statement: &OnlinePredictionStatement,
-) -> Result<(), OnlineSelectionError> {
+fn validate_statement(statement: &OnlinePredictionStatement) -> Result<(), OnlineSelectionError> {
     if statement.statement_id == 0 {
         return Err(OnlineSelectionError::InvalidStatementId);
     }
@@ -479,7 +487,9 @@ mod tests {
     fn coverage_bit_feedback_scores_without_revealing_exact_cost() {
         let mut ledger = OnlineSelectionLedger::new();
         ledger.append_statement(statement(1, 10, 1, 1)).unwrap();
-        ledger.append_feedback(receipt(1, 1, 2, bit(false))).unwrap();
+        ledger
+            .append_feedback(receipt(1, 1, 2, bit(false)))
+            .unwrap();
         let report = ledger.report(2);
         assert_eq!(report.coverage_misses, 1);
         assert_eq!(report.observed_fcr, Some(1.0));
@@ -490,18 +500,28 @@ mod tests {
         let mut ledger = OnlineSelectionLedger::new();
         ledger.append_statement(statement(1, 10, 1, 1)).unwrap();
         ledger.append_statement(statement(2, 11, 1, 1)).unwrap();
-        ledger.append_feedback(receipt(1, 1, 2,
-            OnlineFeedbackDisposition::RightCensored {
-                observed_resource_lower_bound: ResourceVector::new(21, 0, 0, 0, 0, 0),
-                meter_receipt_digest: [6; 32],
-            },
-        )).unwrap();
-        ledger.append_feedback(receipt(2, 2, 3,
-            OnlineFeedbackDisposition::RightCensored {
-                observed_resource_lower_bound: ResourceVector::new(15, 0, 0, 0, 0, 0),
-                meter_receipt_digest: [7; 32],
-            },
-        )).unwrap();
+        ledger
+            .append_feedback(receipt(
+                1,
+                1,
+                2,
+                OnlineFeedbackDisposition::RightCensored {
+                    observed_resource_lower_bound: ResourceVector::new(21, 0, 0, 0, 0, 0),
+                    meter_receipt_digest: [6; 32],
+                },
+            ))
+            .unwrap();
+        ledger
+            .append_feedback(receipt(
+                2,
+                2,
+                3,
+                OnlineFeedbackDisposition::RightCensored {
+                    observed_resource_lower_bound: ResourceVector::new(15, 0, 0, 0, 0, 0),
+                    meter_receipt_digest: [7; 32],
+                },
+            ))
+            .unwrap();
         let report = ledger.report(3);
         assert_eq!(report.resolved_coverage_statements, 1);
         assert_eq!(report.coverage_misses, 1);
@@ -513,12 +533,17 @@ mod tests {
     fn competing_terminal_is_neither_covered_nor_missed() {
         let mut ledger = OnlineSelectionLedger::new();
         ledger.append_statement(statement(1, 10, 1, 1)).unwrap();
-        ledger.append_feedback(receipt(1, 1, 2,
-            OnlineFeedbackDisposition::CompetingTerminal {
-                terminal: OnlineCompetingTerminal::PermissionRevoked,
-                evaluator_receipt_digest: [6; 32],
-            },
-        )).unwrap();
+        ledger
+            .append_feedback(receipt(
+                1,
+                1,
+                2,
+                OnlineFeedbackDisposition::CompetingTerminal {
+                    terminal: OnlineCompetingTerminal::PermissionRevoked,
+                    evaluator_receipt_digest: [6; 32],
+                },
+            ))
+            .unwrap();
         let report = ledger.report(2);
         assert_eq!(report.competing_terminal, 1);
         assert_eq!(report.resolved_coverage_statements, 0);
@@ -529,11 +554,16 @@ mod tests {
     fn unknown_action_outcome_requires_one_later_reconciliation() {
         let mut ledger = OnlineSelectionLedger::new();
         ledger.append_statement(statement(1, 10, 1, 1)).unwrap();
-        ledger.append_feedback(receipt(1, 1, 2,
-            OnlineFeedbackDisposition::ActionOutcomeUnknown {
-                action_id_digest: [6; 32],
-            },
-        )).unwrap();
+        ledger
+            .append_feedback(receipt(
+                1,
+                1,
+                2,
+                OnlineFeedbackDisposition::ActionOutcomeUnknown {
+                    action_id_digest: [6; 32],
+                },
+            ))
+            .unwrap();
         assert_eq!(ledger.report(2).action_outcome_unknown, 1);
         assert_eq!(
             ledger.append_feedback(receipt(2, 1, 3,
