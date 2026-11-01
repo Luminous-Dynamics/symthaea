@@ -1,0 +1,11 @@
+[package]
+name = "connectome-monte-carlo-scorecard"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Method-neutral Monte Carlo calibration and confidence-set scorecard for clustered IV benchmarks"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
