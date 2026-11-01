@@ -473,6 +473,7 @@ impl ActionConditionedVisualResidualPredictor {
             || !state.learning_rate.is_finite()
             || !(0.0..=1.0).contains(&state.learning_rate)
             || state.max_pending_forecasts == 0
+            || state.next_forecast_id == 0
             || state.pending.len() > state.max_pending_forecasts
             || !state.max_lateness_factor.is_finite()
             || state.max_lateness_factor < 0.0
@@ -713,6 +714,9 @@ mod tests {
         );
         assert_eq!(positive_score.model_version_before, 0);
         assert_eq!(negative_score.model_version_before, 1);
+        assert_eq!(positive_score.score_sha256, hash_forecast_score(&positive_score));
+        assert_eq!(positive_score.forecast_sha256, positive.forecast_sha256);
+        assert_eq!(positive_score.model_checkpoint_sha256, digest('e'));
         assert_eq!(model.training_steps(), 2);
 
         let after_positive = model.issue_forecast(
@@ -782,8 +786,10 @@ mod tests {
             &digest('a'), 20, &digest('b'), &digest('c'), &digest('e'), 4, 0.25, &[0.1, 0.2], &[1.0, 0.5]
         ).unwrap();
         let state = model.save_state();
+        let encoded = serde_json::to_vec(&state).unwrap();
+        let decoded: ActionConditionedPredictorState = serde_json::from_slice(&encoded).unwrap();
         let mut restored = predictor();
-        restored.load_state(&state).unwrap();
+        restored.load_state(&decoded).unwrap();
         assert_eq!(restored.save_state(), state);
         let score = restored.score_and_learn(receipt.forecast_id, &[0.2, 0.3], 21, 0.25).unwrap();
         assert_eq!(score.forecast_id, receipt.forecast_id);
