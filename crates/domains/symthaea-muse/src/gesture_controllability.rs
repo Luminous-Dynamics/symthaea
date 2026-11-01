@@ -537,8 +537,12 @@ fn validate_measurements(
 ) {
     let mut previous: Option<(&GestureTarget, &str)> = None;
     for measurement in measurements {
-        if measurement.feature_id.trim().is_empty() || !measurement.value.is_finite() {
-            issues.push(format!("{name} contains an empty feature ID or non-finite value"));
+        if measurement.feature_id.trim().is_empty()
+            || measurement.instrument_id.trim().is_empty()
+            || measurement.source_model_id.as_ref().is_some_and(|model| model.trim().is_empty())
+            || !measurement.value.is_finite()
+        {
+            issues.push(format!("{name} contains an empty identity/feature ID or non-finite value"));
         }
         match &measurement.target {
             GestureTarget::Part { part_id } if *part_id == u16::MAX => {
@@ -946,24 +950,36 @@ mod tests {
         });
         value.intervention_features.push(FeatureMeasurement {
             target: other_target.clone(),
-            feature_id: "other_note_level".to_string(),
+            instrument_id: "violin".to_string(),
+            source_model_id: Some("violin.model-a".to_string()),
+            feature_id: "spectral_centroid_hz".to_string(),
             value: 0.3,
             unit: FeatureUnit::Normalized,
         });
-        value.baseline_features.sort_by(|a, b| compare_feature_key(&a.target, &a.feature_id, &b.target, &b.feature_id));
-        value.intervention_features.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
+        value.baseline_features.sort_by(|a, b| {
+            compare_feature_key(&a.target, &a.feature_id, &b.target, &b.feature_id)
+        });
+        value.intervention_features.sort_by(|a, b| {
+            compare_feature_key(&a.target, &a.feature_id, &b.target, &b.feature_id)
+        });
         value.side_effect_budgets.push(SideEffectBudget {
-            target: other_target,
-            feature_id: "other_note_level".to_string(),
+            target: other_target.clone(),
+            feature_id: "spectral_centroid_hz".to_string(),
             unit: FeatureUnit::Normalized,
             maximum_abs_delta: 0.0,
         });
-        value.side_effect_budgets.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
+        value.side_effect_budgets.sort_by(|a, b| {
+            compare_feature_key(&a.target, &a.feature_id, &b.target, &b.feature_id)
+        });
         value.seal();
         assert!(value.verify().is_ok());
+        assert!(value
+            .verify_against_identity_map(&"a".repeat(64), 2, &identity_map())
+            .is_ok());
 
         value.intervention_features.iter_mut()
-            .find(|feature| feature.feature_id == "other_note_level")
+            .find(|feature| feature.target == other_target
+                && feature.feature_id == "spectral_centroid_hz")
             .unwrap().value = 0.31;
         value.seal();
         assert!(value.verify().unwrap_err().iter()
