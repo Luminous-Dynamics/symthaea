@@ -73,10 +73,10 @@ interventions; stochastic systems need independent paired replicates and
 uncertainty intervals across held-out episodes. A single deterministic table
 only characterizes its declared context.
 
-Eight source-level tests cover additive controls, pure third-/fourth-order
+Nine source-level tests cover additive controls, pure third-/fourth-order
 synergy, higher-order antagonism, conflict-group exclusions, budget exclusions,
 context/registry mismatch, and incomplete/duplicate subset tables.
 
-The evaluator package currently has 29 authored Rust test functions across
+The evaluator package currently has 30 authored Rust test functions across
 joint-budget, pairwise-interaction and higher-order decomposition modules.
 No Rust build, format, Clippy or test execution is claimed.
