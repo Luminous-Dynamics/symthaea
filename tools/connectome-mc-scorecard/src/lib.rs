@@ -506,6 +506,9 @@ fn confidence_set_diagnostics(
     } else {
         Some((covered + missing) as f64 / records.len() as f64)
     };
+    let finite_noncovering_set_rate = (topology_counts.finite_bounded > 0).then_some(
+        finite_noncovering_set_count as f64 / topology_counts.finite_bounded as f64,
+    );
 
     Ok(ConfidenceSetDiagnostics {
         available,
@@ -518,9 +521,7 @@ fn confidence_set_diagnostics(
         unbounded_count,
         unbounded_rate: (available > 0).then_some(unbounded_count as f64 / available as f64),
         finite_noncovering_set_count,
-        finite_noncovering_set_rate: (topology_counts.finite_bounded > 0).then_some(
-            finite_noncovering_set_count as f64 / topology_counts.finite_bounded as f64,
-        ),
+        finite_noncovering_set_rate,
         finite_width_count: widths.len(),
         finite_width_median: quantile(&widths, 0.50),
         finite_width_p90: quantile(&widths, 0.90),
