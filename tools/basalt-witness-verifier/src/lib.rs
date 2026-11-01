@@ -293,6 +293,458 @@ pub fn load_pinned_trust_store(
     Ok(trust)
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustRootKey {
+    pub keyid: String,
+    pub algorithm: String,
+    pub public_key: String,
+    pub administrative_domain: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WitnessTrustRoot {
+    pub record_type: String,
+    pub schema_version: u32,
+    pub authority_id: String,
+    pub trust_root_version: String,
+    pub previous_trust_root_digest: Option<String>,
+    pub root_threshold: usize,
+    pub root_keys: Vec<TrustRootKey>,
+    pub initial_witness_set_id: String,
+    pub initial_witness_set_version: String,
+    pub initial_witness_set_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WitnessSetMember {
+    pub member_id: String,
+    pub keyid: String,
+    pub algorithm: String,
+    pub public_key: String,
+    pub administrative_domain: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WitnessSetMetadata {
+    pub record_type: String,
+    pub schema_version: u32,
+    pub authority_id: String,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub previous_witness_set_digest: Option<String>,
+    pub trust_root_version: String,
+    pub fault_tolerance: usize,
+    pub member_count: usize,
+    pub write_quorum: usize,
+    pub read_quorum: usize,
+    pub signature_algorithm_policy: String,
+    pub members: Vec<WitnessSetMember>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TrustRootChainReport {
+    pub status: String,
+    pub authority_id: String,
+    pub genesis_pin_sha256: String,
+    pub latest_root_version: String,
+    pub latest_root_digest: String,
+    pub verified_root_versions: Vec<String>,
+    pub latest_root_threshold: usize,
+    pub latest_active_root_keys: usize,
+    pub initial_witness_set_id: String,
+    pub initial_witness_set_version: String,
+    pub initial_witness_set_digest: String,
+    pub claim_ceiling: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct WitnessSetChainReport {
+    pub status: String,
+    pub authority_id: String,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub witness_set_digest: String,
+    pub trust_root_version: String,
+    pub active_members: usize,
+    pub fault_tolerance: usize,
+    pub read_quorum: usize,
+    pub write_quorum: usize,
+    pub claim_ceiling: String,
+}
+
+struct PreparedRoot {
+    verifiers: Vec<Ed25519Verifier>,
+}
+
+fn prefixed_domain_digest(domain: &[u8], payload: &[u8]) -> String {
+    let mut preimage = Vec::with_capacity(domain.len() + 1 + payload.len());
+    preimage.extend_from_slice(domain);
+    preimage.push(0);
+    preimage.extend_from_slice(payload);
+    sha256_prefixed(&preimage)
+}
+
+pub fn witness_trust_root_digest(canonical_payload: &[u8]) -> String {
+    prefixed_domain_digest(b"BASALT-WITNESS-TRUST-ROOT-V1", canonical_payload)
+}
+
+pub fn witness_set_metadata_digest(canonical_payload: &[u8]) -> String {
+    prefixed_domain_digest(b"BASALT-WITNESS-SET-METADATA-V1", canonical_payload)
+}
+
+fn parse_strict_canonical_json<T>(payload: &[u8], label: &str) -> Result<T, String>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    let value: Value = serde_json::from_slice(payload)
+        .map_err(|error| format!("{label} is invalid JSON or has duplicate object fields: {error}"))?;
+    let canonical = serde_json_canonicalizer::to_vec(&value)
+        .map_err(|error| format!("{label} cannot be canonicalized with RFC 8785 JCS: {error}"))?;
+    if canonical != payload {
+        return Err(format!("{label} is not byte-for-byte RFC 8785 canonical JSON"));
+    }
+    serde_json::from_value(value).map_err(|error| format!("{label} has invalid fields: {error}"))
+}
+
+fn verify_dsse_payload_with_verifiers(
+    envelope_bytes: &[u8],
+    expected_payload_type: &str,
+    verifiers: &[Ed25519Verifier],
+    threshold: usize,
+) -> Result<VerifiedPayload, String> {
+    if threshold == 0 || threshold > verifiers.len() {
+        return Err("signature threshold is outside the active key count".to_string());
+    }
+    let strict: StrictEnvelope = serde_json::from_slice(envelope_bytes)
+        .map_err(|error| format!("invalid DSSE envelope JSON: {error}"))?;
+    if strict.payload_type != expected_payload_type {
+        return Err(format!(
+            "unexpected DSSE payload type: expected {expected_payload_type}, got {}",
+            strict.payload_type
+        ));
+    }
+    if strict.signatures.is_empty() || strict.signatures.len() > MAX_SIGNATURES {
+        return Err(format!(
+            "DSSE signature count must be between 1 and {MAX_SIGNATURES}"
+        ));
+    }
+    let mut signature_ids = HashSet::new();
+    for signature in &strict.signatures {
+        if !is_lower_hex_64(&signature.keyid) || !signature_ids.insert(signature.keyid.as_str()) {
+            return Err("DSSE signature key ID is malformed or duplicated".to_string());
+        }
+        if signature.sig.is_empty() {
+            return Err("DSSE signature bytes must not be empty".to_string());
+        }
+    }
+    let envelope = Envelope {
+        payload: strict.payload,
+        payload_type: strict.payload_type,
+        signatures: strict
+            .signatures
+            .into_iter()
+            .map(|signature| Signature {
+                keyid: Some(signature.keyid),
+                sig: signature.sig,
+            })
+            .collect(),
+    };
+    let verifier_refs: Vec<&dyn Verifier> = verifiers
+        .iter()
+        .map(|verifier| verifier as &dyn Verifier)
+        .collect();
+    let verified = verify(&envelope, &verifier_refs, threshold)
+        .map_err(|error| format!("DSSE threshold verification failed: {error}"))?;
+    let _ = parse_strict_canonical_json::<Value>(&verified.payload, "verified DSSE payload")?;
+    Ok(verified)
+}
+
+fn prepare_root(root: &WitnessTrustRoot) -> Result<PreparedRoot, String> {
+    if root.record_type != "basalt.authority.witness-trust-root" || root.schema_version != 1 {
+        return Err("unsupported witness trust-root record type/schema version".to_string());
+    }
+    if root.authority_id.is_empty()
+        || root.initial_witness_set_id.is_empty()
+        || !is_prefixed_sha256(&root.initial_witness_set_digest)
+    {
+        return Err("trust-root authority or initial witness-set commitment is malformed".to_string());
+    }
+    parse_canonical_u64(&root.trust_root_version, "trust_root_version")?;
+    parse_canonical_u64(&root.initial_witness_set_version, "initial_witness_set_version")?;
+    if root.root_threshold == 0 || root.root_keys.is_empty() {
+        return Err("trust-root threshold and key list must be nonempty".to_string());
+    }
+    if root.previous_trust_root_digest
+        .as_deref()
+        .is_some_and(|digest| !is_prefixed_sha256(digest))
+    {
+        return Err("previous_trust_root_digest is malformed".to_string());
+    }
+
+    let mut seen_key_ids = HashSet::new();
+    let mut seen_public_keys = HashSet::new();
+    let mut active_domains = BTreeSet::new();
+    let mut verifiers = Vec::new();
+    for key in &root.root_keys {
+        if !is_lower_hex_64(&key.keyid) || !seen_key_ids.insert(key.keyid.as_str()) {
+            return Err(format!("trust-root key ID is malformed or duplicated: {}", key.keyid));
+        }
+        if key.algorithm != "ed25519" {
+            return Err(format!("unsupported trust-root key algorithm: {}", key.algorithm));
+        }
+        let public_bytes = decode_canonical_base64(&key.public_key, "trust-root public_key")?;
+        if public_bytes.len() != 32 || !seen_public_keys.insert(public_bytes.clone()) {
+            return Err("trust-root public key is malformed or duplicated".to_string());
+        }
+        if canonical_key_id(&key.public_key)? != key.keyid {
+            return Err(format!("trust-root key ID does not match public key {}", key.keyid));
+        }
+        match key.status.as_str() {
+            "active" => {
+                if key.administrative_domain.is_empty()
+                    || !active_domains.insert(key.administrative_domain.as_str())
+                {
+                    return Err("active trust-root keys must use distinct administrative domains".to_string());
+                }
+                verifiers.push(
+                    Ed25519Verifier::from_bytes(&public_bytes)
+                        .map_err(|error| format!("invalid Ed25519 trust-root key: {error}"))?
+                        .with_key_id(key.keyid.clone()),
+                );
+            }
+            "revoked" => {}
+            other => return Err(format!("unsupported trust-root key status {other}")),
+        }
+    }
+    if root.root_threshold > verifiers.len() {
+        return Err("trust-root threshold exceeds active unique root keys".to_string());
+    }
+    Ok(PreparedRoot { verifiers })
+}
+
+/// Verifies a chain from exact externally pinned canonical genesis bytes.
+/// Each successor root must meet both the previous-root and successor-root thresholds.
+pub fn verify_trust_root_chain(
+    genesis_bytes: &[u8],
+    expected_genesis_sha256: &str,
+    successor_envelopes: &[Vec<u8>],
+) -> Result<TrustRootChainReport, String> {
+    if sha256_prefixed(genesis_bytes) != expected_genesis_sha256 {
+        return Err("pinned genesis trust-root digest mismatch".to_string());
+    }
+    let mut root: WitnessTrustRoot =
+        parse_strict_canonical_json(genesis_bytes, "genesis trust root")?;
+    if root.previous_trust_root_digest.is_some() {
+        return Err("pinned genesis trust root must have no predecessor".to_string());
+    }
+    let mut prepared = prepare_root(&root)?;
+    let mut root_digest = witness_trust_root_digest(genesis_bytes);
+    let genesis_pin = expected_genesis_sha256.to_string();
+    let mut versions = vec![root.trust_root_version.clone()];
+    if root.trust_root_version != "1" {
+        return Err("genesis trust_root_version must be 1".to_string());
+    }
+
+    for (index, envelope) in successor_envelopes.iter().enumerate() {
+        let old_version = parse_canonical_u64(&root.trust_root_version, "current trust root version")?;
+        let expected_version = old_version
+            .checked_add(1)
+            .ok_or_else(|| "trust-root version overflow".to_string())?;
+        let old_verified = verify_dsse_payload_with_verifiers(
+            envelope,
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &prepared.verifiers,
+            root.root_threshold,
+        )
+        .map_err(|error| format!("successor root {index} lacks old-root threshold: {error}"))?;
+        let successor: WitnessTrustRoot =
+            parse_strict_canonical_json(&old_verified.payload, "successor trust root")?;
+        let next_version = parse_canonical_u64(&successor.trust_root_version, "successor trust root version")?;
+        if next_version != expected_version {
+            return Err(format!(
+                "successor trust-root version must be exactly {expected_version}, got {next_version}"
+            ));
+        }
+        if successor.authority_id != root.authority_id {
+            return Err("trust-root authority ID cannot change during ordinary rotation".to_string());
+        }
+        if successor.previous_trust_root_digest.as_deref() != Some(root_digest.as_str()) {
+            return Err("successor trust-root predecessor digest does not match current root".to_string());
+        }
+        if successor.initial_witness_set_id != root.initial_witness_set_id
+            || successor.initial_witness_set_version != root.initial_witness_set_version
+            || successor.initial_witness_set_digest != root.initial_witness_set_digest
+        {
+            return Err("trust-root rotation cannot change the pinned initial witness-set commitment".to_string());
+        }
+        let next_prepared = prepare_root(&successor)?;
+        let new_verified = verify_dsse_payload_with_verifiers(
+            envelope,
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &next_prepared.verifiers,
+            successor.root_threshold,
+        )
+        .map_err(|error| format!("successor root {index} lacks new-root threshold: {error}"))?;
+        if new_verified.payload != old_verified.payload {
+            return Err("old-root and new-root thresholds did not authenticate identical bytes".to_string());
+        }
+        root_digest = witness_trust_root_digest(&new_verified.payload);
+        versions.push(successor.trust_root_version.clone());
+        root = successor;
+        prepared = next_prepared;
+    }
+
+    Ok(TrustRootChainReport {
+        status: "verified".to_string(),
+        authority_id: root.authority_id.clone(),
+        genesis_pin_sha256: genesis_pin,
+        latest_root_version: root.trust_root_version.clone(),
+        latest_root_digest: root_digest,
+        verified_root_versions: versions,
+        latest_root_threshold: root.root_threshold,
+        latest_active_root_keys: prepared.verifiers.len(),
+        initial_witness_set_id: root.initial_witness_set_id.clone(),
+        initial_witness_set_version: root.initial_witness_set_version.clone(),
+        initial_witness_set_digest: root.initial_witness_set_digest.clone(),
+        claim_ceiling: "Verifies canonical trust-root metadata and dual-threshold successor rotations from exact externally pinned genesis bytes. Does not prove secure provisioning, key secrecy, actual administrative independence, or production witness service availability.".to_string(),
+    })
+}
+
+fn validate_witness_set(set: &WitnessSetMetadata) -> Result<(), String> {
+    if set.record_type != "basalt.authority.witness-set-metadata"
+        || set.schema_version != 1
+        || set.signature_algorithm_policy != "from-pinned-trust-metadata; never selected from an untrusted envelope"
+    {
+        return Err("unsupported witness-set record type/schema/algorithm policy".to_string());
+    }
+    parse_canonical_u64(&set.witness_set_version, "witness_set_version")?;
+    parse_canonical_u64(&set.trust_root_version, "trust_root_version")?;
+    if set.authority_id.is_empty() || set.witness_set_id.is_empty() {
+        return Err("witness-set authority and set identity must be nonempty".to_string());
+    }
+    if set.previous_witness_set_digest.as_deref().is_some_and(|value| !is_prefixed_sha256(value)) {
+        return Err("previous_witness_set_digest is malformed".to_string());
+    }
+    let expected_n = set.fault_tolerance
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| "witness-set fault-tolerance arithmetic overflow".to_string())?;
+    let expected_q = set.fault_tolerance
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| "witness-set quorum arithmetic overflow".to_string())?;
+    if set.member_count != expected_n || set.read_quorum != expected_q || set.write_quorum != expected_q {
+        return Err("witness-set must satisfy n=3f+1 and read/write quorum=2f+1".to_string());
+    }
+
+    let mut members = HashSet::new();
+    let mut ids = HashSet::new();
+    let mut public_keys = HashSet::new();
+    let mut domains = BTreeSet::new();
+    let mut active = 0usize;
+    for member in &set.members {
+        if member.member_id.is_empty() || !members.insert(member.member_id.as_str()) {
+            return Err("witness-set member ID is empty or duplicated".to_string());
+        }
+        if !is_lower_hex_64(&member.keyid) || !ids.insert(member.keyid.as_str()) {
+            return Err("witness-set key ID is malformed or duplicated".to_string());
+        }
+        if member.algorithm != "ed25519" {
+            return Err("witness-set contains unsupported member algorithm".to_string());
+        }
+        let public = decode_canonical_base64(&member.public_key, "witness-set public key")?;
+        if public.len() != 32 || !public_keys.insert(public.clone()) {
+            return Err("witness-set public key is malformed or duplicated".to_string());
+        }
+        if canonical_key_id(&member.public_key)? != member.keyid {
+            return Err("witness-set member key ID does not match public key".to_string());
+        }
+        match member.status.as_str() {
+            "active" => {
+                active += 1;
+                if member.administrative_domain.is_empty() || !domains.insert(member.administrative_domain.as_str()) {
+                    return Err("active witness-set members must have distinct administrative domains".to_string());
+                }
+            }
+            "revoked" => {}
+            other => return Err(format!("unsupported witness-set member status {other}")),
+        }
+    }
+    if active != set.member_count {
+        return Err(format!("witness-set declares {} active members but contains {active}", set.member_count));
+    }
+    Ok(())
+}
+
+/// Verifies an initial or successor witness-set metadata envelope using the latest
+/// root keyset. Pass the previous verified metadata for each rotation after genesis.
+pub fn verify_witness_set_metadata(
+    envelope_bytes: &[u8],
+    root_chain: &TrustRootChainReport,
+    root_payload: &WitnessTrustRoot,
+    root_keys: &[Ed25519Verifier],
+    previous_set: Option<&WitnessSetMetadata>,
+) -> Result<(WitnessSetMetadata, WitnessSetChainReport), String> {
+    let verified = verify_dsse_payload_with_verifiers(
+        envelope_bytes,
+        WITNESS_SET_PAYLOAD_TYPE,
+        root_keys,
+        root_payload.root_threshold,
+    )?;
+    let set: WitnessSetMetadata =
+        parse_strict_canonical_json(&verified.payload, "witness-set metadata")?;
+    validate_witness_set(&set)?;
+    if set.authority_id != root_chain.authority_id
+        || set.trust_root_version != root_chain.latest_root_version
+    {
+        return Err("witness-set metadata authority/trust-root version mismatch".to_string());
+    }
+    let digest = witness_set_metadata_digest(&verified.payload);
+    match previous_set {
+        None => {
+            if set.witness_set_id != root_chain.initial_witness_set_id
+                || set.witness_set_version != root_chain.initial_witness_set_version
+                || set.previous_witness_set_digest.is_some()
+                || digest != root_chain.initial_witness_set_digest
+            {
+                return Err("initial witness-set metadata does not match the root-pinned commitment".to_string());
+            }
+        }
+        Some(previous) => {
+            let expected_version = parse_canonical_u64(&previous.witness_set_version, "previous witness set version")?
+                .checked_add(1)
+                .ok_or_else(|| "witness-set version overflow".to_string())?;
+            if set.witness_set_id != previous.witness_set_id
+                || parse_canonical_u64(&set.witness_set_version, "witness_set_version")? != expected_version
+                || set.previous_witness_set_digest.as_deref()
+                    != Some(witness_set_metadata_digest(&serde_json_canonicalizer::to_vec(previous).map_err(|error| error.to_string())?).as_str())
+            {
+                return Err("successor witness-set metadata has wrong identity, version or predecessor".to_string());
+            }
+        }
+    }
+    let report = WitnessSetChainReport {
+        status: "verified".to_string(),
+        authority_id: set.authority_id.clone(),
+        witness_set_id: set.witness_set_id.clone(),
+        witness_set_version: set.witness_set_version.clone(),
+        witness_set_digest: digest,
+        trust_root_version: set.trust_root_version.clone(),
+        active_members: set.member_count,
+        fault_tolerance: set.fault_tolerance,
+        read_quorum: set.read_quorum,
+        write_quorum: set.write_quorum,
+        claim_ceiling: "Verifies canonical witness-set metadata signed by the latest verified root threshold and linked to the pinned genesis commitment or previous set digest. Does not prove deployed member durability or operational failure-domain independence.".to_string(),
+    };
+    Ok((set, report))
+}
+
 /// Verifies a DSSE envelope against active keys from an already pinned trust store.
 ///
 /// The payload is returned only after DSSE threshold verification and byte-for-byte
