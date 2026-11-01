@@ -281,12 +281,12 @@ impl BinaryLogFactor {
             {
                 assignment_slot += 1;
             }
-            if let Some((assigned, value)) = assignments.get(assignment_slot) {
-                if *assigned == variable {
-                    fixed_values[local_slot] = Some(*value);
-                    assignment_slot += 1;
-                    continue;
-                }
+            if let Some((assigned, value)) = assignments.get(assignment_slot)
+                && *assigned == variable
+            {
+                fixed_values[local_slot] = Some(*value);
+                assignment_slot += 1;
+                continue;
             }
             variables.push(variable);
         }
@@ -821,10 +821,10 @@ pub fn min_fill_sum_product(
                 continue;
             };
             for other_variable in factor.variables.iter().copied() {
-                if other_variable != variable {
-                    if let Some(bucket) = buckets.get_mut(&other_variable) {
-                        bucket.remove(&factor_id);
-                    }
+                if other_variable != variable
+                    && let Some(bucket) = buckets.get_mut(&other_variable)
+                {
+                    bucket.remove(&factor_id);
                 }
             }
 
@@ -1057,10 +1057,10 @@ pub fn min_fill_log_sum_product_with_cutset_plan(
         }
 
         let report = min_fill_log_sum_product_with_plan(&conditioned_factors, residual_plan)?;
-        if let Some(previous) = &accumulated {
-            if previous.variables != report.factor.variables {
-                return Err(FactorGraphError::CutsetBranchScopeMismatch);
-            }
+        if let Some(previous) = &accumulated
+            && previous.variables != report.factor.variables
+        {
+            return Err(FactorGraphError::CutsetBranchScopeMismatch);
         }
         peak_factor_entries = peak_factor_entries.max(report.peak_factor_entries);
         factor_multiplications = factor_multiplications
@@ -1640,7 +1640,7 @@ mod tests {
         for variable_count in 2..=7 {
             for seed in 0..16u64 {
                 let eliminate = (0..variable_count)
-                    .filter(|variable| (*variable as u64 + seed) % 3 != 0)
+                    .filter(|variable| !(*variable as u64 + seed).is_multiple_of(3))
                     .collect::<Vec<_>>();
                 let retained = (0..variable_count)
                     .filter(|variable| !eliminate.contains(variable))
@@ -1663,7 +1663,7 @@ mod tests {
                         if next_random(&mut random) % 5 < 2 {
                             let values = (0..4)
                                 .map(|entry| {
-                                    if (entry as u64 + next_random(&mut random)) % 13 == 0 {
+                                    if (entry as u64 + next_random(&mut random)).is_multiple_of(13) {
                                         0.0
                                     } else {
                                         0.1 + (next_random(&mut random) % 9) as f64 * 0.1
@@ -1680,10 +1680,10 @@ mod tests {
                     for first in 0..variable_count {
                         for second in first + 1..variable_count {
                             for third in second + 1..variable_count {
-                                if next_random(&mut random) % 19 == 0 {
+                                if next_random(&mut random).is_multiple_of(19) {
                                     let values = (0..8)
                                         .map(|entry| {
-                                            if (entry as u64 + next_random(&mut random)) % 17 == 0 {
+                                            if (entry as u64 + next_random(&mut random)).is_multiple_of(17) {
                                                 0.0
                                             } else {
                                                 0.1 + (next_random(&mut random) % 9) as f64 * 0.1
@@ -1925,13 +1925,13 @@ mod tests {
 
         // Independent full-joint enumeration is intentionally exponential and
         // used only as a small-system oracle for the conditioned contraction.
-        let mut expected = vec![f64::NEG_INFINITY; 2];
+        let mut expected = [f64::NEG_INFINITY; 2];
         for assignment in 0..(1usize << VARIABLES) {
             let mut log_weight = 0.0;
             for factor in &factors {
                 let scope = factor.variables();
-                let local_index = usize::from((assignment >> scope[0]) & 1)
-                    | (usize::from((assignment >> scope[1]) & 1) << 1);
+                let local_index = ((assignment >> scope[0]) & 1)
+                    | (((assignment >> scope[1]) & 1) << 1);
                 log_weight += factor.log_values()[local_index];
             }
             let retained_state = (assignment >> RETAINED) & 1;
@@ -2033,10 +2033,9 @@ mod tests {
                     report.peak_factor_entries,
                     "preflight peak differs: n={variable_count}, seed={seed}"
                 );
-                for state in 0..2 {
+                for (state, expected_value) in expected.iter().copied().enumerate() {
                     let baseline_value = baseline.factor.log_values()[state];
                     let cutset_value = report.factor.log_values()[state];
-                    let expected_value = expected[state];
                     assert!(
                         (baseline_value == expected_value)
                             || (baseline_value.is_finite()
@@ -2165,9 +2164,9 @@ mod tests {
     #[test]
     fn cutset_conditioning_counts_absent_variables_and_rejects_invalid_budgets() {
         let factor = BinaryLogFactor::new(vec![0], vec![0.25_f64.ln(), 0.75_f64.ln()]).unwrap();
-        let ordinary = min_fill_log_sum_product(&[factor.clone()], &[1], 2).unwrap();
+        let ordinary = min_fill_log_sum_product(std::slice::from_ref(&factor), &[1], 2).unwrap();
         let conditioned = min_fill_log_sum_product_with_cutset(
-            &[factor.clone()],
+            std::slice::from_ref(&factor),
             &[1],
             &[1],
             2,
@@ -2182,11 +2181,11 @@ mod tests {
         }
 
         assert!(matches!(
-            min_fill_log_sum_product_with_cutset(&[factor.clone()], &[1], &[1, 1], 2, 4),
+            min_fill_log_sum_product_with_cutset(std::slice::from_ref(&factor), &[1], &[1, 1], 2, 4),
             Err(FactorGraphError::DuplicateCutsetVariable { variable: 1 })
         ));
         assert!(matches!(
-            min_fill_log_sum_product_with_cutset(&[factor.clone()], &[1], &[0], 2, 2),
+            min_fill_log_sum_product_with_cutset(std::slice::from_ref(&factor), &[1], &[0], 2, 2),
             Err(FactorGraphError::CutsetVariableNotEliminated { variable: 0 })
         ));
         assert!(matches!(
