@@ -670,9 +670,9 @@ pub fn analyze_finite_stopping_continuation(
                 "conditional continuation summary missing for a history",
             ))?;
         let (value, action) = if continue_value > stop_value {
-            (continue_value, OptionalStoppingAction::Continue)
+            (continue_value, OptionalStoppingAction::ContinueObserving)
         } else {
-            (stop_value, OptionalStoppingAction::StopHere)
+            (stop_value, OptionalStoppingAction::StopAtCurrentHistory)
         };
         if value > node.test_value + SUPERMARTINGALE_TOLERANCE {
             return Err(StoppingContinuationError::new(
@@ -740,7 +740,7 @@ pub fn analyze_finite_stopping_continuation(
             continuation_terminal_leaf_size: terminal_leaf_size,
             combined_policy_value: combined_values.get(&node.node_id).copied().unwrap_or(f64::NAN),
             optimal_action: combined_actions.get(&node.node_id).copied().unwrap_or(
-                OptionalStoppingAction::StopHere
+                OptionalStoppingAction::StopAtCurrentHistory
             ),
         });
     }
@@ -758,6 +758,7 @@ pub fn analyze_finite_stopping_continuation(
     }
 
     let plan_sha256 = plan.plan_sha256()?;
+    let first_process_policy = stopping_decisions(&history_summary);
     let payload = ReportPayload {
         schema: REPORT_SCHEMA,
         version: REPORT_VERSION,
@@ -765,7 +766,7 @@ pub fn analyze_finite_stopping_continuation(
         plan_sha256: &plan_sha256,
         significance_level: plan.significance_level,
         maximum_first_process_optional_stopping_size: history_summary.maximum_optional_stopping_value,
-        maximum_first_process_optional_stopping_policy: &stopping_decisions(&history_summary),
+        maximum_first_process_optional_stopping_policy: &first_process_policy,
         maximum_adaptive_continuation_size,
         histories: &histories,
         continuation_processes: &continuation_reports,
@@ -954,6 +955,15 @@ mod tests {
         let late = report.histories.iter().find(|row| row.node_id == "late").unwrap();
         assert_eq!(late.optimal_action, OptionalStoppingAction::StopAtCurrentHistory);
         assert!((late.combined_policy_value - 0.025).abs() < 1e-12);
+        let first_process_root = report.maximum_first_process_optional_stopping_policy
+            .iter().find(|decision| decision.node_id == "root").unwrap();
+        assert_eq!(first_process_root.action, OptionalStoppingAction::StopAtCurrentHistory);
+        assert!((first_process_root.optimal_expected_test_value - 0.05).abs() < 1e-12);
+        let early_continuation = report.continuation_processes
+            .iter().find(|process| process.history_node_id == "early").unwrap();
+        assert!(early_continuation.optimal_stopping_policy.iter()
+            .any(|decision| decision.node_id == "c-root"
+                && decision.action == OptionalStoppingAction::StopAtCurrentHistory));
         verify_finite_stopping_continuation_report(&plan, &report).unwrap();
     }
 
