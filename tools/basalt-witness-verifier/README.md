@@ -28,11 +28,11 @@ From the repository root:
 
 ```sh
 cargo fmt --manifest-path tools/basalt-witness-verifier/Cargo.toml -- --check
-cargo test --manifest-path tools/basalt-witness-verifier/Cargo.toml
-cargo clippy --manifest-path tools/basalt-witness-verifier/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path tools/basalt-witness-verifier/Cargo.toml
+cargo clippy --locked --manifest-path tools/basalt-witness-verifier/Cargo.toml --all-targets -- -D warnings
 ```
 
-After the initial Cargo-generated lockfile is committed, all commands must run with `--locked`.
+The standalone Cargo lockfile is committed. All validation commands use `--locked`.
 
 CLI:
 
@@ -70,7 +70,7 @@ These are authored tests. They are not described as passing until the exact-head
 
 ## Claim ceiling / what is not verified
 
-A `pass` means only that a canonical payload was authenticated by the configured threshold of Ed25519 keys in the exact locally pinned trust store. It does **not** establish:
+A `pass` means only that a canonical payload was authenticated by the configured threshold of Ed25519 keys in the exact locally pinned trust-store bytes; the library verifier loads that trust store from the bytes itself, so callers cannot substitute a separately constructed key set. It does **not** establish:
 - that the trust-store pin was provisioned securely (the caller must supply that assurance);
 - that trust-root signatures, dual-threshold root rotation, revocation history or witness-set metadata chains are valid;
 - that the signers are independent in actual operations (the verifier checks only unique declared administrative-domain labels);
