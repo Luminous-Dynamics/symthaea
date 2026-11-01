@@ -162,10 +162,10 @@ pub fn select_budget_feasible_pareto(
     }
 
     for forecast in &ordered {
-        if !context
+        if context
             .admissible_operation_families
             .binary_search(&forecast.operation_family)
-            .is_ok()
+            .is_err()
         {
             return Err(BudgetedParetoError::UnknownForecast);
         }
