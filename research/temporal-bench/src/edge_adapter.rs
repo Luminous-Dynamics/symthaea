@@ -208,9 +208,9 @@ const T10_METRICS: &[TaskMetricDefinition] = &[
 ];
 
 const T1_BASELINES: &[BaselineFamily] = &[
-    BaselineFamily::ThresholdEma, BaselineFamily::StaticTinyMl, BaselineFamily::Tcn,
-    BaselineFamily::Gru, BaselineFamily::AdaptiveLif, BaselineFamily::HdcOnly,
-    BaselineFamily::CfcOnly, BaselineFamily::HdcLtc,
+    BaselineFamily::ThresholdEma, BaselineFamily::StaticTinyMl, BaselineFamily::AdaptiveTinyMl,
+    BaselineFamily::Tcn, BaselineFamily::Gru, BaselineFamily::AdaptiveLif,
+    BaselineFamily::HdcOnly, BaselineFamily::CfcOnly, BaselineFamily::HdcLtc,
 ];
 const T2_BASELINES: &[BaselineFamily] = &[
     BaselineFamily::Gru, BaselineFamily::Lstm, BaselineFamily::AssociativeMemory,
@@ -222,18 +222,19 @@ const T3_BASELINES: &[BaselineFamily] = &[
     BaselineFamily::HdcLtc,
 ];
 const T4_BASELINES: &[BaselineFamily] = &[
-    BaselineFamily::ThresholdEma, BaselineFamily::GruD, BaselineFamily::BrainTraceDRtrl,
+    BaselineFamily::ThresholdEma, BaselineFamily::AdaptiveTinyMl, BaselineFamily::Gru,
+    BaselineFamily::Lstm, BaselineFamily::GruD, BaselineFamily::BrainTraceDRtrl,
     BaselineFamily::BrainTracePpProp, BaselineFamily::EProp,
     BaselineFamily::HdcLtcConfidenceGated,
 ];
 const T5_BASELINES: &[BaselineFamily] = &[
-    BaselineFamily::GruD, BaselineFamily::OdeRnn, BaselineFamily::LatentOde,
-    BaselineFamily::CfcOnly, BaselineFamily::HdcLtc,
+    BaselineFamily::AdaptiveTinyMl, BaselineFamily::GruD, BaselineFamily::OdeRnn,
+    BaselineFamily::LatentOde, BaselineFamily::CfcOnly, BaselineFamily::HdcLtc,
 ];
 const T6_BASELINES: &[BaselineFamily] = &[
-    BaselineFamily::KeyValueOverwrite, BaselineFamily::RecencyDecay,
-    BaselineFamily::AssociativeMemory, BaselineFamily::HdcOnly,
-    BaselineFamily::BitemporalLedger, BaselineFamily::HdcLtc,
+    BaselineFamily::AdaptiveTinyMl, BaselineFamily::KeyValueOverwrite,
+    BaselineFamily::RecencyDecay, BaselineFamily::AssociativeMemory,
+    BaselineFamily::HdcOnly, BaselineFamily::BitemporalLedger, BaselineFamily::HdcLtc,
 ];
 const T7_BASELINES: &[BaselineFamily] = &[
     BaselineFamily::Gru, BaselineFamily::Lstm, BaselineFamily::Tcn,
