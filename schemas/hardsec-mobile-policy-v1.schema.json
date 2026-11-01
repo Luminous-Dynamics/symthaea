@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-mobile-policy-v1.schema.json",
+  "title": "HARDSEC mobile declarative security policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_id", "target", "controls"],
+  "properties": {
+    "schema_version": { "const": "hardsec-mobile-policy-v1" },
+    "policy_id": { "type": "string", "minLength": 1 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "product_family"],
+      "properties": {
+        "platform": { "enum": ["android", "ios"] },
+        "product_family": { "type": "string", "minLength": 1 }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "control_id",
+          "claim_path",
+          "desired_values",
+          "accepted_evidence_source_types",
+          "enforcement_layer",
+          "verification_action",
+          "on_unknown",
+          "on_unsupported"
+        ],
+        "properties": {
+          "control_id": { "type": "string", "minLength": 1 },
+          "claim_path": {
+            "enum": [
+              "boot_integrity.verified_boot_state",
+              "boot_integrity.attestation_security_level",
+              "boot_integrity.attestation_challenge_freshness",
+              "boot_integrity.certificate_chain_status",
+              "hardware_protections.memory_tagging.runtime_state",
+              "pmu_acquisition.observer_effect_status"
+            ]
+          },
+          "desired_values": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "accepted_evidence_source_types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "hardware_attestation_verified",
+                "privileged_device_tool",
+                "physical_lab_measurement"
+              ]
+            }
+          },
+          "enforcement_layer": { "type": "string", "minLength": 1 },
+          "verification_action": { "type": "string", "minLength": 1 },
+          "on_unknown": { "const": "abstain" },
+          "on_unsupported": { "const": "incompatible" }
+        }
+      }
+    }
+  }
+}
