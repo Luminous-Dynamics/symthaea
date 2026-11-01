@@ -7,6 +7,7 @@ const BET_DENOMINATOR: u128 = 2;
 const HORIZON: u32 = 12;
 const ALPHA_NUMERATOR: u128 = 1;
 const ALPHA_DENOMINATOR: u128 = 10;
+#[cfg(test)]
 const EXPECTED_CROSSING_NUMERATORS: [u128; 2] = [52_840_309_168, 55_866_239_952];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,7 +32,7 @@ fn gcd(mut a: u128, mut b: u128) -> u128 {
     a
 }
 
-fn pow_u128(mut base: u128, exponent: u32) -> u128 {
+fn pow_u128(base: u128, exponent: u32) -> u128 {
     let mut result = 1_u128;
     for _ in 0..exponent {
         result *= base;
