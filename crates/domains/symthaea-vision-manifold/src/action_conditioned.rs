@@ -391,6 +391,161 @@ impl ActionConditionedVisualResidualPredictor {
         Ok(receipts)
     }
 
+    /// Score a complete frozen action set against later real encoded visual
+    /// observations without changing predictor weights or training version.
+    ///
+    /// This is the qualification/evaluation path. Held-out evaluator outcomes
+    /// must use this read-only method, never score_action_set_and_learn.
+    pub fn score_action_set(
+        &mut self,
+        outcomes: &[ActionConditionedObservedOutcome],
+    ) -> Result<Vec<ActionConditionedForecastScore>, ActionConditionedPredictorError> {
+        if outcomes.len() < 2 {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+        let mut forecast_ids = Vec::with_capacity(outcomes.len());
+        let mut pending_records = Vec::with_capacity(outcomes.len());
+        for outcome in outcomes {
+            if forecast_ids.contains(&outcome.forecast_id) {
+                return Err(ActionConditionedPredictorError::ActionSetMismatch);
+            }
+            forecast_ids.push(outcome.forecast_id);
+            let pending = self.pending.get(&outcome.forecast_id)
+                .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
+            pending_records.push(pending.clone());
+        }
+
+        let first = &pending_records[0].receipt;
+        if first.action_set_size != outcomes.len() {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+        let mut action_ids = Vec::with_capacity(pending_records.len());
+        for pending in &pending_records {
+            let receipt = &pending.receipt;
+            if receipt.action_set_id != first.action_set_id
+                || receipt.action_set_size != first.action_set_size
+                || receipt.action_set_sha256 != first.action_set_sha256
+                || receipt.history_sha256 != first.history_sha256
+                || receipt.action_manifest_sha256 != first.action_manifest_sha256
+                || receipt.source_frame_sequence != first.source_frame_sequence
+                || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
+                || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+                || receipt.model_version != first.model_version
+            {
+                return Err(ActionConditionedPredictorError::ActionSetMismatch);
+            }
+            action_ids.push(receipt.action_id);
+        }
+        action_ids.sort_unstable();
+        if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ActionConditionedPredictorError::DuplicateActionId);
+        }
+        let mut descriptors: Vec<(u64, String)> = pending_records.iter()
+            .map(|pending| (
+                pending.receipt.action_id,
+                pending.receipt.action_descriptor_sha256.clone(),
+            ))
+            .collect();
+        descriptors.sort_unstable_by_key(|(action_id, _)| *action_id);
+        if hash_action_descriptors(&descriptors) != first.action_set_sha256 {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+
+        let mut all_late = false;
+        for (pending, outcome) in pending_records.iter().zip(outcomes) {
+            if outcome.actual_future_hv.len() != self.dim {
+                return Err(ActionConditionedPredictorError::InvalidVectorDimension);
+            }
+            if outcome.actual_future_hv.iter().any(|value| !value.is_finite()) {
+                return Err(ActionConditionedPredictorError::NonFiniteValue);
+            }
+            if outcome.observed_frame_sequence <= pending.receipt.source_frame_sequence {
+                return Err(ActionConditionedPredictorError::ObservationNotLater);
+            }
+            if !outcome.observation_delay_seconds.is_finite()
+                || outcome.observation_delay_seconds < 0.0
+            {
+                return Err(ActionConditionedPredictorError::NonFiniteValue);
+            }
+            if outcome.observation_delay_seconds < pending.receipt.horizon_seconds {
+                return Err(ActionConditionedPredictorError::ObservationBeforeTarget);
+            }
+            let lateness = outcome.observation_delay_seconds - pending.receipt.horizon_seconds;
+            all_late |= lateness > pending.receipt.horizon_seconds * self.max_lateness_factor;
+        }
+        if all_late {
+            for forecast_id in &forecast_ids {
+                self.pending.remove(forecast_id);
+            }
+            self.expired_forecasts = self.expired_forecasts
+                .saturating_add(forecast_ids.len() as u64);
+            return Err(ActionConditionedPredictorError::ForecastTooLate);
+        }
+
+        let mut scores = Vec::with_capacity(outcomes.len());
+        for (pending, outcome) in pending_records.iter().zip(outcomes) {
+            let actual = symthaea_core::hdc::ContinuousHV::from_vec(outcome.actual_future_hv.clone());
+            let predicted = symthaea_core::hdc::ContinuousHV::from_vec(
+                pending.receipt.predicted_future_hv.clone()
+            );
+            let base = symthaea_core::hdc::ContinuousHV::from_vec(
+                pending.autonomous_base_prediction.clone()
+            );
+            let prediction_error = 1.0 - actual.similarity(&predicted).clamp(-1.0, 1.0);
+            let autonomous_baseline_error = 1.0 - actual.similarity(&base).clamp(-1.0, 1.0);
+            let mut squared_error = 0.0f64;
+            for (actual_value, predicted_value) in outcome.actual_future_hv.iter()
+                .zip(&pending.receipt.predicted_future_hv)
+            {
+                let error = actual_value - predicted_value;
+                squared_error += f64::from(error) * f64::from(error);
+            }
+            let observed_future_hv_sha256 = hash_f32_vector(
+                b"vis005-observed-future-visual-hv-v1",
+                &outcome.actual_future_hv,
+            );
+            let mut score = ActionConditionedForecastScore {
+                schema_version: ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION,
+                forecast_id: pending.receipt.forecast_id,
+                history_sha256: pending.receipt.history_sha256.clone(),
+                action_manifest_sha256: pending.receipt.action_manifest_sha256.clone(),
+                action_descriptor_sha256: pending.receipt.action_descriptor_sha256.clone(),
+                model_checkpoint_sha256: pending.receipt.model_checkpoint_sha256.clone(),
+                forecast_sha256: pending.receipt.forecast_sha256.clone(),
+                observed_future_hv_sha256,
+                score_sha256: String::new(),
+                action_id: pending.receipt.action_id,
+                forecast_model_version: pending.receipt.model_version,
+                source_frame_sequence: pending.receipt.source_frame_sequence,
+                observed_frame_sequence: outcome.observed_frame_sequence,
+                observation_delay_seconds: outcome.observation_delay_seconds,
+                lateness_seconds: outcome.observation_delay_seconds - pending.receipt.horizon_seconds,
+                prediction_error,
+                autonomous_baseline_error,
+                improvement_over_autonomous_baseline: autonomous_baseline_error - prediction_error,
+                mean_squared_error: (squared_error / self.dim as f64) as f32,
+                model_version_before: self.training_steps,
+                model_version_after: self.training_steps,
+            };
+            score.score_sha256 = hash_forecast_score(&score);
+            if [
+                score.prediction_error,
+                score.autonomous_baseline_error,
+                score.improvement_over_autonomous_baseline,
+                score.mean_squared_error,
+            ].iter().any(|value| !value.is_finite())
+            {
+                return Err(ActionConditionedPredictorError::NonFiniteUpdate);
+            }
+            scores.push(score);
+        }
+
+        for forecast_id in &forecast_ids {
+            self.pending.remove(forecast_id);
+        }
+        Ok(scores)
+    }
+
     /// Score and learn from a complete action set after every branch has
     /// produced its later real visual observation. All forecasts must share
     /// the exact history, action manifest, source frame, horizon, checkpoint
@@ -562,8 +717,9 @@ impl ActionConditionedVisualResidualPredictor {
     }
 
     /// Score a previously sealed forecast against a later real encoded visual
-    /// observation, then apply one online update. Each forecast ID is consumed
-    /// at most once. An over-late target expires the forecast without training.
+    /// observation, then apply one online update. This is a supervised-training
+    /// path only; never use held-out qualification outcomes here. Each forecast
+    /// ID is consumed at most once. An over-late target expires without training.
     pub fn score_and_learn(
         &mut self,
         forecast_id: u64,
@@ -1024,6 +1180,51 @@ mod tests {
         assert_eq!(model.pending_forecast_count(), 0);
     }
 
+
+
+    #[test]
+    fn heldout_action_set_scoring_consumes_receipts_without_updating_the_predictor() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 1.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, -1.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 80, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let before = model.save_state();
+        let scores = model.score_action_set(&[
+            ActionConditionedObservedOutcome {
+                forecast_id: receipts[0].forecast_id,
+                actual_future_hv: vec![-0.5, -0.25],
+                observed_frame_sequence: 81,
+                observation_delay_seconds: 1.0,
+            },
+            ActionConditionedObservedOutcome {
+                forecast_id: receipts[1].forecast_id,
+                actual_future_hv: vec![0.5, 0.25],
+                observed_frame_sequence: 81,
+                observation_delay_seconds: 1.0,
+            },
+        ]).unwrap();
+        assert_eq!(scores.len(), 2);
+        assert!(scores.iter().all(|score| score.model_version_before == 0));
+        assert!(scores.iter().all(|score| score.model_version_after == 0));
+        assert!(scores.iter().all(|score| score.forecast_model_version == 0));
+        assert!(scores.iter().all(|score| score.score_sha256 == hash_forecast_score(score)));
+        let after = model.save_state();
+        assert_eq!(after.action_weights, before.action_weights);
+        assert_eq!(after.training_steps, before.training_steps);
+        assert!(after.pending.is_empty());
+    }
 
     #[test]
     fn action_set_scores_all_branches_at_one_version_then_updates_once() {
