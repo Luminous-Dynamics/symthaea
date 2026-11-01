@@ -1,0 +1,72 @@
+name: PITB Lean Structural Expression Wire V1
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-proof-insights/src/bin/verify_lean_expr_wire_v1.rs"
+      - "data/benchmarks/proof-insight-transfer-v0/lean-pilot/lean-expr-wire-v1.schema.json"
+      - "data/benchmarks/proof-insight-transfer-v0/lean-pilot/fixtures/lean-expr-wire-v1.synthetic.json"
+      - "docs/research/pitb-lean-expr-wire-v1-2026-11-01.md"
+      - ".github/workflows/pitb-lean-expr-wire-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schema-and-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned JSON Schema validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/pitb-expr-wire-venv"
+          "$RUNNER_TEMP/pitb-expr-wire-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate the strict recursive wire schema and synthetic fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-expr-wire-venv/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0/lean-pilot")
+          schema = json.loads((base / "lean-expr-wire-v1.schema.json").read_text())
+          fixture = json.loads((base / "fixtures/lean-expr-wire-v1.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          validator.validate(fixture)
+          if fixture["evidence_class"] != "synthetic_contract_fixture":
+              raise SystemExit("checked-in example must remain explicitly synthetic")
+
+          def reject(label, document):
+              try:
+                  validator.validate(document)
+              except ValidationError:
+                  print(f"PITB_LEAN_EXPR_WIRE_SCHEMA_NEGATIVE_PASS: {label}")
+                  return
+              raise SystemExit(f"schema accepted invalid fixture: {label}")
+
+          bad = copy.deepcopy(fixture)
+          bad["target"] = {"tag":"mvar", "id":"?m.1"}
+          reject("expression metavariable", bad)
+          bad = copy.deepcopy(fixture)
+          bad["target"] = {"tag":"sort", "level":{"tag":"mvar", "id":"?u.1"}}
+          reject("universe metavariable", bad)
+          bad = copy.deepcopy(fixture)
+          bad["environment"]["clean_checkout"] = False
+          reject("dirty checkout", bad)
+          bad = copy.deepcopy(fixture)
+          bad["target"]["unreviewed"] = True
+          reject("unknown expression field", bad)
+          print("PITB_LEAN_EXPR_WIRE_SCHEMA_PASS: synthetic shape only; no Lean capture or kernel proof")
+          PY
