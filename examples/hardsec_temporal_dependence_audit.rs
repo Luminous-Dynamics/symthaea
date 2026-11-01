@@ -307,7 +307,7 @@ fn parse_model(value: &Value) -> Result<Model, String> {
         return Err("only higher_is_more_anomalous score direction is supported".to_owned());
     }
     let alpha = f64_field(value, "target_miscoverage_alpha", "model")?;
-    if !(0.0..1.0).contains(&alpha) {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
         return Err("target_miscoverage_alpha must be in (0,1)".to_owned());
     }
     for key in ["predictor_fixed_status", "score_marginal_continuity_status"] {
