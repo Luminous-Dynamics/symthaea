@@ -26,6 +26,7 @@ from typing import Any
 PINNED_PYPHI_VERSION = "2.0.0rc4"
 EXPECTED_EXAMPLE = "pyphi.examples.iit4_2023_fig1a_substrate()"
 EXPECTED_FORMALISM = "IIT_4_0_2023"
+EXPECTED_PYPHI_WHEEL_SHA256 = "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
 EXPECTED_STATE = (0, 1, 1)
 # Canonical binary TPM captured from the executed PyPhi 2.0.0rc4 Fig. 1A
 # reference run. PyPhi's weight->TPM builder is independently checked against
@@ -309,6 +310,7 @@ def run(output_path: Path) -> dict[str, Any]:
         "provenance": {
             "distribution": "pyphi",
             "version": installed_version,
+            "pyphi_wheel_sha256": EXPECTED_PYPHI_WHEEL_SHA256,
             "python_version": platform.python_version(),
             "formalism": formalism,
             "upstream_example": reference["api_example"],
