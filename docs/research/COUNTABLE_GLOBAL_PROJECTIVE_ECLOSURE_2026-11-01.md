@@ -152,6 +152,15 @@ Two transparent ex-ante choices have exact total mass one:
 
 The coordinate-to-index mapping and weight scheme must be registered before observing evidence. Do not renormalize weights over the currently active set: doing so changes the projective merger and can rewrite earlier certificates.
 
+### The symmetry limit is structural, not an implementation bug
+
+The dynamic e-closure paper's cross-horizon rigidity result shows that, within its pointwise arbitrary-dependence merger class, global summability is unavoidable. Its Corollary 4.13 further shows that a symmetric nontrivial merger over a countably infinite open-ended universe is impossible: symmetry forces equal coordinate weights, and summability then forces every weight to zero.
+
+Therefore geometric and telescoping weights are not merely interchangeable engineering settings. Every useful countable projective design in this class must encode a pre-data priority, group structure, or other asymmetry. This can be an explicit registry order, a domain hierarchy, or a fixed group-weight × within-group-weight scheme. The benchmark must report how much weight lands on hypotheses by arrival rank and group, and measure sensitivity to reasonable pre-registered relabelings.
+
+The route beyond this limitation is not to secretly renormalize or select weights after observing evidence. It is to leave at least one assumption of the rigidity theorem: exploit verified conditional dependence, use direct intersection betting, or build history-dependent mergers with their own filtration-validity proof. The paper identifies these as future research directions; they are the highest-upside theory track after the current affine arrival extension.
+
+
 The finite oracle implements both schemes with exact rational arithmetic and verifies dormant-one equality between the active true-null certificate and the finite fixture's full true-null certificate.
 
 ## 6. Implementation and trust boundary
@@ -187,4 +196,4 @@ Compare at matched guarantees against #9538/#9539 coherent dynamic e-closure, #9
 
 Report stopped-FDR and SupFDR separately; power, true actionable discoveries, false investigations, precision@B, recall@B, utility regret, coordinate-weight sensitivity by arrival rank, cumulative capacity use, p50/p95 decision and verifier latency, peak memory, and local constraint counts. The global-projective method should also report what fraction of total coordinate budget lands on eventually active hypotheses. Do not compare ordinary FDR to SupFDR. Simulation is a diagnostic, not a proof of stochastic validity.
 
-The target is not merely to beat a baseline on p-value thresholds. The engineering goal is a system where every action can be independently replayed from an immutable event ledger, while the statistical guarantee remains valid under predictable arrivals and arbitrary cross-coordinate dependence.
+The target is not merely to beat a baseline on p-value thresholds. The engineering goal is a system where every action can be independently replayed from an immutable event ledger, while the statistical guarantee remains valid under predictable arrivals and arbitrary cross-coordinate dependence. The next theory frontier is a verified history-dependent or direct-intersection betting construction that can recover power without violating the global budget or the symmetry impossibility.
