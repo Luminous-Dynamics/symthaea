@@ -927,6 +927,19 @@ pub fn audit_search_time_findings(
         .iter()
         .map(|event| (event.sequence, event))
         .collect();
+    let expected_body_events: BTreeSet<u64> = trace.events.iter()
+        .filter(|event| {
+            event.disposition == SearchEventDispositionV1::Allowed && event.response_bytes > 0
+        })
+        .map(|event| event.sequence)
+        .collect();
+    let declared_unavailable: BTreeSet<u64> =
+        findings.unavailable_body_event_sequences.iter().copied().collect();
+    if declared_unavailable.len() != findings.unavailable_body_event_sequences.len()
+        || declared_unavailable.iter().any(|sequence| !expected_body_events.contains(sequence))
+    {
+        return Err("unavailable body event sequences must be unique response-bearing allowed events".to_owned());
+    }
     let mut seen = BTreeSet::new();
     let mut metadata = 0_u64;
     let mut context = 0_u64;
@@ -954,6 +967,9 @@ pub fn audit_search_time_findings(
             ));
         }
         validate_digest(&finding.evidence_sha256, "finding.evidence_sha256")?;
+        if event.response_sha256.as_deref() != Some(finding.evidence_sha256.as_str()) {
+            return Err("finding evidence digest does not match its event response digest".to_owned());
+        }
         if matches!(
             finding.exposure_class,
             SearchExposureClassV1::ContextBearing | SearchExposureClassV1::AnswerBearing
@@ -989,6 +1005,24 @@ pub fn audit_search_time_findings(
             SearchExposureClassV1::Unknown => unknown += 1,
         }
     }
+    if findings.response_body_event_count != u64::try_from(expected_body_events.len()).map_err(|_| "response body event count exceeds u64")?
+        || findings.response_body_evidence_count != u64::try_from(findings.findings.len()).map_err(|_| "body evidence count exceeds u64")?
+    {
+        return Err("findings response-body coverage counts do not match trace".to_owned());
+    }
+    let covered: BTreeSet<u64> = seen.union(&declared_unavailable).copied().collect();
+    if !seen.is_disjoint(&declared_unavailable) || covered != expected_body_events {
+        return Err("every response-bearing event must have retained evidence or be explicitly unavailable".to_owned());
+    }
+    let response_body_event_count = findings.response_body_event_count;
+    let response_body_evidence_count = findings.response_body_evidence_count;
+    let unavailable_body_event_count = u64::try_from(declared_unavailable.len())
+        .map_err(|_| "unavailable body count exceeds u64")?;
+    let body_evidence_coverage_permille = if response_body_event_count == 0 {
+        None
+    } else {
+        Some(((response_body_evidence_count * 1_000) / response_body_event_count) as u16)
+    };
     Ok(SearchTimeExposureFindingsAuditV1 {
         schema: SEARCH_FINDINGS_AUDIT_SCHEMA.to_owned(),
         valid: digest_matches,
@@ -1000,8 +1034,12 @@ pub fn audit_search_time_findings(
         answer_bearing_count: answer,
         unknown_count: unknown,
         matched_item_reference_count: matched_items,
+        response_body_event_count,
+        response_body_evidence_count,
+        unavailable_body_event_count,
+        body_evidence_coverage_permille,
         findings_sha256: findings.findings_sha256.clone(),
-        claim_boundary: "validates_evaluator_supplied_classification_record_bindings_only;does_not_perform_semantic_retrieval_matching_or_prove_score_influence".to_owned(),
+        claim_boundary: "response_body_coverage_and_evaluator_supplied_classification_bindings_checked;semantic_retrieval_matching_and_causal_score_influence_not_established".to_owned(),
         issues: Vec::new(),
     })
 }
@@ -1096,11 +1134,14 @@ mod tests {
             schema: SEARCH_FINDINGS_SCHEMA.to_owned(),
             run_id: trace.run_id.clone(),
             trace_root_sha256: trace.trace_root_sha256.clone(),
+            response_body_event_count: 1,
+            response_body_evidence_count: 1,
+            unavailable_body_event_sequences: Vec::new(),
             findings: vec![SearchExposureFindingV1 {
                 event_sequence: 1,
                 exposure_class: SearchExposureClassV1::MetadataOnly,
                 matched_item_ids: vec!["item-001".to_owned()],
-                evidence_sha256: digest("matching-evidence"),
+                evidence_sha256: trace.events[0].response_sha256.clone().unwrap(),
                 method: SearchFindingMethodV1::ExactMatch,
                 confidence_permille: 1_000,
             }],
