@@ -46,6 +46,8 @@ struct Environment {
     lean_binary_sha256: String,
     lean_runtime_manifest_sha256: String,
     imported_olean_manifest_sha256: String,
+    lean_runtime_artifacts: Vec<RuntimeArtifact>,
+    imported_olean_artifacts: Vec<ImportedOleanArtifact>,
     task_id: String,
     source_repository: String,
     source_path: String,
@@ -58,6 +60,22 @@ struct Environment {
     context_exporter_source_sha256: String,
     clean_checkout: bool,
     serializer_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RuntimeArtifact {
+    path: String,
+    kind: String,
+    sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportedOleanArtifact {
+    module_name: String,
+    path: String,
+    sha256: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -678,6 +696,91 @@ fn validate_relative_source_path(value: &str) -> Result<()> {
     Ok(())
 }
 
+fn compute_runtime_manifest_digest(rows: &[RuntimeArtifact]) -> String {
+    sha256_domain(b"RUNTIME-MANIFEST\0", |encoder| {
+        encoder.u64(rows.len() as u64);
+        for row in rows {
+            encoder.string(&row.path);
+            encoder.string(&row.kind);
+            encoder.string(&row.sha256);
+        }
+    })
+}
+
+fn compute_imported_olean_manifest_digest(rows: &[ImportedOleanArtifact]) -> String {
+    sha256_domain(b"IMPORTED-OLEAN-MANIFEST\0", |encoder| {
+        encoder.u64(rows.len() as u64);
+        for row in rows {
+            encoder.string(&row.module_name);
+            encoder.string(&row.path);
+            encoder.string(&row.sha256);
+        }
+    })
+}
+
+fn validate_artifact_manifests(environment: &Environment) -> Result<()> {
+    if environment.lean_runtime_artifacts.is_empty()
+        || environment.imported_olean_artifacts.is_empty()
+    {
+        bail!("runtime and imported OLean artifact manifests must be nonempty");
+    }
+    let mut previous_runtime_path: Option<&str> = None;
+    let mut executable_count = 0usize;
+    for row in &environment.lean_runtime_artifacts {
+        validate_relative_source_path(&row.path)?;
+        validate_digest(&row.sha256, "runtime artifact SHA-256")?;
+        if previous_runtime_path.is_some_and(|previous| previous >= row.path.as_str()) {
+            bail!("runtime artifact paths must be unique and strictly sorted");
+        }
+        previous_runtime_path = Some(&row.path);
+        match row.kind.as_str() {
+            "lean_executable" => {
+                executable_count += 1;
+                if row.sha256 != environment.lean_binary_sha256 {
+                    bail!("runtime manifest executable hash differs from lean_binary_sha256");
+                }
+            }
+            "shared_library" => {}
+            _ => bail!("unknown runtime artifact kind: {}", row.kind),
+        }
+    }
+    if executable_count != 1 {
+        bail!("runtime manifest must contain exactly one Lean executable");
+    }
+    let runtime_digest = compute_runtime_manifest_digest(&environment.lean_runtime_artifacts);
+    if runtime_digest != environment.lean_runtime_manifest_sha256 {
+        bail!("Lean runtime manifest digest does not match its artifact rows");
+    }
+
+    let mut previous_pair: Option<(&str, &str)> = None;
+    let mut modules = BTreeSet::new();
+    let mut paths = BTreeSet::new();
+    for row in &environment.imported_olean_artifacts {
+        if row.module_name.trim().is_empty() {
+            bail!("imported OLean module name cannot be empty");
+        }
+        validate_relative_source_path(&row.path)?;
+        if !row.path.ends_with(".olean") {
+            bail!("imported artifact path must end in .olean");
+        }
+        validate_digest(&row.sha256, "imported OLean SHA-256")?;
+        let pair = (row.module_name.as_str(), row.path.as_str());
+        if previous_pair.is_some_and(|previous| previous >= pair) {
+            bail!("imported OLean artifacts must be strictly sorted by module and path");
+        }
+        previous_pair = Some(pair);
+        if !modules.insert(row.module_name.as_str()) || !paths.insert(row.path.as_str()) {
+            bail!("imported OLean module names and artifact paths must be unique");
+        }
+    }
+    let imported_digest =
+        compute_imported_olean_manifest_digest(&environment.imported_olean_artifacts);
+    if imported_digest != environment.imported_olean_manifest_sha256 {
+        bail!("imported OLean manifest digest does not match its artifact rows");
+    }
+    Ok(())
+}
+
 fn validate_evidence(evidence: &Evidence) -> Result<DigestsComputed> {
     if evidence.schema_version != SCHEMA_VERSION {
         bail!("unsupported schema version");
@@ -743,6 +846,7 @@ fn validate_evidence(evidence: &Evidence) -> Result<DigestsComputed> {
         bail!("source_repository cannot be empty");
     }
     validate_relative_source_path(&environment.source_path)?;
+    validate_artifact_manifests(environment)?;
 
     let declarations = &evidence.local_context.declarations;
     if declarations.len() > MAX_CONTEXT_DECLARATIONS {
@@ -964,6 +1068,21 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["environment"]["imported_olean_manifest_sha256"] =
         Value::String("c".repeat(64));
     reject_value("imported OLean closure drift changes identity", bad)?;
+    let mut bad = fixture.clone();
+    bad["environment"]["lean_runtime_artifacts"][1]["sha256"] =
+        Value::String("c".repeat(64));
+    reject_value("runtime artifact bytes differ from manifest digest", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["environment"]["imported_olean_artifacts"][1]["sha256"] =
+        Value::String("c".repeat(64));
+    reject_value("imported OLean bytes differ from manifest digest", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["environment"]["imported_olean_artifacts"][1]["path"] =
+        Value::String("../outside.olean".into());
+    reject_value("imported OLean path traversal", bad)?;
+
 
     let mut bad = fixture.clone();
     bad["environment"]["source_path"] = Value::String("../outside/Target.lean".into());
