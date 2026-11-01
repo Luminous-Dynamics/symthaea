@@ -359,7 +359,12 @@ fn build_primal_plan(
     if base_cost > radius + radius_tolerance {
         return Err(WassersteinDecisionError::new("transport.base_cost", "minimum-cost dual maximizers exceed radius"));
     }
-    alternatives.sort_by(|a,b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)).then_with(|| a.2.cmp(&b.2)));
+    // At a positive optimal multiplier, dual-tied destinations have equal
+    // reduced reward. To attain any required transport budget while respecting
+    // each source row's mass cap, shift toward the largest-cost tied destination
+    // first. Filling a cheaper alternative first can exhaust that row's mass and
+    // leave the primal plan below the complementary-slackness transport budget.
+    alternatives.sort_by(|a,b| b.0.total_cmp(&a.0).then_with(|| a.1.cmp(&b.1)).then_with(|| a.2.cmp(&b.2)));
     let mut extra = if lambda > 1e-12 { (radius-base_cost).max(0.0) } else { 0.0 };
     let mut shifted = vec![0.0_f64; n];
     for (increment, source, target) in alternatives {
@@ -515,6 +520,26 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn tied_destinations_fill_transport_budget_using_highest_cost_option() {
+        let nominal = [1.0_f64, 0.0, 0.0];
+        let losses = [0.0_f64, 5.0, 10.0];
+        let costs = vec![
+            vec![0.0, 1.0, 2.0],
+            vec![1.0, 0.0, 1.0],
+            vec![2.0, 1.0, 0.0],
+        ];
+        let ids = vec!["world-a".into(), "world-b".into(), "world-c".into()];
+        let solution = solve_finite_transport(&nominal, &losses, &costs, 1.5, &ids).unwrap();
+        assert!((solution.dual_multiplier.unwrap() - 5.0).abs() < 1e-12);
+        assert!((solution.distribution[0] - 0.25).abs() < 1e-9);
+        assert!(solution.distribution[1].abs() < 1e-9);
+        assert!((solution.distribution[2] - 0.75).abs() < 1e-9);
+        assert!((solution.transport_cost - 1.5).abs() < 1e-9);
+        assert!((compensated_dot(&solution.distribution, &losses) - 7.5).abs() < 1e-8);
+        assert!((solution.dual_upper_bound - 7.5).abs() < 1e-8);
     }
 
     #[test]
