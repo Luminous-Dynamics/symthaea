@@ -176,3 +176,14 @@ Never report only a normalized aggregate or average across datasets. Include wor
 8. Measure end-to-end resources and publish per-dataset raw results.
 
 No external model has been reproduced and no benchmark score is claimed by this plan.
+
+
+## 9. Bitemporal source history
+
+The candidate event adapter now includes a microsecond append-only event
+revision ledger. It distinguishes event/valid time from transaction/knowledge
+time and supports assertion, supersession and retraction without overwriting
+prior history. This supplements the existing day-granularity Broca bitemporal
+ledger and its alternative-proof runtime (PRs #9109 and #9292); it does not
+replace or yet compose with them. This distinction is important for irregular
+datasets where corrections and late arrivals may occur within the same day.
