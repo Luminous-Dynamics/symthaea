@@ -192,6 +192,48 @@ This crossover distinguishes a storage bottleneck from a plasticity bottleneck.
 A policy that only wins when memory is scarce has not established a general
 continual-learning advantage.
 
+## 8.2 Exact higher-order interaction decomposition
+
+The evaluator-only `interaction_decomposition.rs` module computes exact
+Möbius (Harsanyi-dividend) terms for every non-empty subset in the complete
+binary action lattice. It goes beyond the pairwise difference-in-differences
+reported by `interaction.rs`.
+
+For each exposure axis, let the measured benefit of subset S be:
+
+`v(S) = E(empty) - E(S)`
+
+The pure interaction contribution for action set T is:
+
+`d(T) = sum_{S subseteq T} (-1)^(|T|-|S|) * v(S)`
+
+A singleton is a main effect; order two is pairwise interaction; orders three
+and above isolate effects not explained by lower-order combinations. Positive
+coefficients indicate additional temporal exposure reduction, while negative
+coefficients indicate antagonism.
+
+The evaluator reports one exact signed integer coefficient per exposure axis
+and action subset. It emits a coefficient only when every required sub-subset
+is compatible and within the same episode's measured hard resource budget.
+Conflict-group and over-budget exclusions are counted separately. It does not
+impute unavailable counterfactuals as zero.
+
+This is a finite-lattice decomposition for one committed episode, not a
+Shapley-value allocation, population-level causal estimate or universal
+synergy claim. A causal interpretation still requires valid randomized or
+otherwise justified matched interventions. Stochastic systems need independent
+paired replicates and uncertainty estimates across held-out episodes; one
+deterministic table only characterizes its declared context. The maximum 16
+factors bound the exact lattice to 65,536 measured alternatives. A subset
+Möbius transform plus subset-count transforms computes all coefficients and
+exclusion counts in O(n * 2^n). Benchmark the evaluator runtime at the 16-factor
+ceiling and use a preregistered factorial/covering design for larger problems
+rather than silently extending the exact claim.
+
+Nine additional source-level tests cover additive controls, isolated
+three-way and four-way synergy, antagonistic higher-order effects,
+incompatible/over-budget exclusions, digest mismatch and enumeration errors.
+
 ## 9. Metrics
 
 ### Outcome (non-compensatory)
@@ -303,7 +345,9 @@ do not lower them after seeing results.
 
 Candidate controller: 12 Rust test functions authored.  
 Evaluator exact subset oracle: 15 Rust test functions authored.  
-Evaluator interaction attribution: 6 Rust test functions authored.  
+Evaluator pairwise interaction attribution: 6 Rust test functions authored.  
+Evaluator higher-order interaction decomposition: 9 Rust test functions authored.  
+**Total: 42 source-authored test functions across the joint controller, exact subset oracle and interaction modules; none have run.**  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
 The controller and oracle are research prototypes, not production schedulers.
