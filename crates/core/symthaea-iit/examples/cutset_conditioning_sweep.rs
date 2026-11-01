@@ -276,7 +276,7 @@ fn run() -> Result<(), String> {
             cutset_reused_median as f64 / baseline_median as f64
         };
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{:.4},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{:.4},true,{}",
             side,
             variables,
             factors.len(),
@@ -297,7 +297,6 @@ fn run() -> Result<(), String> {
             cutset_reused_median,
             replanned_ratio,
             reused_ratio,
-            true,
             cutset_report.peak_factor_entries <= cutset_factor_entry_budget,
         );
     }
