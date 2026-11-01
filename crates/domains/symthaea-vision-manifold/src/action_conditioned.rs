@@ -27,6 +27,8 @@ pub struct ActionConditionedForecastReceipt {
     /// Number of supervised updates completed before this forecast was issued.
     pub model_version: u64,
     /// Predicted future visual-manifold state; still a prediction, never an observation.
+    pub autonomous_base_prediction_sha256: String,
+    pub action_embedding_sha256: String,
     pub predicted_future_hv: Vec<f32>,
     pub predicted_future_hv_sha256: String,
     pub forecast_sha256: String,
@@ -211,6 +213,14 @@ impl ActionConditionedVisualResidualPredictor {
             action_id,
             horizon_seconds,
             model_version: self.training_steps,
+            autonomous_base_prediction_sha256: hash_f32_vector(
+                b"vis005-autonomous-base-visual-hv-v1",
+                autonomous_base_prediction,
+            ),
+            action_embedding_sha256: hash_f32_vector(
+                b"vis005-action-embedding-v1",
+                action_embedding,
+            ),
             predicted_future_hv,
             predicted_future_hv_sha256,
             forecast_sha256: String::new(),
@@ -315,6 +325,14 @@ impl ActionConditionedVisualResidualPredictor {
                 action_id: candidate.action_id,
                 horizon_seconds,
                 model_version,
+                autonomous_base_prediction_sha256: hash_f32_vector(
+                    b"vis005-autonomous-base-visual-hv-v1",
+                    autonomous_base_prediction,
+                ),
+                action_embedding_sha256: hash_f32_vector(
+                    b"vis005-action-embedding-v1",
+                    &candidate.action_embedding,
+                ),
                 predicted_future_hv,
                 predicted_future_hv_sha256,
                 forecast_sha256: String::new(),
@@ -488,8 +506,18 @@ impl ActionConditionedVisualResidualPredictor {
                 || receipt.forecast_id >= state.next_forecast_id
                 || receipt.model_version > state.training_steps
                 || !is_lower_hex_sha256(&receipt.model_checkpoint_sha256)
+                || !is_lower_hex_sha256(&receipt.autonomous_base_prediction_sha256)
+                || !is_lower_hex_sha256(&receipt.action_embedding_sha256)
                 || !is_lower_hex_sha256(&receipt.predicted_future_hv_sha256)
                 || !is_lower_hex_sha256(&receipt.forecast_sha256)
+                || hash_f32_vector(
+                    b"vis005-autonomous-base-visual-hv-v1",
+                    &forecast.autonomous_base_prediction,
+                ) != receipt.autonomous_base_prediction_sha256
+                || hash_f32_vector(
+                    b"vis005-action-embedding-v1",
+                    &forecast.action_embedding,
+                ) != receipt.action_embedding_sha256
                 || hash_f32_vector(
                     b"vis005-action-conditioned-prediction-v1",
                     &receipt.predicted_future_hv,
@@ -559,6 +587,8 @@ fn hash_forecast_receipt(receipt: &ActionConditionedForecastReceipt) -> String {
     hasher.update(receipt.action_id.to_le_bytes());
     hasher.update(receipt.horizon_seconds.to_bits().to_le_bytes());
     hasher.update(receipt.model_version.to_le_bytes());
+    hash_text(&mut hasher, &receipt.autonomous_base_prediction_sha256);
+    hash_text(&mut hasher, &receipt.action_embedding_sha256);
     hash_text(&mut hasher, &receipt.predicted_future_hv_sha256);
     format!("{:x}", hasher.finalize())
 }
@@ -770,7 +800,7 @@ mod tests {
             &digest('a'), 0, &digest('b'), &digest('c'), &digest('e'), 1, 1.0, &[0.0, 0.0], &[1.0, 1.0]
         ).unwrap();
         let mut state = model.save_state();
-        state.pending[0].receipt.predicted_future_hv[0] = f32::NAN;
+        state.pending[0].action_embedding[0] += 0.25;
         assert_eq!(
             model.load_state(&state),
             Err(ActionConditionedPredictorError::InvalidCheckpointState)
