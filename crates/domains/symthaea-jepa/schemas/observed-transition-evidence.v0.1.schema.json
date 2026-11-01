@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/symthaea-jepa-observed-transition-evidence-v0.1.json",
   "title": "JEPA observation-grounded transition evidence",
-  "description": "Evidence contract for training a one-step JEPA action predictor against a later observed embedding. The Rust API recomputes embedding digests; raw observation, history and action-manifest digests must be authenticated by the upstream adapter.",
+  "description": "Versioned evidence contract for training one-step JEPA against a later observed embedding, bound to an episode/branch/forecast and requested target time. The Rust API recomputes embedding digests; raw observation, history and action-manifest digests must be authenticated by the upstream adapter.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,6 +13,9 @@
     "target_observation_sha256",
     "target_embedding_sha256",
     "action_manifest_sha256",
+    "episode_id",
+    "branch_id",
+    "forecast_id",
     "source_observation_id",
     "target_observation_id",
     "source_sequence",
@@ -20,9 +23,12 @@
     "action_id",
     "action_index",
     "source_observed_at_seconds",
+    "forecast_issued_at_seconds",
     "action_started_at_seconds",
     "action_ended_at_seconds",
-    "target_observed_at_seconds"
+    "requested_target_time_seconds",
+    "target_observed_at_seconds",
+    "max_target_lateness_seconds"
   ],
   "properties": {
     "schema_version": {
@@ -92,14 +98,41 @@
     },
     "target_observed_at_seconds": {
       "type": "number"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "forecast_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "forecast_issued_at_seconds": {
+      "type": "number"
+    },
+    "requested_target_time_seconds": {
+      "type": "number"
+    },
+    "max_target_lateness_seconds": {
+      "type": "number",
+      "minimum": 0
     }
   },
   "x-rust-invariants": [
     "source_sequence < target_sequence",
-    "source_observed_at_seconds <= action_started_at_seconds <= action_ended_at_seconds < target_observed_at_seconds",
-    "all timestamps must be finite",
+    "source_observed_at_seconds <= forecast_issued_at_seconds <= action_started_at_seconds",
+    "action_ended_at_seconds >= action_started_at_seconds",
+    "requested_target_time_seconds >= action_started_at_seconds",
+    "target_observed_at_seconds >= requested_target_time_seconds",
+    "target_observed_at_seconds - requested_target_time_seconds <= max_target_lateness_seconds",
+    "all timestamps and maximum lateness must be finite",
+    "episode_id, branch_id, forecast_id and observation IDs must be non-empty; source and target observation IDs must differ",
     "the action index must exist in the configured discrete action space",
     "source_embedding_sha256 and target_embedding_sha256 are recomputed from the exact supplied ContinuousHV values and must match",
-    "both embeddings must have the configured input dimension and finite f32 values"
+    "both embeddings must have configured input dimension and finite f32 values"
   ]
 }
