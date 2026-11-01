@@ -83,9 +83,9 @@ pub struct SelectedProofUpperBound {
     pub selected_operation_family: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SelectedProofEnvelope {
-    Bounded(SelectedProofUpperBound),
+    Bounded(Box<SelectedProofUpperBound>),
     Unbounded {
         target_coverage: f64,
         calibration_count: usize,
@@ -299,7 +299,7 @@ impl SelectionConditionedConformalCalibrator {
                     prediction.uncertainty_scale,
                     threshold,
                 )?;
-                Ok(SelectedProofEnvelope::Bounded(SelectedProofUpperBound {
+                Ok(SelectedProofEnvelope::Bounded(Box::new(SelectedProofUpperBound {
                     upper,
                     target_coverage: self.target_coverage,
                     calibration_count: self.calibration_count,
@@ -310,7 +310,7 @@ impl SelectionConditionedConformalCalibrator {
                     calibration_digest: self.calibration_digest,
                     frontier_digest: selection.frontier_digest,
                     selected_operation_family: self.selected_operation_family,
-                }))
+                })))
             }
         }
     }
