@@ -108,3 +108,10 @@ All are proposed targets, not achieved results.
 ### LeanLean repository compression track (2026-11-01)
 
 Added a separate LeanLean evaluation design and per-repository outcome receipt. The benchmark is 64 real Lean repositories, 12 hours each, with a paper Opus 5 compression reference of 48.3%. PITB's new cohort contract pins the dataset identifier, per-repository source commit, token-size band, comparator bundle, protected-declaration manifest, exact candidate/build/comparator receipts and resource budget. The 620 protected declarations are a **cohort total**, not a per-repository count. The design and contract are under `docs/research/pitb-leanlean-evaluation-2026-11-01.md` and `data/benchmarks/proof-insight-transfer-v0/leanlean-track/`. No LeanLean tasks have been downloaded or scored by PITB.
+
+
+### Adaptive proof-search allocation track (2026-11-01)
+
+Added the deterministic Rust controller `allocate_proof_search_budget.rs`, the decision schema and a synthetic fixture. The controller computes a 1.96-SE lower confidence bound on incremental verified-success probability, enforces all remaining resource caps, ranks feasible actions by LCB per shadow-priced fraction of remaining budget, and stops when no action clears the registered threshold. Its action space includes continue, retrieve, redecompose, typed repair, tactic probe, R5 snapshot branch, semantic check and restart.
+
+The focused SorryDB workflow now validates the controller schema/fixture and runs the Rust self-test in the isolated PITB crate. This remains unexecuted until workflow evidence appears. External comparison: the 2026 action-routing paper reports 25.8% cost savings over fixed-step on a PutnamBench subset; a separate simulation reports 7.9% cost-quality AUC gain and 28.9% lower budget to matched accuracy. PITB's proposed targets are ≥30% lower cost per verified success and ≥10% AUC gain at non-inferior success, under matched budgets. No adaptive-routing performance has yet been measured.
