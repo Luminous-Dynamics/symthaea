@@ -33,7 +33,7 @@ impl HarthLabelProfile {
 
     /// Map one parsed raw label to a stable target class ID.
     ///
-    /// NativeTwelve returns the original numeric ID, including 130 and 140.
+    /// NativeTwelve returns contiguous class IDs 1..=12 in the declared raw-code order.
     /// PaperMergedNineV1 uses the original paper's reported label aggregation:
     /// 3/6/140 -> Standing and 7/130 -> Sitting.
     pub fn target_class_id(self, raw: HarthActivity) -> u8 {
