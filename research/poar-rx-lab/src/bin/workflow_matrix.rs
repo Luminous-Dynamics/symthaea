@@ -1,4 +1,4 @@
-use poar_rx_lab::workflow::{run_workflow, WorkflowFault, WorkflowPolicy};
+use poar_rx_lab::workflow::{WorkflowFault, WorkflowPolicy, run_workflow};
 
 fn main() {
     println!(
