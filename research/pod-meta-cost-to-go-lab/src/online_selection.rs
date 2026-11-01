@@ -49,7 +49,7 @@ pub enum OnlineCompetingTerminal {
 pub enum OnlineFeedbackDisposition {
     ActionOutcomeUnknown { action_id_digest: [u8; 32] },
     ExactVerifiedCost {
-        observed_cost: u128,
+        observed_remaining_to_verified_proof: ResourceVector,
         meter_receipt_digest: [u8; 32],
         completion_verifier_digest: [u8; 32],
     },
@@ -59,7 +59,7 @@ pub enum OnlineFeedbackDisposition {
         evaluator_receipt_digest: [u8; 32],
     },
     RightCensored {
-        observed_lower_bound: u128,
+        observed_resource_lower_bound: ResourceVector,
         meter_receipt_digest: [u8; 32],
     },
     CompetingTerminal {
@@ -295,7 +295,11 @@ impl OnlineSelectionLedger {
                 OnlineFeedbackDisposition::ActionOutcomeUnknown { .. } => {
                     report.action_outcome_unknown += 1;
                 }
-                OnlineFeedbackDisposition::ExactVerifiedCost { observed_cost, .. } => {
+                OnlineFeedbackDisposition::ExactVerifiedCost {
+                    observed_remaining_to_verified_proof,
+                    ..
+                } => {
+                    let observed_cost = statement.dimension.value(observed_remaining_to_verified_proof);
                     record_coverage(
                         &mut report,
                         observed_cost >= statement.lower_bound
@@ -306,9 +310,10 @@ impl OnlineSelectionLedger {
                     record_coverage(&mut report, covered);
                 }
                 OnlineFeedbackDisposition::RightCensored {
-                    observed_lower_bound,
+                    observed_resource_lower_bound,
                     ..
                 } => {
+                    let observed_lower_bound = statement.dimension.value(observed_resource_lower_bound);
                     if observed_lower_bound > statement.upper_bound {
                         record_coverage(&mut report, false);
                     } else {
@@ -427,7 +432,7 @@ mod tests {
 
     fn exact(value: u128) -> OnlineFeedbackDisposition {
         OnlineFeedbackDisposition::ExactVerifiedCost {
-            observed_cost: value,
+            observed_remaining_to_verified_proof: ResourceVector::new(value, 0, 0, 0, 0, 0),
             meter_receipt_digest: [6; 32],
             completion_verifier_digest: [7; 32],
         }
@@ -487,13 +492,13 @@ mod tests {
         ledger.append_statement(statement(2, 11, 1, 1)).unwrap();
         ledger.append_feedback(receipt(1, 1, 2,
             OnlineFeedbackDisposition::RightCensored {
-                observed_lower_bound: 21,
+                observed_resource_lower_bound: ResourceVector::new(21, 0, 0, 0, 0, 0),
                 meter_receipt_digest: [6; 32],
             },
         )).unwrap();
         ledger.append_feedback(receipt(2, 2, 3,
             OnlineFeedbackDisposition::RightCensored {
-                observed_lower_bound: 15,
+                observed_resource_lower_bound: ResourceVector::new(15, 0, 0, 0, 0, 0),
                 meter_receipt_digest: [7; 32],
             },
         )).unwrap();
