@@ -224,10 +224,11 @@ synergy claim. A causal interpretation still requires valid randomized or
 otherwise justified matched interventions. Stochastic systems need independent
 paired replicates and uncertainty estimates across held-out episodes; one
 deterministic table only characterizes its declared context. The maximum 16
-factors bound the exact lattice to 65,536 measured alternatives. Enumerating
-all sub-subsets for each dividend is O(3^n), so benchmark the evaluator runtime
-and use a preregistered factorial/covering design for larger problems rather
-than silently extending the exact claim.
+factors bound the exact lattice to 65,536 measured alternatives. A subset
+Möbius transform plus subset-count transforms computes all coefficients and
+exclusion counts in O(n * 2^n). Benchmark the evaluator runtime at the 16-factor
+ceiling and use a preregistered factorial/covering design for larger problems
+rather than silently extending the exact claim.
 
 Eight additional source-level tests cover additive controls, isolated
 three-way and four-way synergy, antagonistic higher-order effects,
