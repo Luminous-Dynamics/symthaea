@@ -645,23 +645,49 @@ mod tests {
         );
     }
 
-    #[test]
-    fn profile_contains_no_stable_identifiers_or_raw_attestation_fields() {
-        let profile = capture_profile(&fixture_properties(), None, None);
-        let output = serde_json::to_string(&profile)
-            .unwrap()
-            .to_ascii_lowercase();
-        for forbidden in [
+    fn contains_forbidden_identifier_key(value: &Value) -> bool {
+        const FORBIDDEN_KEYS: &[&str] = &[
             "imei",
             "meid",
             "imsi",
             "iccid",
+            "serial",
             "serial_number",
+            "serialnumber",
             "android_id",
+            "androidid",
             "attestation_certificate_der",
-        ] {
-            assert!(!output.contains(forbidden));
+        ];
+
+        match value {
+            Value::Object(fields) => fields.iter().any(|(key, child)| {
+                let normalized = key.to_ascii_lowercase();
+                FORBIDDEN_KEYS
+                    .iter()
+                    .any(|forbidden| normalized == *forbidden || normalized.contains(forbidden))
+                    || contains_forbidden_identifier_key(child)
+            }),
+            Value::Array(items) => items.iter().any(contains_forbidden_identifier_key),
+            _ => false,
         }
+    }
+
+    #[test]
+    fn profile_contains_no_stable_identifier_fields_or_raw_identifier_values() {
+        let mut properties = fixture_properties();
+        // Inject sensitive values under non-allowlisted keys. The collector
+        // must neither query nor serialize these properties.
+        properties.insert("imei", "490154203237518".to_owned());
+        properties.insert("android_id", "0123456789abcdef".to_owned());
+        properties.insert("serialno", "PRIVATE-SERIAL-DO-NOT-EXPORT".to_owned());
+
+        let profile = capture_profile(&properties, None, None);
+        let output = serde_json::to_string(&profile).unwrap().to_ascii_lowercase();
+
+        assert!(!contains_forbidden_identifier_key(&profile));
+        assert!(!output.contains("490154203237518"));
+        assert!(!output.contains("0123456789abcdef"));
+        assert!(!output.contains("private-serial-do-not-export"));
     }
 
     #[test]
