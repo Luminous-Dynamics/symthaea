@@ -65,6 +65,8 @@ pub struct CalibrationGroupIdentityV1 {
     pub language: String,
     pub exposure_stage: ExposureStageV1,
     pub probe_config_sha256: String,
+    /// Digest of the registered independent source-cluster construction rule.
+    pub cluster_unit_definition_sha256: String,
     /// One independently trained treatment/placebo model-pair replicate.
     pub training_replicate_id: String,
 }
@@ -507,6 +509,10 @@ fn validate_group(group: &CalibrationGroupV1) -> Result<(), String> {
     require_digest(&group.identity.model_checkpoint_sha256, "model checkpoint")?;
     require_digest(&group.identity.tokenizer_sha256, "tokenizer")?;
     require_digest(&group.identity.probe_config_sha256, "probe config")?;
+    require_digest(
+        &group.identity.cluster_unit_definition_sha256,
+        "cluster unit definition",
+    )?;
     valid_id(&group.identity.task_family, "task_family")?;
     valid_id(&group.identity.language, "language")?;
     valid_id(&group.identity.training_replicate_id, "training_replicate_id")?;
@@ -628,10 +634,18 @@ fn analyze_group(
         (ObservationSplitV1, &str),
         GroundTruthV1,
     >::new();
+    let mut cluster_size_by_split = BTreeMap::<
+        (ObservationSplitV1, &str),
+        u64,
+    >::new();
     for ((split, sample_id), (truth, cluster_id)) in &sample_metadata {
         valid_id(sample_id, "sample_id")?;
         valid_id(cluster_id, "source_cluster_id")?;
         let cluster_key = (*split, *cluster_id);
+        let cluster_size = cluster_size_by_split.entry(cluster_key).or_default();
+        *cluster_size = cluster_size
+            .checked_add(1)
+            .ok_or_else(|| "source cluster size overflows u64".to_owned())?;
         if let Some(previous) = cluster_truth_by_split.insert(cluster_key, *truth)
             && previous != *truth
         {
@@ -660,6 +674,22 @@ fn analyze_group(
     }
     if calibration_clusters.intersection(&test_clusters).next().is_some() {
         return Err("source clusters overlap between clean calibration and locked test".to_owned());
+    }
+    let calibration_cluster_sizes: BTreeSet<u64> = cluster_size_by_split
+        .iter()
+        .filter(|((split, _), _)| *split == ObservationSplitV1::CleanCalibration)
+        .map(|(_, size)| *size)
+        .collect();
+    let test_cluster_sizes: BTreeSet<u64> = cluster_size_by_split
+        .iter()
+        .filter(|((split, _), _)| *split == ObservationSplitV1::LockedTest)
+        .map(|(_, size)| *size)
+        .collect();
+    if calibration_cluster_sizes.len() != 1
+        || test_cluster_sizes.len() != 1
+        || calibration_cluster_sizes != test_cluster_sizes
+    {
+        return Err("source clusters must have one fixed, matching item count across calibration and locked-test splits; stratify cluster sizes into separate calibration groups".to_owned());
     }
 
     for detector in definitions {
@@ -1118,7 +1148,7 @@ pub fn analyze_detector_calibration(
         .filter(|point| !point.calibration_resolution_sufficient)
         .count();
     let issues = vec![
-        "Conformal p-values are finite-sample super-uniform only under exchangeability of clean calibration and clean test observations inside the exact declared calibration group.".to_owned(),
+        "Conformal p-values are finite-sample super-uniform only under exchangeability of clean calibration and clean test source clusters inside the exact declared calibration group; cluster-max aggregation and equal cluster size are required.".to_owned(),
         "Calibration identity digests are consistency commitments; this module does not authenticate model/checkpoint custody, source manifests, clean-label truth or evaluator access controls.".to_owned(),
         "Held-out FPR intervals are one-sided exact binomial bounds per group and target, not simultaneous or multiplicity-adjusted family-wise intervals.".to_owned(),
         "Groups with insufficient calibration resolution are not estimable at the requested alpha; a zero observed false-positive count is not a 1% guarantee.".to_owned(),
@@ -1150,7 +1180,7 @@ pub fn analyze_detector_calibration(
         confirmatory_eligible: false,
         analysis_status: analysis_status.to_owned(),
         issues,
-        claim_boundary: "This report calculates finite-sample upper-tail conformal p-values against disjoint clean calibration cohorts and evaluates fixed-alpha operating points on a separate locked test split. The conformal super-uniform guarantee requires exchangeability of clean calibration/test observations within each exact model-checkpoint, tokenizer, task-family, language, exposure-stage and detector-probe group. Held-out FPR uncertainty is a one-sided exact binomial bound for each group/target; intervals are not simultaneous or multiplicity-adjusted. The report does not establish exchangeability under distribution shift, authenticate model/data custody, prove training membership, establish causal exposure, or support a universal detector or SOTA claim.".to_owned(),
+        claim_boundary: "This report calculates finite-sample upper-tail cluster-max conformal p-values against disjoint clean calibration source clusters and evaluates fixed-alpha operating points on a separate locked test split. Every source cluster must have the same item count and one ground-truth label. The conformal super-uniform guarantee requires exchangeability of clean calibration/test source clusters within each exact model-checkpoint, tokenizer, task-family, language, exposure-stage, cluster-construction and detector-probe group. Held-out FPR uncertainty is a one-sided exact binomial bound for each group/target; intervals are not simultaneous or multiplicity-adjusted. The report does not establish exchangeability under distribution shift, authenticate model/data custody, prove training membership, establish causal exposure, or support a universal detector or SOTA claim.".to_owned(),
     })
 }
 
@@ -1178,6 +1208,7 @@ mod tests {
             language: "en".to_owned(),
             exposure_stage: ExposureStageV1::ReinforcementLearningVerifiableReward,
             probe_config_sha256: digest('c'),
+            cluster_unit_definition_sha256: digest('d'),
             training_replicate_id: "pair-001".to_owned(),
         }
     }
