@@ -1,125 +1,508 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://luminousdynamics.io/schemas/pitb/proof-graph-state-v0.schema.json",
-  "title":"PITB two-level proof graph state and scheduler decision v0",
-  "description":"Auditable snapshot of an intra-declaration AND/OR proof hypergraph, a cross-declaration lemma dependency DAG, the dependency-ready goal frontier, and one priced specialist action. This validates graph contracts, not the bytes behind Lean receipts.",
-  "type":"object","additionalProperties":false,
-  "required":["schema_version","evidence_class","task","root_declaration_ids","declarations","goal_nodes","proof_steps","scheduler_decision","resource_ledger"],
-  "properties":{
-    "schema_version":{"const":"pitb.proof-graph-state.v0"},
-    "evidence_class":{"enum":["synthetic_contract_fixture","measured_snapshot"]},
-    "task":{"$ref":"#/$defs/task"},
-    "root_declaration_ids":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},
-    "declarations":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/declaration"}},
-    "goal_nodes":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/goal"}},
-    "proof_steps":{"type":"array","items":{"$ref":"#/$defs/proof_step"}},
-    "scheduler_decision":{"$ref":"#/$defs/scheduler"},
-    "resource_ledger":{"$ref":"#/$defs/resources"}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-graph-state-v0.schema.json",
+  "title": "PITB two-level proof graph state and scheduler decision v0",
+  "description": "Auditable snapshot of an intra-declaration AND/OR proof hypergraph, a cross-declaration lemma dependency DAG, the dependency-ready goal frontier, and one priced specialist action. This validates graph contracts, not the bytes behind Lean receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "task",
+    "root_declaration_ids",
+    "declarations",
+    "goal_nodes",
+    "proof_steps",
+    "scheduler_decision",
+    "resource_ledger"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-graph-state.v0"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_contract_fixture",
+        "measured_snapshot"
+      ]
+    },
+    "task": {
+      "$ref": "#/$defs/task"
+    },
+    "root_declaration_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "declarations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/declaration"
+      }
+    },
+    "goal_nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/goal"
+      }
+    },
+    "proof_steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/proof_step"
+      }
+    },
+    "scheduler_decision": {
+      "$ref": "#/$defs/scheduler"
+    },
+    "resource_ledger": {
+      "$ref": "#/$defs/resources"
+    }
   },
-  "$defs":{
-    "sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-    "sha1":{"type":"string","pattern":"^[a-f0-9]{40}$"},
-    "task":{
-      "type":"object","additionalProperties":false,
-      "required":["task_id","repository_commit","environment_sha256","target_manifest_sha256"],
-      "properties":{
-        "task_id":{"$ref":"#/$defs/sha256"},
-        "repository_commit":{"$ref":"#/$defs/sha1"},
-        "environment_sha256":{"$ref":"#/$defs/sha256"},
-        "target_manifest_sha256":{"$ref":"#/$defs/sha256"}
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "repository_commit",
+        "environment_sha256",
+        "target_manifest_sha256"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "repository_commit": {
+          "$ref": "#/$defs/sha1"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
-    "declaration":{
-      "type":"object","additionalProperties":false,
-      "required":["declaration_id","kind","statement_sha256","lifecycle_state","dependency_ids","proof_receipt_sha256","kernel_verified","contains_sorry_ax","axiom_names"],
-      "properties":{
-        "declaration_id":{"type":"string","minLength":1,"maxLength":160},
-        "kind":{"enum":["target","helper"]},
-        "statement_sha256":{"$ref":"#/$defs/sha256"},
-        "lifecycle_state":{"enum":["open","provisional","stable","discarded"]},
-        "dependency_ids":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-        "proof_receipt_sha256":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/sha256"}]},
-        "kernel_verified":{"type":"boolean"},
-        "contains_sorry_ax":{"type":"boolean"},
-        "axiom_names":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}}
-      }
-    },
-    "goal":{
-      "type":"object","additionalProperties":false,
-      "required":["goal_id","declaration_id","normalized_goal_sha256","status","closure_proof_sha256","closure_receipt_sha256","closure_kernel_verified","closure_contains_sorry_ax"],
-      "properties":{
-        "goal_id":{"type":"string","minLength":1,"maxLength":160},
-        "declaration_id":{"type":"string","minLength":1,"maxLength":160},
-        "normalized_goal_sha256":{"$ref":"#/$defs/sha256"},
-        "status":{"enum":["open","closed","discarded"]},
-        "closure_proof_sha256":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/sha256"}]},
-        "closure_receipt_sha256":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/sha256"}]},
-        "closure_kernel_verified":{"type":"boolean"},
-        "closure_contains_sorry_ax":{"type":"boolean"}
-      }
-    },
-    "proof_step":{
-      "type":"object","additionalProperties":false,
-      "required":["step_id","parent_goal_id","goal_state_sha256","status","subgoal_ids","transition_checker_id","transition_receipt_sha256","terminal_proof_sha256","terminal_receipt_sha256","terminal_kernel_verified","terminal_contains_sorry_ax"],
-      "properties":{
-        "step_id":{"type":"string","minLength":1,"maxLength":160},
-        "parent_goal_id":{"type":"string","minLength":1,"maxLength":160},
-        "goal_state_sha256":{"$ref":"#/$defs/sha256"},
-        "status":{"enum":["candidate","applied","rejected","failed"]},
-        "subgoal_ids":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-        "transition_checker_id":{"type":["string","null"]},
-        "transition_receipt_sha256":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/sha256"}]},
-        "terminal_proof_sha256":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/sha256"}]},
-        "terminal_receipt_sha256":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/sha256"}]},
-        "terminal_kernel_verified":{"type":"boolean"},
-        "terminal_contains_sorry_ax":{"type":"boolean"}
-      }
-    },
-    "scheduler":{
-      "type":"object","additionalProperties":false,
-      "required":["decision_id","ready_frontier_goal_ids","selected_goal_ids","specialist","reasoning_effort","max_specialist_calls","routing_policy_sha256","decision_receipt_sha256"],
-      "properties":{
-        "decision_id":{"type":"string","minLength":1},
-        "ready_frontier_goal_ids":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-        "selected_goal_ids":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},
-        "specialist":{"enum":["deterministic_automation","proof_writer","lemma_planner","recovery"]},
-        "reasoning_effort":{"enum":["none","low","medium","high"]},
-        "max_specialist_calls":{"type":"integer","minimum":0,"maximum":64},
-        "routing_policy_sha256":{"$ref":"#/$defs/sha256"},
-        "decision_receipt_sha256":{"$ref":"#/$defs/sha256"}
-      }
-    },
-    "resources":{
-      "type":"object","additionalProperties":false,
-      "required":["budget","actual"],
-      "properties":{
-        "budget":{
-          "type":"object","additionalProperties":false,
-          "required":["model_calls","tool_calls","tokens","wall_ms","lean_cpu_ms","cost_microusd"],
-          "properties":{
-            "model_calls":{"type":"integer","minimum":0},
-            "tool_calls":{"type":"integer","minimum":0},
-            "tokens":{"type":"integer","minimum":0},
-            "wall_ms":{"type":"integer","minimum":0},
-            "lean_cpu_ms":{"type":"integer","minimum":0},
-            "cost_microusd":{"type":"integer","minimum":0}
+    "declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declaration_id",
+        "kind",
+        "statement_sha256",
+        "lifecycle_state",
+        "dependency_ids",
+        "proof_receipt_sha256",
+        "kernel_verified",
+        "contains_sorry_ax",
+        "axiom_names"
+      ],
+      "properties": {
+        "declaration_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "kind": {
+          "enum": [
+            "target",
+            "helper"
+          ]
+        },
+        "statement_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lifecycle_state": {
+          "enum": [
+            "open",
+            "provisional",
+            "stable",
+            "discarded"
+          ]
+        },
+        "dependency_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "actual":{
-          "type":"object","additionalProperties":false,
-          "required":["router_model_calls","specialist_model_calls","model_calls","tool_calls","tokens","wall_ms","lean_cpu_ms","router_cost_microusd","specialist_cost_microusd","lean_cost_microusd","cost_microusd"],
-          "properties":{
-            "router_model_calls":{"type":"integer","minimum":0},
-            "specialist_model_calls":{"type":"integer","minimum":0},
-            "model_calls":{"type":"integer","minimum":0},
-            "tool_calls":{"type":"integer","minimum":0},
-            "tokens":{"type":"integer","minimum":0},
-            "wall_ms":{"type":"integer","minimum":0},
-            "lean_cpu_ms":{"type":"integer","minimum":0},
-            "router_cost_microusd":{"type":"integer","minimum":0},
-            "specialist_cost_microusd":{"type":"integer","minimum":0},
-            "lean_cost_microusd":{"type":"integer","minimum":0},
-            "cost_microusd":{"type":"integer","minimum":0}
+        "proof_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "kernel_verified": {
+          "type": "boolean"
+        },
+        "contains_sorry_ax": {
+          "type": "boolean"
+        },
+        "axiom_names": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal_id",
+        "declaration_id",
+        "normalized_goal_sha256",
+        "status",
+        "closure_proof_sha256",
+        "closure_receipt_sha256",
+        "closure_kernel_verified",
+        "closure_contains_sorry_ax"
+      ],
+      "properties": {
+        "goal_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "declaration_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "normalized_goal_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "closed",
+            "discarded"
+          ]
+        },
+        "closure_proof_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "closure_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "closure_kernel_verified": {
+          "type": "boolean"
+        },
+        "closure_contains_sorry_ax": {
+          "type": "boolean"
+        }
+      }
+    },
+    "proof_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_id",
+        "parent_goal_id",
+        "goal_state_sha256",
+        "status",
+        "subgoal_ids",
+        "transition_checker_id",
+        "transition_receipt_sha256",
+        "terminal_proof_sha256",
+        "terminal_receipt_sha256",
+        "terminal_kernel_verified",
+        "terminal_contains_sorry_ax"
+      ],
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "parent_goal_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "goal_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "status": {
+          "enum": [
+            "candidate",
+            "applied",
+            "rejected",
+            "failed"
+          ]
+        },
+        "subgoal_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "transition_checker_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transition_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "terminal_proof_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "terminal_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "terminal_kernel_verified": {
+          "type": "boolean"
+        },
+        "terminal_contains_sorry_ax": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scheduler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "ready_frontier_goal_ids",
+        "selected_goal_ids",
+        "specialist",
+        "reasoning_effort",
+        "max_specialist_calls",
+        "routing_policy_sha256",
+        "decision_receipt_sha256",
+        "selection_policy_id",
+        "max_selected_goals"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ready_frontier_goal_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "selected_goal_ids": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "specialist": {
+          "enum": [
+            "deterministic_automation",
+            "proof_writer",
+            "lemma_planner",
+            "recovery"
+          ]
+        },
+        "reasoning_effort": {
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "max_specialist_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "routing_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selection_policy_id": {
+          "const": "pitb.shared-stable-helper-batch.v0"
+        },
+        "max_selected_goals": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget",
+        "actual"
+      ],
+      "properties": {
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_calls",
+            "tool_calls",
+            "tokens",
+            "wall_ms",
+            "lean_cpu_ms",
+            "cost_microusd"
+          ],
+          "properties": {
+            "model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wall_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "lean_cpu_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "actual": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "router_model_calls",
+            "specialist_model_calls",
+            "model_calls",
+            "tool_calls",
+            "tokens",
+            "wall_ms",
+            "lean_cpu_ms",
+            "router_cost_microusd",
+            "specialist_cost_microusd",
+            "lean_cost_microusd",
+            "cost_microusd"
+          ],
+          "properties": {
+            "router_model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "specialist_model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wall_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "lean_cpu_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "router_cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "specialist_cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "lean_cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         }
       }
