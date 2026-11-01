@@ -216,7 +216,7 @@ fn validate_protection_claim(profile: &Value, protection_name: &str) -> Result<(
         )
     {
         return Err(format!(
-            "{protection_name} verified runtime state requires linked runtime evidence"
+            "{protection_name} verified runtime state cannot be inferred from vendor documentation alone; linked runtime evidence is required"
         ));
     }
     Ok(())
@@ -279,6 +279,28 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
         && !boot_attestation
     {
         return Err("cryptographic boot or attestation claim requires linked hardware_attestation_verified evidence".to_owned());
+    }
+
+    if boot["patch_level_binding_status"] == "software_reported"
+        && !has_linked_evidence_source(
+            profile,
+            &boot["evidence_ids"],
+            &["on_device_property", "privileged_device_tool"],
+        )
+    {
+        return Err("software-reported patch level requires linked on-device property evidence".to_owned());
+    }
+
+    if profile["pmu_acquisition"]["available_events"]
+        .as_array()
+        .is_some_and(|events| !events.is_empty())
+        && !has_linked_evidence_source(
+            profile,
+            &profile["pmu_acquisition"]["evidence_ids"],
+            &["on_device_property", "privileged_device_tool", "physical_lab_measurement"],
+        )
+    {
+        return Err("PMU event inventory requires linked on-device event-list evidence".to_owned());
     }
 
     for name in [
