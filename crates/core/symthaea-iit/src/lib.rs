@@ -324,7 +324,7 @@ pub enum Iit4SystemPhiBoundCertificateError {
 impl Iit4SystemPhiBoundCertificate {
     fn canonical_digest(&self) -> String {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"SYMTHAEA-IIT4-2023-SYSTEM-PHI-BOUND-CERTIFICATE\\0v0.1\\0");
+        bytes.extend_from_slice(b"SYMTHAEA-IIT4-2023-SYSTEM-PHI-BOUND-CERTIFICATE\0v0.1\0");
         receipt_string(&mut bytes, &self.theorem_id);
         receipt_string(&mut bytes, &self.formalism_id);
         receipt_string(&mut bytes, &self.partition_family_id);
