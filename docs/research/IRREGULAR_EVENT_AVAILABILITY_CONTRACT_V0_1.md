@@ -112,3 +112,20 @@ microsecond timestamps and does not yet join the derived justification graph.
 
 The crate now has 27 source-authored test functions: 16 event contract tests
 and 11 bitemporal source-revision tests. No Rust build or test has run.
+
+
+## 8. Purged chronological window splits
+
+The `splits` module partitions per entity using distinct forecast origins.
+Windows sharing an origin cannot be divided between train/validation/test.
+Training windows are retained only when the exclusive end of their target
+interval is no later than the validation forecast-origin boundary (minus an
+optional embargo). Validation windows obey the analogous test boundary.
+Windows that cross a boundary are counted as purged rather than silently
+relabelled. Historical input overlap is allowed; future target-label overlap is
+not.
+
+Eight source-authored tests cover overlapping forecast windows, exact boundary
+semantics, embargoes, tied origins, input-order invariance, per-entity
+boundaries, invalid intervals/ratios, duplicate IDs and insufficient/empty
+partitions. The package now has 35 source-authored test functions total.
