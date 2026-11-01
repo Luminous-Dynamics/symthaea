@@ -380,6 +380,19 @@ fn validate_plan(value: &Value) -> Result<usize> {
     Ok(pairs.len())
 }
 
+fn refresh_pair_ids_and_orders(value: &mut Value) -> Result<()> {
+    let seed = string(value, "/randomization/seed_sha256")?.to_owned();
+    let (arm_ids, _) = parse_arm_ids(value)?;
+    let pairs = value["pairs"].as_array_mut().context("pairs array")?;
+    for pair in pairs {
+        let pair_id = expected_pair_id(pair)?;
+        pair["pair_id"] = json!(pair_id);
+        let order = expected_execution_order(&seed, &pair_id, &arm_ids)?;
+        pair["execution_order"] = json!(order);
+    }
+    Ok(())
+}
+
 fn must_reject(label: &str, value: Value) -> Result<()> {
     if validate_plan(&value).is_ok() {
         bail!("negative intervention-trial control unexpectedly accepted: {label}");
@@ -433,6 +446,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     for pair in bad["pairs"].as_array_mut().context("pairs array")? {
         pair["component_id"] = json!("single-cluster");
     }
+    refresh_pair_ids_and_orders(&mut bad)?;
     must_reject("insufficient independent component clusters", bad)?;
 
     let mut bad = value.clone();
