@@ -694,6 +694,7 @@ pub struct HorizonForecastReceiptState {
     pub due_at_seconds: f64,
     pub observed_at_seconds: f64,
     pub requested_horizon_seconds: f32,
+    pub max_lateness_factor_used: f32,
     pub lateness_seconds: f64,
     pub status: HorizonForecastReceiptStatus,
     pub source_observation_blake3: Option<String>,
