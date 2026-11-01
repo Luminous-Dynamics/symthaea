@@ -12,6 +12,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::pareto_anytime::{AnytimeError, AnytimeHistory, AnytimeRecorder};
 use super::pareto_benchmarks::{dtlz2_three_objectives, zdt1_objectives};
 use super::pareto_objectives::{
     analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
@@ -207,7 +208,28 @@ pub fn run_nsga2_zdt1(
                 .map_err(|error| Nsga2Error::new("zdt1", error.to_string()))?;
             Ok(objectives.to_vec())
         },
+        None,
     )
+}
+
+/// Run NSGA-II while recording every objective evaluation into a shared anytime history.
+/// The history header must identify this algorithm/problem/seed and declare a synthetic
+/// objective-evaluation-unit cost model. Physical resource meters remain Unknown.
+pub fn run_nsga2_zdt1_with_history(
+    config: &Nsga2Config,
+    decision_dimensions: usize,
+    history: &mut AnytimeHistory,
+) -> Result<Nsga2RunReport, Nsga2Error> {
+    if decision_dimensions < 2 {
+        return Err(Nsga2Error::new("decision_dimensions", "ZDT1 requires at least two decision variables"));
+    }
+    let budget = config.population_size.checked_mul(config.generations.saturating_add(1))
+        .ok_or_else(|| Nsga2Error::new("config", "evaluation budget overflows usize"))?;
+    let mut recorder = make_anytime_recorder(history, "zdt1", config.seed, 2, budget)?;
+    run_nsga2("zdt1", config, decision_dimensions, 2, |decision| {
+        zdt1_objectives(decision).map(|values| values.to_vec())
+            .map_err(|error| Nsga2Error::new("zdt1", error.to_string()))
+    }, Some(&mut recorder))
 }
 
 pub fn run_nsga2_dtlz2(
@@ -230,7 +252,25 @@ pub fn run_nsga2_dtlz2(
                 .map_err(|error| Nsga2Error::new("dtlz2", error.to_string()))?;
             Ok(objectives.to_vec())
         },
+        None,
     )
+}
+
+pub fn run_nsga2_dtlz2_with_history(
+    config: &Nsga2Config,
+    decision_dimensions: usize,
+    history: &mut AnytimeHistory,
+) -> Result<Nsga2RunReport, Nsga2Error> {
+    if decision_dimensions < 3 {
+        return Err(Nsga2Error::new("decision_dimensions", "three-objective DTLZ2 requires at least three decision variables"));
+    }
+    let budget = config.population_size.checked_mul(config.generations.saturating_add(1))
+        .ok_or_else(|| Nsga2Error::new("config", "evaluation budget overflows usize"))?;
+    let mut recorder = make_anytime_recorder(history, "dtlz2-3obj", config.seed, 3, budget)?;
+    run_nsga2("dtlz2-3obj", config, decision_dimensions, 3, |decision| {
+        dtlz2_three_objectives(decision).map(|values| values.to_vec())
+            .map_err(|error| Nsga2Error::new("dtlz2", error.to_string()))
+    }, Some(&mut recorder))
 }
 
 fn run_nsga2<F>(
@@ -239,6 +279,7 @@ fn run_nsga2<F>(
     decision_dimensions: usize,
     objective_dimensions: usize,
     evaluator: F,
+    mut recorder: Option<&mut AnytimeRecorder<'_>>,
 ) -> Result<Nsga2RunReport, Nsga2Error>
 where
     F: Fn(&[f64]) -> Result<Vec<f64>, Nsga2Error>,
@@ -259,7 +300,19 @@ where
         let decision = (0..decision_dimensions)
             .map(|_| rng.unit_f64())
             .collect::<Vec<_>>();
-        let objectives = evaluate_checked(&evaluator, &decision, objective_dimensions)?;
+        let objectives = match evaluate_checked(&evaluator, &decision, objective_dimensions) {
+            Ok(values) => values,
+            Err(error) => {
+                if let Some(recorder) = &mut recorder {
+                    recorder.record_failure(&decision, super::pareto_anytime::EvaluationOutcome::Failed, error.to_string())
+                        .map_err(map_anytime_error)?;
+                }
+                return Err(error);
+            }
+        };
+        if let Some(recorder) = &mut recorder {
+            recorder.record_success(&decision, &objectives, true, Vec::new()).map_err(map_anytime_error)?;
+        }
         objective_evaluations = checked_add_usize(objective_evaluations, 1, "objective_evaluations")?;
         population.push(Individual {
             decision,
@@ -303,7 +356,19 @@ where
 
         let mut offspring = Vec::with_capacity(config.population_size);
         for (index, decision) in offspring_decisions.into_iter().enumerate() {
-            let objectives = evaluate_checked(&evaluator, &decision, objective_dimensions)?;
+            let objectives = match evaluate_checked(&evaluator, &decision, objective_dimensions) {
+                Ok(values) => values,
+                Err(error) => {
+                    if let Some(recorder) = &mut recorder {
+                        recorder.record_failure(&decision, super::pareto_anytime::EvaluationOutcome::Failed, error.to_string())
+                            .map_err(map_anytime_error)?;
+                    }
+                    return Err(error);
+                }
+            };
+            if let Some(recorder) = &mut recorder {
+                recorder.record_success(&decision, &objectives, true, Vec::new()).map_err(map_anytime_error)?;
+            }
             objective_evaluations = checked_add_usize(objective_evaluations, 1, "objective_evaluations")?;
             offspring.push(Individual {
                 decision,
@@ -447,6 +512,32 @@ pub fn analyze_nsga2_report(
     ).map_err(map_pareto_error)?;
     let analysis = analyze_pareto(&plan).map_err(map_pareto_error)?;
     Ok(Nsga2ParetoAnalysis { plan, analysis })
+}
+
+fn make_anytime_recorder<'a>(
+    history: &'a mut AnytimeHistory,
+    problem_id: &str,
+    seed: u64,
+    objective_dimensions: usize,
+    expected_attempts: usize,
+) -> Result<AnytimeRecorder<'a>, Nsga2Error> {
+    let header = history.header();
+    if header.algorithm_id != ALGORITHM_ID || header.problem_id != problem_id || header.seed != seed {
+        return Err(Nsga2Error::new("anytime.header", "history algorithm, problem, or seed differs from this NSGA-II run"));
+    }
+    if header.objective_specs.len() != objective_dimensions
+        || header.objective_specs.iter().any(|spec| spec.direction != ObjectiveDirection::Minimize)
+    {
+        return Err(Nsga2Error::new("anytime.objective_specs", "history objectives do not match the minimization problem"));
+    }
+    if header.max_objective_evaluation_attempts < u64::try_from(expected_attempts).unwrap_or(u64::MAX) {
+        return Err(Nsga2Error::new("anytime.max_objective_evaluation_attempts", "history attempt budget is below the optimizer's exact budget"));
+    }
+    AnytimeRecorder::new(history).map_err(map_anytime_error)
+}
+
+fn map_anytime_error(error: AnytimeError) -> Nsga2Error {
+    Nsga2Error::new(error.path, error.message)
 }
 
 fn map_pareto_error(error: ParetoError) -> Nsga2Error {
