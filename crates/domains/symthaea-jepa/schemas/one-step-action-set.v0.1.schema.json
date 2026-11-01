@@ -11,7 +11,8 @@
     "source_embedding_sha256",
     "action_manifest_sha256",
     "candidate_set_sha256",
-    "predictions"
+    "predictions",
+    "predictor_parameters_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -64,6 +65,11 @@
           }
         }
       }
+    },
+    "predictor_parameters_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Canonical digest of the exact JEPA model/configuration parameter state that produced the latent means."
     }
   },
   "x-rust-invariants": [
@@ -71,6 +77,7 @@
     "action indices must be unique and within the configured discrete action space",
     "source embedding is encoded exactly once and reused for every action in the returned set",
     "candidate_set_sha256 is invariant to input row order",
-    "predicted_latent entries are deterministic point predictions; never reinterpret them as posterior samples or calibrated intervals"
+    "predicted_latent entries are deterministic point predictions; never reinterpret them as posterior samples or calibrated intervals",
+    "predictor_parameters_sha256 binds prediction-relevant configuration and exact context, target and latent-predictor f32 parameter bits; mutable telemetry is excluded"
   ]
 }
