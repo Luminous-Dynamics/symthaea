@@ -1764,7 +1764,7 @@ mod tests {
 const SQLITE_SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS basalt_state_meta (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+    schema_version INTEGER NOT NULL,
     revision TEXT NOT NULL,
     signer_policy_version TEXT,
     witness_policy_version TEXT,
