@@ -119,6 +119,7 @@ struct ObservationFingerprint {
     status: ObservationStatus,
     objective_values: Option<Vec<f64>>,
     evidence_sha256: Option<String>,
+    failure_reason: Option<String>,
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -202,20 +203,20 @@ fn fingerprint_from_tape(
         } => (candidate_sha256.clone(), decision_sha256.clone(), replicate_id.clone(), *sample_seed),
         _ => return Err(EventTapeNoisyError::new(format!("{path}.intent"), "not a noisy replicate intent")),
     };
-    let (status, objective_values, evidence_sha256) = match outcome {
-        ActionOutcome::CandidateNoisyObservation { disposition, objective_values, evidence_sha256, .. } => {
+    let (status, objective_values, evidence_sha256, failure_reason) = match outcome {
+        ActionOutcome::CandidateNoisyObservation { disposition, objective_values, evidence_sha256, failure_reason, .. } => {
             let status = match disposition {
                 NoisyObservationDisposition::Succeeded => ObservationStatus::Succeeded,
                 NoisyObservationDisposition::Failed => ObservationStatus::Failed,
                 NoisyObservationDisposition::Invalid | NoisyObservationDisposition::VerifierRejected => ObservationStatus::Invalid,
                 NoisyObservationDisposition::TimedOut => ObservationStatus::TimedOut,
             };
-            (status, objective_values.clone(), evidence_sha256.clone())
+            (status, objective_values.clone(), evidence_sha256.clone(), failure_reason.clone())
         }
         _ => return Err(EventTapeNoisyError::new(format!("{path}.outcome"), "wrong outcome type for noisy replicate intent")),
     };
     Ok(ObservationFingerprint {
-        candidate_id, decision_sha256, replicate_id, sample_seed, status, objective_values, evidence_sha256,
+        candidate_id, decision_sha256, replicate_id, sample_seed, status, objective_values, evidence_sha256, failure_reason,
     })
 }
 
@@ -225,7 +226,7 @@ fn fingerprint_from_history(
 ) -> Result<Option<ObservationFingerprint>, EventTapeNoisyError> {
     let AnytimeAction::CandidateNoisyObservation {
         candidate_id, decision_sha256, replicate_id, sample_seed, outcome,
-        objective_values, evidence_sha256, ..
+        objective_values, evidence_sha256, failure_reason, ..
     } = action else { return Ok(None) };
     let status = match outcome {
         EvaluationOutcome::Succeeded => ObservationStatus::Succeeded,
@@ -248,6 +249,7 @@ fn fingerprint_from_history(
         status,
         objective_values: objective_values.clone(),
         evidence_sha256: evidence_sha256.clone(),
+        failure_reason: failure_reason.clone(),
     }))
 }
 
