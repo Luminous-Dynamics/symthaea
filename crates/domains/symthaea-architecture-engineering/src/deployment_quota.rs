@@ -1,4 +1,4 @@
-//! Success-driven deployment quota sizing under an explicit Bernoulli yield contract.
+//! Success-driven deployment quota sizing under explicit stochastic-yield contracts.
 //!
 //! This computes the smallest attempt budget that reaches a requested number of verified
 //! deployment successes with a specified probability, assuming either iid attempts with
