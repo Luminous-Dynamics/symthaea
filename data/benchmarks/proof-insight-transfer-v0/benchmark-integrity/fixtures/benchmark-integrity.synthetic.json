@@ -19,7 +19,8 @@
     "end_line": 10,
     "end_column": 32,
     "statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-    "expected_informal_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    "expected_informal_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "repository_branch": "main"
   },
   "environment": {
     "lean_toolchain": "leanprover/lean4:v4.synthetic",
