@@ -1,4 +1,5 @@
 import math
+import random
 import unittest
 
 from projective_vector_betting import (
@@ -57,6 +58,27 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
         ]
         for actual, expected_value in zip(kernel.matvec(values, active), expected_vec):
             self.assertAlmostEqual(actual, expected_value)
+
+    def test_low_rank_operator_randomized_against_dense_reference(self):
+        rng = random.Random(69851)
+        for dimension in range(1, 26):
+            kernel = ProjectiveEquicorrelationKernel(dimension, 0.2, 0.8)
+            dense = kernel.dense()
+            values = [rng.uniform(0.0, 1.5) for _ in range(dimension)]
+            active = [rng.random() < 0.7 for _ in range(dimension)]
+            masked = [values[i] if active[i] else 0.0 for i in range(dimension)]
+            dense_q = sum(
+                masked[i] * dense[i][j] * masked[j]
+                for i in range(dimension) for j in range(dimension)
+            )
+            self.assertAlmostEqual(kernel.quadratic(values, active), dense_q, places=9)
+            dense_v = [
+                sum(dense[i][j] * masked[j] for j in range(dimension))
+                if active[i] else 0.0
+                for i in range(dimension)
+            ]
+            for actual, expected in zip(kernel.matvec(values, active), dense_v):
+                self.assertAlmostEqual(actual, expected, places=9)
 
     def test_low_rank_factor_matches_dense_factor(self):
         kernel = ProjectiveEquicorrelationKernel(4, 0.2, 0.8)
