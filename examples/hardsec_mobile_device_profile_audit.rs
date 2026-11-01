@@ -119,7 +119,10 @@ fn validate_evidence_links(profile: &Value) -> Result<(), String> {
 
     let linked_sections = [
         ("boot_integrity", &profile["boot_integrity"]["evidence_ids"]),
-        ("pmu_acquisition", &profile["pmu_acquisition"]["evidence_ids"]),
+        (
+            "pmu_acquisition",
+            &profile["pmu_acquisition"]["evidence_ids"],
+        ),
         (
             "memory_tagging",
             &profile["hardware_protections"]["memory_tagging"]["evidence_ids"],
@@ -136,7 +139,10 @@ fn validate_evidence_links(profile: &Value) -> Result<(), String> {
             "secure_element",
             &profile["hardware_protections"]["secure_element"]["evidence_ids"],
         ),
-        ("tee", &profile["hardware_protections"]["tee"]["evidence_ids"]),
+        (
+            "tee",
+            &profile["hardware_protections"]["tee"]["evidence_ids"],
+        ),
     ];
 
     for (section, value) in linked_sections {
@@ -150,10 +156,14 @@ fn validate_evidence_links(profile: &Value) -> Result<(), String> {
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| format!("{section}.evidence_ids contains an invalid ID"))?;
             if !section_ids.insert(id.to_owned()) {
-                return Err(format!("{section}.evidence_ids contains duplicate ID: {id}"));
+                return Err(format!(
+                    "{section}.evidence_ids contains duplicate ID: {id}"
+                ));
             }
             if !known_ids.contains(id) {
-                return Err(format!("{section}.evidence_ids references unknown evidence ID: {id}"));
+                return Err(format!(
+                    "{section}.evidence_ids references unknown evidence ID: {id}"
+                ));
             }
         }
     }
@@ -253,7 +263,9 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
             &["on_device_property", "privileged_device_tool"],
         )
     {
-        return Err("reported bootloader state requires linked on-device property evidence".to_owned());
+        return Err(
+            "reported bootloader state requires linked on-device property evidence".to_owned(),
+        );
     }
     if boot["reported_verified_boot_state"] != "unknown"
         && boot["reported_verified_boot_state"] != "not_measured"
@@ -263,7 +275,9 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
             &["on_device_property", "privileged_device_tool"],
         )
     {
-        return Err("reported Verified Boot state requires linked on-device property evidence".to_owned());
+        return Err(
+            "reported Verified Boot state requires linked on-device property evidence".to_owned(),
+        );
     }
     if (boot["bootloader_locked"] == "locked"
         || boot["bootloader_locked"] == "unlocked"
@@ -288,7 +302,9 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
             &["on_device_property", "privileged_device_tool"],
         )
     {
-        return Err("software-reported patch level requires linked on-device property evidence".to_owned());
+        return Err(
+            "software-reported patch level requires linked on-device property evidence".to_owned(),
+        );
     }
 
     if profile["pmu_acquisition"]["available_events"]
@@ -297,7 +313,11 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
         && !has_linked_evidence_source(
             profile,
             &profile["pmu_acquisition"]["evidence_ids"],
-            &["on_device_property", "privileged_device_tool", "physical_lab_measurement"],
+            &[
+                "on_device_property",
+                "privileged_device_tool",
+                "physical_lab_measurement",
+            ],
         )
     {
         return Err("PMU event inventory requires linked on-device event-list evidence".to_owned());
