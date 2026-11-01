@@ -117,6 +117,7 @@ pub enum ActionConditionedPredictorError {
     NonFiniteUpdate,
     ActionSetMismatch,
     DuplicateActionId,
+    StaleForecastModelVersion,
 }
 
 /// A diagonal, action-conditioned residual head over an autonomous future HV.
@@ -400,7 +401,7 @@ impl ActionConditionedVisualResidualPredictor {
         &mut self,
         outcomes: &[ActionConditionedObservedOutcome],
     ) -> Result<Vec<ActionConditionedForecastScore>, ActionConditionedPredictorError> {
-        if outcomes.len() < 2 {
+        if outcomes.is_empty() {
             return Err(ActionConditionedPredictorError::ActionSetMismatch);
         }
         let mut forecast_ids = Vec::with_capacity(outcomes.len());
@@ -610,6 +611,12 @@ impl ActionConditionedVisualResidualPredictor {
         if hash_action_descriptors(&descriptors) != first.action_set_sha256 {
             return Err(ActionConditionedPredictorError::ActionSetMismatch);
         }
+        if hash_f32_vector(
+            b"vis005-action-conditioned-residual-weights-v1",
+            &self.action_weights,
+        ) != first.model_weights_sha256 {
+            return Err(ActionConditionedPredictorError::StaleForecastModelVersion);
+        }
         let next_training_step = self.training_steps.checked_add(1)
             .ok_or(ActionConditionedPredictorError::ForecastIdExhausted)?;
 
@@ -733,6 +740,14 @@ impl ActionConditionedVisualResidualPredictor {
             .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
         if pending.receipt.action_set_size != 1 {
             return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+        if pending.receipt.model_version != self.training_steps
+            || hash_f32_vector(
+                b"vis005-action-conditioned-residual-weights-v1",
+                &self.action_weights,
+            ) != pending.receipt.model_weights_sha256
+        {
+            return Err(ActionConditionedPredictorError::StaleForecastModelVersion);
         }
         if actual_future_hv.len() != self.dim {
             return Err(ActionConditionedPredictorError::InvalidVectorDimension);
@@ -1371,6 +1386,36 @@ mod tests {
         assert!(after_negative.predicted_future_hv[0] < 0.0);
     }
 
+
+
+    #[test]
+    fn stale_single_forecast_can_be_scored_but_cannot_update_newer_weights() {
+        let mut model = predictor();
+        let first = model.issue_forecast(
+            &digest('a'), 10, &digest('b'), &digest('c'), &digest('e'),
+            17, 1.0, &[0.0, 0.0], &[1.0, 1.0]
+        ).unwrap();
+        let second = model.issue_forecast(
+            &digest('a'), 10, &digest('b'), &digest('d'), &digest('e'),
+            3, 1.0, &[0.0, 0.0], &[-1.0, -1.0]
+        ).unwrap();
+        model.score_and_learn(first.forecast_id, &[0.5, 0.5], 11, 1.0).unwrap();
+        assert_eq!(
+            model.score_and_learn(second.forecast_id, &[-0.5, -0.5], 11, 1.0),
+            Err(ActionConditionedPredictorError::StaleForecastModelVersion)
+        );
+        let score = model.score_action_set(&[ActionConditionedObservedOutcome {
+            forecast_id: second.forecast_id,
+            actual_future_hv: vec![-0.5, -0.5],
+            observed_frame_sequence: 11,
+            observation_delay_seconds: 1.0,
+        }]).unwrap();
+        assert_eq!(score.len(), 1);
+        assert_eq!(score[0].forecast_model_version, 0);
+        assert_eq!(score[0].model_version_before, 1);
+        assert_eq!(score[0].model_version_after, 1);
+        assert_eq!(model.training_steps(), 1);
+    }
 
     #[test]
     fn incomplete_action_set_checkpoint_restore_is_rejected() {
