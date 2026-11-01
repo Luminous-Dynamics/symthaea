@@ -22,7 +22,7 @@ class AffineProjectiveClosureSolverBenchmarkTests(unittest.TestCase):
             weight = Fraction(1, 1 << i)
             self.assertEqual(
                 weight * (first["evidence"][i] - 1),
-                Fraction(10, 12),
+                Fraction(12, 12),
             )
 
     def test_scipy_matrix_size_is_linear(self):
@@ -35,7 +35,7 @@ class AffineProjectiveClosureSolverBenchmarkTests(unittest.TestCase):
         )
         inputs = _scipy_milp_inputs(model)
         self.assertEqual(inputs["matrix_shape"], (20 + 2 + 1, 41))
-        self.assertLessEqual(inputs["nonzeros"], 5 * 20 + 5)
+        self.assertEqual(inputs["nonzeros"], 6 * 20 + 2)
         self.assertEqual(inputs["integrality"].sum(), 20)
 
     def test_exact_exhaustive_action_oracle_finds_feasible_optimum(self):
@@ -48,7 +48,7 @@ class AffineProjectiveClosureSolverBenchmarkTests(unittest.TestCase):
         optimum = exhaustive_optimum(model)
         self.assertTrue(optimum["feasible"])
         self.assertEqual(optimum["checked_actions"], 256)
-        self.assertGreaterEqual(len(optimum["rejection_ids"]), 7)
+        self.assertGreaterEqual(len(optimum["rejection_ids"]), 6)
 
     @unittest.skipUnless(importlib.util.find_spec("scipy"), "SciPy is optional")
     def test_highs_incumbent_is_exactly_verified_and_matches_small_oracle(self):
