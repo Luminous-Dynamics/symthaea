@@ -229,6 +229,91 @@ def build_additive_anchored_coordinate_e_paths(
     }
 
 
+def build_additive_anchored_portfolio_e_paths(
+    *,
+    universe: Iterable[str],
+    baseline_path: Sequence[Iterable[str]],
+    coordinate_budgets: Mapping[str, Fraction | int | str],
+    strategies: Mapping[
+        str,
+        Mapping[str, Mapping[str, Fraction | int | str] | Mapping[str, Sequence[Fraction | int | str]]],
+    ],
+    strategy_prior: Mapping[str, Fraction | int | str],
+    alpha: Fraction | int | str,
+) -> dict[str, tuple[Fraction, ...]]:
+    """Mix ex-ante auxiliary budget allocations into additive coordinate e-paths.
+
+    Each strategy is a mapping with:
+      - "budgets": {hypothesis_id: v_i}
+      - "paths": {hypothesis_id: [F_i,t]}
+
+    Every strategy must independently satisfy sum_i(q_i+v_i)<=1 and each
+    coordinate path is assumed to satisfy E_Hi[sup_t F_i,t]<=1. A fixed prior
+    over strategies preserves validity; data-dependent best-strategy selection
+    is deliberately not supported.
+    """
+    ids = _ids(universe)
+    a = _q(alpha)
+    if not 0 < a <= 1:
+        raise ValueError("alpha must be in (0,1]")
+    if not strategies:
+        raise ValueError("at least one auxiliary strategy is required")
+    if set(coordinate_budgets) != set(ids):
+        raise ValueError("coordinate_budgets must contain exactly the universe IDs")
+    if set(strategy_prior) != set(strategies):
+        raise ValueError("strategy_prior must contain exactly the strategy names")
+    q = {i: _q(coordinate_budgets[i]) for i in ids}
+    if any(value < 0 for value in q.values()):
+        raise ValueError("coordinate budgets must be nonnegative")
+    prior = {name: _q(value) for name, value in strategy_prior.items()}
+    if any(value < 0 for value in prior.values()):
+        raise ValueError("strategy prior weights must be nonnegative")
+    if sum(prior.values(), Fraction(0)) != 1:
+        raise ValueError("fixed strategy prior weights must sum exactly to one")
+
+    baseline = _normalize_path(baseline_path, frozenset(ids), "baseline_path")
+    if not baseline:
+        raise ValueError("baseline_path must contain at least one round")
+    horizon = len(baseline)
+    parsed: dict[str, tuple[dict[str, Fraction], dict[str, tuple[Fraction, ...]]]] = {}
+    for name, strategy in strategies.items():
+        if set(strategy) != {"budgets", "paths"}:
+            raise ValueError("each strategy must contain exactly budgets and paths")
+        budgets_raw = strategy["budgets"]
+        paths_raw = strategy["paths"]
+        if set(budgets_raw) != set(ids) or set(paths_raw) != set(ids):
+            raise ValueError("each strategy budget/path map must contain exactly the universe IDs")
+        v = {i: _q(budgets_raw[i]) for i in ids}
+        if any(value < 0 for value in v.values()):
+            raise ValueError("strategy auxiliary budgets must be nonnegative")
+        if sum(q.values(), Fraction(0)) + sum(v.values(), Fraction(0)) > 1:
+            raise ValueError(f"strategy {name} exceeds the global anchored budget")
+        paths = {i: tuple(_q(x) for x in paths_raw[i]) for i in ids}
+        if any(len(path) != horizon for path in paths.values()):
+            raise ValueError(f"strategy {name} path horizon mismatch")
+        if any(x < 0 for path in paths.values() for x in path):
+            raise ValueError("strategy auxiliary paths must be nonnegative")
+        parsed[name] = (v, paths)
+
+    ever = coordinate_ever_rejected(baseline, ids)
+    output: dict[str, tuple[Fraction, ...]] = {}
+    for i in ids:
+        output[i] = tuple(
+            ever[i][t] / a
+            + sum(
+                (
+                    prior[name]
+                    * parsed[name][0][i]
+                    * parsed[name][1][i][t]
+                    for name in strategies
+                ),
+                Fraction(0),
+            )
+            for t in range(horizon)
+        )
+    return output
+
+
 def select_additive_anchored_e_bh(
     *,
     coordinate_e_values: Mapping[str, Fraction | int | str],
