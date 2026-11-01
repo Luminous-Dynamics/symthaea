@@ -60,7 +60,7 @@ pub struct ActionConditionedPredictorState {
     pub pending: Vec<PendingActionConditionedForecastState>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionConditionedForecastScore {
     pub schema_version: u32,
     pub forecast_id: u64,
@@ -614,6 +614,11 @@ mod tests {
         ).unwrap();
         assert_eq!(receipt.predicted_future_hv, base);
         assert_eq!(receipt.model_version, 0);
+        assert_eq!(
+            receipt.predicted_future_hv_sha256,
+            hash_f32_vector(b"vis005-action-conditioned-prediction-v1", &base)
+        );
+        assert_eq!(receipt.forecast_sha256, hash_forecast_receipt(&receipt));
         assert_eq!(model.pending_forecast_count(), 1);
     }
 
@@ -700,6 +705,12 @@ mod tests {
         let positive_score = model.score_and_learn(positive.forecast_id, &[0.8, 0.6], 11, 1.0).unwrap();
         let negative_score = model.score_and_learn(negative.forecast_id, &[-0.8, -0.6], 11, 1.0).unwrap();
         assert!(positive_score.mean_squared_error > 0.0);
+        assert!(is_lower_hex_sha256(&positive_score.observed_future_hv_sha256));
+        assert!(is_lower_hex_sha256(&positive_score.score_sha256));
+        assert_eq!(
+            positive_score.observed_future_hv_sha256,
+            hash_f32_vector(b"vis005-observed-future-visual-hv-v1", &[0.8, 0.6])
+        );
         assert_eq!(positive_score.model_version_before, 0);
         assert_eq!(negative_score.model_version_before, 1);
         assert_eq!(model.training_steps(), 2);
