@@ -242,7 +242,7 @@
         "action_id",
         "kind",
         "proof_state_sha256",
-        "predicted_incremental_success_ppm",
+        "predicted_verified_success_probability_ppm",
         "standard_error_ppm",
         "prediction_evidence_sha256",
         "calibration_receipt_sha256",
@@ -286,6 +286,12 @@
         },
         "expected_resources": {
           "$ref": "#/$defs/resources"
+        },
+        "predicted_verified_success_probability_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "description": "Estimated probability that this action, followed by the registered continuation policy through evaluation_horizon_id, ends in an independently verified proof."
         }
       }
     }
