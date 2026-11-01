@@ -791,7 +791,6 @@ mod tests {
         let mut ledger = BitemporalEventLedger::default();
         let before = ledger.state_sha256();
         let first = revision_record(1, 10, 10, 1);
-        let second = revision_record(2, 11, 20, 2);
         assert_eq!(
             ledger.append_batch([
                 revision(1, 1, 1, 20, EventRevisionOperation::Assert { record: first }),
@@ -886,12 +885,12 @@ mod tests {
     fn active_source_sequence_collision_is_rejected_at_commit() {
         let mut ledger = BitemporalEventLedger::default();
         let first = revision_record(1, 10, 10, 1);
-        let mut second = revision_record(2, 11, 11, 2);
+        let mut second = revision_record(2, 10, 10, 2);
         second.source_sequence = first.source_sequence;
         assert_eq!(
             ledger.append_batch([
                 revision(1, 1, 1, 10, EventRevisionOperation::Assert { record: first }),
-                revision(2, 2, 1, 11, EventRevisionOperation::Assert { record: second }),
+                revision(2, 2, 1, 10, EventRevisionOperation::Assert { record: second }),
             ]),
             Err(BitemporalEventError::InvalidHistory)
         );
