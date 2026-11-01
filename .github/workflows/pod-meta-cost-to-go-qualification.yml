@@ -1,0 +1,46 @@
+name: POD-Meta Proof Cost-to-Go Lab Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/pod-meta-cost-to-go-qualification.yml"
+      - "research/pod-meta-cost-to-go-lab/**"
+  push:
+    branches:
+      - "research/pod-meta-proof-cost-to-go-2026-11-01"
+    paths:
+      - ".github/workflows/pod-meta-cost-to-go-qualification.yml"
+      - "research/pod-meta-cost-to-go-lab/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install repository Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+      - name: Format
+        run: cargo +1.96.0 fmt --manifest-path research/pod-meta-cost-to-go-lab/Cargo.toml -- --check
+      - name: Tests
+        run: cargo +1.96.0 test --locked --manifest-path research/pod-meta-cost-to-go-lab/Cargo.toml
+      - name: Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path research/pod-meta-cost-to-go-lab/Cargo.toml --all-targets -- -D warnings
+      - name: Emit and qualify deterministic ledger matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path research/pod-meta-cost-to-go-lab/Cargo.toml --bin pod-meta-cost-to-go > cost-to-go-ledger.tsv
+          test "$(grep -c '^CASE' cost-to-go-ledger.tsv)" -eq 8
+          if grep '^CASE' cost-to-go-ledger.tsv | awk -F '\t' '$7 != 0 && $2 != "hard-cap-overrun-visible" { bad=1 } END { exit bad }'; then
+            echo "Only the deliberate hard-cap negative control recorded a cap violation."
+          else
+            echo "Unexpected hard-budget violation." >&2
+            exit 1
+          fi
+          sha256sum cost-to-go-ledger.tsv
+          wc -l cost-to-go-ledger.tsv
