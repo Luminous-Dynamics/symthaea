@@ -797,6 +797,20 @@ mod tests {
             vec!["future_vendor_metric".to_owned()]
         );
         assert_eq!(audit.receipt.pareto_fronts.len(), 12);
+        assert_eq!(audit.receipt.measured_arch_indices, vec![0, 1, 2]);
+        assert_eq!(audit.receipt.infeasible_arch_indices, vec![3]);
+        assert!(audit.receipt.pareto_fronts.iter().all(|front| {
+            front.candidate_count == front.candidate_indices.len()
+        }));
+    }
+
+    #[test]
+    fn accepts_measured_candidate_exactly_at_published_flash_boundary() {
+        let (mut hardware, accuracy, failures, contract) = fixture();
+        hardware = hardware.replacen(",100,380,", ",746,380,", 1);
+        let audit = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
+            .expect("the published model-size limit is inclusive");
+        assert_eq!(audit.candidates[0].int8_model_kb, 746.0);
     }
 
     #[test]
@@ -832,7 +846,7 @@ mod tests {
         accuracy = accuracy.replace("2,91.0,61.0,31.0\n", "");
         let error = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
             .expect_err("missing accuracy data must not be imputed");
-        assert!(error.to_string().contains("expected 3 accuracy rows"));
+        assert!(error.to_string().contains("accuracy indices must exactly equal measured hardware indices"));
     }
 
     #[test]
