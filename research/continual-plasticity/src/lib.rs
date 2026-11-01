@@ -391,6 +391,25 @@ mod tests {
     }
 
     #[test]
+    fn reservoir_is_uniform_over_exhaustive_two_of_four_draw_space() {
+        let mut subset_counts = std::collections::BTreeMap::<Vec<u64>, u32>::new();
+        for draw_third in 0..3_u64 {
+            for draw_fourth in 0..4_u64 {
+                let mut buffer = ReplayBuffer::new(ReplayPolicy::Reservoir, 2);
+                buffer.observe(item(0, 10, 1, 1), 0, None).unwrap();
+                buffer.observe(item(1, 11, 1, 1), 1, None).unwrap();
+                buffer.observe(item(2, 12, 1, 1), 2, Some(draw_third)).unwrap();
+                buffer.observe(item(3, 13, 1, 1), 3, Some(draw_fourth)).unwrap();
+                let mut retained = buffer.retained().iter().map(|entry| entry.item_id).collect::<Vec<_>>();
+                retained.sort_unstable();
+                *subset_counts.entry(retained).or_insert(0) += 1;
+            }
+        }
+        assert_eq!(subset_counts.len(), 6);
+        assert!(subset_counts.values().all(|count| *count == 2));
+    }
+
+    #[test]
     fn fifo_rejects_irrelevant_random_draws() {
         let mut b=ReplayBuffer::new(ReplayPolicy::Fifo,1);
         assert_eq!(b.observe(item(0,10,4,1),0,Some(0)),Err(ReplayError::UnexpectedRandomDraw));
