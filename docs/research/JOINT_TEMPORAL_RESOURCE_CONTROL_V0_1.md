@@ -76,7 +76,7 @@ qualified as candidate plans. Each run binds identical, nonzero identities and c
 - model digest;
 - initial-state digest;
 - candidate-visible feature snapshot;
-- evaluator-owned action-registry digest (action IDs and mutual-exclusion groups), recomputed by the evaluator from sorted entries using a domain-separated canonical encoding; a nonzero caller-supplied digest alone is not accepted;
+- evaluator-owned action-registry digest (action IDs, mutual-exclusion groups and per-action semantic-contract digests), recomputed by the evaluator from sorted entries using a domain-separated canonical encoding; a nonzero caller-supplied digest alone is not accepted;
 - episode horizon and resource budget.
 
 For every subset, the evaluator records measured resource use and each of the
@@ -292,7 +292,7 @@ do not lower them after seeing results.
 ## 12. Implementation status and limits
 
 Candidate controller: 12 Rust test functions authored.  
-Evaluator exact subset oracle: 14 Rust test functions authored.  
+Evaluator exact subset oracle: 15 Rust test functions authored.  
 Evaluator interaction attribution: 6 Rust test functions authored.  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
