@@ -265,7 +265,8 @@
           "$ref": "#/$defs/sha256"
         },
         "proof_state_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256",
+          "description": "Domain-separated SHA-256 over environment_sha256, goal_metadata_sha256, target_expr_sha256, local_context_sha256 and metavar_context_sha256. Recomputed by the Rust receipt verifier."
         }
       }
     },
