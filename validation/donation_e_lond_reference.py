@@ -51,13 +51,20 @@ def donation_wealth_reference(
 ) -> Fraction:
     """O(t) exact reference for Wbar_t in the donation e-LOND paper."""
     level = as_fraction(delta)
+    if not 0 < level <= 1:
+        raise ValueError("delta must be in (0,1]")
     e_values = [as_fraction(x) for x in previous_e_values]
     gamma = [as_fraction(x) for x in previous_gamma]
     if len(e_values) != len(gamma):
         raise ValueError("previous e-values and gamma must have equal lengths")
     if any(x < 0 for x in e_values) or any(x < 0 for x in gamma):
         raise ValueError("e-values and gamma weights must be nonnegative")
-    rejected_ids = set(rejected)
+    if sum(gamma, Fraction(0)) > 1:
+        raise ValueError("gamma weights must sum to at most one")
+    rejected_list = list(rejected)
+    rejected_ids = set(rejected_list)
+    if len(rejected_list) != len(rejected_ids):
+        raise ValueError("rejected IDs must be unique")
     if any(isinstance(i, bool) or not isinstance(i, int) or i < 1 or i > len(e_values) for i in rejected_ids):
         raise ValueError("rejected IDs must be 1-based indices in the previous stream")
     r = len(rejected_ids)
@@ -270,6 +277,8 @@ class DonationELONDIndex:
         weight = as_fraction(next_gamma)
         if weight < 0:
             raise ValueError("next gamma weight must be nonnegative")
+        if self.gamma_mass + weight > 1:
+            raise ValueError("cumulative gamma weights must sum to at most one")
         r = self.rejection_count
         q = Fraction(1, 1) / (self.delta * (r + 1))
         prefix_count, prefix_gamma, prefix_gamma_e = _prefix_le(self.root, q)
