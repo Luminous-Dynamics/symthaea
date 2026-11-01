@@ -567,7 +567,7 @@ pub fn plan_min_fill_cutset_elimination(
     if cutset_assignments > max_cutset_assignments {
         return Err(FactorGraphError::CutsetAssignmentBudgetExceeded {
             assignments: cutset_assignments,
-            maximum: max_cutset_assignments,
+            maximum: plan.max_cutset_assignments,
         });
     }
 
