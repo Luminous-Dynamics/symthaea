@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/fixtures/pyphi-iit4-2023-primitive-corpus-v0.1.schema.json",
+  "title": "Pinned PyPhi IIT 4.0 (2023) Primitive Corpus v0.1",
+  "description": "Exact-input PyPhi primitive reference vectors for later Rust differential qualification; not yet a Rust parity claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "qualification_scope",
+    "consciousness_inference_permitted",
+    "provenance",
+    "cases",
+    "summary",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pyphi-iit4-2023-primitive-corpus-v0.1"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "qualification_scope": {
+      "const": "pinned_pyphi_primitive_reference_only"
+    },
+    "consciousness_inference_permitted": {
+      "const": false
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "python_version",
+        "formalism",
+        "pyphi_wheel_sha256",
+        "model_sha256",
+        "evaluation_sha256",
+        "state",
+        "model_input_semantics",
+        "system_background_semantics",
+        "vector_semantics",
+        "source_commit"
+      ],
+      "properties": {
+        "distribution": {
+          "const": "pyphi"
+        },
+        "version": {
+          "const": "2.0.0rc4"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formalism": {
+          "const": "IIT_4_0_2023"
+        },
+        "pyphi_wheel_sha256": {
+          "const": "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+        },
+        "model_sha256": {
+          "const": "6d67ba617b5d2ccbba711cb44f4753286a45ae6ded16fc1a544a77dc8e931ac1"
+        },
+        "evaluation_sha256": {
+          "const": "1442d185bc5d2c23e3c6fc92e94f21d1c492cbe41a451cebd1d51fa36e862744"
+        },
+        "state": {
+          "const": [
+            0,
+            1,
+            1
+          ]
+        },
+        "model_input_semantics": {
+          "type": "string",
+          "minLength": 20
+        },
+        "system_background_semantics": {
+          "const": "external units are causally marginalized conditional on the observed whole-substrate state (IIT 4.0 2023 Eq. 4)"
+        },
+        "vector_semantics": {
+          "const": "PyPhi repertoire axes are flattened in Fortran order; candidate unit order is canonical ascending; first listed purview unit is the least-significant output bit"
+        },
+        "source_commit": {
+          "const": "134a8f31b49db512322465ed3ba5da7194d362fd"
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "candidate_label",
+          "candidate_system",
+          "mechanism",
+          "purview",
+          "state",
+          "background_conditioning",
+          "primitives"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_label": {
+            "enum": [
+              "AB",
+              "ABC"
+            ]
+          },
+          "candidate_system": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "minItems": 2,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "mechanism": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "purview": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "state": {
+            "const": [
+              0,
+              1,
+              1
+            ]
+          },
+          "background_conditioning": {
+            "const": "CAUSAL_MARGINALIZATION"
+          },
+          "primitives": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cause_repertoire",
+              "effect_repertoire",
+              "forward_cause_likelihood"
+            ],
+            "properties": {
+              "cause_repertoire": {
+                "$ref": "#/$defs/cause"
+              },
+              "effect_repertoire": {
+                "$ref": "#/$defs/effect"
+              },
+              "forward_cause_likelihood": {
+                "$ref": "#/$defs/forward"
+              }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_case_count",
+        "computed_case_count",
+        "operations_per_case",
+        "expected_operation_count",
+        "computed_operation_count"
+      ],
+      "properties": {
+        "expected_case_count": {
+          "const": 12
+        },
+        "computed_case_count": {
+          "const": 12
+        },
+        "operations_per_case": {
+          "const": 3
+        },
+        "expected_operation_count": {
+          "const": 36
+        },
+        "computed_operation_count": {
+          "const": 36
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "primitive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "request_sha256",
+        "shape",
+        "flatten_order",
+        "values",
+        "sum",
+        "vector_sha256"
+      ],
+      "properties": {
+        "operation_id": {
+          "type": "string"
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "flatten_order": {
+          "const": "Fortran/column-major; first listed purview unit is least-significant bit"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 8,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "sum": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "vector_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "cause": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/primitive"
+        },
+        {
+          "properties": {
+            "operation_id": {
+              "const": "iit4_cause_repertoire"
+            }
+          }
+        }
+      ]
+    },
+    "effect": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/primitive"
+        },
+        {
+          "properties": {
+            "operation_id": {
+              "const": "iit4_effect_repertoire"
+            }
+          }
+        }
+      ]
+    },
+    "forward": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/primitive"
+        },
+        {
+          "properties": {
+            "operation_id": {
+              "const": "iit4_forward_cause_likelihood"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
