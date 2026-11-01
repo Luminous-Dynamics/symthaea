@@ -87,5 +87,6 @@
     "replay_verifier_id": null,
     "checker_candidate_sha256": null,
     "replay_candidate_sha256": null
-  }
+  },
+  "snapshot_receipt_sha256": null
 }
