@@ -807,3 +807,47 @@ Raw response body text is not copied into the findings report. Keep the source b
 
 Tests include four deterministic synthetic classes: exact answer, full task-text context, task-item metadata, and unrelated unknown content. The matcher is intentionally deterministic and auditable; future semantic models must be separately versioned, calibrated against human adjudication, and accompanied by false-positive/false-negative confidence bounds.
 
+
+
+## Randomized search-time access-policy effects
+
+The module src/search_time_causal.rs estimates the effect of declared retrieval-access policies on fresh-benchmark performance using independently replicated three-condition run blocks.
+
+The independent statistical unit is the run block—not the benchmark questions, retrieval events, or tool calls within a run.
+
+Each block contains one run for each condition:
+- NetworkDisabled
+- Allowlisted
+- Unrestricted
+
+The condition order is deterministically randomized from evaluator-held seed material and block ID. The analyzer recomputes the order and per-block order commitment instead of trusting a submitted run sequence.
+
+The protocol holds checkpoint, challenge packet, inference harness, prompt/decoding, metric and budget specifications constant. Each arm must use distinct sandbox, agent-memory and cache namespaces and carry state-reset receipt references. Reused namespaces, incomplete runs or budget overruns make the study inconclusive rather than silently deleting the block.
+
+Run outputs bind to condition policy, trace root, evaluator findings, fresh score report, submission and execution receipt. Shared budget-spec digests are allowed; run-specific evidence and isolation namespaces must be unique.
+
+### Estimate and claim boundary
+
+Per-block paired differences are calculated for:
+- Allowlisted minus NetworkDisabled accuracy;
+- Unrestricted minus NetworkDisabled accuracy;
+- Unrestricted minus Allowlisted accuracy;
+- answered coverage;
+- observed answer-bearing retrieval finding counts.
+
+The report aggregates condition means and paired block-level differences with two-sided 95% Student-t intervals over independent blocks. The current 20-block threshold is an operational pilot floor, not a power guarantee. Multiple policy contrasts remain exploratory until one primary contrast and a multiplicity plan are preregistered and the sample size is qualified by the power simulation.
+
+The study only estimates the effect of the declared access policy under the recorded isolation protocol. It does not show that one particular retrieved page caused a score change. Run-state isolation, complete mediation, independence and confirmatory eligibility remain hard-false until independently authenticated.
+
+### CLI
+
+~~~sh
+cargo run --locked -- analyze-search-time-access-trial \
+  /secure/evaluator/search-time-access-trial-study.json \
+  /secure/evaluator/search-time-access-trial-report.json
+~~~
+
+Schemas:
+- schema/search-time-access-trial-study.schema.json
+- schema/search-time-access-trial-report.schema.json
+
