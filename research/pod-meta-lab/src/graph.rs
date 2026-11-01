@@ -4,16 +4,30 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Polarity { Supports, Refutes }
+pub enum Polarity {
+    Supports,
+    Refutes,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceIntegrity { Verified, Unverified, Invalid }
+pub enum SourceIntegrity {
+    Verified,
+    Unverified,
+    Invalid,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EvidenceLifecycle { Active, Retracted }
+pub enum EvidenceLifecycle {
+    Active,
+    Retracted,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DatasetSplit { Development, Calibration, Test }
+pub enum DatasetSplit {
+    Development,
+    Calibration,
+    Test,
+}
 
 impl DatasetSplit {
     fn label(self) -> &'static str {
@@ -44,13 +58,21 @@ impl GraphGenerationConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GraphGenerationError {
-    ChainDepthOutOfRange { requested: usize, minimum: usize, maximum: usize },
+    ChainDepthOutOfRange {
+        requested: usize,
+        minimum: usize,
+        maximum: usize,
+    },
 }
 
 impl std::fmt::Display for GraphGenerationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ChainDepthOutOfRange { requested, minimum, maximum } => write!(
+            Self::ChainDepthOutOfRange {
+                requested,
+                minimum,
+                maximum,
+            } => write!(
                 f,
                 "chain depth {requested} is outside the supported range {minimum}..={maximum}"
             ),
@@ -89,7 +111,10 @@ pub struct EvidenceRevision {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProofRequirement {
     Evidence(String),
-    Claim { claim_id: String, polarity: Polarity },
+    Claim {
+        claim_id: String,
+        polarity: Polarity,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,8 +164,11 @@ impl ProofPacket {
     pub fn abstain_all(case: &PlannerCase) -> Self {
         Self {
             case_id: case.id.clone(),
-            claim_dispositions: case.target_claim_ids.iter()
-                .map(|id| (id.clone(), ClaimDisposition::Abstain)).collect(),
+            claim_dispositions: case
+                .target_claim_ids
+                .iter()
+                .map(|id| (id.clone(), ClaimDisposition::Abstain))
+                .collect(),
             retrieval_ranking: Vec::new(),
             cited_evidence_ids: BTreeSet::new(),
         }
@@ -181,13 +209,13 @@ pub struct CaseScore {
 impl CaseScore {
     pub fn temporal_coverage_at_k(&self) -> Option<f64> {
         (self.temporal_relevant_evidence > 0).then_some(
-            self.temporal_relevant_retrieved_at_k as f64 / self.temporal_relevant_evidence as f64
+            self.temporal_relevant_retrieved_at_k as f64 / self.temporal_relevant_evidence as f64,
         )
     }
 
     pub fn temporal_precision_at_k(&self) -> Option<f64> {
         (self.temporal_retrieved_at_k > 0).then_some(
-            self.temporal_relevant_retrieved_at_k as f64 / self.temporal_retrieved_at_k as f64
+            self.temporal_relevant_retrieved_at_k as f64 / self.temporal_retrieved_at_k as f64,
         )
     }
 }
@@ -200,15 +228,26 @@ pub struct GraphEvaluationReport {
 }
 
 impl GraphEvaluationReport {
-    pub fn case_count(&self) -> usize { self.case_scores.len() }
+    pub fn case_count(&self) -> usize {
+        self.case_scores.len()
+    }
     pub fn correct_dispositions(&self) -> usize {
-        self.case_scores.iter().map(|s| s.correct_dispositions).sum()
+        self.case_scores
+            .iter()
+            .map(|s| s.correct_dispositions)
+            .sum()
     }
     pub fn false_supported_claims(&self) -> usize {
-        self.case_scores.iter().map(|s| s.false_supported_claims).sum()
+        self.case_scores
+            .iter()
+            .map(|s| s.false_supported_claims)
+            .sum()
     }
     pub fn false_refuted_claims(&self) -> usize {
-        self.case_scores.iter().map(|s| s.false_refuted_claims).sum()
+        self.case_scores
+            .iter()
+            .map(|s| s.false_refuted_claims)
+            .sum()
     }
     pub fn invalid_citations(&self) -> usize {
         self.case_scores.iter().map(|s| s.invalid_citations).sum()
@@ -218,10 +257,14 @@ impl GraphEvaluationReport {
             && self.false_refuted_claims() == 0
             && self.invalid_citations() == 0
             && self.case_scores.iter().all(|s| {
-                s.unsupported_proof_paths == 0 && s.temporal_violations == 0
-                    && s.scope_violations == 0 && s.authority_violations == 0
-                    && s.integrity_violations == 0 && s.retracted_citations == 0
-                    && s.correlation_violations == 0 && s.missing_required_citations == 0
+                s.unsupported_proof_paths == 0
+                    && s.temporal_violations == 0
+                    && s.scope_violations == 0
+                    && s.authority_violations == 0
+                    && s.integrity_violations == 0
+                    && s.retracted_citations == 0
+                    && s.correlation_violations == 0
+                    && s.missing_required_citations == 0
             })
     }
 }
@@ -239,10 +282,19 @@ pub enum EvidenceMutation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HiddenTruth { SupportsAssertion, RefutesAssertion, Irrelevant }
+enum HiddenTruth {
+    SupportsAssertion,
+    RefutesAssertion,
+    Irrelevant,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OracleState { Supported, Refuted, Contested, Unknown }
+enum OracleState {
+    Supported,
+    Refuted,
+    Contested,
+    Unknown,
+}
 
 #[derive(Debug, Clone, Default)]
 struct Witness {
@@ -267,7 +319,10 @@ impl ClaimEval {
         }
     }
     fn witnesses(&self, polarity: Polarity) -> &BTreeMap<String, Witness> {
-        match polarity { Polarity::Supports => &self.support, Polarity::Refutes => &self.refute }
+        match polarity {
+            Polarity::Supports => &self.support,
+            Polarity::Refutes => &self.refute,
+        }
     }
 }
 
@@ -283,8 +338,12 @@ pub struct GraphSuite {
 }
 
 impl GraphSuite {
-    pub fn planner_cases(&self) -> &[PlannerCase] { &self.planner_cases }
-    pub fn case_count(&self) -> usize { self.planner_cases.len() }
+    pub fn planner_cases(&self) -> &[PlannerCase] {
+        &self.planner_cases
+    }
+    pub fn case_count(&self) -> usize {
+        self.planner_cases.len()
+    }
 
     /// Apply a controlled mutation to planner-facing evidence metadata.
     /// The private oracle label is never changed, so the mutation can be scored.
@@ -294,8 +353,12 @@ impl GraphSuite {
         evidence_id: &str,
         mutation: EvidenceMutation,
     ) -> bool {
-        let Some(case) = self.planner_cases.iter_mut().find(|c| c.id == case_id) else { return false; };
-        let Some(evidence) = case.evidence.iter_mut().find(|e| e.id == evidence_id) else { return false; };
+        let Some(case) = self.planner_cases.iter_mut().find(|c| c.id == case_id) else {
+            return false;
+        };
+        let Some(evidence) = case.evidence.iter_mut().find(|e| e.id == evidence_id) else {
+            return false;
+        };
         match mutation {
             EvidenceMutation::Retract => evidence.lifecycle = EvidenceLifecycle::Retracted,
             EvidenceMutation::FlipAssertedPolarity => {
@@ -325,15 +388,23 @@ impl GraphSuite {
         let mut by_case = BTreeMap::<String, &ProofPacket>::new();
         let mut duplicates = 0;
         for packet in packets {
-            if by_case.insert(packet.case_id.clone(), packet).is_some() { duplicates += 1; }
+            if by_case.insert(packet.case_id.clone(), packet).is_some() {
+                duplicates += 1;
+            }
         }
         let mut case_scores = Vec::with_capacity(self.planner_cases.len());
         for case in &self.planner_cases {
-            let labels = self.oracle.get(&case.id).expect("oracle labels exist for generated case");
+            let labels = self
+                .oracle
+                .get(&case.id)
+                .expect("oracle labels exist for generated case");
             let abstain;
             let packet = match by_case.remove(&case.id) {
                 Some(packet) => packet,
-                None => { abstain = ProofPacket::abstain_all(case); &abstain }
+                None => {
+                    abstain = ProofPacket::abstain_all(case);
+                    &abstain
+                }
             };
             case_scores.push(score_case(case, labels, packet));
         }
@@ -346,21 +417,26 @@ impl GraphSuite {
 }
 
 fn temporal(e: &EvidenceRevision, q: &QueryProfile) -> bool {
-    e.valid_from <= q.valid_at && e.valid_until.map_or(true, |end| q.valid_at < end)
-        && e.known_from <= q.known_at && e.known_until.map_or(true, |end| q.known_at < end)
+    e.valid_from <= q.valid_at
+        && e.valid_until.map_or(true, |end| q.valid_at < end)
+        && e.known_from <= q.known_at
+        && e.known_until.map_or(true, |end| q.known_at < end)
 }
 
 fn admissible(e: &EvidenceRevision, q: &QueryProfile) -> bool {
-    temporal(e, q) && e.scope_id == q.required_scope
+    temporal(e, q)
+        && e.scope_id == q.required_scope
         && e.authority_id == q.required_authority
         && e.integrity == SourceIntegrity::Verified
         && e.lifecycle == EvidenceLifecycle::Active
 }
 
 fn truth_matches(e: &EvidenceRevision, labels: &BTreeMap<String, HiddenTruth>) -> bool {
-    matches!((e.asserted_polarity, labels.get(&e.id).copied()),
+    matches!(
+        (e.asserted_polarity, labels.get(&e.id).copied()),
         (Polarity::Supports, Some(HiddenTruth::SupportsAssertion))
-        | (Polarity::Refutes, Some(HiddenTruth::RefutesAssertion)))
+            | (Polarity::Refutes, Some(HiddenTruth::RefutesAssertion))
+    )
 }
 
 fn resolve_claim(
@@ -370,9 +446,15 @@ fn resolve_claim(
     stack: &mut BTreeSet<String>,
     memo: &mut BTreeMap<String, ClaimEval>,
 ) -> ClaimEval {
-    if let Some(cached) = memo.get(claim_id) { return cached.clone(); }
-    if stack.contains(claim_id) { return ClaimEval::default(); }
-    let Some(node) = case.claims.iter().find(|n| n.id == claim_id) else { return ClaimEval::default(); };
+    if let Some(cached) = memo.get(claim_id) {
+        return cached.clone();
+    }
+    if stack.contains(claim_id) {
+        return ClaimEval::default();
+    }
+    let Some(node) = case.claims.iter().find(|n| n.id == claim_id) else {
+        return ClaimEval::default();
+    };
     stack.insert(claim_id.to_string());
     let evidence_by_id: BTreeMap<&str, &EvidenceRevision> =
         case.evidence.iter().map(|e| (e.id.as_str(), e)).collect();
@@ -385,34 +467,55 @@ fn resolve_claim(
         for req in &alt.requirements {
             match req {
                 ProofRequirement::Evidence(id) => {
-                    let Some(e) = evidence_by_id.get(id.as_str()) else { valid = false; break; };
-                    if e.subject_claim_id != claim_id || !admissible(e, &case.query) || !truth_matches(e, labels) {
+                    let Some(e) = evidence_by_id.get(id.as_str()) else {
+                        valid = false;
+                        break;
+                    };
+                    if e.subject_claim_id != claim_id
+                        || !admissible(e, &case.query)
+                        || !truth_matches(e, labels)
+                    {
                         valid = false;
                         break;
                     }
                     witness.evidence_ids.insert(e.id.clone());
-                    witness.independence_groups.insert(e.independence_group_id.clone());
+                    witness
+                        .independence_groups
+                        .insert(e.independence_group_id.clone());
                     direct_independence_groups.insert(e.independence_group_id.clone());
                 }
-                ProofRequirement::Claim { claim_id: child_id, polarity } => {
+                ProofRequirement::Claim {
+                    claim_id: child_id,
+                    polarity,
+                } => {
                     let child = resolve_claim(case, labels, child_id, stack, memo);
                     let Some(child_witness) = child.witnesses(*polarity).values().next() else {
                         valid = false;
                         break;
                     };
-                    witness.evidence_ids.extend(child_witness.evidence_ids.iter().cloned());
-                    witness.independence_groups.extend(child_witness.independence_groups.iter().cloned());
+                    witness
+                        .evidence_ids
+                        .extend(child_witness.evidence_ids.iter().cloned());
+                    witness
+                        .independence_groups
+                        .extend(child_witness.independence_groups.iter().cloned());
                 }
             }
         }
-        if !valid { continue; }
+        if !valid {
+            continue;
+        }
         if direct_independence_groups.len() < alt.min_independent_groups {
             result.correlation_rejected.insert(alt.id.clone());
             continue;
         }
         match alt.conclusion {
-            Polarity::Supports => { result.support.insert(alt.id.clone(), witness); }
-            Polarity::Refutes => { result.refute.insert(alt.id.clone(), witness); }
+            Polarity::Supports => {
+                result.support.insert(alt.id.clone(), witness);
+            }
+            Polarity::Refutes => {
+                result.refute.insert(alt.id.clone(), witness);
+            }
         }
     }
     stack.remove(claim_id);
@@ -438,8 +541,15 @@ fn collect_reachable_evidence_requirements(
                 ProofRequirement::Evidence(evidence_id) => {
                     requirements.insert((claim_id.to_string(), evidence_id.clone()));
                 }
-                ProofRequirement::Claim { claim_id: child, .. } => {
-                    collect_reachable_evidence_requirements(case, child, visited_claims, requirements);
+                ProofRequirement::Claim {
+                    claim_id: child, ..
+                } => {
+                    collect_reachable_evidence_requirements(
+                        case,
+                        child,
+                        visited_claims,
+                        requirements,
+                    );
                 }
             }
         }
@@ -458,13 +568,16 @@ fn oracle_relevant_evidence_ids(
 
     let evidence_by_id: BTreeMap<&str, &EvidenceRevision> =
         case.evidence.iter().map(|e| (e.id.as_str(), e)).collect();
-    requirements.into_iter().filter_map(|(claim_id, evidence_id)| {
-        let evidence = evidence_by_id.get(evidence_id.as_str())?;
-        (evidence.subject_claim_id == claim_id
-            && admissible(evidence, &case.query)
-            && truth_matches(evidence, labels))
+    requirements
+        .into_iter()
+        .filter_map(|(claim_id, evidence_id)| {
+            let evidence = evidence_by_id.get(evidence_id.as_str())?;
+            (evidence.subject_claim_id == claim_id
+                && admissible(evidence, &case.query)
+                && truth_matches(evidence, labels))
             .then_some(evidence_id)
-    }).collect()
+        })
+        .collect()
 }
 
 fn score_case(
@@ -485,9 +598,7 @@ fn score_case(
     let mut seen_retrieval = BTreeSet::new();
     for evidence_id in packet.retrieval_ranking.iter().take(TEMPORAL_RETRIEVAL_K) {
         score.temporal_retrieved_at_k += 1;
-        if seen_retrieval.insert(evidence_id.clone())
-            && relevant_evidence.contains(evidence_id)
-        {
+        if seen_retrieval.insert(evidence_id.clone()) && relevant_evidence.contains(evidence_id) {
             score.temporal_relevant_retrieved_at_k += 1;
         }
     }
@@ -495,7 +606,10 @@ fn score_case(
     for id in &case.target_claim_ids {
         let evaluation = resolve_claim(case, labels, id, &mut BTreeSet::new(), &mut memo);
         let state = evaluation.state();
-        let disposition = packet.claim_dispositions.get(id).unwrap_or(&ClaimDisposition::Abstain);
+        let disposition = packet
+            .claim_dispositions
+            .get(id)
+            .unwrap_or(&ClaimDisposition::Abstain);
         let mut correct = false;
         let mut witness: Option<&Witness> = None;
         match disposition {
@@ -504,8 +618,12 @@ fn score_case(
                 correct = state == OracleState::Supported && witness.is_some();
                 if !correct {
                     score.false_supported_claims += 1;
-                    if witness.is_none() { score.unsupported_proof_paths += 1; }
-                    if evaluation.correlation_rejected.contains(alternative_id) { score.correlation_violations += 1; }
+                    if witness.is_none() {
+                        score.unsupported_proof_paths += 1;
+                    }
+                    if evaluation.correlation_rejected.contains(alternative_id) {
+                        score.correlation_violations += 1;
+                    }
                 }
             }
             ClaimDisposition::Refuted { alternative_id } => {
@@ -513,18 +631,25 @@ fn score_case(
                 correct = state == OracleState::Refuted && witness.is_some();
                 if !correct {
                     score.false_refuted_claims += 1;
-                    if witness.is_none() { score.unsupported_proof_paths += 1; }
+                    if witness.is_none() {
+                        score.unsupported_proof_paths += 1;
+                    }
                 }
             }
-            ClaimDisposition::Contested => { correct = state == OracleState::Contested; }
+            ClaimDisposition::Contested => {
+                correct = state == OracleState::Contested;
+            }
             ClaimDisposition::Abstain => {
                 score.abstained_claims += 1;
                 correct = state == OracleState::Unknown;
-                if !correct { score.missed_resolvable_claims += 1; }
+                if !correct {
+                    score.missed_resolvable_claims += 1;
+                }
             }
         }
-        if correct { score.correct_dispositions += 1; }
-        else {
+        if correct {
+            score.correct_dispositions += 1;
+        } else {
             score.incorrect_dispositions += 1;
             if !matches!(disposition, ClaimDisposition::Abstain) && state != OracleState::Unknown {
                 score.missed_resolvable_claims += 1;
@@ -532,64 +657,138 @@ fn score_case(
         }
         if let Some(w) = witness {
             for required in &w.evidence_ids {
-                if !packet.cited_evidence_ids.contains(required) { score.missing_required_citations += 1; }
+                if !packet.cited_evidence_ids.contains(required) {
+                    score.missing_required_citations += 1;
+                }
             }
         }
     }
 
     for citation in &packet.cited_evidence_ids {
-        let Some(e) = evidence_by_id.get(citation.as_str()) else { score.invalid_citations += 1; continue; };
+        let Some(e) = evidence_by_id.get(citation.as_str()) else {
+            score.invalid_citations += 1;
+            continue;
+        };
         let mut invalid = false;
-        if !temporal(e, &case.query) { score.temporal_violations += 1; invalid = true; }
-        if e.scope_id != case.query.required_scope { score.scope_violations += 1; invalid = true; }
-        if e.authority_id != case.query.required_authority { score.authority_violations += 1; invalid = true; }
-        if e.integrity != SourceIntegrity::Verified { score.integrity_violations += 1; invalid = true; }
-        if e.lifecycle == EvidenceLifecycle::Retracted { score.retracted_citations += 1; invalid = true; }
-        if !truth_matches(e, labels) { invalid = true; }
-        if invalid { score.invalid_citations += 1; }
+        if !temporal(e, &case.query) {
+            score.temporal_violations += 1;
+            invalid = true;
+        }
+        if e.scope_id != case.query.required_scope {
+            score.scope_violations += 1;
+            invalid = true;
+        }
+        if e.authority_id != case.query.required_authority {
+            score.authority_violations += 1;
+            invalid = true;
+        }
+        if e.integrity != SourceIntegrity::Verified {
+            score.integrity_violations += 1;
+            invalid = true;
+        }
+        if e.lifecycle == EvidenceLifecycle::Retracted {
+            score.retracted_citations += 1;
+            invalid = true;
+        }
+        if !truth_matches(e, labels) {
+            invalid = true;
+        }
+        if invalid {
+            score.invalid_citations += 1;
+        }
     }
     score
 }
 
 #[allow(clippy::too_many_arguments)] // Synthetic fixture fields are deliberately explicit at call sites.
 fn ev(
-    seed: u64, split: DatasetSplit, family: &str, id: &str, claim: &str, polarity: Polarity, group: &str,
-    valid: (u64, Option<u64>), known: (u64, Option<u64>), scope: &str, authority: &str,
+    seed: u64,
+    split: DatasetSplit,
+    family: &str,
+    id: &str,
+    claim: &str,
+    polarity: Polarity,
+    group: &str,
+    valid: (u64, Option<u64>),
+    known: (u64, Option<u64>),
+    scope: &str,
+    authority: &str,
 ) -> EvidenceRevision {
     EvidenceRevision {
-        id: id.into(), source_id: format!("src-{}-{seed}-{family}-{id}", split.label()),
+        id: id.into(),
+        source_id: format!("src-{}-{seed}-{family}-{id}", split.label()),
         source_family_id: format!("{}-family-{family}", split.label()),
-        independence_group_id: group.into(), subject_claim_id: claim.into(),
-        asserted_polarity: polarity, valid_from: valid.0, valid_until: valid.1,
-        known_from: known.0, known_until: known.1, scope_id: scope.into(),
-        authority_id: authority.into(), integrity: SourceIntegrity::Verified,
+        independence_group_id: group.into(),
+        subject_claim_id: claim.into(),
+        asserted_polarity: polarity,
+        valid_from: valid.0,
+        valid_until: valid.1,
+        known_from: known.0,
+        known_until: known.1,
+        scope_id: scope.into(),
+        authority_id: authority.into(),
+        integrity: SourceIntegrity::Verified,
         lifecycle: EvidenceLifecycle::Active,
     }
 }
 
 fn q(valid_at: u64, known_at: u64) -> QueryProfile {
-    QueryProfile { valid_at, known_at, required_scope: "scope-a".into(), required_authority: "authority-a".into() }
+    QueryProfile {
+        valid_at,
+        known_at,
+        required_scope: "scope-a".into(),
+        required_authority: "authority-a".into(),
+    }
 }
 
-fn alt(id: &str, conclusion: Polarity, requirements: Vec<ProofRequirement>, independent: usize) -> ProofAlternative {
-    ProofAlternative { id: id.into(), conclusion, requirements, min_independent_groups: independent }
+fn alt(
+    id: &str,
+    conclusion: Polarity,
+    requirements: Vec<ProofRequirement>,
+    independent: usize,
+) -> ProofAlternative {
+    ProofAlternative {
+        id: id.into(),
+        conclusion,
+        requirements,
+        min_independent_groups: independent,
+    }
 }
 
 fn claim(id: &str, alternatives: Vec<ProofAlternative>) -> ClaimNode {
-    ClaimNode { id: id.into(), alternatives }
+    ClaimNode {
+        id: id.into(),
+        alternatives,
+    }
 }
 
 #[allow(clippy::too_many_arguments)] // Fixture constructor keeps case, graph, evidence, and oracle labels visible.
 fn add(
-    suite: &mut GraphSuite, seed: u64, split: DatasetSplit, suffix: &str, query: QueryProfile,
-    targets: &[&str], claims: Vec<ClaimNode>, evidence: Vec<EvidenceRevision>,
+    suite: &mut GraphSuite,
+    seed: u64,
+    split: DatasetSplit,
+    suffix: &str,
+    query: QueryProfile,
+    targets: &[&str],
+    claims: Vec<ClaimNode>,
+    evidence: Vec<EvidenceRevision>,
     labels: &[(&str, HiddenTruth)],
 ) {
     let id = format!("poar-{}-{}-{suffix}", split.label(), seed);
     suite.planner_cases.push(PlannerCase {
-        id: id.clone(), query, target_claim_ids: targets.iter().map(|s| (*s).into()).collect(), claims, evidence,
+        id: id.clone(),
+        query,
+        target_claim_ids: targets.iter().map(|s| (*s).into()).collect(),
+        claims,
+        evidence,
     });
-    suite.oracle.insert(id, labels.iter().map(|(id, label)| ((*id).into(), *label)).collect());
+    suite.oracle.insert(
+        id,
+        labels
+            .iter()
+            .map(|(id, label)| ((*id).into(), *label))
+            .collect(),
+    );
 }
 
 /// Fixed-template synthetic generator. Seed salts identities and time coordinates;
@@ -626,99 +825,519 @@ pub fn generate_poar_graph_suite_with_config(
     };
 
     // AND: root needs a supported child claim and separate root evidence.
-    add(&mut suite, seed, split, "and-chain", q(t+5,t+5), &["root"], vec![
-        claim("leaf", vec![alt("leaf-support", Polarity::Supports, vec![ProofRequirement::Evidence("e-leaf".into())], 1)]),
-        claim("root", vec![alt("and-path", Polarity::Supports, vec![
-            ProofRequirement::Claim { claim_id: "leaf".into(), polarity: Polarity::Supports },
-            ProofRequirement::Evidence("e-root".into()),
-        ], 1)]),
-    ], vec![
-        ev(seed,split,"and","e-leaf","leaf",Polarity::Supports,"g-leaf",(t,None),(t,None),"scope-a","authority-a"),
-        ev(seed,split,"and","e-root","root",Polarity::Supports,"g-root",(t,None),(t,None),"scope-a","authority-a"),
-    ], &[("e-leaf",HiddenTruth::SupportsAssertion),("e-root",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "and-chain",
+        q(t + 5, t + 5),
+        &["root"],
+        vec![
+            claim(
+                "leaf",
+                vec![alt(
+                    "leaf-support",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-leaf".into())],
+                    1,
+                )],
+            ),
+            claim(
+                "root",
+                vec![alt(
+                    "and-path",
+                    Polarity::Supports,
+                    vec![
+                        ProofRequirement::Claim {
+                            claim_id: "leaf".into(),
+                            polarity: Polarity::Supports,
+                        },
+                        ProofRequirement::Evidence("e-root".into()),
+                    ],
+                    1,
+                )],
+            ),
+        ],
+        vec![
+            ev(
+                seed,
+                split,
+                "and",
+                "e-leaf",
+                "leaf",
+                Polarity::Supports,
+                "g-leaf",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+            ev(
+                seed,
+                split,
+                "and",
+                "e-root",
+                "root",
+                Polarity::Supports,
+                "g-root",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+        ],
+        &[
+            ("e-leaf", HiddenTruth::SupportsAssertion),
+            ("e-root", HiddenTruth::SupportsAssertion),
+        ],
+    );
 
     // OR: old revision is no longer known; current path remains admissible.
-    add(&mut suite, seed, split, "or-current-alternative", q(t+5,t+20), &["claim"], vec![
-        claim("claim", vec![
-            alt("old-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-old".into())],1),
-            alt("current-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-current".into())],1),
-        ]),
-    ], vec![
-        ev(seed,split,"or","e-old","claim",Polarity::Supports,"g-old",(t,None),(t,Some(t+10)),"scope-a","authority-a"),
-        ev(seed,split,"or","e-current","claim",Polarity::Supports,"g-current",(t,None),(t+10,None),"scope-a","authority-a"),
-    ], &[("e-old",HiddenTruth::SupportsAssertion),("e-current",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "or-current-alternative",
+        q(t + 5, t + 20),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![
+                alt(
+                    "old-path",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-old".into())],
+                    1,
+                ),
+                alt(
+                    "current-path",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-current".into())],
+                    1,
+                ),
+            ],
+        )],
+        vec![
+            ev(
+                seed,
+                split,
+                "or",
+                "e-old",
+                "claim",
+                Polarity::Supports,
+                "g-old",
+                (t, None),
+                (t, Some(t + 10)),
+                "scope-a",
+                "authority-a",
+            ),
+            ev(
+                seed,
+                split,
+                "or",
+                "e-current",
+                "claim",
+                Polarity::Supports,
+                "g-current",
+                (t, None),
+                (t + 10, None),
+                "scope-a",
+                "authority-a",
+            ),
+        ],
+        &[
+            ("e-old", HiddenTruth::SupportsAssertion),
+            ("e-current", HiddenTruth::SupportsAssertion),
+        ],
+    );
 
     // Correlated echo: two record IDs but one independence group.
-    add(&mut suite, seed, split, "correlated-echo", q(t+5,t+5), &["claim"], vec![
-        claim("claim", vec![alt("echo-path",Polarity::Supports,vec![
-            ProofRequirement::Evidence("e-echo-a".into()),ProofRequirement::Evidence("e-echo-b".into()),
-        ],2)]),
-    ], vec![
-        ev(seed,split,"echo","e-echo-a","claim",Polarity::Supports,"same-origin",(t,None),(t,None),"scope-a","authority-a"),
-        ev(seed,split,"echo","e-echo-b","claim",Polarity::Supports,"same-origin",(t,None),(t,None),"scope-a","authority-a"),
-    ], &[("e-echo-a",HiddenTruth::SupportsAssertion),("e-echo-b",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "correlated-echo",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "echo-path",
+                Polarity::Supports,
+                vec![
+                    ProofRequirement::Evidence("e-echo-a".into()),
+                    ProofRequirement::Evidence("e-echo-b".into()),
+                ],
+                2,
+            )],
+        )],
+        vec![
+            ev(
+                seed,
+                split,
+                "echo",
+                "e-echo-a",
+                "claim",
+                Polarity::Supports,
+                "same-origin",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+            ev(
+                seed,
+                split,
+                "echo",
+                "e-echo-b",
+                "claim",
+                Polarity::Supports,
+                "same-origin",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+        ],
+        &[
+            ("e-echo-a", HiddenTruth::SupportsAssertion),
+            ("e-echo-b", HiddenTruth::SupportsAssertion),
+        ],
+    );
 
     // Bitemporal correction: both records are valid at the query time, but only
     // the revision known at the query's known_at coordinate may be used.
-    for (suffix, known_at) in [("temporal-before-correction",t+5),("temporal-after-correction",t+15)] {
-        add(&mut suite,seed,split,suffix,q(t+5,known_at),&["claim"],vec![
-            claim("claim",vec![
-                alt("revision-one",Polarity::Supports,vec![ProofRequirement::Evidence("e-rev-one".into())],1),
-                alt("revision-two",Polarity::Refutes,vec![ProofRequirement::Evidence("e-rev-two".into())],1),
-            ]),
-        ],vec![
-            ev(seed,split,"temporal","e-rev-one","claim",Polarity::Supports,"g-rev-one",(t,Some(t+100)),(t,Some(t+10)),"scope-a","authority-a"),
-            ev(seed,split,"temporal","e-rev-two","claim",Polarity::Refutes,"g-rev-two",(t,Some(t+100)),(t+10,None),"scope-a","authority-a"),
-        ],&[("e-rev-one",HiddenTruth::SupportsAssertion),("e-rev-two",HiddenTruth::RefutesAssertion)]);
+    for (suffix, known_at) in [
+        ("temporal-before-correction", t + 5),
+        ("temporal-after-correction", t + 15),
+    ] {
+        add(
+            &mut suite,
+            seed,
+            split,
+            suffix,
+            q(t + 5, known_at),
+            &["claim"],
+            vec![claim(
+                "claim",
+                vec![
+                    alt(
+                        "revision-one",
+                        Polarity::Supports,
+                        vec![ProofRequirement::Evidence("e-rev-one".into())],
+                        1,
+                    ),
+                    alt(
+                        "revision-two",
+                        Polarity::Refutes,
+                        vec![ProofRequirement::Evidence("e-rev-two".into())],
+                        1,
+                    ),
+                ],
+            )],
+            vec![
+                ev(
+                    seed,
+                    split,
+                    "temporal",
+                    "e-rev-one",
+                    "claim",
+                    Polarity::Supports,
+                    "g-rev-one",
+                    (t, Some(t + 100)),
+                    (t, Some(t + 10)),
+                    "scope-a",
+                    "authority-a",
+                ),
+                ev(
+                    seed,
+                    split,
+                    "temporal",
+                    "e-rev-two",
+                    "claim",
+                    Polarity::Refutes,
+                    "g-rev-two",
+                    (t, Some(t + 100)),
+                    (t + 10, None),
+                    "scope-a",
+                    "authority-a",
+                ),
+            ],
+            &[
+                ("e-rev-one", HiddenTruth::SupportsAssertion),
+                ("e-rev-two", HiddenTruth::RefutesAssertion),
+            ],
+        );
     }
 
     // Transitive retraction: a root conclusion depends on a retractable leaf source.
-    add(&mut suite,seed,split,"retraction-dependency",q(t+5,t+5),&["root","unaffected"],vec![
-        claim("base",vec![alt("base-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-base".into())],1)]),
-        claim("root",vec![alt("root-via-base",Polarity::Supports,vec![
-            ProofRequirement::Claim{claim_id:"base".into(),polarity:Polarity::Supports},
-        ],0)]),
-        claim("unaffected",vec![alt("unaffected-path",Polarity::Supports,vec![
-            ProofRequirement::Evidence("e-unaffected".into()),
-        ],1)]),
-    ],vec![
-        ev(seed,split,"retraction","e-base","base",Polarity::Supports,"g-base",(t,None),(t,None),"scope-a","authority-a"),
-        ev(seed,split,"retraction-independent","e-unaffected","unaffected",Polarity::Supports,"g-unaffected",(t,None),(t,None),"scope-a","authority-a"),
-    ],&[("e-base",HiddenTruth::SupportsAssertion),("e-unaffected",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "retraction-dependency",
+        q(t + 5, t + 5),
+        &["root", "unaffected"],
+        vec![
+            claim(
+                "base",
+                vec![alt(
+                    "base-path",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-base".into())],
+                    1,
+                )],
+            ),
+            claim(
+                "root",
+                vec![alt(
+                    "root-via-base",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Claim {
+                        claim_id: "base".into(),
+                        polarity: Polarity::Supports,
+                    }],
+                    0,
+                )],
+            ),
+            claim(
+                "unaffected",
+                vec![alt(
+                    "unaffected-path",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-unaffected".into())],
+                    1,
+                )],
+            ),
+        ],
+        vec![
+            ev(
+                seed,
+                split,
+                "retraction",
+                "e-base",
+                "base",
+                Polarity::Supports,
+                "g-base",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+            ev(
+                seed,
+                split,
+                "retraction-independent",
+                "e-unaffected",
+                "unaffected",
+                Polarity::Supports,
+                "g-unaffected",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+        ],
+        &[
+            ("e-base", HiddenTruth::SupportsAssertion),
+            ("e-unaffected", HiddenTruth::SupportsAssertion),
+        ],
+    );
 
     // Scope mismatch and authority mismatch are distinct fixtures.
-    add(&mut suite,seed,split,"scope-mismatch",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![alt("scope-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-scope".into())],1)]),
-    ],vec![ev(seed,split,"scope","e-scope","claim",Polarity::Supports,"g-scope",(t,None),(t,None),"scope-b","authority-a")],
-    &[("e-scope",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "scope-mismatch",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "scope-path",
+                Polarity::Supports,
+                vec![ProofRequirement::Evidence("e-scope".into())],
+                1,
+            )],
+        )],
+        vec![ev(
+            seed,
+            split,
+            "scope",
+            "e-scope",
+            "claim",
+            Polarity::Supports,
+            "g-scope",
+            (t, None),
+            (t, None),
+            "scope-b",
+            "authority-a",
+        )],
+        &[("e-scope", HiddenTruth::SupportsAssertion)],
+    );
 
-    add(&mut suite,seed,split,"authority-mismatch",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![alt("authority-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-authority".into())],1)]),
-    ],vec![ev(seed,split,"authority","e-authority","claim",Polarity::Supports,"g-authority",(t,None),(t,None),"scope-a","authority-b")],
-    &[("e-authority",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "authority-mismatch",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "authority-path",
+                Polarity::Supports,
+                vec![ProofRequirement::Evidence("e-authority".into())],
+                1,
+            )],
+        )],
+        vec![ev(
+            seed,
+            split,
+            "authority",
+            "e-authority",
+            "claim",
+            Polarity::Supports,
+            "g-authority",
+            (t, None),
+            (t, None),
+            "scope-a",
+            "authority-b",
+        )],
+        &[("e-authority", HiddenTruth::SupportsAssertion)],
+    );
 
     // Simultaneous positive and negative support must remain contested.
-    add(&mut suite,seed,split,"positive-negative-conflict",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![
-            alt("positive-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-positive".into())],1),
-            alt("negative-path",Polarity::Refutes,vec![ProofRequirement::Evidence("e-negative".into())],1),
-        ]),
-    ],vec![
-        ev(seed,split,"conflict","e-positive","claim",Polarity::Supports,"g-plus",(t,None),(t,None),"scope-a","authority-a"),
-        ev(seed,split,"conflict","e-negative","claim",Polarity::Refutes,"g-minus",(t,None),(t,None),"scope-a","authority-a"),
-    ],&[("e-positive",HiddenTruth::SupportsAssertion),("e-negative",HiddenTruth::RefutesAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "positive-negative-conflict",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![
+                alt(
+                    "positive-path",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-positive".into())],
+                    1,
+                ),
+                alt(
+                    "negative-path",
+                    Polarity::Refutes,
+                    vec![ProofRequirement::Evidence("e-negative".into())],
+                    1,
+                ),
+            ],
+        )],
+        vec![
+            ev(
+                seed,
+                split,
+                "conflict",
+                "e-positive",
+                "claim",
+                Polarity::Supports,
+                "g-plus",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+            ev(
+                seed,
+                split,
+                "conflict",
+                "e-negative",
+                "claim",
+                Polarity::Refutes,
+                "g-minus",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+        ],
+        &[
+            ("e-positive", HiddenTruth::SupportsAssertion),
+            ("e-negative", HiddenTruth::RefutesAssertion),
+        ],
+    );
 
     // Cycles cannot self-certify.
-    add(&mut suite,seed,split,"cyclic-derivation",q(t+5,t+5),&["a"],vec![
-        claim("a",vec![alt("a-via-b",Polarity::Supports,vec![ProofRequirement::Claim{claim_id:"b".into(),polarity:Polarity::Supports}],0)]),
-        claim("b",vec![alt("b-via-a",Polarity::Supports,vec![ProofRequirement::Claim{claim_id:"a".into(),polarity:Polarity::Supports}],0)]),
-    ],Vec::new(),&[]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "cyclic-derivation",
+        q(t + 5, t + 5),
+        &["a"],
+        vec![
+            claim(
+                "a",
+                vec![alt(
+                    "a-via-b",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Claim {
+                        claim_id: "b".into(),
+                        polarity: Polarity::Supports,
+                    }],
+                    0,
+                )],
+            ),
+            claim(
+                "b",
+                vec![alt(
+                    "b-via-a",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Claim {
+                        claim_id: "a".into(),
+                        polarity: Polarity::Supports,
+                    }],
+                    0,
+                )],
+            ),
+        ],
+        Vec::new(),
+        &[],
+    );
 
     // Future-known evidence cannot leak into the earlier as-known view.
-    add(&mut suite,seed,split,"future-known-leak",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![alt("future-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-future".into())],1)]),
-    ],vec![ev(seed,split,"future","e-future","claim",Polarity::Supports,"g-future",(t,None),(t+20,None),"scope-a","authority-a")],
-    &[("e-future",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "future-known-leak",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "future-path",
+                Polarity::Supports,
+                vec![ProofRequirement::Evidence("e-future".into())],
+                1,
+            )],
+        )],
+        vec![ev(
+            seed,
+            split,
+            "future",
+            "e-future",
+            "claim",
+            Polarity::Supports,
+            "g-future",
+            (t, None),
+            (t + 20, None),
+            "scope-a",
+            "authority-a",
+        )],
+        &[("e-future", HiddenTruth::SupportsAssertion)],
+    );
 
     // Difficulty is structurally stratified: dev=8, calibration=32, held-out test=64.
     {
@@ -727,52 +1346,176 @@ pub fn generate_poar_graph_suite_with_config(
         for index in 0..depth {
             let id = format!("chain-{index:03}");
             let alternative = if index + 1 == depth {
-                alt("chain-tail", Polarity::Supports,
-                    vec![ProofRequirement::Evidence("e-chain-leaf".into())], 1)
+                alt(
+                    "chain-tail",
+                    Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-chain-leaf".into())],
+                    1,
+                )
             } else {
-                alt(&format!("chain-step-{index:03}"), Polarity::Supports,
+                alt(
+                    &format!("chain-step-{index:03}"),
+                    Polarity::Supports,
                     vec![ProofRequirement::Claim {
                         claim_id: format!("chain-{:03}", index + 1),
                         polarity: Polarity::Supports,
-                    }], 0)
+                    }],
+                    0,
+                )
             };
-            claims.push(ClaimNode { id, alternatives: vec![alternative] });
+            claims.push(ClaimNode {
+                id,
+                alternatives: vec![alternative],
+            });
         }
         let leaf = format!("chain-{:03}", depth - 1);
         let suffix = format!("long-chain-{depth}");
-        add(&mut suite, seed, split, &suffix, q(t+5,t+5), &["chain-000"], claims,
-            vec![ev(seed,split,"long-chain","e-chain-leaf",&leaf,Polarity::Supports,"g-chain-leaf",
-                (t,None),(t,None),"scope-a","authority-a")],
-            &[("e-chain-leaf",HiddenTruth::SupportsAssertion)]);
+        add(
+            &mut suite,
+            seed,
+            split,
+            &suffix,
+            q(t + 5, t + 5),
+            &["chain-000"],
+            claims,
+            vec![ev(
+                seed,
+                split,
+                "long-chain",
+                "e-chain-leaf",
+                &leaf,
+                Polarity::Supports,
+                "g-chain-leaf",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            )],
+            &[("e-chain-leaf", HiddenTruth::SupportsAssertion)],
+        );
     }
 
     // The public assertion is plausible but the hidden source-truth label disagrees.
-    add(&mut suite,seed,split,"assertion-content-mismatch",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![alt("assertion-path",Polarity::Supports,
-            vec![ProofRequirement::Evidence("e-assertion".into())],1)]),
-    ],vec![ev(seed,split,"assertion","e-assertion","claim",Polarity::Supports,"g-assertion",
-        (t,None),(t,None),"scope-a","authority-a")],
-    &[("e-assertion",HiddenTruth::Irrelevant)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "assertion-content-mismatch",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "assertion-path",
+                Polarity::Supports,
+                vec![ProofRequirement::Evidence("e-assertion".into())],
+                1,
+            )],
+        )],
+        vec![ev(
+            seed,
+            split,
+            "assertion",
+            "e-assertion",
+            "claim",
+            Polarity::Supports,
+            "g-assertion",
+            (t, None),
+            (t, None),
+            "scope-a",
+            "authority-a",
+        )],
+        &[("e-assertion", HiddenTruth::Irrelevant)],
+    );
 
     // Truthful content is still inadmissible when the source-integrity floor fails.
-    let mut unverified = ev(seed,split,"integrity","e-unverified","claim",Polarity::Supports,"g-unverified",
-        (t,None),(t,None),"scope-a","authority-a");
+    let mut unverified = ev(
+        seed,
+        split,
+        "integrity",
+        "e-unverified",
+        "claim",
+        Polarity::Supports,
+        "g-unverified",
+        (t, None),
+        (t, None),
+        "scope-a",
+        "authority-a",
+    );
     unverified.integrity = SourceIntegrity::Unverified;
-    add(&mut suite,seed,split,"unverified-source",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![alt("unverified-path",Polarity::Supports,
-            vec![ProofRequirement::Evidence("e-unverified".into())],1)]),
-    ],vec![unverified],&[("e-unverified",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "unverified-source",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "unverified-path",
+                Polarity::Supports,
+                vec![ProofRequirement::Evidence("e-unverified".into())],
+                1,
+            )],
+        )],
+        vec![unverified],
+        &[("e-unverified", HiddenTruth::SupportsAssertion)],
+    );
 
     // Independent pair is a mutation baseline for a later source-correlation merge.
-    add(&mut suite,seed,split,"independent-pair",q(t+5,t+5),&["claim"],vec![
-        claim("claim",vec![alt("independent-path",Polarity::Supports,vec![
-            ProofRequirement::Evidence("e-independent-a".into()),
-            ProofRequirement::Evidence("e-independent-b".into()),
-        ],2)]),
-    ],vec![
-        ev(seed,split,"independent","e-independent-a","claim",Polarity::Supports,"g-independent-a",(t,None),(t,None),"scope-a","authority-a"),
-        ev(seed,split,"independent","e-independent-b","claim",Polarity::Supports,"g-independent-b",(t,None),(t,None),"scope-a","authority-a"),
-    ],&[("e-independent-a",HiddenTruth::SupportsAssertion),("e-independent-b",HiddenTruth::SupportsAssertion)]);
+    add(
+        &mut suite,
+        seed,
+        split,
+        "independent-pair",
+        q(t + 5, t + 5),
+        &["claim"],
+        vec![claim(
+            "claim",
+            vec![alt(
+                "independent-path",
+                Polarity::Supports,
+                vec![
+                    ProofRequirement::Evidence("e-independent-a".into()),
+                    ProofRequirement::Evidence("e-independent-b".into()),
+                ],
+                2,
+            )],
+        )],
+        vec![
+            ev(
+                seed,
+                split,
+                "independent",
+                "e-independent-a",
+                "claim",
+                Polarity::Supports,
+                "g-independent-a",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+            ev(
+                seed,
+                split,
+                "independent",
+                "e-independent-b",
+                "claim",
+                Polarity::Supports,
+                "g-independent-b",
+                (t, None),
+                (t, None),
+                "scope-a",
+                "authority-a",
+            ),
+        ],
+        &[
+            ("e-independent-a", HiddenTruth::SupportsAssertion),
+            ("e-independent-b", HiddenTruth::SupportsAssertion),
+        ],
+    );
 
     Ok(suite)
 }
@@ -871,14 +1614,16 @@ pub fn encode_planner_artifact_v1(
                             hex_field(&alternative.id),
                             hex_field(evidence_id),
                         ])),
-                        ProofRequirement::Claim { claim_id, polarity } => records.push(join_record(&[
-                            "REQ_C".into(),
-                            case_id.clone(),
-                            hex_field(&claim.id),
-                            hex_field(&alternative.id),
-                            hex_field(claim_id),
-                            polarity_field(*polarity).into(),
-                        ])),
+                        ProofRequirement::Claim { claim_id, polarity } => {
+                            records.push(join_record(&[
+                                "REQ_C".into(),
+                                case_id.clone(),
+                                hex_field(&claim.id),
+                                hex_field(&alternative.id),
+                                hex_field(claim_id),
+                                polarity_field(*polarity).into(),
+                            ]))
+                        }
                     }
                 }
             }
@@ -959,7 +1704,9 @@ pub fn encode_oracle_artifact_v1(
     let mut records = Vec::<String>::new();
     for case in &suite.planner_cases {
         let case_id = hex_field(&case.id);
-        let labels = suite.oracle.get(&case.id)
+        let labels = suite
+            .oracle
+            .get(&case.id)
             .ok_or_else(|| format!("missing oracle labels for case {}", case.id))?;
 
         for (evidence_id, truth) in labels {
@@ -973,13 +1720,7 @@ pub fn encode_oracle_artifact_v1(
 
         let mut memo = BTreeMap::new();
         for claim_id in &case.target_claim_ids {
-            let evaluation = resolve_claim(
-                case,
-                labels,
-                claim_id,
-                &mut BTreeSet::new(),
-                &mut memo,
-            );
+            let evaluation = resolve_claim(case, labels, claim_id, &mut BTreeSet::new(), &mut memo);
             records.push(join_record(&[
                 "GOLD_CLAIM".into(),
                 case_id.clone(),
@@ -1027,12 +1768,21 @@ mod tests {
     use super::*;
 
     fn find<'a>(suite: &'a GraphSuite, suffix: &str) -> &'a PlannerCase {
-        suite.planner_cases().iter().find(|c| c.id.ends_with(suffix)).expect("fixture exists")
+        suite
+            .planner_cases()
+            .iter()
+            .find(|c| c.id.ends_with(suffix))
+            .expect("fixture exists")
     }
-    fn packet(c: &PlannerCase, claim: &str, disposition: ClaimDisposition, citations: &[&str]) -> ProofPacket {
+    fn packet(
+        c: &PlannerCase,
+        claim: &str,
+        disposition: ClaimDisposition,
+        citations: &[&str],
+    ) -> ProofPacket {
         ProofPacket {
             case_id: c.id.clone(),
-            claim_dispositions: BTreeMap::from([(claim.into(),disposition)]),
+            claim_dispositions: BTreeMap::from([(claim.into(), disposition)]),
             retrieval_ranking: citations.iter().map(|id| (*id).into()).collect(),
             cited_evidence_ids: citations.iter().map(|id| (*id).into()).collect(),
         }
@@ -1040,15 +1790,18 @@ mod tests {
 
     #[test]
     fn planner_artifact_excludes_truth_and_gold_records() {
-        let suite=generate_poar_graph_suite(123,DatasetSplit::Test);
-        let planner=encode_planner_artifact_v1(&suite,"unit-test-generator-revision").expect("planner encoding");
-        let oracle=encode_oracle_artifact_v1(&suite,"unit-test-generator-revision",&"a".repeat(64)).expect("oracle encoding");
+        let suite = generate_poar_graph_suite(123, DatasetSplit::Test);
+        let planner = encode_planner_artifact_v1(&suite, "unit-test-generator-revision")
+            .expect("planner encoding");
+        let oracle =
+            encode_oracle_artifact_v1(&suite, "unit-test-generator-revision", &"a".repeat(64))
+                .expect("oracle encoding");
         assert!(planner.starts_with("HEADER\tPOAR-TSV/1\t"));
         assert!(!planner.lines().any(|line| line.starts_with("TRUTH\t")));
         assert!(!planner.lines().any(|line| line.starts_with("GOLD_CLAIM\t")));
         assert!(!planner.lines().any(|line| line.starts_with("GOLD_PATH\t")));
         assert!(!planner.contains("supports_assertion"));
-        assert!(oracle.starts_with(&format!("ORACLE_HEADER\tPOAR-TSV/1\t{}\t","a".repeat(64))));
+        assert!(oracle.starts_with(&format!("ORACLE_HEADER\tPOAR-TSV/1\t{}\t", "a".repeat(64))));
         assert!(oracle.lines().any(|line| line.starts_with("TRUTH\t")));
         assert!(oracle.lines().any(|line| line.starts_with("GOLD_CLAIM\t")));
         assert!(oracle.lines().any(|line| line.starts_with("GOLD_PATH\t")));
@@ -1056,324 +1809,595 @@ mod tests {
 
     #[test]
     fn oracle_artifact_rejects_noncanonical_planner_digests() {
-        let suite=generate_poar_graph_suite(123,DatasetSplit::Test);
-        assert!(encode_oracle_artifact_v1(&suite,"rev","ABCDEF").is_err());
-        assert!(encode_oracle_artifact_v1(&suite,"rev",&"g".repeat(64)).is_err());
-        assert!(encode_oracle_artifact_v1(&suite,"rev",&"A".repeat(64)).is_err());
-        assert!(encode_oracle_artifact_v1(&suite,"",&"a".repeat(64)).is_err());
+        let suite = generate_poar_graph_suite(123, DatasetSplit::Test);
+        assert!(encode_oracle_artifact_v1(&suite, "rev", "ABCDEF").is_err());
+        assert!(encode_oracle_artifact_v1(&suite, "rev", &"g".repeat(64)).is_err());
+        assert!(encode_oracle_artifact_v1(&suite, "rev", &"A".repeat(64)).is_err());
+        assert!(encode_oracle_artifact_v1(&suite, "", &"a".repeat(64)).is_err());
     }
 
     #[test]
     fn split_graph_depths_are_held_out_in_difficulty_order() {
         fn chain_depth(suite: &GraphSuite) -> usize {
-            let case = suite.planner_cases().iter().find(|c| c.id.contains("long-chain-")).expect("chain fixture exists");
-            case.claims.iter().filter(|c| c.id.starts_with("chain-")).count()
+            let case = suite
+                .planner_cases()
+                .iter()
+                .find(|c| c.id.contains("long-chain-"))
+                .expect("chain fixture exists");
+            case.claims
+                .iter()
+                .filter(|c| c.id.starts_with("chain-"))
+                .count()
         }
-        let dev = generate_poar_graph_suite(41,DatasetSplit::Development);
-        let cal = generate_poar_graph_suite(41,DatasetSplit::Calibration);
-        let test = generate_poar_graph_suite(41,DatasetSplit::Test);
-        assert_eq!(chain_depth(&dev),8);
-        assert_eq!(chain_depth(&cal),32);
-        assert_eq!(chain_depth(&test),64);
+        let dev = generate_poar_graph_suite(41, DatasetSplit::Development);
+        let cal = generate_poar_graph_suite(41, DatasetSplit::Calibration);
+        let test = generate_poar_graph_suite(41, DatasetSplit::Test);
+        assert_eq!(chain_depth(&dev), 8);
+        assert_eq!(chain_depth(&cal), 32);
+        assert_eq!(chain_depth(&test), 64);
     }
 
     #[test]
     fn custom_generation_profiles_change_graph_depth_deterministically() {
-        let config=GraphGenerationConfig{chain_depth:5};
-        let first=generate_poar_graph_suite_with_config(99,DatasetSplit::Test,config).expect("valid config");
-        let second=generate_poar_graph_suite_with_config(99,DatasetSplit::Test,config).expect("same valid config");
-        assert_eq!(first.planner_cases(),second.planner_cases());
-        let chain=first.planner_cases().iter().find(|case| case.id.contains("long-chain-")).expect("custom chain exists");
-        assert_eq!(chain.claims.iter().filter(|claim| claim.id.starts_with("chain-")).count(),5);
+        let config = GraphGenerationConfig { chain_depth: 5 };
+        let first = generate_poar_graph_suite_with_config(99, DatasetSplit::Test, config)
+            .expect("valid config");
+        let second = generate_poar_graph_suite_with_config(99, DatasetSplit::Test, config)
+            .expect("same valid config");
+        assert_eq!(first.planner_cases(), second.planner_cases());
+        let chain = first
+            .planner_cases()
+            .iter()
+            .find(|case| case.id.contains("long-chain-"))
+            .expect("custom chain exists");
+        assert_eq!(
+            chain
+                .claims
+                .iter()
+                .filter(|claim| claim.id.starts_with("chain-"))
+                .count(),
+            5
+        );
         assert!(chain.id.ends_with("long-chain-5"));
     }
 
     #[test]
     fn invalid_generation_profiles_fail_closed() {
-        for depth in [0,257] {
-            let error=generate_poar_graph_suite_with_config(
-                99,DatasetSplit::Test,GraphGenerationConfig{chain_depth:depth}
-            ).expect_err("invalid depth must be rejected");
-            assert_eq!(error,GraphGenerationError::ChainDepthOutOfRange{
-                requested:depth,minimum:1,maximum:256
-            });
+        for depth in [0, 257] {
+            let error = generate_poar_graph_suite_with_config(
+                99,
+                DatasetSplit::Test,
+                GraphGenerationConfig { chain_depth: depth },
+            )
+            .expect_err("invalid depth must be rejected");
+            assert_eq!(
+                error,
+                GraphGenerationError::ChainDepthOutOfRange {
+                    requested: depth,
+                    minimum: 1,
+                    maximum: 256
+                }
+            );
         }
     }
 
     #[test]
     fn source_families_are_disjoint_across_development_calibration_and_test() {
         let suites = [
-            generate_poar_graph_suite(41,DatasetSplit::Development),
-            generate_poar_graph_suite(41,DatasetSplit::Calibration),
-            generate_poar_graph_suite(41,DatasetSplit::Test),
+            generate_poar_graph_suite(41, DatasetSplit::Development),
+            generate_poar_graph_suite(41, DatasetSplit::Calibration),
+            generate_poar_graph_suite(41, DatasetSplit::Test),
         ];
-        let families = |s: &GraphSuite| s.planner_cases().iter()
-            .flat_map(|c| c.evidence.iter().map(|e| e.source_family_id.clone())).collect::<BTreeSet<_>>();
-        let sources = |s: &GraphSuite| s.planner_cases().iter()
-            .flat_map(|c| c.evidence.iter().map(|e| e.source_id.clone())).collect::<BTreeSet<_>>();
-        let a=families(&suites[0]); let b=families(&suites[1]); let c=families(&suites[2]);
-        let sa=sources(&suites[0]); let sb=sources(&suites[1]); let sc=sources(&suites[2]);
+        let families = |s: &GraphSuite| {
+            s.planner_cases()
+                .iter()
+                .flat_map(|c| c.evidence.iter().map(|e| e.source_family_id.clone()))
+                .collect::<BTreeSet<_>>()
+        };
+        let sources = |s: &GraphSuite| {
+            s.planner_cases()
+                .iter()
+                .flat_map(|c| c.evidence.iter().map(|e| e.source_id.clone()))
+                .collect::<BTreeSet<_>>()
+        };
+        let a = families(&suites[0]);
+        let b = families(&suites[1]);
+        let c = families(&suites[2]);
+        let sa = sources(&suites[0]);
+        let sb = sources(&suites[1]);
+        let sc = sources(&suites[2]);
         assert!(a.is_disjoint(&b) && a.is_disjoint(&c) && b.is_disjoint(&c));
         assert!(sa.is_disjoint(&sb) && sa.is_disjoint(&sc) && sb.is_disjoint(&sc));
     }
 
     #[test]
     fn same_seed_and_split_reproduce_identical_planner_cases() {
-        let first=generate_poar_graph_suite(2026,DatasetSplit::Development);
-        let second=generate_poar_graph_suite(2026,DatasetSplit::Development);
-        assert_eq!(first.planner_cases(),second.planner_cases());
-        let first_predictions=first.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
-        let second_predictions=second.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
-        assert_eq!(first.evaluate(&first_predictions),second.evaluate(&second_predictions));
+        let first = generate_poar_graph_suite(2026, DatasetSplit::Development);
+        let second = generate_poar_graph_suite(2026, DatasetSplit::Development);
+        assert_eq!(first.planner_cases(), second.planner_cases());
+        let first_predictions = first
+            .planner_cases()
+            .iter()
+            .map(ProofPacket::abstain_all)
+            .collect::<Vec<_>>();
+        let second_predictions = second
+            .planner_cases()
+            .iter()
+            .map(ProofPacket::abstain_all)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            first.evaluate(&first_predictions),
+            second.evaluate(&second_predictions)
+        );
     }
 
     #[test]
     fn source_ids_are_seed_specific_within_a_split() {
-        let first=generate_poar_graph_suite(7,DatasetSplit::Development);
-        let second=generate_poar_graph_suite(8,DatasetSplit::Development);
-        let source_ids = |suite: &GraphSuite| suite.planner_cases().iter()
-            .flat_map(|case| case.evidence.iter().map(|e| e.source_id.clone())).collect::<BTreeSet<_>>();
-        let family_ids = |suite: &GraphSuite| suite.planner_cases().iter()
-            .flat_map(|case| case.evidence.iter().map(|e| e.source_family_id.clone())).collect::<BTreeSet<_>>();
+        let first = generate_poar_graph_suite(7, DatasetSplit::Development);
+        let second = generate_poar_graph_suite(8, DatasetSplit::Development);
+        let source_ids = |suite: &GraphSuite| {
+            suite
+                .planner_cases()
+                .iter()
+                .flat_map(|case| case.evidence.iter().map(|e| e.source_id.clone()))
+                .collect::<BTreeSet<_>>()
+        };
+        let family_ids = |suite: &GraphSuite| {
+            suite
+                .planner_cases()
+                .iter()
+                .flat_map(|case| case.evidence.iter().map(|e| e.source_family_id.clone()))
+                .collect::<BTreeSet<_>>()
+        };
         assert!(source_ids(&first).is_disjoint(&source_ids(&second)));
-        assert_eq!(family_ids(&first),family_ids(&second));
+        assert_eq!(family_ids(&first), family_ids(&second));
     }
 
     #[test]
     fn oracle_accepts_and_or_and_current_paths_but_rejects_stale_revision() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let and=find(&suite,"and-chain");
-        let or=find(&suite,"or-current-alternative");
-        let good=vec![
-            packet(and,"root",ClaimDisposition::Supported{alternative_id:"and-path".into()},&["e-leaf","e-root"]),
-            packet(or,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]),
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let and = find(&suite, "and-chain");
+        let or = find(&suite, "or-current-alternative");
+        let good = vec![
+            packet(
+                and,
+                "root",
+                ClaimDisposition::Supported {
+                    alternative_id: "and-path".into(),
+                },
+                &["e-leaf", "e-root"],
+            ),
+            packet(
+                or,
+                "claim",
+                ClaimDisposition::Supported {
+                    alternative_id: "current-path".into(),
+                },
+                &["e-current"],
+            ),
         ];
-        let report=suite.evaluate(&good);
-        assert_eq!(report.case_scores[0].correct_dispositions,1);
-        assert_eq!(report.case_scores[1].correct_dispositions,1);
-        let stale=suite.evaluate(&[packet(or,"claim",ClaimDisposition::Supported{alternative_id:"old-path".into()},&["e-old"])]);
-        assert_eq!(stale.case_scores[1].false_supported_claims,1);
-        assert_eq!(stale.case_scores[1].temporal_violations,1);
+        let report = suite.evaluate(&good);
+        assert_eq!(report.case_scores[0].correct_dispositions, 1);
+        assert_eq!(report.case_scores[1].correct_dispositions, 1);
+        let stale = suite.evaluate(&[packet(
+            or,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "old-path".into(),
+            },
+            &["e-old"],
+        )]);
+        assert_eq!(stale.case_scores[1].false_supported_claims, 1);
+        assert_eq!(stale.case_scores[1].temporal_violations, 1);
     }
 
     #[test]
     fn correlated_source_echo_does_not_meet_independence_threshold() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"correlated-echo");
-        let report=suite.evaluate(&[packet(c,"claim",ClaimDisposition::Supported{alternative_id:"echo-path".into()},&["e-echo-a","e-echo-b"])]);
-        assert_eq!(report.case_scores[2].false_supported_claims,1);
-        assert_eq!(report.case_scores[2].correlation_violations,1);
-        assert_eq!(report.case_scores[2].unsupported_proof_paths,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "correlated-echo");
+        let report = suite.evaluate(&[packet(
+            c,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "echo-path".into(),
+            },
+            &["e-echo-a", "e-echo-b"],
+        )]);
+        assert_eq!(report.case_scores[2].false_supported_claims, 1);
+        assert_eq!(report.case_scores[2].correlation_violations, 1);
+        assert_eq!(report.case_scores[2].unsupported_proof_paths, 1);
     }
 
     #[test]
     fn known_time_selects_correct_side_of_late_correction() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let before=find(&suite,"temporal-before-correction");
-        let after=find(&suite,"temporal-after-correction");
-        let mut before_packet=packet(before,"claim",ClaimDisposition::Supported{alternative_id:"revision-one".into()},&["e-rev-one"]);
-        before_packet.retrieval_ranking=vec!["e-rev-two".into(),"e-rev-one".into()];
-        let mut after_packet=packet(after,"claim",ClaimDisposition::Refuted{alternative_id:"revision-two".into()},&["e-rev-two"]);
-        after_packet.retrieval_ranking=vec!["e-rev-one".into(),"e-rev-two".into()];
-        let report=suite.evaluate(&[before_packet,after_packet]);
-        assert_eq!(report.case_scores[3].correct_dispositions,1);
-        assert_eq!(report.case_scores[4].correct_dispositions,1);
-        assert_eq!(report.case_scores[3].temporal_violations,0);
-        assert_eq!(report.case_scores[4].temporal_violations,0);
-        assert_eq!(report.case_scores[3].temporal_relevant_evidence,1);
-        assert_eq!(report.case_scores[4].temporal_relevant_evidence,1);
-        assert_eq!(report.case_scores[3].temporal_coverage_at_k(),Some(1.0));
-        assert_eq!(report.case_scores[4].temporal_coverage_at_k(),Some(1.0));
-        assert_eq!(report.case_scores[3].temporal_precision_at_k(),Some(0.5));
-        assert_eq!(report.case_scores[4].temporal_precision_at_k(),Some(0.5));
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let before = find(&suite, "temporal-before-correction");
+        let after = find(&suite, "temporal-after-correction");
+        let mut before_packet = packet(
+            before,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "revision-one".into(),
+            },
+            &["e-rev-one"],
+        );
+        before_packet.retrieval_ranking = vec!["e-rev-two".into(), "e-rev-one".into()];
+        let mut after_packet = packet(
+            after,
+            "claim",
+            ClaimDisposition::Refuted {
+                alternative_id: "revision-two".into(),
+            },
+            &["e-rev-two"],
+        );
+        after_packet.retrieval_ranking = vec!["e-rev-one".into(), "e-rev-two".into()];
+        let report = suite.evaluate(&[before_packet, after_packet]);
+        assert_eq!(report.case_scores[3].correct_dispositions, 1);
+        assert_eq!(report.case_scores[4].correct_dispositions, 1);
+        assert_eq!(report.case_scores[3].temporal_violations, 0);
+        assert_eq!(report.case_scores[4].temporal_violations, 0);
+        assert_eq!(report.case_scores[3].temporal_relevant_evidence, 1);
+        assert_eq!(report.case_scores[4].temporal_relevant_evidence, 1);
+        assert_eq!(report.case_scores[3].temporal_coverage_at_k(), Some(1.0));
+        assert_eq!(report.case_scores[4].temporal_coverage_at_k(), Some(1.0));
+        assert_eq!(report.case_scores[3].temporal_precision_at_k(), Some(0.5));
+        assert_eq!(report.case_scores[4].temporal_precision_at_k(), Some(0.5));
     }
 
     #[test]
     fn retraction_invalidates_dependents_but_preserves_unrelated_claims() {
-        let mut suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"retraction-dependency");
-        let id=c.id.clone();
-        let p=ProofPacket {
-            case_id:id.clone(),
-            claim_dispositions:BTreeMap::from([
-                ("root".into(),ClaimDisposition::Supported{alternative_id:"root-via-base".into()}),
-                ("unaffected".into(),ClaimDisposition::Supported{alternative_id:"unaffected-path".into()}),
+        let mut suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "retraction-dependency");
+        let id = c.id.clone();
+        let p = ProofPacket {
+            case_id: id.clone(),
+            claim_dispositions: BTreeMap::from([
+                (
+                    "root".into(),
+                    ClaimDisposition::Supported {
+                        alternative_id: "root-via-base".into(),
+                    },
+                ),
+                (
+                    "unaffected".into(),
+                    ClaimDisposition::Supported {
+                        alternative_id: "unaffected-path".into(),
+                    },
+                ),
             ]),
-            retrieval_ranking:vec!["e-base".into(),"e-unaffected".into()],
-            cited_evidence_ids:BTreeSet::from(["e-base".into(),"e-unaffected".into()]),
+            retrieval_ranking: vec!["e-base".into(), "e-unaffected".into()],
+            cited_evidence_ids: BTreeSet::from(["e-base".into(), "e-unaffected".into()]),
         };
-        assert_eq!(suite.evaluate(&[p.clone()]).case_scores[5].correct_dispositions,2);
-        assert!(suite.retract_evidence(&id,"e-base"));
-        let report=suite.evaluate(&[p]);
-        let score=&report.case_scores[5];
-        assert_eq!(score.false_supported_claims,1);
-        assert_eq!(score.correct_dispositions,1);
-        assert_eq!(score.retracted_citations,1);
-        assert_eq!(score.invalid_citations,1);
+        assert_eq!(
+            suite.evaluate(&[p.clone()]).case_scores[5].correct_dispositions,
+            2
+        );
+        assert!(suite.retract_evidence(&id, "e-base"));
+        let report = suite.evaluate(&[p]);
+        let score = &report.case_scores[5];
+        assert_eq!(score.false_supported_claims, 1);
+        assert_eq!(score.correct_dispositions, 1);
+        assert_eq!(score.retracted_citations, 1);
+        assert_eq!(score.invalid_citations, 1);
     }
 
     #[test]
     fn scope_and_authority_are_separate_hard_checks() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let scope=find(&suite,"scope-mismatch");
-        let authority=find(&suite,"authority-mismatch");
-        let report=suite.evaluate(&[
-            packet(scope,"claim",ClaimDisposition::Supported{alternative_id:"scope-path".into()},&["e-scope"]),
-            packet(authority,"claim",ClaimDisposition::Supported{alternative_id:"authority-path".into()},&["e-authority"]),
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let scope = find(&suite, "scope-mismatch");
+        let authority = find(&suite, "authority-mismatch");
+        let report = suite.evaluate(&[
+            packet(
+                scope,
+                "claim",
+                ClaimDisposition::Supported {
+                    alternative_id: "scope-path".into(),
+                },
+                &["e-scope"],
+            ),
+            packet(
+                authority,
+                "claim",
+                ClaimDisposition::Supported {
+                    alternative_id: "authority-path".into(),
+                },
+                &["e-authority"],
+            ),
         ]);
-        assert_eq!(report.case_scores[6].scope_violations,1);
-        assert_eq!(report.case_scores[7].authority_violations,1);
+        assert_eq!(report.case_scores[6].scope_violations, 1);
+        assert_eq!(report.case_scores[7].authority_violations, 1);
     }
 
     #[test]
     fn contradictory_support_and_refutation_requires_contested_disposition() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"positive-negative-conflict");
-        let correct=suite.evaluate(&[packet(c,"claim",ClaimDisposition::Contested,&["e-positive","e-negative"])]);
-        assert_eq!(correct.case_scores[8].correct_dispositions,1);
-        let wrong=suite.evaluate(&[packet(c,"claim",ClaimDisposition::Supported{alternative_id:"positive-path".into()},&["e-positive"])]);
-        assert_eq!(wrong.case_scores[8].false_supported_claims,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "positive-negative-conflict");
+        let correct = suite.evaluate(&[packet(
+            c,
+            "claim",
+            ClaimDisposition::Contested,
+            &["e-positive", "e-negative"],
+        )]);
+        assert_eq!(correct.case_scores[8].correct_dispositions, 1);
+        let wrong = suite.evaluate(&[packet(
+            c,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "positive-path".into(),
+            },
+            &["e-positive"],
+        )]);
+        assert_eq!(wrong.case_scores[8].false_supported_claims, 1);
     }
 
     #[test]
     fn cyclic_claim_dependencies_fail_closed() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"cyclic-derivation");
-        let report=suite.evaluate(&[packet(c,"a",ClaimDisposition::Supported{alternative_id:"a-via-b".into()},&[])]);
-        assert_eq!(report.case_scores[9].false_supported_claims,1);
-        assert_eq!(report.case_scores[9].unsupported_proof_paths,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "cyclic-derivation");
+        let report = suite.evaluate(&[packet(
+            c,
+            "a",
+            ClaimDisposition::Supported {
+                alternative_id: "a-via-b".into(),
+            },
+            &[],
+        )]);
+        assert_eq!(report.case_scores[9].false_supported_claims, 1);
+        assert_eq!(report.case_scores[9].unsupported_proof_paths, 1);
     }
 
     #[test]
     fn future_known_evidence_is_not_admissible() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"future-known-leak");
-        let report=suite.evaluate(&[packet(c,"claim",ClaimDisposition::Supported{alternative_id:"future-path".into()},&["e-future"])]);
-        assert_eq!(report.case_scores[10].temporal_violations,1);
-        assert_eq!(report.case_scores[10].false_supported_claims,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "future-known-leak");
+        let report = suite.evaluate(&[packet(
+            c,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "future-path".into(),
+            },
+            &["e-future"],
+        )]);
+        assert_eq!(report.case_scores[10].temporal_violations, 1);
+        assert_eq!(report.case_scores[10].false_supported_claims, 1);
     }
 
     #[test]
     fn deep_dependency_chain_requires_terminal_evidence() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"long-chain-64");
-        let good=packet(c,"chain-000",ClaimDisposition::Supported{alternative_id:"chain-step-000".into()},&["e-chain-leaf"]);
-        let report=suite.evaluate(&[good]);
-        assert_eq!(report.case_scores[11].correct_dispositions,1);
-        let missing=packet(c,"chain-000",ClaimDisposition::Supported{alternative_id:"chain-step-000".into()},&[]);
-        let missing_report=suite.evaluate(&[missing]);
-        assert_eq!(missing_report.case_scores[11].missing_required_citations,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "long-chain-64");
+        let good = packet(
+            c,
+            "chain-000",
+            ClaimDisposition::Supported {
+                alternative_id: "chain-step-000".into(),
+            },
+            &["e-chain-leaf"],
+        );
+        let report = suite.evaluate(&[good]);
+        assert_eq!(report.case_scores[11].correct_dispositions, 1);
+        let missing = packet(
+            c,
+            "chain-000",
+            ClaimDisposition::Supported {
+                alternative_id: "chain-step-000".into(),
+            },
+            &[],
+        );
+        let missing_report = suite.evaluate(&[missing]);
+        assert_eq!(missing_report.case_scores[11].missing_required_citations, 1);
     }
 
     #[test]
     fn asserted_polarity_does_not_replace_hidden_source_truth() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"assertion-content-mismatch");
-        let p=packet(c,"claim",ClaimDisposition::Supported{alternative_id:"assertion-path".into()},&["e-assertion"]);
-        let report=suite.evaluate(&[p]);
-        let score=&report.case_scores[12];
-        assert_eq!(score.false_supported_claims,1);
-        assert_eq!(score.invalid_citations,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "assertion-content-mismatch");
+        let p = packet(
+            c,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "assertion-path".into(),
+            },
+            &["e-assertion"],
+        );
+        let report = suite.evaluate(&[p]);
+        let score = &report.case_scores[12];
+        assert_eq!(score.false_supported_claims, 1);
+        assert_eq!(score.invalid_citations, 1);
     }
 
     #[test]
     fn unverified_source_cannot_discharge_a_claim() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"unverified-source");
-        let p=packet(c,"claim",ClaimDisposition::Supported{alternative_id:"unverified-path".into()},&["e-unverified"]);
-        let report=suite.evaluate(&[p]);
-        let score=&report.case_scores[13];
-        assert_eq!(score.false_supported_claims,1);
-        assert_eq!(score.integrity_violations,1);
-        assert_eq!(score.invalid_citations,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "unverified-source");
+        let p = packet(
+            c,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "unverified-path".into(),
+            },
+            &["e-unverified"],
+        );
+        let report = suite.evaluate(&[p]);
+        let score = &report.case_scores[13];
+        assert_eq!(score.false_supported_claims, 1);
+        assert_eq!(score.integrity_violations, 1);
+        assert_eq!(score.invalid_citations, 1);
     }
 
     #[test]
     fn mutation_time_polarity_integrity_and_independence_are_detected() {
         // Move a current record beyond known_at: the formerly valid proof must fail.
-        let mut temporal_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let temporal_case=find(&temporal_suite,"or-current-alternative");
-        let temporal_id=temporal_case.id.clone();
-        let temporal_packet=packet(temporal_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
-        assert!(temporal_suite.mutate_evidence(&temporal_id,"e-current",EvidenceMutation::SetKnownFrom(9_999)));
-        let temporal_score=temporal_suite.evaluate(&[temporal_packet]);
-        assert_eq!(temporal_score.case_scores[1].temporal_violations,1);
-        assert_eq!(temporal_score.case_scores[1].false_supported_claims,1);
+        let mut temporal_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let temporal_case = find(&temporal_suite, "or-current-alternative");
+        let temporal_id = temporal_case.id.clone();
+        let temporal_packet = packet(
+            temporal_case,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "current-path".into(),
+            },
+            &["e-current"],
+        );
+        assert!(temporal_suite.mutate_evidence(
+            &temporal_id,
+            "e-current",
+            EvidenceMutation::SetKnownFrom(9_999)
+        ));
+        let temporal_score = temporal_suite.evaluate(&[temporal_packet]);
+        assert_eq!(temporal_score.case_scores[1].temporal_violations, 1);
+        assert_eq!(temporal_score.case_scores[1].false_supported_claims, 1);
 
         // A metadata polarity flip does not rewrite the hidden source-truth label.
-        let mut polarity_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let polarity_case=find(&polarity_suite,"and-chain");
-        let polarity_id=polarity_case.id.clone();
-        let polarity_packet=packet(polarity_case,"root",ClaimDisposition::Supported{alternative_id:"and-path".into()},&["e-leaf","e-root"]);
-        assert!(polarity_suite.mutate_evidence(&polarity_id,"e-root",EvidenceMutation::FlipAssertedPolarity));
-        let polarity_score=polarity_suite.evaluate(&[polarity_packet]);
-        assert_eq!(polarity_score.case_scores[0].false_supported_claims,1);
-        assert_eq!(polarity_score.case_scores[0].invalid_citations,1);
+        let mut polarity_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let polarity_case = find(&polarity_suite, "and-chain");
+        let polarity_id = polarity_case.id.clone();
+        let polarity_packet = packet(
+            polarity_case,
+            "root",
+            ClaimDisposition::Supported {
+                alternative_id: "and-path".into(),
+            },
+            &["e-leaf", "e-root"],
+        );
+        assert!(polarity_suite.mutate_evidence(
+            &polarity_id,
+            "e-root",
+            EvidenceMutation::FlipAssertedPolarity
+        ));
+        let polarity_score = polarity_suite.evaluate(&[polarity_packet]);
+        assert_eq!(polarity_score.case_scores[0].false_supported_claims, 1);
+        assert_eq!(polarity_score.case_scores[0].invalid_citations, 1);
 
         // Integrity downgrade keeps content truth fixed but removes admissibility.
-        let mut integrity_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let integrity_case=find(&integrity_suite,"and-chain");
-        let integrity_id=integrity_case.id.clone();
-        let integrity_packet=packet(integrity_case,"root",ClaimDisposition::Supported{alternative_id:"and-path".into()},&["e-leaf","e-root"]);
-        assert!(integrity_suite.mutate_evidence(&integrity_id,"e-root",EvidenceMutation::SetIntegrity(SourceIntegrity::Invalid)));
-        let integrity_score=integrity_suite.evaluate(&[integrity_packet]);
-        assert_eq!(integrity_score.case_scores[0].integrity_violations,1);
-        assert_eq!(integrity_score.case_scores[0].false_supported_claims,1);
+        let mut integrity_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let integrity_case = find(&integrity_suite, "and-chain");
+        let integrity_id = integrity_case.id.clone();
+        let integrity_packet = packet(
+            integrity_case,
+            "root",
+            ClaimDisposition::Supported {
+                alternative_id: "and-path".into(),
+            },
+            &["e-leaf", "e-root"],
+        );
+        assert!(integrity_suite.mutate_evidence(
+            &integrity_id,
+            "e-root",
+            EvidenceMutation::SetIntegrity(SourceIntegrity::Invalid)
+        ));
+        let integrity_score = integrity_suite.evaluate(&[integrity_packet]);
+        assert_eq!(integrity_score.case_scores[0].integrity_violations, 1);
+        assert_eq!(integrity_score.case_scores[0].false_supported_claims, 1);
 
         // Two genuinely independent sources collapse to one group after mutation.
-        let mut correlation_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let correlation_case=find(&correlation_suite,"independent-pair");
-        let correlation_id=correlation_case.id.clone();
-        let correlation_packet=packet(correlation_case,"claim",ClaimDisposition::Supported{alternative_id:"independent-path".into()},&["e-independent-a","e-independent-b"]);
-        assert_eq!(correlation_suite.evaluate(&[correlation_packet.clone()]).case_scores[14].correct_dispositions,1);
-        assert!(correlation_suite.mutate_evidence(&correlation_id,"e-independent-b",EvidenceMutation::SetIndependenceGroup("g-independent-a".into())));
-        let correlation_score=correlation_suite.evaluate(&[correlation_packet]);
-        assert_eq!(correlation_score.case_scores[14].correlation_violations,1);
-        assert_eq!(correlation_score.case_scores[14].false_supported_claims,1);
+        let mut correlation_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let correlation_case = find(&correlation_suite, "independent-pair");
+        let correlation_id = correlation_case.id.clone();
+        let correlation_packet = packet(
+            correlation_case,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "independent-path".into(),
+            },
+            &["e-independent-a", "e-independent-b"],
+        );
+        assert_eq!(
+            correlation_suite
+                .evaluate(&[correlation_packet.clone()])
+                .case_scores[14]
+                .correct_dispositions,
+            1
+        );
+        assert!(correlation_suite.mutate_evidence(
+            &correlation_id,
+            "e-independent-b",
+            EvidenceMutation::SetIndependenceGroup("g-independent-a".into())
+        ));
+        let correlation_score = correlation_suite.evaluate(&[correlation_packet]);
+        assert_eq!(correlation_score.case_scores[14].correlation_violations, 1);
+        assert_eq!(correlation_score.case_scores[14].false_supported_claims, 1);
     }
 
     #[test]
     fn valid_time_scope_and_authority_mutations_are_detected() {
         // valid_from moves beyond the query's valid_at coordinate.
-        let mut valid_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let valid_case=find(&valid_suite,"or-current-alternative");
-        let valid_id=valid_case.id.clone();
-        let valid_packet=packet(valid_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
-        assert!(valid_suite.mutate_evidence(&valid_id,"e-current",EvidenceMutation::SetValidFrom(9_999)));
-        let valid_report=valid_suite.evaluate(&[valid_packet]);
-        assert_eq!(valid_report.case_scores[1].temporal_violations,1);
+        let mut valid_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let valid_case = find(&valid_suite, "or-current-alternative");
+        let valid_id = valid_case.id.clone();
+        let valid_packet = packet(
+            valid_case,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "current-path".into(),
+            },
+            &["e-current"],
+        );
+        assert!(valid_suite.mutate_evidence(
+            &valid_id,
+            "e-current",
+            EvidenceMutation::SetValidFrom(9_999)
+        ));
+        let valid_report = valid_suite.evaluate(&[valid_packet]);
+        assert_eq!(valid_report.case_scores[1].temporal_violations, 1);
 
         // A source can retain truthful content while leaving the required scope.
-        let mut scope_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let scope_case=find(&scope_suite,"or-current-alternative");
-        let scope_id=scope_case.id.clone();
-        let scope_packet=packet(scope_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
-        assert!(scope_suite.mutate_evidence(&scope_id,"e-current",EvidenceMutation::SetScope("scope-outside".into())));
-        let scope_report=scope_suite.evaluate(&[scope_packet]);
-        assert_eq!(scope_report.case_scores[1].scope_violations,1);
+        let mut scope_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let scope_case = find(&scope_suite, "or-current-alternative");
+        let scope_id = scope_case.id.clone();
+        let scope_packet = packet(
+            scope_case,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "current-path".into(),
+            },
+            &["e-current"],
+        );
+        assert!(scope_suite.mutate_evidence(
+            &scope_id,
+            "e-current",
+            EvidenceMutation::SetScope("scope-outside".into())
+        ));
+        let scope_report = scope_suite.evaluate(&[scope_packet]);
+        assert_eq!(scope_report.case_scores[1].scope_violations, 1);
 
         // Authority is independent of scope and content truth.
-        let mut authority_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let authority_case=find(&authority_suite,"or-current-alternative");
-        let authority_id=authority_case.id.clone();
-        let authority_packet=packet(authority_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
-        assert!(authority_suite.mutate_evidence(&authority_id,"e-current",EvidenceMutation::SetAuthority("authority-revoked".into())));
-        let authority_report=authority_suite.evaluate(&[authority_packet]);
-        assert_eq!(authority_report.case_scores[1].authority_violations,1);
+        let mut authority_suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let authority_case = find(&authority_suite, "or-current-alternative");
+        let authority_id = authority_case.id.clone();
+        let authority_packet = packet(
+            authority_case,
+            "claim",
+            ClaimDisposition::Supported {
+                alternative_id: "current-path".into(),
+            },
+            &["e-current"],
+        );
+        assert!(authority_suite.mutate_evidence(
+            &authority_id,
+            "e-current",
+            EvidenceMutation::SetAuthority("authority-revoked".into())
+        ));
+        let authority_report = authority_suite.evaluate(&[authority_packet]);
+        assert_eq!(authority_report.case_scores[1].authority_violations, 1);
     }
 
     #[test]
     fn duplicate_and_unknown_prediction_packets_are_counted() {
-        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
-        let c=find(&suite,"and-chain");
-        let p=ProofPacket::abstain_all(c);
-        let unknown=ProofPacket{case_id:"unknown".into(),claim_dispositions:BTreeMap::new(),retrieval_ranking:Vec::new(),cited_evidence_ids:BTreeSet::new()};
-        let report=suite.evaluate(&[p.clone(),p,unknown]);
-        assert_eq!(report.duplicate_prediction_packets,1);
-        assert_eq!(report.unknown_prediction_packets,1);
+        let suite = generate_poar_graph_suite(7, DatasetSplit::Test);
+        let c = find(&suite, "and-chain");
+        let p = ProofPacket::abstain_all(c);
+        let unknown = ProofPacket {
+            case_id: "unknown".into(),
+            claim_dispositions: BTreeMap::new(),
+            retrieval_ranking: Vec::new(),
+            cited_evidence_ids: BTreeSet::new(),
+        };
+        let report = suite.evaluate(&[p.clone(), p, unknown]);
+        assert_eq!(report.duplicate_prediction_packets, 1);
+        assert_eq!(report.unknown_prediction_packets, 1);
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // POAR frozen-artifact parser and evaluator. This runs after inference: the
@@ -1465,10 +2489,10 @@ fn canonical_lines_v1(bytes: &[u8], label: &str) -> Result<Vec<String>, String> 
     if lines.len() > 2_000_000 {
         return Err(format!("{label}: record limit exceeded"));
     }
-    if lines.len() > 2
-        && lines[1..].windows(2).any(|pair| pair[0] >= pair[1])
-    {
-        return Err(format!("{label}: records must be strictly lexicographically sorted and unique"));
+    if lines.len() > 2 && lines[1..].windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(format!(
+            "{label}: records must be strictly lexicographically sorted and unique"
+        ));
     }
     Ok(lines)
 }
@@ -1490,7 +2514,9 @@ fn expect_fields_v1<'a>(
 
 fn decode_hex_field_v1(value: &str, label: &str) -> Result<String, String> {
     if value.is_empty() || value.len() % 2 != 0 {
-        return Err(format!("{label}: hex field must be non-empty and have even length"));
+        return Err(format!(
+            "{label}: hex field must be non-empty and have even length"
+        ));
     }
     let mut bytes = Vec::with_capacity(value.len() / 2);
     for pair in value.as_bytes().chunks_exact(2) {
@@ -1501,8 +2527,10 @@ fn decode_hex_field_v1(value: &str, label: &str) -> Result<String, String> {
                 _ => None,
             }
         };
-        let high = digit(pair[0]).ok_or_else(|| format!("{label}: hex must be lowercase canonical hexadecimal"))?;
-        let low = digit(pair[1]).ok_or_else(|| format!("{label}: hex must be lowercase canonical hexadecimal"))?;
+        let high = digit(pair[0])
+            .ok_or_else(|| format!("{label}: hex must be lowercase canonical hexadecimal"))?;
+        let low = digit(pair[1])
+            .ok_or_else(|| format!("{label}: hex must be lowercase canonical hexadecimal"))?;
         bytes.push((high << 4) | low);
     }
     let decoded = String::from_utf8(bytes)
@@ -1514,7 +2542,9 @@ fn decode_hex_field_v1(value: &str, label: &str) -> Result<String, String> {
         || decoded.contains('\n')
         || hex_field(&decoded) != value
     {
-        return Err(format!("{label}: decoded string is empty, contains a forbidden control, or is non-canonical"));
+        return Err(format!(
+            "{label}: decoded string is empty, contains a forbidden control, or is non-canonical"
+        ));
     }
     Ok(decoded)
 }
@@ -1566,7 +2596,9 @@ fn parse_polarity_v1(value: &str, label: &str) -> Result<Polarity, String> {
 
 fn valid_sha256_v1(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
@@ -1616,7 +2648,9 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
                 expect_fields_v1(&fields, 3, "TARGET", line_number)?;
                 let target = decode_hex_field_v1(fields[2], "target claim ID")?;
                 if !builder.targets.insert(target.clone()) {
-                    return Err(format!("planner: duplicate target {target:?} in {case_id:?}"));
+                    return Err(format!(
+                        "planner: duplicate target {target:?} in {case_id:?}"
+                    ));
                 }
             }
             "CLAIM" => {
@@ -1634,10 +2668,19 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
                     id: alternative_id.clone(),
                     conclusion: parse_polarity_v1(fields[4], "alternative conclusion")?,
                     requirements: Vec::new(),
-                    min_independent_groups: parse_usize_canonical_v1(fields[5], "minimum independent groups")?,
+                    min_independent_groups: parse_usize_canonical_v1(
+                        fields[5],
+                        "minimum independent groups",
+                    )?,
                 };
-                if builder.alternatives.insert((claim.clone(), alternative_id.clone()), alternative).is_some() {
-                    return Err(format!("planner: duplicate alternative {alternative_id:?} for {claim:?}"));
+                if builder
+                    .alternatives
+                    .insert((claim.clone(), alternative_id.clone()), alternative)
+                    .is_some()
+                {
+                    return Err(format!(
+                        "planner: duplicate alternative {alternative_id:?} for {claim:?}"
+                    ));
                 }
             }
             "REQ_E" => {
@@ -1645,13 +2688,23 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
                 let claim = decode_hex_field_v1(fields[2], "requirement claim ID")?;
                 let alternative = decode_hex_field_v1(fields[3], "requirement alternative ID")?;
                 let evidence = decode_hex_field_v1(fields[4], "requirement evidence ID")?;
-                let key = (case_id.clone(), claim.clone(), alternative.clone(), "E".into(), evidence.clone());
+                let key = (
+                    case_id.clone(),
+                    claim.clone(),
+                    alternative.clone(),
+                    "E".into(),
+                    evidence.clone(),
+                );
                 if !requirements_seen.insert(key) {
-                    return Err(format!("planner: duplicate evidence requirement {evidence:?}"));
+                    return Err(format!(
+                        "planner: duplicate evidence requirement {evidence:?}"
+                    ));
                 }
                 let target = builder.alternatives.get_mut(&(claim, alternative))
                     .ok_or_else(|| format!("planner: REQ_E references an undeclared alternative at line {line_number}"))?;
-                target.requirements.push(ProofRequirement::Evidence(evidence));
+                target
+                    .requirements
+                    .push(ProofRequirement::Evidence(evidence));
             }
             "REQ_C" => {
                 expect_fields_v1(&fields, 6, "REQ_C", line_number)?;
@@ -1659,13 +2712,22 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
                 let alternative = decode_hex_field_v1(fields[3], "requirement alternative ID")?;
                 let child = decode_hex_field_v1(fields[4], "child claim ID")?;
                 let polarity = parse_polarity_v1(fields[5], "child claim polarity")?;
-                let key = (case_id.clone(), claim.clone(), alternative.clone(), "C".into(), format!("{child}:{polarity:?}"));
+                let key = (
+                    case_id.clone(),
+                    claim.clone(),
+                    alternative.clone(),
+                    "C".into(),
+                    format!("{child}:{polarity:?}"),
+                );
                 if !requirements_seen.insert(key) {
                     return Err(format!("planner: duplicate claim requirement {child:?}"));
                 }
                 let target = builder.alternatives.get_mut(&(claim, alternative))
                     .ok_or_else(|| format!("planner: REQ_C references an undeclared alternative at line {line_number}"))?;
-                target.requirements.push(ProofRequirement::Claim { claim_id: child, polarity });
+                target.requirements.push(ProofRequirement::Claim {
+                    claim_id: child,
+                    polarity,
+                });
             }
             "EVIDENCE" => {
                 expect_fields_v1(&fields, 16, "EVIDENCE", line_number)?;
@@ -1687,19 +2749,33 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
                         "verified" => SourceIntegrity::Verified,
                         "unverified" => SourceIntegrity::Unverified,
                         "invalid" => SourceIntegrity::Invalid,
-                        other => return Err(format!("planner: unknown source integrity {other:?}")),
+                        other => {
+                            return Err(format!("planner: unknown source integrity {other:?}"));
+                        }
                     },
                     lifecycle: match fields[15] {
                         "active" => EvidenceLifecycle::Active,
                         "retracted" => EvidenceLifecycle::Retracted,
-                        other => return Err(format!("planner: unknown evidence lifecycle {other:?}")),
+                        other => {
+                            return Err(format!("planner: unknown evidence lifecycle {other:?}"));
+                        }
                     },
                 };
-                if builder.evidence.insert(evidence_id.clone(), evidence).is_some() {
-                    return Err(format!("planner: duplicate evidence ID {evidence_id:?} in {case_id:?}"));
+                if builder
+                    .evidence
+                    .insert(evidence_id.clone(), evidence)
+                    .is_some()
+                {
+                    return Err(format!(
+                        "planner: duplicate evidence ID {evidence_id:?} in {case_id:?}"
+                    ));
                 }
             }
-            other => return Err(format!("planner: unknown record type {other:?} at line {line_number}")),
+            other => {
+                return Err(format!(
+                    "planner: unknown record type {other:?} at line {line_number}"
+                ));
+            }
         }
     }
 
@@ -1708,32 +2784,47 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
     }
     let mut cases = Vec::with_capacity(builders.len());
     for (case_id, builder) in builders {
-        let query = builder.query.ok_or_else(|| format!("planner: case {case_id:?} has no CASE record"))?;
+        let query = builder
+            .query
+            .ok_or_else(|| format!("planner: case {case_id:?} has no CASE record"))?;
         if builder.targets.is_empty() || builder.declared_claims.is_empty() {
-            return Err(format!("planner: case {case_id:?} must declare at least one target and claim"));
+            return Err(format!(
+                "planner: case {case_id:?} must declare at least one target and claim"
+            ));
         }
         for target in &builder.targets {
             if !builder.declared_claims.contains(target) {
-                return Err(format!("planner: target {target:?} is not a declared claim"));
+                return Err(format!(
+                    "planner: target {target:?} is not a declared claim"
+                ));
             }
         }
         let evidence_ids = builder.evidence.keys().cloned().collect::<BTreeSet<_>>();
-        let mut claims = builder.declared_claims.iter()
+        let mut claims = builder
+            .declared_claims
+            .iter()
             .map(|id| (id.clone(), Vec::<ProofAlternative>::new()))
             .collect::<BTreeMap<_, _>>();
         for ((claim_id, _), alternative) in builder.alternatives {
-            let alternatives = claims.get_mut(&claim_id)
-                .ok_or_else(|| format!("planner: alternative belongs to undeclared claim {claim_id:?}"))?;
+            let alternatives = claims.get_mut(&claim_id).ok_or_else(|| {
+                format!("planner: alternative belongs to undeclared claim {claim_id:?}")
+            })?;
             for requirement in &alternative.requirements {
                 match requirement {
-                    ProofRequirement::Claim { claim_id: child, .. } => {
+                    ProofRequirement::Claim {
+                        claim_id: child, ..
+                    } => {
                         if !builder.declared_claims.contains(child) {
-                            return Err(format!("planner: alternative references unknown child claim {child:?}"));
+                            return Err(format!(
+                                "planner: alternative references unknown child claim {child:?}"
+                            ));
                         }
                     }
                     ProofRequirement::Evidence(evidence_id) => {
                         if !evidence_ids.contains(evidence_id) {
-                            return Err(format!("planner: alternative references unknown evidence {evidence_id:?}"));
+                            return Err(format!(
+                                "planner: alternative references unknown evidence {evidence_id:?}"
+                            ));
                         }
                     }
                 }
@@ -1752,7 +2843,10 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
             id: case_id,
             query,
             target_claim_ids: builder.targets.into_iter().collect(),
-            claims: claims.into_iter().map(|(id, alternatives)| ClaimNode { id, alternatives }).collect(),
+            claims: claims
+                .into_iter()
+                .map(|(id, alternatives)| ClaimNode { id, alternatives })
+                .collect(),
             evidence: builder.evidence.into_values().collect(),
         });
     }
@@ -1802,8 +2896,15 @@ fn parse_oracle_artifact_v1(bytes: &[u8]) -> Result<ParsedOracleV1, String> {
                     "irrelevant" => HiddenTruth::Irrelevant,
                     other => return Err(format!("oracle: unknown truth label {other:?}")),
                 };
-                if truths.entry(case_id).or_default().insert(evidence_id.clone(), truth).is_some() {
-                    return Err(format!("oracle: duplicate truth label for evidence {evidence_id:?}"));
+                if truths
+                    .entry(case_id)
+                    .or_default()
+                    .insert(evidence_id.clone(), truth)
+                    .is_some()
+                {
+                    return Err(format!(
+                        "oracle: duplicate truth label for evidence {evidence_id:?}"
+                    ));
                 }
             }
             "GOLD_CLAIM" => {
@@ -1825,7 +2926,9 @@ fn parse_oracle_artifact_v1(bytes: &[u8]) -> Result<ParsedOracleV1, String> {
             }
             "GOLD_PATH" => {
                 if fields.len() < 6 {
-                    return Err(format!("oracle: GOLD_PATH has too few fields at line {line_number}"));
+                    return Err(format!(
+                        "oracle: GOLD_PATH has too few fields at line {line_number}"
+                    ));
                 }
                 let case_id = decode_hex_field_v1(fields[1], "gold path case ID")?;
                 let claim_id = decode_hex_field_v1(fields[2], "gold path claim ID")?;
@@ -1833,20 +2936,31 @@ fn parse_oracle_artifact_v1(bytes: &[u8]) -> Result<ParsedOracleV1, String> {
                 let alternative_id = decode_hex_field_v1(fields[4], "gold path alternative ID")?;
                 let count = parse_usize_canonical_v1(fields[5], "gold path evidence count")?;
                 if fields.len() != 6 + count {
-                    return Err(format!("oracle: GOLD_PATH count does not match its evidence fields at line {line_number}"));
+                    return Err(format!(
+                        "oracle: GOLD_PATH count does not match its evidence fields at line {line_number}"
+                    ));
                 }
                 let mut evidence_ids = BTreeSet::new();
                 for encoded in &fields[6..] {
                     let evidence_id = decode_hex_field_v1(encoded, "gold path evidence ID")?;
                     if !evidence_ids.insert(evidence_id.clone()) {
-                        return Err(format!("oracle: duplicate evidence {evidence_id:?} in GOLD_PATH"));
+                        return Err(format!(
+                            "oracle: duplicate evidence {evidence_id:?} in GOLD_PATH"
+                        ));
                     }
                 }
-                if gold_paths.insert((case_id, claim_id, polarity, alternative_id), evidence_ids).is_some() {
+                if gold_paths
+                    .insert((case_id, claim_id, polarity, alternative_id), evidence_ids)
+                    .is_some()
+                {
                     return Err("oracle: duplicate GOLD_PATH identity".into());
                 }
             }
-            other => return Err(format!("oracle: unknown record type {other:?} at line {line_number}")),
+            other => {
+                return Err(format!(
+                    "oracle: unknown record type {other:?} at line {line_number}"
+                ));
+            }
         }
     }
     if truths.is_empty() || gold_claims.is_empty() {
@@ -1887,15 +3001,26 @@ pub fn encode_prediction_artifact_v1(
                 return Err("prediction claim ID must not be empty".into());
             }
             let (label, alternative) = match disposition {
-                ClaimDisposition::Supported { alternative_id } => ("supported", hex_field(alternative_id)),
-                ClaimDisposition::Refuted { alternative_id } => ("refuted", hex_field(alternative_id)),
+                ClaimDisposition::Supported { alternative_id } => {
+                    ("supported", hex_field(alternative_id))
+                }
+                ClaimDisposition::Refuted { alternative_id } => {
+                    ("refuted", hex_field(alternative_id))
+                }
                 ClaimDisposition::Contested => ("contested", "-".into()),
                 ClaimDisposition::Abstain => ("abstain", "-".into()),
             };
-            records.push(format!(
-                "DISPOSITION\t{}\t{}\t{}\t{}\n",
-                case_id, hex_field(claim_id), label, alternative
-            ).trim_end_matches('\n').to_owned());
+            records.push(
+                format!(
+                    "DISPOSITION\t{}\t{}\t{}\t{}\n",
+                    case_id,
+                    hex_field(claim_id),
+                    label,
+                    alternative
+                )
+                .trim_end_matches('\n')
+                .to_owned(),
+            );
         }
         let mut seen_retrieval = BTreeSet::new();
         for (index, evidence_id) in packet.retrieval_ranking.iter().enumerate() {
@@ -1904,7 +3029,9 @@ pub fn encode_prediction_artifact_v1(
             }
             records.push(format!(
                 "RETRIEVED\t{}\t{}\t{}",
-                case_id, index + 1, hex_field(evidence_id)
+                case_id,
+                index + 1,
+                hex_field(evidence_id)
             ));
         }
         for evidence_id in &packet.cited_evidence_ids {
@@ -1948,7 +3075,9 @@ fn parse_predictions_v1(
     }
     for (index, label) in [(4, "checkpoint"), (5, "prompt"), (6, "run config")] {
         if !valid_sha256_v1(header[index]) {
-            return Err(format!("predictions: {label} digest is not canonical lowercase SHA-256"));
+            return Err(format!(
+                "predictions: {label} digest is not canonical lowercase SHA-256"
+            ));
         }
     }
     let identity = PoarPredictionIdentityV1 {
@@ -1964,20 +3093,30 @@ fn parse_predictions_v1(
         return Err("predictions: seed/split identity does not match planner artifact".into());
     }
 
-    let case_map = planner.cases.iter().map(|case| (case.id.as_str(), case)).collect::<BTreeMap<_, _>>();
+    let case_map = planner
+        .cases
+        .iter()
+        .map(|case| (case.id.as_str(), case))
+        .collect::<BTreeMap<_, _>>();
     let mut builders = BTreeMap::<String, PredictionCaseBuilderV1>::new();
     for (offset, line) in lines.iter().enumerate().skip(1) {
         let line_number = offset + 1;
         let fields = line.split('\t').collect::<Vec<_>>();
         let tag = fields.first().copied().unwrap_or("");
         if tag == "PRED_HEADER" {
-            return Err(format!("predictions: duplicate header at line {line_number}"));
+            return Err(format!(
+                "predictions: duplicate header at line {line_number}"
+            ));
         }
         let case_id = decode_hex_field_v1(
-            fields.get(1).ok_or_else(|| format!("predictions: missing case ID at line {line_number}"))?,
-            "prediction case ID"
+            fields
+                .get(1)
+                .ok_or_else(|| format!("predictions: missing case ID at line {line_number}"))?,
+            "prediction case ID",
         )?;
-        let case = case_map.get(case_id.as_str()).copied()
+        let case = case_map
+            .get(case_id.as_str())
+            .copied()
             .ok_or_else(|| format!("predictions: unknown case {case_id:?}"))?;
         let builder = builders.entry(case_id.clone()).or_default();
 
@@ -1986,43 +3125,70 @@ fn parse_predictions_v1(
                 expect_fields_v1(&fields, 5, "DISPOSITION", line_number)?;
                 let claim_id = decode_hex_field_v1(fields[2], "prediction claim ID")?;
                 if !case.target_claim_ids.contains(&claim_id) {
-                    return Err(format!("predictions: claim {claim_id:?} is not a target of case {case_id:?}"));
+                    return Err(format!(
+                        "predictions: claim {claim_id:?} is not a target of case {case_id:?}"
+                    ));
                 }
                 let disposition = match fields[3] {
                     "supported" | "refuted" => {
-                        let alternative_id = decode_hex_field_v1(fields[4], "prediction alternative ID")?;
-                        let claim = case.claims.iter().find(|node| node.id == claim_id)
+                        let alternative_id =
+                            decode_hex_field_v1(fields[4], "prediction alternative ID")?;
+                        let claim = case
+                            .claims
+                            .iter()
+                            .find(|node| node.id == claim_id)
                             .ok_or_else(|| format!("predictions: unknown claim {claim_id:?}"))?;
-                        let alternative = claim.alternatives.iter().find(|alt| alt.id == alternative_id)
-                            .ok_or_else(|| format!("predictions: unknown alternative {alternative_id:?}"))?;
+                        let alternative = claim
+                            .alternatives
+                            .iter()
+                            .find(|alt| alt.id == alternative_id)
+                            .ok_or_else(|| {
+                                format!("predictions: unknown alternative {alternative_id:?}")
+                            })?;
                         if fields[3] == "supported" {
                             if alternative.conclusion != Polarity::Supports {
-                                return Err(format!("predictions: supported disposition references refuting alternative {alternative_id:?}"));
+                                return Err(format!(
+                                    "predictions: supported disposition references refuting alternative {alternative_id:?}"
+                                ));
                             }
                             ClaimDisposition::Supported { alternative_id }
                         } else {
                             if alternative.conclusion != Polarity::Refutes {
-                                return Err(format!("predictions: refuted disposition references supporting alternative {alternative_id:?}"));
+                                return Err(format!(
+                                    "predictions: refuted disposition references supporting alternative {alternative_id:?}"
+                                ));
                             }
                             ClaimDisposition::Refuted { alternative_id }
                         }
                     }
                     "contested" => {
                         if fields[4] != "-" {
-                            return Err("predictions: contested disposition must use '-' for alternative".into());
+                            return Err(
+                                "predictions: contested disposition must use '-' for alternative"
+                                    .into(),
+                            );
                         }
                         ClaimDisposition::Contested
                     }
                     "abstain" => {
                         if fields[4] != "-" {
-                            return Err("predictions: abstain disposition must use '-' for alternative".into());
+                            return Err(
+                                "predictions: abstain disposition must use '-' for alternative"
+                                    .into(),
+                            );
                         }
                         ClaimDisposition::Abstain
                     }
                     other => return Err(format!("predictions: unknown disposition {other:?}")),
                 };
-                if builder.dispositions.insert(claim_id.clone(), disposition).is_some() {
-                    return Err(format!("predictions: duplicate disposition for {claim_id:?}"));
+                if builder
+                    .dispositions
+                    .insert(claim_id.clone(), disposition)
+                    .is_some()
+                {
+                    return Err(format!(
+                        "predictions: duplicate disposition for {claim_id:?}"
+                    ));
                 }
             }
             "RETRIEVED" => {
@@ -2032,41 +3198,69 @@ fn parse_predictions_v1(
                     return Err("predictions: retrieval ranks start at 1".into());
                 }
                 let evidence_id = decode_hex_field_v1(fields[3], "retrieved evidence ID")?;
-                if !case.evidence.iter().any(|evidence| evidence.id == evidence_id) {
-                    return Err(format!("predictions: retrieval references unknown evidence {evidence_id:?}"));
+                if !case
+                    .evidence
+                    .iter()
+                    .any(|evidence| evidence.id == evidence_id)
+                {
+                    return Err(format!(
+                        "predictions: retrieval references unknown evidence {evidence_id:?}"
+                    ));
                 }
                 if !builder.retrieval_ids.insert(evidence_id.clone())
                     || builder.retrieval.insert(rank, evidence_id).is_some()
                 {
-                    return Err(format!("predictions: duplicate retrieval ID or rank in case {case_id:?}"));
+                    return Err(format!(
+                        "predictions: duplicate retrieval ID or rank in case {case_id:?}"
+                    ));
                 }
             }
             "CITATION" => {
                 expect_fields_v1(&fields, 3, "CITATION", line_number)?;
                 let evidence_id = decode_hex_field_v1(fields[2], "citation evidence ID")?;
-                if !case.evidence.iter().any(|evidence| evidence.id == evidence_id) {
-                    return Err(format!("predictions: citation references unknown evidence {evidence_id:?}"));
+                if !case
+                    .evidence
+                    .iter()
+                    .any(|evidence| evidence.id == evidence_id)
+                {
+                    return Err(format!(
+                        "predictions: citation references unknown evidence {evidence_id:?}"
+                    ));
                 }
                 if !builder.citations.insert(evidence_id.clone()) {
                     return Err(format!("predictions: duplicate citation {evidence_id:?}"));
                 }
             }
-            other => return Err(format!("predictions: unknown record type {other:?} at line {line_number}")),
+            other => {
+                return Err(format!(
+                    "predictions: unknown record type {other:?} at line {line_number}"
+                ));
+            }
         }
     }
 
     let mut packets = Vec::with_capacity(planner.cases.len());
     for case in &planner.cases {
-        let builder = builders.remove(&case.id)
+        let builder = builders
+            .remove(&case.id)
             .ok_or_else(|| format!("predictions: no records for case {:?}", case.id))?;
         if builder.dispositions.len() != case.target_claim_ids.len()
-            || case.target_claim_ids.iter().any(|target| !builder.dispositions.contains_key(target))
+            || case
+                .target_claim_ids
+                .iter()
+                .any(|target| !builder.dispositions.contains_key(target))
         {
-            return Err(format!("predictions: every target in case {:?} needs exactly one disposition", case.id));
+            return Err(format!(
+                "predictions: every target in case {:?} needs exactly one disposition",
+                case.id
+            ));
         }
         for (expected, actual) in (1_u64..).zip(builder.retrieval.keys().copied()) {
             if expected != actual {
-                return Err(format!("predictions: retrieval ranks in case {:?} must be contiguous from 1", case.id));
+                return Err(format!(
+                    "predictions: retrieval ranks in case {:?} must be contiguous from 1",
+                    case.id
+                ));
             }
         }
         packets.push(ProofPacket {
@@ -2090,48 +3284,75 @@ fn validate_oracle_labels_v1(
     for case in &planner.cases {
         expected_truths.insert(
             case.id.clone(),
-            case.evidence.iter().map(|evidence| evidence.id.clone()).collect()
+            case.evidence
+                .iter()
+                .map(|evidence| evidence.id.clone())
+                .collect(),
         );
     }
     if oracle.truths.len() != expected_truths.len() {
         return Err("oracle: case coverage does not match planner".into());
     }
     for (case_id, expected_ids) in &expected_truths {
-        let labels = oracle.truths.get(case_id)
+        let labels = oracle
+            .truths
+            .get(case_id)
             .ok_or_else(|| format!("oracle: missing truth labels for case {case_id:?}"))?;
         let actual_ids = labels.keys().cloned().collect::<BTreeSet<_>>();
         if &actual_ids != expected_ids {
-            return Err(format!("oracle: truth evidence IDs do not exactly match planner case {case_id:?}"));
+            return Err(format!(
+                "oracle: truth evidence IDs do not exactly match planner case {case_id:?}"
+            ));
         }
     }
 
     let mut expected_claims = BTreeMap::<(String, String), OracleState>::new();
-    let mut expected_paths = BTreeMap::<(String, String, Polarity, String), BTreeSet<String>>::new();
+    let mut expected_paths =
+        BTreeMap::<(String, String, Polarity, String), BTreeSet<String>>::new();
     for case in &planner.cases {
-        let labels = oracle.truths.get(&case.id).expect("truth map validated above");
+        let labels = oracle
+            .truths
+            .get(&case.id)
+            .expect("truth map validated above");
         let mut memo = BTreeMap::new();
         for claim_id in &case.target_claim_ids {
             let evaluation = resolve_claim(case, labels, claim_id, &mut BTreeSet::new(), &mut memo);
             expected_claims.insert((case.id.clone(), claim_id.clone()), evaluation.state());
             for (alternative_id, witness) in &evaluation.support {
                 expected_paths.insert(
-                    (case.id.clone(), claim_id.clone(), Polarity::Supports, alternative_id.clone()),
-                    witness.evidence_ids.clone()
+                    (
+                        case.id.clone(),
+                        claim_id.clone(),
+                        Polarity::Supports,
+                        alternative_id.clone(),
+                    ),
+                    witness.evidence_ids.clone(),
                 );
             }
             for (alternative_id, witness) in &evaluation.refute {
                 expected_paths.insert(
-                    (case.id.clone(), claim_id.clone(), Polarity::Refutes, alternative_id.clone()),
-                    witness.evidence_ids.clone()
+                    (
+                        case.id.clone(),
+                        claim_id.clone(),
+                        Polarity::Refutes,
+                        alternative_id.clone(),
+                    ),
+                    witness.evidence_ids.clone(),
                 );
             }
         }
     }
     if expected_claims != oracle.gold_claims {
-        return Err("oracle: GOLD_CLAIM labels are incomplete or inconsistent with its truth records".into());
+        return Err(
+            "oracle: GOLD_CLAIM labels are incomplete or inconsistent with its truth records"
+                .into(),
+        );
     }
     if expected_paths != oracle.gold_paths {
-        return Err("oracle: GOLD_PATH witnesses are incomplete or inconsistent with its truth records".into());
+        return Err(
+            "oracle: GOLD_PATH witnesses are incomplete or inconsistent with its truth records"
+                .into(),
+        );
     }
     Ok(())
 }
@@ -2190,7 +3411,11 @@ mod artifact_evaluator_tests_v1 {
         let generator = "test-generator-revision";
         let planner = encode_planner_artifact_v1(&suite, generator).expect("planner encode");
         let oracle = encode_oracle_artifact_v1(&suite, generator, DIGEST).expect("oracle encode");
-        let packets = suite.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
+        let packets = suite
+            .planner_cases()
+            .iter()
+            .map(ProofPacket::abstain_all)
+            .collect::<Vec<_>>();
         let identity = PoarPredictionIdentityV1 {
             planner_sha256: DIGEST.into(),
             model_id: "test-model".into(),
@@ -2200,7 +3425,8 @@ mod artifact_evaluator_tests_v1 {
             seed: 1729,
             split: DatasetSplit::Test,
         };
-        let predictions = encode_prediction_artifact_v1(&identity, &packets).expect("prediction encode");
+        let predictions =
+            encode_prediction_artifact_v1(&identity, &packets).expect("prediction encode");
         (planner, oracle, predictions, DIGEST.into())
     }
 
@@ -2208,103 +3434,266 @@ mod artifact_evaluator_tests_v1 {
     fn frozen_artifacts_round_trip_and_score_in_a_fresh_evaluator_api() {
         let (planner, oracle, predictions, digest) = artifacts();
         let evaluated = evaluate_poar_artifacts_v1(
-            planner.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest
-        ).expect("valid frozen artifacts");
+            planner.as_bytes(),
+            oracle.as_bytes(),
+            predictions.as_bytes(),
+            &digest,
+        )
+        .expect("valid frozen artifacts");
         assert_eq!(evaluated.report.case_count(), 16);
         assert_eq!(evaluated.report.duplicate_prediction_packets, 0);
         assert_eq!(evaluated.report.unknown_prediction_packets, 0);
         assert_eq!(evaluated.prediction_identity.model_id, "test-model");
-        assert_eq!(evaluated.report.case_scores.iter().map(|score| score.target_claims).sum::<usize>(), 18);
+        assert_eq!(
+            evaluated
+                .report
+                .case_scores
+                .iter()
+                .map(|score| score.target_claims)
+                .sum::<usize>(),
+            18
+        );
     }
 
     #[test]
     fn parser_rejects_missing_final_lf_crlf_bom_and_empty_records() {
         let (planner, oracle, predictions, digest) = artifacts();
         let no_lf = planner.trim_end_matches('\n').as_bytes().to_vec();
-        assert!(evaluate_poar_artifacts_v1(&no_lf, oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(&no_lf, oracle.as_bytes(), predictions.as_bytes(), &digest)
+                .is_err()
+        );
         let crlf = planner.replace('\n', "\r\n");
-        assert!(evaluate_poar_artifacts_v1(crlf.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                crlf.as_bytes(),
+                oracle.as_bytes(),
+                predictions.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
         let bom = format!("\u{feff}{planner}");
-        assert!(evaluate_poar_artifacts_v1(bom.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                bom.as_bytes(),
+                oracle.as_bytes(),
+                predictions.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
         let blank = planner.replacen('\n', "\n\n", 1);
-        assert!(evaluate_poar_artifacts_v1(blank.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                blank.as_bytes(),
+                oracle.as_bytes(),
+                predictions.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn planner_oracle_and_prediction_digest_bindings_fail_closed() {
         let (planner, oracle, predictions, digest) = artifacts();
         let wrong = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), wrong).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                oracle.as_bytes(),
+                predictions.as_bytes(),
+                wrong
+            )
+            .is_err()
+        );
         let wrong_pred = predictions.replace(&digest, wrong);
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), wrong_pred.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                oracle.as_bytes(),
+                wrong_pred.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
         let wrong_oracle = oracle.replace(&digest, wrong);
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), wrong_oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                wrong_oracle.as_bytes(),
+                predictions.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn prediction_parser_rejects_missing_or_duplicate_target_dispositions() {
         let (planner, oracle, predictions, digest) = artifacts();
-        let without_first = predictions.lines().enumerate()
+        let without_first = predictions
+            .lines()
+            .enumerate()
             .filter(|(index, _)| *index != 1)
-            .map(|(_, line)| line).collect::<Vec<_>>().join("\n") + "\n";
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), without_first.as_bytes(), &digest).is_err());
+            .map(|(_, line)| line)
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                oracle.as_bytes(),
+                without_first.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
         let first_record = predictions.lines().nth(1).expect("first prediction record");
         let duplicate = format!("{predictions}{first_record}\n");
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), duplicate.as_bytes(), &digest).is_err());
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                oracle.as_bytes(),
+                duplicate.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn prediction_parser_rejects_retrieval_rank_gaps_and_unknown_evidence() {
         let (planner, oracle, predictions, digest) = artifacts();
         let case_id = hex_field("and-chain-1729-test");
-        let rank_gap = format!("{predictions}RETRIEVED\t{case_id}\t2\t{}\n", hex_field("e-leaf"));
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), rank_gap.as_bytes(), &digest).is_err());
-        let unknown = format!("{predictions}CITATION\t{case_id}\t{}\n", hex_field("not-in-planner"));
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), unknown.as_bytes(), &digest).is_err());
+        let rank_gap = format!(
+            "{predictions}RETRIEVED\t{case_id}\t2\t{}\n",
+            hex_field("e-leaf")
+        );
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                oracle.as_bytes(),
+                rank_gap.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
+        let unknown = format!(
+            "{predictions}CITATION\t{case_id}\t{}\n",
+            hex_field("not-in-planner")
+        );
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                oracle.as_bytes(),
+                unknown.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn tampered_gold_claim_and_gold_path_artifacts_are_rejected() {
         let (planner, oracle, predictions, digest) = artifacts();
-        let tampered_claim = oracle.replacen("GOLD_CLAIM", "GOLD_CLAIM", 1)
-            .replacen("\tsupported\n", "\tunknown\n", 1);
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), tampered_claim.as_bytes(), predictions.as_bytes(), &digest).is_err());
-        let tampered_path = oracle.replacen("GOLD_PATH", "GOLD_PATH", 1)
+        let tampered_claim = oracle.replacen("GOLD_CLAIM", "GOLD_CLAIM", 1).replacen(
+            "\tsupported\n",
+            "\tunknown\n",
+            1,
+        );
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                tampered_claim.as_bytes(),
+                predictions.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
+        let tampered_path = oracle
+            .replacen("GOLD_PATH", "GOLD_PATH", 1)
             .replace("GOLD_PATH\t", "GOLD_PATH\t");
-        let malformed_path = tampered_path.lines().map(|line| {
-            if line.starts_with("GOLD_PATH\t") { line.trim_end().to_owned() + "\t00" } else { line.to_owned() }
-        }).collect::<Vec<_>>().join("\n") + "\n";
-        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), malformed_path.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        let malformed_path = tampered_path
+            .lines()
+            .map(|line| {
+                if line.starts_with("GOLD_PATH\t") {
+                    line.trim_end().to_owned() + "\t00"
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        assert!(
+            evaluate_poar_artifacts_v1(
+                planner.as_bytes(),
+                malformed_path.as_bytes(),
+                predictions.as_bytes(),
+                &digest
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn frozen_predictions_are_scored_for_false_support_and_missing_proof_citations() {
         let suite = generate_poar_graph_suite(1729, DatasetSplit::Test);
-        let planner = encode_planner_artifact_v1(&suite, "test-generator-revision").expect("planner");
-        let oracle = encode_oracle_artifact_v1(&suite, "test-generator-revision", DIGEST).expect("oracle");
-        let case = suite.planner_cases().iter().find(|case| case.id.ends_with("or-current-alternative")).expect("case");
+        let planner =
+            encode_planner_artifact_v1(&suite, "test-generator-revision").expect("planner");
+        let oracle =
+            encode_oracle_artifact_v1(&suite, "test-generator-revision", DIGEST).expect("oracle");
+        let case = suite
+            .planner_cases()
+            .iter()
+            .find(|case| case.id.ends_with("or-current-alternative"))
+            .expect("case");
         let packet = ProofPacket {
             case_id: case.id.clone(),
             claim_dispositions: BTreeMap::from([(
                 "claim".into(),
-                ClaimDisposition::Supported { alternative_id: "current-path".into() }
+                ClaimDisposition::Supported {
+                    alternative_id: "current-path".into(),
+                },
             )]),
             retrieval_ranking: vec![],
             cited_evidence_ids: BTreeSet::new(),
         };
-        let mut packets = suite.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
-        let target = packets.iter_mut().find(|packet| packet.case_id == case.id).expect("packet");
+        let mut packets = suite
+            .planner_cases()
+            .iter()
+            .map(ProofPacket::abstain_all)
+            .collect::<Vec<_>>();
+        let target = packets
+            .iter_mut()
+            .find(|packet| packet.case_id == case.id)
+            .expect("packet");
         *target = packet;
         let identity = PoarPredictionIdentityV1 {
-            planner_sha256: DIGEST.into(), model_id: "test-model".into(),
-            checkpoint_sha256: DIGEST.into(), prompt_sha256: DIGEST.into(),
-            run_config_sha256: DIGEST.into(), seed: 1729, split: DatasetSplit::Test,
+            planner_sha256: DIGEST.into(),
+            model_id: "test-model".into(),
+            checkpoint_sha256: DIGEST.into(),
+            prompt_sha256: DIGEST.into(),
+            run_config_sha256: DIGEST.into(),
+            seed: 1729,
+            split: DatasetSplit::Test,
         };
         let predictions = encode_prediction_artifact_v1(&identity, &packets).expect("predictions");
         let result = evaluate_poar_artifacts_v1(
-            planner.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), DIGEST
-        ).expect("evaluation");
-        let score = result.report.case_scores.iter().find(|score| score.case_id == case.id).expect("case score");
+            planner.as_bytes(),
+            oracle.as_bytes(),
+            predictions.as_bytes(),
+            DIGEST,
+        )
+        .expect("evaluation");
+        let score = result
+            .report
+            .case_scores
+            .iter()
+            .find(|score| score.case_id == case.id)
+            .expect("case score");
         assert_eq!(score.correct_dispositions, 1);
         assert_eq!(score.missing_required_citations, 1);
         assert!(!result.report.all_hard_invariants_hold());
