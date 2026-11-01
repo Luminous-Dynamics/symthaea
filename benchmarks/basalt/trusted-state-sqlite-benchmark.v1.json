@@ -113,6 +113,18 @@
       "phase": "integrity",
       "mutation": "Create an accepted receipt revision gap or duplicate acceptance revision",
       "expected": "Reject incomplete or duplicated accepted-revision history"
+    },
+    {
+      "id": "TSTATE-SQL-019",
+      "phase": "integrity",
+      "mutation": "Change an accepted receipt's checkpoint evidence class from pinned bootstrap to same-tree and recompute the unkeyed state digest",
+      "expected": "Reject because the first accepted checkpoint for a log must have a matching pinned bootstrap"
+    },
+    {
+      "id": "TSTATE-SQL-020",
+      "phase": "integrity",
+      "mutation": "Roll the current log cursor back to an older accepted checkpoint and recompute the unkeyed state digest",
+      "expected": "Reject because the persisted log cursor must equal the last accepted checkpoint for that log"
     }
   ],
   "metrics": [
@@ -226,6 +238,18 @@
     },
     {
       "id": "schema_version_mismatch_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "checkpoint_evidence_class_history_tamper_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "log_cursor_rollback_with_recomputed_digest_acceptances",
       "class": "safety",
       "unit": "count",
       "target": "0"
