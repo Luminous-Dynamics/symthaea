@@ -228,11 +228,6 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         bail!("dataset.source_task_id cannot be empty");
     }
     if evidence_class == "measured_audit"
-        && string(value, "/dataset/cohort_id")? != "SorryDB_2601"
-    {
-        bail!("measured SorryDB integrity receipts must identify the SorryDB_2601 cohort");
-    }
-    if evidence_class == "measured_audit"
         && hex::encode(Sha256::digest(source_task_id.as_bytes())) != task_id
     {
         bail!("dataset.task_id must be SHA-256(source_task_id) for measured receipts");
