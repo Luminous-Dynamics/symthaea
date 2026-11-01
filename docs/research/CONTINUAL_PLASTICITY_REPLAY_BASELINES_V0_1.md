@@ -1,6 +1,6 @@
 # Continual Plasticity: Replay Baseline Contract (v0.1)
 
-**Tracking:** NEURO-SILICON-010 / #9677  
+**Tracking:** NEURO-SILICON-010  
 **Implementation:** `research/continual-plasticity/`  
 **Companion joint controller:** #9666 / PR #9667  
 **Status:** FIFO and reservoir data structures authored; no Rust execution
