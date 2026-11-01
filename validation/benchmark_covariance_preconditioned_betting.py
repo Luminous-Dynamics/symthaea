@@ -227,7 +227,7 @@ def simulate_cell(
             lambda_eta
             + etas[:, None, None]
             * eta_gradient
-            / proxy_diag[None, None, :],
+            / proxy_diag,
             0.0,
             cap,
         )
