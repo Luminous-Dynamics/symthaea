@@ -133,7 +133,7 @@ def build_affine_closure_milp(
             "previous_rejections": previous,
             "closure_constraints_covered": (1 << len(ids)) - 1,
             "model_variables": 2 * len(ids) + 1,
-            "model_constraint_rows": 2 * len(ids) + 2 + len(previous) + (1 if cap is not None else 0),
+            "model_constraint_rows": len(ids) + 2 + len(previous) + (1 if cap is not None else 0),
             "complexity": "O(n) variables and O(n) constraints; 0-1 optimization remains combinatorial",
         },
     }
@@ -155,7 +155,7 @@ def verify_affine_closure_milp_solution(
     y = {}
     for i in ids:
         bit = rejection_values.get(i)
-        if isinstance(bit, bool) or bit not in (0, 1):
+        if isinstance(bit, bool) or not isinstance(bit, int) or bit not in (0, 1):
             failures.append(("invalid_binary_rejection", i, bit))
             continue
         x[i] = int(bit)
@@ -227,7 +227,7 @@ def minimal_auxiliary_values(
     x = {}
     for i in ids:
         bit = rejection_values.get(i)
-        if isinstance(bit, bool) or bit not in (0, 1):
+        if isinstance(bit, bool) or not isinstance(bit, int) or bit not in (0, 1):
             raise ValueError(f"rejection indicator for {i} must be binary")
         x[i] = int(bit)
     r = sum(x.values())
