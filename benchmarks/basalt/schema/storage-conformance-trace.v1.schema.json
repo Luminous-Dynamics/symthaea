@@ -193,7 +193,7 @@
     "operation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["op_id", "runner_id", "client_id", "client_sequence", "kind", "scope", "invoked_at_ns", "completed_at_ns", "request", "result"],
+      "required": ["op_id", "runner_id", "client_id", "client_sequence", "kind", "scope", "invoked_at_ns", "completed_at_ns", "request", "expected_result"],
       "properties": {
         "op_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
         "runner_id": { "type": "string", "minLength": 1 },
@@ -234,7 +234,7 @@
             "next_policy_digest": { "$ref": "#/$defs/digest" }
           }
         },
-        "result": {
+        "expected_result": {
           "type": "object",
           "additionalProperties": false,
           "required": ["outcome", "receipt_id", "receipt_acceptance_revision", "current_authority_revision", "reason"],
