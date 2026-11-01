@@ -1097,6 +1097,87 @@ mod tests {
     }
 
     #[test]
+    fn semantic_and_same_skill_cells_require_unanimous_adjudication() {
+        for relation in [
+            TransferRelationV1::SemanticEquivalent,
+            TransferRelationV1::NovelRecipeSameSkill,
+        ] {
+            let mut replicate = sample_transfer_replicate();
+            let row = replicate
+                .strata
+                .iter_mut()
+                .find(|row| row.relation == relation)
+                .unwrap();
+            row.minimum_item_agreement_permille = 999;
+            let mut expected_cells = BTreeMap::new();
+            let mut expected_matrix_keys = None;
+            assert!(validate_replicate_matrix(
+                &replicate,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn indeterminate_adjudication_is_not_scoreable() {
+        let mut replicate = sample_transfer_replicate();
+        replicate.strata[0].adjudication_decision =
+            RelationAdjudicationDecisionV1::Indeterminate;
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        assert!(validate_replicate_matrix(
+            &replicate,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn duplicate_adjudicator_pseudonyms_are_rejected() {
+        let mut replicate = sample_transfer_replicate();
+        replicate.strata[0].adjudication_reviewer_ids[2] =
+            replicate.strata[0].adjudication_reviewer_ids[1].clone();
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        assert!(validate_replicate_matrix(
+            &replicate,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn adjudication_binding_must_match_across_model_pairs() {
+        let first = sample_transfer_replicate();
+        let mut second = sample_transfer_replicate();
+        second.replicate_id = "pair-002".to_owned();
+        second.strata[0].adjudication_reviewer_ids[0] = "different-reviewer".to_owned();
+        let mut expected_cells = BTreeMap::new();
+        let mut expected_matrix_keys = None;
+        validate_replicate_matrix(
+            &first,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .unwrap();
+        assert!(validate_replicate_matrix(
+            &second,
+            None,
+            &mut expected_cells,
+            &mut expected_matrix_keys,
+        )
+        .is_err());
+    }
+
+    #[test]
     fn treatment_placebo_contrast_direction_is_explicit() {
         let high = RateTriplet {
             base: 500.0,
