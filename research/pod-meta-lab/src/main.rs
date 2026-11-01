@@ -1,6 +1,6 @@
 use pod_meta_lab::{
-    choose_next, CandidateOperation, Obligation, ObligationState, OperationKind,
-    SchedulingClass, Selection, SelectionContext,
+    CandidateOperation, Obligation, ObligationState, OperationKind, SchedulingClass, Selection,
+    SelectionContext, choose_next,
 };
 use std::collections::BTreeSet;
 
