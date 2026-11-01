@@ -16,7 +16,6 @@ use crate::performance_gesture::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
-use std::collections::HashSet;
 
 /// Wire schema for paired gesture-controllability receipts.
 pub const GESTURE_CONTROLLABILITY_SCHEMA_VERSION: u16 = 1;
@@ -222,6 +221,8 @@ impl GestureCounterfactualReceiptV1 {
             {
                 if baseline.feature_id != intervention.feature_id
                     || baseline.target != intervention.target
+                    || baseline.instrument_id != intervention.instrument_id
+                    || baseline.source_model_id != intervention.source_model_id
                     || baseline.unit != intervention.unit
                 {
                     issues.push("baseline/intervention feature identities or units differ".to_string());
@@ -243,13 +244,10 @@ impl GestureCounterfactualReceiptV1 {
             issues.push("the same target feature cannot be both an expected effect and a side-effect budget".to_string());
         }
 
-        let baseline_index = feature_index(&self.baseline_features);
-        let intervention_index = feature_index(&self.intervention_features);
-
         for effect in &self.expected_effects {
             let (Some(baseline), Some(intervention)) = (
-                baseline_index.get(effect.feature_id.as_str()),
-                intervention_index.get(effect.feature_id.as_str()),
+                find_feature(&self.baseline_features, &effect.target, &effect.feature_id),
+                find_feature(&self.intervention_features, &effect.target, &effect.feature_id),
             ) else {
                 issues.push(format!(
                     "expected feature {} is missing from a paired measurement",
@@ -290,8 +288,8 @@ impl GestureCounterfactualReceiptV1 {
 
         for budget in &self.side_effect_budgets {
             let (Some(baseline), Some(intervention)) = (
-                baseline_index.get(budget.feature_id.as_str()),
-                intervention_index.get(budget.feature_id.as_str()),
+                find_feature(&self.baseline_features, &budget.target, &budget.feature_id),
+                find_feature(&self.intervention_features, &budget.target, &budget.feature_id),
             ) else {
                 issues.push(format!(
                     "side-effect feature {} is missing from a paired measurement",
@@ -413,6 +411,41 @@ impl GestureCounterfactualReceiptV1 {
             issues.push("counterfactual uses a different note identity map".to_string());
         }
 
+        for measurement in self.baseline_features.iter().chain(self.intervention_features.iter()) {
+            match &measurement.target {
+                GestureTarget::Note { part_id, note_id } => match identity_map.note(*part_id, note_id) {
+                    None => issues.push(format!(
+                        "feature {} references an unknown part/note identity",
+                        measurement.feature_id
+                    )),
+                    Some(note) => {
+                        if note.instrument_id != measurement.instrument_id
+                            || note.source_model_id != measurement.source_model_id
+                        {
+                            issues.push(format!(
+                                "feature {} instrument/model does not match its score note",
+                                measurement.feature_id
+                            ));
+                        }
+                    }
+                },
+                GestureTarget::Part { part_id } => {
+                    let part_notes: Vec<_> = identity_map.notes.iter()
+                        .filter(|note| note.part_id == *part_id).collect();
+                    let homogeneous = !part_notes.is_empty() && part_notes.iter().all(|note| {
+                        note.instrument_id == measurement.instrument_id
+                            && note.source_model_id == measurement.source_model_id
+                    });
+                    if !homogeneous {
+                        issues.push(format!(
+                            "feature {} part target is absent or has heterogeneous instrument/model identity",
+                            measurement.feature_id
+                        ));
+                    }
+                }
+            }
+        }
+
         match &self.target {
             GestureTarget::Note { part_id, note_id } => match identity_map.note(*part_id, note_id) {
                 None => issues.push("counterfactual references an unknown part/note identity".to_string()),
@@ -502,7 +535,7 @@ fn validate_measurements(
     measurements: &[FeatureMeasurement],
     issues: &mut Vec<String>,
 ) {
-    let mut previous: Option<&str> = None;
+    let mut previous: Option<(&GestureTarget, &str)> = None;
     for measurement in measurements {
         if measurement.feature_id.trim().is_empty() || !measurement.value.is_finite() {
             issues.push(format!("{name} contains an empty feature ID or non-finite value"));
@@ -518,10 +551,13 @@ fn validate_measurements(
             }
             _ => {}
         }
-        if previous.is_some_and(|prior| prior >= measurement.feature_id.as_str()) {
-            issues.push(format!("{name} must be sorted by unique feature_id"));
+        if previous.is_some_and(|(prior_target, prior_id)| {
+            compare_feature_key(prior_target, prior_id, &measurement.target, &measurement.feature_id)
+                != Ordering::Less
+        }) {
+            issues.push(format!("{name} must be sorted by unique (target, feature_id)"));
         }
-        previous = Some(measurement.feature_id.as_str());
+        previous = Some((&measurement.target, measurement.feature_id.as_str()));
     }
 }
 
@@ -529,7 +565,7 @@ fn validate_sorted_unique_effects(
     effects: &[ExpectedFeatureEffect],
     issues: &mut Vec<String>,
 ) {
-    let mut previous: Option<&str> = None;
+    let mut previous: Option<(&GestureTarget, &str)> = None;
     for effect in effects {
         if effect.feature_id.trim().is_empty()
             || !effect.minimum_abs_delta.is_finite()
@@ -537,10 +573,13 @@ fn validate_sorted_unique_effects(
         {
             issues.push("expected effect has an empty ID or invalid minimum delta".to_string());
         }
-        if previous.is_some_and(|prior| prior >= effect.feature_id.as_str()) {
-            issues.push("expected effects must be sorted by unique feature_id".to_string());
+        if previous.is_some_and(|(prior_target, prior_id)| {
+            compare_feature_key(prior_target, prior_id, &effect.target, &effect.feature_id)
+                != Ordering::Less
+        }) {
+            issues.push("expected effects must be sorted by unique (target, feature_id)".to_string());
         }
-        previous = Some(effect.feature_id.as_str());
+        previous = Some((&effect.target, effect.feature_id.as_str()));
     }
 }
 
@@ -548,7 +587,7 @@ fn validate_sorted_unique_budgets(
     budgets: &[SideEffectBudget],
     issues: &mut Vec<String>,
 ) {
-    let mut previous: Option<&str> = None;
+    let mut previous: Option<(&GestureTarget, &str)> = None;
     for budget in budgets {
         if budget.feature_id.trim().is_empty()
             || !budget.maximum_abs_delta.is_finite()
@@ -556,20 +595,47 @@ fn validate_sorted_unique_budgets(
         {
             issues.push("side-effect budget has an empty ID or invalid maximum delta".to_string());
         }
-        if previous.is_some_and(|prior| prior >= budget.feature_id.as_str()) {
-            issues.push("side-effect budgets must be sorted by unique feature_id".to_string());
+        if previous.is_some_and(|(prior_target, prior_id)| {
+            compare_feature_key(prior_target, prior_id, &budget.target, &budget.feature_id)
+                != Ordering::Less
+        }) {
+            issues.push("side-effect budgets must be sorted by unique (target, feature_id)".to_string());
         }
-        previous = Some(budget.feature_id.as_str());
+        previous = Some((&budget.target, budget.feature_id.as_str()));
     }
 }
 
-fn feature_index(
-    measurements: &[FeatureMeasurement],
-) -> std::collections::HashMap<&str, &FeatureMeasurement> {
-    measurements
-        .iter()
-        .map(|measurement| (measurement.feature_id.as_str(), measurement))
-        .collect()
+fn compare_target(left: &GestureTarget, right: &GestureTarget) -> Ordering {
+    match (left, right) {
+        (GestureTarget::Part { part_id: left }, GestureTarget::Part { part_id: right }) => {
+            left.cmp(right)
+        }
+        (GestureTarget::Part { .. }, GestureTarget::Note { .. }) => Ordering::Less,
+        (GestureTarget::Note { .. }, GestureTarget::Part { .. }) => Ordering::Greater,
+        (
+            GestureTarget::Note { part_id: left_part, note_id: left_note },
+            GestureTarget::Note { part_id: right_part, note_id: right_note },
+        ) => left_part.cmp(right_part).then_with(|| left_note.cmp(right_note)),
+    }
+}
+
+fn compare_feature_key(
+    left_target: &GestureTarget,
+    left_id: &str,
+    right_target: &GestureTarget,
+    right_id: &str,
+) -> Ordering {
+    compare_target(left_target, right_target).then_with(|| left_id.cmp(right_id))
+}
+
+fn find_feature<'a>(
+    measurements: &'a [FeatureMeasurement],
+    target: &GestureTarget,
+    feature_id: &str,
+) -> Option<&'a FeatureMeasurement> {
+    measurements.iter().find(|measurement| {
+        &measurement.target == target && measurement.feature_id == feature_id
+    })
 }
 
 fn hash_string(hasher: &mut Sha256, value: &str) {
@@ -652,16 +718,27 @@ mod tests {
     fn identity_map() -> ScoreNoteIdentityMapV1 {
         ScoreNoteIdentityMapV1::new(
             "a".repeat(64),
-            1,
-            vec![ScoreNoteIdentityV1 {
-                note_index: 0,
-                note_id: "vln-note-1".to_string(),
-                part_id: 4,
-                instrument_id: "violin".to_string(),
-                source_model_id: Some("violin.model-a".to_string()),
-                onset: BeatPosition::new(0, 1).unwrap(),
-                duration: BeatPosition::new(4, 1).unwrap(),
-            }],
+            2,
+            vec![
+                ScoreNoteIdentityV1 {
+                    note_index: 0,
+                    note_id: "vln-note-1".to_string(),
+                    part_id: 4,
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
+                    onset: BeatPosition::new(0, 1).unwrap(),
+                    duration: BeatPosition::new(2, 1).unwrap(),
+                },
+                ScoreNoteIdentityV1 {
+                    note_index: 1,
+                    note_id: "vln-note-2".to_string(),
+                    part_id: 4,
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
+                    onset: BeatPosition::new(2, 1).unwrap(),
+                    duration: BeatPosition::new(2, 1).unwrap(),
+                },
+            ],
         )
     }
 
@@ -795,7 +872,7 @@ mod tests {
         assert!(value.verify().is_ok());
         assert!(value
             .verify_against_event_and_identity_map(
-                &"a".repeat(64), 1, &identity_map(), &gesture_event()
+                &"a".repeat(64), 2, &identity_map(), &gesture_event()
             )
             .is_ok());
     }
@@ -863,7 +940,7 @@ mod tests {
             target: other_target.clone(),
             instrument_id: "violin".to_string(),
             source_model_id: Some("violin.model-a".to_string()),
-            feature_id: "other_note_level".to_string(),
+            feature_id: "spectral_centroid_hz".to_string(),
             value: 0.3,
             unit: FeatureUnit::Normalized,
         });
@@ -873,7 +950,7 @@ mod tests {
             value: 0.3,
             unit: FeatureUnit::Normalized,
         });
-        value.baseline_features.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
+        value.baseline_features.sort_by(|a, b| compare_feature_key(&a.target, &a.feature_id, &b.target, &b.feature_id));
         value.intervention_features.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
         value.side_effect_budgets.push(SideEffectBudget {
             target: other_target,
@@ -890,7 +967,7 @@ mod tests {
             .unwrap().value = 0.31;
         value.seal();
         assert!(value.verify().unwrap_err().iter()
-            .any(|issue| issue.contains("side-effect budget exceeded for other_note_level")));
+            .any(|issue| issue.contains("side-effect budget exceeded for spectral_centroid_hz")));
     }
 
     #[test]
@@ -925,7 +1002,7 @@ mod tests {
         };
         value.seal();
         assert!(value
-            .verify_against_identity_map(&"a".repeat(64), 1, &identity_map())
+            .verify_against_identity_map(&"a".repeat(64), 2, &identity_map())
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("unknown part/note")));
