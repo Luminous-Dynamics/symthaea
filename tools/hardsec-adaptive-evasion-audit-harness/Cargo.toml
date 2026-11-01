@@ -22,6 +22,7 @@ hardsec-context-restarted-cctm-monitor = []
 hardsec-temporal-dependence-audit = []
 hardsec-markov-conditional-rank-oracle = []
 hardsec-markov-transition-cs-audit = []
+hardsec-restarted-markov-portfolio = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -76,3 +77,8 @@ required-features = ["hardsec-markov-conditional-rank-oracle"]
 name = "hardsec_markov_transition_cs_audit"
 path = "../../examples/hardsec_markov_transition_cs_audit.rs"
 required-features = ["hardsec-markov-transition-cs-audit"]
+
+[[example]]
+name = "hardsec_restarted_markov_portfolio"
+path = "../../examples/hardsec_restarted_markov_portfolio.rs"
+required-features = ["hardsec-restarted-markov-portfolio"]
