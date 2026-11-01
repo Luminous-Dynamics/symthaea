@@ -89,6 +89,30 @@
       "phase": "integrity",
       "mutation": "Migrate an existing source to a new pinned transparency log with explicit continuity evidence, close and reopen the SQLite database",
       "expected": "Persist the unchanged source key, next generation, predecessor seal and new log ID; retain old log history and reject migration without evidence"
+    },
+    {
+      "id": "TSTATE-SQL-015",
+      "phase": "integrity",
+      "mutation": "Roll back a source cursor to an older accepted receipt but recompute the unkeyed local state digest",
+      "expected": "Reject because the latest source cursor does not point to the last accepted generation in the complete receipt history"
+    },
+    {
+      "id": "TSTATE-SQL-016",
+      "phase": "configuration",
+      "mutation": "Change the persisted schema version to an unsupported value",
+      "expected": "Reject before interpreting or mutating state"
+    },
+    {
+      "id": "TSTATE-SQL-017",
+      "phase": "integrity",
+      "mutation": "Change or omit a profile, boot, log-origin or policy transition-evidence digest in accepted receipt history",
+      "expected": "Reject history whose transition authorization record is missing or malformed"
+    },
+    {
+      "id": "TSTATE-SQL-018",
+      "phase": "integrity",
+      "mutation": "Create an accepted receipt revision gap or duplicate acceptance revision",
+      "expected": "Reject incomplete or duplicated accepted-revision history"
     }
   ],
   "metrics": [
@@ -166,6 +190,24 @@
     },
     {
       "id": "unsafe_database_path_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "accepted_history_gap_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "source_cursor_rollback_with_recomputed_digest_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "missing_transition_evidence_history_acceptances",
       "class": "safety",
       "unit": "count",
       "target": "0"
