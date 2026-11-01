@@ -95,3 +95,38 @@ This clean scaler is for the leakage-controlled comparison. The official
 IMM-TSF reproduction must preserve and disclose the released full-record
 normalization path; do not call clean-split results official leaderboard
 reproductions.
+
+
+## Time-IMM CSV adapter
+
+The `time_imm` module reads one per-entity `time_series.csv` or `text.csv`
+and emits the event contract above.
+
+- Requires exact feature-column mapping and stable modality/unit/decimal-scale
+  IDs. Unexpected or unconfigured columns are rejected, not silently ignored.
+- Binds exact source-file bytes with a file SHA-256; each emitted event also
+  binds a canonical parsed-row digest. Text payload bytes are separately
+  content-addressed without trimming their content.
+- Supports RFC3339 timestamps directly. Naive timestamps require an explicit
+  fixed offset or IANA timezone. DST-ambiguous and nonexistent local times fail
+  closed. The timezone configuration receives its own digest.
+- Requires an explicit availability policy: synchronous-at-event-time
+  assumption or a declared fixed delay. The policy receives its own digest.
+  Neither option is evidence of physical acquisition or arrival time.
+- Numeric decimal strings are converted to configured fixed-point scale in
+  [-9, 0], rounding nearest with ties away from zero. A half-unit quantization
+  error bound is returned for every configured feature.
+- Numeric empty/NA/NaN cells remain Missing records; text payloads remain
+  opaque digest/length/encoding references.
+
+The concrete Time-IMM EPA-Air/Bexar release has the documented headers
+`date_time,record_id,temp,pm2_5,aqi,ozone` for numeric observations and
+`date_time,record_id,text` for text. The adapter requires the caller to supply
+the actual timezone and availability policy; it does not infer either from
+these CSV columns.
+
+Nine source-authored adapter tests cover timezone and DST, missing numeric
+cells, explicit availability delay, text payload hashing/whitespace,
+fixed-point quantization, file/row provenance, record identity and schema
+failures. The crate now has 53 source-authored test functions total. No build or
+test has run.
