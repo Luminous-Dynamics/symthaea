@@ -613,7 +613,7 @@ The official generate_full_data.py sets K=50 by default, requests vLLM per-step 
 
 The faithful released-code reproduction therefore uses vllm_top_k_raw_partial: it sums the returned probabilities exactly as released, without renormalizing them. The Rust scorer requires the actual returned probability vectors, verifies their raw partial entropy against the supplied entropy sequence, and reports returned probability mass plus lower/upper bounds on the omitted tail entropy. Those tail bounds are diagnostics; they are not silently substituted into the detector score.
 
-A separate full_vocab_softmax_exact mode is available when a model backend can provide the complete vocabulary softmax distribution. It is a measurement variant, not the released-code baseline. Report the two modes in separate rows. Never label the exact-full-vocabulary result as a byte-for-byte reproduction of the released top-K experiment.
+A separate full_vocab_softmax_exact mode is available when a model backend can provide the complete vocabulary softmax distribution at every observed token step. The Rust scorer validates vector width and probability mass, then recomputes Shannon entropy from the complete vectors instead of trusting caller-supplied entropy values. It caps the complete probability input at 25 million scalar cells per generation. It is a measurement variant, not the released-code baseline. Report the two modes in separate rows. Never label the exact-full-vocabulary result as a byte-for-byte reproduction of the released top-K experiment.
 
 For a returned top-K probability mass m, vocabulary size V and n returned token entries, omitted tail mass q=1-m. Its entropy contribution lies at least at -q*ln(q) and at most at -q*ln(q/(V-n)), given only the remaining mass and number of possible tokens. The code reports the mean of these bounds for each generation. These are per-token entropy bounds, not a direct interval on the nonlinear cosine score.
 
@@ -627,8 +627,9 @@ src/self_critique.rs contains:
 - Greedy / temperature=0 checks for both responses.
 - Generated-token count, observed entropy-step count, missing-step count and coverage permille.
 - Per-step top-K probability/entropy consistency and omitted tail-mass diagnostics.
+- Exact full-vocabulary entropy is recomputed from every complete probability vector; caller-provided entropy must match.
 - Domain-separated request and entropy-sequence digests.
-- 17 authored tests, including formula fixtures, zero norm, empty/malformed sequences, exact-vs-topK mode separation, partial-entropy mismatch and tail-mass bounds.
+- 20 authored tests, including top-K and full-vocabulary JSON fixtures, formula fixtures, zero norm, empty/malformed sequences, mode separation, probability normalization, entropy mismatch and tail-mass bounds.
 
 CLI:
 
