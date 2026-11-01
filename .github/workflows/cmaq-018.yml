@@ -141,6 +141,92 @@ jobs:
           hostile_bank["outcome_samples"][0][0] += 0.25
           assert canonical_joint_draw_bank_digest(hostile_bank) != joint_bank["joint_draw_bank_sha256"]
 
+          structured_schema = json.loads(
+              Path("structured-visual-action-bank.v0.1.schema.json").read_text()
+          )
+          Draft202012Validator.check_schema(structured_schema)
+          structured_bank = json.loads(
+              Path("fixtures/structured-visual-action-bank.example.json").read_text()
+          )
+          validate(instance=structured_bank, schema=structured_schema)
+          assert len(structured_bank["channels"]) == 2
+          assert all(
+              len(channel["outcome_samples"]) == len(structured_bank["action_ids"])
+              for channel in structured_bank["channels"]
+          )
+          assert all(
+              len(row) == len(structured_bank["joint_draw_ids"])
+              for channel in structured_bank["channels"]
+              for row in channel["outcome_samples"]
+          )
+
+          def canonical_structured_bank_digest(bank):
+              payload = bytearray(b"cmaq-018-structured-visual-action-bank-v0.1\0")
+
+              def append_text(value):
+                  encoded = value.encode("utf-8")
+                  payload.extend(struct.pack("<Q", len(encoded)))
+                  payload.extend(encoded)
+
+              def append_ids(values):
+                  payload.extend(struct.pack("<Q", len(values)))
+                  for value in values:
+                      payload.extend(struct.pack("<Q", value))
+
+              append_text(bank["history_sha256"])
+              payload.extend(struct.pack("<Q", bank["horizon_steps"]))
+              append_text(bank["action_manifest_sha256"])
+              append_ids(bank["action_ids"])
+              append_ids(bank["joint_draw_ids"])
+              payload.append({
+                  "shared_posterior_and_world_noise": 0,
+                  "paired_exogenous_disturbance": 1,
+                  "deterministic_shared_latent": 2,
+              }[bank["coupling"]])
+              kind_tags = {
+                  "geometry": 0,
+                  "motion": 1,
+                  "contact": 2,
+                  "visibility": 3,
+                  "task_utility": 4,
+                  "terminal_risk": 5,
+                  "other": 255,
+              }
+              payload.extend(struct.pack("<Q", len(bank["channels"])))
+              for channel in bank["channels"]:
+                  append_text(channel["channel_id"])
+                  payload.append(kind_tags[channel["kind"]])
+                  append_text(channel["unit"])
+                  payload.extend(struct.pack("<Q", len(channel["outcome_samples"])))
+                  for row in channel["outcome_samples"]:
+                      payload.extend(struct.pack("<Q", len(row)))
+                      for value in row:
+                          payload.extend(struct.pack("<d", value))
+              return hashlib.sha256(payload).hexdigest()
+
+          structured_digest = canonical_structured_bank_digest(structured_bank)
+          assert structured_digest == structured_bank["joint_draw_bank_sha256"]
+          assert structured_digest == (
+              "4c8f7c1de1ad1d886d873630a9e43c9f512d0a6665db7e4e610658d4cdd2de2b"
+          )
+          hostile_structured = json.loads(json.dumps(structured_bank))
+          hostile_structured["channels"][0]["outcome_samples"][0][0] += 0.01
+          assert (
+              canonical_structured_bank_digest(hostile_structured) != structured_digest
+          )
+          hostile_structured = json.loads(json.dumps(structured_bank))
+          hostile_structured["channels"][1]["channel_id"] = hostile_structured["channels"][0]["channel_id"]
+          assert len({channel["channel_id"] for channel in hostile_structured["channels"]}) != len(
+              hostile_structured["channels"]
+          )
+          hostile_structured = json.loads(json.dumps(structured_bank))
+          hostile_structured["channels"][0]["outcome_samples"][0].pop()
+          assert any(
+              len(row) != len(hostile_structured["joint_draw_ids"])
+              for channel in hostile_structured["channels"]
+              for row in channel["outcome_samples"]
+          )
+
           selected_action_schema = json.loads(
               Path("selected-action-evaluation.v0.1.schema.json").read_text()
           )
