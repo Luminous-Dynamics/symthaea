@@ -54,6 +54,26 @@ If B_t(P) is empty, the loss is zero. Optional stopping of the single global cou
 
 The proof does not require independence across coordinates; it requires every coordinate process to be valid in the same global filtration under its own null. The pathwise local constraint must hold at each report, and every active family must be finite so the local closure family is finite.
 
+### Exact linear-time separator for the affine closure family
+
+For a fixed candidate rejection set R with r=|R|>0 (the same expression also handles R empty), write
+
+    d_i = w_i (M_{i,t}-1)
+    c_i = 1{i in R}/r - alpha*d_i.
+
+For any nonempty S subset of I_t, its local constraint is equivalent to
+
+    sum_{i in S} c_i <= alpha.
+
+The maximum over all subsets is separable: include every coordinate with c_i>0. Therefore all 2^|I_t|-1 local inequalities hold if and only if
+
+    sum_{i in I_t} max(0, 1{i in R}/r - alpha*w_i*(M_{i,t}-1)) <= alpha.
+
+This is an exact O(|I_t|) separation test. When the positive-part sum exceeds alpha, the set of positive-coefficient coordinates is an explicit violating intersection. If no coefficient is positive, all nonempty subset sums are nonpositive and the constraints pass because alpha>0. The implementation uses exact Fractions and checks this separator against exhaustive enumeration on every rejection mask for active-family sizes 1 through 5 and a rational evidence grid.
+
+This reduces the cost of checking one proposed rejection set from O(2^n) to O(n). If an outer exact action optimizer still enumerates 2^n candidate rejection sets, its closure-checking component can fall from O(4^n) to O(n 2^n). The action-optimization problem itself is not yet solved by this separator; it still needs an exact branch-and-bound or MILP treatment under cumulative capacity and persistence constraints.
+
+
 ## 3. SupFDR extension
 
 The ordinary e-process condition does not by itself control the expected path supremum. For SupFDR, require the projective certificate family to be pathwise time-monotone e-processes, or apply a valid common running-maximum adjuster to the whole projective family while preserving dormant-one projectivity.
@@ -100,7 +120,7 @@ The finite oracle implements both schemes with exact rational arithmetic and ver
 - `validation/countable_global_projective_eclosure.py` provides exact rational weights, projective certificate evaluation, exhaustive finite local-closure verification, dormant-one checks, full-true-set/active-true-set identity checks, and a pathwise monotonicity diagnostic.
 - `validation/test_countable_global_projective_eclosure.py` covers both weight families, random nested arrivals, dormant padding, empty true sets, local closure, invalid inputs, and the SupFDR condition boundary.
 
-The module is a finite exact oracle. It does not authenticate event timestamps, signatures, catalogues, or filtration completeness. It does not infer E[M_{i,t}|F_{t-1}]<=1 from a realised path. Predictable activation and the conditional e-process contract remain obligations of the upstream evidence producer. The local exhaustive verifier is exponential in active-family size; it is not a production-scale algorithm.
+The module is a finite exact oracle. It does not authenticate event timestamps, signatures, catalogues, or filtration completeness. It does not infer E[M_{i,t}|F_{t-1}]<=1 from a realised path. Predictable activation and the conditional e-process contract remain obligations of the upstream evidence producer. The exhaustive differential oracle is exponential and is intentionally test-only. The production-facing local-constraint separator is O(n), but the exact action optimizer still needs a scalable solution; no production-scale claim is made.
 
 Run from the repository root:
 
@@ -122,7 +142,7 @@ Relevant sources:
 
 ## 8. Benchmark programme
 
-Compare at matched guarantees against #9538/#9539 coherent dynamic e-closure, #9648 finite-envelope predictable arrivals, #9684 countable prior-weighted closure, online closed testing, online e-closure/compound e-values, and Carefree multiple testing. Use exact finite enumeration for n=2..12, then 5,000 exploratory and 50,000 frozen confirmatory streams.
+Compare at matched guarantees against #9538/#9539 coherent dynamic e-closure, #9648 finite-envelope predictable arrivals, #9684 countable prior-weighted closure, online closed testing, online e-closure/compound e-values, and Carefree multiple testing. Use exact finite enumeration for n=2..12, then 5,000 exploratory and 50,000 frozen confirmatory streams. Benchmark both the O(n) separator and the exhaustive reference, and then evaluate whether a binary optimization model can minimize utility regret under the separator constraints without enumerating every action.
 
 Report stopped-FDR and SupFDR separately; power, true actionable discoveries, false investigations, precision@B, recall@B, utility regret, coordinate-weight sensitivity by arrival rank, cumulative capacity use, p50/p95 decision and verifier latency, peak memory, and local constraint counts. The global-projective method should also report what fraction of total coordinate budget lands on eventually active hypotheses. Do not compare ordinary FDR to SupFDR. Simulation is a diagnostic, not a proof of stochastic validity.
 
