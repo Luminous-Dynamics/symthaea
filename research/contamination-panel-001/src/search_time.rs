@@ -1251,6 +1251,149 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_response_matcher_classifies_answer_context_metadata_and_unknown() {
+        let config = crate::fresh_instance::FreshChallengeConfigV1 {
+            schema: crate::fresh_instance::FRESH_CONFIG_SCHEMA.to_owned(),
+            batch_id: "fresh-search-match".to_owned(),
+            benchmark_id: "symthaea-fresh-instances".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            task_family: "linear-system-2x2".to_owned(),
+            requested_item_count: 3,
+            matrix_coefficient_min: -9,
+            matrix_coefficient_max: 9,
+            solution_component_min: -5,
+            solution_component_max: 5,
+            minimum_absolute_determinant: 1,
+            minimum_normalized_determinant_margin_permille: 50,
+            model_checkpoint_sha256: digest("match-checkpoint"),
+            checkpoint_freeze_receipt_sha256: digest("match-freeze"),
+            checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
+            challenge_generated_at_utc: "2026-10-31T18:01:00Z".to_owned(),
+            generator_source_sha256: digest("match-source"),
+            generator_binary_sha256: digest("match-binary"),
+            runtime_image_sha256: digest("match-runtime"),
+            generator_config_sha256: String::new(),
+        };
+        let mut config = config;
+        config.generator_config_sha256 =
+            crate::fresh_instance::canonical_config_digest(&config).unwrap();
+        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
+            &config,
+            &[0x91; 32],
+        ).unwrap();
+
+        let cases = [
+            (
+                serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap(),
+                SearchExposureClassV1::AnswerBearing,
+            ),
+            (
+                bundle.public_packet.tasks[0].task_text.clone(),
+                SearchExposureClassV1::ContextBearing,
+            ),
+            (
+                bundle.public_packet.tasks[0].item_id.clone(),
+                SearchExposureClassV1::MetadataOnly,
+            ),
+            (
+                "an unrelated article about weather and gardening".to_owned(),
+                SearchExposureClassV1::Unknown,
+            ),
+        ];
+        for (body, expected_class) in cases {
+            let mut trace = trace_fixture();
+            trace.challenge_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
+            trace.events[0].response_sha256 = Some(search_response_body_digest(&body));
+            trace.events[0].response_bytes = body.len() as u64;
+            seal_search_time_trace(&mut trace).unwrap();
+            let evidence = SearchCapturedResponseBodyV1 {
+                event_sequence: 1,
+                content_type: "text/plain".to_owned(),
+                response_sha256: search_response_body_digest(&body),
+                body_text: body.clone(),
+            };
+            let findings = analyze_search_time_response_bodies(
+                &trace,
+                &bundle,
+                &[evidence],
+                &[],
+            ).unwrap();
+            assert_eq!(findings.findings.len(), 1);
+            assert_eq!(findings.findings[0].exposure_class, expected_class);
+            let public_output = serde_json::to_string(&findings).unwrap();
+            assert!(!public_output.contains(&body));
+            assert!(!public_output.contains("\"body_text\""));
+            assert!(audit_search_time_findings(&trace, &findings).unwrap().valid);
+        }
+    }
+
+    #[test]
+    fn response_body_coverage_requires_retained_evidence_or_explicit_unavailability() {
+        let mut trace = trace_fixture();
+        let body = "body that is not benchmark-related";
+        trace.events[0].response_sha256 = Some(search_response_body_digest(body));
+        trace.events[0].response_bytes = body.len() as u64;
+        seal_search_time_trace(&mut trace).unwrap();
+        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
+            &crate::fresh_instance::FreshChallengeConfigV1 {
+                schema: crate::fresh_instance::FRESH_CONFIG_SCHEMA.to_owned(),
+                batch_id: "fresh-search-coverage".to_owned(),
+                benchmark_id: "search-coverage".to_owned(),
+                benchmark_version: "v1".to_owned(),
+                task_family: "linear-system-2x2".to_owned(),
+                requested_item_count: 2,
+                matrix_coefficient_min: -9,
+                matrix_coefficient_max: 9,
+                solution_component_min: -5,
+                solution_component_max: 5,
+                minimum_absolute_determinant: 1,
+                minimum_normalized_determinant_margin_permille: 50,
+                model_checkpoint_sha256: digest("coverage-checkpoint"),
+                checkpoint_freeze_receipt_sha256: digest("coverage-freeze"),
+                checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
+                challenge_generated_at_utc: "2026-10-31T18:01:00Z".to_owned(),
+                generator_source_sha256: digest("coverage-source"),
+                generator_binary_sha256: digest("coverage-binary"),
+                runtime_image_sha256: digest("coverage-runtime"),
+                generator_config_sha256: {
+                    let mut value = crate::fresh_instance::FreshChallengeConfigV1 {
+                        schema: crate::fresh_instance::FRESH_CONFIG_SCHEMA.to_owned(),
+                        batch_id: "fresh-search-coverage".to_owned(),
+                        benchmark_id: "search-coverage".to_owned(),
+                        benchmark_version: "v1".to_owned(),
+                        task_family: "linear-system-2x2".to_owned(),
+                        requested_item_count: 2,
+                        matrix_coefficient_min: -9,
+                        matrix_coefficient_max: 9,
+                        solution_component_min: -5,
+                        solution_component_max: 5,
+                        minimum_absolute_determinant: 1,
+                        minimum_normalized_determinant_margin_permille: 50,
+                        model_checkpoint_sha256: digest("coverage-checkpoint"),
+                        checkpoint_freeze_receipt_sha256: digest("coverage-freeze"),
+                        checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
+                        challenge_generated_at_utc: "2026-10-31T18:01:00Z".to_owned(),
+                        generator_source_sha256: digest("coverage-source"),
+                        generator_binary_sha256: digest("coverage-binary"),
+                        runtime_image_sha256: digest("coverage-runtime"),
+                        generator_config_sha256: String::new(),
+                    };
+                    value.generator_config_sha256 =
+                        crate::fresh_instance::canonical_config_digest(&value).unwrap();
+                    value.generator_config_sha256
+                },
+            },
+            &[0x92; 32],
+        ).unwrap();
+        assert!(analyze_search_time_response_bodies(&trace, &bundle, &[], &[])
+            .unwrap_err().contains("every response-bearing allowed event"));
+        let findings = analyze_search_time_response_bodies(&trace, &bundle, &[], &[1]).unwrap();
+        let audit = audit_search_time_findings(&trace, &findings).unwrap();
+        assert_eq!(audit.body_evidence_coverage_permille, Some(0));
+        assert_eq!(audit.unavailable_body_event_count, 1);
+    }
+
+    #[test]
     fn exact_hash_chain_replays_for_valid_trace() {
         let trace = trace_fixture();
         let audit = audit_search_time_trace(&trace).unwrap();
