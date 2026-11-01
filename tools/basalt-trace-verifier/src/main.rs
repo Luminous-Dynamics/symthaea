@@ -8,11 +8,13 @@ use std::process::ExitCode;
 fn main() -> ExitCode {
     let mut trace_path = None::<String>;
     let mut report_path = None::<String>;
+    let mut schema_path = None::<String>;
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--trace" => trace_path = args.next(),
             "--out" => report_path = args.next(),
+            "--schema" => schema_path = args.next(),
             _ => {
                 eprintln!("unknown argument: {arg}");
                 return ExitCode::from(2);
@@ -40,10 +42,19 @@ fn main() -> ExitCode {
                 "error": error.to_string(),
                 "trace_sha256": format!("sha256:{}", hex_lower(&Sha256::digest(&raw)))
             });
-            return emit(invalid, report_path);
+            return emit(invalid, report_path, 2);
         }
     };
-    let report = verify_reference(&trace, &raw);
+    let mut report = verify_reference(&trace, &raw);
+    if let Some(schema_path) = schema_path {
+        match fs::read(&schema_path) {
+            Ok(schema_bytes) => report.schema_sha256 = Some(format!("sha256:{}", hex_lower(&Sha256::digest(&schema_bytes)))),
+            Err(error) => {
+                eprintln!("cannot read schema {schema_path}: {error}");
+                return ExitCode::from(2);
+            }
+        }
+    }
     let status = report.status.clone();
     let output = match serde_json::to_value(report) {
         Ok(value) => value,
@@ -53,12 +64,10 @@ fn main() -> ExitCode {
         }
     };
     let code = if status == "pass" { 0 } else { 1 };
-    let exit = emit(output, report_path);
-    if exit != ExitCode::SUCCESS { return exit; }
-    if code == 0 { ExitCode::SUCCESS } else { ExitCode::from(1) }
+    emit(output, report_path, code)
 }
 
-fn emit(value: serde_json::Value, path: Option<String>) -> ExitCode {
+fn emit(value: serde_json::Value, path: Option<String>, exit_code: u8) -> ExitCode {
     let serialized = match serde_json::to_string_pretty(&value) {
         Ok(text) => text + "\n",
         Err(error) => {
@@ -75,7 +84,7 @@ fn emit(value: serde_json::Value, path: Option<String>) -> ExitCode {
         }
         None => print!("{serialized}"),
     }
-    ExitCode::SUCCESS
+    if exit_code == 0 { ExitCode::SUCCESS } else { ExitCode::from(exit_code) }
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
