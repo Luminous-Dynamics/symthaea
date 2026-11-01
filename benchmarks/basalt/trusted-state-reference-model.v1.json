@@ -80,6 +80,16 @@
       "id": "TSTATE-MODEL-015",
       "invariant": "Candidate was verified against a stale state revision",
       "expected": "Reject compare conflict and require re-verification"
+    },
+    {
+      "id": "TSTATE-MODEL-016",
+      "invariant": "Two independent source streams preview against the same log checkpoint and state revision; the loser must re-read, re-verify and rebase",
+      "expected": "Both source cursors commit in sequence; the shared log checkpoint has no lost update"
+    },
+    {
+      "id": "TSTATE-MODEL-017",
+      "invariant": "Sixteen threads concurrently attempt the same prepared state plan",
+      "expected": "Exactly one commit succeeds and fifteen receive compare conflicts"
     }
   ],
   "metrics": [
