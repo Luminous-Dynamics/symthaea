@@ -920,10 +920,22 @@ fn self_test(path: &PathBuf) -> Result<()> {
         bail!("self-test fixture must remain synthetic");
     }
     let digests = validate_evidence(&evidence)?;
+    let (typing_edges, provenance_edges) = dependency_edge_counts(&evidence.local_context);
+    if typing_edges != 3 || provenance_edges != 1 {
+        bail!(concat!(
+            "synthetic value-role calibration changed: expected typing=3/provenance=1, ",
+            "got typing={typing_edges}/provenance={provenance_edges}"
+        ));
+    }
     println!(
-        "PITB_LEAN_EXPR_WIRE_FIXTURE_PASS: declarations={} local_instances={} target_nodes_hash={}",
+        concat!(
+            "PITB_LEAN_EXPR_WIRE_FIXTURE_PASS: declarations={} local_instances={} ",
+            "typing_edges={} provenance_edges={} target_nodes_hash={}"
+        ),
         evidence.local_context.declarations.len(),
         evidence.local_context.local_instances.len(),
+        typing_edges,
+        provenance_edges,
         digests.target_expr_sha256
     );
 
@@ -952,6 +964,35 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["environment"]["imported_olean_manifest_sha256"] =
         Value::String("c".repeat(64));
     reject_value("imported OLean closure drift changes identity", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["environment"]["source_path"] = Value::String("../outside/Target.lean".into());
+    reject_value("source path traversal", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["local_context"]["local_instances"] = serde_json::json!([
+        {
+            "class_name": {
+                "tag": "str",
+                "prefix": {"tag": "anonymous"},
+                "value": "PITBLocalInstanceProbe"
+            },
+            "local_index": 2
+        },
+        {
+            "class_name": {
+                "tag": "str",
+                "prefix": {"tag": "anonymous"},
+                "value": "PITBLocalInstanceProbe"
+            },
+            "local_index": 2
+        }
+    ]);
+    reject_value("duplicate local instance registry entry", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["local_context"]["declarations"][4]["is_nondep"] = Value::Bool(false);
+    reject_value("nondependent value cannot become a typing dependency", bad)?;
 
     let mut bad = fixture.clone();
     bad["target"] = serde_json::json!({"tag":"mvar","id":"?m.1"});
