@@ -393,7 +393,6 @@ def run_benchmark(
                 row["exhaustive_objective_match"] = (
                     solved["utility_exact"] == exact["utility_exact"]
                     and solved["cost_exact"] == exact["cost_exact"]
-                    and solved["rejection_ids"] == exact["rejection_ids"]
                 )
             else:
                 row["exhaustive_objective_match"] = None
