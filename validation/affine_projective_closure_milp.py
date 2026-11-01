@@ -83,7 +83,9 @@ def build_affine_closure_milp(
         "objective": {f"x_{i}": utility[i] for i in ids},
         "variables": {
             **{f"x_{i}": {"type": "binary"} for i in ids},
-            "r": {"type": "integer", "lower": 0, "upper": len(ids)},
+            # r = sum_i x_i and x_i are binary, so r is integral
+            # automatically; keeping r continuous avoids a redundant integer.
+            "r": {"type": "continuous", "lower": 0, "upper": len(ids)},
             **{f"y_{i}": {"type": "continuous", "lower": 0} for i in ids},
         },
         "constraints": {
