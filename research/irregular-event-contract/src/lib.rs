@@ -44,6 +44,7 @@ pub struct EventRecord {
     pub event_id: u64,
     pub entity_id: u64,
     pub modality_id: u32,
+    pub source_id: u64,
     /// When the measured phenomenon occurred, not when the model learned it.
     pub event_time_us: TimestampUs,
     /// Earliest time the candidate could legally access this record.
@@ -77,6 +78,8 @@ pub enum ContractError {
     ZeroEventId,
     ZeroEntityId,
     ZeroModalityId,
+    ZeroSourceId,
+    AvailabilityPrecedesEvent { event_id: u64 },
     ZeroSourceDigest,
     DuplicateEventId { event_id: u64 },
     DuplicateSourceSequence {
@@ -99,6 +102,8 @@ impl fmt::Display for ContractError {
             Self::ZeroEventId => write!(f, "event ID must be nonzero"),
             Self::ZeroEntityId => write!(f, "entity ID must be nonzero"),
             Self::ZeroModalityId => write!(f, "modality ID must be nonzero"),
+            Self::ZeroSourceId => write!(f, "source ID must be nonzero"),
+            Self::AvailabilityPrecedesEvent { event_id } => write!(f, "observation {event_id} is available before its event time; use the known-future covariate type for pre-published information"),
             Self::ZeroSourceDigest => write!(f, "source digest must be nonzero"),
             Self::DuplicateEventId { event_id } => write!(f, "duplicate event ID {event_id}"),
             Self::DuplicateSourceSequence { entity_id, modality_id, source_sequence } => {
@@ -135,6 +140,12 @@ impl EventRecord {
         }
         if self.modality_id == 0 {
             return Err(ContractError::ZeroModalityId);
+        }
+        if self.source_id == 0 {
+            return Err(ContractError::ZeroSourceId);
+        }
+        if self.available_at_us < self.event_time_us {
+            return Err(ContractError::AvailabilityPrecedesEvent { event_id: self.event_id });
         }
         if !nonzero_digest(&self.source_sha256) {
             return Err(ContractError::ZeroSourceDigest);
@@ -205,7 +216,7 @@ pub fn validate_event_batch(events: &[EventRecord]) -> Result<(), ContractError>
         if !event_ids.insert(event.event_id) {
             return Err(ContractError::DuplicateEventId { event_id: event.event_id });
         }
-        if !source_sequences.insert((event.entity_id, event.modality_id, event.source_sequence)) {
+        if !source_sequences.insert((event.entity_id, event.modality_id, event.source_id, event.source_sequence)) {
             return Err(ContractError::DuplicateSourceSequence {
                 entity_id: event.entity_id,
                 modality_id: event.modality_id,
@@ -270,6 +281,7 @@ mod tests {
             event_id: id,
             entity_id: 1,
             modality_id: modality,
+            source_id: modality as u64,
             event_time_us: event_time,
             available_at_us: available,
             source_sequence: seq,
@@ -398,6 +410,25 @@ mod tests {
         let mut item = observed(1, 1, 1, 1, 0);
         item.measurement = Measurement::Observed { scaled_value: 1, decimal_scale: 10 };
         assert_eq!(item.validate(), Err(ContractError::InvalidDecimalScale { scale: 10 }));
+    }
+
+    #[test]
+    fn an_observation_cannot_be_available_before_its_event_time() {
+        let mut event = observed(1, 1, 20, 19, 0);
+        event.source_id = 1;
+        assert_eq!(
+            event.validate(),
+            Err(ContractError::AvailabilityPrecedesEvent { event_id: 1 })
+        );
+    }
+
+    #[test]
+    fn equal_source_sequences_from_distinct_sources_do_not_collide() {
+        let mut left = observed(1, 1, 10, 10, 0);
+        left.source_id = 100;
+        let mut right = observed(2, 1, 11, 11, 0);
+        right.source_id = 200;
+        assert_eq!(validate_event_batch(&[left, right]), Ok(()));
     }
 
     #[test]
