@@ -354,6 +354,15 @@ fn validate_candidate_bundle(
         EdgeEvidenceError::new("prequential.retention", "retention is undefined; benchmark stream must contain a recurring prior regime")
     })?;
     let latency = p95_latency_ms(&hardware.latency_samples_us)?;
+    if hardware.sensor_samples_per_hour.is_none()
+        || hardware.online_update_energy_uj.is_none()
+        || hardware.adaptation_bytes_written.is_none()
+    {
+        return Err(EdgeEvidenceError::new(
+            "hardware.system_costs",
+            "temporal/active-sensing candidates must report sensor samples/hour, online-update energy and adaptation bytes written; baselines use explicit zero update cost",
+        ));
+    }
     let mut rejection_reasons = Vec::new();
     let available_sram = manifest.target.sram_budget_bytes
         .checked_sub(manifest.target.protected_sram_reserve_bytes)
@@ -432,7 +441,7 @@ fn validate_candidate_bundle(
     })
 }
 
-fn objectives(metrics: &EdgeCandidateParetoMetrics) -> [f64; 13] {
+fn objectives(metrics: &EdgeCandidateParetoMetrics) -> [f64; 16] {
     [
         metrics.quality_score,
         -metrics.false_alarms_per_hour,
@@ -447,9 +456,12 @@ fn objectives(metrics: &EdgeCandidateParetoMetrics) -> [f64; 13] {
         metrics.open_set_auprc,
         -metrics.mean_drift_recovery_samples,
         -metrics.maximum_regime_retention_loss_pp,
+        -metrics.sensor_samples_per_hour.expect("validated hardware receipt has sensor rate"),
+        -metrics.online_update_energy_uj.expect("validated hardware receipt has update energy"),
+        -(metrics.adaptation_bytes_written.expect("validated hardware receipt has adaptation bytes") as f64),
     ]
 }
-fn dominates(left: &[f64; 13], right: &[f64; 13]) -> bool {
+fn dominates(left: &[f64; 16], right: &[f64; 16]) -> bool {
     let no_worse = left.iter().zip(right).all(|(l, r)| l >= r);
     let strictly_better = left.iter().zip(right).any(|(l, r)| l > r);
     no_worse && strictly_better
@@ -546,6 +558,50 @@ mod tests {
     fn invalid_latency_samples_are_rejected() {
         assert!(p95_latency_ms(&[]).is_err());
         assert!(p95_latency_ms(&[1, 0, 2]).is_err());
+    }
+
+    #[test]
+    fn pareto_objectives_include_sensing_and_online_adaptation_costs() {
+        let base = EdgeCandidateParetoMetrics {
+            candidate_id: "base".into(),
+            candidate_family: "adaptive_tinyml".into(),
+            hard_feasible: true,
+            rejection_reasons: Vec::new(),
+            quality_score: 0.95,
+            false_alarms_per_hour: 1.0,
+            missed_events_per_hour: 1.0,
+            coverage: 0.99,
+            brier_score: 0.02,
+            worst_regime_accuracy: 0.90,
+            open_set_auprc: 0.92,
+            mean_drift_recovery_samples: 10.0,
+            drift_transition_count: 2,
+            recovered_drift_transition_count: 2,
+            unrecovered_drift_transitions: 0,
+            maximum_regime_retention_loss_pp: 1.0,
+            retention_compared_regime_count: 1,
+            p95_latency_ms: 5.0,
+            mean_energy_per_successful_event_uj: 20.0,
+            expanded_energy_uncertainty_uj: 1.0,
+            energy_upper_bound_uj: 21.0,
+            peak_sram_bytes: 16_384,
+            flash_bytes: 32_768,
+            sensor_samples_per_hour: Some(360.0),
+            online_update_energy_uj: Some(0.0),
+            adaptation_bytes_written: Some(0),
+            prequential_audit_sha256: "a".repeat(64),
+            phase_energy_receipt_sha256: "b".repeat(64),
+            event_energy_uncertainty_receipt_sha256: "c".repeat(64),
+            hardware_receipt_sha256: "d".repeat(64),
+            pareto_front_member: false,
+        };
+        let mut expensive_sensing = base.clone();
+        expensive_sensing.sensor_samples_per_hour = Some(720.0);
+        let mut expensive_updates = base.clone();
+        expensive_updates.online_update_energy_uj = Some(2.0);
+        expensive_updates.adaptation_bytes_written = Some(256);
+        assert!(dominates(&objectives(&base), &objectives(&expensive_sensing)));
+        assert!(dominates(&objectives(&base), &objectives(&expensive_updates)));
     }
 
     #[test]
