@@ -51,6 +51,7 @@ pub struct ResourcePriceSnapshot {
     pub prices_ppm: [u64; 12],
     pub smoothed_utilization_ppm: [u64; 12],
     pub completed_episodes: u64,
+    pub config: Option<ResourcePriceConfig>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,6 +59,7 @@ pub struct ResourcePriceState {
     prices_ppm: [u64; 12],
     smoothed_utilization_ppm: [u64; 12],
     completed_episodes: u64,
+    config: Option<ResourcePriceConfig>,
 }
 
 impl Default for ResourcePriceState {
@@ -66,6 +68,7 @@ impl Default for ResourcePriceState {
             prices_ppm: [0; 12],
             smoothed_utilization_ppm: [0; 12],
             completed_episodes: 0,
+            config: None,
         }
     }
 }
@@ -96,6 +99,7 @@ impl ResourcePriceState {
             prices_ppm: self.prices_ppm,
             smoothed_utilization_ppm: self.smoothed_utilization_ppm,
             completed_episodes: self.completed_episodes,
+            config: self.config,
         }
     }
 
@@ -104,6 +108,13 @@ impl ResourcePriceState {
         config: ResourcePriceConfig,
     ) -> Result<Self, PriceError> {
         config.validate()?;
+        let uninitialized = snapshot.completed_episodes == 0
+            && snapshot.prices_ppm == [0; 12]
+            && snapshot.smoothed_utilization_ppm == [0; 12]
+            && snapshot.config.is_none();
+        if snapshot.config != Some(config) && !uninitialized {
+            return Err(PriceError::ConfigMismatch);
+        }
         if snapshot.prices_ppm.iter().any(|price| *price > config.maximum_price_ppm)
             || snapshot.smoothed_utilization_ppm.iter().any(|value| {
                 *value > config.maximum_observed_utilization_ppm
@@ -115,6 +126,7 @@ impl ResourcePriceState {
             prices_ppm: snapshot.prices_ppm,
             smoothed_utilization_ppm: snapshot.smoothed_utilization_ppm,
             completed_episodes: snapshot.completed_episodes,
+            config: Some(config),
         })
     }
 }
@@ -140,6 +152,7 @@ pub struct ResourcePriceReceipt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PriceError {
     InvalidConfig,
+    ConfigMismatch,
     SnapshotOutOfRange,
     ArithmeticOverflow,
 }
@@ -148,6 +161,7 @@ impl fmt::Display for PriceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidConfig => write!(f, "resource price configuration is invalid"),
+            Self::ConfigMismatch => write!(f, "resource price configuration changed without an explicit state migration"),
             Self::SnapshotOutOfRange => write!(f, "persisted resource price snapshot exceeds configured bounds"),
             Self::ArithmeticOverflow => write!(f, "resource price update arithmetic overflowed"),
         }
@@ -168,6 +182,9 @@ pub fn update_resource_prices(
     config: ResourcePriceConfig,
 ) -> Result<ResourcePriceReceipt, PriceError> {
     config.validate()?;
+    if state.config.is_some_and(|active| active != config) {
+        return Err(PriceError::ConfigMismatch);
+    }
     let next_episode = state.completed_episodes
         .checked_add(1)
         .ok_or(PriceError::ArithmeticOverflow)?;
@@ -210,6 +227,7 @@ pub fn update_resource_prices(
     }
 
     state.completed_episodes = next_episode;
+    state.config = Some(config);
 
     Ok(ResourcePriceReceipt {
         completed_episode: state.completed_episodes,
@@ -438,6 +456,29 @@ mod tests {
         ).unwrap();
         let restored = ResourcePriceState::restore(state.snapshot(), config()).unwrap();
         assert_eq!(restored, state);
+    }
+
+    #[test]
+    fn snapshot_rejects_unannounced_configuration_change() {
+        let mut state = ResourcePriceState::default();
+        update_resource_prices(
+            &mut state,
+            ResourceVector::default(),
+            ResourceVector::default(),
+            config(),
+        ).unwrap();
+        let mut changed = config();
+        changed.step_size_ppm += 1;
+        let before = state;
+        assert_eq!(
+            update_resource_prices(&mut state, ResourceVector::default(), ResourceVector::default(), changed),
+            Err(PriceError::ConfigMismatch)
+        );
+        assert_eq!(state, before);
+        assert_eq!(
+            ResourcePriceState::restore(state.snapshot(), changed),
+            Err(PriceError::ConfigMismatch)
+        );
     }
 
     #[test]
