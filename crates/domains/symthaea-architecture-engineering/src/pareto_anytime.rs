@@ -1134,7 +1134,7 @@ pub fn resolve_and_append_artifact_verified_promotion<R: EvidenceArtifactResolve
     Ok((event_sha256, receipt))
 }
 
-const SYNTHETIC_OBJECTIVE_COST_MODEL_ID: &str =
+pub const SYNTHETIC_OBJECTIVE_COST_MODEL_ID: &str =
     "symthaea.synthetic-objective-evaluation-unit.v0.1";
 
 #[derive(Serialize)]
@@ -1195,13 +1195,9 @@ impl<'a> AnytimeRecorder<'a> {
                 "a fresh deterministic optimizer run requires an empty run-specific history; resume support is not implemented",
             ));
         }
-        let mut attempts = BTreeMap::new();
-        for event in &history.events {
-            if let AnytimeAction::CandidateEvaluation { candidate_id, attempt, .. } = &event.action {
-                attempts.insert(candidate_id.clone(), *attempt);
-            }
-        }
-        Ok(Self { history, attempts })
+        // A recorder is bound to one fresh run; incremental resume will be introduced
+        // through a separate API with an explicit optimizer checkpoint contract.
+        Ok(Self { history, attempts: BTreeMap::new() })
     }
 
     pub fn history(&self) -> &AnytimeHistory {
