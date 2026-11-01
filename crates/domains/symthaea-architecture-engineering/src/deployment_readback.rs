@@ -29,6 +29,7 @@ const RECEIPT_DOMAIN: &[u8] = b"symthaea.nas.deployment-readback-receipt.v0.1";
 const MEASUREMENT_DOMAIN: &[u8] = b"symthaea.nas.readback-bound-measurement.v0.1";
 const SHA256_HEX_LEN: usize = 64;
 const MAX_REGIONS: usize = 1024;
+const MAX_SESSION_LEDGER_RECORDS: usize = 100_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -787,6 +788,8 @@ pub fn verify_readback_bound_measurement_receipt(
     if receipt.artifact_sha256 != artifact.artifact_sha256()
         || receipt.readback_receipt_sha256 != readback.readback_receipt_sha256()
         || readback.artifact_sha256() != artifact.artifact_sha256()
+        || readback.target_id() != artifact.target_id()
+        || readback.hardware_profile_sha256() != artifact.hardware_profile_sha256()
     {
         return Err(DeploymentReadbackError::new(
             "readback_scope",
@@ -958,6 +961,12 @@ fn validate_session_ledger_fields(
     }
     require_sha256("hardware_profile_sha256", &ledger.hardware_profile_sha256)?;
     require_sha256("ledger_sha256", &ledger.ledger_sha256)?;
+    if ledger.records.len() > MAX_SESSION_LEDGER_RECORDS {
+        return Err(DeploymentReadbackError::new(
+            "records",
+            format!("session ledger exceeds {MAX_SESSION_LEDGER_RECORDS} records"),
+        ));
+    }
 
     let mut session_ids = HashSet::with_capacity(ledger.records.len());
     let mut previous_sequence = 0u64;
