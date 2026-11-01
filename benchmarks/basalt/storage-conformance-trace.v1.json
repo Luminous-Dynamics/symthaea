@@ -72,7 +72,8 @@
         "receipt_acceptance_revision": "rev-1",
         "current_authority_revision": "rev-1",
         "reason": null
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-b-commit",
@@ -102,7 +103,8 @@
         "receipt_acceptance_revision": "rev-2",
         "current_authority_revision": "rev-2",
         "reason": null
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-a-exact-retry",
@@ -129,7 +131,8 @@
         "receipt_acceptance_revision": "rev-1",
         "current_authority_revision": "rev-2",
         "reason": "exact receipt identity; unrelated authority commit advanced current revision"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-c-race-winner",
@@ -162,7 +165,8 @@
         "receipt_acceptance_revision": "rev-3",
         "current_authority_revision": "rev-3",
         "reason": null
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-d-race-loser",
@@ -195,7 +199,8 @@
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-3",
         "reason": "predecessor was consumed by receipt-C; no records advanced for receipt-D"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-e-commit-lost-response",
@@ -228,7 +233,8 @@
         "receipt_acceptance_revision": null,
         "current_authority_revision": null,
         "reason": "server committed rev-4; successful response was dropped; client must resolve by exact receipt identity"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-e-recovery-lookup",
@@ -254,7 +260,8 @@
         "receipt_acceptance_revision": "rev-4",
         "current_authority_revision": "rev-4",
         "reason": "lost-response recovery found the already accepted immutable receipt"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-policy-publish",
@@ -281,7 +288,8 @@
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-5",
         "reason": "policy head advanced atomically from policy-v1 to policy-v2"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-stale-policy-rejected",
@@ -315,7 +323,8 @@
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-5",
         "reason": "expected policy-v1 but commit-time policy head is policy-v2"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-serializable-attempt-1",
@@ -351,7 +360,8 @@
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-5",
         "reason": "SQLSTATE 40001; the entire serializable transaction, including its read-derived decisions, rolled back"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-serializable-attempt-2",
@@ -386,7 +396,8 @@
         "receipt_acceptance_revision": "rev-6",
         "current_authority_revision": "rev-6",
         "reason": "second whole-transaction attempt committed after fresh transaction begin"
-      }
+      },
+      "runner_id": "runner-1"
     },
     {
       "op_id": "op-restore-old-snapshot",
@@ -413,7 +424,8 @@
         "receipt_acceptance_revision": null,
         "current_authority_revision": "rev-6",
         "reason": "restored snapshot reuses the authority identity but does not match the independently witnessed head at sequence 12"
-      }
+      },
+      "runner_id": "runner-1"
     }
   ],
   "faults": [
@@ -422,21 +434,24 @@
       "target_op_id": "op-e-commit-lost-response",
       "at_ns": 87,
       "class": "response_loss",
-      "action": "drop the successful response after durable commit; the client records an indeterminate outcome"
+      "action": "drop the successful response after durable commit; the client records an indeterminate outcome",
+      "runner_id": "runner-1"
     },
     {
       "fault_id": "fault-serialization-40001",
       "target_op_id": "op-serializable-attempt-1",
       "at_ns": 159,
       "class": "serialization_failure",
-      "action": "force SQLSTATE 40001 before commit; all writes in attempt one must roll back"
+      "action": "force SQLSTATE 40001 before commit; all writes in attempt one must roll back",
+      "runner_id": "runner-1"
     },
     {
       "fault_id": "fault-snapshot-restore",
       "target_op_id": "op-restore-old-snapshot",
       "at_ns": 186,
       "class": "snapshot_restore",
-      "action": "mount an older internally consistent snapshot under the same authority ID; the external witness remains at sequence 12"
+      "action": "mount an older internally consistent snapshot under the same authority ID; the external witness remains at sequence 12",
+      "runner_id": "runner-1"
     }
   ],
   "witness_observations": [
