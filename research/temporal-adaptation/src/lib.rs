@@ -487,6 +487,7 @@ mod tests {
             prices_ppm: [u64::MAX; 12],
             smoothed_utilization_ppm: [0; 12],
             completed_episodes: 1,
+            config: Some(config()),
         };
         assert_eq!(
             ResourcePriceState::restore(snapshot, config()),
