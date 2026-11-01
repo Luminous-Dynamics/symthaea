@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/retrieval-decomposition-oracle-v1.json",
+  "title": "Sealed retrieval decomposition task oracle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "task_id",
+    "expected_answer",
+    "calculation",
+    "required_claims",
+    "distractor_scenarios",
+    "allowed_alternative_evidence_paths",
+    "answer_sha256",
+    "oracle_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.retrieval_decomposition.sealed_oracle.v1"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "units",
+        "canonicalization"
+      ],
+      "properties": {
+        "amount": {
+          "type": "integer"
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonicalization": {
+          "const": "exact_integer"
+        }
+      }
+    },
+    "required_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "claim_text",
+          "supporting_spans",
+          "derived_from_claim_ids"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supporting_spans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "document_id",
+                "start_byte",
+                "end_byte",
+                "span_sha256"
+              ],
+              "properties": {
+                "document_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "start_byte": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end_byte": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "span_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          },
+          "derived_from_claim_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "distractor_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document_id",
+          "adjacent_query",
+          "distractor_answer",
+          "billable_days",
+          "overnight_stays",
+          "confusion_mechanism"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adjacent_query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "distractor_answer": {
+            "type": "integer"
+          },
+          "confusion_mechanism": {
+            "type": "string",
+            "minLength": 1
+          },
+          "billable_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "overnight_stays": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "allowed_alternative_evidence_paths": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      }
+    },
+    "answer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "labor_rate_per_day",
+        "billable_days",
+        "overnight_rate",
+        "overnight_stays",
+        "expected_total"
+      ],
+      "properties": {
+        "labor_rate_per_day": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "billable_days": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overnight_rate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overnight_stays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_total": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
