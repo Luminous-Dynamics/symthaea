@@ -214,6 +214,11 @@ pub struct EventTapeHeader {
     pub initial_direction_ids: Vec<String>,
     pub execution: ExecutionContract,
     pub policy: PolicySnapshot,
+    /// Optional typed objective contract. None is omitted to preserve legacy v0.1 hashes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective_contract: Option<EventTapeObjectiveContract>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective_contract_sha256: Option<String>,
 }
 
 /// A resource measurement is either known or explicitly unknown. Unknown is never zero.
@@ -527,6 +532,23 @@ pub enum ActionIntent {
         parent_direction_id: Option<String>,
         semantic_delta_sha256: String,
     },
+    EvaluateCandidateVector {
+        candidate_sha256: String,
+        parent_candidate_sha256: Option<String>,
+        semantic_delta_sha256: String,
+        direction_id: String,
+        objective_contract_sha256: String,
+    },
+    ObserveCandidateReplicate {
+        candidate_sha256: String,
+        parent_candidate_sha256: Option<String>,
+        semantic_delta_sha256: String,
+        direction_id: String,
+        objective_contract_sha256: String,
+        decision_sha256: String,
+        replicate_id: String,
+        sample_seed: u64,
+    },
 }
 
 /// Candidate evaluation result recorded by the evaluator.
@@ -573,6 +595,34 @@ pub enum ActionOutcome {
         verifier_sha256: String,
         verifier_receipt_sha256: String,
         disposition: ProposalDisposition,
+    },
+    CandidateMultiObjectiveEvaluation {
+        task_recipe_sha256: String,
+        comparison_profile_sha256: String,
+        evaluator_sha256: String,
+        verifier_sha256: String,
+        verifier_receipt_sha256: String,
+        objective_contract_sha256: String,
+        disposition: CandidateDisposition,
+        objective_values: Option<Vec<f64>>,
+        evidence_sha256: Option<String>,
+        evidence_manifest_sha256: Option<String>,
+        evidence_byte_receipt_sha256: Option<String>,
+        failure_reason: Option<String>,
+    },
+    CandidateNoisyObservation {
+        task_recipe_sha256: String,
+        comparison_profile_sha256: String,
+        evaluator_sha256: String,
+        verifier_sha256: String,
+        verifier_receipt_sha256: String,
+        objective_contract_sha256: String,
+        disposition: NoisyObservationDisposition,
+        objective_values: Option<Vec<f64>>,
+        evidence_sha256: Option<String>,
+        evidence_manifest_sha256: Option<String>,
+        evidence_byte_receipt_sha256: Option<String>,
+        failure_reason: Option<String>,
     },
 }
 
