@@ -478,6 +478,21 @@ impl GestureCounterfactualReceiptV1 {
                     })
                 {
                     issues.push("counterfactual part has no homogeneous matching instrument/model assignment".to_string());
+                } else {
+                    let first_onset = part_notes.iter()
+                        .map(|note| note.onset)
+                        .min_by(|left, right| left.cmp_exact(*right));
+                    let latest_end = part_notes.iter()
+                        .filter_map(|note| note.onset.checked_add(note.duration))
+                        .max_by(|left, right| left.cmp_exact(*right));
+                    match (first_onset, latest_end) {
+                        (Some(first), Some(last))
+                            if self.at.cmp_exact(first) != Ordering::Less
+                                && self.at.cmp_exact(last) != Ordering::Greater => {}
+                        _ => issues.push(
+                            "counterfactual part-scoped gesture lies outside the part score-time envelope or has unrepresentable timing".to_string()
+                        ),
+                    }
                 }
             }
         }
