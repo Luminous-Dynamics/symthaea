@@ -74,6 +74,8 @@
           "additionalProperties": false,
           "required": [
             "planned_pairs",
+            "baseline_record_count",
+            "candidate_record_count",
             "matched_record_pairs",
             "complete_rejection_pairs",
             "unknown_pairs",
@@ -134,6 +136,14 @@
             },
             "hoeffding_radius": {
               "type": "number",
+              "minimum": 0
+            },
+            "baseline_record_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "candidate_record_count": {
+              "type": "integer",
               "minimum": 0
             }
           }
