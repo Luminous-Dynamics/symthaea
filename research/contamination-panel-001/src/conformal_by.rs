@@ -251,8 +251,7 @@ fn adjusted_p_value_upper(
         return Err("BY family cannot be empty".to_owned());
     }
     if sorted_p_values.windows(2).any(|pair| {
-        compare_rational(pair[0].0, pair[0].1, pair[1].0, pair[1].1)
-            == std::cmp::Ordering::Greater
+        compare_rational(pair[0].0, pair[0].1, pair[1].0, pair[1].1) == std::cmp::Ordering::Greater
     }) {
         return Err("BY p-values must be sorted in nondecreasing exact-rational order".to_owned());
     }
@@ -578,7 +577,9 @@ pub fn analyze_conformal_by(
     config: &ConformalByConfigV1,
 ) -> Result<ConformalByReportV1, String> {
     if config.schema != CONFORMAL_BY_CONFIG_SCHEMA {
-        return Err(format!("config schema must be {CONFORMAL_BY_CONFIG_SCHEMA}"));
+        return Err(format!(
+            "config schema must be {CONFORMAL_BY_CONFIG_SCHEMA}"
+        ));
     }
     if source_report.schema != crate::detector_calibration::CALIBRATION_REPORT_SCHEMA {
         return Err(
