@@ -81,6 +81,7 @@ pub enum InterventionSetError {
     CandidatePoolDigestMismatch,
     CandidatePoolMismatch,
     TrialDidNotStartWithProofOperation,
+    InvalidTrajectory(crate::TrajectoryReplayError),
     TrialSelectedOperationNotInPool,
     TrialOutcomeNotVerified,
     ArithmeticOverflow,
@@ -147,7 +148,7 @@ impl MatchedInterventionSet {
         for trial in &self.trials {
             trial
                 .validate()
-                .map_err(|_| InterventionSetError::TrialDidNotStartWithProofOperation)?;
+                .map_err(InterventionSetError::InvalidTrajectory)?;
             if !run_ids.insert(trial.run_id) {
                 return Err(InterventionSetError::DuplicateRunId);
             }
@@ -300,6 +301,9 @@ mod tests {
     use crate::{ActionTrajectory, TrajectoryActionReceipt, TrajectoryTerminalRecord};
 
     fn features(unresolved: u64) -> crate::ProofFrontierFeatures {
+        if unresolved == 0 {
+            return crate::ProofFrontierFeatures::default();
+        }
         crate::ProofFrontierFeatures {
             unresolved_obligations: unresolved,
             mandatory_obligations: unresolved,
@@ -498,6 +502,7 @@ mod tests {
         let mut matched = set(InterventionAssignmentEvidence::DeterministicSimulation {
             simulator_digest: [8; 32],
         });
+        matched.trials[1].actions.pop();
         matched.trials[1].terminal.outcome = Some(crate::TerminalOutcome::RightCensored(
             crate::CensorReason::Timeout,
         ));
