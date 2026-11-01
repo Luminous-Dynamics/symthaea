@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 35,
+    "rust_test_functions_authored": 44,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -46,7 +46,8 @@
     "external_dataset_adapter_executed": false,
     "event_contract_test_functions_authored": 16,
     "bitemporal_test_functions_authored": 11,
-    "purged_split_test_functions_authored": 8
+    "purged_split_test_functions_authored": 8,
+    "train_only_scaler_test_functions_authored": 9
   },
   "opaque_payload_contract": {
     "fields": [
@@ -105,5 +106,30 @@
     "history_window_overlap_allowed": true,
     "cross_partition_target_overlap_allowed": false,
     "purged_windows_reported_separately": true
+  },
+  "train_only_standardizer": {
+    "module": "research/irregular-event-contract/src/scaler.rs",
+    "fit_scope": "train_window_ids only",
+    "grouping": [
+      "entity_id",
+      "feature_id"
+    ],
+    "raw_observation_dedup_key": [
+      "entity_id",
+      "feature_id",
+      "observation_id"
+    ],
+    "conflict_policy": "reject duplicate raw observation IDs with different values",
+    "estimator": "Welford sample mean and standard deviation (ddof=1)",
+    "validation_test_purged_values_read": false,
+    "validates_split_plan_boundaries": true,
+    "missing_values": "adapter omits from numeric moment samples and preserves a separate mask",
+    "zero_std": "subtract mean without division",
+    "exposes": [
+      "count",
+      "mean",
+      "sample_std"
+    ],
+    "physical_measurement_claim": false
   }
 }
