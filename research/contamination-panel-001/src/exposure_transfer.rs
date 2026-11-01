@@ -11,18 +11,16 @@
 
 use crate::{
     causal_analysis::{
-        analyze_replicated_causal_study, mean_interval, MeanIntervalV1,
-        ReplicatedCausalStudyV1, ScoreCountV1,
+        MeanIntervalV1, ReplicatedCausalStudyV1, ScoreCountV1, analyze_replicated_causal_study,
+        mean_interval,
     },
     hash_domain,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const EXPOSURE_TRANSFER_STUDY_SCHEMA: &str =
-    "symthaea.exposure_transfer_study.v1";
-pub const EXPOSURE_TRANSFER_REPORT_SCHEMA: &str =
-    "symthaea.exposure_transfer_report.v1";
+pub const EXPOSURE_TRANSFER_STUDY_SCHEMA: &str = "symthaea.exposure_transfer_study.v1";
+pub const EXPOSURE_TRANSFER_REPORT_SCHEMA: &str = "symthaea.exposure_transfer_report.v1";
 pub const MIN_TRANSFER_FAMILIES: usize = 2;
 pub const MAX_TRANSFER_REPLICATES: usize = 1_000;
 pub const MAX_TRANSFER_ROWS_PER_REPLICATE: usize = 10_000;
@@ -249,7 +247,9 @@ fn mean(values: &[f64], label: &str) -> Result<f64, String> {
 
 fn sum_u64(values: impl IntoIterator<Item = u64>, label: &str) -> Result<u64, String> {
     values.into_iter().try_fold(0_u64, |total, value| {
-        total.checked_add(value).ok_or_else(|| format!("{label} overflows"))
+        total
+            .checked_add(value)
+            .ok_or_else(|| format!("{label} overflows"))
     })
 }
 
@@ -308,16 +308,13 @@ fn evaluation_evidence_digest(
 
 fn family_band_rate_map(
     replicate: &TransferReplicateV1,
-) -> Result<
-    BTreeMap<(String, TransferRelationV1), FamilyRelationValues>,
-    String,
-> {
+) -> Result<BTreeMap<(String, TransferRelationV1), FamilyRelationValues>, String> {
     let mut by_family_relation =
         BTreeMap::<(String, TransferRelationV1), Vec<(RateTriplet, u64, u64)>>::new();
 
     for row in &replicate.strata {
-        let item_count = u64::try_from(row.item_ids.len())
-            .map_err(|_| "item count exceeds u64".to_owned())?;
+        let item_count =
+            u64::try_from(row.item_ids.len()).map_err(|_| "item count exceeds u64".to_owned())?;
         let rates = RateTriplet {
             base: score_rate(&row.base, item_count, "base score")?,
             treatment: score_rate(&row.treatment, item_count, "treatment score")?,
@@ -355,10 +352,7 @@ fn family_band_rate_map(
 fn validate_replicate_matrix(
     replicate: &TransferReplicateV1,
     expected_families: Option<&BTreeSet<String>>,
-    expected_cells: &mut BTreeMap<
-        (String, String, TransferRelationV1),
-        CellBindingSignature,
-    >,
+    expected_cells: &mut BTreeMap<(String, String, TransferRelationV1), CellBindingSignature>,
     expected_matrix_keys: &mut Option<BTreeSet<(String, String, TransferRelationV1)>>,
 ) -> Result<BTreeSet<String>, String> {
     if replicate.replicate_id.trim().is_empty() || replicate.replicate_id.len() > 128 {
@@ -372,16 +366,15 @@ fn validate_replicate_matrix(
         &replicate.training_receipt_audit_sha256,
         "training_receipt_audit_sha256",
     )?;
-    if replicate.strata.is_empty()
-        || replicate.strata.len() > MAX_TRANSFER_ROWS_PER_REPLICATE
-    {
+    if replicate.strata.is_empty() || replicate.strata.len() > MAX_TRANSFER_ROWS_PER_REPLICATE {
         return Err(format!(
             "strata length must be in 1..={MAX_TRANSFER_ROWS_PER_REPLICATE}"
         ));
     }
 
     let total_item_ids = replicate.strata.iter().try_fold(0_usize, |total, row| {
-        total.checked_add(row.item_ids.len())
+        total
+            .checked_add(row.item_ids.len())
             .ok_or_else(|| "replicate item-ID count overflows".to_owned())
     })?;
     if total_item_ids > MAX_ITEM_IDS_PER_REPLICATE {
@@ -391,7 +384,9 @@ fn validate_replicate_matrix(
     }
 
     let mut families = BTreeSet::new();
-    let mut cells = BTreeMap::<(String, String), BTreeMap<TransferRelationV1, &TransferStratumOutcomeV1>>::new();
+    let mut cells =
+        BTreeMap::<(String, String), BTreeMap<TransferRelationV1, &TransferStratumOutcomeV1>>::new(
+        );
     let mut global_items = BTreeSet::new();
     let mut matrix_keys = BTreeSet::new();
 
@@ -401,7 +396,9 @@ fn validate_replicate_matrix(
             || row.difficulty_band.trim().is_empty()
             || row.difficulty_band.len() > 64
         {
-            return Err("task_family and difficulty_band must be nonempty and at most 64 bytes".to_owned());
+            return Err(
+                "task_family and difficulty_band must be nonempty and at most 64 bytes".to_owned(),
+            );
         }
         if row.cluster_count == 0 {
             return Err("cluster_count must be positive".to_owned());
@@ -426,10 +423,10 @@ fn validate_replicate_matrix(
             &row.adjudication_report_sha256,
             "adjudication_report_sha256",
         )?;
-        if row.adjudication_reviewer_ids.len() < 3
-            || row.adjudication_reviewer_ids.len() > 20
-        {
-            return Err("each relation cell requires 3..=20 independent adjudication reviewers".to_owned());
+        if row.adjudication_reviewer_ids.len() < 3 || row.adjudication_reviewer_ids.len() > 20 {
+            return Err(
+                "each relation cell requires 3..=20 independent adjudication reviewers".to_owned(),
+            );
         }
         let reviewer_ids: BTreeSet<&str> = row
             .adjudication_reviewer_ids
@@ -445,36 +442,46 @@ fn validate_replicate_matrix(
                         .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
             })
         {
-            return Err("adjudication reviewer IDs must be distinct opaque ASCII identifiers".to_owned());
+            return Err(
+                "adjudication reviewer IDs must be distinct opaque ASCII identifiers".to_owned(),
+            );
         }
         if row.adjudication_decision != RelationAdjudicationDecisionV1::Accepted {
-            return Err("indeterminate or rejected relation adjudications cannot enter a scored stratum".to_owned());
+            return Err(
+                "indeterminate or rejected relation adjudications cannot enter a scored stratum"
+                    .to_owned(),
+            );
         }
         if !(800..=1_000).contains(&row.minimum_item_agreement_permille) {
             return Err("minimum_item_agreement_permille must be in [800, 1000]".to_owned());
         }
         if matches!(
             row.relation,
-            TransferRelationV1::SemanticEquivalent
-                | TransferRelationV1::NovelRecipeSameSkill
+            TransferRelationV1::SemanticEquivalent | TransferRelationV1::NovelRecipeSameSkill
         ) && row.minimum_item_agreement_permille != 1_000
         {
             return Err("semantic-equivalence and same-skill strata require unanimous per-item adjudication".to_owned());
         }
-        let item_count = u64::try_from(row.item_ids.len())
-            .map_err(|_| "item count exceeds u64".to_owned())?;
+        let item_count =
+            u64::try_from(row.item_ids.len()).map_err(|_| "item count exceeds u64".to_owned())?;
         score_rate(&row.base, item_count, "base score")?;
         score_rate(&row.treatment, item_count, "treatment score")?;
         score_rate(&row.placebo, item_count, "placebo score")?;
 
         for item_id in &row.item_ids {
             if !global_items.insert(item_id.as_str()) {
-                return Err("an item ID occurs in more than one relation/family/difficulty cell".to_owned());
+                return Err(
+                    "an item ID occurs in more than one relation/family/difficulty cell".to_owned(),
+                );
             }
         }
 
         let key = (row.task_family.clone(), row.difficulty_band.clone());
-        matrix_keys.insert((row.task_family.clone(), row.difficulty_band.clone(), row.relation));
+        matrix_keys.insert((
+            row.task_family.clone(),
+            row.difficulty_band.clone(),
+            row.relation,
+        ));
         let relation_map = cells.entry(key).or_default();
         if relation_map.insert(row.relation, row).is_some() {
             return Err("duplicate task_family/difficulty_band/relation cell".to_owned());
@@ -489,14 +496,18 @@ fn validate_replicate_matrix(
     }
     if let Some(expected) = expected_families {
         if &families != expected {
-            return Err("task-family set differs across independent model-pair replicates".to_owned());
+            return Err(
+                "task-family set differs across independent model-pair replicates".to_owned(),
+            );
         }
     }
 
     let mut family_bands = BTreeMap::<String, BTreeSet<String>>::new();
     for ((family, band), relation_map) in &cells {
         if relation_map.len() != TransferRelationV1::ALL.len()
-            || TransferRelationV1::ALL.iter().any(|relation| !relation_map.contains_key(relation))
+            || TransferRelationV1::ALL
+                .iter()
+                .any(|relation| !relation_map.contains_key(relation))
         {
             return Err(format!(
                 "family {family} difficulty band {band} must contain all six relation strata"
@@ -534,7 +545,10 @@ fn validate_replicate_matrix(
                 expected_cells.insert(key, signature);
             }
         }
-        family_bands.entry(family.clone()).or_default().insert(band.clone());
+        family_bands
+            .entry(family.clone())
+            .or_default()
+            .insert(band.clone());
     }
 
     let first_bands = family_bands
@@ -641,19 +655,18 @@ pub fn analyze_exposure_transfer(
         || study.benchmark_id != base_study.benchmark_id
         || study.benchmark_version != base_study.benchmark_version
         || study.primary_metric_id != base_study.primary_metric_id
-        || study.primary_metric_definition_sha256
-            != base_study.primary_metric_definition_sha256
+        || study.primary_metric_definition_sha256 != base_study.primary_metric_definition_sha256
     {
-        return Err("transfer study identity and metric must exactly match the base causal study".to_owned());
+        return Err(
+            "transfer study identity and metric must exactly match the base causal study"
+                .to_owned(),
+        );
     }
     validate_digest(
         &study.primary_metric_definition_sha256,
         "primary_metric_definition_sha256",
     )?;
-    validate_digest(
-        &study.relation_protocol_sha256,
-        "relation_protocol_sha256",
-    )?;
+    validate_digest(&study.relation_protocol_sha256, "relation_protocol_sha256")?;
     validate_digest(
         &study.evaluator_relation_manifest_sha256,
         "evaluator_relation_manifest_sha256",
@@ -679,18 +692,9 @@ pub fn analyze_exposure_transfer(
     let mut expected_cells = BTreeMap::new();
     let mut expected_matrix_keys = None;
     let mut expected_families: Option<BTreeSet<String>> = None;
-    let mut pair_values = BTreeMap::<
-        (String, TransferRelationV1),
-        PairRelationValues,
-    >::new();
-    let mut family_values = BTreeMap::<
-        (TransferRelationV1, String),
-        Vec<RateTriplet>,
-    >::new();
-    let mut family_cell_metadata = BTreeMap::<
-        (TransferRelationV1, String),
-        (u64, u64, u64),
-    >::new();
+    let mut pair_values = BTreeMap::<(String, TransferRelationV1), PairRelationValues>::new();
+    let mut family_values = BTreeMap::<(TransferRelationV1, String), Vec<RateTriplet>>::new();
+    let mut family_cell_metadata = BTreeMap::<(TransferRelationV1, String), (u64, u64, u64)>::new();
 
     for transfer_replicate in &study.replicates {
         if !transfer_ids.insert(transfer_replicate.replicate_id.as_str()) {
@@ -699,10 +703,11 @@ pub fn analyze_exposure_transfer(
         let base = base_by_id
             .get(transfer_replicate.replicate_id.as_str())
             .ok_or_else(|| "transfer replicate has no matching base causal replicate".to_owned())?;
-        if transfer_replicate.training_receipt_audit_sha256
-            != base.training_receipt_audit_sha256
-        {
-            return Err("transfer replicate training receipt does not match the base causal replicate".to_owned());
+        if transfer_replicate.training_receipt_audit_sha256 != base.training_receipt_audit_sha256 {
+            return Err(
+                "transfer replicate training receipt does not match the base causal replicate"
+                    .to_owned(),
+            );
         }
         let expected_evidence = evaluation_evidence_digest(&base.evaluation_evidence)?;
         if transfer_replicate.evaluation_evidence_sha256 != expected_evidence {
@@ -736,7 +741,10 @@ pub fn analyze_exposure_transfer(
             );
             if let Some(previous) = family_cell_metadata.get(&(*relation, family.clone())) {
                 if previous != &metadata {
-                    return Err("family/relation counts differ across independent model-pair replicates".to_owned());
+                    return Err(
+                        "family/relation counts differ across independent model-pair replicates"
+                            .to_owned(),
+                    );
                 }
             } else {
                 family_cell_metadata.insert((*relation, family.clone()), metadata);
@@ -748,19 +756,18 @@ pub fn analyze_exposure_transfer(
             .ok_or_else(|| "no task families were supplied".to_owned())?;
         for relation in TransferRelationV1::ALL {
             let value = relation_pair_values(&family_rates, families, relation)?;
-            pair_values.insert(
-                (transfer_replicate.replicate_id.clone(), relation),
-                value,
-            );
+            pair_values.insert((transfer_replicate.replicate_id.clone(), relation), value);
         }
     }
 
     if transfer_ids.len() != base_by_id.len() {
-        return Err("transfer study must contain exactly one row for every base model-pair replicate".to_owned());
+        return Err(
+            "transfer study must contain exactly one row for every base model-pair replicate"
+                .to_owned(),
+        );
     }
 
-    let families = expected_families
-        .ok_or_else(|| "no task families were supplied".to_owned())?;
+    let families = expected_families.ok_or_else(|| "no task families were supplied".to_owned())?;
     let mut relation_reports = Vec::new();
     let mut replicate_by_relation =
         BTreeMap::<TransferRelationV1, Vec<TransferReplicateRelationEffectV1>>::new();
@@ -797,7 +804,9 @@ pub fn analyze_exposure_transfer(
                 || relation_cluster_count != Some(value.cluster_count)
                 || relation_band_count != Some(value.difficulty_band_count)
             {
-                return Err("relation totals differ across independent model-pair replicates".to_owned());
+                return Err(
+                    "relation totals differ across independent model-pair replicates".to_owned(),
+                );
             }
             replicate_effects.push(TransferReplicateRelationEffectV1 {
                 replicate_id: transfer_replicate.replicate_id.clone(),
@@ -883,8 +892,7 @@ pub fn analyze_exposure_transfer(
                 return Err("contrast arms are not paired by model-pair replicate ID".to_owned());
             }
             differences.push(
-                left.treatment_minus_placebo_permille
-                    - right.treatment_minus_placebo_permille,
+                left.treatment_minus_placebo_permille - right.treatment_minus_placebo_permille,
             );
         }
         predeclared_contrasts.push(TransferContrastV1 {
@@ -897,8 +905,7 @@ pub fn analyze_exposure_transfer(
 
     let transfer_bytes = serde_json::to_vec(study)
         .map_err(|error| format!("cannot serialize transfer study for digest: {error}"))?;
-    let transfer_study_sha256 =
-        hash_domain(b"exposure-transfer-study.v1", &transfer_bytes);
+    let transfer_study_sha256 = hash_domain(b"exposure-transfer-study.v1", &transfer_bytes);
     let issues = vec![
         "training and checkpoint receipts are content-bound but this analyzer has no independent trust-root verifier".to_owned(),
         "semantic-equivalence and same-skill labels require external blinded expert adjudication".to_owned(),
@@ -964,15 +971,17 @@ mod tests {
         };
         assert_eq!(score_rate(&valid, 10, "test").unwrap(), 700.0);
         assert!(score_rate(&valid, 9, "test").is_err());
-        assert!(score_rate(
-            &ScoreCountV1 {
-                success_count: 11,
-                observed_count: 10,
-            },
-            10,
-            "test"
-        )
-        .is_err());
+        assert!(
+            score_rate(
+                &ScoreCountV1 {
+                    success_count: 11,
+                    observed_count: 10,
+                },
+                10,
+                "test"
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1044,13 +1053,15 @@ mod tests {
         replicate.strata.pop();
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
-        assert!(validate_replicate_matrix(
-            &replicate,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .is_err());
+        assert!(
+            validate_replicate_matrix(
+                &replicate,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1062,13 +1073,15 @@ mod tests {
         replicate.strata[1].item_set_sha256 = duplicate_digest;
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
-        assert!(validate_replicate_matrix(
-            &replicate,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .is_err());
+        assert!(
+            validate_replicate_matrix(
+                &replicate,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1081,20 +1094,17 @@ mod tests {
         }
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
-        validate_replicate_matrix(
-            &first,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .unwrap();
-        assert!(validate_replicate_matrix(
-            &second,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .is_err());
+        validate_replicate_matrix(&first, None, &mut expected_cells, &mut expected_matrix_keys)
+            .unwrap();
+        assert!(
+            validate_replicate_matrix(
+                &second,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1112,30 +1122,33 @@ mod tests {
             row.minimum_item_agreement_permille = 999;
             let mut expected_cells = BTreeMap::new();
             let mut expected_matrix_keys = None;
-            assert!(validate_replicate_matrix(
-                &replicate,
-                None,
-                &mut expected_cells,
-                &mut expected_matrix_keys,
-            )
-            .is_err());
+            assert!(
+                validate_replicate_matrix(
+                    &replicate,
+                    None,
+                    &mut expected_cells,
+                    &mut expected_matrix_keys,
+                )
+                .is_err()
+            );
         }
     }
 
     #[test]
     fn indeterminate_adjudication_is_not_scoreable() {
         let mut replicate = sample_transfer_replicate();
-        replicate.strata[0].adjudication_decision =
-            RelationAdjudicationDecisionV1::Indeterminate;
+        replicate.strata[0].adjudication_decision = RelationAdjudicationDecisionV1::Indeterminate;
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
-        assert!(validate_replicate_matrix(
-            &replicate,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .is_err());
+        assert!(
+            validate_replicate_matrix(
+                &replicate,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1145,13 +1158,15 @@ mod tests {
         replicate.strata[0].adjudication_reviewer_ids[2] = duplicate_reviewer;
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
-        assert!(validate_replicate_matrix(
-            &replicate,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .is_err());
+        assert!(
+            validate_replicate_matrix(
+                &replicate,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1162,20 +1177,17 @@ mod tests {
         second.strata[0].adjudication_reviewer_ids[0] = "different-reviewer".to_owned();
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
-        validate_replicate_matrix(
-            &first,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .unwrap();
-        assert!(validate_replicate_matrix(
-            &second,
-            None,
-            &mut expected_cells,
-            &mut expected_matrix_keys,
-        )
-        .is_err());
+        validate_replicate_matrix(&first, None, &mut expected_cells, &mut expected_matrix_keys)
+            .unwrap();
+        assert!(
+            validate_replicate_matrix(
+                &second,
+                None,
+                &mut expected_cells,
+                &mut expected_matrix_keys,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1190,8 +1202,7 @@ mod tests {
             treatment: 550.0,
             placebo: 600.0,
         };
-        let difference = high.treatment - high.placebo
-            - (low.treatment - low.placebo);
+        let difference = high.treatment - high.placebo - (low.treatment - low.placebo);
         assert_eq!(difference, 250.0);
     }
 }
