@@ -27,6 +27,7 @@ const VERSION: &str = "0.1.0";
 const CLOCK_DOMAIN: &[u8] = b"symthaea.nas.phase-clock-mapping.v0.1";
 const PROTOCOL_DOMAIN: &[u8] = b"symthaea.nas.application-phase-protocol.v0.1";
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.nas.application-phase-energy-receipt.v0.1";
+const OUTCOME_DOMAIN: &[u8] = b"symthaea.nas.application-event-outcome.v0.1";
 const NOMINAL_MS_PER_NS: f64 = 1e-6;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +75,36 @@ pub struct ApplicationPhaseDefinition {
     pub required: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApplicationEventOutcome {
+    Correct,
+    Incorrect,
+    Abstained,
+    Fallback,
+    Failed,
+    NotAttempted,
+}
+
+impl ApplicationEventOutcome {
+    pub fn is_intrinsically_unsuccessful(self) -> bool {
+        matches!(self, Self::Incorrect | Self::Failed | Self::NotAttempted)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ApplicationEventOutcomeEvidence {
+    pub event_id: String,
+    pub outcome: ApplicationEventOutcome,
+    pub input_sha256: String,
+    pub output_sha256: Option<String>,
+    pub quality_metric_id: Option<String>,
+    pub quality_value: Option<f64>,
+    pub deadline_met: bool,
+    pub retry_count: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationPhaseProtocolManifest {
@@ -83,6 +114,8 @@ pub struct ApplicationPhaseProtocolManifest {
     pub protocol_id: String,
     /// Strictly ordered phase graph. At least one phase must be required.
     pub phases: Vec<ApplicationPhaseDefinition>,
+    /// Explicit statuses considered successful for this application. Incorrect/Failed/NotAttempted are forbidden.
+    pub accepted_success_outcomes: Vec<ApplicationEventOutcome>,
     /// A complete event is only labelled complete if unassigned gaps are within this limit.
     pub maximum_unattributed_gap_ms: f64,
     pub protocol_sha256: String,
@@ -120,6 +153,15 @@ pub struct PhaseEnergyEventMetrics {
     pub event_id: String,
     pub segment_id: String,
     pub status: PhaseEnergyEventStatus,
+    pub outcome: ApplicationEventOutcome,
+    pub outcome_evidence_sha256: String,
+    pub input_sha256: String,
+    pub output_sha256: Option<String>,
+    pub quality_metric_id: Option<String>,
+    pub quality_value: Option<f64>,
+    pub deadline_met: bool,
+    pub retry_count: u32,
+    pub accepted_success_outcome: bool,
     pub missing_phase_ids: Vec<String>,
     pub missing_required_phase_ids: Vec<String>,
     pub phase_windows: Vec<PhaseEnergyWindowMetrics>,
@@ -142,8 +184,10 @@ pub struct PhaseEnergyAuditReceipt {
     pub version: String,
     pub sample_csv_sha256: String,
     pub marker_csv_sha256: String,
+    pub outcomes_csv_sha256: String,
     pub sample_csv_bytes: usize,
     pub marker_csv_bytes: usize,
+    pub outcomes_csv_bytes: usize,
     pub trace_audit_receipt_sha256: String,
     pub clock_mapping_sha256: String,
     pub phase_protocol_sha256: String,
@@ -156,6 +200,8 @@ pub struct PhaseEnergyAuditReceipt {
     pub complete_phase_coverage_events: usize,
     pub unattributed_interval_events: usize,
     pub missing_required_phase_events: usize,
+    pub successful_completed_events: usize,
+    pub mean_energy_per_successful_event_uj: Option<f64>,
     pub events: Vec<PhaseEnergyEventMetrics>,
     pub receipt_sha256: String,
 }
