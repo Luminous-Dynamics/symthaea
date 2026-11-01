@@ -979,10 +979,10 @@ mod tests {
         assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
 
         run.flash_bytes = 1024;
-        run.latency_samples_us = vec![100_000, 100_000];
-        run.p50_latency_us = 100_000;
-        run.p95_latency_us = 100_000;
-        run.p99_latency_us = 100_000;
+        run.latency_samples_us = vec![100_001, 100_001];
+        run.p50_latency_us = 100_001;
+        run.p95_latency_us = 100_001;
+        run.p99_latency_us = 100_001;
         run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
         assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
     }
@@ -1034,6 +1034,66 @@ mod tests {
         energy.replicate_count = 1;
         run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
         assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
+    }
+
+    #[test]
+    fn streaming_quality_result_enforces_false_positive_and_negative_targets() {
+        let contract = closed_contract(MlperfTinyTask::StreamingWakeWord);
+        let accepted = MlperfTinyQualityResult::StreamingWakeWord {
+            false_positives: 8,
+            false_negatives: 8,
+            listening_duration_seconds: 3_600,
+            stream_artifact_sha256: sha('a'),
+        };
+        validate_quality_result(&contract, &accepted).unwrap();
+
+        let rejected = MlperfTinyQualityResult::StreamingWakeWord {
+            false_positives: 9,
+            false_negatives: 8,
+            listening_duration_seconds: 3_600,
+            stream_artifact_sha256: sha('a'),
+        };
+        assert!(validate_quality_result(&contract, &rejected).is_err());
+    }
+
+    #[test]
+    fn anomaly_quality_result_enforces_auc_target_and_both_classes() {
+        let contract = closed_contract(MlperfTinyTask::AnomalyDetection);
+        let accepted = MlperfTinyQualityResult::RocAuc {
+            score_ppm: 850_000,
+            positive_count: 100,
+            negative_count: 100,
+        };
+        validate_quality_result(&contract, &accepted).unwrap();
+
+        let below_target = MlperfTinyQualityResult::RocAuc {
+            score_ppm: 849_999,
+            positive_count: 100,
+            negative_count: 100,
+        };
+        assert!(validate_quality_result(&contract, &below_target).is_err());
+
+        let single_class = MlperfTinyQualityResult::RocAuc {
+            score_ppm: 950_000,
+            positive_count: 100,
+            negative_count: 0,
+        };
+        assert!(validate_quality_result(&contract, &single_class).is_err());
+    }
+
+    #[test]
+    fn pairwise_comparability_rejects_different_target_budgets_and_rules() {
+        let left = closed_contract(MlperfTinyTask::KeywordSpotting);
+        let mut different_budget = left.clone();
+        different_budget.sram_budget_bytes -= 1;
+        different_budget.contract_sha256 = compute_mlperf_tiny_contract_sha256(&different_budget).unwrap();
+        assert!(validate_mlperf_tiny_pairwise_comparability(&left, &different_budget).is_err());
+
+        let mut different_rules = left.clone();
+        different_rules.rules_version = "different-rules-pack".into();
+        different_rules.rules_document_sha256 = sha('8');
+        different_rules.contract_sha256 = compute_mlperf_tiny_contract_sha256(&different_rules).unwrap();
+        assert!(validate_mlperf_tiny_pairwise_comparability(&left, &different_rules).is_err());
     }
 
     #[test]
