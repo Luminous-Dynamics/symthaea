@@ -20,8 +20,13 @@ pub struct ExpectedIdentity<'a> {
     pub lean_toolchain: &'a str,
     pub environment_sha256: &'a str,
     pub initial_proof_state_sha256: &'a str,
+    pub initial_state_receipt_sha256: &'a str,
     pub target_statement_sha256: &'a str,
     pub model_seed_sha256: &'a str,
+    pub model_id: &'a str,
+    pub model_version: &'a str,
+    pub arm_policy_sha256: &'a str,
+    pub arm_config_sha256: &'a str,
     pub evaluation_horizon_id: &'a str,
     pub continuation_policy_sha256: &'a str,
     pub execution_order_index: u64,
@@ -113,8 +118,13 @@ fn validate_common(
         ("lean_toolchain", expected.lean_toolchain),
         ("environment_sha256", expected.environment_sha256),
         ("initial_proof_state_sha256", expected.initial_proof_state_sha256),
+        ("initial_state_receipt_sha256", expected.initial_state_receipt_sha256),
         ("target_statement_sha256", expected.target_statement_sha256),
         ("model_seed_sha256", expected.model_seed_sha256),
+        ("model_id", expected.model_id),
+        ("model_version", expected.model_version),
+        ("arm_policy_sha256", expected.arm_policy_sha256),
+        ("arm_config_sha256", expected.arm_config_sha256),
     ];
     for (key, expected_value) in expected_pairs {
         if get_str(value, key)? != expected_value {
@@ -157,7 +167,7 @@ pub fn verify_checker_receipt(
     proof_sha256: Option<&str>,
     checked_target_sha256: Option<&str>,
 ) -> Result<()> {
-    const KEYS: [&str; 25] = [
+    const KEYS: [&str; 30] = [
         "schema_version",
         "evidence_class",
         "evidence_kind",
@@ -171,8 +181,13 @@ pub fn verify_checker_receipt(
         "lean_toolchain",
         "environment_sha256",
         "initial_proof_state_sha256",
+        "initial_state_receipt_sha256",
         "target_statement_sha256",
         "model_seed_sha256",
+        "model_id",
+        "model_version",
+        "arm_policy_sha256",
+        "arm_config_sha256",
         "checker_id",
         "checker_version",
         "checker_binary_sha256",
@@ -268,7 +283,7 @@ pub fn verify_run_receipt(
     outcome: &Value,
     planned_budget: &Value,
 ) -> Result<()> {
-    const KEYS: [&str; 28] = [
+    const KEYS: [&str; 33] = [
         "schema_version",
         "evidence_class",
         "evidence_kind",
@@ -282,8 +297,13 @@ pub fn verify_run_receipt(
         "lean_toolchain",
         "environment_sha256",
         "initial_proof_state_sha256",
+        "initial_state_receipt_sha256",
         "target_statement_sha256",
         "model_seed_sha256",
+        "model_id",
+        "model_version",
+        "arm_policy_sha256",
+        "arm_config_sha256",
         "evaluation_horizon_id",
         "continuation_policy_sha256",
         "execution_order_index",
@@ -313,6 +333,9 @@ pub fn verify_run_receipt(
         bail!("run receipt horizon, continuation policy or execution order differs from the paired plan");
     }
     check_sha256(get_str(&value, "run_config_sha256")?, "run configuration")?;
+    if get_str(&value, "run_config_sha256")? != expected.arm_config_sha256 {
+        bail!("run receipt configuration digest differs from the frozen arm config");
+    }
     if !get_bool(&value, "started_from_fresh_process")?
         || !get_bool(&value, "mutable_caches_isolated")?
     {
@@ -350,7 +373,7 @@ pub fn verify_successor_receipt(
     expected: ExpectedIdentity<'_>,
     proof_sha256: &str,
 ) -> Result<()> {
-    const KEYS: [&str; 20] = [
+    const KEYS: [&str; 25] = [
         "schema_version",
         "evidence_class",
         "evidence_kind",
@@ -364,8 +387,13 @@ pub fn verify_successor_receipt(
         "lean_toolchain",
         "environment_sha256",
         "initial_proof_state_sha256",
+        "initial_state_receipt_sha256",
         "target_statement_sha256",
         "model_seed_sha256",
+        "model_id",
+        "model_version",
+        "arm_policy_sha256",
+        "arm_config_sha256",
         "status",
         "proof_sha256",
         "successor_suite_id",
@@ -410,6 +438,9 @@ mod tests {
     const SHA_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const SHA_E: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const SHA_F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const SHA_G: &str = "abababababababababababababababababababababababababababababababab";
+    const SHA_H: &str = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd";
+    const SHA_I: &str = "edededededededededededededededededededededededededededededededed";
     const TASK: &str = "1111111111111111111111111111111111111111111111111111111111111111";
     const COMMIT: &str = "2222222222222222222222222222222222222222";
     const COMPONENT: &str = "project-test";
@@ -426,8 +457,13 @@ mod tests {
             lean_toolchain: "leanprover/lean4:v4.26.0",
             environment_sha256: SHA_B,
             initial_proof_state_sha256: SHA_C,
+            initial_state_receipt_sha256: SHA_G,
             target_statement_sha256: SHA_D,
             model_seed_sha256: SHA_E,
+            model_id: "synthetic-model",
+            model_version: "synthetic-version",
+            arm_policy_sha256: SHA_H,
+            arm_config_sha256: SHA_I,
             evaluation_horizon_id: "horizon-test",
             continuation_policy_sha256: SHA_F,
             execution_order_index: 1,
@@ -448,8 +484,13 @@ mod tests {
             "lean_toolchain":"leanprover/lean4:v4.26.0",
             "environment_sha256":SHA_B,
             "initial_proof_state_sha256":SHA_C,
+            "initial_state_receipt_sha256":SHA_G,
             "target_statement_sha256":SHA_D,
-            "model_seed_sha256":SHA_E
+            "model_seed_sha256":SHA_E,
+            "model_id":"synthetic-model",
+            "model_version":"synthetic-version",
+            "arm_policy_sha256":SHA_H,
+            "arm_config_sha256":SHA_I
         })
     }
 
@@ -496,7 +537,7 @@ mod tests {
         receipt["checker_receipt_sha256"] = json!(checker_sha);
         receipt["target_integrity_receipt_sha256"] = json!(SHA_A);
         receipt["successor_receipt_sha256"] = json!(SHA_B);
-        receipt["run_config_sha256"] = json!(SHA_C);
+        receipt["run_config_sha256"] = json!(SHA_I);
         receipt["started_from_fresh_process"] = Value::Bool(true);
         receipt["mutable_caches_isolated"] = Value::Bool(true);
         receipt
