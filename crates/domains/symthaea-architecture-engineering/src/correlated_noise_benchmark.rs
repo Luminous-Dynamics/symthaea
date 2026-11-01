@@ -129,8 +129,10 @@ impl CorrelatedBoundedNoiseModel {
     /// Known correlation matrix: Corr(e_i,e_j) = loading_i * loading_j.
     pub fn theoretical_correlation_matrix(&self) -> Result<Vec<Vec<f64>>, CorrelatedNoiseError> {
         self.validate()?;
-        Ok(self.objectives.iter().map(|left| {
-            self.objectives.iter().map(|right| left.shared_loading * right.shared_loading).collect()
+        Ok(self.objectives.iter().enumerate().map(|(row, left)| {
+            self.objectives.iter().enumerate().map(|(column, right)| {
+                if row == column { 1.0 } else { left.shared_loading * right.shared_loading }
+            }).collect()
         }).collect())
     }
 
@@ -215,7 +217,9 @@ fn counter_key(seed: u64, candidate_id: &str, replicate_id: &str) -> u64 {
     hasher.update((replicate_id.len() as u64).to_le_bytes());
     hasher.update(replicate_id.as_bytes());
     let digest = hasher.finalize();
-    u64::from_le_bytes(digest[0..8].try_into().expect("fixed SHA-256 prefix"))
+    let mut prefix = [0_u8; 8];
+    prefix.copy_from_slice(&digest[0..8]);
+    u64::from_le_bytes(prefix)
 }
 
 fn sign(value: u64) -> f64 {
@@ -254,12 +258,12 @@ mod tests {
         let model = model();
         let matrix = model.theoretical_correlation_matrix().unwrap();
         assert_eq!(matrix.len(), 3);
-        assert!((matrix[0][0] - 0.64).abs() < 1e-12);
+        assert!((matrix[0][0] - 1.0).abs() < 1e-12);
         assert!((matrix[0][1] + 0.4).abs() < 1e-12);
         assert!((matrix[0][2]).abs() < 1e-12);
-        assert!((matrix[1][1] - 0.25).abs() < 1e-12);
+        assert!((matrix[1][1] - 1.0).abs() < 1e-12);
         assert!((matrix[1][2]).abs() < 1e-12);
-        assert!((matrix[2][2]).abs() < 1e-12);
+        assert!((matrix[2][2] - 1.0).abs() < 1e-12);
     }
 
     #[test]
