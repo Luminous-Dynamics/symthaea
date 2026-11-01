@@ -151,3 +151,33 @@ Adapters must supply only legitimate training observations and preserve
 missingness separately. This is the clean comparison path; the official
 benchmark code path must be separately reproduced and labeled when it uses
 different normalization.
+
+
+## 10. Time-IMM CSV adapter
+
+The `time_imm` module parses one entity's numeric and text CSV files.
+
+It requires an exact numeric feature mapping: column name, modality ID, unit
+code and fixed-point exponent. Unknown, missing or duplicate columns fail
+closed. Source-file SHA-256 binds exact input bytes; event source digests bind
+canonical parsed rows. Text is content-addressed without whitespace trimming.
+
+RFC3339 timestamps are unambiguous. Naive timestamps require an explicit fixed
+UTC offset or IANA timezone; DST-ambiguous/nonexistent local times are rejected
+rather than silently shifted. The timestamp-zone configuration is digest-bound.
+
+The adapter also requires a caller-selected availability policy (synchronous
+at event time as an explicit assumption, or a fixed delay). Its digest is
+reported independently. The Time-IMM CSV does not contain a separate observed
+system-arrival timestamp, so the adapter makes no claim that either policy
+reconstructs actual acquisition latency.
+
+Numeric values are converted to per-feature fixed-point scales in [-9, 0].
+Rounding is nearest, ties away from zero, and the maximum half-unit error bound
+is returned. Empty/NA/NaN measurements become Missing records; text is stored
+as an opaque payload reference. No interpolation, imputation or resampling is
+performed.
+
+The parser is a dataset adapter, not a timezone/availability oracle. Dataset
+maintainers must verify the correct IANA timezone and the benchmark's intended
+availability semantics before using a configuration for claims.
