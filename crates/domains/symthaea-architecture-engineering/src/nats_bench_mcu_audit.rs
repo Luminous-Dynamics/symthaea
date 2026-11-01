@@ -834,7 +834,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_architecture_indices() {
         let (mut hardware, accuracy, failures, contract) = fixture();
-        hardware.push_str("0,|duplicate|,100,380,120,0.010,1000,3.0,0.030,nrf5340dk_1,q\n");
+        hardware = hardware.replace("1,|nor~1|", "0,|nor~1|");
         let error = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
             .expect_err("duplicate architecture indices must fail");
         assert!(error.to_string().contains("duplicate measured architecture index"));
@@ -843,7 +843,7 @@ mod tests {
     #[test]
     fn rejects_accuracy_rows_that_do_not_join_exactly_to_measured_architectures() {
         let (hardware, mut accuracy, failures, contract) = fixture();
-        accuracy = accuracy.replace("2,91.0,61.0,31.0\n", "");
+        accuracy = accuracy.replace("2,91.0,61.0,31.0", "3,91.0,61.0,31.0");
         let error = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
             .expect_err("missing accuracy data must not be imputed");
         assert!(error.to_string().contains("accuracy indices must exactly equal measured hardware indices"));
