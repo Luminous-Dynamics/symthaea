@@ -89,7 +89,6 @@ pub struct NetDecisionValueMetrics {
     pub mean_d1_net_utility: f64,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AbstainReason {
     NoIntervalDominantAction,
@@ -101,7 +100,6 @@ pub enum RobustActionDecision {
     Certified { action_index: usize },
     Abstain { reason: AbstainReason },
 }
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JointDrawCoupling {
@@ -243,16 +241,13 @@ pub fn paired_effect_interval(
     central_interval(&paired_differences, nominal_coverage)
 }
 
-
 /// Validate the shape and provenance bindings of one same-history action bank.
 ///
 /// This checks that an adapter supplies a shared draw axis. It cannot prove
 /// that the producer honestly generated the values using the declared
 /// coupling; the source/recorder and draw-bank bytes must be independently
 /// retained and verified by the adapter's evidence layer.
-pub fn validate_joint_action_set(
-    bank: &JointActionSetSamples,
-) -> Result<(), IntervalError> {
+pub fn validate_joint_action_set(bank: &JointActionSetSamples) -> Result<(), IntervalError> {
     validate_joint_action_set_shape(bank)?;
     let expected_digest = compute_joint_draw_bank_sha256(bank)?;
     if expected_digest != bank.joint_draw_bank_sha256 {
@@ -261,9 +256,7 @@ pub fn validate_joint_action_set(
     Ok(())
 }
 
-fn validate_joint_action_set_shape(
-    bank: &JointActionSetSamples,
-) -> Result<(), IntervalError> {
+fn validate_joint_action_set_shape(bank: &JointActionSetSamples) -> Result<(), IntervalError> {
     if bank.horizon_steps == 0 {
         return Err(IntervalError::InvalidHorizon);
     }
@@ -312,7 +305,6 @@ fn validate_joint_action_set_shape(
     Ok(())
 }
 
-
 fn append_len_prefixed(buffer: &mut Vec<u8>, bytes: &[u8]) {
     buffer.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
     buffer.extend_from_slice(bytes);
@@ -357,54 +349,95 @@ pub fn compute_joint_draw_bank_sha256(
 
 fn sha256_hex(input: &[u8]) -> String {
     const K: [u32; 64] = [
-        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2,
     ];
-    let mut h = [0x6a09e667u32,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    let mut h = [
+        0x6a09e667u32,
+        0xbb67ae85,
+        0x3c6ef372,
+        0xa54ff53a,
+        0x510e527f,
+        0x9b05688c,
+        0x1f83d9ab,
+        0x5be0cd19,
+    ];
     let bit_len = (input.len() as u64).wrapping_mul(8);
     let mut message = input.to_vec();
     message.push(0x80);
-    while message.len() % 64 != 56 { message.push(0); }
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
     message.extend_from_slice(&bit_len.to_be_bytes());
     for chunk in message.chunks_exact(64) {
         let mut w = [0u32; 64];
         for i in 0..16 {
             let start = i * 4;
-            w[i] = u32::from_be_bytes([chunk[start], chunk[start+1], chunk[start+2], chunk[start+3]]);
+            w[i] = u32::from_be_bytes([
+                chunk[start],
+                chunk[start + 1],
+                chunk[start + 2],
+                chunk[start + 3],
+            ]);
         }
         for i in 16..64 {
-            let s0 = w[i-15].rotate_right(7) ^ w[i-15].rotate_right(18) ^ (w[i-15] >> 3);
-            let s1 = w[i-2].rotate_right(17) ^ w[i-2].rotate_right(19) ^ (w[i-2] >> 10);
-            w[i] = w[i-16].wrapping_add(s0).wrapping_add(w[i-7]).wrapping_add(s1);
+            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[i - 7])
+                .wrapping_add(s1);
         }
         let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = h;
         for i in 0..64 {
             let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
             let choice = (e & f) ^ ((!e) & g);
-            let temp1 = hh.wrapping_add(s1).wrapping_add(choice).wrapping_add(K[i]).wrapping_add(w[i]);
+            let temp1 = hh
+                .wrapping_add(s1)
+                .wrapping_add(choice)
+                .wrapping_add(K[i])
+                .wrapping_add(w[i]);
             let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
             let majority = (a & b) ^ (a & c) ^ (b & c);
             let temp2 = s0.wrapping_add(majority);
-            hh = g; g = f; f = e; e = d.wrapping_add(temp1);
-            d = c; c = b; b = a; a = temp1.wrapping_add(temp2);
+            hh = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = c;
+            c = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
         }
-        h[0]=h[0].wrapping_add(a); h[1]=h[1].wrapping_add(b); h[2]=h[2].wrapping_add(c); h[3]=h[3].wrapping_add(d);
-        h[4]=h[4].wrapping_add(e); h[5]=h[5].wrapping_add(f); h[6]=h[6].wrapping_add(g); h[7]=h[7].wrapping_add(hh);
+        h[0] = h[0].wrapping_add(a);
+        h[1] = h[1].wrapping_add(b);
+        h[2] = h[2].wrapping_add(c);
+        h[3] = h[3].wrapping_add(d);
+        h[4] = h[4].wrapping_add(e);
+        h[5] = h[5].wrapping_add(f);
+        h[6] = h[6].wrapping_add(g);
+        h[7] = h[7].wrapping_add(hh);
     }
     let mut output = String::with_capacity(64);
-    for word in h { write!(&mut output, "{word:08x}").unwrap(); }
+    for word in h {
+        write!(&mut output, "{word:08x}").unwrap();
+    }
     output
 }
 
 fn is_lower_hex_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 /// Produce a predictive interval for each action in the original action-id
@@ -449,9 +482,15 @@ fn joint_action_effect_interval_validated(
     if left_action_id == right_action_id {
         return Err(IntervalError::SameActionRequested);
     }
-    let left_index = bank.action_ids.iter().position(|id| *id == left_action_id)
+    let left_index = bank
+        .action_ids
+        .iter()
+        .position(|id| *id == left_action_id)
         .ok_or(IntervalError::InvalidSelectedIndex)?;
-    let right_index = bank.action_ids.iter().position(|id| *id == right_action_id)
+    let right_index = bank
+        .action_ids
+        .iter()
+        .position(|id| *id == right_action_id)
         .ok_or(IntervalError::InvalidSelectedIndex)?;
     let interval = paired_effect_interval(
         &bank.outcome_samples[left_index],
@@ -479,7 +518,10 @@ pub fn all_joint_action_effect_intervals(
     for left in 0..ids.len() {
         for right in (left + 1)..ids.len() {
             effects.push(joint_action_effect_interval_validated(
-                bank, ids[left], ids[right], nominal_coverage
+                bank,
+                ids[left],
+                ids[right],
+                nominal_coverage,
             )?);
         }
     }
@@ -694,7 +736,10 @@ pub fn evaluate_net_decision_value(
         metrics.mean_world_model_net_utility,
         metrics.mean_d0_net_utility,
         metrics.mean_d1_net_utility,
-    ].iter().any(|value| !value.is_finite()) {
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+    {
         return Err(IntervalError::NonFiniteDerivedMetric);
     }
     Ok(Some(metrics))
@@ -791,10 +836,17 @@ pub fn evaluate_selected_action_sets(
         let dominant = is_interval_dominant(&episode.intervals, selected)?;
         total_regret += regret;
         total_bound += bound;
-        total_selected_width += episode.intervals[selected].upper - episode.intervals[selected].lower;
-        if bound + 1e-12 >= regret { covered_bounds += 1; }
-        if all_covered { simultaneous_covered += 1; }
-        if dominant { dominant_certificates += 1; }
+        total_selected_width +=
+            episode.intervals[selected].upper - episode.intervals[selected].lower;
+        if bound + 1e-12 >= regret {
+            covered_bounds += 1;
+        }
+        if all_covered {
+            simultaneous_covered += 1;
+        }
+        if dominant {
+            dominant_certificates += 1;
+        }
         if dominant && regret > 1e-12 {
             false_dominant += 1;
         }
@@ -919,7 +971,6 @@ fn linear_quantile(sorted: &[f64], probability: f64) -> f64 {
 mod tests {
     use super::*;
 
-
     fn joint_bank_fixture() -> JointActionSetSamples {
         let mut bank = JointActionSetSamples {
             history_sha256: "a".repeat(64),
@@ -970,7 +1021,9 @@ mod tests {
         assert_eq!(original_effect, permuted_effect);
         let all = all_joint_action_effect_intervals(&permuted, 0.8).unwrap();
         assert_eq!(
-            all.iter().map(|effect| (effect.left_action_id, effect.right_action_id)).collect::<Vec<_>>(),
+            all.iter()
+                .map(|effect| (effect.left_action_id, effect.right_action_id))
+                .collect::<Vec<_>>(),
             vec![(3, 9), (3, 17), (9, 17)]
         );
     }
@@ -989,7 +1042,10 @@ mod tests {
         );
         assert_eq!(compute_joint_draw_bank_sha256(&bank).unwrap(), digest);
         bank.outcome_samples[0][0] += 0.25;
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::JointDrawBankDigestMismatch));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::JointDrawBankDigestMismatch)
+        );
     }
 
     #[test]
@@ -1009,52 +1065,85 @@ mod tests {
     fn joint_action_bank_rejects_duplicate_ids_and_bad_cardinality() {
         let mut bank = joint_bank_fixture();
         bank.action_ids[1] = bank.action_ids[0];
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::DuplicateActionId));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::DuplicateActionId)
+        );
 
         let mut bank = joint_bank_fixture();
         bank.joint_draw_ids[1] = bank.joint_draw_ids[0];
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::DuplicateJointDrawId));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::DuplicateJointDrawId)
+        );
 
         let mut bank = joint_bank_fixture();
         bank.outcome_samples[1].pop();
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::ActionSampleCardinalityMismatch));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::ActionSampleCardinalityMismatch)
+        );
     }
 
     #[test]
     fn joint_action_bank_requires_action_semantics_and_outcome_channel_identity() {
         let mut bank = joint_bank_fixture();
         bank.action_manifest_sha256 = "bad".into();
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidActionManifestDigest));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::InvalidActionManifestDigest)
+        );
 
         let mut bank = joint_bank_fixture();
         bank.outcome_channel = "  ".into();
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::EmptyOutcomeChannel));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::EmptyOutcomeChannel)
+        );
     }
 
     #[test]
     fn joint_action_bank_rejects_missing_or_invalid_provenance_and_horizon() {
         let mut bank = joint_bank_fixture();
         bank.history_sha256 = "not-a-digest".into();
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidHistoryDigest));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::InvalidHistoryDigest)
+        );
 
         let mut bank = joint_bank_fixture();
         bank.joint_draw_bank_sha256 = "B".repeat(64);
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidJointDrawDigest));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::InvalidJointDrawDigest)
+        );
 
         let mut bank = joint_bank_fixture();
         bank.horizon_steps = 0;
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidHorizon));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::InvalidHorizon)
+        );
     }
 
     #[test]
     fn joint_action_bank_rejects_nonfinite_draws_and_same_action_effect() {
         let mut bank = joint_bank_fixture();
         bank.outcome_samples[0][0] = f64::NAN;
-        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::NonFiniteDerivedMetric));
+        assert_eq!(
+            validate_joint_action_set(&bank),
+            Err(IntervalError::NonFiniteDerivedMetric)
+        );
 
         let bank = joint_bank_fixture();
-        assert_eq!(joint_action_effect_interval(&bank, 17, 17, 0.8), Err(IntervalError::SameActionRequested));
-        assert_eq!(joint_action_effect_interval(&bank, 17, 999, 0.8), Err(IntervalError::InvalidSelectedIndex));
+        assert_eq!(
+            joint_action_effect_interval(&bank, 17, 17, 0.8),
+            Err(IntervalError::SameActionRequested)
+        );
+        assert_eq!(
+            joint_action_effect_interval(&bank, 17, 999, 0.8),
+            Err(IntervalError::InvalidSelectedIndex)
+        );
     }
 
     fn interval(lower: f64, upper: f64, nominal_coverage: f64) -> PredictiveInterval {
@@ -1176,9 +1265,7 @@ mod tests {
                 observation(0.0, 2.0, 0.9, 3.0),
             ],
         ];
-        let metrics = evaluate_simultaneous_sets(&episodes, 0.9)
-            .unwrap()
-            .unwrap();
+        let metrics = evaluate_simultaneous_sets(&episodes, 0.9).unwrap().unwrap();
         assert_eq!(metrics.episode_count, 2);
         assert_eq!(metrics.intervals_per_episode, 2);
         assert_eq!(metrics.empirical_simultaneous_coverage, 0.5);
@@ -1188,10 +1275,7 @@ mod tests {
 
     #[test]
     fn simultaneous_coverage_rejects_empty_and_mismatched_action_banks() {
-        assert_eq!(
-            evaluate_simultaneous_sets(&[], 0.9).unwrap(),
-            None
-        );
+        assert_eq!(evaluate_simultaneous_sets(&[], 0.9).unwrap(), None);
         assert_eq!(
             evaluate_simultaneous_sets(&[vec![]], 0.9),
             Err(IntervalError::EmptyActionSet)
@@ -1216,20 +1300,26 @@ mod tests {
             interval(0.0, 2.0, 0.9),
             interval(1.0, 2.5, 0.9),
         ];
-        assert_eq!(selected_action_regret_upper_bound(&intervals, 0).unwrap(), 0.0);
+        assert_eq!(
+            selected_action_regret_upper_bound(&intervals, 0).unwrap(),
+            0.0
+        );
         assert!(is_interval_dominant(&intervals, 0).unwrap());
 
-        let uncertain = [
-            interval(1.5, 2.0, 0.9),
-            interval(0.0, 2.5, 0.9),
-        ];
-        assert_eq!(selected_action_regret_upper_bound(&uncertain, 0).unwrap(), 1.0);
+        let uncertain = [interval(1.5, 2.0, 0.9), interval(0.0, 2.5, 0.9)];
+        assert_eq!(
+            selected_action_regret_upper_bound(&uncertain, 0).unwrap(),
+            1.0
+        );
         assert!(!is_interval_dominant(&uncertain, 0).unwrap());
     }
 
-
-
-    fn costed(utility: f64, inference: f64, acquisition: f64, recovery: f64) -> CostedDecisionOutcome {
+    fn costed(
+        utility: f64,
+        inference: f64,
+        acquisition: f64,
+        recovery: f64,
+    ) -> CostedDecisionOutcome {
         CostedDecisionOutcome {
             realized_utility: utility,
             inference_cost: inference,
@@ -1274,13 +1364,19 @@ mod tests {
             direct_d0: costed(1.0, 0.0, 0.0, 0.0),
             direct_d1: costed(1.0, 0.0, 0.0, 0.0),
         }];
-        assert_eq!(evaluate_net_decision_value(&invalid_cost), Err(IntervalError::NegativeDecisionCost));
+        assert_eq!(
+            evaluate_net_decision_value(&invalid_cost),
+            Err(IntervalError::NegativeDecisionCost)
+        );
         let invalid_utility = [DecisionValueEpisode {
             world_model: costed(f64::NAN, 0.0, 0.0, 0.0),
             direct_d0: costed(1.0, 0.0, 0.0, 0.0),
             direct_d1: costed(1.0, 0.0, 0.0, 0.0),
         }];
-        assert_eq!(evaluate_net_decision_value(&invalid_utility), Err(IntervalError::NonFiniteRealization));
+        assert_eq!(
+            evaluate_net_decision_value(&invalid_utility),
+            Err(IntervalError::NonFiniteRealization)
+        );
         assert_eq!(evaluate_net_decision_value(&[]).unwrap(), None);
     }
 
@@ -1288,23 +1384,23 @@ mod tests {
     fn selected_action_evaluator_scores_realized_regret_and_certificate_quality() {
         let episodes = vec![
             SelectionEpisode {
-                intervals: vec![interval(2.0,4.0,0.9), interval(0.0,3.0,0.9)],
-                realized_outcomes: vec![3.5,3.0],
+                intervals: vec![interval(2.0, 4.0, 0.9), interval(0.0, 3.0, 0.9)],
+                realized_outcomes: vec![3.5, 3.0],
                 selected_index: 0,
             },
             SelectionEpisode {
-                intervals: vec![interval(0.0,2.0,0.9), interval(3.0,4.0,0.9)],
-                realized_outcomes: vec![1.5,3.5],
+                intervals: vec![interval(0.0, 2.0, 0.9), interval(3.0, 4.0, 0.9)],
+                realized_outcomes: vec![1.5, 3.5],
                 selected_index: 0,
             },
             SelectionEpisode {
-                intervals: vec![interval(3.0,4.0,0.9), interval(0.0,2.0,0.9)],
-                realized_outcomes: vec![3.5,1.0],
+                intervals: vec![interval(3.0, 4.0, 0.9), interval(0.0, 2.0, 0.9)],
+                realized_outcomes: vec![3.5, 1.0],
                 selected_index: 0,
             },
             SelectionEpisode {
-                intervals: vec![interval(3.0,4.0,0.9), interval(0.0,2.0,0.9)],
-                realized_outcomes: vec![1.0,4.0],
+                intervals: vec![interval(3.0, 4.0, 0.9), interval(0.0, 2.0, 0.9)],
+                realized_outcomes: vec![1.0, 4.0],
                 selected_index: 0,
             },
         ];
@@ -1324,68 +1420,71 @@ mod tests {
     fn selected_action_evaluator_rejects_bad_episode_shapes_and_nonfinite_truth() {
         assert_eq!(evaluate_selected_action_sets(&[]).unwrap(), None);
         let bad_shape = [SelectionEpisode {
-            intervals: vec![interval(0.0,1.0,0.9), interval(0.0,1.0,0.9)],
+            intervals: vec![interval(0.0, 1.0, 0.9), interval(0.0, 1.0, 0.9)],
             realized_outcomes: vec![0.5],
             selected_index: 0,
         }];
-        assert_eq!(evaluate_selected_action_sets(&bad_shape), Err(IntervalError::UnequalActionSetCardinality));
+        assert_eq!(
+            evaluate_selected_action_sets(&bad_shape),
+            Err(IntervalError::UnequalActionSetCardinality)
+        );
         let bad_index = [SelectionEpisode {
-            intervals: vec![interval(0.0,1.0,0.9), interval(0.0,1.0,0.9)],
-            realized_outcomes: vec![0.5,0.5],
+            intervals: vec![interval(0.0, 1.0, 0.9), interval(0.0, 1.0, 0.9)],
+            realized_outcomes: vec![0.5, 0.5],
             selected_index: 2,
         }];
-        assert_eq!(evaluate_selected_action_sets(&bad_index), Err(IntervalError::InvalidSelectedIndex));
+        assert_eq!(
+            evaluate_selected_action_sets(&bad_index),
+            Err(IntervalError::InvalidSelectedIndex)
+        );
         let bad_truth = [SelectionEpisode {
-            intervals: vec![interval(0.0,1.0,0.9), interval(0.0,1.0,0.9)],
-            realized_outcomes: vec![0.5,f64::NAN],
+            intervals: vec![interval(0.0, 1.0, 0.9), interval(0.0, 1.0, 0.9)],
+            realized_outcomes: vec![0.5, f64::NAN],
             selected_index: 0,
         }];
-        assert_eq!(evaluate_selected_action_sets(&bad_truth), Err(IntervalError::NonFiniteRealization));
+        assert_eq!(
+            evaluate_selected_action_sets(&bad_truth),
+            Err(IntervalError::NonFiniteRealization)
+        );
     }
-
 
     #[test]
     fn robust_action_selection_certifies_only_a_unique_interval_dominant_action() {
         let intervals = [
-            interval(3.0,4.0,0.9),
-            interval(0.0,2.0,0.9),
-            interval(1.0,2.5,0.9),
+            interval(3.0, 4.0, 0.9),
+            interval(0.0, 2.0, 0.9),
+            interval(1.0, 2.5, 0.9),
         ];
         assert_eq!(
             select_interval_dominant_action(&intervals).unwrap(),
             RobustActionDecision::Certified { action_index: 0 }
         );
 
-        let overlapping = [
-            interval(1.0,3.0,0.9),
-            interval(2.0,4.0,0.9),
-        ];
+        let overlapping = [interval(1.0, 3.0, 0.9), interval(2.0, 4.0, 0.9)];
         assert_eq!(
             select_interval_dominant_action(&overlapping).unwrap(),
-            RobustActionDecision::Abstain { reason: AbstainReason::NoIntervalDominantAction }
+            RobustActionDecision::Abstain {
+                reason: AbstainReason::NoIntervalDominantAction
+            }
         );
 
-        let boundary_tie = [
-            interval(2.0,2.0,0.9),
-            interval(2.0,2.0,0.9),
-        ];
+        let boundary_tie = [interval(2.0, 2.0, 0.9), interval(2.0, 2.0, 0.9)];
         assert_eq!(
             select_interval_dominant_action(&boundary_tie).unwrap(),
-            RobustActionDecision::Abstain { reason: AbstainReason::AmbiguousDominantActions }
+            RobustActionDecision::Abstain {
+                reason: AbstainReason::AmbiguousDominantActions
+            }
         );
     }
 
     #[test]
     fn robust_action_selection_rejects_mixed_levels_and_too_small_sets() {
         assert_eq!(
-            select_interval_dominant_action(&[interval(0.0,1.0,0.9)]),
+            select_interval_dominant_action(&[interval(0.0, 1.0, 0.9)]),
             Err(IntervalError::InsufficientActions)
         );
         assert_eq!(
-            select_interval_dominant_action(&[
-                interval(2.0,3.0,0.9),
-                interval(0.0,1.0,0.8),
-            ]),
+            select_interval_dominant_action(&[interval(2.0, 3.0, 0.9), interval(0.0, 1.0, 0.8),]),
             Err(IntervalError::MixedNominalCoverage)
         );
     }
