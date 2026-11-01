@@ -411,7 +411,10 @@ impl MacroUnitSpec {
             }
         }
 
-        let minimum_width = self.constituents.last().copied().unwrap_or(0) + 1;
+        let maximum_constituent = self.constituents.last().copied().unwrap_or(0);
+        let minimum_width = maximum_constituent
+            .checked_add(1)
+            .ok_or(MacroUnitError::SequenceDomainOverflow)?;
         let actual_width = state_width.unwrap_or(0);
         if actual_width < minimum_width {
             let unit = self
@@ -661,6 +664,15 @@ mod tests {
                 unit: 5,
                 actual: 4
             })
+        );
+    }
+
+    #[test]
+    fn micro_history_width_arithmetic_rejects_maximum_unit_index() {
+        let unit = MacroUnitSpec::new(vec![usize::MAX], 1, vec![false, true], 2).unwrap();
+        assert_eq!(
+            unit.map_micro_history(&[Vec::new()]),
+            Err(MacroUnitError::SequenceDomainOverflow)
         );
     }
 
