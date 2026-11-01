@@ -696,6 +696,8 @@ fn hash_event_record(hasher: &mut Sha256, record: &EventRecord) {
 }
 
 
+pub mod csv_adapter;
+
 #[cfg(test)]
 mod tests {
     use super::*;
