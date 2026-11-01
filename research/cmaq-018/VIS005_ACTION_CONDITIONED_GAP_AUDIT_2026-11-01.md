@@ -148,3 +148,8 @@ That is a falsifiable scientific contribution. It connects visual representation
 ## Claim ceiling
 
 The existing delayed-horizon evaluator establishes observation-grounded autonomous forecast metrics. The current JEPA path uses a prior action but its target is the CfC prediction approximation. The current cross-manifold predictor maps vision to cognition. The joint action-bank PR supplies uncertainty/paired-effect metrics and selection/value evaluators. None of these facts alone establishes a production action-conditioned visual world model, calibrated counterfactual predictions, SOTA, or physical safety.
+
+
+## Structured belief output contract update
+
+The joint action-bank interface now supports more than a scalar utility. The structured counterpart preserves independently named geometry, motion, contact, visibility, terminal-risk and task-utility channels under one frozen history/action/draw identity. This is the appropriate seam for future VIS-005 outputs such as tracked object position/velocity, contact likelihood and visibility belief. Each channel retains its own unit and paired-effect interval; heterogeneous channels are never pooled until a separate, versioned task-utility mapping is applied. The content digest binds the exact channel descriptors and f64 samples but still does not prove the predictor honestly used common noise.
