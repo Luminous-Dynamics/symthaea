@@ -62,6 +62,20 @@ impl TargetEncoder {
         }
     }
 
+    /// Append exact learned parameter bytes to a canonical model digest buffer.
+    pub(crate) fn append_parameters_to(&self, output: &mut Vec<u8>) {
+        output.extend_from_slice(&(self.input_dim as u64).to_le_bytes());
+        output.extend_from_slice(&(self.latent_dim as u64).to_le_bytes());
+        output.extend_from_slice(&(self.weights.len() as u64).to_le_bytes());
+        for value in &self.weights {
+            output.extend_from_slice(&value.to_bits().to_le_bytes());
+        }
+        output.extend_from_slice(&(self.bias.len() as u64).to_le_bytes());
+        for value in &self.bias {
+            output.extend_from_slice(&value.to_bits().to_le_bytes());
+        }
+    }
+
     /// Encode a ContinuousHV into latent space (same math as ContextEncoder).
     ///
     /// Computes: SiLU(W × x + b)
