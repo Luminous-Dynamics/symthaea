@@ -997,8 +997,7 @@ fn main() {
         .append_forecast(prefix_forecast(6, 906, 1, 8))
         .unwrap();
     let mut shifted_prefix = prefix_forecast(7, 907, 1, 8);
-    shifted_prefix.forecast.shift_status =
-        pod_meta_cost_to_go_lab::ShiftStatus::UnsupportedShift;
+    shifted_prefix.forecast.shift_status = pod_meta_cost_to_go_lab::ShiftStatus::UnsupportedShift;
     prefix_journal.append_forecast(shifted_prefix).unwrap();
     prefix_journal
         .append_outcome(prefix_outcome(
@@ -1013,9 +1012,7 @@ fn main() {
             2,
             2,
             ResourceVector::new(21, 1, 2, 3, 4, 5),
-            TerminalOutcome::RightCensored(
-                pod_meta_cost_to_go_lab::CensorReason::Timeout,
-            ),
+            TerminalOutcome::RightCensored(pod_meta_cost_to_go_lab::CensorReason::Timeout),
         ))
         .unwrap();
     prefix_journal
@@ -1033,9 +1030,7 @@ fn main() {
             5,
             2,
             ResourceVector::new(26, 1, 1, 1, 1, 1),
-            TerminalOutcome::RightCensored(
-                pod_meta_cost_to_go_lab::CensorReason::Timeout,
-            ),
+            TerminalOutcome::RightCensored(pod_meta_cost_to_go_lab::CensorReason::Timeout),
         ))
         .unwrap();
     prefix_journal
@@ -1150,5 +1145,4 @@ fn main() {
         feasibility.unknown_actual_outcomes,
         feasibility.abstained_predictions
     );
-
 }
