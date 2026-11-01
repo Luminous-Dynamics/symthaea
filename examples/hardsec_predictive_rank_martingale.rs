@@ -485,7 +485,7 @@ fn audit_values(
     let data=parse_data(data_value,&plan)?;
     let assignments=parse_context_receipt(context_value,&plan,&data)?;
     let n=data.calibration_samples.len();
-    let counts=vec![0_u64;n+1];
+    let mut counts=vec![0_u64;n+1];
     let mut features:Vec<FeatureState>=plan.features.iter().map(|(id,kind,weight)|FeatureState{
         feature_id:id.clone(),feature_type:kind.clone(),portfolio_weight:*weight,
         feature_values:feature_values(kind,n),lambda:0.0,accumulator:1.0,log_wealth:0.0,first_crossing_index:None
@@ -849,7 +849,7 @@ mod tests {
         let plan=parse_plan(&p).unwrap();
         let data=parse_data(&d,&plan).unwrap();
         let n=data.calibration_samples.len();
-        let mut counts=vec![0_u64;n+1];
+        let counts=vec![0_u64;n+1];
         let pi=predictive_law(&counts,n,1);
         for (_,kind,_) in &plan.features{
             let h=feature_values(kind,n);
