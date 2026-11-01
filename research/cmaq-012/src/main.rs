@@ -1022,7 +1022,6 @@ fn render_report(report: &Report) -> String {
         for (arm_index, arm) in ARMS.iter().enumerate() {
             let m = &group.arms[arm];
             let comma = if arm_index + 1 == ARMS.len() { "" } else { "," };
-            writeln!(&mut out,
             writeln!(&mut out, "        \"{}\": {{", arm.name()).unwrap();
             writeln!(&mut out, "          \"mean_return\": {},", number(m.mean_return)).unwrap();
             writeln!(&mut out, "          \"success_rate\": {},", number(m.success_rate)).unwrap();
