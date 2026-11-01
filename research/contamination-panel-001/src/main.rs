@@ -1,11 +1,8 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
-    PublicChallengePacketV1, SealedChallengeKeyV1,
-    audit_blinded_adjudications,
+    PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
-    detectors::{
-        DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet,
-    },
+    detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     fresh_instance::{
         FreshChallengeBundleV1, FreshChallengeConfigV1, FreshChallengeManifestV1,
         FreshPublicChallengePacketV1, SealedFreshOraclePacketV1, audit_fresh_challenge_bundle,
@@ -24,7 +21,7 @@ use contamination_panel_bench::{
         randomize_intervention,
     },
     search_time::{
-        SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES, SEARCH_MAX_TOTAL_BODY_BYTES,
+        SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TOTAL_BODY_BYTES, SEARCH_MAX_TRACE_BYTES,
         SearchCapturedResponseBodyV1, SearchTimeExposureFindingsV1, SearchTimeExposureTraceV1,
         analyze_search_time_response_bodies, audit_search_time_findings, audit_search_time_trace,
     },
@@ -304,8 +301,12 @@ fn match_search_time_bodies_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         return Err("search-time trace failed integrity audit".into());
     }
     let bundle = FreshChallengeBundleV1 {
-        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[2])?)?,
-        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[3])?)?,
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(
+            &args[2],
+        )?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(
+            &args[3],
+        )?)?,
         manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[4])?)?,
     };
     let body_bytes = read_bounded(
@@ -320,24 +321,43 @@ fn match_search_time_bodies_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         "unavailable event-sequence file",
     )?;
     let unavailable: Vec<u64> = serde_json::from_slice(&unavailable_bytes)?;
-    let findings = analyze_search_time_response_bodies(
-        &trace,
-        &bundle,
-        &response_bodies,
-        &unavailable,
-    ).map_err(io::Error::other)?;
+    let findings =
+        analyze_search_time_response_bodies(&trace, &bundle, &response_bodies, &unavailable)
+            .map_err(io::Error::other)?;
     write_bytes(&args[7], &serde_json::to_vec_pretty(&findings)?)?;
     println!(
         "body_events={} inspected={} unavailable={} metadata={} context={} answer={} unknown={}",
         findings.response_body_event_count,
         findings.response_body_evidence_count,
         findings.unavailable_body_event_sequences.len(),
-        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::MetadataOnly).count(),
-        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::ContextBearing).count(),
-        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::AnswerBearing).count(),
-        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::Unknown).count()
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::MetadataOnly)
+            .count(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::ContextBearing)
+            .count(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::AnswerBearing)
+            .count(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::Unknown)
+            .count()
     );
-    println!("Raw bodies and sealed answers were used locally and are not copied to the findings artifact.");
+    println!(
+        "Raw bodies and sealed answers were used locally and are not copied to the findings artifact."
+    );
     Ok(())
 }
 
