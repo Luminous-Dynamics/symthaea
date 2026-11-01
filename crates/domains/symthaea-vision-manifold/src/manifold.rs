@@ -2892,6 +2892,8 @@ impl VisionManifold {
             mean_lateness_seconds: vec![0.0; errors.len()],
             dropped_forecasts: vec![0; errors.len()],
             expired_forecasts: vec![0; errors.len()],
+            score_receipt_count: 0,
+            evicted_score_receipts: 0,
             errors,
             frame_sequence: self.frame_count,
         }
@@ -4958,6 +4960,8 @@ impl DelayedHorizonEvaluator {
             mean_lateness_seconds,
             dropped_forecasts,
             expired_forecasts,
+            score_receipt_count: self.score_receipts.len(),
+            evicted_score_receipts: self.evicted_score_receipts,
             frame_sequence,
         }
     }
