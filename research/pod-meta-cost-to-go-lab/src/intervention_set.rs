@@ -570,7 +570,8 @@ mod tests {
         );
         assert!(family_two.immediate_proof_progress < family_three.immediate_proof_progress);
         assert!(
-            family_three.verified_remaining_cost.tokens < family_four.verified_remaining_cost.tokens
+            family_three.verified_remaining_cost.tokens
+                < family_four.verified_remaining_cost.tokens
         );
         assert_eq!(
             family_three.immediate_proof_progress,
