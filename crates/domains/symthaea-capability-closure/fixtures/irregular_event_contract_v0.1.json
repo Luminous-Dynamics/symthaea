@@ -1,0 +1,46 @@
+{
+  "schema": "symthaea.irregular_event_contract.v0.1",
+  "tracking_issue": "NEURO-SILICON-011",
+  "candidate_package": "research/irregular-event-contract",
+  "clocks": {
+    "event_time": "phenomenon occurred",
+    "availability_time": "earliest legal candidate access",
+    "observation_visibility": "available_at_us <= forecast_origin_us",
+    "observation_invariant": "available_at_us >= event_time_us"
+  },
+  "identity": [
+    "event_id",
+    "entity_id",
+    "modality_id",
+    "source_id",
+    "source_sequence",
+    "source_sha256"
+  ],
+  "measurement_variants": [
+    "observed_fixed_point",
+    "missing_with_reason",
+    "censored_interval"
+  ],
+  "known_future_covariates": {
+    "separate_type": true,
+    "availability": "published_at_us <= forecast_origin_us",
+    "requires_target_inside_validity_interval": true,
+    "future_derived_targets_never_candidate_visible": true
+  },
+  "preprocessing": {
+    "implicit_sort_by_event_time": false,
+    "implicit_resampling": false,
+    "implicit_interpolation": false,
+    "implicit_forward_fill": false,
+    "implicit_zero_imputation": false,
+    "separately_versioned_and_charged": true
+  },
+  "validation_status": {
+    "rust_test_functions_authored": 15,
+    "cargo_build_executed": false,
+    "rustfmt_executed": false,
+    "clippy_executed": false,
+    "rust_tests_executed": false,
+    "external_dataset_adapter_executed": false
+  }
+}
