@@ -65,6 +65,9 @@ fn verify_binding(run: &Value, integrity: &benchmark_integrity::IntegritySummary
     if string(run, "/task/repository_remote")? != integrity.repository_remote {
         bail!("repository remote differs from the integrity receipt");
     }
+    if string(run, "/task/repository_branch")? != integrity.repository_branch {
+        bail!("repository branch differs from the integrity receipt");
+    }
     if string(run, "/task/repository_commit")? != integrity.repository_commit
         || string(run, "/environment/repository_commit")? != integrity.repository_commit
     {
@@ -211,6 +214,10 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     bad["task"]["repository_commit"] = json!("0".repeat(40));
     bad["environment"]["repository_commit"] = json!("0".repeat(40));
     must_reject("repository commit substitution", bad, &integrity_bytes)?;
+
+    let mut bad = run.clone();
+    bad["task"]["repository_branch"] = json!("other-branch");
+    must_reject("repository branch substitution", bad, &integrity_bytes)?;
 
     let mut bad = run.clone();
     bad["task"]["source_path"] = json!("Synthetic/Neighbor.lean");
