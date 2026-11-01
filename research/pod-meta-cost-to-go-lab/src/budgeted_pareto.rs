@@ -489,6 +489,45 @@ mod tests {
     }
 
     #[test]
+    fn mandatory_verifier_reserve_is_included_in_every_budget_check() {
+        let mut constrained = context();
+        constrained.remaining_budget.tokens = 32;
+        let selection = select_budget_feasible_pareto(&constrained, &forecasts()).unwrap();
+        assert_eq!(
+            selection.assessments[0].disposition,
+            CandidateDisposition::BudgetInfeasible
+        );
+        assert_eq!(
+            selection.assessments[1].disposition,
+            CandidateDisposition::BudgetInfeasible
+        );
+    }
+
+    #[test]
+    fn frontier_model_and_policy_identity_mismatches_fail_closed() {
+        let mut data = forecasts();
+        data[0].frontier_digest = [90; 32];
+        assert_eq!(
+            select_budget_feasible_pareto(&context(), &data),
+            Err(BudgetedParetoError::FrontierMismatch)
+        );
+
+        let mut data = forecasts();
+        data[0].model_digest = [91; 32];
+        assert_eq!(
+            select_budget_feasible_pareto(&context(), &data),
+            Err(BudgetedParetoError::ModelMismatch)
+        );
+
+        let mut data = forecasts();
+        data[0].policy_digest = [92; 32];
+        assert_eq!(
+            select_budget_feasible_pareto(&context(), &data),
+            Err(BudgetedParetoError::PolicyMismatch)
+        );
+    }
+
+    #[test]
     fn q90_and_verifier_reserve_are_checked_for_overflow() {
         let mut data = forecasts();
         data[0].remaining_q90.tokens = u128::MAX;
