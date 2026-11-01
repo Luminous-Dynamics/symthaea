@@ -19,6 +19,7 @@ The struct carries:
 - source and target embedding digests;
 - canonical action-manifest digest;
 - a JEPA-recomputed action-binding digest over the manifest digest, stable action ID and discrete action index;
+- the exact parameter digest of the JEPA forecast-producing model;
 - episode, branch and forecast IDs;
 - distinct source/target observation IDs and monotonic sequence numbers;
 - stable action ID and its discrete JEPA action index;
@@ -37,7 +38,7 @@ train_observed_transition and evaluate_observed_transition reject:
 - non-finite embeddings;
 - embedding digest mismatch.
 
-The crate recomputes the source/target embedding SHA-256 over a domain-separated canonical byte encoding: domain tag, little-endian u64 dimension, then each exact f32 IEEE-754 bit pattern in little-endian order. This binds the values supplied to JEPA. It does not prove that the HDC embeddings were honestly derived from the raw observation bytes; the adapter must bind those bytes and digests independently.
+The crate recomputes the source/target embedding SHA-256 over a domain-separated canonical byte encoding: domain tag, little-endian u64 dimension, then each exact f32 IEEE-754 bit pattern in little-endian order. It also recomputes the action-binding digest from the action-manifest digest, stable action ID and JEPA discrete index. This binds the values supplied to JEPA. It does not prove that the HDC embeddings were honestly derived from the raw observation bytes; the adapter must bind those bytes and digests independently.
 
 The transition clock requires source observation ≤ forecast issuance ≤ action start ≤ action end ≤ requested target ≤ actual target. The actual target may be late only within the explicitly declared maximum lateness. The actual target may be late only within the explicitly declared maximum lateness. This preserves a precise requested horizon while allowing bounded sensor timing jitter.
 
@@ -53,7 +54,7 @@ This API:
 5. evaluates every candidate action against the same encoded context;
 6. returns action-indexed latent point predictions and a canonical candidate-set digest.
 
-The candidate-set digest is invariant to row order and binds the full action-manifest digest plus sorted (action_id, action_index) pairs. For a single observed transition, a separate action-binding digest is recomputed from the manifest digest, stable action ID and discrete JEPA action index. The manifest digest must itself be generated and authenticated by the upstream adapter from canonical action descriptors, units and action-space version.
+The candidate-set digest is invariant to row order and binds the full action-manifest digest plus sorted (action_id, action_index) pairs. The returned predictions also identify the exact JEPA parameter digest used for the forecast. For a single observed transition, a separate action-binding digest is recomputed from the manifest digest, stable action ID and discrete JEPA action index. The manifest digest must itself be generated and authenticated by the upstream adapter from canonical action descriptors, units and action-space version.
 
 These outputs are deterministic point predictions. Do not promote repeated calls, candidate rows or latent dimensions into a posterior sample bank. This API is a point-prediction comparator / explicit-action-head interface. CMAQ-018 remains the separate uncertainty and paired-effect evaluator.
 
@@ -70,6 +71,8 @@ The correct future integration is not to silently replace the existing target wi
 - hidden state, unchosen counterfactual outcomes and evaluator labels were not accessible to the predictor.
 
 If an internal cognitive cycle can occur without a new observation, it must not be treated as an observed transition. The observation adapter, not the model's cycle clock, owns the observation sequence and timestamps.
+
+The parameter digest covers prediction-relevant configuration plus exact context-encoder, target-encoder and latent-predictor parameter bits; mutable telemetry/counters are excluded. Read-only forecast evaluation requires the loaded model to match the recorded digest. Online training may use the matured observation with a newer current model, but the receipt continues to identify the original forecast-producing checkpoint.
 
 ## Relationship to CMAQ-018
 
@@ -90,6 +93,7 @@ The crate now tests:
 - rejection of out-of-range action indices and invalid learning rates;
 - rejection when the exact source/target embedding bytes do not match the supplied embedding digests;
 - rejection when the stable action ID is substituted without updating its manifest/index binding digest;
+- rejection when a stored forecast is evaluated against a different JEPA parameter digest;
 - common-context action-set prediction and identity preservation;
 - row-order invariance of candidate-set digest and named-action outputs;
 - duplicate action identity/index rejection;
