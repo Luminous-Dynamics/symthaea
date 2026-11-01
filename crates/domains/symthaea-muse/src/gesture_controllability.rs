@@ -617,6 +617,11 @@ fn hash_measurements(hasher: &mut Sha256, measurements: &[FeatureMeasurement]) {
     hasher.update((measurements.len() as u64).to_be_bytes());
     for measurement in measurements {
         hash_target(hasher, &measurement.target);
+        hash_string(hasher, &measurement.instrument_id);
+        match measurement.source_model_id.as_deref() {
+            Some(model) => { hasher.update([1u8]); hash_string(hasher, model); }
+            None => hasher.update([0u8]),
+        }
         hash_string(hasher, &measurement.feature_id);
         hasher.update(measurement.value.to_bits().to_be_bytes());
         hasher.update([feature_unit_code(measurement.unit)]);
@@ -717,6 +722,8 @@ mod tests {
                     part_id: 4,
                     note_id: "vln-note-1".to_string(),
                 },
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
                     feature_id: "onset_latency_ms".to_string(),
                     value: 18.0,
                     unit: FeatureUnit::Milliseconds,
@@ -726,6 +733,8 @@ mod tests {
                     part_id: 4,
                     note_id: "vln-note-1".to_string(),
                 },
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
                     feature_id: "spectral_centroid_hz".to_string(),
                     value: 1800.0,
                     unit: FeatureUnit::Hertz,
@@ -737,6 +746,8 @@ mod tests {
                         part_id: 4,
                         note_id: "vln-note-1".to_string(),
                     },
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
                     feature_id: "onset_latency_ms".to_string(),
                     value: 19.0,
                     unit: FeatureUnit::Milliseconds,
@@ -746,6 +757,8 @@ mod tests {
                         part_id: 4,
                         note_id: "vln-note-1".to_string(),
                     },
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
                     feature_id: "spectral_centroid_hz".to_string(),
                     value: 2050.0,
                     unit: FeatureUnit::Hertz,
@@ -848,6 +861,8 @@ mod tests {
         };
         value.baseline_features.push(FeatureMeasurement {
             target: other_target.clone(),
+            instrument_id: "violin".to_string(),
+            source_model_id: Some("violin.model-a".to_string()),
             feature_id: "other_note_level".to_string(),
             value: 0.3,
             unit: FeatureUnit::Normalized,
