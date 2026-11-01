@@ -16,6 +16,9 @@ pub struct PrefixReplayRow {
     pub observed_work: Option<ResourceVector>,
     pub terminal: Option<TerminalOutcome>,
     pub verifier_present: bool,
+    pub remaining_budget: Option<ResourceVector>,
+    pub predicted_feasible: Option<bool>,
+    pub actual_feasible: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -68,6 +71,33 @@ pub struct TaskFamilyReplayMetrics {
     pub dimensions: [DimensionReplayMetrics; DIMENSION_COUNT],
 }
 
+/// Remaining hard budget captured at the same pre-action state as a forecast.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PrefixBudgetReceipt {
+    pub run_id: u64,
+    pub decision_sequence: u64,
+    pub pre_state_digest: [u8; 32],
+    pub remaining_budget: ResourceVector,
+    pub evidence_digest: [u8; 32],
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FeasibilityReplayMetrics {
+    pub budgeted_prefixes: usize,
+    pub predicted_feasible: usize,
+    pub actual_feasibility_known: usize,
+    pub actual_feasible: usize,
+    pub false_feasible: usize,
+    pub false_infeasible: usize,
+    pub true_feasible: usize,
+    pub true_infeasible: usize,
+    pub unknown_actual_outcomes: usize,
+    /// False feasible / all predictions declared feasible.
+    pub false_feasible_rate: Option<f64>,
+    /// False infeasible / all predictions declared infeasible.
+    pub false_infeasible_rate: Option<f64>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrefixReplayReport {
     pub total_forecasts: usize,
@@ -79,6 +109,7 @@ pub struct PrefixReplayReport {
     pub empirical_joint_q90_coverage: Option<f64>,
     pub dimensions: [DimensionReplayMetrics; DIMENSION_COUNT],
     pub by_task_family: Vec<TaskFamilyReplayMetrics>,
+    pub feasibility: FeasibilityReplayMetrics,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -94,6 +125,12 @@ pub enum PrefixReplayError {
     MissingCompletedObservation,
     NumericOverflow,
     InconsistentJournalOutcome,
+    InvalidFeasibilityThreshold,
+    InvalidBudgetReceipt,
+    DuplicateBudgetReceipt,
+    BudgetForUnknownForecast,
+    BudgetPreStateMismatch,
+    BudgetArithmeticOverflow,
 }
 
 impl std::fmt::Display for PrefixReplayError {
@@ -116,11 +153,73 @@ impl PrefixReplayEvaluator {
     pub fn evaluate(
         journal: &ForecastJournal,
     ) -> Result<PrefixReplayEvaluation, PrefixReplayError> {
-        let mut rows = journal
-            .iter_forecasts()
+        Self::evaluate_with_budgets(journal, &[], 0.5)
+    }
+
+    /// Replay using state-bound remaining-budget receipts. A prefix is
+    /// predicted feasible only when the probability threshold passes and the
+    /// q90 vector plus mandatory verification reserve fits every budget
+    /// dimension. Actual feasibility is known for exact sufficient-proof
+    /// outcomes, or when a censored lower bound already exceeds the budget.
+    pub fn evaluate_with_budgets(
+        journal: &ForecastJournal,
+        budgets: &[PrefixBudgetReceipt],
+        minimum_completion_probability: f64,
+    ) -> Result<PrefixReplayEvaluation, PrefixReplayError> {
+        if !minimum_completion_probability.is_finite()
+            || !(0.0..=1.0).contains(&minimum_completion_probability)
+        {
+            return Err(PrefixReplayError::InvalidFeasibilityThreshold);
+        }
+
+        let mut budgets_by_key = BTreeMap::new();
+        for budget in budgets {
+            if budget.run_id == 0
+                || budget.decision_sequence == 0
+                || is_zero(budget.pre_state_digest)
+                || is_zero(budget.evidence_digest)
+            {
+                return Err(PrefixReplayError::InvalidBudgetReceipt);
+            }
+            if budgets_by_key
+                .insert((budget.run_id, budget.decision_sequence), *budget)
+                .is_some()
+            {
+                return Err(PrefixReplayError::DuplicateBudgetReceipt);
+            }
+        }
+
+        let forecasts = journal.iter_forecasts().collect::<Vec<_>>();
+        for budget in budgets {
+            let forecast = forecasts
+                .iter()
+                .find(|forecast| {
+                    forecast.run_id == budget.run_id
+                        && forecast.decision_sequence == budget.decision_sequence
+                })
+                .ok_or(PrefixReplayError::BudgetForUnknownForecast)?;
+            if forecast.forecast.pre_state_digest != budget.pre_state_digest {
+                return Err(PrefixReplayError::BudgetPreStateMismatch);
+            }
+        }
+
+        let mut rows = forecasts
+            .into_iter()
             .map(|forecast| {
                 let outcome = journal.outcome(forecast.id);
-                PrefixReplayRow {
+                let budget = budgets_by_key
+                    .get(&(forecast.run_id, forecast.decision_sequence))
+                    .copied();
+                let predicted_feasible = budget
+                    .map(|receipt| predicted_feasible(
+                        forecast.forecast,
+                        receipt.remaining_budget,
+                        minimum_completion_probability,
+                    ))
+                    .transpose()?;
+                let actual_feasible = budget
+                    .and_then(|receipt| actual_feasible(outcome, receipt.remaining_budget));
+                Ok(PrefixReplayRow {
                     forecast_id: forecast.id,
                     run_id: forecast.run_id,
                     decision_sequence: forecast.decision_sequence,
@@ -132,16 +231,21 @@ impl PrefixReplayEvaluator {
                     verifier_present: outcome
                         .and_then(|value| value.verifier_digest)
                         .is_some(),
-                }
+                    remaining_budget: budget.map(|value| value.remaining_budget),
+                    predicted_feasible,
+                    actual_feasible,
+                })
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, PrefixReplayError>>()?;
         rows.sort_by_key(|row| (row.run_id, row.decision_sequence, row.forecast_id));
 
         let mut overall = FamilyAccumulator::default();
+        let mut feasibility = FeasibilityReplayMetrics::default();
         let mut by_family = BTreeMap::<u32, FamilyAccumulator>::new();
         for row in &rows {
             update_accumulator(&mut overall, row)?;
             update_accumulator(by_family.entry(row.task_family).or_default(), row)?;
+            update_feasibility(&mut feasibility, row)?;
         }
 
         let report = PrefixReplayReport {
@@ -171,10 +275,105 @@ impl PrefixReplayEvaluator {
                     dimensions: dimension_metrics(values.dimensions),
                 })
                 .collect(),
+            feasibility,
         };
 
         Ok(PrefixReplayEvaluation { rows, report })
     }
+}
+
+fn predicted_feasible(
+    forecast: RemainingCostForecast,
+    remaining_budget: ResourceVector,
+    minimum_completion_probability: f64,
+) -> Result<bool, PrefixReplayError> {
+    let required = forecast
+        .remaining_q90
+        .checked_add(forecast.mandatory_verification_reserve)
+        .ok_or(PrefixReplayError::BudgetArithmeticOverflow)?;
+    Ok(forecast.completion_probability >= minimum_completion_probability
+        && within_budget(required, remaining_budget))
+}
+
+fn actual_feasible(
+    outcome: Option<&crate::ForecastOutcomeReceipt>,
+    remaining_budget: ResourceVector,
+) -> Option<bool> {
+    let outcome = outcome?;
+    match outcome.terminal {
+        TerminalOutcome::SufficientProof => Some(within_budget(
+            outcome.observed_work,
+            remaining_budget,
+        )),
+        TerminalOutcome::RightCensored(_) => {
+            let lower_bound = outcome.observed_work;
+            (!within_budget(lower_bound, remaining_budget)).then_some(false)
+        }
+        TerminalOutcome::CompetingTerminal(_) => None,
+    }
+}
+
+fn within_budget(cost: ResourceVector, budget: ResourceVector) -> bool {
+    let cost = resource_values(cost);
+    let budget = resource_values(budget);
+    (0..DIMENSION_COUNT).all(|index| cost[index] <= budget[index])
+}
+
+fn update_feasibility(
+    metrics: &mut FeasibilityReplayMetrics,
+    row: &PrefixReplayRow,
+) -> Result<(), PrefixReplayError> {
+    if row.remaining_budget.is_none() {
+        return Ok(());
+    }
+    metrics.budgeted_prefixes = metrics
+        .budgeted_prefixes
+        .checked_add(1)
+        .ok_or(PrefixReplayError::NumericOverflow)?;
+    let predicted = row
+        .predicted_feasible
+        .ok_or(PrefixReplayError::InvalidBudgetReceipt)?;
+    let Some(actual) = row.actual_feasible else {
+        metrics.unknown_actual_outcomes = metrics
+            .unknown_actual_outcomes
+            .checked_add(1)
+            .ok_or(PrefixReplayError::NumericOverflow)?;
+        return Ok(());
+    };
+    metrics.actual_feasibility_known = metrics
+        .actual_feasibility_known
+        .checked_add(1)
+        .ok_or(PrefixReplayError::NumericOverflow)?;
+    if actual {
+        metrics.actual_feasible += 1;
+    }
+    match (predicted, actual) {
+        (true, true) => metrics.true_feasible += 1,
+        (true, false) => metrics.false_feasible += 1,
+        (false, true) => metrics.false_infeasible += 1,
+        (false, false) => metrics.true_infeasible += 1,
+    }
+    metrics.predicted_feasible = metrics
+        .predicted_feasible
+        .checked_add(usize::from(predicted))
+        .ok_or(PrefixReplayError::NumericOverflow)?;
+    metrics.false_feasible_rate = ratio(
+        metrics.false_feasible,
+        metrics.predicted_feasible,
+    );
+    let predicted_infeasible = metrics
+        .actual_feasibility_known
+        .checked_sub(metrics.predicted_feasible.min(metrics.actual_feasibility_known))
+        .unwrap_or(0);
+    metrics.false_infeasible_rate = ratio(
+        metrics.false_infeasible,
+        predicted_infeasible,
+    );
+    Ok(())
+}
+
+fn is_zero(digest: [u8; 32]) -> bool {
+    digest.iter().all(|byte| *byte == 0)
 }
 
 fn update_accumulator(
