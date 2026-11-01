@@ -48,6 +48,13 @@ pub enum DesignError {
     OutcomeIndexOutOfRange { index: usize, outcome_count: usize },
     ImpossibleObservedOutcome { outcome_index: usize },
     SelectedExperimentNotFound { experiment_id: String },
+    EmptyHypothesisId,
+    DuplicateHypothesisId { hypothesis_id: String },
+    MissingUnresolvedHypothesis,
+    ZeroUnresolvedPrior,
+    EmptyLikelihoodScenarioSet,
+    EmptyLikelihoodScenarioId,
+    DuplicateLikelihoodScenarioId { scenario_id: String },
     NumericalInstability,
 }
 
@@ -106,6 +113,25 @@ impl fmt::Display for DesignError {
             Self::SelectedExperimentNotFound { experiment_id } => {
                 write!(f, "selected experiment {experiment_id:?} is not in the candidate set")
             }
+            Self::EmptyHypothesisId => write!(f, "hypothesis identifiers must not be empty"),
+            Self::DuplicateHypothesisId { hypothesis_id } => {
+                write!(f, "duplicate hypothesis identifier {hypothesis_id:?}")
+            }
+            Self::MissingUnresolvedHypothesis => {
+                write!(f, "hypothesis set must include OTHER_OR_UNRESOLVED exactly once")
+            }
+            Self::ZeroUnresolvedPrior => {
+                write!(f, "OTHER_OR_UNRESOLVED must have a positive caller-supplied prior")
+            }
+            Self::EmptyLikelihoodScenarioSet => {
+                write!(f, "open-world candidate must declare at least one likelihood scenario")
+            }
+            Self::EmptyLikelihoodScenarioId => {
+                write!(f, "likelihood scenario identifier must not be empty")
+            }
+            Self::DuplicateLikelihoodScenarioId { scenario_id } => {
+                write!(f, "duplicate likelihood scenario identifier {scenario_id:?}")
+            }
             Self::NumericalInstability => {
                 write!(f, "entropy calculation exceeded its numerical tolerance")
             }
@@ -154,6 +180,73 @@ pub struct SelectionRegret {
     pub selected_utility_bits_per_cost: f64,
     pub best_utility_bits_per_cost: f64,
     pub regret_bits_per_cost: f64,
+}
+
+/// Reserved hypothesis identifier for mechanisms outside the named candidate set.
+///
+/// The caller must assign this state a positive prior and supply a calibrated
+/// likelihood ambiguity set. This crate deliberately does not invent either.
+pub const UNRESOLVED_HYPOTHESIS_ID: &str = "OTHER_OR_UNRESOLVED";
+
+/// One admissible conditional-likelihood model for an open-world experiment.
+///
+/// The likelihood rows are ordered exactly as the hypothesis_ids supplied to
+/// OpenWorldCandidateExperiment; columns share the candidate outcome order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LikelihoodScenario {
+    pub id: String,
+    pub likelihoods_by_hypothesis: Vec<Vec<f64>>,
+}
+
+/// Candidate experiment evaluated across a finite, explicitly declared
+/// ambiguity set of possible conditional likelihoods.
+///
+/// The hypothesis list must contain exactly one OTHER_OR_UNRESOLVED state with
+/// positive caller-supplied prior mass. The likelihood scenarios are not
+/// learned or calibrated here; they must be prespecified from independent
+/// calibration data, held-out mechanism families, or declared sensitivity
+/// assumptions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenWorldCandidateExperiment {
+    pub id: String,
+    pub cost: f64,
+    pub outcomes: Vec<String>,
+    pub hypothesis_ids: Vec<String>,
+    pub likelihood_scenarios: Vec<LikelihoodScenario>,
+}
+
+/// EIG under one admissible likelihood scenario.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScenarioInformationGain {
+    pub scenario_id: String,
+    pub information_gain_bits: f64,
+    pub information_gain_bits_per_cost: f64,
+}
+
+/// Worst-/best-case EIG over the candidate's declared likelihood scenarios.
+///
+/// These are bounds only over the supplied finite ambiguity set. They are not
+/// guarantees against arbitrary omitted mechanisms outside that set.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenWorldInformationGainScore {
+    pub experiment_id: String,
+    pub cost: f64,
+    pub unresolved_prior_mass: f64,
+    pub worst_case_scenario_id: String,
+    pub best_case_scenario_id: String,
+    pub worst_case_information_gain_bits: f64,
+    pub best_case_information_gain_bits: f64,
+    pub worst_case_information_gain_bits_per_cost: f64,
+    pub best_case_information_gain_bits_per_cost: f64,
+    /// All scenario scores are sorted by scenario ID for deterministic output.
+    pub scenario_scores: Vec<ScenarioInformationGain>,
+}
+
+/// Open-world experiment after ranking by worst-case EIG per unit cost.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedOpenWorldExperiment {
+    pub experiment_id: String,
+    pub score: OpenWorldInformationGainScore,
 }
 
 /// Shannon entropy in bits. Input probabilities must be non-negative and sum
@@ -397,6 +490,157 @@ pub fn rank_candidates(
     Ok(ranked)
 }
 
+/// Evaluate a candidate using the minimum EIG across its declared
+/// likelihood ambiguity scenarios.
+///
+/// This function refuses to silently collapse the unresolved hypothesis into
+/// the named hypotheses: OTHER_OR_UNRESOLVED must be present and receive a
+/// positive prior. It also refuses an empty or malformed ambiguity set.
+/// The output is robust only to the supplied scenario set, not to every
+/// possible missing mechanism.
+pub fn evaluate_open_world_candidate(
+    priors: &[f64],
+    candidate: &OpenWorldCandidateExperiment,
+) -> Result<OpenWorldInformationGainScore, DesignError> {
+    validate_priors(priors)?;
+
+    if candidate.hypothesis_ids.len() != priors.len() {
+        return Err(DesignError::PriorCountMismatch {
+            expected: priors.len(),
+            actual: candidate.hypothesis_ids.len(),
+        });
+    }
+
+    let mut hypothesis_ids = HashSet::with_capacity(candidate.hypothesis_ids.len());
+    let mut unresolved_index = None;
+    for (index, hypothesis_id) in candidate.hypothesis_ids.iter().enumerate() {
+        if hypothesis_id.trim().is_empty() {
+            return Err(DesignError::EmptyHypothesisId);
+        }
+        if !hypothesis_ids.insert(hypothesis_id.as_str()) {
+            return Err(DesignError::DuplicateHypothesisId {
+                hypothesis_id: hypothesis_id.clone(),
+            });
+        }
+        if hypothesis_id == UNRESOLVED_HYPOTHESIS_ID {
+            unresolved_index = Some(index);
+        }
+    }
+
+    let unresolved_index = unresolved_index.ok_or(DesignError::MissingUnresolvedHypothesis)?;
+    let unresolved_prior_mass = priors[unresolved_index];
+    if unresolved_prior_mass <= 0.0 {
+        return Err(DesignError::ZeroUnresolvedPrior);
+    }
+
+    if candidate.id.trim().is_empty() {
+        return Err(DesignError::EmptyExperimentId);
+    }
+    if !candidate.cost.is_finite() || candidate.cost <= 0.0 {
+        return Err(DesignError::InvalidExperimentCost { cost: candidate.cost });
+    }
+    if candidate.outcomes.is_empty() {
+        return Err(DesignError::EmptyOutcomeSet);
+    }
+    if candidate.likelihood_scenarios.is_empty() {
+        return Err(DesignError::EmptyLikelihoodScenarioSet);
+    }
+
+    let mut scenario_ids = HashSet::with_capacity(candidate.likelihood_scenarios.len());
+    let mut scenario_scores = Vec::with_capacity(candidate.likelihood_scenarios.len());
+    for scenario in &candidate.likelihood_scenarios {
+        if scenario.id.trim().is_empty() {
+            return Err(DesignError::EmptyLikelihoodScenarioId);
+        }
+        if !scenario_ids.insert(scenario.id.as_str()) {
+            return Err(DesignError::DuplicateLikelihoodScenarioId {
+                scenario_id: scenario.id.clone(),
+            });
+        }
+
+        let discrete_candidate = CandidateExperiment {
+            id: candidate.id.clone(),
+            cost: candidate.cost,
+            outcomes: candidate.outcomes.clone(),
+            likelihoods_by_hypothesis: scenario.likelihoods_by_hypothesis.clone(),
+        };
+        let score = evaluate_candidate(priors, &discrete_candidate)?;
+        scenario_scores.push(ScenarioInformationGain {
+            scenario_id: scenario.id.clone(),
+            information_gain_bits: score.information_gain_bits,
+            information_gain_bits_per_cost: score.information_gain_bits_per_cost,
+        });
+    }
+
+    scenario_scores.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    let mut worst = &scenario_scores[0];
+    let mut best = &scenario_scores[0];
+    for score in &scenario_scores[1..] {
+        if score.information_gain_bits_per_cost < worst.information_gain_bits_per_cost {
+            worst = score;
+        }
+        if score.information_gain_bits_per_cost > best.information_gain_bits_per_cost {
+            best = score;
+        }
+    }
+
+    Ok(OpenWorldInformationGainScore {
+        experiment_id: candidate.id.clone(),
+        cost: candidate.cost,
+        unresolved_prior_mass,
+        worst_case_scenario_id: worst.scenario_id.clone(),
+        best_case_scenario_id: best.scenario_id.clone(),
+        worst_case_information_gain_bits: worst.information_gain_bits,
+        best_case_information_gain_bits: best.information_gain_bits,
+        worst_case_information_gain_bits_per_cost: worst.information_gain_bits_per_cost,
+        best_case_information_gain_bits_per_cost: best.information_gain_bits_per_cost,
+        scenario_scores,
+    })
+}
+
+/// Rank open-world experiments by worst-case EIG per unit cost, then worst-case
+/// raw EIG, then stable experiment ID. All candidates must use the same
+/// hypothesis identities and prior ordering.
+pub fn rank_open_world_candidates(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+) -> Result<Vec<RankedOpenWorldExperiment>, DesignError> {
+    validate_priors(priors)?;
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !ids.insert(candidate.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: candidate.id.clone(),
+            });
+        }
+        ranked.push(RankedOpenWorldExperiment {
+            experiment_id: candidate.id.clone(),
+            score: evaluate_open_world_candidate(priors, candidate)?,
+        });
+    }
+
+    ranked.sort_by(|left, right| {
+        right
+            .score
+            .worst_case_information_gain_bits_per_cost
+            .total_cmp(&left.score.worst_case_information_gain_bits_per_cost)
+            .then_with(|| {
+                right
+                    .score
+                    .worst_case_information_gain_bits
+                    .total_cmp(&left.score.worst_case_information_gain_bits)
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+
+    Ok(ranked)
+}
+
 /// Compute opportunity regret under the EIG-per-cost objective. This is
 /// regret relative to the best experiment in this finite candidate set, not
 /// behavioural utility or real-world scientific value.
@@ -619,6 +863,173 @@ mod tests {
             rank_candidates(&[0.5, 0.5], &[first, second]),
             Err(DesignError::DuplicateExperimentId { .. })
         ));
+    }
+
+    fn open_world_candidate(
+        id: &str,
+        cost: f64,
+        scenario_a: Vec<Vec<f64>>,
+        scenario_b: Vec<Vec<f64>>,
+    ) -> OpenWorldCandidateExperiment {
+        OpenWorldCandidateExperiment {
+            id: id.to_owned(),
+            cost,
+            outcomes: vec!["response".to_owned(), "no_response".to_owned()],
+            hypothesis_ids: vec![
+                "mechanism_a".to_owned(),
+                "mechanism_b".to_owned(),
+                UNRESOLVED_HYPOTHESIS_ID.to_owned(),
+            ],
+            likelihood_scenarios: vec![
+                LikelihoodScenario {
+                    id: "calibration-a".to_owned(),
+                    likelihoods_by_hypothesis: scenario_a,
+                },
+                LikelihoodScenario {
+                    id: "calibration-b".to_owned(),
+                    likelihoods_by_hypothesis: scenario_b,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn open_world_requires_explicit_unresolved_hypothesis() {
+        let mut candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        );
+        candidate.hypothesis_ids.pop();
+        let priors = [0.45, 0.45, 0.10];
+        assert_eq!(
+            evaluate_open_world_candidate(&priors, &candidate),
+            Err(DesignError::PriorCountMismatch { expected: 3, actual: 2 })
+        );
+    }
+
+    #[test]
+    fn open_world_requires_positive_unresolved_prior_mass() {
+        let candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        );
+        let priors = [0.5, 0.5, 0.0];
+        assert_eq!(
+            evaluate_open_world_candidate(&priors, &candidate),
+            Err(DesignError::ZeroUnresolvedPrior)
+        );
+    }
+
+    #[test]
+    fn open_world_reports_worst_and_best_declared_likelihood_scenarios() {
+        let candidate = open_world_candidate(
+            "open-world",
+            2.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.6, 0.4], vec![0.4, 0.6], vec![0.5, 0.5]],
+        );
+        let priors = [0.45, 0.45, 0.10];
+        let score = evaluate_open_world_candidate(&priors, &candidate).unwrap();
+        assert_eq!(score.unresolved_prior_mass, 0.10);
+        assert_eq!(score.scenario_scores.len(), 2);
+        assert_eq!(score.worst_case_scenario_id, "calibration-b");
+        assert_eq!(score.best_case_scenario_id, "calibration-a");
+        assert!(score.worst_case_information_gain_bits > 0.0);
+        assert!(score.worst_case_information_gain_bits < score.best_case_information_gain_bits);
+        assert_eq!(
+            score.worst_case_information_gain_bits_per_cost,
+            score.worst_case_information_gain_bits / 2.0
+        );
+    }
+
+    #[test]
+    fn open_world_worst_case_cannot_exceed_best_case() {
+        let candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![0.5, 0.5]],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5], vec![0.5, 0.5]],
+        );
+        let priors = [0.45, 0.45, 0.10];
+        let score = evaluate_open_world_candidate(&priors, &candidate).unwrap();
+        assert_eq!(score.worst_case_information_gain_bits, 0.0);
+        assert!(score.best_case_information_gain_bits > 0.0);
+    }
+
+    #[test]
+    fn open_world_ranking_uses_worst_case_not_nominal_eig() {
+        let optimistic_brittle = open_world_candidate(
+            "optimistic-brittle",
+            1.0,
+            vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![0.5, 0.5]],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5], vec![0.5, 0.5]],
+        );
+        let robust = open_world_candidate(
+            "robust",
+            1.0,
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+            vec![vec![0.7, 0.3], vec![0.3, 0.7], vec![0.5, 0.5]],
+        );
+        let priors = [0.45, 0.45, 0.10];
+        let ranked = rank_open_world_candidates(
+            &priors,
+            &[optimistic_brittle, robust],
+        ).unwrap();
+        assert_eq!(ranked[0].experiment_id, "robust");
+        assert!(ranked[0].score.worst_case_information_gain_bits > 0.0);
+        assert_eq!(ranked[1].score.worst_case_information_gain_bits, 0.0);
+    }
+
+    #[test]
+    fn open_world_rejects_duplicate_scenario_ids() {
+        let mut candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        );
+        candidate.likelihood_scenarios[1].id = "calibration-a".to_owned();
+        let priors = [0.45, 0.45, 0.10];
+        assert_eq!(
+            evaluate_open_world_candidate(&priors, &candidate),
+            Err(DesignError::DuplicateLikelihoodScenarioId {
+                scenario_id: "calibration-a".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn open_world_rejects_malformed_likelihood_scenario() {
+        let candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.3], vec![0.2, 0.8], vec![0.5, 0.5]],
+        );
+        let priors = [0.45, 0.45, 0.10];
+        assert!(matches!(
+            evaluate_open_world_candidate(&priors, &candidate),
+            Err(DesignError::LikelihoodMassNotOne { hypothesis_index: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn open_world_scenario_order_does_not_change_score() {
+        let mut candidate = open_world_candidate(
+            "open-world",
+            1.0,
+            vec![vec![0.9, 0.1], vec![0.1, 0.9], vec![0.5, 0.5]],
+            vec![vec![0.6, 0.4], vec![0.4, 0.6], vec![0.5, 0.5]],
+        );
+        let priors = [0.45, 0.45, 0.10];
+        let first = evaluate_open_world_candidate(&priors, &candidate).unwrap();
+        candidate.likelihood_scenarios.reverse();
+        let second = evaluate_open_world_candidate(&priors, &candidate).unwrap();
+        assert_eq!(first, second);
     }
 
     #[test]
