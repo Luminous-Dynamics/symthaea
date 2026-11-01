@@ -1,6 +1,6 @@
 # PITB research track: adaptive proof-search allocation (2026-11-01)
 
-**Status:** deterministic controller and synthetic contract added; no proof-search allocation experiment or Lean result has been executed. The controller's probability estimates and calibration receipt digests remain untrusted inputs until separately authenticated and evaluated.
+**Status:** deterministic controller, exact-byte calibration receipt verifier, and synthetic contract added; no real calibration dataset, proof-search allocation experiment, or Lean result has been executed. The synthetic calibration fixture is not empirical evidence.
 
 ## Research opportunity
 
@@ -120,18 +120,23 @@ The five-percentage-point improvement over 25.8% is a stretch target. The first 
 ## Current implementation
 
 The current PR adds:
-- \`adaptive-allocation/proof-search-allocation-decision-v0.schema.json\`;
-- \`adaptive-allocation/fixtures/proof-search-allocation.synthetic.json\`;
-- \`allocate_proof_search_budget.rs\`, a deterministic LCB/shadow-price decision engine;
-- tests for uncertainty-sensitive ranking, one-resource infeasibility, calibration gating, duplicate actions, state identity, shadow-weight normalization and conservative stop behavior.
+- `adaptive-allocation/proof-search-allocation-decision-v0.schema.json`;
+- `adaptive-allocation/proof-search-calibration-receipt-v0.schema.json`;
+- synthetic no-run decision and calibration fixtures;
+- `allocate_proof_search_budget.rs`, a deterministic LCB/shadow-price decision engine;
+- `proof_search_calibration.rs`, an exact-byte receipt verifier that recomputes per-action ten-bin ECE and Brier sufficient statistics;
+- tests for uncertainty-sensitive ranking, single-resource infeasibility, calibration mismatch, receipt substitution, model mismatch, duplicate actions, state identity, shadow-weight normalization and conservative stopping.
 
-The controller deliberately does not authenticate the bytes behind \`calibration_receipt_sha256\` or prove that the predictions are calibrated. That is a separate next milestone: implement a calibration-report receipt verifier and measure empirical calibration on frozen validation trajectories. Current code is a deterministic action selector over supplied estimates, not a trained router, proof checker, or measured SOTA result.
+The controller requires the exact calibration receipt file in production selection. It checks the receipt SHA-256 and dataset-manifest digest, verifies that each proposed action kind has its own calibration group, matches predictor ID/version, recomputes ECE/Brier, and verifies the canonical policy hash. It is a deterministic selector, not a trained router, proof checker, or measured SOTA result.
+
+Important limitation: the calibration bins are **self-consistent and content-addressed**, not independently authenticated scientific observations. The verifier checks sufficient-statistic arithmetic and the source outcome-receipt manifest digest, but does not open every underlying Lean checker and independent replay receipt. The checked-in 1,600-observation calibration fixture is synthetic; its ECE=0 and Brier values are only contract-test arithmetic. No empirical calibration result is claimed.
 
 ## Next milestones
 
-1. Compile the new Rust binary and run its synthetic negative controls in the isolated PITB crate workflow.
-2. Add a calibration-report schema and byte-authenticating verifier; calculate ECE/Brier from held-out trajectories rather than trusting caller-supplied values.
-3. Add an action-outcome trajectory importer that joins each prediction to the exact action, state digest, policy, resources and independent outcome receipt.
-4. Reproduce A0 and A2 on a small, pinned PutnamBench smoke cohort, then compare A0–A5 under equal resource caps.
-5. Scale to all SorryDB_2601 tasks only after the smoke cohort's environment reconstruction and verifier receipts are valid.
-6. Freeze policy, calibration and shadow weights before the external challenge/test run.
+1. Compile the Rust controller and calibration module; run the synthetic negative controls in the isolated PITB crate workflow and inspect exact-head CI evidence.
+2. Implement a trajectory importer that authenticates each underlying Lean checker and independent replay receipt before producing calibration rows.
+3. Measure action-conditional calibration on a frozen validation split; publish reliability diagrams, Brier score, ECE by action class and uncertainty intervals.
+4. Add repeated-task/context strata so estimates are calibrated conditionally on failure history, proof-state features and remaining budget—not merely globally by action type.
+5. Reproduce A0 and A2 on a small, pinned PutnamBench smoke cohort, then compare A0–A5 under equal resource caps.
+6. Scale to all SorryDB_2601 tasks only after environment reconstruction, proof outcome receipts and calibration lineage are valid.
+7. Freeze policy, calibration and shadow weights before the external challenge/test run.
