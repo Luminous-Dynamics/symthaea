@@ -435,7 +435,7 @@ impl TimeImmCsvAdapter {
 
 fn timestamp_zone_sha256(zone: Option<&NaiveTimestampZone>) -> [u8; 32] {
     let mut h = Sha256::new();
-    h.update(b"SYMTHAEA-TIME-IMM-TIMESTAMP-ZONE-V1\\0");
+    h.update(b"SYMTHAEA-TIME-IMM-TIMESTAMP-ZONE-V1\0");
     match zone {
         None => h.update([0]),
         Some(NaiveTimestampZone::FixedOffsetSeconds(seconds)) => {
