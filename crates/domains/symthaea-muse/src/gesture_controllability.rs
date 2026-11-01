@@ -1077,6 +1077,15 @@ mod tests {
             &source_event,
         ).is_ok());
 
+        let mut out_of_envelope = value.clone();
+        out_of_envelope.at = BeatPosition::new(5, 1).unwrap();
+        out_of_envelope.seal();
+        assert!(out_of_envelope
+            .verify_against_identity_map(&"a".repeat(64), 2, &identity_map)
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("outside the part score-time envelope")));
+
         value.intervention_value = GestureValue::Scalar {
             amount: 0.8,
             unit: GestureUnit::Hertz,
