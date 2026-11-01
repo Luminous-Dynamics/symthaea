@@ -1,0 +1,493 @@
+#!/usr/bin/env python3
+"""Finite reference oracle for countable global-weight projective e-closure.
+
+The theorem uses one fixed summable weight per coordinate, not a separate
+prior over every intersection. This module checks finite paths exactly using
+Fraction arithmetic. It does not establish stochastic e-process validity,
+predictability of real-world activation, or completeness of the filtration.
+"""
+from __future__ import annotations
+
+from fractions import Fraction
+from itertools import combinations
+from math import isfinite
+from typing import Iterable, Mapping, Sequence
+
+CoordinatePaths = Mapping[int, Sequence[int | float | str | Fraction]]
+
+
+def as_fraction(value: int | float | str | Fraction) -> Fraction:
+    if isinstance(value, bool):
+        raise TypeError("boolean values are not valid numeric inputs")
+    if isinstance(value, Fraction):
+        return value
+    if isinstance(value, int):
+        return Fraction(value)
+    if isinstance(value, str):
+        return Fraction(value)
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValueError("numeric inputs must be finite")
+        return Fraction(str(value))
+    raise TypeError(f"unsupported numeric input: {type(value).__name__}")
+
+
+def validate_ids(ids: Iterable[int]) -> tuple[int, ...]:
+    try:
+        values = tuple(ids)
+    except TypeError as error:
+        raise TypeError("hypothesis ids must be an iterable of positive integers") from error
+    if any(isinstance(i, bool) or not isinstance(i, int) or i < 1 for i in values):
+        raise ValueError("hypothesis ids must be positive integers")
+    if len(set(values)) != len(values):
+        raise ValueError("hypothesis ids must be unique")
+    return tuple(sorted(values))
+
+
+def _validate_scheme(scheme: str) -> None:
+    if scheme not in ("geometric", "telescoping"):
+        raise ValueError("weight scheme must be 'geometric' or 'telescoping'")
+
+
+def coordinate_weight(index: int, scheme: str = "geometric") -> Fraction:
+    """Exactly summable ex-ante global coordinate weights."""
+    if isinstance(index, bool) or not isinstance(index, int) or index < 1:
+        raise ValueError("coordinate index must be a positive integer")
+    _validate_scheme(scheme)
+    if scheme == "geometric":
+        return Fraction(1, 1 << index)
+    if scheme == "telescoping":
+        return Fraction(1, index * (index + 1))
+    raise ValueError("weight scheme must be 'geometric' or 'telescoping'")
+
+
+def finite_weight_mass(ids: Iterable[int], scheme: str = "geometric") -> Fraction:
+    _validate_scheme(scheme)
+    return sum((coordinate_weight(i, scheme) for i in validate_ids(ids)), Fraction(0))
+
+
+def nonempty_subsets(ids: Iterable[int]) -> tuple[tuple[int, ...], ...]:
+    values = validate_ids(ids)
+    return tuple(
+        subset
+        for size in range(1, len(values) + 1)
+        for subset in combinations(values, size)
+    )
+
+
+def projective_certificate(
+    intersection: Iterable[int],
+    coordinate_values: Mapping[int, int | float | str | Fraction],
+    *,
+    scheme: str = "geometric",
+) -> Fraction:
+    """E_t^S = 1 - sum_{i in S}w_i + sum_{i in S}w_i M_{i,t}."""
+    _validate_scheme(scheme)
+    total = Fraction(1)
+    for i in validate_ids(intersection):
+        if i not in coordinate_values:
+            raise ValueError(f"missing coordinate value for hypothesis {i}")
+        value = as_fraction(coordinate_values[i])
+        if value < 0:
+            raise ValueError(f"negative coordinate e-value for hypothesis {i}")
+        total += coordinate_weight(i, scheme) * (value - 1)
+    if total < 0:
+        raise AssertionError("nonnegative affine merger became negative")
+    return total
+
+
+def fdp(rejections: Iterable[int], null_intersection: Iterable[int]) -> Fraction:
+    rejected = set(validate_ids(rejections))
+    nulls = set(validate_ids(null_intersection))
+    return Fraction(len(rejected & nulls), len(rejected)) if rejected else Fraction(0)
+
+
+def separate_local_closure(
+    active: Iterable[int],
+    rejections: Iterable[int],
+    coordinate_values: Mapping[int, int | float | str | Fraction],
+    alpha: int | float | str | Fraction,
+    *,
+    scheme: str = "geometric",
+) -> dict:
+    """Check all nonempty local constraints with an exact O(|I|) separator.
+
+    For a nonempty rejection set R, each intersection S must satisfy
+      sum_{i in S} [1{i in R}/|R| - alpha*w_i*(M_i-1)] <= alpha.
+    The maximizing subset contains exactly the coordinates with positive
+    bracket values, so all 2^|I|-1 constraints reduce to one linear scan.
+    """
+    _validate_scheme(scheme)
+    ids = validate_ids(active)
+    rejected = validate_ids(rejections)
+    if not set(rejected).issubset(ids):
+        raise ValueError("rejections must be a subset of the active family")
+    level = as_fraction(alpha)
+    if not 0 < level < 1:
+        raise ValueError("alpha must lie strictly between zero and one")
+    if not ids:
+        return {
+            "certified": True, "active_count": 0,
+            "subsets_implicitly_checked": 0, "coordinate_terms_evaluated": 0,
+            "separating_subset": (), "maximum_nonempty_lhs": None,
+            "positive_part_sum": Fraction(0), "slack": None,
+            "scope": "empty active family has no nonempty local constraints",
+        }
+
+    r = len(rejected)
+    rejected_set = set(rejected)
+    coefficients = {}
+    for i in ids:
+        if i not in coordinate_values:
+            raise ValueError(f"missing coordinate value for hypothesis {i}")
+        m = as_fraction(coordinate_values[i])
+        if m < 0:
+            raise ValueError(f"negative coordinate e-value for hypothesis {i}")
+        d_i = coordinate_weight(i, scheme) * (m - 1)
+        coefficients[i] = (Fraction(1, r) if i in rejected_set else Fraction(0)) - level * d_i
+
+    positive_ids = tuple(i for i in ids if coefficients[i] > 0)
+    positive_part_sum = sum((coefficients[i] for i in positive_ids), Fraction(0))
+    if positive_ids:
+        witness = positive_ids
+        maximum_nonempty_lhs = positive_part_sum
+    else:
+        witness = (max(ids, key=lambda i: coefficients[i]),)
+        maximum_nonempty_lhs = coefficients[witness[0]]
+    return {
+        "certified": positive_part_sum <= level,
+        "active_count": len(ids),
+        "subsets_implicitly_checked": (1 << len(ids)) - 1,
+        "coordinate_terms_evaluated": len(ids),
+        "separating_subset": witness,
+        "maximum_nonempty_lhs": maximum_nonempty_lhs,
+        "positive_part_sum": positive_part_sum,
+        "slack": level - maximum_nonempty_lhs,
+        "coefficients": coefficients,
+        "scope": "exact O(|I|) separator equivalent to every local affine-closure constraint",
+    }
+
+
+def _normalize_path_inputs(
+    active_by_time: Sequence[Iterable[int]],
+    rejections_by_time: Sequence[Iterable[int]],
+    coordinate_paths: CoordinatePaths,
+    true_null_ids: Iterable[int],
+) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]], dict[int, tuple[Fraction, ...]], tuple[int, ...]]:
+    if not active_by_time:
+        raise ValueError("at least one reporting time is required")
+    if len(active_by_time) != len(rejections_by_time):
+        raise ValueError("active and rejection paths must have equal lengths")
+    active = [validate_ids(row) for row in active_by_time]
+    rejected = [validate_ids(row) for row in rejections_by_time]
+    for t, (i_t, r_t) in enumerate(zip(active, rejected)):
+        if not set(r_t).issubset(i_t):
+            raise ValueError(f"rejections at time {t} must be a subset of the active family")
+    for t in range(1, len(active)):
+        if not set(active[t - 1]).issubset(active[t]):
+            raise ValueError("active families must be nested for the arrival model")
+
+    truth = validate_ids(true_null_ids)
+    all_ids = set(truth)
+    for row in active:
+        all_ids.update(row)
+    normalized = {}
+    for i in sorted(all_ids):
+        if i not in coordinate_paths:
+            raise ValueError(f"missing coordinate path for hypothesis {i}")
+        path = coordinate_paths[i]
+        if len(path) != len(active):
+            raise ValueError(f"coordinate path for hypothesis {i} has wrong horizon")
+        values = tuple(as_fraction(v) for v in path)
+        if any(v < 0 for v in values):
+            raise ValueError(f"coordinate path for hypothesis {i} contains a negative value")
+        first_active = next((t for t, row in enumerate(active) if i in row), None)
+        if first_active is None:
+            if any(v != 1 for v in values):
+                raise ValueError(f"never-active coordinate {i} must remain neutral at one")
+        elif any(values[t] != 1 for t in range(first_active)):
+            raise ValueError(f"coordinate {i} must be dormant at one before activation")
+        normalized[i] = values
+    return active, rejected, normalized, truth
+
+
+def verify_countable_global_projective_path(
+    active_by_time: Sequence[Iterable[int]],
+    rejections_by_time: Sequence[Iterable[int]],
+    true_null_ids: Iterable[int],
+    coordinate_paths: CoordinatePaths,
+    alpha: int | float | str | Fraction,
+    *,
+    scheme: str = "geometric",
+) -> dict:
+    """Verify finite fixtures for local closure and full-true-set projectivity.
+
+    The true-null set is finite in this oracle. The mathematical construction
+    extends to countable true-null sets by nonnegative countable mixing.
+    """
+    _validate_scheme(scheme)
+    level = as_fraction(alpha)
+    if not 0 < level < 1:
+        raise ValueError("alpha must lie strictly between zero and one")
+    active, rejected, paths, truth = _normalize_path_inputs(
+        active_by_time, rejections_by_time, coordinate_paths, true_null_ids,
+    )
+    rows, failures = [], []
+    monotone = all(
+        all(path[t] <= path[t + 1] for t in range(len(path) - 1))
+        for path in paths.values()
+    )
+
+    for t, (i_t, r_t) in enumerate(zip(active, rejected)):
+        values_t = {i: path[t] for i, path in paths.items()}
+        separation = separate_local_closure(
+            i_t, r_t, values_t, level, scheme=scheme
+        )
+        if not separation["certified"]:
+            witness = separation["separating_subset"]
+            witness_cert = projective_certificate(witness, values_t, scheme=scheme)
+            witness_loss = fdp(r_t, witness)
+            failures.append(("local_closure_violation", t, witness, witness_loss, level * witness_cert))
+
+        active_true = tuple(i for i in truth if i in set(i_t))
+        active_true_cert = projective_certificate(active_true, values_t, scheme=scheme)
+        full_true_cert = projective_certificate(truth, values_t, scheme=scheme)
+        if active_true_cert != full_true_cert:
+            failures.append(("projective_dormant_padding_identity_failed", t))
+        actual_loss = fdp(r_t, active_true)
+        domination_slack = level * full_true_cert - actual_loss
+        if domination_slack < 0:
+            failures.append(("true_null_domination_failed", t, actual_loss, level * full_true_cert))
+
+        rows.append({
+            "time": t, "active": i_t, "rejections": r_t,
+            "active_true_nulls": active_true,
+            "local_constraints_covered": separation["subsets_implicitly_checked"],
+            "local_constraint_terms_evaluated": separation["coordinate_terms_evaluated"],
+            "local_constraints_certified": separation["certified"],
+            "local_closure_separator": separation,
+            "full_true_certificate": full_true_cert,
+            "active_true_certificate": active_true_cert,
+            "projective_identity": full_true_cert == active_true_cert,
+            "true_null_fdp": actual_loss,
+            "alpha_full_true_certificate": level * full_true_cert,
+            "true_null_domination_slack": domination_slack,
+            "dominated": domination_slack >= 0,
+        })
+
+    return {
+        "valid": not failures,
+        "failures": failures,
+        "schema": "countable-global-projective-eclosure-finite-oracle-v1",
+        "weight_scheme": scheme,
+        "finite_true_null_ids": truth,
+        "finite_true_null_weight_mass": finite_weight_mass(truth, scheme),
+        "active_sizes": [len(row) for row in active],
+        "times_checked": len(rows),
+        "local_constraints_covered": sum(row["local_constraints_covered"] for row in rows),
+        "local_constraint_terms_evaluated": sum(row["local_constraint_terms_evaluated"] for row in rows),
+        "all_projective_identities_verified": all(row["projective_identity"] for row in rows),
+        "all_true_null_losses_dominated": all(row["dominated"] for row in rows),
+        "raw_global_certificate_pathwise_monotone": monotone,
+        "supfdr_certificate_contract": (
+            "requires time-monotone projective intersection e-processes; "
+            "use a valid common running-maximum adjuster when raw paths are not monotone"
+        ),
+        "path": rows,
+        "scope": (
+            "finite exact pathwise oracle; global countable-mixing theorem and "
+            "coordinate e-process validity are mathematical assumptions, not inferred from paths"
+        ),
+    }
+
+
+def validate_running_max_adjuster(
+    thresholds: Sequence[int | float | str | Fraction],
+    increments: Sequence[int | float | str | Fraction],
+) -> tuple[tuple[Fraction, ...], tuple[Fraction, ...], Fraction]:
+    c = tuple(as_fraction(x) for x in thresholds)
+    a = tuple(as_fraction(x) for x in increments)
+    if len(c) != len(a):
+        raise ValueError("adjuster threshold and increment lengths differ")
+    if any(x <= 1 for x in c):
+        raise ValueError("adjuster thresholds must exceed one")
+    if any(c[i] >= c[i + 1] for i in range(len(c) - 1)):
+        raise ValueError("adjuster thresholds must be strictly increasing")
+    if any(x < 0 for x in a):
+        raise ValueError("adjuster increments must be nonnegative")
+    budget = sum((a[i] / c[i] for i in range(len(c))), Fraction(0))
+    if budget > 1:
+        raise ValueError("adjuster violates integral budget sum(a_j/c_j) <= 1")
+    return c, a, budget
+
+
+def adjusted_running_max_path(
+    raw_path: Sequence[int | float | str | Fraction],
+    thresholds: Sequence[int | float | str | Fraction],
+    increments: Sequence[int | float | str | Fraction],
+) -> tuple[Fraction, ...]:
+    """A(1 vee max_{u<=t} E_u), an e-process by the adjuster theorem."""
+    c, a, _budget = validate_running_max_adjuster(thresholds, increments)
+    running_max = Fraction(1)
+    adjusted = []
+    for raw in raw_path:
+        value = as_fraction(raw)
+        if value < 0:
+            raise ValueError("raw intersection e-values must be nonnegative")
+        running_max = max(running_max, value)
+        adjusted.append(sum(
+            (increment for threshold, increment in zip(c, a) if running_max >= threshold),
+            Fraction(0),
+        ))
+    return tuple(adjusted)
+
+
+def verify_adjusted_projective_supfdr_path(
+    active_by_time: Sequence[Iterable[int]],
+    rejections_by_time: Sequence[Iterable[int]],
+    true_null_ids: Iterable[int],
+    coordinate_paths: CoordinatePaths,
+    alpha: int | float | str | Fraction,
+    thresholds: Sequence[int | float | str | Fraction],
+    increments: Sequence[int | float | str | Fraction],
+    *,
+    scheme: str = "geometric",
+) -> dict:
+    """Replay adjusted local closure and countable true-set projectivity.
+
+    This path uses full finite-subset verification; the raw affine O(n)
+    separator is not valid after applying a nonlinear running-max adjuster.
+    """
+    _validate_scheme(scheme)
+    c, a, budget = validate_running_max_adjuster(thresholds, increments)
+    level = as_fraction(alpha)
+    if not 0 < level < 1:
+        raise ValueError("alpha must lie strictly between zero and one")
+    active, rejected, paths, truth = _normalize_path_inputs(
+        active_by_time, rejections_by_time, coordinate_paths, true_null_ids,
+    )
+    all_ids = sorted(set(truth).union(*(set(row) for row in active)))
+    time_count = len(active)
+    values_by_time = [
+        {i: paths[i][t] for i in all_ids}
+        for t in range(time_count)
+    ]
+
+    full_true_raw = tuple(
+        projective_certificate(truth, values_by_time[t], scheme=scheme)
+        for t in range(time_count)
+    )
+    full_true_adjusted = adjusted_running_max_path(full_true_raw, c, a)
+
+    failures = []
+    rows = []
+    constraints_checked = 0
+    for t, (active_t, rejected_t) in enumerate(zip(active, rejected)):
+        subsets = nonempty_subsets(active_t)
+        local_rows = []
+        for subset in subsets:
+            raw_history = tuple(
+                projective_certificate(subset, values_by_time[u], scheme=scheme)
+                for u in range(t + 1)
+            )
+            adjusted_history = adjusted_running_max_path(raw_history, c, a)
+            adjusted_value = adjusted_history[-1]
+            loss = fdp(rejected_t, subset)
+            slack = level * adjusted_value - loss
+            constraints_checked += 1
+            local_rows.append({
+                "intersection": subset,
+                "raw_current": raw_history[-1],
+                "adjusted_current": adjusted_value,
+                "fdp": loss,
+                "slack": slack,
+                "certified": slack >= 0,
+            })
+            if slack < 0:
+                failures.append(("adjusted_local_closure_violation", t, subset, loss, level * adjusted_value))
+
+        active_true = tuple(i for i in truth if i in set(active_t))
+        active_true_history = tuple(
+            projective_certificate(active_true, values_by_time[u], scheme=scheme)
+            for u in range(t + 1)
+        )
+        active_true_adjusted = adjusted_running_max_path(active_true_history, c, a)
+        full_true_prefix = full_true_adjusted[:t + 1]
+        identity = active_true_adjusted == full_true_prefix
+        if not identity:
+            failures.append(("adjusted_projective_history_mismatch", t))
+        actual_loss = fdp(rejected_t, active_true)
+        global_adjusted = full_true_adjusted[t]
+        if actual_loss > level * global_adjusted:
+            failures.append(("adjusted_true_loss_not_dominated", t, actual_loss, level * global_adjusted))
+        rows.append({
+            "time": t,
+            "active": active_t,
+            "rejections": rejected_t,
+            "active_true_nulls": active_true,
+            "local_constraints_checked": len(local_rows),
+            "local_constraints_certified": all(row["certified"] for row in local_rows),
+            "local_constraints": local_rows,
+            "active_true_adjusted_history": active_true_adjusted,
+            "full_true_adjusted_prefix": full_true_prefix,
+            "adjusted_projective_identity": identity,
+            "actual_true_null_fdp": actual_loss,
+            "global_adjusted_true_certificate": global_adjusted,
+            "true_loss_dominated": actual_loss <= level * global_adjusted,
+        })
+
+    monotone = all(
+        full_true_adjusted[t] <= full_true_adjusted[t + 1]
+        for t in range(time_count - 1)
+    )
+    return {
+        "valid": not failures,
+        "failures": failures,
+        "schema": "adjusted-countable-global-projective-supfdr-oracle-v1",
+        "weight_scheme": scheme,
+        "adjuster": {
+            "thresholds": c,
+            "increments": a,
+            "integral_budget": budget,
+        },
+        "finite_true_null_ids": truth,
+        "full_true_raw_path": full_true_raw,
+        "full_true_adjusted_path": full_true_adjusted,
+        "adjusted_true_certificate_monotone": monotone,
+        "adjusted_projective_equalities_verified": all(
+            row["adjusted_projective_identity"] for row in rows
+        ),
+        "local_constraints_checked": constraints_checked,
+        "all_local_constraints_certified": all(
+            row["local_constraints_certified"] for row in rows
+        ),
+        "all_true_losses_dominated": all(row["true_loss_dominated"] for row in rows),
+        "path": rows,
+        "scope": (
+            "finite exact adjusted-path replay; the adjuster theorem supplies "
+            "stochastic e-process validity only when the raw input is an e-process"
+        ),
+    }
+
+
+def verify_weight_scheme_prefix(scheme: str = "geometric", n: int = 100) -> dict:
+    if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+        raise ValueError("n must be a positive integer")
+    mass = finite_weight_mass(range(1, n + 1), scheme)
+    if scheme == "geometric":
+        expected = Fraction(1) - Fraction(1, 1 << n)
+        proof = "geometric series sum_i 2^-i = 1"
+    elif scheme == "telescoping":
+        expected = Fraction(1) - Fraction(1, n + 1)
+        proof = "telescoping series sum_i (1/i - 1/(i+1)) = 1"
+    else:
+        raise ValueError("weight scheme must be 'geometric' or 'telescoping'")
+    return {
+        "scheme": scheme, "prefix_size": n, "prefix_mass": mass,
+        "expected_prefix_mass": expected, "matches": mass == expected,
+        "infinite_mass": Fraction(1), "normalization_proof": proof,
+    }
+
+
+if __name__ == "__main__":
+    raise SystemExit("Run test_countable_global_projective_eclosure.py.")
