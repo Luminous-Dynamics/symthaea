@@ -332,7 +332,7 @@ pub fn verify_observed_history(
     trace: &Trace,
     config: &HistorySearchConfig,
 ) -> HistorySearchReport {
-    let claim_ceiling = "Bounded search over trace-shaped, fully completed operations. This does not parse raw backend event streams, resolve pending operations, verify witness signatures, test physical durability, or qualify a backend.";
+    let claim_ceiling = "Bounded search over trace-shaped, fully completed operations. Final modeled revision/cursors/policy/receipt fields are compared; the opaque final state digest is not recomputed from a complete canonical manifest. This does not parse raw backend event streams, resolve pending operations, verify witness signatures, test physical durability, or qualify a backend.";
 
     let invalid = |errors: Vec<String>| HistorySearchReport {
         report_version: 1,
@@ -401,7 +401,7 @@ pub fn verify_observed_history(
     let mut context = SearchContext {
         trace,
         predecessors,
-        max_search_states: config.max_search_states.max(1),
+        max_search_states: config.max_search_states,
         states_explored: 0,
         memo_hits: 0,
         max_enabled_frontier: 0,
@@ -565,6 +565,14 @@ mod tests {
         second.completed_at_ns = 90;
 
         trace.operations = vec![first.clone(), second.clone()];
+        trace.initial_state = InitialState {
+            authority_revision: trace.final_observation.authority_revision.clone(),
+            state_digest: trace.final_observation.state_digest.clone(),
+            policy_digest: trace.final_observation.policy_digest.clone(),
+            source_cursors: trace.final_observation.source_cursors.clone(),
+            log_cursors: trace.final_observation.log_cursors.clone(),
+        };
+        trace.final_observation.accepted_receipts.clear();
         trace.reference_linearization_order.clear();
         trace.faults.clear();
         trace.negative_controls.clear();
