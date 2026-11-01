@@ -123,7 +123,7 @@ impl fmt::Display for ContractError {
             Self::AvailabilityPrecedesEvent { event_id } => write!(f, "observation {event_id} is available before its event time; use the known-future covariate type for pre-published information"),
             Self::ZeroSourceDigest => write!(f, "source digest must be nonzero"),
             Self::DuplicateEventId { event_id } => write!(f, "duplicate event ID {event_id}"),
-            Self::DuplicateSourceSequence { entity_id, modality_id, source_sequence } => {
+            Self::DuplicateSourceSequence { entity_id, modality_id, source_id, source_sequence } => {
                 write!(f, "duplicate source sequence {source_sequence} for entity {entity_id}, modality {modality_id}, source {source_id}")
             }
             Self::InvalidDecimalScale { scale } => write!(f, "decimal scale {scale} is outside the supported range [-9, 9]"),
