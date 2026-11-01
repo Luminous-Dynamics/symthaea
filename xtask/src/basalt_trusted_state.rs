@@ -11,11 +11,12 @@
 //! transitions require explicit authorization evidence and never reset the
 //! source generation.
 
+use anyhow::Context;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 
-use rusqlite::{params, Connection, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
 
 const MAX_ID_BYTES: usize = 128;
@@ -1422,15 +1423,7 @@ impl SqliteTrustedStateStore {
             ));
         }
 
-        write_sqlite_transition(&tx, &plan)
-            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
-        after_stage(SqliteCommitStage::SourceCursorWritten)
-            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
-        after_stage(SqliteCommitStage::LogCursorWritten)
-            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
-        after_stage(SqliteCommitStage::ReceiptWritten)
-            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
-        after_stage(SqliteCommitStage::MetaWritten)
+        write_sqlite_transition(&tx, &plan, &mut after_stage)
             .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
 
         tx.commit().map_err(|error| {
@@ -1739,10 +1732,14 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
     Ok(state)
 }
 
-fn write_sqlite_transition(
+fn write_sqlite_transition<F>(
     transaction: &Transaction<'_>,
     plan: &AdvancePlan,
-) -> anyhow::Result<()> {
+    after_stage: &mut F,
+) -> anyhow::Result<()>
+where
+    F: FnMut(SqliteCommitStage) -> anyhow::Result<()>,
+{
     let receipt = plan
         .next_state
         .accepted_receipts
@@ -1786,6 +1783,7 @@ fn write_sqlite_transition(
             source.boot_incarnation_digest,
         ],
     )?;
+    after_stage(SqliteCommitStage::SourceCursorWritten)?;
 
     transaction.execute(
         "INSERT INTO basalt_log_cursors (log_id, tree_size, root_digest, checkpoint_digest)
@@ -1801,6 +1799,7 @@ fn write_sqlite_transition(
             checkpoint.checkpoint_digest,
         ],
     )?;
+    after_stage(SqliteCommitStage::LogCursorWritten)?;
 
     transaction.execute(
         "INSERT INTO basalt_accepted_receipts
@@ -1829,6 +1828,7 @@ fn write_sqlite_transition(
             receipt.policy_versions.bundle_digest,
         ],
     )?;
+    after_stage(SqliteCommitStage::ReceiptWritten)?;
 
     let updated = transaction.execute(
         "UPDATE basalt_state_meta
@@ -1846,6 +1846,7 @@ fn write_sqlite_transition(
     if updated != 1 {
         anyhow::bail!("expected exactly one BASALT state-meta row to advance");
     }
+    after_stage(SqliteCommitStage::MetaWritten)?;
     Ok(())
 }
 
