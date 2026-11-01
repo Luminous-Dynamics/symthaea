@@ -98,7 +98,8 @@
         "attestation_security_level",
         "attestation_challenge_freshness",
         "certificate_chain_status",
-        "patch_level_binding_status"
+        "patch_level_binding_status",
+        "evidence_ids"
       ],
       "properties": {
         "bootloader_locked": {
@@ -170,6 +171,12 @@
             "not_measured",
             "not_applicable"
           ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -214,7 +221,8 @@
         "time_running_ns",
         "read_overhead_status",
         "sample_loss_status",
-        "observer_effect_status"
+        "observer_effect_status",
+        "evidence_ids"
       ],
       "properties": {
         "interface": {
@@ -299,6 +307,12 @@
             "not_measured",
             "not_available"
           ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
