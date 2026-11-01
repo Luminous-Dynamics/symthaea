@@ -1,20 +1,100 @@
 {
- "$schema":"https://json-schema.org/draft/2020-12/schema",
- "$id":"https://luminousdynamics.io/schemas/pitb/reviewer-attestation-v0.schema.json",
- "title":"PITB reviewer attestation v0",
- "description":"Canonical JSON payload signed with Ed25519 by a reviewer key in the externally pinned registry. The signature field is excluded from the signed payload.",
- "type":"object","additionalProperties":false,
- "required":["schema_version","reviewer_identity","key_id","audit_id","task_id_sha256","statement_sha256","expected_informal_statement_sha256","review_scope","decision","signature_ed25519_hex"],
- "properties":{
-  "schema_version":{"const":"pitb.reviewer-attestation.v0"},
-  "reviewer_identity":{"type":"string","minLength":1},
-  "key_id":{"type":"string","minLength":1},
-  "audit_id":{"type":"string","minLength":1},
-  "task_id_sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-  "statement_sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-  "expected_informal_statement_sha256":{"oneOf":[{"type":"null"},{"type":"string","pattern":"^[a-f0-9]{64}$"}]},
-  "review_scope":{"enum":["informal_to_formal","domain_expert_review","combined"]},
-  "decision":{"const":"approved"},
-  "signature_ed25519_hex":{"type":"string","pattern":"^[a-f0-9]{128}$"}
- }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/reviewer-attestation-v0.schema.json",
+  "title": "PITB reviewer attestation v0",
+  "description": "Canonical JSON payload signed with Ed25519 by a reviewer key in the externally pinned registry. The signature field is excluded from the signed payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "reviewer_identity",
+    "key_id",
+    "audit_id",
+    "task_id_sha256",
+    "statement_sha256",
+    "expected_informal_statement_sha256",
+    "review_scope",
+    "decision",
+    "signature_ed25519_hex",
+    "cohort_id",
+    "snapshot_id",
+    "repository_commit",
+    "source_path",
+    "source_file_sha256",
+    "source_span_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.reviewer-attestation.v0"
+    },
+    "reviewer_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "statement_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_informal_statement_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "review_scope": {
+      "enum": [
+        "informal_to_formal",
+        "domain_expert_review",
+        "combined"
+      ]
+    },
+    "decision": {
+      "const": "approved"
+    },
+    "signature_ed25519_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$"
+    },
+    "cohort_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_span_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
 }
