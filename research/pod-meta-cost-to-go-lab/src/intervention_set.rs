@@ -46,6 +46,22 @@ pub struct PairedInterventionContrast {
     pub interpretation: InterventionInterpretation,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InterventionAlternativeOutcome {
+    pub operation_family: u32,
+    pub first_action_cost: ResourceVector,
+    pub verified_remaining_cost: ResourceVector,
+    pub immediate_proof_progress: i128,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InterventionParetoSummary {
+    /// Sorted by operation-family ID for deterministic reporting.
+    pub alternatives: Vec<InterventionAlternativeOutcome>,
+    /// Non-dominated alternatives. Resource dimensions are never scalarized.
+    pub frontier_operation_families: Vec<u32>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MatchedInterventionSet {
     pub experiment_digest: [u8; 32],
@@ -203,6 +219,65 @@ impl MatchedInterventionSet {
         Ok(())
     }
 
+    /// Produce an exact multi-objective frontier over verified remaining
+    /// cost in all six resource dimensions and immediate proof progress.
+    /// No weighted scalar score is constructed. Complexity is O(k^2) in the
+    /// number of admissible operation families.
+    pub fn pareto_summary(
+        &self,
+    ) -> Result<InterventionParetoSummary, InterventionSetError> {
+        self.validate()?;
+        let mut alternatives = Vec::with_capacity(self.trials.len());
+        for trial in &self.trials {
+            let first = trial
+                .actions
+                .first()
+                .ok_or(InterventionSetError::TrialDidNotStartWithProofOperation)?;
+            let verified_remaining_cost = match trial
+                .outcome_label(0)
+                .map_err(|_| InterventionSetError::TrialOutcomeNotVerified)?
+            {
+                PrefixOutcomeLabel::VerifiedRemainingCost { cost, .. } => cost,
+                _ => return Err(InterventionSetError::TrialOutcomeNotVerified),
+            };
+            let next_frontier = trial
+                .actions
+                .get(1)
+                .ok_or(InterventionSetError::TrialOutcomeNotVerified)?
+                .frontier_features;
+            let immediate_proof_progress = i128::try_from(first.frontier_features.unresolved_obligations)
+                .map_err(|_| InterventionSetError::ArithmeticOverflow)?
+                .checked_sub(
+                    i128::try_from(next_frontier.unresolved_obligations)
+                        .map_err(|_| InterventionSetError::ArithmeticOverflow)?,
+                )
+                .ok_or(InterventionSetError::ArithmeticOverflow)?;
+            alternatives.push(InterventionAlternativeOutcome {
+                operation_family: first.operation_family,
+                first_action_cost: first.measured_cost,
+                verified_remaining_cost,
+                immediate_proof_progress,
+            });
+        }
+        alternatives.sort_by_key(|outcome| outcome.operation_family);
+
+        let mut frontier_operation_families = Vec::new();
+        for candidate in &alternatives {
+            let dominated = alternatives
+                .iter()
+                .any(|other| other.operation_family != candidate.operation_family
+                    && dominates(*other, *candidate));
+            if !dominated {
+                frontier_operation_families.push(candidate.operation_family);
+            }
+        }
+
+        Ok(InterventionParetoSummary {
+            alternatives,
+            frontier_operation_families,
+        })
+    }
+
     /// Compute resource-cost and immediate proof-frontier contrasts against
     /// the lowest-ID candidate as the deterministic baseline. This method
     /// requires verified outcomes for every trial; partial/censored sets must
@@ -252,6 +327,20 @@ impl MatchedInterventionSet {
         }
         Ok(contrasts)
     }
+}
+
+fn dominates(
+    candidate: InterventionAlternativeOutcome,
+    other: InterventionAlternativeOutcome,
+) -> bool {
+    let candidate_cost = resource_values(candidate.verified_remaining_cost);
+    let other_cost = resource_values(other.verified_remaining_cost);
+    let no_worse_on_resources = (0..6).all(|index| candidate_cost[index] <= other_cost[index]);
+    let no_worse_on_progress =
+        candidate.immediate_proof_progress >= other.immediate_proof_progress;
+    let strictly_better = (0..6).any(|index| candidate_cost[index] < other_cost[index])
+        || candidate.immediate_proof_progress > other.immediate_proof_progress;
+    no_worse_on_resources && no_worse_on_progress && strictly_better
 }
 
 fn resource_delta(
@@ -454,6 +543,55 @@ mod tests {
         assert_eq!(
             contrasts[0].interpretation,
             InterventionInterpretation::SimulatedContrast
+        );
+    }
+
+    #[test]
+    fn pareto_frontier_preserves_cost_progress_tradeoffs_without_scalarization() {
+        let mut matched = set(InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [8; 32],
+        });
+        matched.admissible_operation_families = vec![2, 3, 4];
+        matched.trials.push(trial(102, 4, 30));
+
+        let summary = matched.pareto_summary().unwrap();
+        assert_eq!(
+            summary
+                .alternatives
+                .iter()
+                .map(|alternative| alternative.operation_family)
+                .collect::<Vec<_>>(),
+            vec![2, 3, 4]
+        );
+        assert_eq!(summary.frontier_operation_families, vec![2, 3]);
+        let family_two = summary.alternatives[0];
+        let family_three = summary.alternatives[1];
+        let family_four = summary.alternatives[2];
+        assert!(family_two.verified_remaining_cost.tokens
+            < family_three.verified_remaining_cost.tokens);
+        assert!(family_two.immediate_proof_progress
+            < family_three.immediate_proof_progress);
+        assert!(family_three.verified_remaining_cost.tokens
+            < family_four.verified_remaining_cost.tokens);
+        assert_eq!(
+            family_three.immediate_proof_progress,
+            family_four.immediate_proof_progress
+        );
+    }
+
+    #[test]
+    fn pareto_summary_rejects_censored_and_invalid_trials() {
+        let mut matched = set(InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [8; 32],
+        });
+        matched.trials[1].actions.pop();
+        matched.trials[1].terminal.outcome = Some(crate::TerminalOutcome::RightCensored(
+            crate::CensorReason::Timeout,
+        ));
+        matched.trials[1].terminal.completion_verifier_digest = None;
+        assert_eq!(
+            matched.pareto_summary(),
+            Err(InterventionSetError::TrialOutcomeNotVerified)
         );
     }
 
