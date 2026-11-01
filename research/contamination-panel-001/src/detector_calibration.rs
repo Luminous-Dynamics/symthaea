@@ -23,7 +23,6 @@ pub const MAX_DETECTORS: usize = 128;
 pub const MAX_TARGETS: usize = 16;
 pub const MAX_ID_LENGTH: usize = 128;
 pub const DEFAULT_FPR_TARGETS_PERMILLE: [u16; 3] = [10, 50, 100];
-pub const MIN_BINOMIAL_EXACT_SUPPORT: u64 = 1;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
@@ -247,31 +246,6 @@ pub struct DetectorCalibrationReportV1 {
     pub claim_boundary: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct DetectorGroupKey {
-    group_sha256: String,
-    detector_id: String,
-    detector_version: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ObservationKey {
-    group_sha256: String,
-    split: ObservationSplitV1,
-    sample_id: String,
-    detector_id: String,
-    detector_version: String,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Counts {
-    clean: u64,
-    contaminated: u64,
-    false_positive: u64,
-    true_positive: u64,
-    false_negative: u64,
-    true_negative: u64,
-}
 
 fn valid_digest(value: &str) -> bool {
     value.len() == 64
@@ -357,9 +331,8 @@ fn conformal_p_value(
         .map_err(|_| "conformal support overflows u64")?
         .checked_add(1)
         .ok_or_else(|| "conformal denominator overflows u64".to_owned())?;
-    let ceiling = u64::from(denominator)
-        .checked_sub(1)
-        .and_then(|_| numerator.checked_mul(1_000))
+    let ceiling = numerator
+        .checked_mul(1_000)
         .ok_or_else(|| "conformal p-value scaling overflows u64".to_owned())?
         .div_ceil(denominator)
         .min(1_000) as u16;
@@ -615,15 +588,6 @@ fn analyze_group(
     disagreement_output: &mut Vec<DetectorDisagreementCellV1>,
     cost_output: &mut Vec<DetectorCostSummaryV1>,
 ) -> Result<Vec<DetectorCalibrationCellV1>, String> {
-    let definitions_by_key: BTreeMap<(&str, &str), &DetectorDefinitionV1> = definitions
-        .iter()
-        .map(|definition| {
-            (
-                (definition.detector_id.as_str(), definition.detector_version.as_str()),
-                definition,
-            )
-        })
-        .collect();
     let mut observations_by_key =
         BTreeMap::<(ObservationSplitV1, &str, &str, &str), &DetectorObservationV1>::new();
     let mut sample_metadata =
@@ -662,12 +626,12 @@ fn analyze_group(
                 if *truth != GroundTruthV1::Clean {
                     return Err("clean calibration split may contain only adjudicated clean observations".to_owned());
                 }
-                calibration_ids.insert(sample_id);
-                calibration_clusters.insert(cluster_id);
+                calibration_ids.insert(*sample_id);
+                calibration_clusters.insert(*cluster_id);
             }
             ObservationSplitV1::LockedTest => {
-                test_ids.insert(sample_id);
-                test_clusters.insert(cluster_id);
+                test_ids.insert(*sample_id);
+                test_clusters.insert(*cluster_id);
             }
         }
     }
@@ -685,7 +649,7 @@ fn analyze_group(
         for sample_id in &calibration_ids {
             if !observations_by_key.contains_key(&(
                 ObservationSplitV1::CleanCalibration,
-                sample_id,
+                *sample_id,
                 detector.detector_id.as_str(),
                 detector.detector_version.as_str(),
             )) {
@@ -715,8 +679,6 @@ fn analyze_group(
 
     let mut sorted_clean_by_detector =
         BTreeMap::<(&str, &str), Vec<f64>>::new();
-    let mut test_observations_by_detector =
-        BTreeMap::<(&str, &str), Vec<&DetectorObservationV1>>::new();
     for detector in definitions {
         let clean = sorted_clean_by_detector
             .entry((detector.detector_id.as_str(), detector.detector_version.as_str()))
@@ -755,10 +717,6 @@ fn analyze_group(
                 conformal_p_value: p_value,
             });
         }
-        test_observations_by_detector.insert(
-            (detector.detector_id.as_str(), detector.detector_version.as_str()),
-            costs.clone(),
-        );
         cost_output.push(make_cost_summary(&group.group_sha256, detector, &costs)?);
     }
 
