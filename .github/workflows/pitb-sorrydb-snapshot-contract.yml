@@ -1,0 +1,118 @@
+name: PITB SorryDB Live Snapshot Receipt Contract
+
+on:
+  pull_request:
+    paths:
+      - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/snapshot-branch-receipt-v0.schema.json"
+      - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/snapshot-branch-receipt.synthetic.json"
+      - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/speculative-branch-ledger.schema.json"
+      - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json"
+      - "crates/bridges/symthaea-proof-insights/src/bin/analyze_sorrydb_branch_ledger.rs"
+      - "docs/research/pitb-external-benchmark-portfolio-2026-10-31.md"
+      - "docs/research/pitb-leanlean-evaluation-2026-11-01.md"
+      - ".github/workflows/pitb-sorrydb-snapshot-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot-receipt-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned Draft 2020-12 validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/pitb-snapshot-jsonschema"
+          "$RUNNER_TEMP/pitb-snapshot-jsonschema/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate no-run snapshot fixture and fail-closed controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-snapshot-jsonschema/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path.cwd() / "data/benchmarks/proof-insight-transfer-v0/sorrydb-track"
+          schema = json.loads((root / "snapshot-branch-receipt-v0.schema.json").read_text())
+          fixture = json.loads((root / "fixtures/snapshot-branch-receipt.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(fixture)
+          if fixture["evidence_class"] != "synthetic_contract_fixture":
+              raise SystemExit("checked-in snapshot receipt must remain synthetic")
+          if fixture["run_status"] != "not_attempted" or fixture["snapshot"]["capture_status"] != "not_attempted":
+              raise SystemExit("synthetic snapshot fixture claims an execution")
+          if fixture["branches"] or fixture["measurements"]["branch_count"] != 0:
+              raise SystemExit("synthetic snapshot fixture must contain no branch execution")
+          print("PITB_SNAPSHOT_RECEIPT_FIXTURE_PASS: shape only; no real snapshot was captured")
+
+          def reject(label, value):
+              try:
+                  validator.validate(value)
+              except ValidationError:
+                  print("PITB_SNAPSHOT_RECEIPT_NEGATIVE_PASS: " + label)
+                  return
+              raise SystemExit("snapshot receipt schema accepted invalid case: " + label)
+
+          bad = copy.deepcopy(fixture)
+          bad["execution_contract"]["environment_policy"] = "mutable_copied_environment"
+          reject("mutable environment policy", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["execution_contract"]["mutable_state_policy"] = "shared_metavar_context"
+          reject("shared mutable metavariable context", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["execution_contract"]["typeclass_cache_policy"] = "share_without_generation_validation"
+          reject("unqualified shared typeclass cache", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["execution_contract"]["capture_stage"] = "pre_elaboration"
+          reject("snapshot before elaboration", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["run_status"] = "measured"
+          reject("measured run without captured snapshot and branch receipts", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["snapshot"]["capture_status"] = "captured"
+          bad["snapshot"]["snapshot_id_sha256"] = "a" * 64
+          reject("captured snapshot with zero measured branches", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["branches"] = [{
+              "branch_id":"branch-1",
+              "base_snapshot_sha256":"a" * 64,
+              "mutable_context_isolated":False,
+              "cache_policy":"discard_and_reinitialize_per_branch",
+              "status":"candidate_available",
+              "candidate_sha256":"b" * 64
+          }]
+          reject("branch sharing mutable context", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["branches"] = [{
+              "branch_id":"branch-1",
+              "base_snapshot_sha256":"a" * 64,
+              "mutable_context_isolated":True,
+              "cache_policy":"discard_and_reinitialize_per_branch",
+              "status":"candidate_available",
+              "candidate_sha256":"b" * 64
+          }]
+          reject("branch receipt without measured run", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["proof_state"]["proof_state_sha256"] = "not-a-digest"
+          reject("malformed proof-state identity", bad)
+          print("PITB_SNAPSHOT_RECEIPT_CONTRACT_PASS: snapshot isolation, cache policy, target identity, and execution-state controls")
+          PY
