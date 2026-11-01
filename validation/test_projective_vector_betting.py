@@ -159,8 +159,8 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
                 )
 
     def test_preconditioned_bet_ignores_dormant_extension(self):
-        envelope3 = equicorrelation_envelope(3, 0.2, 0.8, 0.5)
-        envelope2 = [row[:2] for row in envelope3[:2]]
+        envelope3 = projective_equicorrelation_envelope(3, 0.2, 0.8)
+        envelope2 = projective_equicorrelation_envelope(2, 0.2, 0.8)
         old = CovariancePreconditionedBet(envelope2, step_size=0.05)
         extended = CovariancePreconditionedBet(envelope3, step_size=0.05)
         for score in ([1.0, -0.5], [0.8, 0.2], [-0.1, 1.2], [1.1, 0.5]):
@@ -175,7 +175,7 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
             )
 
     def test_preconditioned_bet_new_coordinate_starts_dormant(self):
-        envelope = equicorrelation_envelope(2, 0.2, 0.8, 0.5)
+        envelope = projective_equicorrelation_envelope(2, 0.2, 0.8)
         state = CovariancePreconditionedBet(envelope, step_size=0.05)
         state.bets([True, False])
         state.observe([4.0, 123.0])
