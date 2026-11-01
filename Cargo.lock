@@ -24622,9 +24622,9 @@ dependencies = [
  "clap",
  "csv",
  "libc",
+ "rusqlite",
  "serde",
  "serde_json",
- "rusqlite",
  "sha2 0.10.9",
  "toml 0.8.23",
 ]
