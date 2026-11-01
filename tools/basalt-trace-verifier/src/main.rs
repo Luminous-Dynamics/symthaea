@@ -63,7 +63,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let code = if status == "pass" { 0 } else { 1 };
+    let code = match status.as_str() { "pass" => 0, "fail" => 1, "invalid_evidence" => 2, _ => 3 };
     emit(output, report_path, code)
 }
 
