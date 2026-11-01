@@ -820,13 +820,19 @@ fn validate_and_apply_event(
                     "identical decision bytes must share one canonical candidate ID",
                 ));
             }
-            if state.successful.contains_key(candidate_id)
-                && !matches!(outcome, EvaluationOutcome::Succeeded)
-            {
-                return Err(AnytimeError::new(
-                    format!("{path}.candidate_id"),
-                    "an admitted deterministic candidate cannot be retried after success",
-                ));
+            if let Some(existing) = state.successful.get(candidate_id) {
+                if existing.verification_rejected {
+                    return Err(AnytimeError::new(
+                        format!("{path}.candidate_id"),
+                        "a candidate rejected by verification is terminal for this run",
+                    ));
+                }
+                if !matches!(outcome, EvaluationOutcome::Succeeded) {
+                    return Err(AnytimeError::new(
+                        format!("{path}.candidate_id"),
+                        "an admitted deterministic candidate cannot be retried after success",
+                    ));
+                }
             }
 
             let new_candidate = match outcome {
@@ -1504,7 +1510,7 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                 objective_values: Some(values), feasible: Some(feasible),
                 constraint_violations, evidence_sha256: Some(evidence), decision_sha256, ..
             } => {
-                candidates.insert(candidate_id.clone(), CandidateState {
+                let candidate_state = CandidateState {
                     candidate: ParetoCandidate {
                         candidate_id: candidate_id.clone(),
                         objective_values: values.clone(),
@@ -1515,8 +1521,20 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                     decision_sha256: decision_sha256.clone(),
                     evidence_level: EvidenceLevel::Recorded,
                     verification_rejected: false,
-                });
-                newly_eligible_range = Some((None, EvidenceLevel::Recorded));
+                };
+                if let Some(existing) = candidates.get(candidate_id) {
+                    if existing.candidate != candidate_state.candidate
+                        || existing.decision_sha256 != candidate_state.decision_sha256
+                    {
+                        return Err(AnytimeError::new(
+                            "history.candidate_evaluation",
+                            "duplicate candidate replay changed its deterministic output",
+                        ));
+                    }
+                } else {
+                    candidates.insert(candidate_id.clone(), candidate_state);
+                    newly_eligible_range = Some((None, EvidenceLevel::Recorded));
+                }
             }
             AnytimeAction::CandidateVerification { candidate_id, level, .. } => {
                 let state = candidates.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(
@@ -1671,7 +1689,7 @@ fn metric_snapshot(
     metric: AnytimeTargetMetric,
 ) -> Result<MetricSnapshot, AnytimeError> {
     let eligible = candidates.values()
-        .filter(|state| state.evidence_level.meets(minimum_evidence_level))
+        .filter(|state| !state.verification_rejected && state.evidence_level.meets(minimum_evidence_level))
         .map(|state| state.candidate.clone())
         .collect::<Vec<_>>();
     if eligible.is_empty() {
@@ -1696,7 +1714,7 @@ fn metric_snapshot(
         .map(|candidate| candidate.utility_vector.clone())
         .collect::<Vec<_>>();
     let decision_digests = candidates.values()
-        .filter(|state| state.evidence_level.meets(minimum_evidence_level))
+        .filter(|state| !state.verification_rejected && state.evidence_level.meets(minimum_evidence_level))
         .map(|state| (&state.candidate.candidate_id, &state.decision_sha256))
         .collect::<Vec<_>>();
     let archive_sha256 = digest_serializable(&(
@@ -2163,6 +2181,55 @@ mod tests {
         append_candidate(&mut history, 3, "dominated", "d1", vec![0.25, 1.0]);
         let after = analyze_anytime_history(&history).unwrap().target_results[0].final_metric_value.unwrap();
         assert!((before - after).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejected_candidate_is_excluded_from_all_future_archive_prefixes() {
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
+        let before = analyze_anytime_history(&history).unwrap();
+        assert_eq!(
+            before.target_results.iter().find(|target| target.target_id == "recorded-hv").unwrap().status,
+            TargetAttainmentStatus::Reached,
+        );
+
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: Some(11),
+            completed_elapsed_millis: Some(12),
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateVerificationRejected {
+                candidate_id: "candidate-a".to_owned(),
+                evidence_sha256: H4.to_owned(),
+                verifier_receipt_sha256: H5.to_owned(),
+                rejection_reason: "artifact failed independent adjudication".to_owned(),
+            },
+        }).unwrap();
+        let after = analyze_anytime_history(&history).unwrap();
+        let recorded = after.target_results.iter().find(|target| target.target_id == "recorded-hv").unwrap();
+        assert_eq!(recorded.final_metric_value, Some(0.0));
+        assert_eq!(recorded.final_archive_sha256, digest_serializable(&Vec::<String>::new()).unwrap());
+        // Historical crossing is retained as a prefix fact; the final archive no longer contains it.
+        assert_eq!(recorded.first_event_ordinal, Some(1));
+        assert!(verify_anytime_run_receipt(&history, &after).is_ok());
+
+        let retry = history.append(AnytimeEventDraft {
+            started_elapsed_millis: Some(12),
+            completed_elapsed_millis: Some(13),
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "eval-a-retry".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 2,
+                decision_sha256: H3.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.0, 1.0]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H4.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(retry.is_err());
     }
 
     #[test]
