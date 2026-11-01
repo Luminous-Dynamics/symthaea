@@ -773,5 +773,19 @@
       "digest": "sha256:7bab2385bd7d9bfafd3568521b52e06fbed4157560c577b361d85e14bd84f937",
       "role": "cursor_predecessor"
     }
+  ],
+  "reference_linearization_order": [
+    "op-a-commit",
+    "op-b-commit",
+    "op-a-exact-retry",
+    "op-c-race-winner",
+    "op-d-race-loser",
+    "op-e-commit-lost-response",
+    "op-e-recovery-lookup",
+    "op-policy-publish",
+    "op-stale-policy-rejected",
+    "op-serializable-attempt-1",
+    "op-serializable-attempt-2",
+    "op-restore-old-snapshot"
   ]
 }
