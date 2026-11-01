@@ -217,17 +217,17 @@ fn evaluate_control(
             "abstain",
             "the required state has not been measured",
         )
-    } else if matches!(observed, "unsupported" | "not_applicable") {
-        (
-            "incompatible",
-            "reject_policy_for_target",
-            "the target does not provide the required capability",
-        )
-    } else if desired_match && !accepted_linked_evidence {
+    } else if !accepted_linked_evidence {
         (
             "unqualified_evidence",
             "abstain",
-            "the observed value lacks claim-scoped evidence from an accepted source",
+            "the observed value lacks claim-scoped evidence from an accepted source on a non-synthetic capture",
+        )
+    } else if matches!(observed, "unsupported" | "not_applicable") {
+        (
+            "independent_verifier_required",
+            "abstain",
+            "the target incompatibility is only a profile claim; verify target capability independently before taking action",
         )
     } else if desired_match {
         (
@@ -237,9 +237,9 @@ fn evaluate_control(
         )
     } else {
         (
-            "policy_violated",
-            "deny_or_reconfigure",
-            "the observed claim does not match any desired value",
+            "independent_verifier_required",
+            "abstain",
+            "the reported value conflicts with policy, but the profile and source labels are not independently authenticated; verify before denying or reconfiguring",
         )
     };
 
@@ -423,6 +423,60 @@ mod tests {
         profile["evidence_domain"] = Value::String("physical_device_lab".to_owned());
         profile["hardware_protections"]["memory_tagging"]["runtime_state"] =
             Value::String("enabled_verified".to_owned());
+        profile["evidence"].as_array_mut().unwrap().push(json!({
+            "evidence_id": "mte-runtime-lab-measurement",
+            "source_type": "physical_lab_measurement"
+        }));
+        profile["hardware_protections"]["memory_tagging"]["evidence_ids"] =
+            json!(["mte-runtime-lab-measurement"]);
+
+        let policy = fixture_policy();
+        let ledger = validate_evidence_ledger(&profile).unwrap();
+        let mte = policy["controls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|control| control["control_id"] == "memory.mte-runtime")
+            .unwrap();
+        let receipt = evaluate_control(mte, &profile, &ledger).unwrap();
+
+        assert_eq!(receipt["status"], "independent_verifier_required");
+        assert_eq!(receipt["action"], "abstain");
+    }
+
+    #[test]
+    fn unverified_policy_conflict_never_authorizes_reconfiguration() {
+        let mut profile = fixture_profile();
+        profile["evidence_domain"] = Value::String("physical_device_lab".to_owned());
+        profile["hardware_protections"]["memory_tagging"]["runtime_state"] =
+            Value::String("disabled_verified".to_owned());
+        profile["evidence"].as_array_mut().unwrap().push(json!({
+            "evidence_id": "mte-runtime-lab-measurement",
+            "source_type": "physical_lab_measurement"
+        }));
+        profile["hardware_protections"]["memory_tagging"]["evidence_ids"] =
+            json!(["mte-runtime-lab-measurement"]);
+
+        let policy = fixture_policy();
+        let ledger = validate_evidence_ledger(&profile).unwrap();
+        let mte = policy["controls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|control| control["control_id"] == "memory.mte-runtime")
+            .unwrap();
+        let receipt = evaluate_control(mte, &profile, &ledger).unwrap();
+
+        assert_eq!(receipt["status"], "independent_verifier_required");
+        assert_eq!(receipt["action"], "abstain");
+    }
+
+    #[test]
+    fn reported_unsupported_capability_never_authorizes_rejection_without_verifier() {
+        let mut profile = fixture_profile();
+        profile["evidence_domain"] = Value::String("physical_device_lab".to_owned());
+        profile["hardware_protections"]["memory_tagging"]["runtime_state"] =
+            Value::String("unsupported".to_owned());
         profile["evidence"].as_array_mut().unwrap().push(json!({
             "evidence_id": "mte-runtime-lab-measurement",
             "source_type": "physical_lab_measurement"
