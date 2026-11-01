@@ -179,8 +179,11 @@ fn expected_status(value: &Value) -> Result<&'static str> {
     let review_scope = string(value, "/semantic_review/review_scope")?;
     let intended_statement_present =
         !field(value, "/target/expected_informal_statement_sha256")?.is_null();
-    let review_covers_intent = matches!(review_scope, "informal_to_formal" | "domain_expert_review" | "combined")
-        && (review_scope != "combined" || intended_statement_present);
+    let review_covers_intent = match review_scope {
+        "informal_to_formal" | "combined" => intended_statement_present,
+        "domain_expert_review" => true,
+        _ => false,
+    };
     let approved_review = semantic == "approved"
         && review_covers_intent
         && !string(value, "/semantic_review/reviewer_identity")?.trim().is_empty()
