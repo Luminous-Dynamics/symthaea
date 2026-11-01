@@ -1473,7 +1473,7 @@ pub fn verify_composer_trace(
         if transition.to == ObligationState::Fulfilled {
             match transition.definition.as_ref() {
                 None => {},
-                Some(definition) if transition.score_event_ids.is_empty()
+                Some(_) if transition.score_event_ids.is_empty()
                     || transition.score_event_ids.iter().any(|event| !events.contains_key(event.as_str())) => {}
                 Some(definition) => {
                     if let Err(error) = verify_obligation_semantics(
