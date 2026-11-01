@@ -14,7 +14,8 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - a non-parametric time-to-sufficient-proof baseline separates right-censoring from competing terminal events;
 - an append-only forecast journal stores pre-execution predictions separately from evaluator, meter, and verifier outcomes;
 - a proof-frontier structural baseline feeds one-sided split-conformal simultaneous resource-vector envelopes;
-- a landmark IPCW calibration baseline adapts time-varying history-conditioned censoring weights to proof-completion resource scores.
+- a landmark IPCW calibration baseline adapts time-varying history-conditioned censoring weights to proof-completion resource scores;
+- a canonical graph adapter derives cost-to-go features from target-reachable AND/OR claims and scheduler obligation states.
 
 ## Run
 
@@ -28,7 +29,8 @@ The qualification workflow pins Rust 1.96.0 to match the repository toolchain.
 
 ## Scope and limitations
 
-This slice is not yet a frontier-conditioned remaining-cost predictor, IPCW estimator, conformal predictor, HARP implementation, concurrent distributed ledger, or production adapter. The forecast journal is a serialized append-only research log, not a signed tamper-evident audit log or distributed consensus service. The survival baseline is unconditional from task start and assumes censoring is independent conditional on the declared cohort. It supplies typed resource / receipt boundaries and deterministic survival / ledger invariants for subsequent experiments. The in-process simulator cannot prove provider-side spend enforcement; a production hard-cap claim requires real adapters with enforceable maximums and authoritative metering.
+This slice is not yet a frontier-conditioned remaining-cost predictor, IPCW estimator, conformal predictor, HARP implementation, concurrent distributed ledger, or production adapter. The forecast journal is a serialized append-only research log, not a signed tamper-evident audit log or distributed consensus service. The survival baseline is unconditional from task start and assumes censoring is independent conditional on the declared cohort. It supplies typed resource / receipt boundaries and deterministic survival / ledger invariants for subsequent experiments. The in-process simulator cannot prove provider-side spend enforcement; a production hard-cap claim requires real adapters with enforceable maximums and authoritative metering. The frontier adapter uses a non-cryptographic FNV identity checksum for deterministic tests only; production provenance requires a cryptographic digest over exact canonical bytes and signed or attested pre-action state capture.
 
 No Rust test, formatting, Clippy, or matrix result is claimed until the exact PR head has qualified.
+The graph adapter V1 is specified in [FRONTIER_ADAPTER_V1.md](FRONTIER_ADAPTER_V1.md). It tests feature extraction and stable identity; it is not a learned predictor or proof verifier.
 The landmark IPCW tranche is stacked on the proof-frontier/vector-conformal baseline. The boxed joint-envelope payload and borrow-based budget-fit interface are qualified on the current #9689 base; the IPCW branch must be requalified against that exact base before its own status can be claimed.
