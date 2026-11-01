@@ -155,7 +155,7 @@ Published control-plane baselines should be treated as a distinct capability, no
 
 PITB now has an executable deterministic controller and calibration receipt verifier with:
 - an action set covering continuation, retrieval, redecomposition, typed repair, tactic probes, snapshot branches, semantic checks and restart;
-- a 1.96-SE lower confidence bound on marginal verified-success probability;
+- a nominal 1.96-SE lower bound on action-conditioned verified-success probability by a pinned post-action horizon and continuation policy;
 - strict feasibility against all remaining token, call, tool, wall, Lean CPU and monetary caps;
 - fixed preregistered shadow weights and deterministic tie-breaks;
 - a conservative stop action when no feasible action clears the LCB threshold;
