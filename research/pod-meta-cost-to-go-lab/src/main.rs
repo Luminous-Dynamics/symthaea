@@ -2,7 +2,7 @@ use pod_meta_cost_to_go_lab::{
     BudgetLedger, CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt,
     CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState,
     EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt,
-    FrontierCostCoefficients, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
+    HistoricalCostBaseline, FrontierCostCoefficients, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
     LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
     OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
     OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEvaluator, ProofFrontierFeatures,
@@ -1145,4 +1145,98 @@ fn main() {
         feasibility.unknown_actual_outcomes,
         feasibility.abstained_predictions
     );
+    let mut historical_training = ForecastJournal::default();
+    historical_training
+        .append_forecast(prefix_forecast(801, 9801, 1, 7))
+        .unwrap();
+    historical_training
+        .append_forecast(prefix_forecast(802, 9802, 1, 7))
+        .unwrap();
+    historical_training
+        .append_forecast(prefix_forecast(803, 9803, 1, 7))
+        .unwrap();
+    historical_training
+        .append_outcome(prefix_outcome(
+            801,
+            2,
+            ResourceVector::new(10, 1, 2, 0, 5, 8),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
+    historical_training
+        .append_outcome(prefix_outcome(
+            802,
+            2,
+            ResourceVector::new(20, 2, 4, 1, 10, 16),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
+    historical_training
+        .append_outcome(prefix_outcome(
+            803,
+            2,
+            ResourceVector::new(100, 10, 20, 5, 50, 80),
+            TerminalOutcome::RightCensored(pod_meta_cost_to_go_lab::CensorReason::Timeout),
+        ))
+        .unwrap();
+    let historical_model =
+        HistoricalCostBaseline::fit(&historical_training, [81; 32], [82; 32]).unwrap();
+    let family_profile = historical_model.predict(7).profile;
+    let global_fallback = historical_model.predict(99).profile;
+    println!(
+        "HISTORICAL_BASELINE_ROW\tprofile-support\t{}\t{}\t{}",
+        historical_model.training_run_count(),
+        family_profile.support_count,
+        global_fallback.support_count
+    );
+
+    let mut historical_evaluation = ForecastJournal::default();
+    historical_evaluation
+        .append_forecast(prefix_forecast(811, 9901, 1, 7))
+        .unwrap();
+    historical_evaluation
+        .append_forecast(prefix_forecast(812, 9902, 1, 99))
+        .unwrap();
+    historical_evaluation
+        .append_forecast(prefix_forecast(813, 9903, 1, 7))
+        .unwrap();
+    historical_evaluation
+        .append_outcome(prefix_outcome(
+            811,
+            2,
+            ResourceVector::new(15, 1, 3, 0, 7, 12),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
+    historical_evaluation
+        .append_outcome(prefix_outcome(
+            812,
+            2,
+            ResourceVector::new(22, 2, 4, 1, 11, 17),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
+    historical_evaluation
+        .append_outcome(prefix_outcome(
+            813,
+            2,
+            ResourceVector::new(25, 3, 5, 2, 13, 20),
+            TerminalOutcome::RightCensored(pod_meta_cost_to_go_lab::CensorReason::Timeout),
+        ))
+        .unwrap();
+    let historical_report = historical_model.evaluate(&historical_evaluation).unwrap();
+    println!(
+        "HISTORICAL_BASELINE_ROW\tevaluation-metrics\t{}\t{}\t{}\t{:.3}\t{:.3}",
+        historical_report.report.total_prefixes,
+        historical_report.report.completed_verified,
+        historical_report.report.right_censored,
+        historical_report.report.dimensions[0].q50_mean_absolute_error.unwrap(),
+        historical_report.report.dimensions[0].q90_marginal_coverage.unwrap()
+    );
+    println!(
+        "HISTORICAL_BASELINE_ROW\tfallback-usage\t{}\t{}",
+        historical_report.report.global_fallback_prefixes,
+        historical_report.report.by_task_family.len()
+    );
+
 }
