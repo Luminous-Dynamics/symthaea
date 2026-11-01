@@ -9,6 +9,7 @@
 //! decisions remain separate authorities.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 
@@ -55,6 +56,32 @@ impl BeatPosition {
         ((self.numerator as u128) * (other.denominator as u128))
             .cmp(&((other.numerator as u128) * (self.denominator as u128)))
     }
+
+    fn checked_add(self, other: Self) -> Option<Self> {
+        let numerator = (self.numerator as u128)
+            .checked_mul(other.denominator as u128)?
+            .checked_add(
+                (other.numerator as u128).checked_mul(self.denominator as u128)?,
+            )?;
+        let denominator = (self.denominator as u128)
+            .checked_mul(other.denominator as u128)?;
+        let divisor = gcd_u128(numerator, denominator);
+        let reduced_numerator = numerator / divisor;
+        let reduced_denominator = denominator / divisor;
+        Some(Self {
+            numerator: u64::try_from(reduced_numerator).ok()?,
+            denominator: u32::try_from(reduced_denominator).ok()?,
+        })
+    }
+}
+
+fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.max(1)
 }
 
 fn is_sha256_hex(value: &str) -> bool {
@@ -161,6 +188,154 @@ pub struct PerformanceGestureEvent {
     pub interpolation: GestureInterpolation,
 }
 
+/// Producer-assigned identity and instrument binding for one legacy score note.
+///
+/// This sidecar avoids breaking ScoreNote literals/serialization while still
+/// requiring explicit note IDs. note_index is meaningful only under the exact
+/// score digest carried by this map; it is never used to invent note identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScoreNoteIdentityV1 {
+    pub note_index: usize,
+    pub note_id: String,
+    pub part_id: u16,
+    pub instrument_id: String,
+    pub source_model_id: Option<String>,
+    pub onset: BeatPosition,
+    pub duration: BeatPosition,
+}
+
+/// Complete score-bound identity map for one immutable score serialization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScoreNoteIdentityMapV1 {
+    pub schema_version: u16,
+    pub score_sha256: String,
+    pub note_count: usize,
+    pub notes: Vec<ScoreNoteIdentityV1>,
+    pub identity_map_sha256: String,
+}
+
+impl ScoreNoteIdentityMapV1 {
+    pub fn new(
+        score_sha256: impl Into<String>,
+        note_count: usize,
+        notes: Vec<ScoreNoteIdentityV1>,
+    ) -> Self {
+        let mut map = Self {
+            schema_version: 1,
+            score_sha256: score_sha256.into(),
+            note_count,
+            notes,
+            identity_map_sha256: String::new(),
+        };
+        map.identity_map_sha256 = map.compute_digest();
+        map
+    }
+
+    /// Validate schema, exact score binding, complete index coverage and
+    /// every producer-assigned identity. No IDs are inferred here.
+    pub fn validate_for_score(
+        &self,
+        expected_score_sha256: &str,
+        expected_note_count: usize,
+    ) -> Result<(), Vec<String>> {
+        let mut issues = Vec::new();
+        if self.schema_version != 1 {
+            issues.push(format!(
+                "unsupported note identity map schema version: {}",
+                self.schema_version
+            ));
+        }
+        if !is_sha256_hex(&self.score_sha256) {
+            issues.push("identity map score_sha256 is malformed".to_string());
+        } else if self.score_sha256 != expected_score_sha256 {
+            issues.push("identity map is bound to a different score digest".to_string());
+        }
+        if self.note_count != expected_note_count {
+            issues.push("identity map note_count does not match score".to_string());
+        }
+        if self.notes.len() != self.note_count || self.notes.len() != expected_note_count {
+            issues.push("identity map must contain exactly one entry per score note".to_string());
+        }
+        if !is_sha256_hex(&self.identity_map_sha256)
+            || self.identity_map_sha256 != self.compute_digest()
+        {
+            issues.push("identity map digest is invalid or stale".to_string());
+        }
+
+        let mut note_ids = HashSet::new();
+        for (index, note) in self.notes.iter().enumerate() {
+            if note.note_index != index {
+                issues.push(format!(
+                    "identity map entry {index} must bind exact score note index {index}"
+                ));
+            }
+            if note.note_id.trim().is_empty() || !note_ids.insert(note.note_id.as_str()) {
+                issues.push(format!("identity map entry {index} has an empty or duplicate note_id"));
+            }
+            if note.part_id == u16::MAX {
+                issues.push(format!("identity map entry {index} has unassigned part identity"));
+            }
+            if note.instrument_id.trim().is_empty() {
+                issues.push(format!("identity map entry {index} has empty instrument_id"));
+            }
+            if note.source_model_id.as_ref().is_some_and(|id| id.trim().is_empty()) {
+                issues.push(format!("identity map entry {index} has empty source_model_id"));
+            }
+            if !note.onset.is_canonical() || !note.duration.is_canonical() {
+                issues.push(format!("identity map entry {index} has non-canonical timing"));
+            }
+            if note.duration.numerator == 0 {
+                issues.push(format!("identity map entry {index} has zero duration"));
+            }
+            if note.onset.checked_add(note.duration).is_none() {
+                issues.push(format!("identity map entry {index} timing overflows exact beat range"));
+            }
+        }
+
+        if issues.is_empty() { Ok(()) } else { Err(issues) }
+    }
+
+    pub fn note(&self, part_id: u16, note_id: &str) -> Option<&ScoreNoteIdentityV1> {
+        self.notes.iter().find(|note| {
+            note.part_id == part_id && note.note_id == note_id
+        })
+    }
+
+    fn compute_digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"symthaea:muse:score-note-identity-map:v1\\n");
+        hasher.update(self.schema_version.to_be_bytes());
+        hash_string(&mut hasher, &self.score_sha256);
+        hasher.update((self.note_count as u64).to_be_bytes());
+        hasher.update((self.notes.len() as u64).to_be_bytes());
+        for note in &self.notes {
+            hasher.update((note.note_index as u64).to_be_bytes());
+            hash_string(&mut hasher, &note.note_id);
+            hasher.update(note.part_id.to_be_bytes());
+            hash_string(&mut hasher, &note.instrument_id);
+            match note.source_model_id.as_deref() {
+                Some(model) => {
+                    hasher.update([1]);
+                    hash_string(&mut hasher, model);
+                }
+                None => hasher.update([0]),
+            }
+            hasher.update(note.onset.numerator.to_be_bytes());
+            hasher.update(note.onset.denominator.to_be_bytes());
+            hasher.update(note.duration.numerator.to_be_bytes());
+            hasher.update(note.duration.denominator.to_be_bytes());
+        }
+        format!("{:x}", hasher.finalize())
+    }
+}
+
+fn hash_string(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
 /// Additive sidecar. Existing Score and ScoreNote serialization are unchanged.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -210,6 +385,77 @@ impl PerformanceGestureTrackV1 {
             }
             Some(_) => {}
         }
+        if issues.is_empty() { Ok(()) } else { Err(issues) }
+    }
+
+    /// Validate this stream and resolve every target against producer-assigned
+    /// note identities for the exact score. Renderers must call this before
+    /// consuming the gesture events.
+    pub fn validate_against_identity_map(
+        &self,
+        expected_score_sha256: &str,
+        identity_map: &ScoreNoteIdentityMapV1,
+    ) -> Result<(), Vec<String>> {
+        let mut issues = self.validate().err().unwrap_or_default();
+        if let Err(map_issues) = identity_map.validate_for_score(
+            expected_score_sha256,
+            identity_map.note_count,
+        ) {
+            issues.extend(map_issues);
+        }
+        if self.score_sha256.as_deref() != Some(expected_score_sha256) {
+            issues.push("gesture track score digest does not match requested score".to_string());
+        }
+        if identity_map.score_sha256 != expected_score_sha256 {
+            issues.push("gesture track and note identity map do not share the requested score".to_string());
+        }
+
+        for (index, event) in self.events.iter().enumerate() {
+            match &event.target {
+                GestureTarget::Note { part_id, note_id } => match identity_map.note(*part_id, note_id) {
+                    None => issues.push(format!(
+                        "event[{index}] references an unknown part/note identity"
+                    )),
+                    Some(note) => {
+                        if note.instrument_id != event.instrument_id {
+                            issues.push(format!(
+                                "event[{index}] instrument identity does not match target note"
+                            ));
+                        }
+                        if let Some(event_model) = event.source_model_id.as_deref() {
+                            if note.source_model_id.as_deref() != Some(event_model) {
+                                issues.push(format!(
+                                    "event[{index}] source model does not match target note"
+                                ));
+                            }
+                        }
+                        if event.at.cmp_exact(note.onset) == Ordering::Less {
+                            issues.push(format!("event[{index}] occurs before target note onset"));
+                        }
+                        if let Some(note_end) = note.onset.checked_add(note.duration) {
+                            if event.at.cmp_exact(note_end) == Ordering::Greater {
+                                issues.push(format!("event[{index}] occurs after target note end"));
+                            }
+                        } else {
+                            issues.push(format!("event[{index}] target note timing is not representable"));
+                        }
+                    }
+                },
+                GestureTarget::Part { part_id } => {
+                    let has_matching_part_instrument = identity_map.notes.iter().any(|note| {
+                        note.part_id == *part_id && note.instrument_id == event.instrument_id
+                            && event.source_model_id.as_deref()
+                                .is_none_or(|model| note.source_model_id.as_deref() == Some(model))
+                    });
+                    if !has_matching_part_instrument {
+                        issues.push(format!(
+                            "event[{index}] part/instrument identity is absent from score map"
+                        ));
+                    }
+                }
+            }
+        }
+
         if issues.is_empty() { Ok(()) } else { Err(issues) }
     }
 
@@ -675,6 +921,177 @@ mod tests {
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("categorical gesture value is empty")));
+    }
+
+    fn identity_map_fixture() -> ScoreNoteIdentityMapV1 {
+        ScoreNoteIdentityMapV1::new(
+            "a".repeat(64),
+            2,
+            vec![
+                ScoreNoteIdentityV1 {
+                    note_index: 0,
+                    note_id: "lead-note-1".to_string(),
+                    part_id: 1,
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
+                    onset: BeatPosition::new(0, 1).unwrap(),
+                    duration: BeatPosition::new(2, 1).unwrap(),
+                },
+                ScoreNoteIdentityV1 {
+                    note_index: 1,
+                    note_id: "lead-note-2".to_string(),
+                    part_id: 1,
+                    instrument_id: "violin".to_string(),
+                    source_model_id: Some("violin.model-a".to_string()),
+                    onset: BeatPosition::new(2, 1).unwrap(),
+                    duration: BeatPosition::new(2, 1).unwrap(),
+                },
+            ],
+        )
+    }
+
+    #[test]
+    fn note_identity_map_is_complete_digest_bound_and_resolves_stable_ids() {
+        let map = identity_map_fixture();
+        assert!(map.validate_for_score(&"a".repeat(64), 2).is_ok());
+        assert_eq!(
+            map.note(1, "lead-note-2").unwrap().note_index,
+            1
+        );
+        assert!(map.validate_for_score(&"b".repeat(64), 2).is_err());
+
+        let mut tampered = map.clone();
+        tampered.notes[0].instrument_id = "flute".to_string();
+        assert!(tampered.validate_for_score(&"a".repeat(64), 2).is_err());
+    }
+
+    #[test]
+    fn note_scoped_gesture_must_match_score_note_part_instrument_model_and_time() {
+        let map = identity_map_fixture();
+        let mut gesture = event(
+            "bow-pressure",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::BowForce,
+            GestureValue::Scalar {
+                amount: 1.2,
+                unit: GestureUnit::Newtons,
+            },
+            GestureInterpolation::Linear,
+        );
+        gesture.instrument_id = "violin".to_string();
+        gesture.source_model_id = Some("violin.model-a".to_string());
+        gesture.target = GestureTarget::Note {
+            part_id: 1,
+            note_id: "lead-note-1".to_string(),
+        };
+
+        let mut track = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
+        track.bind_to_score_sha256("a".repeat(64));
+        assert!(track
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .is_ok());
+
+        gesture.target = GestureTarget::Note {
+            part_id: 1,
+            note_id: "lead-note-2".to_string(),
+        };
+        let mut wrong_time = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
+        wrong_time.bind_to_score_sha256("a".repeat(64));
+        // A time inside the second note is valid; the ID is never reconstructed
+        // from pitch, timing or its position in the event stream.
+        assert!(wrong_time
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .is_ok());
+
+        gesture.target = GestureTarget::Note {
+            part_id: 99,
+            note_id: "lead-note-1".to_string(),
+        };
+        let mut wrong_part = PerformanceGestureTrackV1::new(vec![gesture]);
+        wrong_part.bind_to_score_sha256("a".repeat(64));
+        assert!(wrong_part
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("unknown part/note")));
+    }
+
+    #[test]
+    fn note_identity_map_rejects_wrong_instrument_wrong_model_and_out_of_note_time() {
+        let map = identity_map_fixture();
+        let mut base = event(
+            "gesture",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::BowForce,
+            GestureValue::Scalar {
+                amount: 0.8,
+                unit: GestureUnit::Newtons,
+            },
+            GestureInterpolation::Linear,
+        );
+        base.target = GestureTarget::Note {
+            part_id: 1,
+            note_id: "lead-note-1".to_string(),
+        };
+        base.instrument_id = "flute".to_string();
+        let mut wrong_instrument = PerformanceGestureTrackV1::new(vec![base.clone()]);
+        wrong_instrument.bind_to_score_sha256("a".repeat(64));
+        assert!(wrong_instrument
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("instrument identity")));
+
+        base.instrument_id = "violin".to_string();
+        base.source_model_id = Some("another.model".to_string());
+        let mut wrong_model = PerformanceGestureTrackV1::new(vec![base.clone()]);
+        wrong_model.bind_to_score_sha256("a".repeat(64));
+        assert!(wrong_model
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("source model")));
+
+        base.source_model_id = Some("violin.model-a".to_string());
+        base.at = BeatPosition::new(3, 1).unwrap();
+        let mut after_note = PerformanceGestureTrackV1::new(vec![base]);
+        after_note.bind_to_score_sha256("a".repeat(64));
+        assert!(after_note
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("after target note end")));
+    }
+
+    #[test]
+    fn part_scoped_gesture_requires_explicit_part_instrument_mapping() {
+        let map = identity_map_fixture();
+        let mut gesture = event(
+            "part-bow",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::BowSpeed,
+            GestureValue::Scalar {
+                amount: 0.4,
+                unit: GestureUnit::MetersPerSecond,
+            },
+            GestureInterpolation::Linear,
+        );
+        gesture.target = GestureTarget::Part { part_id: 1 };
+        gesture.instrument_id = "violin".to_string();
+        gesture.source_model_id = Some("violin.model-a".to_string());
+
+        let mut track = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
+        track.bind_to_score_sha256("a".repeat(64));
+        assert!(track
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .is_ok());
+
+        gesture.instrument_id = "flute".to_string();
+        let mut wrong_part_instrument = PerformanceGestureTrackV1::new(vec![gesture]);
+        wrong_part_instrument.bind_to_score_sha256("a".repeat(64));
+        assert!(wrong_part_instrument
+            .validate_against_identity_map(&"a".repeat(64), &map)
+            .is_err());
     }
 
     #[test]
