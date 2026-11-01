@@ -254,6 +254,7 @@
             "receipt_id": { "type": ["string", "null"] },
             "receipt_acceptance_revision": { "type": ["string", "null"] },
             "current_authority_revision": { "type": ["string", "null"] },
+            "observed_store_revision": { "type": ["string", "null"] },
             "reason": { "type": ["string", "null"] }
           }
         }
