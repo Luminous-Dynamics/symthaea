@@ -153,11 +153,14 @@ The official paper baseline is 48.3% average compression. PITB's proposed stretc
 
 Published control-plane baselines should be treated as a distinct capability, not hidden inside proof generation. A 2026 Lean action-routing paper reports 25.8% lower average cost than fixed-step proving at preserved performance on a PutnamBench subset. A separate dynamic-compute study reports +7.9% cost-quality AUC and 28.9% lower budget to a target accuracy in a 64-seed simulation on 85 tasks. These are different protocols, not direct PITB targets.
 
-PITB now has an executable deterministic controller with:
+PITB now has an executable deterministic controller and calibration receipt verifier with:
 - an action set covering continuation, retrieval, redecomposition, typed repair, tactic probes, snapshot branches, semantic checks and restart;
 - a 1.96-SE lower confidence bound on marginal verified-success probability;
 - strict feasibility against all remaining token, call, tool, wall, Lean CPU and monetary caps;
 - fixed preregistered shadow weights and deterministic tie-breaks;
-- a conservative stop action when no feasible action clears the LCB threshold.
+- a conservative stop action when no feasible action clears the LCB threshold;
+- exact calibration-receipt byte hashing, per-action ECE/Brier recomputation, dataset-manifest and predictor identity joins, and a canonical policy hash.
+
+The calibration receipt is still an aggregate summary: source checker/replay receipt bytes must be individually authenticated before its values can be described as empirical calibration.
 
 Initial targets are ≥30% lower cost per verified proof and ≥10% cost-quality AUC improvement against a matched fixed-step baseline, with non-inferior success at equal total budget. Those targets intentionally clear the published 25.8% cost and 7.9% AUC results by a small margin; they are not achieved results. The design, schema, synthetic fixture and executable are in `docs/research/pitb-adaptive-proof-search-allocation-2026-11-01.md` and `data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/`.
