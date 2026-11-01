@@ -44,6 +44,8 @@ struct Environment {
     lean_toolchain: String,
     lean_version: String,
     lean_binary_sha256: String,
+    lean_runtime_manifest_sha256: String,
+    imported_olean_manifest_sha256: String,
     task_id: String,
     source_repository: String,
     source_path: String,
@@ -501,6 +503,8 @@ fn encode_environment(encoder: &mut Encoder, environment: &Environment) {
     encoder.string(&environment.lean_toolchain);
     encoder.string(&environment.lean_version);
     encoder.string(&environment.lean_binary_sha256);
+    encoder.string(&environment.lean_runtime_manifest_sha256);
+    encoder.string(&environment.imported_olean_manifest_sha256);
     encoder.string(&environment.task_id);
     encoder.string(&environment.source_repository);
     encoder.string(&environment.source_path);
@@ -698,6 +702,14 @@ fn validate_evidence(evidence: &Evidence) -> Result<DigestsComputed> {
     }
     for (label, value) in [
         ("lean_binary_sha256", environment.lean_binary_sha256.as_str()),
+        (
+            "lean_runtime_manifest_sha256",
+            environment.lean_runtime_manifest_sha256.as_str(),
+        ),
+        (
+            "imported_olean_manifest_sha256",
+            environment.imported_olean_manifest_sha256.as_str(),
+        ),
         (
             "lean_toolchain_file_sha256",
             environment.lean_toolchain_file_sha256.as_str(),
@@ -935,6 +947,11 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let mut bad = fixture.clone();
     bad["environment"]["lean_version"] = Value::String("different-toolchain".into());
     reject_value("environment drift changes identity", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["environment"]["imported_olean_manifest_sha256"] =
+        Value::String("c".repeat(64));
+    reject_value("imported OLean closure drift changes identity", bad)?;
 
     let mut bad = fixture.clone();
     bad["target"] = serde_json::json!({"tag":"mvar","id":"?m.1"});
