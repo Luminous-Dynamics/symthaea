@@ -601,7 +601,8 @@ mod tests {
             target_observation_sha256: "c".repeat(64),
             target_embedding_sha256: embedding_sha256(next_hv),
             action_manifest_sha256: "d".repeat(64),
-            action_binding_sha256: action_binding_sha256(&"d".repeat(64), 42, action_index).unwrap(),
+            action_binding_sha256: action_binding_sha256(&"d".repeat(64), 42, action_index)
+                .unwrap(),
             episode_id: "episode-1".into(),
             branch_id: "branch-action-42".into(),
             forecast_id: "forecast-10-a42".into(),
