@@ -262,7 +262,6 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     for pointer in [
         "/target/source_file_sha256",
         "/target/source_span_sha256",
-        "/target/source_coordinate_system",
         "/reviewer_key_registry_sha256",
         "/target/statement_sha256",
         "/environment/lean_binary_sha256",
