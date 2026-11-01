@@ -21,6 +21,8 @@ const POLICY_VERSION: &str = "0.1.0";
 const RISK_TOLERANCE: f64 = 1e-9;
 const MAX_POLICY_ACTIONS: usize = 16;
 const MAX_EXPANDED_NODES: usize = 100_000;
+/// Keep integer budget/cost values exactly representable when converted to f64.
+const MAX_EXACT_INTEGER_COST_UNITS: u64 = 9_007_199_254_740_991;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequentialPolicyError {
@@ -131,6 +133,12 @@ pub fn solve_sequential_policy(
     problem: &ExactEvsiProblem,
     budget_units: u64,
 ) -> Result<SequentialDecisionPolicy, SequentialPolicyError> {
+    if budget_units > MAX_EXACT_INTEGER_COST_UNITS {
+        return Err(SequentialPolicyError::new(
+            "budget_units",
+            "budget exceeds the largest integer exactly representable by f64",
+        ));
+    }
     let canonical = problem.clone().canonicalize()?;
     if canonical.actions.len() > MAX_POLICY_ACTIONS {
         return Err(SequentialPolicyError::new(
@@ -583,6 +591,11 @@ mod tests {
         let baseline = solve_sequential_policy(&problem, 2).unwrap();
         let different_budget = solve_sequential_policy(&problem, 1).unwrap();
         assert_ne!(baseline.policy_sha256, different_budget.policy_sha256);
+    }
+
+    #[test]
+    fn integer_budget_above_f64_exact_range_is_rejected() {
+        assert!(solve_sequential_policy(&problem(), u64::MAX).is_err());
     }
 
     #[test]
