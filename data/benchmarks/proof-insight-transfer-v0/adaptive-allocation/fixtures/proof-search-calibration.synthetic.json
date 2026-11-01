@@ -959,6 +959,6 @@
       ]
     }
   ],
-  "evaluation_horizon_id": "fixed-horizon-30m-post-action-policy-v0",
+  "evaluation_horizon_id": "synthetic-fixed-horizon-post-action-v0",
   "continuation_policy_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
 }
