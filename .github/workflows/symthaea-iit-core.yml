@@ -29,9 +29,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: clippy
+          components: clippy,rustfmt
 
       - name: Capture benchmark environment and source identity
         shell: bash
@@ -111,6 +111,34 @@ jobs:
 
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
+
+      - name: Validate benchmark evidence completeness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s target/iit-benchmark-evidence/environment.txt
+          test -s target/iit-benchmark-evidence/cargo-test.log
+          test -s target/iit-benchmark-evidence/release-build.log
+          test -s target/iit-benchmark-evidence/clippy.log
+          for stem in \
+            directed-partitions \
+            factor-elimination \
+            cutset-conditioning \
+            cutset-frontier \
+            eq4-background \
+            sparse-eq4-scale \
+            sparse-eq4-topologies \
+            sparse-partition-score \
+            sparse-full-system-search
+          do
+            csv="target/iit-benchmark-evidence/${stem}.csv"
+            timing="target/iit-benchmark-evidence/${stem}.time.txt"
+            test -s "$csv"
+            test -s "$timing"
+            test "$(wc -l < "$csv")" -ge 2
+            grep -q "Maximum resident set size (kbytes):" "$timing"
+            printf 'PASS %s: CSV rows=%s; peak-RSS record present\n' "$stem" "$(( $(wc -l < "$csv") - 1 ))"
+          done
 
       - name: Upload immutable IIT benchmark evidence
         if: always()
