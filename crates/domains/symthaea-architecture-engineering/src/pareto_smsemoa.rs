@@ -831,11 +831,14 @@ fn make_anytime_recorder<'a>(
     {
         return Err(SmsEmoaError::new("anytime.header", "history algorithm, problem, or seed differs from this SMS-EMOA run"));
     }
+    let config_sha256 = config.config_sha256()?;
     if config.objective_specs.len() != objective_dimensions
         || history.header().objective_specs != config.objective_specs
+        || history.header().reference_point_utility != config.reference_point_utility
+        || history.header().search_config_sha256 != config_sha256
         || config.objective_specs.iter().any(|spec| spec.direction != ObjectiveDirection::Minimize)
     {
-        return Err(SmsEmoaError::new("anytime.objective_specs", "history objective definitions differ from SMS-EMOA configuration"));
+        return Err(SmsEmoaError::new("anytime.objective_specs", "history objective/reference-point/search configuration differs from SMS-EMOA configuration"));
     }
     if history.header().max_objective_evaluation_attempts < u64::try_from(expected_attempts).unwrap_or(u64::MAX) {
         return Err(SmsEmoaError::new("anytime.max_objective_evaluation_attempts", "history attempt budget is below the optimizer's exact budget"));
@@ -948,6 +951,7 @@ mod tests {
             "0123456789abcdef0123456789abcdef01234567",
             ALGORITHM_ID,
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            config.config_sha256().unwrap().as_str(),
             "test-evaluator",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "test-independent-verifier",
