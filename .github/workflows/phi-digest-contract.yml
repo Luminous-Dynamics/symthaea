@@ -279,6 +279,9 @@ jobs:
           assert all(len(p["model_sha256"]) == 64 and len(p["evaluation_sha256"]) == 64 and len(p["analysis_request_sha256"]) == 64 for p in points)
           assert all(p["mip_cut_sha256"] and len(p["mip_cut_sha256"]) == 64 for p in points)
           assert all(isinstance(p["mip_cut_removed_edges"], list) for p in points)
+          assert all(p["mip_tie_count"] == len(p["mip_tie_cut_sha256s"]) == len(p["mip_tie_cut_removed_edges"]) for p in points)
+          assert all(p["mip_cut_sha256"] in p["mip_tie_cut_sha256s"] for p in points)
+          assert all(len(set(p["mip_tie_cut_sha256s"])) == p["mip_tie_count"] for p in points)
           assert all(b["qualification"] == "GRID_RESOLUTION_SWITCH_BRACKET_NOT_CERTIFIED" for b in data["grid_resolution_boundaries"])
           print("PASS: 13 pinned PyPhi landscape samples; canonical model/evaluation/request identities; grid brackets remain uncertified")
           PY
