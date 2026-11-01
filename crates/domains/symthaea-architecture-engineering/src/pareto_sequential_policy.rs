@@ -462,7 +462,7 @@ fn digest_serializable<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domains::symthaea_architecture_engineering::pareto_evsi_oracle::{
+    use crate::pareto_evsi_oracle::{
         analyze_exact_evsi, EvsiActionOutcome, EvsiDecision, EvsiWorldLikelihood,
         EvsiWorldLoss, EvsiWorldProbability,
     };
@@ -609,17 +609,19 @@ mod tests {
     #[test]
     fn zero_probability_outcomes_are_retained_without_fabricated_children() {
         let mut model = problem();
-        model.worlds[0].posterior_probability = 1.0;
-        model.worlds[1].posterior_probability = 0.0;
-        let policy = solve_sequential_policy(&model, 2).unwrap();
-        if let Some(action_id) = policy.root.selected_action_id.as_deref() {
-            let action = model.actions.iter().find(|candidate| candidate.action_id == action_id).unwrap();
-            let impossible = policy.root.branches.iter().find(|branch|
-                branch.outcome_id == action.outcomes[1].outcome_id
-            ).unwrap();
-            assert_eq!(impossible.predictive_probability, 0.0);
-            assert_eq!(impossible.child, None);
-            assert_eq!(impossible.posterior_sha256, None);
+        for action in &mut model.actions {
+            action.outcomes.push(EvsiActionOutcome {
+                outcome_id: "impossible".to_owned(),
+                likelihoods_by_world: likelihoods(0.0, 0.0),
+            });
         }
+        let policy = solve_sequential_policy(&model, 2).unwrap();
+        assert!(policy.root.selected_action_id.is_some());
+        let impossible = policy.root.branches.iter().find(|branch|
+            branch.outcome_id == "impossible"
+        ).unwrap();
+        assert_eq!(impossible.predictive_probability, 0.0);
+        assert_eq!(impossible.child, None);
+        assert_eq!(impossible.posterior_sha256, None);
     }
 }
