@@ -215,6 +215,76 @@ def verify_affine_closure_milp_solution(
     }
 
 
+def render_cplex_lp(model: dict) -> str:
+    """Render the exact rational model as a CPLEX-LP-compatible text artifact.
+
+    Each row (and the objective) is independently scaled to integer
+    coefficients by the least common multiple of its rational denominators.
+    This preserves the exact feasible set and objective ordering.
+    """
+    from math import lcm
+
+    def scaled(lhs: Mapping[str, Fraction], rhs: Fraction):
+        values = [Fraction(v) for v in lhs.values()] + [Fraction(rhs)]
+        multiplier = lcm(*(v.denominator for v in values)) if values else 1
+        return (
+            {name: int(Fraction(value) * multiplier) for name, value in lhs.items()},
+            int(Fraction(rhs) * multiplier),
+        )
+
+    def expression(coefficients: Mapping[str, int]) -> str:
+        terms = []
+        for variable, coefficient in coefficients.items():
+            if coefficient == 0:
+                continue
+            magnitude = abs(coefficient)
+            term = variable if magnitude == 1 else f"{magnitude} {variable}"
+            if not terms:
+                terms.append(("-" if coefficient < 0 else "") + term)
+            else:
+                terms.append((" - " if coefficient < 0 else " + ") + term)
+        return "".join(terms) if terms else "0"
+
+    objective, _ = scaled(model["objective"], Fraction(0))
+    lines = ["Maximize", f" obj: {expression(objective)}", "Subject To"]
+    constraints = model["constraints"]
+
+    def append_row(name: str, row: dict) -> None:
+        coefficients, rhs = scaled(row["lhs"], row["rhs"])
+        sense = {
+            "equal": "=",
+            "less_equal": "<=",
+            "greater_equal": ">=",
+        }[row["sense"]]
+        lines.append(f" {name}: {expression(coefficients)} {sense} {rhs}")
+
+    append_row("rejection_count", constraints["rejection_count"])
+    for row in constraints["closure_auxiliary"]:
+        append_row(row["name"], row)
+    append_row("closure_sum", constraints["closure_sum"])
+    if constraints["capacity"] is not None:
+        append_row("capacity", constraints["capacity"])
+    for i, row in enumerate(constraints["persistence"]):
+        append_row(f"persistence_{i}", row)
+
+    lines.append("Bounds")
+    r_bounds = model["variables"]["r"]
+    lines.append(f" {r_bounds['lower']} <= r <= {r_bounds['upper']}")
+    for name, spec in model["variables"].items():
+        if spec["type"] == "continuous":
+            lines.append(f" {spec.get('lower', 0)} <= {name}")
+    integer_vars = [name for name, spec in model["variables"].items() if spec["type"] == "integer"]
+    binary_vars = [name for name, spec in model["variables"].items() if spec["type"] == "binary"]
+    if integer_vars:
+        lines.append("Generals")
+        lines.append(" " + " ".join(integer_vars))
+    if binary_vars:
+        lines.append("Binaries")
+        lines.append(" " + " ".join(binary_vars))
+    lines.append("End")
+    return "\n".join(lines) + "\n"
+
+
 def minimal_auxiliary_values(
     model: dict,
     rejection_values: Mapping[int, int],
