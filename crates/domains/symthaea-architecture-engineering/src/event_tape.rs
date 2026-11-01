@@ -1593,6 +1593,81 @@ fn validate_objective_vector(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn validate_objective_attempt_metadata<'a>(
+    header: &'a EventTapeHeader,
+    contract_sha256: &str,
+    expected_mode: EventTapeObjectiveMode,
+    task_recipe_sha256: &str,
+    comparison_profile_sha256: &str,
+    evaluator_sha256: &str,
+    verifier_sha256: &str,
+    verifier_receipt_sha256: &str,
+    resources: &ResourceReceipt,
+    path: &str,
+) -> Result<&'a EventTapeObjectiveContract, EventTapeError> {
+    let contract = validate_objective_contract_for_action(
+        header,
+        contract_sha256,
+        expected_mode,
+        path,
+    )?;
+    validate_event_versions(
+        task_recipe_sha256,
+        comparison_profile_sha256,
+        evaluator_sha256,
+        header,
+        path,
+        false,
+    )?;
+    validate_sha256(verifier_sha256, &format!("{path}.outcome.verifier_sha256"))?;
+    if verifier_sha256 != header.verifier_sha256 {
+        return Err(EventTapeError::new(
+            format!("{path}.outcome.verifier_sha256"),
+            "objective verifier digest differs from the frozen header",
+        ));
+    }
+    validate_sha256(
+        verifier_receipt_sha256,
+        &format!("{path}.outcome.verifier_receipt_sha256"),
+    )?;
+    require_minimum_meter(
+        &resources.evaluator_calls,
+        1,
+        &format!("{path}.resources.evaluator_calls"),
+    )?;
+    require_minimum_meter(
+        &resources.verifier_calls,
+        1,
+        &format!("{path}.resources.verifier_calls"),
+    )?;
+    Ok(contract)
+}
+
+fn validate_successful_objective_evidence(
+    evidence_sha256: Option<&str>,
+    manifest_sha256: Option<&str>,
+    byte_receipt_sha256: Option<&str>,
+    path: &str,
+) -> Result<(), EventTapeError> {
+    for (field, value) in [
+        ("evidence_sha256", evidence_sha256),
+        ("evidence_manifest_sha256", manifest_sha256),
+        ("evidence_byte_receipt_sha256", byte_receipt_sha256),
+    ] {
+        validate_sha256(
+            value.ok_or_else(|| {
+                EventTapeError::new(
+                    format!("{path}.{field}"),
+                    "successful objective observations require evidence, manifest and byte-receipt digests",
+                )
+            })?,
+            &format!("{path}.{field}"),
+        )?;
+    }
+    Ok(())
+}
+
 fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
     if header.schema != TAPE_SCHEMA {
         return Err(EventTapeError::new(
