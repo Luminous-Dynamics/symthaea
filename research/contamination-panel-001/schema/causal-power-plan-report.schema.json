@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/causal-power-plan-report-v1.json",
+  "title": "Causal model-pair power and precision plan report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "primary_estimand_id",
+    "independent_unit",
+    "request_sha256",
+    "multiplicity_policy",
+    "contrast_count",
+    "familywise_alpha_permille",
+    "adjusted_alpha_policy",
+    "target_power_permille",
+    "target_ci_half_width_permille",
+    "max_gross_model_pair_replicates",
+    "attrition_scenarios_permille",
+    "items_per_pair_scenarios",
+    "independent_degrees_of_freedom_rule",
+    "within_pair_measurement_rule",
+    "numerical_method",
+    "results",
+    "threshold_selection_used_evaluation_data",
+    "questions_counted_as_independent_training_replicates",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.causal_power_plan_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "primary_estimand_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "independent_unit": {
+      "const": "independent_model_pair"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "multiplicity_policy": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bonferroni"
+      ]
+    },
+    "contrast_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "familywise_alpha_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    },
+    "adjusted_alpha_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_power_permille": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 990
+    },
+    "target_ci_half_width_permille": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "max_gross_model_pair_replicates": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 500
+    },
+    "attrition_scenarios_permille": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 900
+      }
+    },
+    "items_per_pair_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "independent_degrees_of_freedom_rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "within_pair_measurement_rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "numerical_method": {
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "true_effect_permille",
+          "between_pair_sd_permille",
+          "within_pair_item_sd_permille",
+          "attrition_rate_permille",
+          "items_per_pair",
+          "adjusted_alpha_permille",
+          "minimum_gross_pairs_for_target_power",
+          "minimum_gross_pairs_for_target_precision",
+          "curve"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "true_effect_permille": {
+            "type": "number"
+          },
+          "between_pair_sd_permille": {
+            "type": "number",
+            "minimum": 0
+          },
+          "within_pair_item_sd_permille": {
+            "type": "number",
+            "minimum": 0
+          },
+          "attrition_rate_permille": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 900
+          },
+          "items_per_pair": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adjusted_alpha_permille": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 200
+          },
+          "minimum_gross_pairs_for_target_power": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 2,
+            "maximum": 500
+          },
+          "minimum_gross_pairs_for_target_precision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 2,
+            "maximum": 500
+          },
+          "curve": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 499,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gross_independent_model_pairs",
+                "expected_completed_model_pairs",
+                "degrees_of_freedom",
+                "effective_pair_effect_sd_permille",
+                "noncentrality_parameter",
+                "power_permille",
+                "expected_two_sided_95_ci_half_width_permille"
+              ],
+              "properties": {
+                "gross_independent_model_pairs": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 500
+                },
+                "expected_completed_model_pairs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 500
+                },
+                "degrees_of_freedom": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 499
+                },
+                "effective_pair_effect_sd_permille": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "noncentrality_parameter": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "power_permille": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "expected_two_sided_95_ci_half_width_permille": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "threshold_selection_used_evaluation_data": {
+      "const": false
+    },
+    "questions_counted_as_independent_training_replicates": {
+      "const": false
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "const": "design_sensitivity_only"
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

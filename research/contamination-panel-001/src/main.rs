@@ -2,6 +2,7 @@ use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    causal_power::{CausalPowerPlanRequestV1, plan_causal_power},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
@@ -287,6 +288,31 @@ fn read_file_bounded(path: &str, maximum_bytes: u64) -> Result<Vec<u8>, Box<dyn 
     Ok(bytes)
 }
 
+fn plan_causal_power_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench plan-causal-power <power-plan-request.json> <power-plan-report.json>"
+                .into(),
+        );
+    }
+    const MAX_POWER_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_POWER_REQUEST_BYTES)?;
+    let request: CausalPowerPlanRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = plan_causal_power(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "scenarios={} independent_unit={} target_power={}‰ max_gross_pairs={} confirmatory_eligible={} status={}",
+        report.results.len(),
+        report.independent_unit,
+        report.target_power_permille,
+        report.max_gross_model_pair_replicates,
+        report.confirmatory_eligible,
+        report.analysis_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -400,10 +426,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-intervention") => audit_intervention_cli(&args),
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
+        Some("plan-causal-power") => plan_causal_power_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | plan-causal-power | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
