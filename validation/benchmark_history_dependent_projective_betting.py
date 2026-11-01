@@ -41,7 +41,7 @@ def _wilson(successes: int, total: int, z: float = 1.959963984540054) -> tuple[f
     return max(0.0, center - radius), min(1.0, center + radius)
 
 
-def _logmeanexp_rows(log_terms):
+def _logsumexp_rows(log_terms):
     import numpy as np
 
     maximum = np.max(log_terms, axis=1)
@@ -151,11 +151,12 @@ def _simulate_one(
         # Arbitrary-dependence coordinate e-process baseline. Each coordinate
         # has unit marginal variance; its fixed positive lambda is valid under
         # its one-sided Gaussian null, regardless of cross-coordinate rho.
-        mmax = int(active_count.max())
-        log_coordinate[:, :mmax] += (
-            coordinate_lambda * z_current[:, :mmax]
-            - 0.5 * coordinate_lambda * coordinate_lambda
-        )
+        for m in np.unique(active_count):
+            idx = np.flatnonzero(active_count == m)
+            log_coordinate[np.ix_(idx, np.arange(m))] += (
+                coordinate_lambda * z_current[np.ix_(idx, np.arange(m))]
+                - 0.5 * coordinate_lambda * coordinate_lambda
+            )
         observations[:, t, :] = np.where(
             np.arange(n_hypotheses)[None, :] < active_count[:, None],
             z_current,
@@ -181,7 +182,7 @@ def _simulate_one(
             if cash > 0:
                 cash_column = np.full((len(idx), 1), math.log(cash))
                 terms = np.concatenate([cash_column, terms], axis=1)
-            log_affine_values[idx] = _logmeanexp_rows(terms)
+            log_affine_values[idx] = _logsumexp_rows(terms)
         newly_crossed = (crossing_times["affine_global"] == horizon + 1) & (
             log_affine_values >= log_threshold
         )
@@ -240,6 +241,7 @@ def run_benchmark(
     alpha: float = 0.05,
     seed: int = 20261101,
 ) -> dict[str, Any]:
+    correlations = tuple(float(rho) for rho in correlations)
     scenarios = []
     started = time.perf_counter()
     scenario_id = 0
