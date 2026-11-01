@@ -24,8 +24,8 @@
 use crate::{
     hash_domain,
     intervention::{
-        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1,
-        audit_intervention, randomize_intervention,
+        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
+        randomize_intervention,
     },
     training_receipt::PairedTrainingExecutionAuditV1,
 };
@@ -33,10 +33,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CAUSAL_STUDY_SCHEMA: &str =
-    "symthaea.replicated_contamination_causal_study.v1";
-pub const CAUSAL_REPORT_SCHEMA: &str =
-    "symthaea.replicated_contamination_causal_report.v1";
+pub const CAUSAL_STUDY_SCHEMA: &str = "symthaea.replicated_contamination_causal_study.v1";
+pub const CAUSAL_REPORT_SCHEMA: &str = "symthaea.replicated_contamination_causal_report.v1";
 pub const CAUSAL_MIN_CONFIRMATORY_REPLICATES: usize = 20;
 pub const CAUSAL_MIN_RANDOMIZATION_DRAWS: u32 = 999;
 pub const CAUSAL_MAX_RANDOMIZATION_DRAWS: u32 = 100_000;
@@ -240,7 +238,10 @@ fn sample_sd(values: &[f64], center: f64) -> Result<f64, String> {
     if values.len() < 2 {
         return Err("at least two independent model-pair replicates are required".to_owned());
     }
-    let sum = values.iter().map(|value| (value - center).powi(2)).sum::<f64>();
+    let sum = values
+        .iter()
+        .map(|value| (value - center).powi(2))
+        .sum::<f64>();
     let sd = (sum / (values.len() - 1) as f64).sqrt();
     if sd.is_finite() {
         Ok(sd)
@@ -252,15 +253,43 @@ fn sample_sd(values: &[f64], center: f64) -> Result<f64, String> {
 fn t_critical_975(df: usize) -> f64 {
     // Conservative upper-df table for two-sided 95% Student-t intervals.
     const TABLE: &[(usize, f64)] = &[
-        (1, 12.706), (2, 4.303), (3, 3.182), (4, 2.776), (5, 2.571),
-        (6, 2.447), (7, 2.365), (8, 2.306), (9, 2.262), (10, 2.228),
-        (11, 2.201), (12, 2.179), (13, 2.160), (14, 2.145), (15, 2.131),
-        (16, 2.120), (17, 2.110), (18, 2.101), (19, 2.093), (20, 2.086),
-        (21, 2.080), (22, 2.074), (23, 2.069), (24, 2.064), (25, 2.060),
-        (26, 2.056), (27, 2.052), (28, 2.048), (29, 2.045), (30, 2.042),
-        (40, 2.042), (60, 2.021), (120, 2.000), (usize::MAX, 1.980),
+        (1, 12.706),
+        (2, 4.303),
+        (3, 3.182),
+        (4, 2.776),
+        (5, 2.571),
+        (6, 2.447),
+        (7, 2.365),
+        (8, 2.306),
+        (9, 2.262),
+        (10, 2.228),
+        (11, 2.201),
+        (12, 2.179),
+        (13, 2.160),
+        (14, 2.145),
+        (15, 2.131),
+        (16, 2.120),
+        (17, 2.110),
+        (18, 2.101),
+        (19, 2.093),
+        (20, 2.086),
+        (21, 2.080),
+        (22, 2.074),
+        (23, 2.069),
+        (24, 2.064),
+        (25, 2.060),
+        (26, 2.056),
+        (27, 2.052),
+        (28, 2.048),
+        (29, 2.045),
+        (30, 2.042),
+        (40, 2.042),
+        (60, 2.021),
+        (120, 2.000),
+        (usize::MAX, 1.980),
     ];
-    TABLE.iter()
+    TABLE
+        .iter()
         .find(|(upper_df, _)| df <= *upper_df)
         .map(|(_, value)| *value)
         .unwrap_or(1.96)
@@ -303,32 +332,45 @@ fn validate_common_design(
         || first.training_hyperparameters_sha256 != next.training_hyperparameters_sha256
         || first.optimizer_schedule_sha256 != next.optimizer_schedule_sha256
     {
-        return Err("replicate designs differ on preregistered common benchmark/training conditions".to_owned());
+        return Err(
+            "replicate designs differ on preregistered common benchmark/training conditions"
+                .to_owned(),
+        );
     }
-    let first_clusters: BTreeMap<String, (String, String, usize, u64, String, String)> =
-        first.clusters.iter().map(|cluster| (
-            cluster.cluster_id.clone(),
+    let first_clusters: BTreeMap<String, (String, String, usize, u64, String, String)> = first
+        .clusters
+        .iter()
+        .map(|cluster| {
             (
-                cluster.task_family.clone(),
-                cluster.source_family_sha256.clone(),
-                cluster.item_ids.len(),
-                cluster.exposure_token_count,
-                cluster.exposure_variant_sha256.clone(),
-                cluster.matched_placebo_record_sha256.clone(),
+                cluster.cluster_id.clone(),
+                (
+                    cluster.task_family.clone(),
+                    cluster.source_family_sha256.clone(),
+                    cluster.item_ids.len(),
+                    cluster.exposure_token_count,
+                    cluster.exposure_variant_sha256.clone(),
+                    cluster.matched_placebo_record_sha256.clone(),
+                ),
             )
-        )).collect();
-    let next_clusters: BTreeMap<String, (String, String, usize, u64, String, String)> =
-        next.clusters.iter().map(|cluster| (
-            cluster.cluster_id.clone(),
+        })
+        .collect();
+    let next_clusters: BTreeMap<String, (String, String, usize, u64, String, String)> = next
+        .clusters
+        .iter()
+        .map(|cluster| {
             (
-                cluster.task_family.clone(),
-                cluster.source_family_sha256.clone(),
-                cluster.item_ids.len(),
-                cluster.exposure_token_count,
-                cluster.exposure_variant_sha256.clone(),
-                cluster.matched_placebo_record_sha256.clone(),
+                cluster.cluster_id.clone(),
+                (
+                    cluster.task_family.clone(),
+                    cluster.source_family_sha256.clone(),
+                    cluster.item_ids.len(),
+                    cluster.exposure_token_count,
+                    cluster.exposure_variant_sha256.clone(),
+                    cluster.matched_placebo_record_sha256.clone(),
+                ),
             )
-        )).collect();
+        })
+        .collect();
     if first_clusters != next_clusters {
         return Err("replicate source-cluster universe or cluster records differ".to_owned());
     }
@@ -342,7 +384,10 @@ fn validate_replicate(
     expected_metric_digest: &str,
 ) -> Result<(), String> {
     if !(1..1_000).contains(&replicate.design.target_exposure_fraction_permille) {
-        return Err("causal localization requires an interior exposure fraction in [1, 999] permille".to_owned());
+        return Err(
+            "causal localization requires an interior exposure fraction in [1, 999] permille"
+                .to_owned(),
+        );
     }
     let seed = decode_seed_hex(&replicate.randomization_seed_hex, "randomization_seed_hex")?;
     audit_intervention(&replicate.design, &replicate.manifest, &seed)?;
@@ -351,42 +396,70 @@ fn validate_replicate(
     {
         return Err("replicate benchmark identity differs from study".to_owned());
     }
-    validate_digest(&replicate.training_receipt_audit_sha256, "training_receipt_audit_sha256")?;
+    validate_digest(
+        &replicate.training_receipt_audit_sha256,
+        "training_receipt_audit_sha256",
+    )?;
     if !replicate.training_receipt_audit.valid
         || !replicate.training_receipt_audit.execution_consistent
         || !replicate.training_receipt_audit.treatment_completed
         || !replicate.training_receipt_audit.placebo_completed
     {
-        return Err("replicate lacks a consistent completed paired training execution audit".to_owned());
+        return Err(
+            "replicate lacks a consistent completed paired training execution audit".to_owned(),
+        );
     }
     let audit_bytes = serde_json::to_vec(&replicate.training_receipt_audit)
         .map_err(|error| format!("cannot serialize training receipt audit: {error}"))?;
-    let expected_audit_digest =
-        hash_domain(b"paired-training-execution-audit.v1", &audit_bytes);
+    let expected_audit_digest = hash_domain(b"paired-training-execution-audit.v1", &audit_bytes);
     if replicate.training_receipt_audit_sha256 != expected_audit_digest {
         return Err("training receipt audit digest does not match report contents".to_owned());
     }
     if replicate.training_receipt_audit.independently_verified {
-        return Err("self-asserted independent verification cannot be trusted by this analysis module".to_owned());
+        return Err(
+            "self-asserted independent verification cannot be trusted by this analysis module"
+                .to_owned(),
+        );
     }
     if !replicate.training_receipt_audit.paired_checkpoints_distinct
         || !replicate.training_receipt_audit.base_checkpoint_matched
-        || !replicate.training_receipt_audit.training_configuration_matched
-        || !replicate.training_receipt_audit.corpus_identities_matched_to_design
-        || !replicate.training_receipt_audit.intervention_payloads_matched_to_assignment
-        || !replicate.training_receipt_audit.observed_token_budgets_complete
-        || !replicate.training_receipt_audit.observed_step_budgets_complete
-        || !replicate.training_receipt_audit.runner_attestation_digests_present
-        || !replicate.training_receipt_audit.checkpoint_custody_digests_present
-        || !replicate.training_receipt_audit.ready_for_independent_attestation_verification
+        || !replicate
+            .training_receipt_audit
+            .training_configuration_matched
+        || !replicate
+            .training_receipt_audit
+            .corpus_identities_matched_to_design
+        || !replicate
+            .training_receipt_audit
+            .intervention_payloads_matched_to_assignment
+        || !replicate
+            .training_receipt_audit
+            .observed_token_budgets_complete
+        || !replicate
+            .training_receipt_audit
+            .observed_step_budgets_complete
+        || !replicate
+            .training_receipt_audit
+            .runner_attestation_digests_present
+        || !replicate
+            .training_receipt_audit
+            .checkpoint_custody_digests_present
+        || !replicate
+            .training_receipt_audit
+            .ready_for_independent_attestation_verification
     {
         return Err("training execution audit is missing a required consistency or external-attestation receipt".to_owned());
     }
-    if replicate.training_receipt_audit.training_rng_seed_commitment_sha256
-            != replicate.design.training_rng_seed_commitment_sha256
+    if replicate
+        .training_receipt_audit
+        .training_rng_seed_commitment_sha256
+        != replicate.design.training_rng_seed_commitment_sha256
         || replicate.training_receipt_audit.design_sha256 != replicate.manifest.design_sha256
         || replicate.training_receipt_audit.manifest_sha256 != replicate.manifest.manifest_sha256
-        || replicate.training_receipt_audit.intervention_manifest_sha256 != replicate.manifest.manifest_sha256
+        || replicate
+            .training_receipt_audit
+            .intervention_manifest_sha256
+            != replicate.manifest.manifest_sha256
         || replicate.training_receipt_audit.treatment_checkpoint_sha256
             != replicate.evaluation_evidence.treatment_checkpoint_sha256
         || replicate.training_receipt_audit.placebo_checkpoint_sha256
@@ -397,61 +470,121 @@ fn validate_replicate(
         return Err("training audit and evaluation checkpoint identities do not match".to_owned());
     }
     for (digest, label) in [
-        (&replicate.evaluation_evidence.base_checkpoint_sha256, "base_checkpoint_sha256"),
-        (&replicate.evaluation_evidence.treatment_checkpoint_sha256, "treatment_checkpoint_sha256"),
-        (&replicate.evaluation_evidence.placebo_checkpoint_sha256, "placebo_checkpoint_sha256"),
-        (&replicate.evaluation_evidence.base_evaluation_receipt_sha256, "base_evaluation_receipt_sha256"),
-        (&replicate.evaluation_evidence.treatment_evaluation_receipt_sha256, "treatment_evaluation_receipt_sha256"),
-        (&replicate.evaluation_evidence.placebo_evaluation_receipt_sha256, "placebo_evaluation_receipt_sha256"),
-        (&replicate.evaluation_evidence.metric_definition_sha256, "metric_definition_sha256"),
-        (&replicate.evaluation_evidence.oracle_or_adjudication_sha256, "oracle_or_adjudication_sha256"),
-        (&replicate.evaluation_evidence.evaluation_harness_sha256, "evaluation_harness_sha256"),
-        (&replicate.evaluation_evidence.prompt_and_decoding_sha256, "prompt_and_decoding_sha256"),
+        (
+            &replicate.evaluation_evidence.base_checkpoint_sha256,
+            "base_checkpoint_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.treatment_checkpoint_sha256,
+            "treatment_checkpoint_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.placebo_checkpoint_sha256,
+            "placebo_checkpoint_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.base_evaluation_receipt_sha256,
+            "base_evaluation_receipt_sha256",
+        ),
+        (
+            &replicate
+                .evaluation_evidence
+                .treatment_evaluation_receipt_sha256,
+            "treatment_evaluation_receipt_sha256",
+        ),
+        (
+            &replicate
+                .evaluation_evidence
+                .placebo_evaluation_receipt_sha256,
+            "placebo_evaluation_receipt_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.metric_definition_sha256,
+            "metric_definition_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.oracle_or_adjudication_sha256,
+            "oracle_or_adjudication_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.evaluation_harness_sha256,
+            "evaluation_harness_sha256",
+        ),
+        (
+            &replicate.evaluation_evidence.prompt_and_decoding_sha256,
+            "prompt_and_decoding_sha256",
+        ),
     ] {
         validate_digest(digest, label)?;
     }
     if replicate.evaluation_evidence.metric_definition_sha256 != expected_metric_digest {
         return Err("replicate metric definition digest differs from study".to_owned());
     }
-    if replicate.evaluation_evidence.treatment_evaluation_receipt_sha256
-        == replicate.evaluation_evidence.placebo_evaluation_receipt_sha256
+    if replicate
+        .evaluation_evidence
+        .treatment_evaluation_receipt_sha256
+        == replicate
+            .evaluation_evidence
+            .placebo_evaluation_receipt_sha256
         || replicate.evaluation_evidence.base_evaluation_receipt_sha256
-            == replicate.evaluation_evidence.treatment_evaluation_receipt_sha256
+            == replicate
+                .evaluation_evidence
+                .treatment_evaluation_receipt_sha256
         || replicate.evaluation_evidence.base_evaluation_receipt_sha256
-            == replicate.evaluation_evidence.placebo_evaluation_receipt_sha256
+            == replicate
+                .evaluation_evidence
+                .placebo_evaluation_receipt_sha256
     {
-        return Err("base/treatment/placebo evaluation receipt digests must be distinct".to_owned());
+        return Err(
+            "base/treatment/placebo evaluation receipt digests must be distinct".to_owned(),
+        );
     }
     if replicate.cluster_outcomes.len() != replicate.design.clusters.len() {
-        return Err("each replicate must provide exactly one outcome per source cluster".to_owned());
+        return Err(
+            "each replicate must provide exactly one outcome per source cluster".to_owned(),
+        );
     }
-    let assignment_map: BTreeMap<&str, (&str, bool, usize)> = replicate.manifest.assignments
+    let assignment_map: BTreeMap<&str, (&str, bool, usize)> = replicate
+        .manifest
+        .assignments
         .iter()
-        .map(|assignment| (
-            assignment.cluster_id.as_str(),
+        .map(|assignment| {
             (
-                assignment.task_family.as_str(),
-                assignment.assigned_to_exposure,
-                assignment.item_ids.len(),
+                assignment.cluster_id.as_str(),
+                (
+                    assignment.task_family.as_str(),
+                    assignment.assigned_to_exposure,
+                    assignment.item_ids.len(),
+                ),
             )
-        ))
+        })
         .collect();
     let mut observed_clusters = BTreeSet::new();
     for outcome in &replicate.cluster_outcomes {
         if !observed_clusters.insert(outcome.cluster_id.as_str()) {
             return Err(format!("duplicate cluster outcome {}", outcome.cluster_id));
         }
-        let (task_family, assigned, item_count) = assignment_map
-            .get(outcome.cluster_id.as_str())
-            .ok_or_else(|| format!("unknown cluster outcome {}", outcome.cluster_id))?;
+        let (task_family, assigned, item_count) =
+            assignment_map
+                .get(outcome.cluster_id.as_str())
+                .ok_or_else(|| format!("unknown cluster outcome {}", outcome.cluster_id))?;
         if *task_family != outcome.task_family.as_str()
             || *assigned != outcome.assigned_to_exposure
             || u64::try_from(*item_count).ok() != Some(outcome.item_count)
         {
-            return Err(format!("cluster outcome {} does not match assignment manifest", outcome.cluster_id));
+            return Err(format!(
+                "cluster outcome {} does not match assignment manifest",
+                outcome.cluster_id
+            ));
         }
-        validate_digest(&outcome.evaluation_item_set_sha256, "evaluation_item_set_sha256")?;
-        let expected_item_ids = replicate.design.clusters.iter()
+        validate_digest(
+            &outcome.evaluation_item_set_sha256,
+            "evaluation_item_set_sha256",
+        )?;
+        let expected_item_ids = replicate
+            .design
+            .clusters
+            .iter()
             .find(|cluster| cluster.cluster_id.as_str() == outcome.cluster_id.as_str())
             .map(|cluster| {
                 let mut ids = cluster.item_ids.clone();
@@ -459,11 +592,16 @@ fn validate_replicate(
                 ids
             })
             .ok_or_else(|| format!("cluster {} missing from design", outcome.cluster_id))?;
-        let expected_item_set_sha256 =
-            hash_domain(b"causal-evaluation-item-set.v1", &serde_json::to_vec(&expected_item_ids)
-                .map_err(|error| format!("cannot serialize item IDs: {error}"))?);
+        let expected_item_set_sha256 = hash_domain(
+            b"causal-evaluation-item-set.v1",
+            &serde_json::to_vec(&expected_item_ids)
+                .map_err(|error| format!("cannot serialize item IDs: {error}"))?,
+        );
         if outcome.evaluation_item_set_sha256 != expected_item_set_sha256 {
-            return Err(format!("cluster {} evaluation item-set digest mismatch", outcome.cluster_id));
+            return Err(format!(
+                "cluster {} evaluation item-set digest mismatch",
+                outcome.cluster_id
+            ));
         }
         for (count, label) in [
             (&outcome.base, "base"),
@@ -472,13 +610,19 @@ fn validate_replicate(
         ] {
             rate_permille(count, label)?;
             if count.observed_count != outcome.item_count {
-                return Err(format!("cluster {} {label} denominator does not cover the full item set", outcome.cluster_id));
+                return Err(format!(
+                    "cluster {} {label} denominator does not cover the full item set",
+                    outcome.cluster_id
+                ));
             }
         }
         if outcome.base.observed_count != outcome.treatment.observed_count
             || outcome.base.observed_count != outcome.placebo.observed_count
         {
-            return Err(format!("cluster {} base/treatment/placebo denominators differ", outcome.cluster_id));
+            return Err(format!(
+                "cluster {} base/treatment/placebo denominators differ",
+                outcome.cluster_id
+            ));
         }
     }
     if observed_clusters.len() != assignment_map.len() {
@@ -506,13 +650,17 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
         base_rates.push(base);
         treatment_rates.push(treatment);
         placebo_rates.push(placebo);
-        item_base_success = item_base_success.checked_add(outcome.base.success_count)
+        item_base_success = item_base_success
+            .checked_add(outcome.base.success_count)
             .ok_or_else(|| "base item success count overflows".to_owned())?;
-        item_treatment_success = item_treatment_success.checked_add(outcome.treatment.success_count)
+        item_treatment_success = item_treatment_success
+            .checked_add(outcome.treatment.success_count)
             .ok_or_else(|| "treatment item success count overflows".to_owned())?;
-        item_placebo_success = item_placebo_success.checked_add(outcome.placebo.success_count)
+        item_placebo_success = item_placebo_success
+            .checked_add(outcome.placebo.success_count)
             .ok_or_else(|| "placebo item success count overflows".to_owned())?;
-        item_total = item_total.checked_add(outcome.item_count)
+        item_total = item_total
+            .checked_add(outcome.item_count)
             .ok_or_else(|| "item total overflows".to_owned())?;
         let advantage = treatment - placebo;
         if outcome.assigned_to_exposure {
@@ -520,20 +668,23 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
         } else {
             unexposed_advantages.push(advantage);
         }
-        family_rows.entry(outcome.task_family.clone()).or_default()
+        family_rows
+            .entry(outcome.task_family.clone())
+            .or_default()
             .push((base, treatment, placebo));
     }
 
     if exposed_advantages.is_empty() || unexposed_advantages.is_empty() {
-        return Err("localization analysis requires both exposed and unexposed clusters".to_owned());
+        return Err(
+            "localization analysis requires both exposed and unexposed clusters".to_owned(),
+        );
     }
     let base_score = sample_mean(&base_rates)?;
     let treatment_score = sample_mean(&treatment_rates)?;
     let placebo_score = sample_mean(&placebo_rates)?;
     let exposed_mean = sample_mean(&exposed_advantages)?;
     let unexposed_mean = sample_mean(&unexposed_advantages)?;
-    let stratified_localization =
-        stratum_localization(&replicate.cluster_outcomes, None)?;
+    let stratified_localization = stratum_localization(&replicate.cluster_outcomes, None)?;
     let item_base = item_base_success as f64 * 1_000.0 / item_total as f64;
     let item_treatment = item_treatment_success as f64 * 1_000.0 / item_total as f64;
     let item_placebo = item_placebo_success as f64 * 1_000.0 / item_total as f64;
@@ -548,7 +699,8 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
         let placebo_family = sample_mean(&placebos)?;
         families.push(FamilyEffectV1 {
             task_family,
-            cluster_count: u64::try_from(values.len()).map_err(|_| "family cluster count overflows")?,
+            cluster_count: u64::try_from(values.len())
+                .map_err(|_| "family cluster count overflows")?,
             base_score_permille: base_family,
             treatment_score_permille: treatment_family,
             placebo_score_permille: placebo_family,
@@ -584,7 +736,8 @@ fn stratum_localization(
     let mut strata = BTreeMap::<(String, String), Vec<(bool, f64)>>::new();
     for outcome in outcomes {
         let exposure = match assigned {
-            Some(map) => *map.get(&outcome.cluster_id)
+            Some(map) => *map
+                .get(&outcome.cluster_id)
                 .ok_or_else(|| "permutation assignment missing a cluster".to_owned())?,
             None => outcome.assigned_to_exposure,
         };
@@ -594,20 +747,33 @@ fn stratum_localization(
             0..=4 => "small",
             5..=16 => "medium",
             _ => "large",
-        }.to_owned();
-        strata.entry((outcome.task_family.clone(), design_bucket))
-            .or_default().push((exposure, advantage));
+        }
+        .to_owned();
+        strata
+            .entry((outcome.task_family.clone(), design_bucket))
+            .or_default()
+            .push((exposure, advantage));
     }
     let total = outcomes.len() as f64;
     let mut weighted = 0.0;
     for values in strata.values() {
-        let exposed: Vec<f64> = values.iter().filter(|value| value.0).map(|value| value.1).collect();
-        let unexposed: Vec<f64> = values.iter().filter(|value| !value.0).map(|value| value.1).collect();
+        let exposed: Vec<f64> = values
+            .iter()
+            .filter(|value| value.0)
+            .map(|value| value.1)
+            .collect();
+        let unexposed: Vec<f64> = values
+            .iter()
+            .filter(|value| !value.0)
+            .map(|value| value.1)
+            .collect();
         if exposed.is_empty() || unexposed.is_empty() {
-            return Err("localization stratum must contain exposed and unexposed clusters".to_owned());
+            return Err(
+                "localization stratum must contain exposed and unexposed clusters".to_owned(),
+            );
         }
-        weighted += values.len() as f64 / total
-            * (sample_mean(&exposed)? - sample_mean(&unexposed)?);
+        weighted +=
+            values.len() as f64 / total * (sample_mean(&exposed)? - sample_mean(&unexposed)?);
     }
     Ok(weighted)
 }
@@ -634,12 +800,18 @@ fn randomization_p_value(
         for replicate in replicates {
             let seed = derive_seed(root_seed, &replicate.design.replicate_id, draw);
             let simulated = randomize_intervention(&replicate.design, &seed)?;
-            let assignment_map: BTreeMap<String, bool> = simulated.assignments
-                .iter().map(|assignment| (
-                    assignment.cluster_id.clone(),
-                    assignment.assigned_to_exposure,
-                )).collect();
-            simulated_sum += stratum_localization(&replicate.cluster_outcomes, Some(&assignment_map))?;
+            let assignment_map: BTreeMap<String, bool> = simulated
+                .assignments
+                .iter()
+                .map(|assignment| {
+                    (
+                        assignment.cluster_id.clone(),
+                        assignment.assigned_to_exposure,
+                    )
+                })
+                .collect();
+            simulated_sum +=
+                stratum_localization(&replicate.cluster_outcomes, Some(&assignment_map))?;
         }
         let simulated_statistic = simulated_sum / replicates.len() as f64;
         if simulated_statistic.abs() + 1.0e-12 >= observed_statistic.abs() {
@@ -685,12 +857,20 @@ pub fn analyze_replicated_causal_study(
             "randomization_test_draws must be in [{CAUSAL_MIN_RANDOMIZATION_DRAWS}, {CAUSAL_MAX_RANDOMIZATION_DRAWS}]"
         ));
     }
-    let root_seed = decode_seed_hex(&study.randomization_test_seed_hex, "randomization_test_seed_hex")?;
+    let root_seed = decode_seed_hex(
+        &study.randomization_test_seed_hex,
+        "randomization_test_seed_hex",
+    )?;
     if study.replicates.len() < 2 {
-        return Err("at least two independent model-pair replicates are required for uncertainty".to_owned());
+        return Err(
+            "at least two independent model-pair replicates are required for uncertainty"
+                .to_owned(),
+        );
     }
     if study.replicates.len() > 1_000 {
-        return Err("study must contain no more than 1000 independent model-pair replicates".to_owned());
+        return Err(
+            "study must contain no more than 1000 independent model-pair replicates".to_owned(),
+        );
     }
 
     let first = &study.replicates[0].design;
@@ -716,7 +896,7 @@ pub fn analyze_replicated_causal_study(
             &study.primary_metric_definition_sha256,
         )?;
         if replicate.evaluation_evidence.oracle_or_adjudication_sha256
-                != first_evaluation.oracle_or_adjudication_sha256
+            != first_evaluation.oracle_or_adjudication_sha256
             || replicate.evaluation_evidence.evaluation_harness_sha256
                 != first_evaluation.evaluation_harness_sha256
             || replicate.evaluation_evidence.prompt_and_decoding_sha256
@@ -727,36 +907,72 @@ pub fn analyze_replicated_causal_study(
         if !replicate_ids.insert(replicate.design.replicate_id.as_str()) {
             return Err("replicate IDs must be unique".to_owned());
         }
-        if !seed_commitments.insert(replicate.manifest.randomization_seed_commitment_sha256.as_str()) {
-            return Err("each model-pair replicate must use a unique randomization seed commitment".to_owned());
+        if !seed_commitments.insert(
+            replicate
+                .manifest
+                .randomization_seed_commitment_sha256
+                .as_str(),
+        ) {
+            return Err(
+                "each model-pair replicate must use a unique randomization seed commitment"
+                    .to_owned(),
+            );
         }
         if !training_seed_commitments.insert(
-            replicate.design.training_rng_seed_commitment_sha256.as_str()
+            replicate
+                .design
+                .training_rng_seed_commitment_sha256
+                .as_str(),
         ) {
             return Err("each independent model-pair replicate must use a unique training RNG seed commitment".to_owned());
         }
         for checkpoint in [
-            replicate.evaluation_evidence.treatment_checkpoint_sha256.as_str(),
-            replicate.evaluation_evidence.placebo_checkpoint_sha256.as_str(),
+            replicate
+                .evaluation_evidence
+                .treatment_checkpoint_sha256
+                .as_str(),
+            replicate
+                .evaluation_evidence
+                .placebo_checkpoint_sha256
+                .as_str(),
         ] {
             if !all_checkpoint_digests.insert(checkpoint) {
-                return Err("output checkpoints must be unique across independent model-pair replicates".to_owned());
+                return Err(
+                    "output checkpoints must be unique across independent model-pair replicates"
+                        .to_owned(),
+                );
             }
         }
         if !all_training_audit_digests.insert(replicate.training_receipt_audit_sha256.as_str()) {
-            return Err("training receipt audit digests must be unique across replicates".to_owned());
+            return Err(
+                "training receipt audit digests must be unique across replicates".to_owned(),
+            );
         }
         for evaluation_digest in [
-            replicate.evaluation_evidence.base_evaluation_receipt_sha256.as_str(),
-            replicate.evaluation_evidence.treatment_evaluation_receipt_sha256.as_str(),
-            replicate.evaluation_evidence.placebo_evaluation_receipt_sha256.as_str(),
+            replicate
+                .evaluation_evidence
+                .base_evaluation_receipt_sha256
+                .as_str(),
+            replicate
+                .evaluation_evidence
+                .treatment_evaluation_receipt_sha256
+                .as_str(),
+            replicate
+                .evaluation_evidence
+                .placebo_evaluation_receipt_sha256
+                .as_str(),
         ] {
             if !all_evaluation_receipt_digests.insert(evaluation_digest) {
-                return Err("evaluation receipt digests must be unique across model-pair replicates".to_owned());
+                return Err(
+                    "evaluation receipt digests must be unique across model-pair replicates"
+                        .to_owned(),
+                );
             }
         }
         all_receipts_consistent &= replicate.training_receipt_audit.execution_consistent;
-        all_ready_for_external_verification &= replicate.training_receipt_audit.ready_for_independent_attestation_verification;
+        all_ready_for_external_verification &= replicate
+            .training_receipt_audit
+            .ready_for_independent_attestation_verification;
         if !replicate.training_receipt_audit.independently_verified {
             issues.push(format!(
                 "replicate {} training receipt is not independently authenticated",
@@ -772,25 +988,32 @@ pub fn analyze_replicated_causal_study(
         return Err("replicate effect accounting mismatch".to_owned());
     }
 
-    let effect_values: Vec<f64> = replicate_effects.iter()
+    let effect_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.treatment_minus_placebo_cluster_weighted_permille)
         .collect();
-    let item_values: Vec<f64> = replicate_effects.iter()
+    let item_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.treatment_minus_placebo_item_weighted_permille)
         .collect();
-    let treatment_base_values: Vec<f64> = replicate_effects.iter()
+    let treatment_base_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.treatment_minus_base_cluster_weighted_permille)
         .collect();
-    let placebo_base_values: Vec<f64> = replicate_effects.iter()
+    let placebo_base_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.placebo_minus_base_cluster_weighted_permille)
         .collect();
-    let exposed_values: Vec<f64> = replicate_effects.iter()
+    let exposed_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.exposed_cluster_advantage_permille)
         .collect();
-    let unexposed_values: Vec<f64> = replicate_effects.iter()
+    let unexposed_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.unexposed_cluster_advantage_permille)
         .collect();
-    let localization_values: Vec<f64> = replicate_effects.iter()
+    let localization_values: Vec<f64> = replicate_effects
+        .iter()
         .map(|effect| effect.exposure_localization_contrast_permille)
         .collect();
 
@@ -807,8 +1030,11 @@ pub fn analyze_replicated_causal_study(
         study.randomization_test_draws,
     )?;
 
-    let family_keys: BTreeSet<String> = replicate_effects[0].families.iter()
-        .map(|family| family.task_family.clone()).collect();
+    let family_keys: BTreeSet<String> = replicate_effects[0]
+        .families
+        .iter()
+        .map(|family| family.task_family.clone())
+        .collect();
     let mut family_reports = Vec::new();
     for family in &family_keys {
         let mut base_values = Vec::new();
@@ -816,7 +1042,9 @@ pub fn analyze_replicated_causal_study(
         let mut placebo_values = Vec::new();
         let mut advantage_values = Vec::new();
         for effect in &replicate_effects {
-            let found = effect.families.iter()
+            let found = effect
+                .families
+                .iter()
                 .find(|entry| &entry.task_family == family)
                 .ok_or_else(|| format!("family {family} missing from replicate"))?;
             base_values.push(found.base_score_permille);
@@ -824,7 +1052,9 @@ pub fn analyze_replicated_causal_study(
             placebo_values.push(found.placebo_score_permille);
             advantage_values.push(found.treatment_minus_placebo_permille);
         }
-        let first_family = replicate_effects[0].families.iter()
+        let first_family = replicate_effects[0]
+            .families
+            .iter()
             .find(|entry| &entry.task_family == family)
             .ok_or_else(|| format!("family {family} missing from first replicate"))?;
         family_reports.push(FamilyEffectV1 {
@@ -849,7 +1079,8 @@ pub fn analyze_replicated_causal_study(
         "exploratory_execution_evidence_incomplete"
     } else {
         "exploratory_waiting_for_external_signature_verification"
-    }.to_owned();
+    }
+    .to_owned();
     if !replicate_count_meets_minimum {
         issues.push(format!(
             "only {} independent model-pair replicates; minimum preregistered count is {}",
@@ -1007,8 +1238,15 @@ mod tests {
             evaluation_harness_sha256: digest("eval-harness"),
             prompt_and_decoding_sha256: digest("prompt-decoding"),
         };
-        let assignment_map: BTreeMap<String, bool> = manifest.assignments.iter()
-            .map(|assignment| (assignment.cluster_id.clone(), assignment.assigned_to_exposure))
+        let assignment_map: BTreeMap<String, bool> = manifest
+            .assignments
+            .iter()
+            .map(|assignment| {
+                (
+                    assignment.cluster_id.clone(),
+                    assignment.assigned_to_exposure,
+                )
+            })
             .collect();
         let mut outcomes = Vec::new();
         for cluster in &design.clusters {
@@ -1025,12 +1263,18 @@ mod tests {
                 assigned_to_exposure: exposed,
                 item_count: 2,
                 evaluation_item_set_sha256: item_digest,
-                base: ScoreCountV1 { success_count: 1, observed_count: 2 },
+                base: ScoreCountV1 {
+                    success_count: 1,
+                    observed_count: 2,
+                },
                 treatment: ScoreCountV1 {
                     success_count: if exposed { 2 } else { 1 },
                     observed_count: 2,
                 },
-                placebo: ScoreCountV1 { success_count: 1, observed_count: 2 },
+                placebo: ScoreCountV1 {
+                    success_count: 1,
+                    observed_count: 2,
+                },
             });
         }
         CausalReplicateInputV1 {
@@ -1063,10 +1307,12 @@ mod tests {
     fn causal_study_and_report_schemas_match_rust_struct_fields() {
         let study_schema: Value = serde_json::from_str(include_str!(
             "../schema/replicated-causal-study.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let report_schema: Value = serde_json::from_str(include_str!(
             "../schema/replicated-causal-report.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let study = study_fixture();
         let report = analyze_replicated_causal_study(&study).unwrap();
         let study_value = serde_json::to_value(&study).unwrap();
@@ -1080,31 +1326,85 @@ mod tests {
             report_schema["properties"]["schema"]["const"].as_str(),
             Some(CAUSAL_REPORT_SCHEMA)
         );
-        let study_required: BTreeSet<String> = study_schema["required"].as_array().unwrap()
-            .iter().map(|v| v.as_str().unwrap().to_owned()).collect();
-        let study_properties: BTreeSet<String> = study_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let study_required: BTreeSet<String> = study_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        let study_properties: BTreeSet<String> = study_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(study_required, study_properties);
         assert_eq!(
-            study_value.as_object().unwrap().keys().cloned().collect::<BTreeSet<_>>(),
+            study_value
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>(),
             study_properties
         );
-        let report_required: BTreeSet<String> = report_schema["required"].as_array().unwrap()
-            .iter().map(|v| v.as_str().unwrap().to_owned()).collect();
-        let report_properties: BTreeSet<String> = report_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let report_required: BTreeSet<String> = report_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        let report_properties: BTreeSet<String> = report_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(report_required, report_properties);
         assert_eq!(
-            report_value.as_object().unwrap().keys().cloned().collect::<BTreeSet<_>>(),
+            report_value
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>(),
             report_properties
         );
     }
 
     #[test]
     fn score_rates_reject_invalid_denominators_and_success_counts() {
-        assert!(rate_permille(&ScoreCountV1 { success_count: 2, observed_count: 0 }, "x").is_err());
-        assert!(rate_permille(&ScoreCountV1 { success_count: 2, observed_count: 1 }, "x").is_err());
-        assert_eq!(rate_permille(&ScoreCountV1 { success_count: 1, observed_count: 2 }, "x").unwrap(), 500.0);
+        assert!(
+            rate_permille(
+                &ScoreCountV1 {
+                    success_count: 2,
+                    observed_count: 0
+                },
+                "x"
+            )
+            .is_err()
+        );
+        assert!(
+            rate_permille(
+                &ScoreCountV1 {
+                    success_count: 2,
+                    observed_count: 1
+                },
+                "x"
+            )
+            .is_err()
+        );
+        assert_eq!(
+            rate_permille(
+                &ScoreCountV1 {
+                    success_count: 1,
+                    observed_count: 2
+                },
+                "x"
+            )
+            .unwrap(),
+            500.0
+        );
     }
 
     #[test]
@@ -1145,10 +1445,14 @@ mod tests {
             "exploratory_insufficient_independent_model_pair_replicates"
         );
         assert!(report.primary_cluster_weighted_effect_permille.mean > 0.0);
-        assert!(report.primary_cluster_weighted_effect_permille.lower_95
-            <= report.primary_cluster_weighted_effect_permille.upper_95);
-        assert!(report.localization_randomization_p_value > 0.0
-            && report.localization_randomization_p_value <= 1.0);
+        assert!(
+            report.primary_cluster_weighted_effect_permille.lower_95
+                <= report.primary_cluster_weighted_effect_permille.upper_95
+        );
+        assert!(
+            report.localization_randomization_p_value > 0.0
+                && report.localization_randomization_p_value <= 1.0
+        );
         assert_eq!(report.family_effects.len(), 4);
         assert!(report.claim_boundary.contains("global_interference"));
     }
@@ -1157,21 +1461,27 @@ mod tests {
     fn one_model_pair_is_not_misrepresented_as_many_training_replicates() {
         let mut study = study_fixture();
         study.replicates.truncate(1);
-        assert!(analyze_replicated_causal_study(&study)
-            .unwrap_err()
-            .contains("at least two independent model-pair replicates"));
+        assert!(
+            analyze_replicated_causal_study(&study)
+                .unwrap_err()
+                .contains("at least two independent model-pair replicates")
+        );
     }
 
     #[test]
     fn a_self_asserted_independent_verification_flag_is_rejected() {
         let mut study = study_fixture();
-        study.replicates[0].training_receipt_audit.independently_verified = true;
+        study.replicates[0]
+            .training_receipt_audit
+            .independently_verified = true;
         let audit_bytes = serde_json::to_vec(&study.replicates[0].training_receipt_audit).unwrap();
         study.replicates[0].training_receipt_audit_sha256 =
             hash_domain(b"paired-training-execution-audit.v1", &audit_bytes);
-        assert!(analyze_replicated_causal_study(&study)
-            .unwrap_err()
-            .contains("self-asserted independent verification"));
+        assert!(
+            analyze_replicated_causal_study(&study)
+                .unwrap_err()
+                .contains("self-asserted independent verification")
+        );
     }
 
     #[test]
