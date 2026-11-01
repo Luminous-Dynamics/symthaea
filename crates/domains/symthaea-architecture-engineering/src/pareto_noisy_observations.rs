@@ -100,8 +100,13 @@ impl NoisyObservationPlan {
         if !self.familywise_alpha.is_finite() || !(0.0..1.0).contains(&self.familywise_alpha) {
             return Err(NoisyParetoError::new("plan.familywise_alpha", "family-wise alpha must be finite and strictly between zero and one"));
         }
-        if self.max_candidates == 0 || self.minimum_replicates == 0 {
-            return Err(NoisyParetoError::new("plan", "candidate and minimum-replicate limits must be positive"));
+        if self.max_candidates == 0 || self.max_candidates > 1_000_000 || self.minimum_replicates == 0 {
+            return Err(NoisyParetoError::new("plan", "candidate limit must be in 1..=1,000,000 and minimum replicates must be positive"));
+        }
+        let alpha_coordinate = self.familywise_alpha
+            / (self.max_candidates as f64 * self.objective_specs.len() as f64);
+        if !alpha_coordinate.is_finite() || alpha_coordinate <= 0.0 {
+            return Err(NoisyParetoError::new("plan.familywise_alpha", "per-coordinate alpha allocation underflows the supported floating-point range"));
         }
         let mut ids = BTreeSet::new();
         for (index, objective) in self.objective_specs.iter().enumerate() {
@@ -117,6 +122,24 @@ impl NoisyObservationPlan {
             }
         }
         Ok(())
+    }
+
+    /// Summable alpha allocation for the n-th replicate prefix of one candidate/objective.
+    /// Since sum_{n=1..infinity} 1/(n(n+1)) = 1, the union bound across all prefixes
+    /// spends at most the frozen per-candidate/per-objective alpha allocation.
+    pub fn alpha_at_prefix(&self, replicate_count: u64) -> Result<f64, NoisyParetoError> {
+        self.validate()?;
+        if replicate_count == 0 {
+            return Err(NoisyParetoError::new("replicate_count", "confidence prefix must be one-based"));
+        }
+        let alpha_coordinate = self.familywise_alpha
+            / (self.max_candidates as f64 * self.objective_specs.len() as f64);
+        let n = replicate_count as f64;
+        let alpha = alpha_coordinate / (n * (n + 1.0));
+        if !alpha.is_finite() || alpha <= 0.0 {
+            return Err(NoisyParetoError::new("replicate_count", "per-prefix alpha underflowed or became non-finite"));
+        }
+        Ok(alpha)
     }
 
     pub fn plan_sha256(&self) -> Result<String, NoisyParetoError> {
@@ -239,6 +262,10 @@ impl NoisyParetoStudy {
         if !self.validated {
             self.validate()?;
             self.validated = true;
+        } else {
+            // The plan and sample/index maps are private; newly constructed/appended state is
+            // checked locally. Replaying every prior replicate on each append would be O(n^2).
+            self.plan.validate()?;
         }
         let candidate_id = candidate_id.into();
         let decision_sha256 = decision_sha256.into();
@@ -428,10 +455,8 @@ impl NoisyParetoStudy {
                 sum = next;
             }
             let mean = sum / sample_count as f64;
-            let alpha_coordinate = self.plan.familywise_alpha
-                / (self.plan.max_candidates as f64 * self.plan.objective_specs.len() as f64);
+            let alpha_at_prefix = self.plan.alpha_at_prefix(sample_count)?;
             let n = sample_count as f64;
-            let alpha_at_prefix = alpha_coordinate / (n * (n + 1.0));
             let radius = (spec.observation_upper_bound - spec.observation_lower_bound)
                 * ((2.0 / alpha_at_prefix).ln() / (2.0 * n)).sqrt();
             if !mean.is_finite() || !radius.is_finite() || !alpha_at_prefix.is_finite() || alpha_at_prefix <= 0.0 {
@@ -566,6 +591,25 @@ mod tests {
             objective_values: values.to_vec(),
             evidence_sha256: H2.to_owned(),
         }
+    }
+
+    #[test]
+    fn alpha_spending_is_summable_and_plan_caps_are_enforced() {
+        let plan = plan();
+        let alpha_coordinate = 0.05 / (10.0 * 2.0);
+        let spent = (1..=10_000u64)
+            .map(|n| plan.alpha_at_prefix(n).unwrap())
+            .sum::<f64>();
+        assert!(spent <= alpha_coordinate + 1e-12);
+        assert!(plan.alpha_at_prefix(0).is_err());
+
+        assert!(NoisyObservationPlan::new(
+            "too-many-candidates",
+            plan.objective_specs.clone(),
+            0.05,
+            1_000_001,
+            2,
+        ).is_err());
     }
 
     #[test]
