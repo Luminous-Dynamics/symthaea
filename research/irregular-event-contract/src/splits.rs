@@ -52,6 +52,7 @@ pub enum SplitError {
     InsufficientDistinctOrigins { entity_id: u64, origins: usize },
     EmbargoUnderflow { entity_id: u64, boundary_us: i64, embargo_us: u64 },
     EmptyPartition { entity_id: u64, partition: &'static str },
+    EmptyInput,
 }
 
 impl fmt::Display for SplitError {
@@ -65,6 +66,7 @@ impl fmt::Display for SplitError {
             Self::InsufficientDistinctOrigins { entity_id, origins } => write!(f, "entity {entity_id} has only {origins} distinct forecast origins; at least three are required"),
             Self::EmbargoUnderflow { entity_id, boundary_us, embargo_us } => write!(f, "embargo {embargo_us} underflows boundary {boundary_us} for entity {entity_id}"),
             Self::EmptyPartition { entity_id, partition } => write!(f, "entity {entity_id} has no eligible {partition} windows after purging"),
+            Self::EmptyInput => write!(f, "at least one forecast window is required"),
         }
     }
 }
@@ -90,6 +92,9 @@ pub fn purged_chronological_split(
     validation_basis_points: u16,
     embargo_us: u64,
 ) -> Result<PurgedSplitPlan, SplitError> {
+    if windows.is_empty() {
+        return Err(SplitError::EmptyInput);
+    }
     if train_basis_points == 0
         || validation_basis_points == 0
         || u32::from(train_basis_points) + u32::from(validation_basis_points) >= 10_000
@@ -271,7 +276,8 @@ mod tests {
     #[test]
     fn embargo_shrinks_the_eligible_target_interval() {
         let plan = purged_chronological_split(&sample_windows(10), 6_000, 2_000, 5).unwrap();
-        assert_eq!(plan.train_target_cutoff(), None);
+        assert_eq!(plan.boundaries[0].train_target_cutoff_us, 65);
+        assert_eq!(plan.boundaries[0].validation_target_cutoff_us, 85);
         assert!(!plan.train_window_ids.contains(&6));
         assert!(!plan.validation_window_ids.contains(&8));
     }
@@ -337,6 +343,10 @@ mod tests {
 
     #[test]
     fn insufficient_origins_and_empty_after_purge_are_reported() {
+        assert_eq!(
+            purged_chronological_split(&[], 6_000, 2_000, 0),
+            Err(SplitError::EmptyInput)
+        );
         let few = vec![window(1, 1, 10, 2), window(2, 1, 20, 2)];
         assert_eq!(
             purged_chronological_split(&few, 6_000, 2_000, 0),
