@@ -779,7 +779,7 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
                             && observed_revision.as_deref() == Some(head.authority_revision.as_str())
                             && operation.request.witness_sequence_seen == Some(head.sequence);
                         let mut result = ComputedResult::new(
-                            if fresh { "committed" } else { "rejected_anti_rollback" },
+                            if fresh { "restore_verified" } else { "rejected_anti_rollback" },
                             parse_revision(&head.authority_revision),
                         );
                         result.observed_store_revision = observed_revision;
@@ -842,13 +842,30 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
 }
 
 pub fn verify_reference(trace: &Trace, trace_bytes: &[u8]) -> VerificationReport {
-    let mut errors = Vec::new();
-    validate_structure(trace, &mut errors);
-    validate_retry_groups(trace, &mut errors);
-    validate_witnesses(trace, &mut errors);
-    let results = replay(trace, &mut errors);
     let trace_hash = Sha256::digest(trace_bytes);
     let digest = format!("sha256:{}", hex_lower(&trace_hash));
+    let mut evidence_errors = Vec::new();
+    validate_structure(trace, &mut evidence_errors);
+    validate_retry_groups(trace, &mut evidence_errors);
+    validate_witnesses(trace, &mut evidence_errors);
+    if !evidence_errors.is_empty() {
+        return VerificationReport {
+            report_version: 1,
+            verifier_version: env!("CARGO_PKG_VERSION").to_string(),
+            schema_sha256: None,
+            claim_ceiling: "Reference trace semantics only; no backend run, cryptographic witness-signature verification, physical durability, or engine qualification.".to_string(),
+            status: "invalid_evidence".to_string(),
+            trace_id: trace.trace_id.clone(),
+            trace_sha256: digest,
+            operations_replayed: 0,
+            invariants_checked: trace.invariant_expectations.len(),
+            mutants_detected: 0,
+            mutants_seeded: trace.negative_controls.len(),
+            counterexamples: evidence_errors,
+        };
+    }
+    let mut errors = Vec::new();
+    let results = replay(trace, &mut errors);
     let mutant_results = verify_mutants(trace);
     let mut mutants_detected = 0usize;
     for control in &trace.negative_controls {
@@ -970,7 +987,7 @@ mod tests {
         let (mut trace, _) = fixture();
         trace.witness_observations.clear();
         let report = verify_reference(&trace, b"missing-witness-control");
-        assert_eq!(report.status, "fail");
+        assert_eq!(report.status, "invalid_evidence");
         assert!(report.counterexamples.iter().any(|x| x.contains("witness")));
     }
 
@@ -979,7 +996,7 @@ mod tests {
         let (mut trace, _) = fixture();
         trace.operations.iter_mut().find(|x| x.op_id == "op-a-commit").unwrap().request.next_log_checkpoint = None;
         let report = verify_reference(&trace, b"missing-next-log-control");
-        assert_eq!(report.status, "fail");
+        assert_eq!(report.status, "invalid_evidence");
         assert!(report.counterexamples.iter().any(|x| x.contains("next_log_checkpoint")));
     }
 
@@ -989,7 +1006,7 @@ mod tests {
         let operation = trace.operations.iter_mut().find(|x| x.op_id == "op-a-commit").unwrap();
         operation.completed_at_ns = operation.invoked_at_ns - 1;
         let report = verify_reference(&trace, b"invalid-interval-control");
-        assert_eq!(report.status, "fail");
+        assert_eq!(report.status, "invalid_evidence");
         assert!(report.counterexamples.iter().any(|x| x.contains("completes before invocation")));
     }
 
@@ -1006,7 +1023,7 @@ mod tests {
         let (mut trace, _) = fixture();
         trace.witness_observations[2].predecessor_witness_digest = None;
         let report = verify_reference(&trace, b"broken-witness-control");
-        assert_eq!(report.status, "fail");
+        assert_eq!(report.status, "invalid_evidence");
     }
 
     #[test]
