@@ -127,6 +127,7 @@ struct AcceptedReceipt {
     log_origin_transition_evidence_digest: Option<String>,
     policy_transition_evidence_digest: Option<String>,
     checkpoint: LogCheckpoint,
+    checkpoint_evidence: CheckpointEvidence,
     policy_versions: PolicyVersions,
 }
 
@@ -307,6 +308,7 @@ impl TrustedState {
                 log_origin_transition_evidence_digest: candidate.log_origin_transition_evidence_digest.clone(),
                 policy_transition_evidence_digest: candidate.policy_transition_evidence_digest.clone(),
                 checkpoint: candidate.checkpoint.clone(),
+                checkpoint_evidence: candidate.checkpoint_evidence.clone(),
                 policy_versions: candidate.policy_versions.clone(),
             },
         );
@@ -1814,6 +1816,8 @@ CREATE TABLE IF NOT EXISTS basalt_accepted_receipts (
     boot_transition_evidence_digest TEXT,
     log_origin_transition_evidence_digest TEXT,
     policy_transition_evidence_digest TEXT,
+    checkpoint_evidence_kind TEXT NOT NULL,
+    checkpoint_evidence_digest TEXT,
     log_id TEXT NOT NULL,
     tree_size TEXT NOT NULL,
     root_digest TEXT NOT NULL,
