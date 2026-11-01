@@ -178,7 +178,7 @@ The synthetic stream now separates two different data types:
 - `TemporalObservation`: timestamp, sensor features and missing-feature mask only; no ground-truth label field exists on this model-facing type. Dropped sensor values are actually zero-filled before the observation is emitted; labels still use the latent complete signal.
 - private `DelayedGroundTruth`: evaluator-only label, release timestamp, regime transition and OOD metadata.
 
-The combined evaluator-owned dataset intentionally does not implement `Debug`, `Serialize` or `Deserialize`; its delayed-label field is private. Candidate implementations should receive only the observation slice, not the evaluator-owned container. This is an API/data-boundary improvement, not a process sandbox: a real deployment benchmark must physically isolate the evaluator label channel.
+The combined evaluator-owned dataset intentionally does not implement `Debug`, `Serialize` or `Deserialize`; both its delayed-label field and drift-schedule configuration are private. Candidate implementations should receive only the observation slice, not the evaluator-owned container. This is an API/data-boundary improvement, not a process sandbox: a real deployment benchmark must physically isolate the evaluator label and schedule channels.
 
 A prequential execution trace is a time-ordered sequence of:
 1. `Prediction` — timestamp, predicted class/abstention, positive-class Q15 probability and the model-state digest used;
