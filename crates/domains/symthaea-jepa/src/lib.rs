@@ -60,6 +60,7 @@ pub use predictor::LatentPredictor;
 pub use state::JepaState;
 pub use target::TargetEncoder;
 
+use sha2::{Digest, Sha256};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Telemetry snapshot from JEPA engine, for inclusion in `CycleMetadata`.
@@ -78,14 +79,24 @@ pub struct JepaTelemetry {
 }
 
 
+pub const OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION: &str =
+    "symthaea-jepa-observed-transition-evidence-v0.1";
+pub const ONE_STEP_ACTION_SET_SCHEMA_VERSION: &str =
+    "symthaea-jepa-one-step-action-set-v0.1";
+
 /// Evidence supplied by an observation adapter for one action-conditioned
-/// transition. The digests identify upstream artifacts; this crate validates
-/// their syntax and temporal bindings, but does not authenticate their bytes.
-#[derive(Debug, Clone, PartialEq)]
+/// transition. Embedding digests are recomputed here; raw-observation, history
+/// and manifest digests identify upstream artifacts and require adapter-level
+/// byte verification.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObservedTransitionEvidence {
+    pub schema_version: String,
     pub source_history_sha256: String,
     pub source_observation_sha256: String,
+    pub source_embedding_sha256: String,
     pub target_observation_sha256: String,
+    pub target_embedding_sha256: String,
     pub action_manifest_sha256: String,
     pub source_observation_id: String,
     pub target_observation_id: String,
@@ -100,7 +111,8 @@ pub struct ObservedTransitionEvidence {
 }
 
 /// Stable candidate identity mapped to the JEPA discrete action embedding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ActionCandidate {
     pub action_id: u64,
     pub action_index: u8,
@@ -108,7 +120,8 @@ pub struct ActionCandidate {
 
 /// One deterministic JEPA latent prediction for a candidate action.
 /// This is a point prediction, not a calibrated distribution or joint draw.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ActionLatentPrediction {
     pub action_id: u64,
     pub action_index: u8,
@@ -117,10 +130,14 @@ pub struct ActionLatentPrediction {
 
 /// Predictions for a frozen action set, all computed from one encoded context.
 /// The manifest/history digests are identifiers supplied by the caller.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OneStepActionSetPrediction {
+    pub schema_version: String,
     pub source_history_sha256: String,
+    pub source_embedding_sha256: String,
     pub action_manifest_sha256: String,
+    pub candidate_set_sha256: String,
     pub predictions: Vec<ActionLatentPrediction>,
 }
 
@@ -129,16 +146,66 @@ fn is_lower_hex_sha256(value: &str) -> bool {
         && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// Canonical digest of the finite HDC embedding values consumed by JEPA.
+/// This binds the exact f32 bit patterns and dimensionality, not the original
+/// camera bytes or the upstream observation capture.
+pub fn embedding_sha256(hv: &ContinuousHV) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-jepa-observation-embedding-v0.1\0");
+    hasher.update((hv.dim() as u64).to_le_bytes());
+    for value in hv.as_slice() {
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    digest_to_hex(hasher.finalize().as_slice())
+}
+
+/// Canonical digest of the frozen action IDs and their discrete JEPA indices.
+/// The action-manifest digest remains the upstream binding to full descriptors.
+pub fn candidate_set_sha256(
+    action_manifest_sha256: &str,
+    candidates: &[ActionCandidate],
+) -> Result<String, String> {
+    if !is_lower_hex_sha256(action_manifest_sha256) {
+        return Err("action_manifest_sha256 must be a lowercase SHA-256 digest".into());
+    }
+    let mut ordered = candidates.to_vec();
+    ordered.sort_by_key(|candidate| candidate.action_id);
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-jepa-action-candidate-set-v0.1\0");
+    hasher.update(action_manifest_sha256.as_bytes());
+    hasher.update((ordered.len() as u64).to_le_bytes());
+    for candidate in ordered {
+        hasher.update(candidate.action_id.to_le_bytes());
+        hasher.update([candidate.action_index]);
+    }
+    Ok(digest_to_hex(hasher.finalize().as_slice()))
+}
+
+fn digest_to_hex(digest: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
 fn validate_observed_transition(
     config: &JepaConfig,
     current_hv: &ContinuousHV,
     next_hv: &ContinuousHV,
     evidence: &ObservedTransitionEvidence,
 ) -> Result<(), String> {
+    if evidence.schema_version != OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION {
+        return Err("unsupported observed-transition evidence schema version".into());
+    }
     for (name, digest) in [
         ("source_history_sha256", &evidence.source_history_sha256),
         ("source_observation_sha256", &evidence.source_observation_sha256),
+        ("source_embedding_sha256", &evidence.source_embedding_sha256),
         ("target_observation_sha256", &evidence.target_observation_sha256),
+        ("target_embedding_sha256", &evidence.target_embedding_sha256),
         ("action_manifest_sha256", &evidence.action_manifest_sha256),
     ] {
         if !is_lower_hex_sha256(digest) {
@@ -181,6 +248,11 @@ fn validate_observed_transition(
         || !next_hv.as_slice().iter().all(|value| value.is_finite())
     {
         return Err("observed transition contains non-finite vector values".into());
+    }
+    if embedding_sha256(current_hv) != evidence.source_embedding_sha256
+        || embedding_sha256(next_hv) != evidence.target_embedding_sha256
+    {
+        return Err("observed transition embedding digest mismatch".into());
     }
     Ok(())
 }
@@ -386,6 +458,8 @@ impl JepaEngine {
             }
         }
 
+        let source_embedding_sha256 = embedding_sha256(current_hv);
+        let candidate_set_sha256 = candidate_set_sha256(action_manifest_sha256, candidates)?;
         let context = self.context.encode(current_hv);
         let predictions = candidates
             .iter()
@@ -401,8 +475,11 @@ impl JepaEngine {
             return Err("JEPA action-set prediction produced non-finite values".into());
         }
         Ok(OneStepActionSetPrediction {
+            schema_version: ONE_STEP_ACTION_SET_SCHEMA_VERSION.into(),
             source_history_sha256: source_history_sha256.to_string(),
+            source_embedding_sha256,
             action_manifest_sha256: action_manifest_sha256.to_string(),
+            candidate_set_sha256,
             predictions,
         })
     }
@@ -443,11 +520,18 @@ mod tests {
         JepaEngine::new(JepaConfig::default(), 12345)
     }
 
-    fn observed_evidence(action_index: u8) -> ObservedTransitionEvidence {
+    fn observed_evidence(
+        current_hv: &ContinuousHV,
+        next_hv: &ContinuousHV,
+        action_index: u8,
+    ) -> ObservedTransitionEvidence {
         ObservedTransitionEvidence {
+            schema_version: OBSERVED_TRANSITION_EVIDENCE_SCHEMA_VERSION.into(),
             source_history_sha256: "a".repeat(64),
             source_observation_sha256: "b".repeat(64),
+            source_embedding_sha256: embedding_sha256(current_hv),
             target_observation_sha256: "c".repeat(64),
+            target_embedding_sha256: embedding_sha256(next_hv),
             action_manifest_sha256: "d".repeat(64),
             source_observation_id: "frame-10".into(),
             target_observation_id: "frame-11".into(),
@@ -468,7 +552,7 @@ mod tests {
         let current = random_hv(501);
         let observed_next = random_hv(502);
         let loss = engine
-            .train_observed_transition(&current, &observed_next, &observed_evidence(2), 0.001)
+            .train_observed_transition(&current, &observed_next, &observed_evidence(&current, &observed_next, 2), 0.001)
             .unwrap();
         assert!(loss.is_finite());
         assert!(engine.latent_pe().is_finite());
@@ -480,7 +564,7 @@ mod tests {
         let current = random_hv(511);
         let next = random_hv(512);
 
-        let mut malformed = observed_evidence(2);
+        let mut malformed = observed_evidence(&current, &next, 2);
         malformed.target_observation_sha256 = "not-a-digest".into();
         let mut candidate = make_engine();
         assert!(candidate
@@ -499,15 +583,49 @@ mod tests {
             .train_observed_transition(&current, &next, &malformed, 0.001)
             .is_err());
 
-        let malformed = observed_evidence(250);
+        let malformed = observed_evidence(&current, &next, 250);
         assert!(candidate
             .train_observed_transition(&current, &next, &malformed, 0.001)
             .is_err());
 
-        let malformed = observed_evidence(2);
+        let malformed = observed_evidence(&current, &next, 2);
         assert!(candidate
             .train_observed_transition(&current, &next, &malformed, f32::NAN)
             .is_err());
+    }
+
+    #[test]
+    fn observed_transition_training_rejects_embedding_byte_mismatch() {
+        let mut engine = make_engine();
+        let current = random_hv(515);
+        let next = random_hv(516);
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.target_embedding_sha256 = "c".repeat(64);
+        assert!(engine
+            .train_observed_transition(&current, &next, &evidence, 0.001)
+            .is_err());
+    }
+
+    #[test]
+    fn candidate_set_digest_is_row_order_invariant_and_binds_action_mapping() {
+        let manifest = "b".repeat(64);
+        let left = [
+            ActionCandidate { action_id: 700, action_index: 1 },
+            ActionCandidate { action_id: 300, action_index: 3 },
+        ];
+        let right = [left[1], left[0]];
+        assert_eq!(
+            candidate_set_sha256(&manifest, &left).unwrap(),
+            candidate_set_sha256(&manifest, &right).unwrap()
+        );
+        let changed = [
+            ActionCandidate { action_id: 700, action_index: 2 },
+            ActionCandidate { action_id: 300, action_index: 3 },
+        ];
+        assert_ne!(
+            candidate_set_sha256(&manifest, &left).unwrap(),
+            candidate_set_sha256(&manifest, &changed).unwrap()
+        );
     }
 
     #[test]
