@@ -6,6 +6,7 @@ from affine_projective_closure_milp import (
     build_affine_closure_milp,
     minimal_auxiliary_values,
     render_cplex_lp,
+    verify_affine_binary_decision,
     verify_affine_closure_milp_solution,
 )
 from countable_global_projective_eclosure import projective_certificate
@@ -29,6 +30,26 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
         self.assertEqual(meta["closure_constraints_covered"], 2**10 - 1)
         self.assertEqual(len(model["constraints"]["closure_auxiliary"]), 10)
         self.assertEqual(len(model["constraints"]["persistence"]), 2)
+
+    def test_linear_time_binary_verifier_does_not_trust_solver_auxiliaries(self):
+        model = build_affine_closure_milp(
+            (1, 2),
+            {1: Fraction(8), 2: Fraction(0)},
+            Fraction(1, 2),
+        )
+        good = verify_affine_binary_decision(model, {1: 1, 2: 0})
+        self.assertTrue(good["valid"], good)
+        self.assertEqual(good["minimal_auxiliary_values"][2], Fraction(1, 8))
+        self.assertEqual(good["coordinate_terms_checked"], 2)
+
+        bad_model = build_affine_closure_milp(
+            (1, 2),
+            {1: Fraction(0), 2: Fraction(0)},
+            Fraction(1, 2),
+        )
+        bad = verify_affine_binary_decision(bad_model, {1: 1, 2: 0})
+        self.assertFalse(bad["valid"])
+        self.assertIn("local_affine_closure_violation", [row[0] for row in bad["failures"]])
 
     def test_exact_milp_certificate_matches_original_closure_constraints(self):
         model = build_affine_closure_milp(
@@ -133,6 +154,7 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
                     certificate = verify_affine_closure_milp_solution(
                         model, rejection, auxiliary
                     )
+                    fast_certificate = verify_affine_binary_decision(model, rejection)
                     r = sum(rejection.values())
                     brute = True
                     for subset in subsets:
@@ -142,6 +164,7 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
                             brute = False
                             break
                     self.assertEqual(certificate["valid"], brute, (n, evidence, rejection))
+                    self.assertEqual(fast_certificate["valid"], brute, (n, evidence, rejection))
 
     def test_lp_export_scales_rational_rows_to_exact_integers(self):
         model = build_affine_closure_milp(
