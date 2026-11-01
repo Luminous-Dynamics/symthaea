@@ -139,4 +139,93 @@ fn main() {
         pod_meta_cost_to_go_lab::AdmissionDecision::Admit
     ));
     println!("CASE\tshift-aware-feasibility\tshift-abstains-in-domain-admits\t0\t0\t0\t0");
+    println!(
+        "SURVIVAL_HEADER\tcohort\tepisodes\tcompleted\tright_censored\tcompeting\tcompletion_cif\tmedian_net_work\tq90_net_work"
+    );
+    let censoring_observations = [
+        pod_meta_cost_to_go_lab::TimeToProofObservation::new(
+            21,
+            1,
+            pod_meta_cost_to_go_lab::TerminalOutcome::SufficientProof,
+        )
+        .unwrap(),
+        pod_meta_cost_to_go_lab::TimeToProofObservation::new(
+            21,
+            2,
+            pod_meta_cost_to_go_lab::TerminalOutcome::RightCensored(
+                pod_meta_cost_to_go_lab::CensorReason::BudgetExhausted,
+            ),
+        )
+        .unwrap(),
+        pod_meta_cost_to_go_lab::TimeToProofObservation::new(
+            21,
+            3,
+            pod_meta_cost_to_go_lab::TerminalOutcome::SufficientProof,
+        )
+        .unwrap(),
+    ];
+    let censoring_summary =
+        pod_meta_cost_to_go_lab::estimate_time_to_proof(&censoring_observations, Some(21))
+            .unwrap();
+    println!(
+        "SURVIVAL_ROW\tbudget-censored-cohort\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}",
+        censoring_summary.episodes,
+        censoring_summary.completed,
+        censoring_summary.right_censored,
+        censoring_summary.competing_terminal,
+        censoring_summary.completion_cumulative_incidence,
+        censoring_summary
+            .median_net_work_units
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_owned()),
+        censoring_summary
+            .q90_net_work_units
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_owned())
+    );
+
+    let competing_observations = [
+        pod_meta_cost_to_go_lab::TimeToProofObservation::new(
+            22,
+            1,
+            pod_meta_cost_to_go_lab::TerminalOutcome::SufficientProof,
+        )
+        .unwrap(),
+        pod_meta_cost_to_go_lab::TimeToProofObservation::new(
+            22,
+            2,
+            pod_meta_cost_to_go_lab::TerminalOutcome::CompetingTerminal(
+                pod_meta_cost_to_go_lab::CompetingReason::PermissionRevoked,
+            ),
+        )
+        .unwrap(),
+        pod_meta_cost_to_go_lab::TimeToProofObservation::new(
+            22,
+            3,
+            pod_meta_cost_to_go_lab::TerminalOutcome::RightCensored(
+                pod_meta_cost_to_go_lab::CensorReason::ActionOutcomeUnknown,
+            ),
+        )
+        .unwrap(),
+    ];
+    let competing_summary =
+        pod_meta_cost_to_go_lab::estimate_time_to_proof(&competing_observations, Some(22))
+            .unwrap();
+    println!(
+        "SURVIVAL_ROW\tcompeting-terminal-cohort\t{}\t{}\t{}\t{}\t{:.6}\t{}\t{}",
+        competing_summary.episodes,
+        competing_summary.completed,
+        competing_summary.right_censored,
+        competing_summary.competing_terminal,
+        competing_summary.completion_cumulative_incidence,
+        competing_summary
+            .median_net_work_units
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_owned()),
+        competing_summary
+            .q90_net_work_units
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_owned())
+    );
+}
 }
