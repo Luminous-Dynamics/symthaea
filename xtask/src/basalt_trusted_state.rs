@@ -1628,7 +1628,9 @@ CREATE TABLE IF NOT EXISTS basalt_source_cursors (
     observer_profile_digest TEXT NOT NULL,
     boot_incarnation_digest TEXT NOT NULL,
     log_id TEXT NOT NULL,
-    PRIMARY KEY (host_id, source_id, partition_id)
+    PRIMARY KEY (host_id, source_id, partition_id),
+    FOREIGN KEY (log_id) REFERENCES basalt_log_cursors(log_id)
+        DEFERRABLE INITIALLY DEFERRED
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS basalt_accepted_receipts (
