@@ -101,7 +101,7 @@ impl RunningMoments {
         let sample_std = if self.count <= 1 {
             0.0
         } else {
-            (self.m2 / (self.count - 1) as f64).sqrt()
+            (self.m2 / (self.count - 1) as f64).max(0.0).sqrt()
         };
         if !sample_std.is_finite() {
             return Err(ScalerError::ArithmeticOverflow);
@@ -125,6 +125,13 @@ impl TrainOnlyStandardizer {
     ) -> Result<Self, ScalerError> {
         let mut window_by_id = BTreeMap::<u64, u64>::new();
         for window in windows {
+            if window.window_id == 0
+                || window.entity_id == 0
+                || window.history_start_us >= window.forecast_origin_us
+                || window.forecast_origin_us >= window.target_end_exclusive_us
+            {
+                return Err(ScalerError::InvalidSplitPlan);
+            }
             if window_by_id.insert(window.window_id, window.entity_id).is_some() {
                 return Err(ScalerError::DuplicateWindowId { window_id: window.window_id });
             }
@@ -159,7 +166,8 @@ impl TrainOnlyStandardizer {
             }
         }
         let entities: BTreeSet<u64> = window_by_id.values().copied().collect();
-        if entities != boundaries.keys().copied().collect() {
+        let boundary_entities: BTreeSet<u64> = boundaries.keys().copied().collect();
+        if entities != boundary_entities {
             return Err(ScalerError::InvalidSplitPlan);
         }
 
