@@ -475,12 +475,12 @@ mod tests {
                 && arguments[0] == "cat"
                 && arguments[1] == "/proc/cpuinfo"
             {
-                Ok("Features : fp asimd mte paca pacg bti\\n".to_owned())
+                Ok("Features : fp asimd mte paca pacg bti\n".to_owned())
             } else if arguments.len() == 2
                 && arguments[0] == "simpleperf"
                 && arguments[1] == "list"
             {
-                Ok("List of hardware events:\\ncpu-cycles\\ninstructions\\n".to_owned())
+                Ok("List of hardware events:\ncpu-cycles\ninstructions\n".to_owned())
             } else {
                 Err("unexpected ADB command".to_owned())
             }
@@ -594,8 +594,8 @@ mod tests {
     fn captured_profile_keeps_attestation_and_measurement_claims_not_measured() {
         let profile = capture_profile(
             &fixture_properties(),
-            Some("Features : fp asimd mte paca pacg bti\\n"),
-            Some("List of hardware events:\\ncpu-cycles\\n"),
+            Some("Features : fp asimd mte paca pacg bti\n"),
+            Some("List of hardware events:\ncpu-cycles\n"),
         );
         assert_eq!(profile["evidence_domain"], "physical_device_capture");
         assert_eq!(profile["device"]["product_family"], "Pixel 8 Pro");
