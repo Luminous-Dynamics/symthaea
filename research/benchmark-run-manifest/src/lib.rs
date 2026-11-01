@@ -319,7 +319,7 @@ pub struct EnergyMeasurement {
     /// depending on method. It is not interchangeable across methods.
     pub evidence_sha256: [u8; 32],
     pub calibration_sha256: Option<[u8; 32]>,
-    pub measured_sample_count: u64,
+    pub sample_count: u64,
     pub gross_energy_nj: u64,
     pub idle_baseline_energy_nj: u64,
     pub net_energy_nj: u64,
@@ -557,6 +557,15 @@ impl BenchmarkRunManifest {
             }
         }
         self.latency.boundary.validate()?;
+        let expected_throughput_milli = u128::from(self.latency.measured_sample_count)
+            .checked_mul(1_000_000_000)
+            .ok_or(ManifestError::ArithmeticOverflow)?
+            .checked_add(u128::from(self.latency.measurement_window_us) / 2)
+            .ok_or(ManifestError::ArithmeticOverflow)?
+            / u128::from(self.latency.measurement_window_us);
+        if expected_throughput_milli != u128::from(self.latency.throughput_milli_per_second) {
+            return Err(ManifestError::InvalidLatencyStatistics);
+        }
         if self.latency.boundary.scope == MeasurementScope::TrainingPipeline
             || self.latency.measured_sample_count == 0
             || self.latency.measurement_window_us == 0
@@ -587,7 +596,7 @@ impl BenchmarkRunManifest {
         if let Some(energy) = &self.energy {
             energy.boundary.validate()?;
             require_digest(&energy.evidence_sha256)?;
-            if energy.measured_sample_count == 0
+            if energy.sample_count == 0
                 || energy.gross_energy_nj == 0
                 || energy.idle_baseline_energy_nj > energy.gross_energy_nj
                 || energy.net_energy_nj
@@ -705,7 +714,7 @@ impl BenchmarkRunManifest {
                 h.update([energy.method.code()]);
                 h.update(energy.evidence_sha256);
                 hash_optional_digest(&mut h, energy.calibration_sha256);
-                h.update(energy.measured_sample_count.to_le_bytes());
+                h.update(energy.sample_count.to_le_bytes());
                 h.update(energy.gross_energy_nj.to_le_bytes());
                 h.update(energy.idle_baseline_energy_nj.to_le_bytes());
                 h.update(energy.net_energy_nj.to_le_bytes());
@@ -884,7 +893,7 @@ mod tests {
                 p50_us: 1_000,
                 p95_us: 1_500,
                 p99_us: 2_000,
-                throughput_milli_per_second: 50_000,
+                throughput_milli_per_second: 10_000,
                 deadline_us: Some(3_000),
                 deadline_misses: 0,
                 peak_memory_bytes: 4_000_000,
@@ -1033,6 +1042,14 @@ mod tests {
     }
 
     #[test]
+    fn throughput_must_match_sample_count_and_measurement_window() {
+        let mut manifest = valid_manifest();
+        assert_eq!(manifest.validate(), Ok(()));
+        manifest.latency.throughput_milli_per_second += 1;
+        assert_eq!(manifest.validate(), Err(ManifestError::InvalidLatencyStatistics));
+    }
+
+    #[test]
     fn calibrated_meter_requires_calibration_and_net_energy_arithmetic() {
         let mut manifest = valid_manifest();
         manifest.energy = Some(EnergyMeasurement {
@@ -1040,7 +1057,7 @@ mod tests {
             method: EnergyMethod::CalibratedExternalMeter,
             evidence_sha256: digest(25),
             calibration_sha256: Some(digest(26)),
-            measured_sample_count: 100,
+            sample_count: 100,
             gross_energy_nj: 10_000,
             idle_baseline_energy_nj: 2_000,
             net_energy_nj: 8_000,
