@@ -36,6 +36,8 @@ def build_affine_closure_milp(
     previous_rejections: Iterable[int] = (),
 ) -> dict:
     """Build the O(n)-size exact MILP for local affine closure and capacity."""
+    if scheme not in ("geometric", "telescoping"):
+        raise ValueError("weight scheme must be 'geometric' or 'telescoping'")
     ids = validate_ids(active)
     level = as_fraction(alpha)
     if not 0 < level < 1:
@@ -155,6 +157,9 @@ def verify_affine_binary_decision(
     d = meta["coordinate_offsets"]
     previous = set(meta["previous_rejections"])
     failures = []
+    extra_ids = set(rejection_values).difference(ids)
+    if extra_ids:
+        failures.append(("unknown_rejection_ids", tuple(sorted(extra_ids))))
     x = {}
     for i in ids:
         bit = rejection_values.get(i)
@@ -210,6 +215,9 @@ def verify_affine_closure_milp_solution(
     d = meta["coordinate_offsets"]
     previous = set(meta["previous_rejections"])
     failures = []
+    extra_ids = set(rejection_values).difference(ids)
+    if extra_ids:
+        failures.append(("unknown_rejection_ids", tuple(sorted(extra_ids))))
     x = {}
     y = {}
     for i in ids:
