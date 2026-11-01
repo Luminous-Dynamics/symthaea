@@ -27,7 +27,9 @@ fn print_case(name: &str, status: &str, ledger: &BudgetLedger) {
 }
 
 fn main() {
-    println!("record_type\tcase\tstatus\tspent_tokens\treserved_tokens\treservation_overruns\thard_budget_violations");
+    println!(
+        "record_type\tcase\tstatus\tspent_tokens\treserved_tokens\treservation_overruns\thard_budget_violations"
+    );
 
     let mut safe = BudgetLedger::new(tokens(100));
     safe.reserve(ReservationId(1), tokens(60)).unwrap();
@@ -93,9 +95,7 @@ fn main() {
     print_case("reservation-overrun-visible", "recorded", &forecast_overrun);
 
     let mut cap_overrun = BudgetLedger::new(tokens(100));
-    cap_overrun
-        .reserve(ReservationId(7), tokens(90))
-        .unwrap();
+    cap_overrun.reserve(ReservationId(7), tokens(90)).unwrap();
     cap_overrun
         .reconcile(
             ReservationId(7),
@@ -108,7 +108,11 @@ fn main() {
         )
         .unwrap();
     assert_eq!(cap_overrun.hard_budget_violations, 1);
-    print_case("hard-cap-overrun-visible", "violation-recorded", &cap_overrun);
+    print_case(
+        "hard-cap-overrun-visible",
+        "violation-recorded",
+        &cap_overrun,
+    );
 
     let mut shifted_forecast = RemainingCostForecast {
         pre_state_digest: [1; 32],
@@ -124,8 +128,7 @@ fn main() {
         shift_status: ShiftStatus::UnsupportedShift,
     };
     let clear_budget = BudgetLedger::new(tokens(100));
-    let shifted_decision =
-        assess_completion_feasibility(shifted_forecast, &clear_budget, 0.90, 32);
+    let shifted_decision = assess_completion_feasibility(shifted_forecast, &clear_budget, 0.90, 32);
     assert!(matches!(
         shifted_decision,
         pod_meta_cost_to_go_lab::AdmissionDecision::Abstain(_)
