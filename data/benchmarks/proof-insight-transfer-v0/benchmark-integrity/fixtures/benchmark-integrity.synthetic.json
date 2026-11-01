@@ -68,5 +68,6 @@
     "reviewer_attestation_sha256": null
   },
   "integrity_status": "not_attempted",
-  "evidence_artifacts": null
+  "evidence_artifacts": null,
+  "reviewer_key_registry_sha256": null
 }
