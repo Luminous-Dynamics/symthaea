@@ -5,9 +5,10 @@ use pod_meta_cost_to_go_lab::{
     FrontierCostCoefficients, HistoricalCostBaseline, JointCostEnvelope, LandmarkEpisode,
     LandmarkIpcwConfig, LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal,
     OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
-    OnlinePredictionStatement, OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEvaluator,
-    ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast, ReservationId,
-    ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
+    LastObservedActionForecaster, OnlinePredictionStatement, OnlineSelectionLedger,
+    PrefixBudgetReceipt, PrefixReplayEngine, PrefixReplayEvaluator, ProofFrontierFeatures,
+    ReconciliationOutcome, RemainingCostForecast, ReservationId, ResourceVector,
+    TrajectoryActionKind, TrajectoryActionReceipt, TrajectoryTerminalRecord, ActionTrajectory, SelectedProofCalibrationExample, SelectedProofEnvelope,
     SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
@@ -103,6 +104,96 @@ fn prefix_outcome(
         evidence_digest: [21; 32],
         meter_digest: [22; 32],
         verifier_digest: (terminal == TerminalOutcome::SufficientProof).then_some([23; 32]),
+    }
+}
+
+fn trajectory_features(unresolved: u64) -> ProofFrontierFeatures {
+    ProofFrontierFeatures {
+        unresolved_obligations: unresolved,
+        mandatory_obligations: unresolved,
+        maximum_dependency_depth: unresolved,
+        dependency_edges: unresolved.saturating_sub(1),
+        admissible_alternatives: 2,
+        missing_evidence_requirements: 0,
+        distinct_operation_families: 2,
+        distinct_evidence_families: 1,
+        mandatory_verifier_operations: 0,
+    }
+}
+
+fn trajectory_action(
+    sequence: u64,
+    kind: TrajectoryActionKind,
+    family: u32,
+    pre: u8,
+    post: u8,
+    cost: ResourceVector,
+    features: ProofFrontierFeatures,
+    candidates: Vec<u32>,
+) -> TrajectoryActionReceipt {
+    TrajectoryActionReceipt {
+        decision_sequence: sequence,
+        kind,
+        operation_id: format!("operation-{sequence}"),
+        operation_family: family,
+        candidate_pool_digest: [30 + sequence as u8; 32],
+        admissible_operation_families: candidates,
+        pre_state_digest: [pre; 32],
+        post_state_digest: [post; 32],
+        frontier_digest: [40 + sequence as u8; 32],
+        frontier_features: features,
+        measured_cost: cost,
+        meter_receipt_digest: [50 + sequence as u8; 32],
+    }
+}
+
+fn action_trajectory(terminal: Option<TerminalOutcome>) -> ActionTrajectory {
+    let success = terminal == Some(TerminalOutcome::SufficientProof);
+    let mut actions = vec![
+        trajectory_action(
+            1,
+            TrajectoryActionKind::ProofOperation,
+            2,
+            1,
+            2,
+            ResourceVector::new(10, 1, 2, 0, 3, 4),
+            trajectory_features(2),
+            vec![2, 3],
+        ),
+        trajectory_action(
+            2,
+            TrajectoryActionKind::ProofOperation,
+            3,
+            2,
+            3,
+            ResourceVector::new(20, 1, 4, 1, 5, 6),
+            trajectory_features(1),
+            vec![3, 4],
+        ),
+    ];
+    if success {
+        actions.push(trajectory_action(
+            3,
+            TrajectoryActionKind::IndependentVerifier,
+            90,
+            3,
+            4,
+            ResourceVector::new(5, 1, 1, 0, 2, 3),
+            ProofFrontierFeatures::default(),
+            vec![90],
+        ));
+    }
+    ActionTrajectory {
+        run_id: 77,
+        task_family: 7,
+        seed: 42,
+        initial_budget: Some(ResourceVector::new(100, 10, 20, 10, 40, 50)),
+        actions,
+        terminal: TrajectoryTerminalRecord {
+            outcome: terminal,
+            evaluator_receipt_digest: terminal.map(|_| [60; 32]),
+            completion_verifier_digest: success.then_some([61; 32]),
+        },
     }
 }
 
@@ -1214,4 +1305,53 @@ fn main() {
         historical_report.report.global_fallback_prefixes,
         historical_report.report.by_task_family.len()
     );
+    let trajectory = action_trajectory(Some(TerminalOutcome::SufficientProof));
+    let trajectory_forecaster = LastObservedActionForecaster::new(
+        [70; 32],
+        ResourceVector::new(2, 1, 1, 0, 1, 1),
+    )
+    .unwrap();
+    let trajectory_replay =
+        PrefixReplayEngine::replay(&trajectory, &trajectory_forecaster).unwrap();
+    let verified_cost = match trajectory_replay.rows[0].label {
+        pod_meta_cost_to_go_lab::PrefixOutcomeLabel::VerifiedRemainingCost { cost, .. } => cost,
+        _ => panic!("expected verified remaining-cost label"),
+    };
+    println!(
+        "TRAJECTORY_REPLAY_ROW\tverified-prefixes\t{}\t{}",
+        trajectory_replay.rows.len(),
+        verified_cost.tokens
+    );
+
+    let mut suffix_mutation = trajectory.clone();
+    suffix_mutation.actions[1].measured_cost = ResourceVector::new(200, 7, 9, 4, 12, 18);
+    let original_prefix = trajectory.prefix_view(1).unwrap();
+    let mutated_prefix = suffix_mutation.prefix_view(1).unwrap();
+    let prefix_unchanged = original_prefix == mutated_prefix;
+    let original_forecast = trajectory_forecaster.predict(&original_prefix).unwrap();
+    let mutated_forecast = trajectory_forecaster.predict(&mutated_prefix).unwrap();
+    let forecast_unchanged = original_forecast == mutated_forecast;
+    let suffix_label_changed =
+        trajectory.outcome_label(1).unwrap() != suffix_mutation.outcome_label(1).unwrap();
+    println!(
+        "TRAJECTORY_REPLAY_ROW\tsuffix-leakage-negative-control\t{}\t{}\t{}",
+        prefix_unchanged,
+        forecast_unchanged,
+        suffix_label_changed
+    );
+
+    let censored_trajectory =
+        action_trajectory(Some(TerminalOutcome::RightCensored(
+            pod_meta_cost_to_go_lab::CensorReason::Timeout,
+        )));
+    let terminal_prefix_unchanged =
+        trajectory.prefix_view(0).unwrap() == censored_trajectory.prefix_view(0).unwrap();
+    let terminal_label_changed =
+        trajectory.outcome_label(0).unwrap() != censored_trajectory.outcome_label(0).unwrap();
+    println!(
+        "TRAJECTORY_REPLAY_ROW\tterminal-label-isolation\t{}\t{}",
+        terminal_prefix_unchanged,
+        terminal_label_changed
+    );
+
 }
