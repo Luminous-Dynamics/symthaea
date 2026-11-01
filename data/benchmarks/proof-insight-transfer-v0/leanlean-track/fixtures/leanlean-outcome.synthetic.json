@@ -11,7 +11,9 @@
     "token_band": "10k_50k",
     "baseline_stripped_tokens": 25000,
     "protected_declaration_count": 3,
-    "protected_declarations_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    "protected_declarations_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "cohort_manifest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "cohort_protected_declaration_total": 620
   },
   "arm": {
     "arm_id": "L2",
