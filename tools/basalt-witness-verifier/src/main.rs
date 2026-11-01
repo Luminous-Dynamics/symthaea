@@ -1,5 +1,5 @@
 use basalt_witness_verifier::{
-    QuorumKind, load_pinned_trust_store, sha256_prefixed, verify_witness_envelope,
+    QuorumKind, sha256_prefixed, verify_witness_envelope,
 };
 use serde::Serialize;
 use std::env;
@@ -86,13 +86,8 @@ fn main() -> ExitCode {
     };
     let actual_pin = sha256_prefixed(&trust_bytes);
     let envelope_sha = sha256_prefixed(&envelope_bytes);
-    let trust = match load_pinned_trust_store(&trust_bytes, &trust_pin) {
-        Ok(value) => value,
-        Err(error) => return fail_cli(actual_pin, envelope_sha, payload_type, error, out_path),
-    };
     match verify_witness_envelope(
         &envelope_bytes,
-        &trust,
         &trust_bytes,
         &trust_pin,
         &payload_type,
