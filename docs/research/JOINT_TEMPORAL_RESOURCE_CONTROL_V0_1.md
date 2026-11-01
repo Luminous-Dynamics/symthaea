@@ -76,7 +76,7 @@ qualified as candidate plans. Each run binds identical, nonzero identities and c
 - model digest;
 - initial-state digest;
 - candidate-visible feature snapshot;
-- evaluator-owned action-registry digest (action IDs and mutual-exclusion groups);
+- evaluator-owned action-registry digest (action IDs and mutual-exclusion groups), recomputed by the evaluator from sorted entries using a domain-separated canonical encoding; a nonzero caller-supplied digest alone is not accepted;
 - episode horizon and resource budget.
 
 For every subset, the evaluator records measured resource use and each of the
