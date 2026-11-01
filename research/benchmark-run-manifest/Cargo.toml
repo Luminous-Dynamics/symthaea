@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-benchmark-run-manifest"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Canonical provenance and resource-boundary manifests for reproducible research benchmarks"
+
+[dependencies]
+sha2 = "0.10"
+
+[workspace]
