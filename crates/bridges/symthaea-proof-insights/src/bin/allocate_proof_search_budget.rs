@@ -142,6 +142,11 @@ fn validate_input(value: &Value, calibration: &proof_search_calibration::Calibra
     {
         bail!("prediction model identity differs from the calibration receipt");
     }
+    if string(value, "/policy/evaluation_horizon_id")? != calibration.evaluation_horizon_id
+        || digest(value, "/policy/continuation_policy_sha256")? != calibration.continuation_policy_sha256
+    {
+        bail!("decision horizon/continuation policy differs from the calibration receipt");
+    }
     let expected_receipt = digest(value, "/policy/calibration_receipt_sha256")?;
     if expected_receipt != calibration.receipt_sha256 {
         bail!("policy calibration receipt SHA-256 differs from the exact supplied receipt bytes");
@@ -206,7 +211,7 @@ fn validate_input(value: &Value, calibration: &proof_search_calibration::Calibra
         if digest(action, &format!("{prefix}/proof_state_sha256"))? != proof_state {
             bail!("action {action_id} is based on a different proof-state identity");
         }
-        let predicted = integer(action, &format!("{prefix}/predicted_incremental_success_ppm"))?;
+        let predicted = integer(action, &format!("{prefix}/predicted_verified_success_probability_ppm"))?;
         let standard_error = integer(action, &format!("{prefix}/standard_error_ppm"))?;
         if predicted > WEIGHT_TOTAL_PPM || standard_error > WEIGHT_TOTAL_PPM {
             bail!("action {action_id} probability estimate exceeds 1,000,000 ppm");
@@ -315,7 +320,7 @@ fn choose(value: &Value, input_sha256: &str, calibration: &proof_search_calibrat
             "selected_action":{
                 "action_id":candidate.action_id,
                 "kind":candidate.kind,
-                "predicted_incremental_success_ppm":candidate.predicted_ppm,
+                "predicted_verified_success_probability_ppm":candidate.predicted_ppm,
                 "standard_error_ppm":candidate.standard_error_ppm,
                 "lower_confidence_bound_ppm":candidate.lcb_ppm,
                 "shadow_cost_ppm":candidate.shadow_cost_ppm,
