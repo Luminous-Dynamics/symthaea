@@ -6,7 +6,10 @@ use pod_meta_lab::graph::{
 };
 use pod_meta_lab::{Obligation, ObligationState};
 
-use crate::ProofFrontierFeatures;
+use crate::{
+    FrontierCostPrediction, FrontierModelError, LinearProofFrontierCostModel,
+    ProofFrontierFeatures, ShiftStatus,
+};
 
 /// Execution facts absent from the planner graph. Source these from the
 /// frozen pre-action operation plan; do not infer them from claim structure.
@@ -26,6 +29,24 @@ pub struct FrontierSnapshot {
     pub features: ProofFrontierFeatures,
     pub fingerprint: [u8; 32],
     pub canonical_bytes: Vec<u8>,
+}
+
+impl FrontierSnapshot {
+    /// Predict from this snapshot so the feature vector and frontier identity
+    /// cannot be paired independently by the calling code.
+    pub fn predict_cost_to_go(
+        &self,
+        model: LinearProofFrontierCostModel,
+        population_cohort_digest: [u8; 32],
+        shift_status: ShiftStatus,
+    ) -> Result<FrontierCostPrediction, FrontierModelError> {
+        model.predict(
+            self.features,
+            self.fingerprint,
+            population_cohort_digest,
+            shift_status,
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -758,6 +779,33 @@ mod tests {
         );
         assert!(!snapshot.canonical_bytes.is_empty());
         assert_ne!(snapshot.fingerprint, [0; 32]);
+    }
+
+    #[test]
+    fn prediction_uses_the_snapshot_features_and_its_bound_identity() {
+        let (case, obligations, context) = fixture();
+        let snapshot = extract_frontier_snapshot(&case, &obligations, &context).unwrap();
+        let point = crate::ResourceVector::new(10, 10, 10, 10, 10, 10);
+        let scale = crate::ResourceVector::new(1, 1, 1, 1, 1, 1);
+        let model = LinearProofFrontierCostModel {
+            model_digest: [71; 32],
+            point_cost: crate::FrontierCostCoefficients {
+                intercept: point,
+                ..Default::default()
+            },
+            uncertainty_scale: crate::FrontierCostCoefficients {
+                intercept: scale,
+                ..Default::default()
+            },
+        };
+        let prediction = snapshot
+            .predict_cost_to_go(model, [72; 32], ShiftStatus::InDomain)
+            .unwrap();
+        assert_eq!(prediction.features, snapshot.features);
+        assert_eq!(prediction.frontier_digest, snapshot.fingerprint);
+        assert_eq!(prediction.model_digest, [71; 32]);
+        assert_eq!(prediction.point_cost, point);
+        assert_eq!(prediction.uncertainty_scale, scale);
     }
 
     #[test]
