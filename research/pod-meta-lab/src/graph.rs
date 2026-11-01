@@ -2909,10 +2909,12 @@ fn parse_oracle_artifact_v1(bytes: &[u8]) -> Result<ParsedOracleV1, String> {
             }
             "GOLD_CLAIM" => {
                 expect_fields_v1(&fields, 4, "GOLD_CLAIM", line_number)?;
-                let key = (
-                    decode_hex_field_v1(fields[1], "gold claim case ID")?,
-                    decode_hex_field_v1(fields[2], "gold claim ID")?,
-                );
+                let case_id = decode_hex_field_v1(fields[1], "gold claim case ID")?;
+                let claim_id = decode_hex_field_v1(fields[2], "gold claim ID")?;
+                // A case with zero evidence emits no TRUTH records. Its GOLD_CLAIM
+                // record still establishes case presence in the oracle artifact.
+                truths.entry(case_id.clone()).or_default();
+                let key = (case_id, claim_id);
                 let state = match fields[3] {
                     "supported" => OracleState::Supported,
                     "refuted" => OracleState::Refuted,
@@ -3428,6 +3430,29 @@ mod artifact_evaluator_tests_v1 {
         let predictions =
             encode_prediction_artifact_v1(&identity, &packets).expect("prediction encode");
         (planner, oracle, predictions, DIGEST.into())
+    }
+
+    #[test]
+    fn oracle_parser_preserves_cases_with_zero_truth_records() {
+        let suite = generate_poar_graph_suite(1729, DatasetSplit::Test);
+        let empty_truth_cases = suite
+            .planner_cases()
+            .iter()
+            .filter(|case| suite.oracle.get(&case.id).is_some_and(|labels| labels.is_empty()))
+            .count();
+        assert!(empty_truth_cases > 0, "fixture must include zero-evidence cases");
+
+        let planner = encode_planner_artifact_v1(&suite, "test-generator-revision")
+            .expect("planner encode");
+        let oracle = encode_oracle_artifact_v1(&suite, "test-generator-revision", DIGEST)
+            .expect("oracle encode");
+        let parsed = parse_oracle_artifact_v1(oracle.as_bytes()).expect("oracle parse");
+
+        assert_eq!(parsed.truths.len(), suite.planner_cases().len());
+        for case in suite.planner_cases() {
+            assert!(parsed.truths.contains_key(&case.id));
+        }
+        assert!(!planner.is_empty());
     }
 
     #[test]
