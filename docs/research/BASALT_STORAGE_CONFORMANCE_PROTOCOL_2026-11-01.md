@@ -73,7 +73,7 @@ A duplicate-receipt response carries two independent facts:
 - `receipt_acceptance_revision`: the historical revision at which that immutable receipt was first accepted;
 - `current_authority_revision`: the revision of the authority state observed by the current lookup/retry.
 
-Neither field is an alias for the other. The exact retry after receipt B advanced the store is specifically designed to catch implementations that overwrite the receipt's original acceptance revision with the current revision.
+Neither field is an alias for the other. The exact retry after receipt B advanced the store is specifically designed to catch implementations that overwrite the receipt's original acceptance revision with the current revision. Restore verification also records `observed_store_revision` separately from the witness-anchored `current_authority_revision`; an old restored store must never define the current trusted head.
 
 A client that loses a successful commit response must treat the outcome as indeterminate and resolve by exact receipt identity. It must not blindly replay a new semantic transition.
 
@@ -106,7 +106,7 @@ The witness must be independent of the database being qualified. Its authenticat
 
 The verifier checks the witness chain under a separately configured trust root. Merely storing a witness pointer inside the candidate database is insufficient: snapshot rollback would roll back both.
 
-If a restored authority snapshot cannot prove continuity with the current independently witnessed head, the result is `rejected_anti_rollback` or `anti_rollback_unknown`. The trace records the restored store's observed revision separately from the witness head's authority revision; neither can be substituted for the other. It is never fresh merely because its rows are internally consistent or its local integer revision looks large.
+If a restored authority snapshot cannot prove continuity with the current independently witnessed head, the result is `rejected_anti_rollback` or `anti_rollback_unknown`. The trace records the restored store's `observed_store_revision` separately from the witness-anchored `current_authority_revision`; neither can be substituted for the other. It is never fresh merely because its rows are internally consistent or its local integer revision looks large.
 
 ## Verifier design
 
