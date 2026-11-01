@@ -251,9 +251,9 @@ fn validate_and_analyze(
         let arm_id = string(arm, "/arm_id")?.to_owned();
         let role = string(arm, "/role")?.to_owned();
         arm_ids.push(arm_id.clone());
-        arm_roles.insert(arm_id.clone(), role);
-        arm_successes.insert(arm_id.clone(), 0);
-        arm_costs.insert(arm_id, 0);
+        let _ = arm_roles.insert(arm_id.clone(), role);
+        let _ = arm_successes.insert(arm_id.clone(), 0);
+        let _ = arm_costs.insert(arm_id, 0);
     }
     let control_id = arm_roles
         .iter()
@@ -274,7 +274,7 @@ fn validate_and_analyze(
 
     let mut pair_by_id = BTreeMap::<String, &Value>::new();
     for pair in pairs {
-        pair_by_id.insert(string(pair, "/pair_id")?.to_owned(), pair);
+        let _ = pair_by_id.insert(string(pair, "/pair_id")?.to_owned(), pair);
     }
     let mut seen = BTreeSet::<(String, String)>::new();
     let mut run_ids = BTreeSet::<String>::new();
@@ -401,7 +401,7 @@ fn validate_and_analyze(
         let cost = integer(outcome, "/actual_resources/cost_microusd")?;
         *arm_costs.get_mut(&arm_id).context("arm cost missing")? += u128::from(cost);
 
-        pair_rows
+        let _ = pair_rows
             .entry(pair_id)
             .or_default()
             .insert(arm_id, (successful, cost));
@@ -428,8 +428,8 @@ fn validate_and_analyze(
             let (success, cost) = rows
                 .get(arm_id)
                 .with_context(|| format!("pair {pair_id} missing arm {arm_id}"))?;
-            successes.insert(arm_id.clone(), *success);
-            costs.insert(arm_id.clone(), *cost);
+            let _ = successes.insert(arm_id.clone(), *success);
+            let _ = costs.insert(arm_id.clone(), *cost);
         }
         paired_outcomes.push(PairOutcome {
             component_id,
@@ -741,7 +741,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     println!("PITB_INTERVENTION_OUTCOME_FIXTURE_PASS: complete synthetic pair x arm matrix analyzed");
     
     let mut missing = outcomes.clone();
-    missing.pop();
+    let _ = missing.pop();
     must_reject_outcomes("missing outcome from a preregistered arm", &plan, &missing)?;
 
     let mut duplicate = outcomes.clone();
