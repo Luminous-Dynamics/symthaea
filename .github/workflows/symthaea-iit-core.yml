@@ -141,7 +141,7 @@ jobs:
             sparse-eq4-scale \
             sparse-eq4-topologies \
             sparse-partition-score \
-            sparse-full-system-search
+            sparse-full-system-search \
             min-fill-planner-comparison
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
