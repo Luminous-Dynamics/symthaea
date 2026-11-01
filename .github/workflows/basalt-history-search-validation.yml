@@ -20,14 +20,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Normalize source and verify formatting
+      - name: Rebase onto the latest PR head and normalize source
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
+          set -euo pipefail
+          git fetch origin "$PR_HEAD_REF"
+          git rebase "origin/$PR_HEAD_REF"
           cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml
-          cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --check
+      - name: Verify formatting on rebased tree
+        run: cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --check
       - name: Run deterministic reducer and bounded history-search tests
         run: cargo test --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml
       - name: Run strict Clippy
