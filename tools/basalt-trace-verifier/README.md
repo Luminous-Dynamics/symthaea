@@ -46,7 +46,7 @@ The optional `--schema` argument binds the schema file's SHA-256 into the report
 ## Result interpretation
 
 - `pass`: the reference fixture is internally consistent with this reducer and every seeded negative control is detected.
-- `fail`: one or more reference invariants or negative controls failed.
-- `invalid_evidence`: the CLI cannot deserialize the supplied trace.
+- `fail`: the well-formed reference trace contradicts the reducer or a seeded negative control was not detected.
+- `invalid_evidence`: strict deserialization, required-field, dependency, ordering, digest, fault-schedule or witness-chain validation failed.
 
 A `pass` is not a backend result or a cryptographic/storage durability claim. Live adapter observations must be written separately and checked by the next verifier increment.
