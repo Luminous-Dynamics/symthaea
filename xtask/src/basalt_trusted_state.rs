@@ -78,6 +78,9 @@ pub struct Candidate {
     pub receipt_digest: String,
     pub observer_profile_digest: String,
     pub boot_incarnation_digest: String,
+    /// The selected transparency-log origin is a source-cursor attribute.
+    /// Switching origins requires explicit continuity evidence.
+    pub log_origin_transition_evidence_digest: Option<String>,
     /// Required only when the observer profile changes for an existing cursor.
     pub profile_transition_evidence_digest: Option<String>,
     /// Required only when the boot incarnation changes for an existing cursor.
@@ -96,6 +99,7 @@ pub struct SourceCursor {
     pub receipt_digest: String,
     pub observer_profile_digest: String,
     pub boot_incarnation_digest: String,
+    pub log_id: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -133,6 +137,7 @@ impl AcceptedReceipt {
             && self.receipt_digest == candidate.receipt_digest
             && self.observer_profile_digest == candidate.observer_profile_digest
             && self.boot_incarnation_digest == candidate.boot_incarnation_digest
+            && self.checkpoint.log_id == candidate.checkpoint.log_id
     }
 }
 
@@ -167,6 +172,8 @@ pub enum TransitionError {
     UnexpectedProfileTransitionEvidence,
     UnauthorizedBootTransition,
     UnexpectedBootTransitionEvidence,
+    UnauthorizedLogOriginTransition,
+    UnexpectedLogOriginTransitionEvidence,
     LogBootstrapRequired,
     LogBootstrapMismatch,
     LogOriginMismatch,
@@ -269,6 +276,7 @@ impl TrustedState {
                 receipt_digest: candidate.receipt_digest.clone(),
                 observer_profile_digest: candidate.observer_profile_digest.clone(),
                 boot_incarnation_digest: candidate.boot_incarnation_digest.clone(),
+                log_id: candidate.checkpoint.log_id.clone(),
             },
         );
 
@@ -337,6 +345,7 @@ fn validate_candidate(candidate: &Candidate) -> Result<(), TransitionError> {
         || !valid_digest(&candidate.observer_profile_digest)
         || !valid_digest(&candidate.boot_incarnation_digest)
         || !valid_id(&candidate.checkpoint.log_id)
+        || candidate.log_origin_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
         || candidate.checkpoint.tree_size == 0
         || !valid_digest(&candidate.checkpoint.root_digest)
         || !valid_digest(&candidate.checkpoint.checkpoint_digest)
@@ -360,6 +369,7 @@ fn validate_source_transition(
             }
             if candidate.profile_transition_evidence_digest.is_some()
                 || candidate.boot_transition_evidence_digest.is_some()
+                || candidate.log_origin_transition_evidence_digest.is_some()
             {
                 return Err(TransitionError::UnexpectedProfileTransitionEvidence);
             }
@@ -400,6 +410,14 @@ fn validate_source_transition(
                 (true, Some(digest)) if valid_digest(digest) => {}
                 (true, _) => return Err(TransitionError::UnauthorizedBootTransition),
                 (false, Some(_)) => return Err(TransitionError::UnexpectedBootTransitionEvidence),
+                (false, None) => {}
+            }
+
+            let log_changed = candidate.checkpoint.log_id != current.log_id;
+            match (log_changed, candidate.log_origin_transition_evidence_digest.as_deref()) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => return Err(TransitionError::UnauthorizedLogOriginTransition),
+                (false, Some(_)) => return Err(TransitionError::UnexpectedLogOriginTransitionEvidence),
                 (false, None) => {}
             }
         }
@@ -550,6 +568,7 @@ fn fixture_candidate() -> Candidate {
         receipt_digest: test_digest(2),
         observer_profile_digest: test_digest(3),
         boot_incarnation_digest: test_digest(4),
+        log_origin_transition_evidence_digest: None,
         profile_transition_evidence_digest: None,
         boot_transition_evidence_digest: None,
         policy_versions: PolicyVersions {
@@ -588,6 +607,7 @@ fn successor_candidate(state: &TrustedState, generation: u64, receipt_seed: u8) 
         receipt_digest: test_digest(receipt_seed),
         observer_profile_digest: current.observer_profile_digest.clone(),
         boot_incarnation_digest: current.boot_incarnation_digest.clone(),
+        log_origin_transition_evidence_digest: None,
         profile_transition_evidence_digest: None,
         boot_transition_evidence_digest: None,
         policy_versions: state.policy_versions().expect("fixture policy").clone(),
@@ -611,6 +631,7 @@ fn secondary_source_candidate(state: &TrustedState) -> Candidate {
         receipt_digest: test_digest(71),
         observer_profile_digest: test_digest(72),
         boot_incarnation_digest: test_digest(73),
+        log_origin_transition_evidence_digest: None,
         profile_transition_evidence_digest: None,
         boot_transition_evidence_digest: None,
         policy_versions: state.policy_versions().expect("fixture policy").clone(),
