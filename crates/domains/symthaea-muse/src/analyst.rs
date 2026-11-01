@@ -1948,6 +1948,52 @@ mod tests {
     }
 
     #[test]
+    fn fulfilled_reach_climax_requires_a_cited_climax_event() {
+        let (mut composition, mut trace) = trace_fixture();
+        composition.notes[1].emphasis = "climax".into();
+        let definition = Some(ObligationDefinitionV1 {
+            schema_version: 1,
+            kind: ObligationKindV1::ReachClimax,
+        });
+        trace.obligation_transitions[0].definition = definition.clone();
+        trace.obligation_transitions[1].definition = definition;
+        let accepted = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(!accepted
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-climax-not-reached"));
+
+        composition.notes[1].emphasis = "normal".into();
+        let rejected = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(rejected
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-climax-not-reached"));
+    }
+
+    #[test]
+    fn unqualified_typed_cadence_is_insufficient_not_verified() {
+        let (composition, mut trace) = trace_fixture();
+        let definition = Some(ObligationDefinitionV1 {
+            schema_version: 1,
+            kind: ObligationKindV1::Cadence {
+                cadence_type: "authentic".into(),
+            },
+        });
+        trace.obligation_transitions[0].definition = definition.clone();
+        trace.obligation_transitions[1].definition = definition;
+        let report = verify_composer_trace(&trace, &composition, "score", 0);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.code == "obligation-kind-not-yet-qualified"));
+        assert_eq!(
+            report.evidence.verification_status,
+            VerificationStatus::InsufficientEvidence
+        );
+    }
+
+    #[test]
     fn fulfilled_transposed_motif_requires_matching_score_intervals() {
         let (mut composition, mut trace) = trace_fixture();
         composition.notes.push(SymbolicNoteEvent {
