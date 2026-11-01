@@ -581,6 +581,8 @@ mod tests {
 
     const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const H2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const H3: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const H4: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
     fn plan() -> NoisyObservationPlan {
         NoisyObservationPlan::new(
@@ -618,6 +620,27 @@ mod tests {
             objective_values: values.to_vec(),
             evidence_sha256: H2.to_owned(),
         }
+    }
+
+    #[test]
+    fn plan_digest_binds_sampling_noise_and_bounds_certificates() {
+        let baseline = plan();
+        let baseline_digest = baseline.plan_sha256().unwrap();
+
+        let mut changed_sampling = baseline.clone();
+        changed_sampling.sampling_protocol_sha256 =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert_ne!(baseline_digest, changed_sampling.plan_sha256().unwrap());
+
+        let mut changed_noise = baseline.clone();
+        changed_noise.noise_model_sha256 =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert_ne!(baseline_digest, changed_noise.plan_sha256().unwrap());
+
+        let mut changed_bounds = baseline.clone();
+        changed_bounds.objective_specs[0].bounds_certificate_sha256 =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert_ne!(baseline_digest, changed_bounds.plan_sha256().unwrap());
     }
 
     #[test]
