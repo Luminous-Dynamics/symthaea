@@ -308,8 +308,7 @@ fn median(sorted: &[u128]) -> Result<u128, HistoricalBaselineError> {
         let lower = sorted[len / 2 - 1];
         let upper = sorted[len / 2];
         lower
-            .checked_add(upper - lower)
-            .map(|sum| sum / 2)
+            .checked_add((upper - lower) / 2)
             .ok_or(HistoricalBaselineError::NumericOverflow)
     }
 }
@@ -458,7 +457,7 @@ mod tests {
     use super::*;
     use crate::{
         CensorReason, CompetingReason, ForecastOutcomeReceipt, ForecastReceipt,
-        RemainingCostForecast, ShiftStatus,
+        RemainingCostForecast,
     };
 
     fn forecast(id: u64, run_id: u64, family: u32) -> ForecastReceipt {
