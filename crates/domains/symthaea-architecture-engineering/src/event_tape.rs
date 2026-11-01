@@ -1474,6 +1474,28 @@ impl EventTape {
                         direction_id: direction_id.clone(),
                     }
                 }
+                ActionIntent::EvaluateCandidateVector {
+                    direction_id,
+                    objective_contract_sha256,
+                    ..
+                } => PolicySelection::EvaluateCandidateVector {
+                    direction_id: direction_id.clone(),
+                    objective_contract_sha256: objective_contract_sha256.clone(),
+                },
+                ActionIntent::ObserveCandidateReplicate {
+                    direction_id,
+                    objective_contract_sha256,
+                    decision_sha256,
+                    replicate_id,
+                    sample_seed,
+                    ..
+                } => PolicySelection::ObserveCandidateReplicate {
+                    direction_id: direction_id.clone(),
+                    objective_contract_sha256: objective_contract_sha256.clone(),
+                    decision_sha256: decision_sha256.clone(),
+                    replicate_id: replicate_id.clone(),
+                    sample_seed: *sample_seed,
+                },
                 ActionIntent::ProposeDirection { .. } => PolicySelection::ProposeDirection,
             };
             if selected != recorded {
@@ -1491,6 +1513,17 @@ impl EventTape {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicySelection {
     EvaluateDirection { direction_id: String },
+    EvaluateCandidateVector {
+        direction_id: String,
+        objective_contract_sha256: String,
+    },
+    ObserveCandidateReplicate {
+        direction_id: String,
+        objective_contract_sha256: String,
+        decision_sha256: String,
+        replicate_id: String,
+        sample_seed: u64,
+    },
     ProposeDirection,
 }
 
