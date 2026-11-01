@@ -169,3 +169,6 @@ Initial targets are ≥30% lower cost per verified proof and ≥10% cost-quality
 ## Benchmark target integrity
 
 The ICML 2026 benchmark audit reported 4,833 findings across five widely used Lean benchmarks/forks, including 398 mechanically certified defects such as counterexamples, vacuous theorems and unsound axioms. PITB now has a separate target-integrity receipt contract and exact-byte Rust verifier. It pins source/statement/environment, checks elaboration and axiom closure, records counterexample/vacuity probe evidence, and requires independent semantic approval before eligibility. Compilation or kernel proof success alone does not establish benchmark semantic validity. This is a separate task-eligibility gate, not a composite performance score; no real cohort audit has yet been run. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md`.
+
+
+The benchmark-integrity gate is now defined separately from all performance outcomes. A compiler-pass, kernel-pass or no-counterexample-probe result cannot substitute for independent semantic approval. The current integrity receipt derives pending/eligible/ineligible status but does not yet authenticate reviewer signatures or run an end-to-end source-to-Lean semantic audit on a public cohort. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md`.
