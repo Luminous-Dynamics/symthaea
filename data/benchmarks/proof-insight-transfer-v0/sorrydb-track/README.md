@@ -218,3 +218,8 @@ The LeanLean repository-compression cohort has a separate per-repository outcome
 
 
 The R5 receipt's `proof_state_sha256` is recomputed over five component digests: environment, metavariable goal metadata, target expression, ordered local context and full MetavarContext. It is deliberately stronger than the static Lean Expr wire v1 proof-state digest; R5 must bind the mutable metavariable context as well.
+
+
+## Benchmark target integrity gate
+
+PITB now defines a cohort-independent target integrity receipt under `data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/`. The gate separates kernel elaboration, axiom closure, counterexample/vacuity probes and independent semantic review. A task remains pending until its meaning is reviewed; no benchmark is treated as semantically valid merely because Lean accepts its target or proof. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md`.
