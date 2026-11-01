@@ -263,8 +263,9 @@ https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/p
    resolve nonzero state-pair ties that currently return an explicit unresolved
    status. Do not invent a canonical winner when PyPhi escalates to Composition.
 4. **Formalism separation:** implement IIT 4.0 (2026)'s intrinsic-information
-   requirement as a separate path. It caps phi_s after MIP selection; it must not
-   silently alter the 2023 computation.
+   requirement as a separate path. At the selected MIP, the 2026 system measure
+   is `phi_s = min(phi_c, phi_e, ii(s))`; IIT 4.0 (2023) remains
+   `phi_s = min(phi_c, phi_e)`. Never mix the two profiles.
 5. **Certified scale-up:** add mathematically valid lower/upper bounds, branch-and-bound
    certificates, and exact stopping conditions. Heuristics are not bounds, and a
    budget-exhausted search must never return an exact scalar.
