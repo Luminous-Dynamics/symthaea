@@ -276,7 +276,22 @@ fn solve_node(
                 "measurement increased expected optimal terminal risk; check likelihood normalization and numeric conditioning",
             ));
         }
-        if expected_risk + RISK_TOLERANCE < best_expected_risk {
+        let improves_risk = expected_risk + RISK_TOLERANCE < best_expected_risk;
+        // Stopping remains preferred when a measurement does not reduce risk. Once a
+        // measurement is strictly better than stopping, equivalent-risk actions prefer
+        // lower expected spend, then lower worst-case spend, then lexical action ID.
+        let improves_cost_tiebreak = match best_action_id.as_deref() {
+            Some(best_id) => {
+                expected_cost + RISK_TOLERANCE < best_expected_cost
+                    || ((expected_cost - best_expected_cost).abs() <= RISK_TOLERANCE
+                        && (worst_case_cost < best_worst_case_cost
+                            || (worst_case_cost == best_worst_case_cost
+                                && action.action_id.as_str() < best_id)))
+            }
+            None => false,
+        };
+        let equivalent_risk = (expected_risk - best_expected_risk).abs() <= RISK_TOLERANCE;
+        if improves_risk || (equivalent_risk && improves_cost_tiebreak) {
             best_expected_risk = expected_risk;
             best_expected_cost = expected_cost;
             best_worst_case_cost = worst_case_cost;
@@ -284,8 +299,6 @@ fn solve_node(
             best_terminal_decision_id = None;
             best_branches = branches;
         }
-        // Actions are canonicalized by ID. Strict improvement preserves deterministic
-        // lexical tie-breaking among actions with equivalent terminal risk.
     }
 
     let posterior_sha256 = digest_serializable(&posterior)?;
@@ -561,6 +574,20 @@ mod tests {
         assert!((policy.expected_total_cost_units - 2.0).abs() < 1e-12);
         assert_eq!(policy.worst_case_total_cost_units, 2);
         verify_sequential_policy(&problem, &policy).unwrap();
+    }
+
+    #[test]
+    fn equivalent_risk_policies_prefer_lower_expected_and_worst_case_cost() {
+        let mut model = problem();
+        model.actions = vec![
+            signal_action("measure-a-cheap", 1, 0.85),
+            signal_action("measure-b-expensive", 2, 0.85),
+        ];
+        let policy = solve_sequential_policy(&model, 2).unwrap();
+        assert_eq!(policy.root.selected_action_id.as_deref(), Some("measure-a-cheap"));
+        assert!((policy.expected_terminal_bayes_risk - 1.5).abs() < 1e-12);
+        assert!((policy.expected_total_cost_units - 1.0).abs() < 1e-12);
+        assert_eq!(policy.worst_case_total_cost_units, 1);
     }
 
     #[test]
