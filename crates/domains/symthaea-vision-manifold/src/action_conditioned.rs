@@ -546,8 +546,9 @@ impl ActionConditionedVisualResidualPredictor {
         Ok(scores)
     }
 
-    /// Score and learn from a complete action set after every branch has
-    /// produced its later real visual observation. All forecasts must share
+    /// Score and learn from a complete action set using authorized supervised-
+    /// training observations only. Never pass held-out qualification outcomes
+    /// here; use score_action_set for those. All forecasts must share
     /// the exact history, action manifest, source frame, horizon, checkpoint
     /// and model version. Scores are computed first; one averaged update is
     /// applied only after the entire set validates.
