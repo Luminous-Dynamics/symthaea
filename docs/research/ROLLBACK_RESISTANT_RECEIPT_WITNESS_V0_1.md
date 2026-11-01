@@ -72,9 +72,10 @@ If the witness cannot durably commit its state, it must not attest.
 - validates a strict BFT witness configuration;
 - verifies the local evaluator checkpoint signature;
 - verifies candidate responses against allow-listed keys using strict Ed25519;
-- ignores unknown, malformed, or invalidly signed responses rather than allowing unauthenticated input to poison a valid quorum;
-- deduplicates byte-for-byte identical retransmissions and excludes a witness that supplies conflicting signed responses;
-- treats a stale-challenge response as a non-vote, counted as stale, rather than aborting the quorum check;
+- authenticates responses before deduplication/equivocation classification, so a forged packet claiming an honest witness ID cannot disqualify that honest witness;
+- ignores unknown, malformed or invalidly signed responses rather than allowing unauthenticated input to poison a valid quorum;
+- deduplicates byte-for-byte identical current-challenge retransmissions and excludes a witness only when it supplies conflicting, validly signed responses for the same evaluator and current challenge;
+- treats stale-challenge responses as non-votes, counted once per witness identity, rather than aborting the quorum check or allowing replay floods to inflate the counter;
 - groups attestations by evaluator epoch, checkpoint digest and previous digest;
 - requires (q) matching witnesses for acceptance;
 - detects local rollback only when a quorum confirms a higher epoch;
@@ -105,7 +106,7 @@ Ten source-level test functions cover:
 5. insufficient quorum and weak-policy rejection;
 6. replay of old attestations yields no quorum under a fresh challenge;
 7. one stale-challenge response cannot block a valid current quorum;
-8. invalid-signature, unknown-identity and equivocating responses cannot poison a valid quorum;
+8. forged invalid-signature response under an honest witness ID, unknown identity, and valid equivocation handling cannot poison a valid quorum;
 9. one Byzantine higher-epoch response cannot override a current quorum;
 10. one Byzantine conflicting-head response cannot deny a current quorum.
 
