@@ -27,5 +27,5 @@ This is a bounded online control heuristic, not a proof of convergence or an opt
 ## Local checks
 
 ```sh
-cargo test --manifest-path research/temporal-adaptation/Cargo.toml --locked
+cargo test --manifest-path research/temporal-adaptation/Cargo.toml
 ```
