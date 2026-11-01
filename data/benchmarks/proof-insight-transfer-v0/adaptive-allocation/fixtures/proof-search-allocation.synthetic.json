@@ -10,7 +10,7 @@
   },
   "policy": {
     "policy_id": "pitb-lcb-shadow-price-v0",
-    "policy_sha256": "536479ac1416ac11de1f7db4885541c4e0e4ca1f2c38d8459499d0464aa54501",
+    "policy_sha256": "d9984050805df114be993570cb3b37b2a256aa1e54bcad068f28b07cdcfbfd72",
     "calibration_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
     "calibration_split": "validation",
     "calibration_sample_count": 1600,
@@ -26,10 +26,10 @@
       "cost_microusd": 200000
     },
     "confidence_z_hundredths": 196,
-    "calibration_receipt_sha256": "d874a8068fc06924d190068564857ca20dcb61f8140bcce8e8499839d8f2372a",
+    "calibration_receipt_sha256": "438f7b5b8c4e2e375ff6fe66e3c00135a297d87788896aa0e0bce19ab6be8b7a",
     "prediction_model_id": "synthetic-action-outcome-estimator",
     "prediction_model_version": "fixture-only",
-    "evaluation_horizon_id": "fixed-horizon-30m-post-action-policy-v0",
+    "evaluation_horizon_id": "synthetic-fixed-horizon-post-action-v0",
     "continuation_policy_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
   },
   "remaining_budget": {
@@ -47,7 +47,7 @@
       "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "standard_error_ppm": 50000,
       "prediction_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-      "calibration_receipt_sha256": "d874a8068fc06924d190068564857ca20dcb61f8140bcce8e8499839d8f2372a",
+      "calibration_receipt_sha256": "438f7b5b8c4e2e375ff6fe66e3c00135a297d87788896aa0e0bce19ab6be8b7a",
       "preconditions_met": true,
       "expected_resources": {
         "tokens": 20000,
@@ -65,7 +65,7 @@
       "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "standard_error_ppm": 20000,
       "prediction_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-      "calibration_receipt_sha256": "d874a8068fc06924d190068564857ca20dcb61f8140bcce8e8499839d8f2372a",
+      "calibration_receipt_sha256": "438f7b5b8c4e2e375ff6fe66e3c00135a297d87788896aa0e0bce19ab6be8b7a",
       "preconditions_met": true,
       "expected_resources": {
         "tokens": 10000,
@@ -83,7 +83,7 @@
       "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "standard_error_ppm": 25000,
       "prediction_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "calibration_receipt_sha256": "d874a8068fc06924d190068564857ca20dcb61f8140bcce8e8499839d8f2372a",
+      "calibration_receipt_sha256": "438f7b5b8c4e2e375ff6fe66e3c00135a297d87788896aa0e0bce19ab6be8b7a",
       "preconditions_met": true,
       "expected_resources": {
         "tokens": 40000,
