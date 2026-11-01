@@ -346,6 +346,7 @@ Candidate controller: 12 Rust test functions authored.
 Evaluator exact subset oracle: 15 Rust test functions authored.  
 Evaluator pairwise interaction attribution: 6 Rust test functions authored.  
 Evaluator higher-order interaction decomposition: 8 Rust test functions authored.  
+**Total: 41 source-authored test functions across the joint controller, exact subset oracle and interaction modules; none have run.**  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
 The controller and oracle are research prototypes, not production schedulers.
