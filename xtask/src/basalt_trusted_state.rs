@@ -1630,6 +1630,74 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_rejects_cursor_rollback_even_when_local_digest_is_recomputed() {
+        let path = temporary_sqlite_path("cursor-history-rollback");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let first = fixture_candidate();
+            let first_plan = match store.preview(&first).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(first_plan).unwrap();
+
+            let before_second = store.read_state().unwrap();
+            let second = successor_candidate(&before_second, 2, 118);
+            let second_plan = match store.preview(&second).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("second receipt is new"),
+            };
+            store.commit_plan(second_plan).unwrap();
+
+            let mut rolled_back = store.read_state().unwrap();
+            let accepted_first = rolled_back
+                .accepted_receipts
+                .get(&first.receipt_digest)
+                .unwrap()
+                .clone();
+            let cursor = rolled_back
+                .source_cursors
+                .get_mut(&fixture_source_key())
+                .unwrap();
+            cursor.generation = accepted_first.generation;
+            cursor.seal_digest = accepted_first.seal_digest;
+            cursor.receipt_digest = accepted_first.receipt_digest;
+            cursor.observer_profile_digest = accepted_first.observer_profile_digest;
+            cursor.boot_incarnation_digest = accepted_first.boot_incarnation_digest;
+            cursor.log_id = accepted_first.checkpoint.log_id;
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_source_cursors
+                     SET generation=?1, seal_digest=?2, receipt_digest=?3,
+                         observer_profile_digest=?4, boot_incarnation_digest=?5, log_id=?6
+                     WHERE host_id=?7 AND source_id=?8 AND partition_id=?9",
+                    params![
+                        cursor.generation.to_string(),
+                        cursor.seal_digest,
+                        cursor.receipt_digest,
+                        cursor.observer_profile_digest,
+                        cursor.boot_incarnation_digest,
+                        cursor.log_id,
+                        fixture_source_key().provisioned_host_id,
+                        fixture_source_key().source_id,
+                        fixture_source_key().partition_id,
+                    ],
+                )
+                .unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                    params![trusted_state_digest(&rolled_back)],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
     fn sqlite_rejects_acceptance_history_with_missing_transition_evidence() {
         let path = temporary_sqlite_path("transition-evidence-history");
         {
@@ -2412,6 +2480,11 @@ fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
     if expected_revision.checked_sub(1) != Some(state.revision) {
         anyhow::bail!("accepted receipt revision history does not close at state revision");
     }
+    match (ordered.last(), state.policy_versions.as_ref()) {
+        (None, None) => {}
+        (Some(last), Some(current)) if &last.policy_versions == current => {}
+        _ => anyhow::bail!("current policy cursor does not match the last accepted receipt"),
+    }
 
     for (source_key, history) in &mut by_source {
         history.sort_by_key(|receipt| receipt.generation);
@@ -2426,6 +2499,21 @@ fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
             || first.log_origin_transition_evidence_digest.is_some()
         {
             anyhow::bail!("source bootstrap carries an unexpected continuity transition");
+        }
+
+        let latest = history.last().expect("source history contains its first receipt");
+        let cursor = state
+            .source_cursors
+            .get(source_key)
+            .ok_or_else(|| anyhow::anyhow!("accepted source history has no current cursor"))?;
+        if cursor.generation != latest.generation
+            || cursor.seal_digest != latest.seal_digest
+            || cursor.receipt_digest != latest.receipt_digest
+            || cursor.observer_profile_digest != latest.observer_profile_digest
+            || cursor.boot_incarnation_digest != latest.boot_incarnation_digest
+            || cursor.log_id != latest.checkpoint.log_id
+        {
+            anyhow::bail!("source cursor does not point to its latest accepted generation");
         }
 
         for pair in history.windows(2) {
