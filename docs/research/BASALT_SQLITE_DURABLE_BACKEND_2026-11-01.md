@@ -19,7 +19,9 @@ Every connection sets and verifies:
 - `journal_mode=WAL`;
 - `synchronous=FULL` (numeric pragma value 2);
 - `foreign_keys=ON`;
-- a 5-second busy timeout.
+- a 5-second busy timeout;
+- bounded state cardinalities: 128 log cursors, 4,096 source cursors and 100,000 accepted receipts;
+- on Unix, reject an existing symlink/non-regular file and set the database file mode to 0600. The containing directory must still be trusted against concurrent path replacement.
 
 The backend starts each state mutation with `BEGIN IMMEDIATE`. It reads the complete current trusted state after obtaining the SQLite writer transaction, checks both the revision and exact expected state snapshot, then writes the source cursor, log cursor, accepted receipt and policy/revision record before committing.
 
@@ -68,7 +70,7 @@ The next production trust layer remains a remote authoritative compare-and-advan
 
 ## Filesystem and deployment constraints
 
-SQLite WAL is a same-host multi-process backend; its shared-memory wal-index is not designed for clients on different machines using a network filesystem. The database must live on a tested local filesystem with correct locking and durable sync semantics. Never place this WAL database on NFS or an unqualified network share.
+SQLite WAL is a same-host multi-process backend; its shared-memory wal-index is not designed for clients on different machines using a network filesystem. The backend caps state at 128 log cursors, 4,096 source cursors and 100,000 accepted receipts so each read can safely materialize the complete state for exact-snapshot comparison. The database must live on a tested local filesystem with correct locking and durable sync semantics. Never place this WAL database on NFS or an unqualified network share.
 
 The `FULL` pragma asks the SQLite VFS to synchronize the WAL at transaction commit. Actual durability still depends on the VFS, filesystem, storage controller, device write-cache and hardware honoring flush/barrier semantics. A pinned reference machine and fault-tested storage stack are required before making a deployment durability claim.
 
