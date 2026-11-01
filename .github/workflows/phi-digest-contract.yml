@@ -284,6 +284,8 @@ jobs:
           assert all(p["mip_tie_count"] == len(p["mip_tie_cut_sha256s"]) == len(p["mip_tie_cut_removed_edges"]) for p in points)
           assert all(p["mip_cut_sha256"] in p["mip_tie_cut_sha256s"] for p in points)
           assert all(len(set(p["mip_tie_cut_sha256s"])) == p["mip_tie_count"] for p in points)
+          assert all(p["mip_default_resolved_tie_count"] == 1 for p in points)
+          assert all(p["mip_default_resolved_cut_sha256s"] == [p["mip_cut_sha256"]] for p in points)
           partition_counts = [len(p["partition_scores"]) for p in points]
           assert len(set(partition_counts)) == 1 and partition_counts[0] == data["summary"]["partition_count_per_point"]
           assert data["summary"]["partition_score_row_count"] == sum(partition_counts)
