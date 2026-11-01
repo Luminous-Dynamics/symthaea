@@ -492,6 +492,8 @@ pub struct PrequentialMetrics {
     pub coverage: f64,
     pub selective_accuracy: Option<f64>,
     pub brier_score: f64,
+    pub ood_event_count: usize,
+    pub in_distribution_event_count: usize,
     pub open_set_auprc: Option<f64>,
     pub per_regime_metrics: Vec<TemporalRegimeMetrics>,
     pub worst_regime_accuracy: Option<f64>,
@@ -988,6 +990,8 @@ pub fn audit_prequential_execution(
         coverage: accepted as f64 / count as f64,
         selective_accuracy,
         brier_score: brier_sum / count as f64,
+        ood_event_count: ood_positive_count,
+        in_distribution_event_count: ood_negative_count,
         open_set_auprc,
         per_regime_metrics,
         worst_regime_accuracy,
@@ -1467,6 +1471,38 @@ mod tests {
         *prediction = sha('e');
         trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
         assert!(audit_prequential_execution(&dataset, &trace).unwrap_err().to_string().contains("current model-state"));
+    }
+
+    #[test]
+    fn prequential_audit_reports_regime_recovery_retention_and_ood_metrics() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let trace = prequential_trace(&dataset, true);
+        let receipt = audit_prequential_execution(&dataset, &trace).unwrap();
+        assert!(!receipt.metrics.per_regime_metrics.is_empty());
+        assert!(receipt.metrics.worst_regime_accuracy.is_some());
+        assert!(receipt.metrics.ood_event_count > 0);
+        assert!(receipt.metrics.in_distribution_event_count > 0);
+        assert_eq!(receipt.metrics.open_set_auprc, Some(1.0));
+        if receipt.metrics.drift_transition_count > 0 {
+            assert_eq!(
+                receipt.metrics.drift_transition_count,
+                receipt.metrics.recovered_drift_transition_count
+                    + receipt.metrics.unrecovered_drift_transitions
+            );
+        }
+    }
+
+    #[test]
+    fn prequential_audit_rejects_out_of_range_novelty_score() {
+        let dataset = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut trace = prequential_trace(&dataset, false);
+        let score = trace.actions.iter_mut().find_map(|action| match action {
+            PrequentialAction::Prediction { event_index: 0, novelty_score_q15, .. } => Some(novelty_score_q15),
+            _ => None,
+        }).unwrap();
+        *score = 32_769;
+        trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
+        assert!(audit_prequential_execution(&dataset, &trace).unwrap_err().to_string().contains("novelty score"));
     }
 
     #[test]
