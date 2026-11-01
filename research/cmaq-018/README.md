@@ -172,3 +172,6 @@ See [VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md](VIS005_ACTION_CONDITIONE
 The scalar action bank is retained for a single declared outcome channel. The new `StructuredJointActionSetSamples` API carries multiple independent channels—such as object geometry, motion, gripper contact probability, visibility, terminal risk and task utility—under one history digest, action manifest and shared joint-draw axis. It computes a canonical SHA-256 over each channel's semantic tag, unit and exact f64 sample bits, and returns per-channel prediction/effect intervals without scalarizing heterogeneous quantities.
 
 See `structured-visual-action-bank.v0.1.schema.json` and `fixtures/structured-visual-action-bank.example.json`. The synthetic known-answer bank keeps object x-position (metres) and contact probability on one shared draw axis. A one-unit paired position effect and a 0.4 paired contact-probability effect are tested independently. These are metric/contract tests, not predictions from a real visual model.
+
+
+Structured-channel action selection is now constrained to an explicitly named `TaskUtility` channel. The same bank fixture includes position, contact probability and task utility, and the selector rejects a geometry channel. This prevents heterogeneous visual beliefs from being accidentally treated as one scalar reward.
