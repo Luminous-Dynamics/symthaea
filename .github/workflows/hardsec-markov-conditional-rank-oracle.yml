@@ -57,18 +57,6 @@ jobs:
           assert receipt["guarantee"]["arbitrary_serial_pmu_pfa_claim"] is False
           assert receipt["guarantee"]["floating_point_runtime_claim"] == "not_established_until_outward_interval_arithmetic_is_certified"
           assert receipt["guarantee"]["effective_sample_size_estimate"] is None
-          envelope = receipt["frozen_upper_envelope"]
-          assert envelope["numerators"] == [[4, 3], [3, 3]]
-          assert envelope["denominators"] == [[5, 10], [5, 5]]
-          calibration = envelope["calibration"]
-          assert calibration["method"] == "fixed_n_hoeffding_upper_bound_with_integer_outward_rounding"
-          assert calibration["visits_per_source_state"] == 1000
-          assert calibration["success_counts"] == [[750, 250], [500, 500]]
-          assert calibration["delta_per_coordinate"] == "1/40"
-          assert calibration["calibration_tally_is_synthetic"] is True
-          assert calibration["physical_calibration_data"] is False
-          assert "predictable source-state visits" in calibration["statistical_contract"]
-
           print("HARDSEC-024 finite-grid transition CS audit qualified.")
           PY
       - name: Verify emitted exact receipt
@@ -129,5 +117,16 @@ jobs:
           assert receipt["guarantee"]["arbitrary_serial_pmu_pfa_claim"] is False
           assert receipt["guarantee"]["physical_hardware_evidence"] is False
           assert receipt["guarantee"]["effective_sample_size_estimate"] is None
+          envelope = receipt["frozen_upper_envelope"]
+          assert envelope["numerators"] == [[4, 3], [3, 3]]
+          assert envelope["denominators"] == [[5, 10], [5, 5]]
+          calibration = envelope["calibration"]
+          assert calibration["method"] == "fixed_n_hoeffding_upper_bound_with_integer_outward_rounding"
+          assert calibration["visits_per_source_state"] == 1000
+          assert calibration["success_counts"] == [[750, 250], [500, 500]]
+          assert calibration["delta_per_coordinate"] == "1/40"
+          assert calibration["calibration_tally_is_synthetic"] is True
+          assert calibration["physical_calibration_data"] is False
+          assert "predictable source-state visits" in calibration["statistical_contract"]
           print("HARDSEC-025 exact rational restarted Markov portfolio oracle qualified.")
           PY
