@@ -223,3 +223,8 @@ The R5 receipt's `proof_state_sha256` is recomputed over five component digests:
 ## Benchmark target integrity gate
 
 PITB now defines a cohort-independent target integrity receipt under `data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/`. The gate separates kernel elaboration, axiom closure, counterexample/vacuity probes and independent semantic review. A task remains pending until its meaning is reviewed; no benchmark is treated as semantically valid merely because Lean accepts its target or proof. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md`.
+
+
+## Measured-run integrity binding
+
+The run receipt schema now requires `task_integrity` on every row. The checked-in synthetic fixture must set it to `null`; a measured run must include the exact integrity receipt SHA-256, stable task-ID SHA-256 and `integrity_status: eligible`. `verify_sorrydb_run_integrity` opens the referenced bytes and checks their digest, derived eligibility, source task ID, repository remote/commit, source path/span, Lean toolchain, and Lake manifest against the run receipt. A measured run without this exact-byte eligible join is invalid. This gate establishes target eligibility only; proof-attempt and independent checker/replay receipts remain separately required.
