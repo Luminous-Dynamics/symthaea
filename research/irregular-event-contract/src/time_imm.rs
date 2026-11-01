@@ -86,7 +86,10 @@ pub struct TimeImmAdapterConfig {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimeImmParsedTable {
+    pub dataset_id: String,
+    pub record_id: String,
     pub entity_id: u64,
+    pub adapter_config_sha256: [u8; 32],
     pub source_file_sha256: [u8; 32],
     pub availability_policy_sha256: [u8; 32],
     pub timestamp_zone_sha256: [u8; 32],
@@ -222,6 +225,29 @@ impl TimeImmCsvAdapter {
         Ok(Self { config })
     }
 
+    /// Canonical, order-independent digest of dataset/entity identity,
+    /// timezone interpretation, availability policy and feature mapping.
+    pub fn config_sha256(&self) -> [u8; 32] {
+        let mut h = Sha256::new();
+        h.update(b"SYMTHAEA-TIME-IMM-ADAPTER-CONFIG-V1\\0");
+        hash_config_string(&mut h, &self.config.dataset_id);
+        hash_config_string(&mut h, &self.config.expected_record_id);
+        h.update(timestamp_zone_sha256(self.config.naive_timestamp_zone.as_ref()));
+        h.update(self.config.availability_policy.sha256());
+        let mut features: Vec<&NumericFeatureSpec> = self.config.features.iter().collect();
+        features.sort_unstable_by(|left, right| left.column_name.cmp(&right.column_name));
+        for feature in features {
+            hash_config_string(&mut h, &feature.column_name);
+            h.update(feature.modality_id.to_le_bytes());
+            h.update(feature.unit_code.to_le_bytes());
+            h.update([feature.decimal_scale as u8]);
+        }
+        h.update(self.config.text_modality_id.to_le_bytes());
+        h.update(self.config.text_unit_code.to_le_bytes());
+        h.update(self.config.text_encoding_id.to_le_bytes());
+        h.finalize().into()
+    }
+
     /// Parse one per-entity time_series.csv. Source file digest covers exact
     /// input bytes; each event also binds a canonical parsed-row digest.
     pub fn parse_time_series<R: Read>(&self, mut input: R) -> Result<TimeImmParsedTable, TimeImmAdapterError> {
@@ -328,7 +354,10 @@ impl TimeImmCsvAdapter {
         super::validate_event_batch(&events)
             .map_err(|error| TimeImmAdapterError::InvalidEventBatch(error.to_string()))?;
         Ok(TimeImmParsedTable {
+            dataset_id: self.config.dataset_id.clone(),
+            record_id: self.config.expected_record_id.clone(),
             entity_id,
+            adapter_config_sha256: self.config_sha256(),
             source_file_sha256,
             availability_policy_sha256: self.config.availability_policy.sha256(),
             timestamp_zone_sha256: timestamp_zone_sha256(self.config.naive_timestamp_zone.as_ref()),
@@ -431,6 +460,11 @@ impl TimeImmCsvAdapter {
             max_rounding_error_by_feature: BTreeMap::new(),
         })
     }
+}
+
+fn hash_config_string(hasher: &mut Sha256, value: &str) {
+    hasher.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
+    hasher.update(value.as_bytes());
 }
 
 fn timestamp_zone_sha256(zone: Option<&NaiveTimestampZone>) -> [u8; 32] {
@@ -594,6 +628,27 @@ mod tests {
             text_unit_code: 10,
             text_encoding_id: 1,
         }
+    }
+
+    #[test]
+    fn adapter_config_digest_binds_timezone_availability_and_feature_mapping_order_independently() {
+        let base_config = config();
+        let base = TimeImmCsvAdapter::new(base_config.clone()).unwrap().config_sha256();
+
+        let mut reordered = base_config.clone();
+        reordered.features.reverse();
+        let reordered_digest = TimeImmCsvAdapter::new(reordered).unwrap().config_sha256();
+        assert_eq!(base, reordered_digest);
+
+        let mut other_timezone = base_config.clone();
+        other_timezone.naive_timestamp_zone = Some(NaiveTimestampZone::FixedOffsetSeconds(-21_600));
+        let timezone_digest = TimeImmCsvAdapter::new(other_timezone).unwrap().config_sha256();
+        assert_ne!(base, timezone_digest);
+
+        let mut other_availability = base_config.clone();
+        other_availability.availability_policy = AvailabilityPolicy::FixedDelay { policy_id: 2, delay_us: 1 };
+        let availability_digest = TimeImmCsvAdapter::new(other_availability).unwrap().config_sha256();
+        assert_ne!(base, availability_digest);
     }
 
     #[test]
