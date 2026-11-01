@@ -188,7 +188,7 @@ fn main() -> ExitCode {
 mod tests {
     #[test]
     fn lower_hex_is_case_sensitive_and_fixed_width() {
-        assert_eq!(super::hex::encode(super::sha2::Sha256::digest(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(hex::encode(sha2::Sha256::digest(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
     use sha2::Digest;
