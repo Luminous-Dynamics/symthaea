@@ -159,8 +159,18 @@ def compare(
                 "rust": rust_tie_count,
             })
 
-        for field in ("phi", "signed_phi", "normalized_phi", "signed_normalized_phi"):
-            mismatch = _close(point[field], rust_point.get(field), tolerance, f"theta={theta} {field}")
+        for py_field, rust_field in (
+            ("phi", "phi_s"),
+            ("signed_phi", "signed_phi"),
+            ("normalized_phi", "normalized_phi"),
+            ("signed_normalized_phi", "signed_normalized_phi"),
+        ):
+            mismatch = _close(
+                point[py_field],
+                rust_point.get(rust_field),
+                tolerance,
+                f"theta={theta} {py_field}",
+            )
             if mismatch:
                 point_mismatches.append(mismatch)
 
