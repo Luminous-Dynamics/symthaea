@@ -677,6 +677,24 @@ pub struct InformationAcquisitionOption {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct InformationProbabilityObservation {
+    pub outcome_ids: Vec<String>,
+    pub probabilities: Vec<f64>,
+    pub realized_outcome_id: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InformationProbabilityMetrics {
+    pub sample_count: usize,
+    /// Mean multiclass Brier score (sum of squared class-probability errors).
+    pub mean_multiclass_brier_score: f64,
+    /// Mean negative log probability; exact zeros use the declared 1e-15 floor.
+    pub mean_log_loss: f64,
+    pub zero_probability_events: usize,
+    pub top_outcome_accuracy: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct InformationOptionEvaluation {
     pub history_sha256: String,
     pub action_manifest_sha256: String,
@@ -869,6 +887,103 @@ fn best_action_index(action_ids: &[u64], utilities: &[f64]) -> usize {
         }
     }
     best
+}
+
+/// Score the probability forecasts that drive EVSI on held-out query outcomes.
+///
+/// The outcome ID order must be frozen across episodes. The multiclass Brier
+/// score and log loss are proper scoring rules; zero-probability realized
+/// outcomes are counted and receive a declared 1e-15 log-loss floor so the
+/// returned aggregate remains finite. This metric does not itself certify
+/// calibration under selection or distribution shift.
+pub fn evaluate_information_probabilities(
+    observations: &[InformationProbabilityObservation],
+) -> Result<Option<InformationProbabilityMetrics>, IntervalError> {
+    let Some(first) = observations.first() else {
+        return Ok(None);
+    };
+    if first.outcome_ids.len() < 2
+        || first.probabilities.len() != first.outcome_ids.len()
+        || first.realized_outcome_id.trim().is_empty()
+        || first.realized_outcome_id.trim() != first.realized_outcome_id
+    {
+        return Err(IntervalError::InvalidInformationOption);
+    }
+    let mut known_ids = first.outcome_ids.clone();
+    known_ids.sort_unstable();
+    if known_ids.iter().any(|id| id.trim().is_empty() || id.trim() != id)
+        || known_ids.windows(2).any(|pair| pair[0] == pair[1])
+    {
+        return Err(IntervalError::InvalidInformationOption);
+    }
+    let mut brier_total = 0.0;
+    let mut log_loss_total = 0.0;
+    let mut zero_probability_events = 0usize;
+    let mut top_correct = 0usize;
+    const LOG_FLOOR: f64 = 1e-15;
+
+    for observation in observations {
+        if observation.outcome_ids != first.outcome_ids
+            || observation.probabilities.len() != first.outcome_ids.len()
+            || observation.realized_outcome_id.trim().is_empty()
+            || observation.realized_outcome_id.trim() != observation.realized_outcome_id
+        {
+            return Err(IntervalError::InvalidInformationOption);
+        }
+        let mut probability_sum = 0.0;
+        for probability in &observation.probabilities {
+            if !probability.is_finite() || *probability < 0.0 || *probability > 1.0 {
+                return Err(IntervalError::InvalidOutcomeProbabilities);
+            }
+            probability_sum += probability;
+        }
+        if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > 1e-9 {
+            return Err(IntervalError::InvalidOutcomeProbabilities);
+        }
+        let realized_index = observation.outcome_ids
+            .iter()
+            .position(|id| id == &observation.realized_outcome_id)
+            .ok_or(IntervalError::InvalidInformationOption)?;
+        let mut best_index = 0usize;
+        let mut brier = 0.0;
+        for index in 0..observation.outcome_ids.len() {
+            let target = f64::from(index == realized_index);
+            let error = observation.probabilities[index] - target;
+            brier += error * error;
+            if observation.probabilities[index] > observation.probabilities[best_index]
+                || (observation.probabilities[index] == observation.probabilities[best_index]
+                    && observation.outcome_ids[index] < observation.outcome_ids[best_index])
+            {
+                best_index = index;
+            }
+        }
+        let realized_probability = observation.probabilities[realized_index];
+        if realized_probability == 0.0 {
+            zero_probability_events += 1;
+        }
+        brier_total += brier;
+        log_loss_total += -realized_probability.max(LOG_FLOOR).ln();
+        if best_index == realized_index {
+            top_correct += 1;
+        }
+    }
+
+    let count = observations.len() as f64;
+    let metrics = InformationProbabilityMetrics {
+        sample_count: observations.len(),
+        mean_multiclass_brier_score: brier_total / count,
+        mean_log_loss: log_loss_total / count,
+        zero_probability_events,
+        top_outcome_accuracy: top_correct as f64 / count,
+    };
+    if [
+        metrics.mean_multiclass_brier_score,
+        metrics.mean_log_loss,
+        metrics.top_outcome_accuracy,
+    ].iter().any(|value| !value.is_finite()) {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
+    Ok(Some(metrics))
 }
 
 fn validate_information_option_shape(
@@ -2046,6 +2161,55 @@ mod tests {
             }
         );
         assert_eq!(evaluation.selected_query_id, None);
+    }
+
+
+    #[test]
+    fn information_probability_scoring_uses_multiclass_brier_and_log_loss() {
+        let observations = vec![
+            InformationProbabilityObservation {
+                outcome_ids: vec!["success".into(), "slip".into()],
+                probabilities: vec![0.8, 0.2],
+                realized_outcome_id: "success".into(),
+            },
+            InformationProbabilityObservation {
+                outcome_ids: vec!["success".into(), "slip".into()],
+                probabilities: vec![0.25, 0.75],
+                realized_outcome_id: "slip".into(),
+            },
+        ];
+        let metrics = evaluate_information_probabilities(&observations).unwrap().unwrap();
+        assert_eq!(metrics.sample_count, 2);
+        assert!((metrics.mean_multiclass_brier_score - 0.1025).abs() < 1e-12);
+        assert!((metrics.mean_log_loss - ((-0.8f64.ln() - 0.75f64.ln()) / 2.0)).abs() < 1e-12);
+        assert_eq!(metrics.zero_probability_events, 0);
+        assert_eq!(metrics.top_outcome_accuracy, 1.0);
+    }
+
+    #[test]
+    fn information_probability_scoring_records_zero_probability_misses_and_rejects_bad_axes() {
+        let zero_miss = [InformationProbabilityObservation {
+            outcome_ids: vec!["success".into(), "slip".into()],
+            probabilities: vec![1.0, 0.0],
+            realized_outcome_id: "slip".into(),
+        }];
+        let metrics = evaluate_information_probabilities(&zero_miss).unwrap().unwrap();
+        assert_eq!(metrics.zero_probability_events, 1);
+        assert!((metrics.mean_log_loss - -((1e-15f64).ln())).abs() < 1e-12);
+
+        let mismatch = [
+            zero_miss[0].clone(),
+            InformationProbabilityObservation {
+                outcome_ids: vec!["slip".into(), "success".into()],
+                probabilities: vec![0.0, 1.0],
+                realized_outcome_id: "success".into(),
+            },
+        ];
+        assert_eq!(
+            evaluate_information_probabilities(&mismatch),
+            Err(IntervalError::InvalidInformationOption)
+        );
+        assert_eq!(evaluate_information_probabilities(&[]).unwrap(), None);
     }
 
     #[test]
