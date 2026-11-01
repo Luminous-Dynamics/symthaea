@@ -199,7 +199,7 @@ The checked-in example is synthetic. The Rust verifier has not yet been compiled
 
 R5 adds the Level-2 live proof-state snapshot baseline to the existing R0–R4 runtime comparison. It is R4 with the post-elaboration proof state captured once; branches share the immutable environment and receive independent mutable metavariable-context copies. This isolates the benefit of avoiding repeated import and theorem-body elaboration from the benefit of PITB's retrieval, context and strategy interventions.
 
-Every R5 branch ledger must bind a separate snapshot receipt SHA-256. The snapshot receipt is independently schema-validated and must attest the environment, goal, context, runtime/imported OLean identities, per-branch metavariable isolation, and cache policy. v0 requires mutable tactic/typeclass caches to be discarded or recreated per branch; cache sharing is not allowed unless a separate dependency-invalidation qualification exists. The checked-in R4 fixture remains a no-snapshot synthetic contract fixture.
+Every R5 branch ledger must bind a separate snapshot receipt SHA-256 and pass `analyze_sorrydb_branch_ledger --validate LEDGER --snapshot-receipt RECEIPT`. The Rust verifier hashes the exact receipt bytes, parses the strict receipt structure, recomputes the full live-state digest over environment + goal metadata + target + LocalContext + MetavarContext, and joins task ID, repository commit, proof-state identity and started branch IDs against the ledger. v0 requires mutable tactic/typeclass caches to be discarded or recreated per branch; cache sharing is not allowed unless a separate dependency-invalidation qualification exists. The checked-in R4 fixture remains a no-snapshot synthetic contract fixture.
 
 
 ### R5 snapshot receipt v0
