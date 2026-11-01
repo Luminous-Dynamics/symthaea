@@ -41,7 +41,9 @@
         "isa_family",
         "os_version",
         "security_patch_level",
-        "build_fingerprint_sha256"
+        "build_fingerprint_sha256",
+        "os_api_level",
+        "vendor_security_patch_level"
       ],
       "properties": {
         "platform": {
@@ -86,6 +88,18 @@
             "null"
           ],
           "pattern": "^([0-9a-f]{64})?$"
+        },
+        "os_api_level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vendor_security_patch_level": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
