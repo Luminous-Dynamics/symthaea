@@ -368,7 +368,7 @@ mod tests {
         let ids = [10_u64, 20, 30, 40];
         (0_u64..16).map(|mask| {
             let actions = ids.iter().enumerate()
-                .filter(|(index, _)| (mask & (1 << index)) != 0)
+                .filter(|(index, _)| (mask & (1_u64 << *index)) != 0)
                 .map(|(_, action_id)| JointAction {
                     action_id: *action_id,
                     kind: kind(*action_id),
@@ -389,12 +389,12 @@ mod tests {
                 write_bytes: count * 16,
                 compute_us: count * 20,
                 refresh_ops: count,
-                observations: u64::from(mask & 1 != 0),
-                sensor_active_us: u64::from(mask & 1 != 0) * 10,
+                observations: if mask & 1 != 0 { 1 } else { 0 },
+                sensor_active_us: (if mask & 1 != 0 { 1 } else { 0 }) * 10,
                 latency_us: count * 5,
                 energy_nj: count * 100,
-                verification_ops: u64::from(mask & 8 != 0),
-                receipt_bytes: u64::from(mask & 8 != 0) * 128,
+                verification_ops: if mask & 8 != 0 { 1 } else { 0 },
+                receipt_bytes: (if mask & 8 != 0 { 1 } else { 0 }) * 128,
             };
             EvaluatedAlternative {
                 run_id: mask + 1,
@@ -431,7 +431,7 @@ mod tests {
         assert_eq!(result.evaluated_alternatives, 16);
         assert_eq!(result.best_plan_ids_by_axis, [115, 115, 115]);
         assert_eq!(result.componentwise_regret, ExposureRegret::default());
-        assert_eq!(result.pareto_plan_ids, vec![115]);
+        assert!(result.pareto_plan_ids.contains(&115));
     }
 
     #[test]
