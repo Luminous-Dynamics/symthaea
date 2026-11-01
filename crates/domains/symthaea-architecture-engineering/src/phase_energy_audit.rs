@@ -1021,6 +1021,7 @@ pub fn validate_phase_energy_audit_receipt(
     for (field, value) in [
         ("sample_csv_sha256", receipt.sample_csv_sha256.as_str()),
         ("marker_csv_sha256", receipt.marker_csv_sha256.as_str()),
+        ("outcomes_csv_sha256", receipt.outcomes_csv_sha256.as_str()),
         ("trace_audit_receipt_sha256", receipt.trace_audit_receipt_sha256.as_str()),
         ("clock_mapping_sha256", receipt.clock_mapping_sha256.as_str()),
         ("phase_protocol_sha256", receipt.phase_protocol_sha256.as_str()),
@@ -1035,6 +1036,7 @@ pub fn validate_phase_energy_audit_receipt(
     }
     if receipt.sample_csv_bytes == 0
         || receipt.marker_csv_bytes == 0
+        || receipt.outcomes_csv_bytes == 0
         || receipt.event_count == 0
         || receipt.event_count != receipt.events.len()
         || !receipt.voltage_v.is_finite()
@@ -1061,6 +1063,35 @@ pub fn validate_phase_energy_audit_receipt(
             || !event_ids.insert(event.event_id.as_str())
         {
             return Err(PhaseEnergyAuditError::new("receipt.events.identity", "event and segment IDs must be non-empty; event IDs must be unique"));
+        }
+        if !is_sha256(&event.outcome_evidence_sha256)
+            || !is_sha256(&event.input_sha256)
+            || event.output_sha256.as_deref().is_some_and(|value| !is_sha256(value))
+            || event.accepted_success_outcome && event.outcome.is_intrinsically_unsuccessful()
+            || event.quality_metric_id.as_deref().is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(PhaseEnergyAuditError::new(
+                format!("receipt.events.{}.outcome_evidence", event.event_id),
+                "outcome evidence digest, input/output identity or accepted-success flag is invalid",
+            ));
+        }
+        if event.quality_metric_id.is_some() != event.quality_value.is_some()
+            || event.quality_value.is_some_and(|value| !value.is_finite())
+        {
+            return Err(PhaseEnergyAuditError::new(
+                format!("receipt.events.{}.quality", event.event_id),
+                "quality metric ID and finite quality value must be present together",
+            ));
+        }
+        if matches!(
+            event.outcome,
+            ApplicationEventOutcome::Correct | ApplicationEventOutcome::Incorrect | ApplicationEventOutcome::Fallback
+        ) && event.output_sha256.is_none()
+        {
+            return Err(PhaseEnergyAuditError::new(
+                format!("receipt.events.{}.output_sha256", event.event_id),
+                "this outcome type requires an output/result digest",
+            ));
         }
         let mut phase_ids = HashSet::with_capacity(event.phase_windows.len());
         let mut declared_energy = 0.0;
@@ -1244,6 +1275,33 @@ pub fn validate_phase_energy_audit_receipt(
             }
         }
     }
+    let successful_energies: Vec<f64> = receipt.events.iter()
+        .filter(|event| event.accepted_success_outcome && event.deadline_met)
+        .filter_map(|event| event.total_event_energy_uj)
+        .collect();
+    let expected_mean_success_energy = if successful_energies.is_empty() {
+        None
+    } else {
+        Some(successful_energies.iter().sum::<f64>() / successful_energies.len() as f64)
+    };
+    let mean_success_matches = match (
+        receipt.mean_energy_per_successful_event_uj,
+        expected_mean_success_energy,
+    ) {
+        (None, None) => true,
+        (Some(actual), Some(expected)) => {
+            actual.is_finite() && (actual - expected).abs() <= 1e-8 * expected.abs().max(1.0)
+        }
+        _ => false,
+    };
+    if successful_energies.len() != receipt.successful_completed_events
+        || !mean_success_matches
+    {
+        return Err(PhaseEnergyAuditError::new(
+            "receipt.successful_event_energy",
+            "successful event count or mean energy does not match accepted outcomes, deadlines and measured event energies",
+        ));
+    }
     if complete_count != receipt.complete_phase_coverage_events
         || unattributed_count != receipt.unattributed_interval_events
         || missing_count != receipt.missing_required_phase_events
@@ -1260,13 +1318,14 @@ pub fn validate_phase_energy_audit_receipt(
 pub fn verify_phase_energy_receipt_against_sources(
     sample_csv: &str,
     marker_csv: &str,
+    outcomes_csv: &str,
     trace_config: Ppk2TraceAuditConfig,
     mapping: &PhaseClockMappingManifest,
     protocol: &ApplicationPhaseProtocolManifest,
     expected: &PhaseEnergyAuditReceipt,
 ) -> Result<(), PhaseEnergyAuditError> {
     validate_phase_energy_audit_receipt(expected)?;
-    let rebuilt = audit_application_phase_energy(sample_csv, marker_csv, trace_config, mapping, protocol)?;
+    let rebuilt = audit_application_phase_energy(sample_csv, marker_csv, outcomes_csv, trace_config, mapping, protocol)?;
     if rebuilt.receipt != *expected {
         return Err(PhaseEnergyAuditError::new("receipt.source_reproduction", "recomputed phase receipt does not exactly match expected receipt"));
     }
