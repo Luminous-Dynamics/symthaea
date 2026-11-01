@@ -96,9 +96,17 @@ fn self_test(path: &PathBuf) -> Result<()> {
     }
     println!("PITB_BENCHMARK_INTEGRITY_METADATA_PASS: candidate status derives from target metadata; unsigned measured receipt remains blocked");
 
-    let mut bad = eligible.clone();
-    bad["dataset"]["cohort_id"] = json!("OtherCohort");
-    must_reject("measured receipt claims the wrong benchmark cohort", bad)?;
+    let mut other_cohort = eligible.clone();
+    other_cohort["dataset"]["cohort_id"] = json!("OtherCohort");
+    let other_cohort_bytes = serde_json::to_vec(&other_cohort)?;
+    let other_cohort_summary = benchmark_integrity::validate_value(
+        &other_cohort,
+        hex::encode(Sha256::digest(&other_cohort_bytes)),
+    )?;
+    if other_cohort_summary.integrity_status != "eligible" {
+        bail!("cohort-neutral metadata verifier unexpectedly imposed a benchmark-specific cohort");
+    }
+    println!("PITB_BENCHMARK_INTEGRITY_COHORT_NEUTRAL_PASS: dataset-specific cohort policy belongs to each benchmark adapter");
 
     let mut bad = eligible.clone();
     bad["target"]["statement_sha256"] = json!("0".repeat(64));
