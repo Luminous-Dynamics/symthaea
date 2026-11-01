@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-information-probability-metrics-v0.1.json",
+  "title": "CMAQ-018 information-outcome probability scoring",
+  "description": "Held-out multiclass proper-score report for outcome probabilities used by value-of-information decisions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "sample_count",
+    "mean_multiclass_brier_score",
+    "mean_log_loss",
+    "zero_probability_events",
+    "top_outcome_accuracy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-information-probability-metrics-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_known_answer_fixture_only_no_probability_calibration_claim"
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mean_multiclass_brier_score": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_log_loss": {
+      "type": "number",
+      "minimum": 0
+    },
+    "zero_probability_events": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "top_outcome_accuracy": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}
