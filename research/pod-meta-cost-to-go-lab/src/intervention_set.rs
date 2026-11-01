@@ -592,11 +592,11 @@ mod tests {
         assert_eq!(summary.frontier_operation_families, vec![2, 3]);
         let lower_token = summary.alternatives[0];
         let lower_gpu = summary.alternatives[1];
-        assert!(lower_token.verified_remaining_cost.tokens
-            < lower_gpu.verified_remaining_cost.tokens);
         assert!(
-            lower_token.verified_remaining_cost.gpu_ms
-                > lower_gpu.verified_remaining_cost.gpu_ms
+            lower_token.verified_remaining_cost.tokens < lower_gpu.verified_remaining_cost.tokens
+        );
+        assert!(
+            lower_token.verified_remaining_cost.gpu_ms > lower_gpu.verified_remaining_cost.gpu_ms
         );
         assert_eq!(
             lower_token.immediate_proof_progress,
