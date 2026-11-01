@@ -3,6 +3,7 @@ import unittest
 
 from projective_vector_betting import (
     CoordinateHistory,
+    CovariancePreconditionedBet,
     assert_symmetric_psd,
     coordinate_local_bets,
     equicorrelation_covariance,
@@ -89,6 +90,59 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
                 [0.0, 0.0, 0.0],
             ]
             self.assertIsNone(assert_symmetric_psd(matrix))
+
+    def test_preconditioned_bet_is_preupdate_and_bounded(self):
+        envelope = equicorrelation_envelope(2, 0.2, 0.8, 0.5)
+        state = CovariancePreconditionedBet(envelope, step_size=0.05, cap=0.7)
+        prior = state.bets([True, True])
+        self.assertEqual(prior, [0.0, 0.0])
+        with self.assertRaises(RuntimeError):
+            state.bets([True, True])
+        state.observe([50.0, 50.0])
+        next_bets = state.bets([True, True])
+        self.assertTrue(all(0.0 <= value <= 0.7 for value in next_bets))
+        self.assertTrue(any(value > 0.0 for value in next_bets))
+        state.observe([-50.0, -50.0])
+        bounded, _ = state.snapshot()
+        self.assertTrue(all(0.0 <= value <= 0.7 for value in bounded))
+
+    def test_preconditioned_bet_rejects_same_round_and_retraction(self):
+        envelope = equicorrelation_envelope(2, 0.2, 0.8, 0.5)
+        state = CovariancePreconditionedBet(envelope)
+        with self.assertRaises(RuntimeError):
+            state.observe([1.0, 1.0])
+        state.bets([True, True])
+        state.observe([1.0, 1.0])
+        with self.assertRaises(ValueError):
+            state.bets([True, False])
+
+    def test_preconditioned_bet_ignores_dormant_extension(self):
+        envelope3 = equicorrelation_envelope(3, 0.2, 0.8, 0.5)
+        envelope2 = [row[:2] for row in envelope3[:2]]
+        old = CovariancePreconditionedBet(envelope2, step_size=0.05)
+        extended = CovariancePreconditionedBet(envelope3, step_size=0.05)
+        for score in ([1.0, -0.5], [0.8, 0.2], [-0.1, 1.2], [1.1, 0.5]):
+            old_bets = old.bets([True, True])
+            extended_bets = extended.bets([True, True, False])
+            self.assertEqual(old_bets, extended_bets[:2])
+            old.observe(list(score))
+            extended.observe([score[0], score[1], 999.0])
+            self.assertEqual(
+                old.snapshot()[0],
+                extended.snapshot()[0][:2],
+            )
+
+    def test_preconditioned_bet_new_coordinate_starts_dormant(self):
+        envelope = equicorrelation_envelope(2, 0.2, 0.8, 0.5)
+        state = CovariancePreconditionedBet(envelope, step_size=0.05)
+        state.bets([True, False])
+        state.observe([4.0, 123.0])
+        before_activation = state.bets([True, True])
+        self.assertGreater(before_activation[0], 0.0)
+        self.assertEqual(before_activation[1], 0.0)
+        state.observe([2.0, 4.0])
+        after_activation = state.bets([True, True])
+        self.assertGreater(after_activation[1], 0.0)
 
     def test_rejects_scaled_indefinite_covariance(self):
         for scale in (1e-9, 1.0, 1e9):
