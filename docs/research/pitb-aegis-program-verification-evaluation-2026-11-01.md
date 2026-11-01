@@ -75,9 +75,17 @@ Resample at translated-program component level, not statement-row level.
 
 ## Immediate execution
 
-1. Locate the exact public Aegis code/data release and license; verify if the 2,000 sample can be reconstructed.
-2. Materialize and hash a small stratified smoke cohort without treating it as a performance result.
+1. Request the exact public Aegis code/data release, 2,000-task manifest, license and baseline harness from the authors; verify whether the published sample is reconstructible.
+2. In parallel, build a separately labeled Aegis-inspired smoke cohort and hash every source/translation/spec artifact.
 3. Audit source → Rust → Aeneas Lean → frozen target → proof/refutation receipt with PITB integrity verifier.
 4. Reproduce one A0 baseline task per obligation class and confirm budget accounting.
-5. Preregister A0–A5 and paired-support experiment on a validation subset.
-6. Scale to the 2,000-task sample only after independent receipt replay.
+5. Preregister A0–A5 and paired-support/mutation studies on validation-only source-program families.
+6. Scale to the published 2,000 sample only after receiving the exact sample and independently replaying all needed receipts.
+
+## Systems baseline and reproduction limits
+
+The paper names the underlying off-the-shelf model as Anthropic Fable-5. EasyProver is a **harness/runtime** result, not a base-model-only result: recursive isolated agents, parallel tactic probing, prompt/result compaction, a separate stateless InfiniLean elaboration service, and a separate Lean Comparator. The implementation uses per-process caps of 64 active sub-agents and 16 concurrent expensive Lean queries; its hardest proofs used more than 300 sub-agents over a run. A single worker's warm elaboration is reported around 0.2 seconds after imports are amortized. The authors report a clean final comparator that rechecks the frozen target and `#print axioms`, so local tactic probes and agent self-reports do not earn proof credit. Source: https://arxiv.org/html/2610.38174, sections 3.1 and 4.
+
+The implementation corpus attempted 2,356 program translations and retained 2,045 (86.8%) that passed Rust tests, Charon extraction, Aeneas translation, Lean elaboration and differential Rust/Lean evaluation. The 2,000 specification sample spans 1,257 translated programs; resampling must therefore cluster by program, not specification row. The paper says that it created mutated variants but did not evaluate them. This is PITB's mutation-benchmark opening; see `docs/research/pitb-mutation-aware-bidirectional-verification-2026-11-01.md`.
+
+**Artifact availability:** the arXiv paper describes the pipeline and says Aegis can benchmark other provers, but the current paper page does not link a dedicated Aegis code/data repository or a downloadable 2,000-task manifest. I did not find an author-linked Aegis repository in the GitHub search during this pass. This is a reproducibility blocker, not evidence that no private or later release exists. PITB must request the exact frozen sample, artifact license, baseline harness/configuration and task-level receipts from the authors before making a direct Aegis head-to-head claim. A self-generated, Aegis-inspired cohort must be labeled separately.
