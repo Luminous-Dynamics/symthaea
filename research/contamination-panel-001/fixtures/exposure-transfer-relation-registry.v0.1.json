@@ -83,7 +83,10 @@
     "Use externally calibrated easy/medium/hard bands where feasible; do not define difficulty from post-treatment model scores.",
     "Keep semantic-equivalence and same-skill judgments blinded; disputes and indeterminate judgments do not enter positive strata.",
     "Use a deterministic primary scoring policy; treat stochastic decoding repeats as nested measurements, not extra training replicates.",
-    "Keep relation labels, hidden item IDs, source/recipe lineage and answer oracles outside model-visible payloads."
+    "Keep relation labels, hidden item IDs, source/recipe lineage and answer oracles outside model-visible payloads.",
+    "Each relation × task-family × difficulty cell requires at least three distinct blinded adjudicator pseudonyms and an Accepted decision; Indeterminate and Rejected cells cannot be included in scored relation strata.",
+    "The minimum item-level adjudication agreement is at least 800‰ for all relations; semantic_equivalent and novel_recipe_same_skill require unanimous 1000‰ item-level agreement.",
+    "Reviewer identities and the full adjudication report digest are bound across independent model-pair replicates; these content commitments are not authenticated identity proof."
   ],
   "estimands": [
     {
