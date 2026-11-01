@@ -228,6 +228,7 @@
             "next_source_predecessor_digest": { "$ref": "#/$defs/digest" },
             "next_log_checkpoint": { "type": "string", "minLength": 1 },
             "restored_incarnation_id": { "type": "string", "minLength": 1 },
+            "restored_authority_revision": { "type": "string", "minLength": 1 },
             "restored_state_digest": { "$ref": "#/$defs/digest" },
             "witness_sequence_seen": { "type": "integer", "minimum": 0 },
             "next_policy_digest": { "$ref": "#/$defs/digest" }
@@ -291,7 +292,7 @@
           "then": {
             "properties": {
               "request": {
-                "required": ["restored_incarnation_id", "restored_state_digest", "witness_sequence_seen"]
+                "required": ["restored_incarnation_id", "restored_authority_revision", "restored_state_digest", "witness_sequence_seen"]
               }
             }
           }
@@ -337,12 +338,13 @@
     "witness_observation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["witness_id", "sequence", "authority_id", "incarnation_id", "state_digest", "predecessor_witness_digest", "signed_record_digest"],
+      "required": ["witness_id", "sequence", "authority_id", "incarnation_id", "authority_revision", "state_digest", "predecessor_witness_digest", "signed_record_digest"],
       "properties": {
         "witness_id": { "type": "string", "minLength": 1 },
         "sequence": { "type": "integer", "minimum": 0 },
         "authority_id": { "type": "string", "minLength": 1 },
         "incarnation_id": { "type": "string", "minLength": 1 },
+        "authority_revision": { "type": "string", "minLength": 1 },
         "state_digest": { "$ref": "#/$defs/digest" },
         "predecessor_witness_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
         "signed_record_digest": { "$ref": "#/$defs/digest" }
