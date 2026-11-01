@@ -13,7 +13,7 @@ const CASES: &[Case] = &[
   id: "AB-mechanism-empty", candidate: &[0, 1], mechanism: &[],
   cause_request: "0547a8ef542880e28a680b3f1f60a54e674159c3d818e5604502298955246f2f", cause: &[0.25, 0.25, 0.25, 0.25],
   effect_request: "4c09985d102e0971e92ad5976bc17d88de0d779026dfab3a98fa7084099c292f", effect: &[0.39540478605678203, 0.39540478605678192, 0.10459521394321813, 0.10459521394321811],
-  forward_request: "a6ca845a658cc699c41b2982b304ce0854c200c6edc6b4691fdff1ba01b56692", forward: &[1, 1, 1, 1],
+  forward_request: "a6ca845a658cc699c41b2982b304ce0854c200c6edc6b4691fdff1ba01b56692", forward: &[1.0, 1.0, 1.0, 1.0],
  },
  Case {
   id: "AB-mechanism-0-1", candidate: &[0, 1], mechanism: &[0, 1],
@@ -25,7 +25,7 @@ const CASES: &[Case] = &[
   id: "ABC-mechanism-empty", candidate: &[0, 1, 2], mechanism: &[],
   cause_request: "f37b2b85c2b87e3fb4b5b2f8c16df713f6a85024c596416fa6b676aacf35a099", cause: &[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],
   effect_request: "86a55234087f3dd09a4104a41d46e2a002302c9e45350c28afcf4a067143b97c", effect: &[0.12500000000000003, 0.125, 0.12500000000000003, 0.125, 0.12500000000000003, 0.125, 0.12500000000000003, 0.125],
-  forward_request: "da787377fccddfea086c40e444d32e2ae73129503202d968a1ae0e3843e086ca", forward: &[1, 1, 1, 1, 1, 1, 1, 1],
+  forward_request: "da787377fccddfea086c40e444d32e2ae73129503202d968a1ae0e3843e086ca", forward: &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
  },
 
  Case {
