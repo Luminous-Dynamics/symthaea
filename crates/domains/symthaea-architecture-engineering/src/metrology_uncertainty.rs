@@ -16,12 +16,17 @@ use crate::ppk2_trace_audit::{
     compute_ppk2_trace_audit_receipt_sha256, validate_ppk2_trace_audit_receipt,
     Ppk2TraceAuditReceipt, Ppk2SegmentMetrics,
 };
+use crate::multi_resource_budget::{
+    remaining_resource_headroom, ResourceBudget, ResourceCostVector, ResourceHeadroom,
+    ResourceQuantity, ResourceRegistry,
+};
 
 const MANIFEST_SCHEMA: &str = "symthaea.nas.metrology-uncertainty-manifest";
 const RECEIPT_SCHEMA: &str = "symthaea.nas.energy-uncertainty-receipt";
 const VERSION: &str = "0.1.0";
 const MANIFEST_DOMAIN: &[u8] = b"symthaea.nas.metrology-uncertainty-manifest.v0.1";
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.nas.energy-uncertainty-receipt.v0.1";
+const REPLICATION_CONFIG_DOMAIN: &[u8] = b"symthaea.nas.replication-planning-config.v0.1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetrologyUncertaintyError {
@@ -123,12 +128,17 @@ pub enum ReplicationPlanningStatus {
     NoPlanWithinBudgetOrHorizon,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Frozen resource-vector inputs to replicate planning. No scalar exchange rate is used:
+/// each plan is checked component-wise against the registered remaining headroom.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReplicationPlanningConfig {
-    pub candidate_cost_per_replicate_units: u64,
-    pub reference_cost_per_replicate_units: u64,
-    pub resource_budget_units: u64,
+    pub resource_registry: ResourceRegistry,
+    pub resource_budget: ResourceBudget,
+    /// Cost of one additional candidate-side replicate, including explicit zeros if applicable.
+    pub candidate_replicate_cost: ResourceCostVector,
+    /// Cost of one additional reference-side replicate, including explicit zeros if applicable.
+    pub reference_replicate_cost: ResourceCostVector,
     pub maximum_additional_replicates_per_side: usize,
 }
 
@@ -138,9 +148,10 @@ pub struct AdditionalReplicationPlan {
     pub kind: ReplicationPlanKind,
     pub additional_candidate_replicates: usize,
     pub additional_reference_replicates: usize,
-    pub incremental_resource_units: u64,
+    pub resource_cost: ResourceCostVector,
     pub projected_candidate_expanded_uncertainty_uj: f64,
     pub projected_reference_expanded_uncertainty_uj: f64,
+    /// Positive only when the projected candidate/reference expanded intervals would be disjoint.
     pub projected_interval_gap_uj: f64,
 }
 
@@ -151,9 +162,12 @@ pub struct EnergyReplicationPlanningResult {
     pub current_decision: EnergyComparisonDecision,
     pub mean_energy_gap_uj: f64,
     pub irreducible_type_b_interval_floor_uj: f64,
-    pub plan: Option<AdditionalReplicationPlan>,
+    pub planning_config_sha256: String,
+    pub resource_registry_sha256: String,
+    pub resource_headroom: Vec<ResourceHeadroom>,
+    /// Non-dominated plans in benefit (projected interval separation) × resource-vector space.
+    pub plan_frontier: Vec<AdditionalReplicationPlan>,
 }
-
 
 fn digest(domain: &[u8], bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
