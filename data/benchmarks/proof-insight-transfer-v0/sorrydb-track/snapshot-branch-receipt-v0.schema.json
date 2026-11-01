@@ -1,0 +1,467 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-branch-receipt-v0.schema.json",
+  "title": "PITB SorryDB live proof-state snapshot branch receipt v0",
+  "description": "Records post-elaboration snapshot identity, immutable environment sharing, isolated mutable metavariable contexts, and branch/cache measurements. A receipt is not a proof-success certificate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "run_status",
+    "task",
+    "environment",
+    "proof_state",
+    "server",
+    "execution_contract",
+    "snapshot",
+    "measurements",
+    "branches"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb.snapshot-branch-receipt.v0"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_contract_fixture",
+        "measured_run"
+      ]
+    },
+    "run_status": {
+      "enum": [
+        "not_attempted",
+        "measured",
+        "failed",
+        "unknown"
+      ]
+    },
+    "task": {
+      "$ref": "#/$defs/task"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "proof_state": {
+      "$ref": "#/$defs/proof_state"
+    },
+    "server": {
+      "$ref": "#/$defs/server"
+    },
+    "execution_contract": {
+      "$ref": "#/$defs/execution_contract"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/snapshot"
+    },
+    "measurements": {
+      "$ref": "#/$defs/measurements"
+    },
+    "branches": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/branch"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "synthetic_contract_fixture"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "run_status": {
+            "const": "not_attempted"
+          },
+          "snapshot": {
+            "properties": {
+              "capture_status": {
+                "const": "not_attempted"
+              },
+              "snapshot_id_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "measurements": {
+            "properties": {
+              "capture_wall_ms": {
+                "const": 0
+              },
+              "branch_restore_p50_ms": {
+                "const": 0
+              },
+              "branch_restore_p95_ms": {
+                "const": 0
+              },
+              "environment_reload_count": {
+                "const": 0
+              },
+              "theorem_reelaboration_count": {
+                "const": 0
+              },
+              "stale_cache_observations": {
+                "const": 0
+              }
+            }
+          },
+          "branches": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_status": {
+            "const": "measured"
+          }
+        },
+        "required": [
+          "run_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_class": {
+            "const": "measured_run"
+          },
+          "snapshot": {
+            "properties": {
+              "capture_status": {
+                "const": "captured"
+              },
+              "snapshot_id_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "branches": {
+            "minItems": 1
+          },
+          "measurements": {
+            "properties": {
+              "capture_wall_ms": {
+                "minimum": 1
+              },
+              "branch_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "repository_commit",
+        "source_path",
+        "source_sha256",
+        "sorry_line",
+        "sorry_character"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "repository_commit": {
+          "$ref": "#/$defs/sha1"
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sorry_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sorry_character": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lean_toolchain",
+        "lean_binary_sha256",
+        "lean_runtime_manifest_sha256",
+        "imported_olean_manifest_sha256",
+        "environment_sha256"
+      ],
+      "properties": {
+        "lean_toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lean_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lean_runtime_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "imported_olean_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "proof_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wire_schema",
+        "goal_metadata_sha256",
+        "target_expr_sha256",
+        "local_context_sha256",
+        "metavar_context_sha256",
+        "proof_state_sha256"
+      ],
+      "properties": {
+        "wire_schema": {
+          "const": "pitb.lean-expr-wire.v1"
+        },
+        "goal_metadata_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_expr_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "local_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metavar_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "proof_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lean_server_binary_sha256",
+        "snapshot_extension_commit",
+        "rpc_contract_sha256",
+        "snapshot_protocol"
+      ],
+      "properties": {
+        "lean_server_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "snapshot_extension_commit": {
+          "$ref": "#/$defs/sha1"
+        },
+        "rpc_contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "snapshot_protocol": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "execution_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_stage",
+        "environment_policy",
+        "mutable_state_policy",
+        "branch_workspace_policy",
+        "typeclass_cache_policy"
+      ],
+      "properties": {
+        "capture_stage": {
+          "const": "post_elaboration_pre_tactic"
+        },
+        "environment_policy": {
+          "const": "immutable_shared_by_reference"
+        },
+        "mutable_state_policy": {
+          "const": "independent_metavar_context_copy_per_branch"
+        },
+        "branch_workspace_policy": {
+          "const": "private_workspace_per_branch"
+        },
+        "typeclass_cache_policy": {
+          "const": "discard_and_reinitialize_per_branch"
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_status",
+        "snapshot_id_sha256",
+        "snapshot_payload_sha256"
+      ],
+      "properties": {
+        "capture_status": {
+          "enum": [
+            "not_attempted",
+            "captured",
+            "capture_failed"
+          ]
+        },
+        "snapshot_id_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "snapshot_payload_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_wall_ms",
+        "branch_count",
+        "branch_restore_p50_ms",
+        "branch_restore_p95_ms",
+        "environment_reload_count",
+        "theorem_reelaboration_count",
+        "stale_cache_observations",
+        "branch_wall_work_ms",
+        "elapsed_wall_ms",
+        "lean_cpu_ms",
+        "peak_rss_bytes"
+      ],
+      "properties": {
+        "capture_wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "branch_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "branch_restore_p50_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "branch_restore_p95_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "environment_reload_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "theorem_reelaboration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale_cache_observations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "branch_wall_work_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "elapsed_wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lean_cpu_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_rss_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch_id",
+        "base_snapshot_sha256",
+        "mutable_context_isolated",
+        "cache_policy",
+        "status",
+        "candidate_sha256"
+      ],
+      "properties": {
+        "branch_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "base_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mutable_context_isolated": {
+          "const": true
+        },
+        "cache_policy": {
+          "const": "discard_and_reinitialize_per_branch"
+        },
+        "status": {
+          "enum": [
+            "not_attempted",
+            "candidate_available",
+            "failed",
+            "cancelled",
+            "budget_exhausted"
+          ]
+        },
+        "candidate_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
