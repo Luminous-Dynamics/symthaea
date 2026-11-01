@@ -85,7 +85,13 @@
     "action_registry": "evaluator-owned action ids with conflict_group constraints",
     "infeasible_conflict_group_subsets_excluded": true,
     "context_requires_nonzero_action_registry_digest": true,
-    "action_registry_binding": "action_registry_sha256"
+    "action_registry_binding": "action_registry_sha256",
+    "action_registry_fields": [
+      "action_id",
+      "conflict_group",
+      "action_semantics_sha256"
+    ],
+    "rejects_zero_action_semantics_digest": true
   },
   "targets_not_results": {
     "zero_future_leakage": true,
@@ -95,7 +101,7 @@
   },
   "validation_status": {
     "candidate_test_functions_authored": 12,
-    "evaluator_test_functions_authored": 14,
+    "evaluator_test_functions_authored": 15,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
