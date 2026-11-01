@@ -1361,6 +1361,16 @@ mod tests {
                         vec![8.0, 18.0, 28.0, 38.0, 48.0],
                     ],
                 },
+                VisualBeliefChannelSamples {
+                    channel_id: "task.utility".into(),
+                    kind: VisualBeliefChannelKind::TaskUtility,
+                    unit: "utility".into(),
+                    outcome_samples: vec![
+                        vec![5.0, 5.0, 5.0, 5.0, 5.0],
+                        vec![3.0, 3.0, 3.0, 3.0, 3.0],
+                        vec![4.0, 4.0, 4.0, 4.0, 4.0],
+                    ],
+                },
             ],
         };
         bank.joint_draw_bank_sha256 = compute_structured_joint_draw_bank_sha256(&bank).unwrap();
@@ -1372,7 +1382,7 @@ mod tests {
         let bank = structured_visual_bank_fixture();
         assert_eq!(
             bank.joint_draw_bank_sha256,
-            "4c8f7c1de1ad1d886d873630a9e43c9f512d0a6665db7e4e610658d4cdd2de2b"
+            "9202be4068e45989a72461f350c6bcea5893d44fde1575df3d671c0dc107f468"
         );
         validate_structured_joint_action_set(&bank).unwrap();
 
@@ -1392,12 +1402,12 @@ mod tests {
         assert!((contact.interval.upper - 0.4).abs() < 1e-12);
 
         let predictions = structured_action_prediction_intervals(&bank, 0.8).unwrap();
-        assert_eq!(predictions.len(), 6);
+        assert_eq!(predictions.len(), 9);
         assert_eq!(predictions[0].channel_id, "gripper.contact_probability");
         assert_eq!(predictions[0].action_id, 3);
 
         let all_effects = all_structured_action_effect_intervals(&bank, 0.8).unwrap();
-        assert_eq!(all_effects.len(), 6);
+        assert_eq!(all_effects.len(), 9);
         assert_eq!(all_effects[0].channel_id, "gripper.contact_probability");
         assert_eq!(
             (
@@ -1449,19 +1459,7 @@ mod tests {
 
     #[test]
     fn structured_action_selection_uses_only_named_task_utility_channel() {
-        let mut bank = structured_visual_bank_fixture();
-        bank.channels.push(VisualBeliefChannelSamples {
-            channel_id: "task.utility".into(),
-            kind: VisualBeliefChannelKind::TaskUtility,
-            unit: "utility".into(),
-            outcome_samples: vec![
-                vec![5.0, 5.0, 5.0, 5.0, 5.0],
-                vec![3.0, 3.0, 3.0, 3.0, 3.0],
-                vec![4.0, 4.0, 4.0, 4.0, 4.0],
-            ],
-        });
-        bank.joint_draw_bank_sha256 =
-            compute_structured_joint_draw_bank_sha256(&bank).unwrap();
+        let bank = structured_visual_bank_fixture();
         assert_eq!(
             select_structured_task_action(&bank, "task.utility", 0.8).unwrap(),
             StructuredActionDecision::Certified { action_id: 17 }
