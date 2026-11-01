@@ -105,3 +105,31 @@ Keep evidence levels separate:
 
 This repository currently has a DGP generator and adapters, not executed Monte Carlo or biological findings. Any superiority claim requires matched, reproducible estimator runs and independent evaluation.
 
+## 6. Versioned environment registry and pretraining-exposure ledger
+
+A public causal benchmark is not contamination-proof merely because its test split was held out at release time. Once public test examples, generator recipes or derived graphs are visible, later training runs may include them. Treat benchmark freshness and method exposure as explicit evaluation variables, not informal caveats.
+
+The new registry contract records each pool's:
+- immutable pool/release version and manifest digest;
+- split (train, public validation, reserved validation, sealed evaluation, retired);
+- source kind (synthetic SCM, semantic-operational, formula-grounded, biological recording);
+- mechanism, noise, observation, intervention, context and outcome family IDs;
+- generator name, code commit, config digest and seed commitment;
+- visibility, pretraining permission and ground-truth access;
+- record count, source version, URI and license.
+
+Reserved/sealed pools must be non-public/restricted, disallow pretraining access and keep ground truth sealed. A planned pool has item_count=0 and must not be represented as qualified data. The example registry includes a planned DANDI pilot only to demonstrate this status; it does not claim any NWB recordings have been materialized or scored.
+
+A method exposure disclosure records code/artifact/weight digests, pretraining cutoff, training sources and the level of direct/derived/family-level/possible/unknown exposure, plus per-pool support status and evidence. Unknown exposure must remain UNKNOWN; absence of a disclosure is not evidence of no overlap.
+
+The rotation policy declares public-pool refresh cadence, maximum public validation age, retirement after exposure, minimum reserved fraction and whether exposure disclosure is mandatory. Benchmark reports must include the exact registry release ID and method-exposure declaration digest.
+
+Schemas:
+- \`CONNECTOME_BENCHMARK_ENVIRONMENT_REGISTRY.schema.json\`
+- \`CONNECTOME_METHOD_EXPOSURE_DISCLOSURE.schema.json\`
+
+Examples:
+- \`CONNECTOME_BENCHMARK_ENVIRONMENT_REGISTRY.example.json\`
+- \`CONNECTOME_METHOD_EXPOSURE_DISCLOSURE.example.json\`
+
+These are contract/fixture additions only. The example registry is illustrative and does not claim a real CausalArena-equivalent benchmark release exists in this repository.
