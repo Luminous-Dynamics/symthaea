@@ -174,7 +174,7 @@ fn resource_values(value: &Value, prefix: &str) -> Result<Vec<u64>> {
 fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
     let status = string(value, "/status")?;
     let checker = bool_value(value, "/checker_passed")?;
-    let semantic = bool_value(value, "/target_integrity_passed")?;
+    let target_integrity_passed = bool_value(value, "/target_integrity_passed")?;
     let successor = string(value, "/successor_gate_status")?;
     let checked_statement = match field(value, "/checked_target_statement_sha256")? {
         Value::Null => None,
@@ -184,7 +184,7 @@ fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
 
     let proof = optional_digest(value, "/proof_sha256")?;
     let checker_receipt = optional_digest(value, "/checker_receipt_sha256")?;
-    let semantic_receipt = optional_digest(value, "/target_integrity_receipt_sha256")?;
+    let target_integrity_receipt = optional_digest(value, "/target_integrity_receipt_sha256")?;
     let successor_receipt = optional_digest(value, "/successor_gate_receipt_sha256")?;
 
     if !matches!(
@@ -205,12 +205,11 @@ fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
 
     if status == "not_attempted" {
         if checker
-            || semantic
+            || !target_integrity_passed
             || successor != "not_run"
             || checked_statement.is_some()
             || proof.is_some()
             || checker_receipt.is_some()
-            || semantic_receipt.is_some()
             || successor_receipt.is_some()
         {
             bail!("not_attempted outcome contains proof/checker/semantic evidence");
@@ -220,12 +219,12 @@ fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
 
     if status == "verified_success" {
         if !checker
-            || !semantic
+            || !target_integrity_passed
             || !matches!(successor, "passed" | "not_applicable")
             || checked_statement != Some(target_statement)
             || proof.is_none()
             || checker_receipt.is_none()
-            || semantic_receipt.is_none()
+            || target_integrity_receipt.is_none()
             || (successor == "passed" && successor_receipt.is_none())
             || (successor == "not_applicable" && successor_receipt.is_some())
         {
@@ -393,7 +392,7 @@ fn validate_and_analyze(
         let receipt_specs = [
             ("/proof_path", "/proof_sha256", "proof artifact", status == "verified_success"),
             ("/checker_receipt_path", "/checker_receipt_sha256", "checker receipt", status == "verified_success"),
-            ("/target_integrity_receipt_path", "/target_integrity_receipt_sha256", "semantic gate receipt", status == "verified_success"),
+            ("/target_integrity_receipt_path", "/target_integrity_receipt_sha256", "target integrity receipt", true),
             (
                 "/successor_gate_receipt_path",
                 "/successor_gate_receipt_sha256",
@@ -504,7 +503,7 @@ fn validate_and_analyze(
             }
         }
 
-        if status == "verified_success" && evidence_class == "measured_outcome" {
+        if evidence_class == "measured_outcome" {
             let root = evidence_root.context("measured semantic receipt requires evidence root")?;
             let semantic_path = match field(outcome, "/target_integrity_receipt_path")? {
                 Value::String(value) => value,
@@ -847,12 +846,12 @@ fn synthesize_outcomes(plan: &Value) -> Result<Vec<Value>> {
                 "execution_order_index":position,
                 "status":status,
                 "checker_passed":success,
-                "target_integrity_passed":success,
+                "target_integrity_passed":true,
                 "successor_gate_status":if success {"passed"} else if not_attempted {"not_run"} else {"failed"},
                 "checked_target_statement_sha256":if success {Some(pair["target_statement_sha256"].clone())} else {None::<Value>},
                 "proof_sha256":proof,
                 "checker_receipt_sha256":checker,
-                "target_integrity_receipt_sha256":semantic,
+                "target_integrity_receipt_sha256":Some("6".repeat(64)),
                 "successor_gate_receipt_sha256":successor,
                 "run_receipt_sha256":"8".repeat(64),
                 "proof_path":null,
