@@ -8,7 +8,6 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
-use std::path::Path;
 
 use super::digest::CanonicalHasher;
 
@@ -290,14 +289,19 @@ fn validate_license_policy(
 }
 
 fn validate_relative_path(path: &str) -> bool {
-    if path.trim().is_empty() || path.starts_with('/') || path.starts_with('\\') {
+    if path.trim().is_empty()
+        || path.starts_with('/')
+        || path.starts_with('\\\\')
+        || path.contains('\\\\')
+        || path.contains(':')
+        || path.contains('\\0')
+    {
         return false;
     }
-    let parsed = Path::new(path);
-    !parsed.is_absolute()
-        && parsed.components().all(|component| {
-            matches!(component, std::path::Component::Normal(_))
-        })
+    // Validate separators independent of the host OS. In particular, a Linux parser must
+    // reject Windows drive/UNC/backslash traversal before the archive is extracted elsewhere.
+    path.split('/')
+        .all(|component| !component.is_empty() && component != "." && component != "..")
 }
 
 pub fn validate_real_temporal_dataset_manifest(
@@ -489,6 +493,14 @@ mod tests {
         manifest.source_uri = "https://zenodo.org/records/3384388".into();
         manifest.license = DatasetLicense::CcBySa4;
         manifest.license_uri = "https://creativecommons.org/licenses/by-sa/4.0/".into();
+        manifest.timestamp_representation = DatasetTimestampRepresentation::SampleIndex;
+        manifest.nominal_sample_rate_millihz = Some(16_000_000);
+        manifest.timestamp_column = "sample_index".into();
+        manifest.channel_names = (0..8).map(|index| format!("microphone_{index}")).collect();
+        manifest.label_map = vec![
+            DatasetLabel { label_id: 0, label_name: "normal".into() },
+            DatasetLabel { label_id: 1, label_name: "anomaly".into() },
+        ];
         manifest.adapted_dataset_material_distributed = true;
         manifest.manifest_sha256 = compute_real_temporal_dataset_manifest_sha256(&manifest);
         assert!(validate_real_temporal_dataset_manifest(&manifest).is_err());
@@ -512,6 +524,22 @@ mod tests {
         manifest.adapted_dataset_material_distributed = true;
         manifest.manifest_sha256 = compute_real_temporal_dataset_manifest_sha256(&manifest);
         assert!(validate_real_temporal_dataset_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_windows_and_unix_path_traversal_independent_of_host_os() {
+        for invalid_path in [
+            "../labels.csv",
+            "subdir/../../labels.csv",
+            "\\\\server\\share\\dataset.csv",
+            "C:/dataset/subject.csv",
+            "nested\\..\\labels.csv",
+        ] {
+            let mut manifest = harth_manifest();
+            manifest.files[0].relative_path = invalid_path.into();
+            manifest.manifest_sha256 = compute_real_temporal_dataset_manifest_sha256(&manifest);
+            assert!(validate_real_temporal_dataset_manifest(&manifest).is_err(), "accepted {invalid_path:?}");
+        }
     }
 
     #[test]
