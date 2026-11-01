@@ -11,7 +11,6 @@ import math
 from typing import Any
 
 import numpy as np
-from scipy.special import logsumexp
 
 
 def covariance(d: int, rho: float) -> np.ndarray:
@@ -155,8 +154,12 @@ def run_fixed_intersection(
                     scalar_bet * score.sum(axis=1) - 0.5 * scalar_penalty
                 )
 
+                coordinate_max = log_coordinate.max(axis=1)
                 log_coordinate_mixture = (
-                    logsumexp(log_coordinate, axis=1) - math.log(dimension)
+                    coordinate_max
+                    + np.log(
+                        np.exp(log_coordinate - coordinate_max[:, None]).mean(axis=1)
+                    )
                 )
                 log_portfolio = (
                     np.logaddexp(log_vector, log_scalar) - math.log(2.0)
