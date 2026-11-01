@@ -781,9 +781,10 @@ mod tests {
     #[test]
     fn last_action_heuristic_uses_prior_cost_and_checked_scaling() {
         let predictor = forecaster();
-        let prefix = trace(Some(TerminalOutcome::SufficientProof))
+        let mut prefix = trace(Some(TerminalOutcome::SufficientProof))
             .prefix_view(1)
             .unwrap();
+        prefix.frontier_features.mandatory_verifier_operations = 1;
         let estimate = predictor.predict(&prefix).unwrap();
         assert_eq!(estimate.q50.tokens, 20);
         assert_eq!(estimate.q90.tokens, 40);
