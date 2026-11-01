@@ -100,6 +100,8 @@ The unit tests enumerate all (2^N) binary paths for a small fixed horizon and ev
 
 The path probability includes the complete N-step sample path while the test value is evaluated at the first stopping prefix. This makes the exact expectation calculation correct even when the process stops before later (unobserved) suffix outcomes; summing over suffix completions leaves the stopped-prefix probability unchanged.
 
+The test suite also includes an exact negative control: at each prefix n, independently apply a fresh unadjusted level-alpha fixed-horizon Bernoulli test designed for horizon n. It computes the family-wise probability of ever rejecting by enumerating all N-step paths and integrating the independent boundary randomization at each look. This deliberately invalid repeated-testing procedure must exceed nominal alpha, while the induced martingale procedure remains at alpha.
+
 ### Matched benchmark comparators
 
 1. **Induced fixed-horizon test:** this reference.

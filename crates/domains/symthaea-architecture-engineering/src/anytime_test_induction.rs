@@ -401,6 +401,40 @@ mod tests {
         expectation
     }
 
+    fn naive_repeated_fixed_horizon_type_one_probability(
+        plan: &InducedBernoulliTestPlan,
+    ) -> Result<f64, InducedTestError> {
+        let n = plan.terminal_horizon;
+        let mut look_tests = Vec::with_capacity(n);
+        for horizon in 1..=n {
+            let mut look_plan = plan.clone();
+            look_plan.terminal_horizon = horizon;
+            look_tests.push(build_terminal_test(&look_plan)?.rejection_probability_by_successes);
+        }
+
+        let mut familywise_error = 0.0;
+        for path_mask in 0..(1usize << n) {
+            let mut successes = 0usize;
+            let mut path_probability = 1.0;
+            let mut no_rejection_probability = 1.0;
+            for look in 1..=n {
+                let success = (path_mask >> (look - 1)) & 1 == 1;
+                if success {
+                    successes += 1;
+                    path_probability *= plan.null_probability;
+                } else {
+                    path_probability *= 1.0 - plan.null_probability;
+                }
+                // Each unadjusted fixed-horizon look randomizes independently at its
+                // own NP boundary. The chance of never rejecting along this path is
+                // the product of the per-look non-rejection probabilities.
+                no_rejection_probability *= 1.0 - look_tests[look - 1][successes];
+            }
+            familywise_error += path_probability * (1.0 - no_rejection_probability);
+        }
+        Ok(familywise_error)
+    }
+
     #[test]
     fn induced_process_is_bounded_martingale_and_matches_terminal_test() {
         let plan = plan();
@@ -427,6 +461,21 @@ mod tests {
                     "optional stopping changed null expectation: {expected}");
             }
         }
+    }
+
+    #[test]
+    fn naive_unadjusted_fixed_horizon_retesting_is_an_inflated_negative_control() {
+        let plan = plan();
+        let induced = analyze_induced_bernoulli_test(&plan).unwrap();
+        let valid_stopping_expectation = stopping_value(
+            &induced,
+            plan.null_probability,
+            |n, successes| successes >= 3 || n - successes >= 5 || n == plan.terminal_horizon,
+        );
+        let naive_repeated_look_error = naive_repeated_fixed_horizon_type_one_probability(&plan).unwrap();
+        assert!((valid_stopping_expectation - plan.significance_level).abs() < 1e-9);
+        assert!(naive_repeated_look_error > plan.significance_level + 0.05,
+            "negative control did not expose optional-stopping inflation: {naive_repeated_look_error}");
     }
 
     #[test]
