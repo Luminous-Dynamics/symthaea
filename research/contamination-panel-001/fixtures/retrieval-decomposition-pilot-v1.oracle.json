@@ -75,7 +75,7 @@
     ]
   ],
   "answer_sha256": "f6103ca1e01bd200a9258a366b7e8c22a542e771bf11a0679967a5bb47ef3688",
-  "oracle_sha256": "ba58bba540e02c7a0b647c6303dbbe0bee53e05b2219f8185753c21d26a8e797",
+  "oracle_sha256": "229350bae829fd45b2e471c5c3dafe92bb3acdb70b152129c8f3cca97de73343",
   "claim_boundary": "sealed synthetic oracle; digest is SHA-256 of serialized oracle with oracle_sha256 cleared",
   "calculation": {
     "labor_rate_per_day": 180,
