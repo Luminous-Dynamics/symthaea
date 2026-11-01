@@ -113,17 +113,21 @@ For each known fact change:
 - answer oscillation rate after the correct update;
 - performance on unchanged facts after nearby distractor updates.
 
-### Proposed Temporal Error Debt extension (not an official OAKS metric)
+### Temporal Error Debt extension (not an official OAKS metric)
 
-Tracked separately in NEURO-SILICON-008 (#9492). For a given document/question, hold each answer state until the next declared chunk/checkpoint. Integrate the duration for which the emitted state is wrong after a fact change:
+Tracked in NEURO-SILICON-008 (#9492). The evaluator-side scorer is implemented in research/temporal-bench/src/temporal_error_debt.rs. It accepts contiguous repeated-checkpoint exposure windows for each query and integrates:
 
 - wrong-belief exposure: time with an explicit but incorrect answer/no-fact state;
 - abstention exposure: time with an explicit abstention;
 - missing exposure: time without a prediction by the checkpoint deadline.
 
-Use source timestamps where available. If only chunk order is available, use chunk-index units and do not convert these to seconds. Report the three exposure components independently, alongside time-to-first-correct-answer. A late answer, an incorrect answer, abstention, and missing output must remain distinguishable. This is a proposed extension to the adapter analysis, not part of the official OAKS score or a claim about OAKS authors' metric definitions.
+The scorer also reports future-knowledge leakage, missed-correction and stale-after-retraction exposure, plus correction/retraction latency. It validates fixed valid_at coordinates, sequential checkpoint indices, contiguous known_at intervals, non-zero durations, and rejects duplicate/unknown prediction records.
 
-The required invariant is that equal aggregate per-chunk accuracy can still produce different wrong-belief exposure when one model updates faster. Never combine these into an opaque weighted score.
+Use source timestamps where available. If only chunk order is available, use chunk-index units and do not convert these to seconds. Report the three exposure components independently, alongside time-to-first-correct-answer. A late answer, an incorrect answer, abstention, and missing output must remain distinguishable.
+
+**Current limitation:** the scorer exists, but the OAKS adapter does not yet generate repeated checkpoint windows or connect OAKS candidate outputs to the scorer. The T10 synthetic generator still emits five anchor query events; the scorer tests use evaluator-created exposure windows. This is not an official OAKS metric and no OAKS/TED result is claimed.
+
+The required invariant is that equal final answers or similar aggregate per-chunk accuracy can still hide different wrong-belief exposure when one model updates faster. Never combine these into an opaque weighted score.
 
 ### Evidence/provenance
 

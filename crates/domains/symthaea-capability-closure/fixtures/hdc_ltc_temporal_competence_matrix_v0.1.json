@@ -66,7 +66,7 @@
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 176,
+    "rust_tests_authored_count": 188,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 18,
@@ -77,7 +77,8 @@
       "research/temporal-bench/src/retention.rs": 16,
       "research/temporal-bench/src/fast_event.rs": 22,
       "research/temporal-bench/src/phase.rs": 24,
-      "research/temporal-bench/src/knowledge_stream.rs": 20
+      "research/temporal-bench/src/knowledge_stream.rs": 20,
+      "research/temporal-bench/src/temporal_error_debt.rs": 12
     },
     "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
@@ -109,7 +110,10 @@
     "knowledge_stream_scoring_implemented": true,
     "knowledge_stream_seed_replay_implemented": true,
     "phase_time_dilation_transform_implemented": true,
-    "phase_missing_prediction_accounting_implemented": true
+    "phase_missing_prediction_accounting_implemented": true,
+    "temporal_error_debt_scorer_implemented": true,
+    "temporal_error_debt_window_generator_implemented": false,
+    "temporal_error_debt_runner_integration_implemented": false
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
@@ -502,7 +506,15 @@
         "stale_answer_rate_over_eligible_post_retraction_queries",
         "historical_as_known_preservation_rate_over_eligible_historical_queries",
         "abstention_and_missing_prediction_rate",
-        "correction_propagation_latency"
+        "correction_propagation_latency",
+        "temporal_error_debt_wrong_belief_exposure",
+        "temporal_error_debt_abstention_exposure",
+        "temporal_error_debt_missing_exposure",
+        "temporal_error_debt_future_knowledge_leakage_exposure",
+        "temporal_error_debt_missed_correction_exposure",
+        "temporal_error_debt_stale_after_retraction_exposure",
+        "temporal_error_debt_correction_latency",
+        "temporal_error_debt_retraction_latency"
       ],
       "oracle": "Independent symbolic scan over append-only source revisions, valid-time boundaries and transaction/knowledge-time cutoffs",
       "paradigm": "Distinguishes what was valid in the modeled world at V from what the system had learned by T; a later correction must not rewrite an earlier as-known query.",
@@ -547,7 +559,7 @@
       "proposed_extensions": {
         "temporal_error_debt": {
           "tracking_issue": 9492,
-          "status": "specified_not_implemented",
+          "status": "evaluator_scorer_implemented; repeated_checkpoint_schedule_and_runner_integration_not_implemented",
           "required_query_stream": "Repeated predictions for the same valid_at coordinate at every evidence/update checkpoint.",
           "measures": [
             "wrong_belief_exposure_time",
@@ -557,7 +569,17 @@
             "time_to_first_no_fact_after_retraction",
             "area_under_per_chunk_error_curve"
           ],
-          "boundary": "Not part of current T10 v0.1 scores or official OAKS scores; source timestamps required for seconds, otherwise use chunk-time units."
+          "boundary": "Not part of current T10 v0.1 scores or official OAKS scores; source timestamps required for seconds, otherwise use chunk-time units.",
+          "implementation": {
+            "path": "research/temporal-bench/src/temporal_error_debt.rs",
+            "authored_tests": 12,
+            "scorer": "score_temporal_error_debt",
+            "resolves_expected_answer_independently": true,
+            "verifies_contiguous_exposure_windows": true,
+            "repeated_query_event_generation": false,
+            "candidate_runner_integration": false,
+            "hardware_measurement": false
+          }
         }
       }
     }
