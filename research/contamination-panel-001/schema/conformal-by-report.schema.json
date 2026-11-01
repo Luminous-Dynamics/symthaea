@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/conformal-by-report-v1.json",
+  "title": "Conformal Benjamini-Yekutieli report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "adjustment_id",
+    "source_calibration_study_sha256",
+    "source_calibration_report_sha256",
+    "config_sha256",
+    "family_scopes",
+    "target_fdr_permille",
+    "family_count",
+    "hypothesis_count",
+    "families",
+    "fdr_adjustment_applied",
+    "arbitrary_dependence_adjustment",
+    "input_p_values_assumed_valid",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.conformal_by_report.v1"
+    },
+    "adjustment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "source_calibration_study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_calibration_report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "family_scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "enum": [
+          "per_detector_per_group",
+          "all_detectors_per_group"
+        ]
+      }
+    },
+    "target_fdr_permille": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      }
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "hypothesis_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4000000
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "calibration_group_sha256",
+          "family_scope",
+          "detector_count",
+          "hypothesis_count",
+          "harmonic_upper_micros",
+          "q_level_summaries",
+          "hypotheses"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "calibration_group_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "family_scope": {
+            "type": "string",
+            "enum": [
+              "per_detector_per_group",
+              "all_detectors_per_group"
+            ]
+          },
+          "detector_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "hypothesis_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          },
+          "harmonic_upper_micros": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "q_level_summaries": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target_fdr_permille",
+                "rejection_cutoff_rank",
+                "discovery_count",
+                "clean_discovery_count",
+                "contaminated_discovery_count",
+                "empirical_fdp",
+                "empirical_power"
+              ],
+              "properties": {
+                "target_fdr_permille": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "rejection_cutoff_rank": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "discovery_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "clean_discovery_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "contaminated_discovery_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "empirical_fdp": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "empirical_power": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "hypotheses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "calibration_group_sha256",
+                "family_id",
+                "family_scope",
+                "detector_id",
+                "detector_version",
+                "source_cluster_id",
+                "item_count",
+                "item_sample_ids",
+                "ground_truth",
+                "conformal_p_value_numerator",
+                "conformal_p_value_denominator",
+                "by_rank",
+                "by_adjusted_p_value",
+                "rejected_at_q_permille"
+              ],
+              "properties": {
+                "calibration_group_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "family_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "family_scope": {
+                  "type": "string",
+                  "enum": [
+                    "per_detector_per_group",
+                    "all_detectors_per_group"
+                  ]
+                },
+                "detector_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:/-]+$"
+                },
+                "detector_version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:/-]+$"
+                },
+                "source_cluster_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:/-]+$"
+                },
+                "item_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "item_sample_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 100000,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:/-]+$"
+                  }
+                },
+                "ground_truth": {
+                  "type": "string",
+                  "enum": [
+                    "clean",
+                    "contaminated"
+                  ]
+                },
+                "conformal_p_value_numerator": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "conformal_p_value_denominator": {
+                  "type": "integer",
+                  "minimum": 2
+                },
+                "by_rank": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "by_adjusted_p_value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "numerator",
+                    "denominator",
+                    "ceiling_permille"
+                  ],
+                  "properties": {
+                    "numerator": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    },
+                    "denominator": {
+                      "const": 1000
+                    },
+                    "ceiling_permille": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    }
+                  }
+                },
+                "rejected_at_q_permille": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "fdr_adjustment_applied": {
+      "const": true
+    },
+    "arbitrary_dependence_adjustment": {
+      "const": true
+    },
+    "input_p_values_assumed_valid": {
+      "const": true
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "const": "exploratory_by_adjustment"
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

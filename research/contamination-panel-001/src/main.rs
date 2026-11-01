@@ -2,7 +2,11 @@ use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
-    detector_calibration::{DetectorCalibrationStudyV1, analyze_detector_calibration},
+    conformal_by::{ConformalByConfigV1, analyze_conformal_by},
+    conformal_by::{ConformalByConfigV1, analyze_conformal_by},
+    detector_calibration::{
+        DetectorCalibrationReportV1, DetectorCalibrationStudyV1, analyze_detector_calibration,
+    },
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
@@ -370,6 +374,33 @@ fn analyze_detector_calibration_cli(args: &[String]) -> Result<(), Box<dyn Error
     Ok(())
 }
 
+fn adjust_conformal_by_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench adjust-conformal-by <calibration-report.json> <by-config.json> <by-report.json>"
+                .into(),
+        );
+    }
+    const MAX_BY_INPUT_BYTES: u64 = 512 * 1024 * 1024;
+    let calibration_bytes = read_file_bounded(&args[1], MAX_BY_INPUT_BYTES)?;
+    let config_bytes = read_file_bounded(&args[2], MAX_BY_INPUT_BYTES)?;
+    let calibration: DetectorCalibrationReportV1 = serde_json::from_slice(&calibration_bytes)?;
+    let config: ConformalByConfigV1 = serde_json::from_slice(&config_bytes)?;
+    let report = analyze_conformal_by(&calibration, &config).map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "families={} hypotheses={} scopes={} q_levels={} arbitrary_dependence={} confirmatory_eligible={}",
+        report.family_count,
+        report.hypothesis_count,
+        report.family_scopes.len(),
+        report.target_fdr_permille.len(),
+        report.arbitrary_dependence_adjustment,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -457,10 +488,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("analyze-detector-calibration") => analyze_detector_calibration_cli(&args),
+        Some("adjust-conformal-by") => adjust_conformal_by_cli(&args),
         Some("score-self-critique") => score_self_critique_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-detector-calibration | score-self-critique | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-detector-calibration | adjust-conformal-by | score-self-critique | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
