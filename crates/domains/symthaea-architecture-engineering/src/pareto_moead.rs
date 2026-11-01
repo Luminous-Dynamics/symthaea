@@ -12,6 +12,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::pareto_anytime::{AnytimeError, AnytimeHistory, AnytimeRecorder, EvaluationOutcome};
 use super::pareto_benchmarks::{dtlz2_three_objectives, zdt1_objectives};
 use super::pareto_objectives::{
     analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
@@ -312,7 +313,26 @@ pub fn run_moead_zdt1(
                 .map(|values| values.to_vec())
                 .map_err(|error| MoeadError::new("zdt1", error.to_string()))
         },
+        None,
     )
+}
+
+pub fn run_moead_zdt1_with_history(
+    config: &MoeadConfig,
+    decision_dimensions: usize,
+    history: &mut AnytimeHistory,
+) -> Result<MoeadRunReport, MoeadError> {
+    if decision_dimensions < 2 || config.weight_mode.objective_dimensions() != 2 {
+        return Err(MoeadError::new("dimensions", "ZDT1 requires at least two decision variables and Uniform2d weights"));
+    }
+    let population_size = config.weight_mode.population_size()?;
+    let budget = population_size.checked_mul(config.generations.saturating_add(1))
+        .ok_or_else(|| MoeadError::new("config", "evaluation budget overflows usize"))?;
+    let mut recorder = make_anytime_recorder(history, "zdt1", config.seed, 2, budget)?;
+    run_moead("zdt1", config, decision_dimensions, 2, |decision| {
+        zdt1_objectives(decision).map(|values| values.to_vec())
+            .map_err(|error| MoeadError::new("zdt1", error.to_string()))
+    }, Some(&mut recorder))
 }
 
 pub fn run_moead_dtlz2(
@@ -335,7 +355,26 @@ pub fn run_moead_dtlz2(
                 .map(|values| values.to_vec())
                 .map_err(|error| MoeadError::new("dtlz2", error.to_string()))
         },
+        None,
     )
+}
+
+pub fn run_moead_dtlz2_with_history(
+    config: &MoeadConfig,
+    decision_dimensions: usize,
+    history: &mut AnytimeHistory,
+) -> Result<MoeadRunReport, MoeadError> {
+    if decision_dimensions < 3 || config.weight_mode.objective_dimensions() != 3 {
+        return Err(MoeadError::new("dimensions", "three-objective DTLZ2 requires at least three decision variables and Simplex3d weights"));
+    }
+    let population_size = config.weight_mode.population_size()?;
+    let budget = population_size.checked_mul(config.generations.saturating_add(1))
+        .ok_or_else(|| MoeadError::new("config", "evaluation budget overflows usize"))?;
+    let mut recorder = make_anytime_recorder(history, "dtlz2-3obj", config.seed, 3, budget)?;
+    run_moead("dtlz2-3obj", config, decision_dimensions, 3, |decision| {
+        dtlz2_three_objectives(decision).map(|values| values.to_vec())
+            .map_err(|error| MoeadError::new("dtlz2", error.to_string()))
+    }, Some(&mut recorder))
 }
 
 fn run_moead<F>(
@@ -344,6 +383,7 @@ fn run_moead<F>(
     decision_dimensions: usize,
     objective_dimensions: usize,
     evaluator: F,
+    mut recorder: Option<&mut AnytimeRecorder<'_>>,
 ) -> Result<MoeadRunReport, MoeadError>
 where
     F: Fn(&[f64]) -> Result<Vec<f64>, MoeadError>,
@@ -363,7 +403,18 @@ where
 
     for _ in 0..population_size {
         let decision = (0..decision_dimensions).map(|_| rng.unit_f64()).collect::<Vec<_>>();
-        let objectives = evaluate_checked(&evaluator, &decision, objective_dimensions)?;
+        let objectives = match evaluate_checked(&evaluator, &decision, objective_dimensions) {
+            Ok(values) => values,
+            Err(error) => {
+                if let Some(recorder) = &mut recorder {
+                    recorder.record_failure(&decision, EvaluationOutcome::Failed, error.to_string()).map_err(map_anytime_error)?;
+                }
+                return Err(error);
+            }
+        };
+        if let Some(recorder) = &mut recorder {
+            recorder.record_success(&decision, &objectives, true, Vec::new()).map_err(map_anytime_error)?;
+        }
         objective_evaluations = checked_add_usize(objective_evaluations, 1, "objective_evaluations")?;
         update_ideal(&mut ideal, &objectives)?;
         population.push(Individual { decision, objectives });
@@ -389,7 +440,18 @@ where
                 config.crossover_rate,
                 &mut rng,
             )?;
-            let objectives = evaluate_checked(&evaluator, &child, objective_dimensions)?;
+            let objectives = match evaluate_checked(&evaluator, &child, objective_dimensions) {
+                Ok(values) => values,
+                Err(error) => {
+                    if let Some(recorder) = &mut recorder {
+                        recorder.record_failure(&child, EvaluationOutcome::Failed, error.to_string()).map_err(map_anytime_error)?;
+                    }
+                    return Err(error);
+                }
+            };
+            if let Some(recorder) = &mut recorder {
+                recorder.record_success(&child, &objectives, true, Vec::new()).map_err(map_anytime_error)?;
+            }
             objective_evaluations = checked_add_usize(objective_evaluations, 1, "objective_evaluations")?;
             update_ideal(&mut ideal, &objectives)?;
 
@@ -546,6 +608,32 @@ pub fn analyze_moead_report(
     ).map_err(map_pareto_error)?;
     let analysis = analyze_pareto(&plan).map_err(map_pareto_error)?;
     Ok(MoeadParetoAnalysis { plan, analysis })
+}
+
+fn make_anytime_recorder<'a>(
+    history: &'a mut AnytimeHistory,
+    problem_id: &str,
+    seed: u64,
+    objective_dimensions: usize,
+    expected_attempts: usize,
+) -> Result<AnytimeRecorder<'a>, MoeadError> {
+    let header = history.header();
+    if header.algorithm_id != ALGORITHM_ID || header.problem_id != problem_id || header.seed != seed {
+        return Err(MoeadError::new("anytime.header", "history algorithm, problem, or seed differs from this MOEA/D run"));
+    }
+    if header.objective_specs.len() != objective_dimensions
+        || header.objective_specs.iter().any(|spec| spec.direction != ObjectiveDirection::Minimize)
+    {
+        return Err(MoeadError::new("anytime.objective_specs", "history objectives do not match the minimization problem"));
+    }
+    if header.max_objective_evaluation_attempts < u64::try_from(expected_attempts).unwrap_or(u64::MAX) {
+        return Err(MoeadError::new("anytime.max_objective_evaluation_attempts", "history attempt budget is below the optimizer's exact budget"));
+    }
+    AnytimeRecorder::new(history).map_err(map_anytime_error)
+}
+
+fn map_anytime_error(error: AnytimeError) -> MoeadError {
+    MoeadError::new(error.path, error.message)
 }
 
 fn map_pareto_error(error: ParetoError) -> MoeadError {
