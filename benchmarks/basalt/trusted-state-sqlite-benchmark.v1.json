@@ -83,6 +83,12 @@
       "phase": "configuration",
       "mutation": "Open an existing symlink, non-regular database path, or an over-limit persisted state",
       "expected": "Reject unsafe path or fail closed before admitting any new state transition"
+    },
+    {
+      "id": "TSTATE-SQL-014",
+      "phase": "integrity",
+      "mutation": "Migrate an existing source to a new pinned transparency log with explicit continuity evidence, close and reopen the SQLite database",
+      "expected": "Persist the unchanged source key, next generation, predecessor seal and new log ID; retain old log history and reject migration without evidence"
     }
   ],
   "metrics": [
