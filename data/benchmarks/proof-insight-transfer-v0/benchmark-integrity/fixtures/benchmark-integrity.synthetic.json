@@ -40,9 +40,9 @@
     "used_axioms": [],
     "used_axioms_manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "allowed_axioms": [
-      "propext",
       "Classical.choice",
-      "Quot.sound"
+      "Quot.sound",
+      "propext"
     ],
     "allowlist_manifest_sha256": "deac1971abc774adfc7514e94bdb6290d3bb2c3167886e3ec923479ac3d75869",
     "unexpected_axioms": 0
