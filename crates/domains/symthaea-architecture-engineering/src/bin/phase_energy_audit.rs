@@ -31,9 +31,6 @@ fn main() -> ExitCode {
         return fail("missing outcomes.csv argument");
     };
     let Some(voltage_arg) = args.next() else {
-        return fail("missing outcomes.csv argument");
-    };
-    let Some(voltage_arg) = args.next() else {
         return fail("missing voltage_v argument");
     };
     let Some(mapping_path) = args.next() else {
@@ -113,11 +110,13 @@ fn main() -> ExitCode {
     }
 
     println!(
-        "PASS: {} events; {} phase-complete, {} with unattributed intervals, {} missing required phase; receipt {}",
+        "PASS: {} events; {} phase-complete, {} with unattributed intervals, {} missing required phase, {} successful deadline-met events; mean energy/event {:?} uJ; receipt {}",
         audit.receipt.event_count,
         audit.receipt.complete_phase_coverage_events,
         audit.receipt.unattributed_interval_events,
         audit.receipt.missing_required_phase_events,
+        audit.receipt.successful_completed_events,
+        audit.receipt.mean_energy_per_successful_event_uj,
         receipt_path.to_string_lossy()
     );
     ExitCode::SUCCESS
