@@ -1,0 +1,60 @@
+name: HARDSEC-027 mobile device profile audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_mobile_device_profile_audit.rs"
+      - "schemas/hardsec-mobile-device-profile-v1.schema.json"
+      - "tests/fixtures/hardsec/mobile-device-v1/**"
+      - "docs/research/HARDSEC_027_MOBILE_DEVICE_SECURITY.md"
+      - "tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml"
+      - ".github/workflows/hardsec-mobile-device-profile-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-027-mobile-profile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-profile-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check mobile profile auditor formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_mobile_device_profile_audit.rs
+      - name: Run profile privacy and evidence contract tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit
+      - name: Verify synthetic mobile profile receipt
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit > /tmp/hardsec-027-mobile-profile.json
+          python3 - <<'PY'
+          import json
+          with open("/tmp/hardsec-027-mobile-profile.json", "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "profile_shape_and_privacy_audit_passed"
+          assert receipt["evidence_domain"] == "synthetic_fixture"
+          assert receipt["device_class"]["product_family"] == "Google Pixel 8 Pro"
+          assert receipt["capability_vs_runtime"]["mte_hardware_support"] == "vendor_documented"
+          assert receipt["capability_vs_runtime"]["mte_runtime_state"] == "not_measured"
+          assert receipt["capability_vs_runtime"]["boot_state"] == "not_measured"
+          assert receipt["capability_vs_runtime"]["attestation_security_level"] == "not_measured"
+          assert receipt["measurement"]["pmu_access_status"] == "not_measured"
+          assert receipt["qualification"]["device_was_queried"] is False
+          assert receipt["qualification"]["runtime_integrity_verified"] is False
+          assert receipt["qualification"]["pmu_measurement_qualified"] is False
+          assert receipt["privacy"]["forbidden_identifier_fields_found"] is False
+          assert receipt["privacy"]["raw_attestation_material_exported"] is False
+          print("HARDSEC-027 synthetic mobile profile contract qualified.")
+          PY
