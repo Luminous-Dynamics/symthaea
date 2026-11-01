@@ -1,6 +1,6 @@
 # Bounded candidate/evaluator wire protocol v0.1
 
-Tracking: [#9850](https://github.com/Luminous-Dynamics/symthaea/issues/9850)  
+Tracking: [#9851](https://github.com/Luminous-Dynamics/symthaea/issues/9851)  
 Implementation branch: `research/temporal-candidate-protocol-v0.1`  
 Parent stack: [HARTH stream parser PR #9847](https://github.com/Luminous-Dynamics/symthaea/pull/9847) and [active-sensing simulator PR #9845](https://github.com/Luminous-Dynamics/symthaea/pull/9845)
 
