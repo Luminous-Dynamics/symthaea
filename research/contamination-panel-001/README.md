@@ -469,3 +469,86 @@ The analysis report includes a SHA-256 digest of the exact serialized study inpu
 
 
 The intervention design also binds a per-replicate training RNG commitment: treatment and placebo use the same committed RNG schedule within a pair, while independent model-pair replicates must use distinct training RNG commitments. This is checked by the paired receipt validator and repeated-replicate analysis.
+
+## Causal exposure-to-competence transfer ladder (SCI-EXPOSURE-TRANSFER-001)
+
+Tracking: [Issue #9726](https://github.com/Luminous-Dynamics/symthaea/issues/9726).
+
+The randomized-intervention and paired-model analysis layers estimate whether a declared training exposure changes model scores. This extension asks *what kind of capability the measured change represents*. It partitions the evaluation set by the relationship between each task and the treatment exposure, then estimates the treatment-minus-placebo effect in every relation stratum.
+
+This is deliberately not another contamination detector. It is a causal outcome decomposition attached to the existing randomized-training experiment. Detector scores (FTD, DVD, Min-K%++, likelihood/gradient, lexical, structural and embedding methods) remain separate comparators.
+
+### Six evaluator-only relation strata
+
+| Relation | Operational definition | Interpretation ceiling |
+| --- | --- | --- |
+| exact_replay | Same source item and target instance that appeared in the treatment exposure payload. | Narrow exact-instance retention; not proof of rote memorization by itself. |
+| surface_variant | Same underlying item and target, transformed wording, formatting or presentation. | Surface robustness; can remain item-specific. |
+| semantic_equivalent | Independently authored reformulation preserving assumptions, target and required reasoning, confirmed by blinded experts. | Semantic retention beyond lexical overlap; still related to the exposed target. |
+| fresh_same_recipe | New post-freeze parameters/data generated using the same solution recipe. | Instance transfer within a learned recipe. |
+| novel_recipe_same_skill | Different recipe and target instance requiring the same predeclared skill/capability. | Stronger evidence of transfer across task recipes, conditional on the skill mapping. |
+| unrelated_control | Different target skill/construct, matched on format and externally calibrated difficulty. | Negative control for generic training drift and unrelated score changes. |
+
+Relation labels, item IDs, task/answer payloads, source and recipe lineage, and evaluator oracles are not model-visible. Semantic-equivalence and same-skill assignments require blinded expert adjudication. Disputed or indeterminate labels are not silently promoted into positive strata.
+
+### Experimental and statistical invariants
+
+1. Reuse the existing source-cluster randomization, matched-token placebo, paired training receipts and independent model-pair replication. Do not re-randomize by question.
+2. Each task family × difficulty band must contain all six relation strata with matched item and cluster counts.
+3. The exact item-set, source-lineage, recipe-lineage and adjudication commitments must match across all independent model-pair replicates.
+4. Base, treatment and placebo checkpoints must be scored on identical item IDs, metric/oracle, harness, prompt/decoding and resource budgets. The transfer study binds the existing causal-study model-pair IDs, evaluation-evidence digests and training-receipt audit digests.
+5. Cross-stratum item-ID duplication, partial relation matrices, denominator mismatch, stale lineage bindings or mismatched pair receipts fail closed.
+6. Within a task family, difficulty bands are equally weighted; task families are then equally weighted. The reported family-macro effect therefore does not let a large or easy task family dominate the headline.
+7. All confidence intervals are calculated across independent model-pair training replicates. Items, task clusters, repeated generations and tool steps are nested measurements—not independent training replicates.
+8. The primary effect in relation r is the family-macro average of treatment accuracy minus placebo accuracy in r. Treatment-minus-base and placebo-minus-base are also reported, to separate exposure benefit from placebo degradation or generic training drift.
+
+The preregistered relation contrasts are:
+- exact memorization premium: exact_replay minus novel_recipe_same_skill;
+- surface retention premium: surface_variant minus novel_recipe_same_skill;
+- semantic retention premium: semantic_equivalent minus novel_recipe_same_skill;
+- same-recipe transfer: fresh_same_recipe minus unrelated_control;
+- cross-recipe skill transfer: novel_recipe_same_skill minus unrelated_control;
+- exact-to-same-recipe gap: exact_replay minus fresh_same_recipe.
+
+These contrasts are descriptive 95% paired-replicate intervals in v1. No multiplicity adjustment or confirmatory p-value is emitted. They are not pure direct effects under unrestricted interference: model parameters are global, so exposure may affect every relation stratum.
+
+### Rust interface
+
+The new module is src/exposure_transfer.rs, exported from lib.rs.
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-exposure-transfer \
+      replicated-causal-study.json \
+      exposure-transfer-study.json \
+      exposure-transfer-report.json
+
+The CLI first revalidates the existing replicated causal study. It then checks the transfer-study model-pair identities, exact evaluation-evidence digest and training-receipt digest, matched relation matrix, item-set commitments and lineage/adjudication bindings. The report contains six relation effects, per-family effects, pair-level effects and six predeclared contrasts.
+
+The evaluator-side study input is defined by:
+- schema/exposure-transfer-study.schema.json
+- schema/exposure-transfer-report.schema.json
+- fixtures/exposure-transfer-relation-registry.v0.1.json
+
+The registry fixture specifies the relation ontology, task families, required controls, estimands, comparator set and claim ceiling. The executable analyzer requires at least two task families and at least two independent model pairs for uncertainty. The base causal protocol's 20-pair minimum remains a planning floor, not a power guarantee. Determine the confirmatory sample size from a blinded pilot and preregistered power simulation using pair-level variance, the smallest effect of interest, family heterogeneity, global spillover and missing-run rates.
+
+### Multi-domain benchmark and comparators
+
+The target task-family registry is mathematics, code, science, factual QA, tool use and multimodal evaluation. For each family, construct exact/surface/semantic relation cases, same-recipe fresh instances, novel-recipe same-skill tasks and unrelated controls. Difficulty must be calibrated independently of the post-treatment checkpoints.
+
+Detector comparisons should include FTD (with paper and released-code configurations labeled separately), DVD, Min-K%++, likelihood/perplexity, gradient-based features where model access permits, exact/normalized/n-gram and structural/AST matching, MinHash/SimHash, embeddings and cross-encoders. Report AUROC and AUPRC by contamination tier and relation, recall at a fixed false-positive rate (initially 1%), null p-value calibration, selective risk, abstention and coverage. Do not let a good detector AUROC stand in for evidence of transferable competence.
+
+Reuse established evaluation runners such as Inspect and Lighteval through adapters that attach the transfer-study, score-validity and exposure-evidence artifacts. Do not rebuild their generic dataset, solver, scorer or multi-backend execution layers.
+
+### Initial qualification targets (not achieved results)
+
+- 100% item/checkpoint/metric coverage across the base, treatment and placebo models in every estimable relation cell.
+- Zero accepted duplicate item IDs across relation/family/difficulty cells, stale lineage digests or adjudication/oracle mismatches.
+- Six relation-stratum reports plus family-macro and worst-family results; no pooled accuracy-only headline.
+- Initial detector operating point: at most 1% FPR, with 95% recall as a T1/T2 aspiration only after fresh multi-domain holdouts. T3/T4 must be reported separately at fixed FPR with confidence intervals and abstention.
+- FTD FDR claims remain blocked until contaminated-null representativeness, per-feature p-value super-uniformity, feature dependence and multiple-testing assumptions are qualified on realistic held-out cohorts.
+- Causal-transfer claims remain exploratory until actual paired training runs, independent training/checkpoint receipt authentication and blinded cross-domain adjudication are complete.
+
+### Claim ceiling
+
+A passing schema, synthetic fixture or content-digest audit establishes internal consistency only. It does not prove that a training job consumed the declared exposure, that the task-relation labels are semantically true, that a score change was caused by a particular retrieved item, that exposure was absent from pretraining, that global spillover is absent, or that the result generalizes outside the declared benchmark. This module hard-sets independent authentication and confirmatory eligibility to false. No causal effect, FDR guarantee or SOTA improvement is claimed by the implementation alone.
+
