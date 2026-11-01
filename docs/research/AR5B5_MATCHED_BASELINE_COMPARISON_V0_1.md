@@ -101,7 +101,7 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 - It does not show that one algorithm wins; all test metrics are synthetic and the test only validates the comparison contract.
 - It does not show cross-run statistical superiority; that needs multiple independently seeded runs and cluster-level inference.
 - It does not show equal wall time or energy; only objective-evaluation budgets are matched here.
-- It does not show external implementation equivalence; NSGA-II, MOEA/D-DE and SMS-EMOA must still be cross-checked against pinned PlatEMO 4.16 or other authoritative reference implementations.
+- It does not show external implementation equivalence; NSGA-II, MOEA/D-DE and SMS-EMOA must still be cross-checked against pinned PlatEMO v4.17 or other authoritative reference implementations.
 - It does not compare Symthaea's native proposal-generation system to the optimizers as complete systems. This is an algorithmic baseline comparison, not a best-practical-system benchmark.
 
 ## Next steps
@@ -109,7 +109,7 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 1. Run 30+ exploratory seeds per problem/instance; determine confirmatory sample size by power analysis.
 2. Add independent cluster/bootstrap and paired randomization inference across seeds and problem instances.
 3. Add time-to-HV-target and resource-cost target curves from external measured telemetry.
-4. Cross-check each algorithm against the same pinned PlatEMO 4.16 algorithm/problem/parameter combination.
+4. Cross-check each algorithm against the same pinned PlatEMO v4.17 algorithm/problem/parameter combination.
 5. Add WFG, constrained DTLZ, noisy/expensive and multimodal benchmark families.
 6. Add MOEA/D and SMS-EMOA to the mechanism-matched research direction-search comparison only after their evaluator and proposal streams can be frozen identically.
 
