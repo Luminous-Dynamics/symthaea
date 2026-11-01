@@ -508,6 +508,15 @@ fn analyze_power_tree<N: PairedPowerNode>(
                 "selected policy action missing from reconstruction",
             )),
         };
+        if value > node.test_value() + SUPERMARTINGALE_TOLERANCE {
+            return Err(PowerContinuationError::new(
+                format!("{path}.{}", node.node_id()),
+                format!(
+                    "P1-optimal policy's conditional P0 size {value} exceeds node test budget {}",
+                    node.test_value()
+                ),
+            ));
+        }
         null_policy_values.insert(node.node_id().to_owned(), value);
     }
 
