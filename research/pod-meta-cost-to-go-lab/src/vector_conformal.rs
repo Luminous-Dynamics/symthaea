@@ -201,7 +201,6 @@ pub enum VectorConformalError {
     ShiftedCalibrationExample,
     InvalidPredictionScale,
     ResourceOverflow,
-    ShiftedPrediction,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -608,15 +607,20 @@ mod tests {
     #[test]
     fn max_score_uses_the_worst_normalized_residual_across_all_resources() {
         let predicted = prediction(4);
-        let observed = ResourceVector::new(12, 20, 10, 10, 10, 10);
+        let observed = ResourceVector::new(
+            predicted.point_cost.tokens + 2 * predicted.uncertainty_scale.tokens,
+            predicted.point_cost.tool_calls + 6 * predicted.uncertainty_scale.tool_calls,
+            predicted.point_cost.cpu_ms + predicted.uncertainty_scale.cpu_ms,
+            predicted.point_cost.gpu_ms,
+            predicted.point_cost.wall_ms + 3 * predicted.uncertainty_scale.wall_ms,
+            predicted.point_cost.micro_usd,
+        );
         let score = max_normalized_upper_residual(
             observed,
             predicted.point_cost,
             predicted.uncertainty_scale,
         );
-        let expected = (20.0 - predicted.point_cost.tool_calls as f64)
-            / predicted.uncertainty_scale.tool_calls as f64;
-        assert!((score - expected.max(0.0)).abs() < 1.0e-12);
+        assert_eq!(score, 6.0);
     }
 
     #[test]
