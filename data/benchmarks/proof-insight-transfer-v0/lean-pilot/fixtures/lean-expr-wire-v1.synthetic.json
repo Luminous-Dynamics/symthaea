@@ -294,8 +294,22 @@
   },
   "digests": {
     "environment_sha256": "0d6870797d7c28ecdc52bdeb5bd8618765a10e617e9787e27ecf936e6d950ab9",
+    "goal_metadata_sha256": "62e40ce4e78a09aa684fbc0352b24b4e5d7050882fae2505e2072c7e68d0a5e1",
     "target_expr_sha256": "491df71b2665e65f05c98dc0a32d7918f033ee2f992f290cfe0c92eb4315d0fa",
     "context_sha256": "ded9ef4aaf8586d75ddf112025d0c4bc43076a99a336491e890de1d8935d8b12",
-    "proof_state_sha256": "04bf10adb7cabdd4950560a13b1e68b12de287d51c16638b8ba94c54979ec855"
+    "proof_state_sha256": "384a681948881df3aca6458b21e88cc1342db1f8189d1502591f66e65383de8b"
+  },
+  "goal": {
+    "user_name": {
+      "tag": "str",
+      "prefix": {
+        "tag": "anonymous"
+      },
+      "value": "pitbSyntheticGoal"
+    },
+    "kind": "natural",
+    "depth_decimal": "0",
+    "num_scope_args_decimal": "0",
+    "creation_index_decimal": "17"
   }
 }
