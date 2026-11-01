@@ -143,6 +143,41 @@ Verification must be possible offline from exported signed envelopes, pinned pub
 
 Every control must be executed against the independent verifier. A test that only checks a helper function is insufficient; at least one end-to-end receipt path must prove that the final capability is not issued.
 
+## Matched baseline map and claim discipline
+
+| Baseline | What the published result establishes | Comparison boundary | Symthaea experiment |
+|---|---|---|---|
+| NATS-Bench-MCU v2 | Physical nRF5340 measurements for the 15,625-topology NATS-Bench TSS; 14,281 profiled and 1,344 flash-infeasible | This is the measured hardware oracle, not a search algorithm | Reconstruct the exact corrected partition and feasible Pareto front before comparing any searcher |
+| ConNAS (ICLR 2026) | Reports a 0.14% gap to the optimal feasible architecture on NATS-Bench under its evaluated parameter/memory constraints | The result is not evidence of a 0.14% gap on NATS-Bench-MCU or on a physically measured nRF5340 deployment | Reproduce ConNAS, then run it on the same MCU task, search space, quantization/compiler stack, hard limits and physical protocol |
+| EdgeVolution (Communications Engineering, 2026) | Samples 4,600 architectures per run over three runs; reports hardware-in-the-loop measurement below 1% of total runtime and training at about 99% | Results are task/target-specific; reducing physical measurement time alone will not address the dominant training cost in that setup | Compare staged partial training and uncertainty-aware promotion against full-training evolutionary search; charge all training, build and device costs |
+| ENAS (arXiv:2609.30272, August 2026) | Authors report 2.41× and 1.70× mean search-time speedups on Visual Wake Words and Melanoma Cancer, using CPU-only search across eight MCUs and nine input resolutions | Author-reported preprint/workshop result; not an independently reproduced result, and not a direct NATS-Bench-MCU comparison | Reproduce the released baseline under its tasks and targets; compare cost per readback-verified artifact, not only search time |
+| MLPerf Tiny v1.4 | An external benchmark suite with closed/open divisions, quality targets and optional energy measurements | Closed and Open results are not interchangeable; task-specific suite versions and rules govern each result | Submit or reproduce closed-division comparisons where applicable, and report Open-division results separately |
+| 2026 algorithm–architecture co-design survey | Maps 122 publications; 84.4% receive a broad cross-layer flag, but only 27.9% are explicitly coded as having explicit cross-layer analysis | Corpus coding is descriptive, not a universal estimate of industry practice | Publish a fully validated cross-layer pipeline and make every layer/configuration visible in the released evidence |
+
+### Fair comparison protocol
+
+- Freeze task, dataset split, search space, target, board revision, quantization/calibration policy, compiler/runtime, measurement protocol, objective normalization, stopping rule and resource ceilings before opening the final test set.
+- Compare on overlapping task/target cells only. A result on CIFAR/NATS-Bench, Visual Wake Words, Melanoma, keyword spotting, nRF5340 or STM32H753ZI must not be transferred to a different cell without a new run.
+- Match total resource budgets, not just candidate counts. Charge training, failed training, quantization, calibration, compilation, failed builds, flash attempts, readback, physical acquisition, retries and independent verification.
+- Use paired search seeds and identical candidate/resource budgets. Use at least five independent search seeds when matching a five-run published protocol; select physical board/temperature/voltage replicate counts from a preregistered variance/power analysis rather than post-hoc convenience.
+- Randomize candidate execution order on hardware, preserve reset/warm-up policy, and record board ID, silicon/board revision, clock state, voltage, temperature, instrument identity and calibration status for every replicate.
+- Keep all resource and quality metrics disaggregated. Report accuracy, latency distribution (p50/p95/p99), energy/inference, ROM/flash, static RAM, tensor arena, stack, heap, compile/build time, readback yield, measurement yield, provenance coverage and total resource vector separately.
+- Report the complete candidate funnel: proposed, structurally rejected, statistically screened, trained, compiled, built, flashed, readback-verified, measured and independently reproduced. Every rejected/failed/not-attempted outcome remains visible.
+- Compare the searcher to the exhaustive NATS-Bench-MCU oracle only on the same target, dataset and objective definitions. Use frozen normalization and report worst-target Pareto regret and hypervolume separately from scalar accuracy gap.
+- For cost superiority, preregister the estimand as total resource cost per fully verified artifact (and time-to-first K verified artifacts). Use paired uncertainty intervals over seeds and target/board strata; do not declare a 2× improvement from point estimates alone.
+- A zero-accepted count on a finite negative-control suite is a finite test result, not proof that the population false-acceptance probability is mathematically zero. Report the control count and a confidence bound alongside it.
+
+### Competitive thesis
+
+The defensible lead is not "we searched more architectures" or "our proxy predicts latency better." It is:
+
+1. At the same task quality and physical target constraints, find a non-dominated set with lower worst-target regret.
+2. Spend less total resource to produce each artifact that passes exact build, authenticated provenance, physical readback and measurement checks.
+3. Preserve or improve the success rate under board/environment variation.
+4. Release enough immutable evidence for an independent party to reproduce the build, deployment status, objective score and Pareto comparison.
+
+The aspirational comparison target remains at least 2× lower cost per fully verified deployment and at least 10% lower worst-target Pareto regret at matched resource budgets. These are hypotheses to test, not results.
+
 ## Benchmark and reporting plan
 
 ### Phase A — fixture-level verification
