@@ -38,7 +38,7 @@ This v0.1 controller does **not** implement online dual-price adaptation, learne
 From the repository root:
 
 ```sh
-cargo test --manifest-path research/temporal-joint-control/Cargo.toml --locked
+cargo test --manifest-path research/temporal-joint-control/Cargo.toml
 ```
 
-The package intentionally has no third-party dependencies. A successful test run is still required before any test is described as passing.
+The package intentionally has no third-party dependencies. This research workspace does not yet contain a committed Cargo.lock; before confirmatory use, generate and commit the lockfile, then run with --locked. A successful test run is still required before any test is described as passing.
