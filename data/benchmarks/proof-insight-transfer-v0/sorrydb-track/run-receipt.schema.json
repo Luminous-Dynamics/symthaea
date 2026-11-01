@@ -13,7 +13,8 @@
     "arm",
     "run",
     "environment",
-    "attempts"
+    "attempts",
+    "task_integrity"
   ],
   "properties": {
     "schema_version": {
@@ -472,6 +473,87 @@
           }
         ]
       }
+    },
+    "task_integrity": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receipt_sha256",
+            "task_id_sha256",
+            "integrity_status"
+          ],
+          "properties": {
+            "receipt_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "task_id_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "integrity_status": {
+              "const": "eligible"
+            }
+          }
+        }
+      ]
     }
-  }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "measured_run"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "task_integrity"
+        ],
+        "properties": {
+          "task_integrity": {
+            "type": "object",
+            "required": [
+              "receipt_sha256",
+              "task_id_sha256",
+              "integrity_status"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "synthetic_contract_fixture"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task_integrity": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
 }
