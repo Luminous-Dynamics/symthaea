@@ -259,7 +259,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import json
+          import json, math
           from pathlib import Path
           path = Path("target/pyphi-reference/PYPHI_IIT4_2023_LANDSCAPE.json")
           data = json.loads(path.read_text(encoding="utf-8"))
