@@ -22,12 +22,12 @@ These are reference practices, not claims that BASALT currently matches their te
 
 ## Protocol objects
 
-The first artifact pair is:
+The first artifact set is:
 
 - `benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json`
 - `benchmarks/basalt/storage-conformance-trace.v1.json`
 
-The fixture is intentionally small and deterministic. It is a reference input, not an observed backend run. Its result fields describe the expected semantic outcome of the reference trace; they must not be presented as engine measurements. The explicit `fixture_digest_catalog` gives each symbolic digest token's SHA-256 preimage so equality and witness-chain examples are reproducible.
+The fixture is intentionally small and deterministic. It is a reference input, not an observed backend run. Each operation's `expected_result` describes the reference semantic outcome; it must not be presented as a backend observation or engine measurement. A future adapter emits a separate observation/event-log artifact that the verifier checks against this reference. The explicit `fixture_digest_catalog` gives each symbolic digest token's SHA-256 preimage so equality and witness-chain examples are reproducible.
 
 ### Trace structure
 
@@ -36,7 +36,7 @@ A trace binds:
 1. **Suite and generator identity:** schema version, trace ID, deterministic seed, monotonic-clock basis and clock-ordering rule.
 2. **Authority identity:** stable authority ID and incarnation ID.
 3. **Initial state:** authority revision, canonical state digest, active policy digest, source cursors and log-origin cursors.
-4. **Operations:** runner ID, client ID and program order; source/log scope; invocation and completion times; complete compare conditions; receipt identity; typed outcome; immutable receipt acceptance revision; current authority revision.
+4. **Operations:** runner ID, client ID and program order; source/log scope; invocation and completion times; complete compare conditions; receipt identity; an explicit `expected_result` for the reference fixture; immutable receipt acceptance revision; current authority revision.
 5. **Fault schedule:** typed fault, target operation, deterministic injection point and action.
 6. **Witness observations:** witness identity and sequence, authority/incarnation, authority revision, state digest, predecessor witness digest and signed-record digest.
 7. **Final observation:** complete cursor state, accepted receipt set, policy digest, current authority revision and canonical state digest.
@@ -203,3 +203,8 @@ The first target is not a specific p99. It is zero safety violations plus reprod
 ## Implementation status and non-claims
 
 This PR adds a versioned trace schema, one deterministic reference fixture and this protocol. It does **not** add the Rust trace runner, pure reference reducer, SQLx/SQLite/Turso/etcd adapters, Jepsen integration, simulation engine, physical failure tests, or verifier. It does not qualify any storage engine. Those remain follow-on implementation work tracked under #9764 and #9792.
+
+
+## Expected versus observed evidence
+
+The v1 reference fixture's per-operation field is named `expected_result`. It is authored reference-model data, not a backend measurement. A live backend runner must write a separate immutable observation log with actual invocation/completion, returned outcome, fault events, store observations and final state. Never replace an expected result with the backend's self-reported result inside the reference fixture. The Rust verifier in #9800 must consume the reference fixture and the separate observed artifact, then produce its own status.
