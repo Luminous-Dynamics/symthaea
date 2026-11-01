@@ -174,7 +174,7 @@ fn resource_values(value: &Value, prefix: &str) -> Result<Vec<u64>> {
 fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
     let status = string(value, "/status")?;
     let checker = bool_value(value, "/checker_passed")?;
-    let semantic = bool_value(value, "/semantic_gate_passed")?;
+    let semantic = bool_value(value, "/target_integrity_passed")?;
     let successor = string(value, "/successor_gate_status")?;
     let checked_statement = match field(value, "/checked_target_statement_sha256")? {
         Value::Null => None,
@@ -184,7 +184,7 @@ fn outcome_success(value: &Value, target_statement: &str) -> Result<bool> {
 
     let proof = optional_digest(value, "/proof_sha256")?;
     let checker_receipt = optional_digest(value, "/checker_receipt_sha256")?;
-    let semantic_receipt = optional_digest(value, "/semantic_gate_receipt_sha256")?;
+    let semantic_receipt = optional_digest(value, "/target_integrity_receipt_sha256")?;
     let successor_receipt = optional_digest(value, "/successor_gate_receipt_sha256")?;
 
     if !matches!(
@@ -393,7 +393,7 @@ fn validate_and_analyze(
         let receipt_specs = [
             ("/proof_path", "/proof_sha256", "proof artifact", status == "verified_success"),
             ("/checker_receipt_path", "/checker_receipt_sha256", "checker receipt", status == "verified_success"),
-            ("/semantic_gate_receipt_path", "/semantic_gate_receipt_sha256", "semantic gate receipt", status == "verified_success"),
+            ("/target_integrity_receipt_path", "/target_integrity_receipt_sha256", "semantic gate receipt", status == "verified_success"),
             (
                 "/successor_gate_receipt_path",
                 "/successor_gate_receipt_sha256",
@@ -506,11 +506,11 @@ fn validate_and_analyze(
 
         if status == "verified_success" && evidence_class == "measured_outcome" {
             let root = evidence_root.context("measured semantic receipt requires evidence root")?;
-            let semantic_path = match field(outcome, "/semantic_gate_receipt_path")? {
+            let semantic_path = match field(outcome, "/target_integrity_receipt_path")? {
                 Value::String(value) => value,
                 _ => bail!("verified success requires a semantic gate integrity receipt path"),
             };
-            let semantic_digest = string(outcome, "/semantic_gate_receipt_sha256")?;
+            let semantic_digest = string(outcome, "/target_integrity_receipt_sha256")?;
             let resolved_semantic_path = safe_artifact_path(root, semantic_path)?;
             let registry_path = reviewer_registry_path
                 .context("measured semantic receipt requires reviewer-key registry")?;
@@ -847,17 +847,17 @@ fn synthesize_outcomes(plan: &Value) -> Result<Vec<Value>> {
                 "execution_order_index":position,
                 "status":status,
                 "checker_passed":success,
-                "semantic_gate_passed":success,
+                "target_integrity_passed":success,
                 "successor_gate_status":if success {"passed"} else if not_attempted {"not_run"} else {"failed"},
                 "checked_target_statement_sha256":if success {Some(pair["target_statement_sha256"].clone())} else {None::<Value>},
                 "proof_sha256":proof,
                 "checker_receipt_sha256":checker,
-                "semantic_gate_receipt_sha256":semantic,
+                "target_integrity_receipt_sha256":semantic,
                 "successor_gate_receipt_sha256":successor,
                 "run_receipt_sha256":"8".repeat(64),
                 "proof_path":null,
                 "checker_receipt_path":null,
-                "semantic_gate_receipt_path":null,
+                "target_integrity_receipt_path":null,
                 "successor_gate_receipt_path":null,
                 "run_receipt_path":null,
                 "actual_resources":resources
@@ -914,7 +914,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
         .iter()
         .position(|row| row["status"] == "verified_success")
         .context("synthetic fixture has no success row")?;
-    false_success[successful_index]["semantic_gate_receipt_sha256"] = Value::Null;
+    false_success[successful_index]["target_integrity_receipt_sha256"] = Value::Null;
     must_reject_outcomes("verified-success claim without semantic receipt", &plan, &false_success)?;
 
     let mut order_drift = outcomes.clone();
