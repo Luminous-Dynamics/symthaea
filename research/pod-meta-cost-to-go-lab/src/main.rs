@@ -1,18 +1,19 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt,
-    CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState,
-    EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt,
-    FrontierCostCoefficients, HistoricalCostBaseline, JointCostEnvelope, LandmarkEpisode,
-    LandmarkIpcwConfig, LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal,
+    ActionTrajectory, BudgetLedger, CapCalibrationPoint, CapCurrentPrediction,
+    CensoringWeightReceipt, CompletedCalibrationExample, DecisionDrivenCapConfig,
+    DecisionDrivenCapState, EffectDisposition, ForecastId, ForecastJournal,
+    ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients, HistoricalCostBaseline,
+    JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
+    LastObservedActionForecaster, LinearProofFrontierCostModel, OnlineCompetingTerminal,
     OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
-    LastObservedActionForecaster, OnlinePredictionStatement, OnlineSelectionLedger,
-    PrefixBudgetReceipt, PrefixReplayEngine, PrefixReplayEvaluator, ProofFrontierFeatures,
-    ReconciliationOutcome, RemainingCostForecast, ReservationId, ResourceVector,
-    TrajectoryActionKind, TrajectoryActionReceipt, TrajectoryTerminalRecord, ActionTrajectory, SelectedProofCalibrationExample, SelectedProofEnvelope,
+    OnlinePredictionStatement, OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEngine,
+    PrefixReplayEvaluator, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
+    ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
     SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
-    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
+    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, TrajectoryActionKind,
+    TrajectoryActionReceipt, TrajectoryTerminalRecord, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
-};
+}
 
 fn online_statement(id: u64, episode: u64, decision: u64, tick: u64) -> OnlinePredictionStatement {
     OnlinePredictionStatement {
@@ -1306,11 +1307,8 @@ fn main() {
         historical_report.report.by_task_family.len()
     );
     let trajectory = action_trajectory(Some(TerminalOutcome::SufficientProof));
-    let trajectory_forecaster = LastObservedActionForecaster::new(
-        [70; 32],
-        ResourceVector::new(2, 1, 1, 0, 1, 1),
-    )
-    .unwrap();
+    let trajectory_forecaster =
+        LastObservedActionForecaster::new([70; 32], ResourceVector::new(2, 1, 1, 0, 1, 1)).unwrap();
     let trajectory_replay =
         PrefixReplayEngine::replay(&trajectory, &trajectory_forecaster).unwrap();
     let verified_cost = match trajectory_replay.rows[0].label {
@@ -1335,23 +1333,18 @@ fn main() {
         trajectory.outcome_label(1).unwrap() != suffix_mutation.outcome_label(1).unwrap();
     println!(
         "TRAJECTORY_REPLAY_ROW\tsuffix-leakage-negative-control\t{}\t{}\t{}",
-        prefix_unchanged,
-        forecast_unchanged,
-        suffix_label_changed
+        prefix_unchanged, forecast_unchanged, suffix_label_changed
     );
 
-    let censored_trajectory =
-        action_trajectory(Some(TerminalOutcome::RightCensored(
-            pod_meta_cost_to_go_lab::CensorReason::Timeout,
-        )));
+    let censored_trajectory = action_trajectory(Some(TerminalOutcome::RightCensored(
+        pod_meta_cost_to_go_lab::CensorReason::Timeout,
+    )));
     let terminal_prefix_unchanged =
         trajectory.prefix_view(0).unwrap() == censored_trajectory.prefix_view(0).unwrap();
     let terminal_label_changed =
         trajectory.outcome_label(0).unwrap() != censored_trajectory.outcome_label(0).unwrap();
     println!(
         "TRAJECTORY_REPLAY_ROW\tterminal-label-isolation\t{}\t{}",
-        terminal_prefix_unchanged,
-        terminal_label_changed
+        terminal_prefix_unchanged, terminal_label_changed
     );
-
 }
