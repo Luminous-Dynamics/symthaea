@@ -4754,8 +4754,10 @@ impl DelayedHorizonEvaluator {
         }
         self.elapsed_seconds += dt as f64;
 
-        let mut scored = 0usize;
+        let target_observation_blake3 = visual_hv_blake3(actual);
+        let target_frame_sequence = manifold.frame_count;
         let now = self.elapsed_seconds;
+        let mut scored = 0usize;
         let mut still_pending = Vec::with_capacity(self.pending.len());
         for forecast in self.pending.drain(..) {
             if forecast.due_time > now {
@@ -4763,27 +4765,82 @@ impl DelayedHorizonEvaluator {
                 continue;
             }
             let lateness = now - forecast.due_time;
+            let max_lateness_factor_used = self.max_lateness_factor;
             let max_lateness =
-                self.horizons[forecast.horizon_index] as f64 * self.max_lateness_factor as f64;
-            let accumulator = &mut self.accumulators[forecast.horizon_index];
+                self.horizons[forecast.horizon_index] as f64 * max_lateness_factor_used as f64;
             if lateness > max_lateness {
-                accumulator.expired_forecasts = accumulator.expired_forecasts.saturating_add(1);
+                self.accumulators[forecast.horizon_index].expired_forecasts = self.accumulators
+                    [forecast.horizon_index]
+                    .expired_forecasts
+                    .saturating_add(1);
+                self.push_score_receipt(HorizonForecastReceiptState {
+                    forecast_id: forecast.forecast_id,
+                    horizon_index: forecast.horizon_index,
+                    source_frame_sequence: forecast.source_frame_sequence,
+                    target_frame_sequence,
+                    issued_at_seconds: forecast.issued_at_seconds,
+                    due_at_seconds: forecast.due_time,
+                    observed_at_seconds: now,
+                    requested_horizon_seconds: self.horizons[forecast.horizon_index],
+                    max_lateness_factor_used,
+                    lateness_seconds: lateness,
+                    status: HorizonForecastReceiptStatus::Expired,
+                    source_observation_blake3: forecast.source_observation_blake3,
+                    source_belief_blake3: forecast.source_belief_blake3,
+                    predictor_parameter_blake3: forecast.predictor_parameter_blake3,
+                    prediction_blake3: forecast.prediction_blake3,
+                    persistence_blake3: forecast.persistence_blake3,
+                    target_observation_blake3: target_observation_blake3.clone(),
+                    prediction_error: None,
+                    persistence_error: None,
+                });
                 continue;
             }
-            let prediction_error = 1.0 - actual.similarity(&forecast.predicted).clamp(-1.0, 1.0);
-            let persistence_error = 1.0 - actual.similarity(&forecast.persistence).clamp(-1.0, 1.0);
-            let prediction_error = prediction_error as f64;
-            let persistence_error = persistence_error as f64;
-            accumulator.prediction_error_sum += prediction_error;
-            accumulator.prediction_error_sq_sum += prediction_error * prediction_error;
-            accumulator.persistence_error_sum += persistence_error;
-            accumulator.persistence_error_sq_sum += persistence_error * persistence_error;
-            accumulator.lateness_sum += lateness;
-            accumulator.samples += 1;
+
+            let prediction_error =
+                1.0 - actual.similarity(&forecast.predicted).clamp(-1.0, 1.0);
+            let persistence_error =
+                1.0 - actual.similarity(&forecast.persistence).clamp(-1.0, 1.0);
+            {
+                let accumulator = &mut self.accumulators[forecast.horizon_index];
+                let prediction_error = prediction_error as f64;
+                let persistence_error = persistence_error as f64;
+                accumulator.prediction_error_sum += prediction_error;
+                accumulator.prediction_error_sq_sum += prediction_error * prediction_error;
+                accumulator.persistence_error_sum += persistence_error;
+                accumulator.persistence_error_sq_sum += persistence_error * persistence_error;
+                accumulator.lateness_sum += lateness;
+                accumulator.samples += 1;
+            }
+            self.push_score_receipt(HorizonForecastReceiptState {
+                forecast_id: forecast.forecast_id,
+                horizon_index: forecast.horizon_index,
+                source_frame_sequence: forecast.source_frame_sequence,
+                target_frame_sequence,
+                issued_at_seconds: forecast.issued_at_seconds,
+                due_at_seconds: forecast.due_time,
+                observed_at_seconds: now,
+                requested_horizon_seconds: self.horizons[forecast.horizon_index],
+                max_lateness_factor_used: self.max_lateness_factor,
+                lateness_seconds: lateness,
+                status: HorizonForecastReceiptStatus::Scored,
+                source_observation_blake3: forecast.source_observation_blake3,
+                source_belief_blake3: forecast.source_belief_blake3,
+                predictor_parameter_blake3: forecast.predictor_parameter_blake3,
+                prediction_blake3: forecast.prediction_blake3,
+                persistence_blake3: forecast.persistence_blake3,
+                target_observation_blake3: target_observation_blake3.clone(),
+                prediction_error: Some(prediction_error),
+                persistence_error: Some(persistence_error),
+            });
             scored += 1;
         }
         self.pending = still_pending;
 
+        let source_frame_sequence = Some(manifold.frame_count);
+        let source_observation_blake3 = Some(target_observation_blake3);
+        let source_belief_blake3 = Some(visual_hv_blake3(&manifold.state));
+        let predictor_parameter_blake3 = Some(transition_parameter_blake3(manifold));
         for (horizon_index, &horizon) in self.horizons.iter().enumerate() {
             let queued = self
                 .pending
@@ -4794,14 +4851,47 @@ impl DelayedHorizonEvaluator {
                 self.accumulators[horizon_index].dropped_forecasts += 1;
                 continue;
             }
+            let forecast_id = self.next_forecast_id;
+            self.next_forecast_id = self
+                .next_forecast_id
+                .checked_add(1)
+                .ok_or_else(|| "delayed-horizon forecast ID space exhausted".to_string())?;
+            let predicted = manifold.predict_horizon(actual, horizon);
+            let persistence = actual.clone();
             self.pending.push(PendingHorizonForecast {
+                forecast_id,
                 horizon_index,
+                source_frame_sequence,
+                issued_at_seconds: now,
                 due_time: now + horizon as f64,
-                predicted: manifold.predict_horizon(actual, horizon),
-                persistence: actual.clone(),
+                source_observation_blake3: source_observation_blake3.clone(),
+                source_belief_blake3: source_belief_blake3.clone(),
+                predictor_parameter_blake3: predictor_parameter_blake3.clone(),
+                prediction_blake3: visual_hv_blake3(&predicted),
+                persistence_blake3: visual_hv_blake3(&persistence),
+                predicted,
+                persistence,
             });
         }
         Ok(scored)
+    }
+
+    /// Return the retained immutable forecast scoring and expiry receipts.
+    pub fn score_receipts(&self) -> &[HorizonForecastReceiptState] {
+        &self.score_receipts
+    }
+
+    /// Number of oldest receipts evicted by the bounded evidence ledger.
+    pub fn evicted_score_receipts(&self) -> u64 {
+        self.evicted_score_receipts
+    }
+
+    fn push_score_receipt(&mut self, receipt: HorizonForecastReceiptState) {
+        if self.score_receipts.len() >= self.max_score_receipts {
+            self.score_receipts.remove(0);
+            self.evicted_score_receipts = self.evicted_score_receipts.saturating_add(1);
+        }
+        self.score_receipts.push(receipt);
     }
 
     /// Aggregate delayed prediction skill collected so far.
