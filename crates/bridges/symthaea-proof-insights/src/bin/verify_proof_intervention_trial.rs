@@ -50,7 +50,9 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let mut bad = value.clone();
     bad["pairs"][0]["execution_order"].as_array_mut()
         .context("execution order array")?
-        .pop();
+        let _ = bad["pairs"][0]["execution_order"].as_array_mut()
+            .context("execution order array")?
+            .pop();
     must_reject("missing arm from paired execution", bad)?;
 
     let mut bad = value.clone();
