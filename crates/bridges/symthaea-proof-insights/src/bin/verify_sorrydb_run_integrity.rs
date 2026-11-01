@@ -252,7 +252,7 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
         .with_context(|| format!("create evidence root {}", evidence_root.display()))?;
 
     run["task_integrity"] = Value::Null;
-    if verify_pair(&run_bytes, &integrity_bytes).is_ok() {
+    if verify_pair(&run_bytes, &integrity_bytes, &evidence_root).is_ok() {
         bail!("unbound synthetic receipts unexpectedly passed as a measured run");
     }
     println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: no-run fixture is not an eligible measured task");
@@ -264,6 +264,8 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
         None,
         &evidence_root,
     )?;
+    run["environment"]["lake_manifest_sha256"] =
+        eligible["environment"]["lake_manifest_sha256"].clone();
     if integrity_summary.integrity_status != "eligible" {
         bail!("synthetic eligible integrity fixture did not derive eligible status");
     }
