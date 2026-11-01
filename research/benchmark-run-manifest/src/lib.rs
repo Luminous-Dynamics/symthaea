@@ -760,6 +760,7 @@ fn hash_latency(hasher: &mut Sha256, latency: &LatencyMeasurement) -> Result<(),
         }
     }
     hasher.update(latency.deadline_misses.to_le_bytes());
+    hasher.update(latency.peak_memory_bytes.to_le_bytes());
     Ok(())
 }
 
@@ -969,6 +970,14 @@ mod tests {
         assert_eq!(invalid.validate(), Err(ManifestError::InvalidResourceBoundary));
         invalid.stages = vec![PipelineStage::ModelInference];
         assert_eq!(invalid.validate(), Ok(()));
+    }
+
+    #[test]
+    fn inference_peak_memory_changes_manifest_digest() {
+        let mut manifest = valid_manifest();
+        let first = manifest.canonical_sha256().unwrap();
+        manifest.latency.peak_memory_bytes += 1;
+        assert_ne!(first, manifest.canonical_sha256().unwrap());
     }
 
     #[test]
