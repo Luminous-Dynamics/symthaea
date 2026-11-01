@@ -2,7 +2,7 @@
 
 **Package:** `symthaea-temporal-adaptation`  
 **Tracking:** NEURO-SILICON-010 / #9872  
-**Status:** research implementation; ten Rust test functions authored, not executed.
+**Status:** research implementation; twelve Rust test functions authored, not executed.
 
 ## Resource shadow prices
 
@@ -18,7 +18,7 @@ Zero budget is explicit: zero usage produces zero utilization; positive usage sa
 
 ## Persistence
 
-`snapshot()` exports the complete bounded state. `restore()` validates persisted prices and smoothed utilization against the active configuration before use. A production caller must bind snapshots to the evaluator's signed receipt/checkpoint stream; this crate does not sign or authenticate snapshots.
+`snapshot()` exports the complete bounded state and the exact active configuration. `restore()` rejects configuration changes and validates persisted prices/smoothed utilization against configured bounds before use. A configuration change requires an explicit migration, not silent continuation. A production caller must bind snapshots to the evaluator's signed receipt/checkpoint stream; this crate does not sign or authenticate snapshots.
 
 ## Limits
 
