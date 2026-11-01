@@ -12,7 +12,7 @@
 //!       --manifest evaluator-manifest.json --truth evaluator-truth.json \
 //!       --receipt receipt.json
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -80,29 +80,41 @@ fn sha256(bytes: &[u8]) -> String {
 
 fn nonempty_id(value: &str, context: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.chars().any(char::is_control) {
-        return Err(format!("{context} must be non-empty and contain no control characters"));
+        return Err(format!(
+            "{context} must be non-empty and contain no control characters"
+        ));
     }
     Ok(())
 }
 
 fn str_field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
-    let result = value.get(key).and_then(Value::as_str)
+    let result = value
+        .get(key)
+        .and_then(Value::as_str)
         .ok_or_else(|| format!("{context}.{key} must be a string"))?;
     nonempty_id(result, &format!("{context}.{key}"))?;
     Ok(result)
 }
 
 fn optional_u64(value: &Value, key: &str, context: &str) -> Result<Option<u64>, String> {
-    let field = value.get(key).ok_or_else(|| format!("{context}.{key} is required"))?;
+    let field = value
+        .get(key)
+        .ok_or_else(|| format!("{context}.{key} is required"))?;
     if field.is_null() {
         return Ok(None);
     }
-    field.as_u64().map(Some)
+    field
+        .as_u64()
+        .map(Some)
         .ok_or_else(|| format!("{context}.{key} must be a non-negative integer or null"))
 }
 
 fn validate_sha(value: &str, context: &str) -> Result<(), String> {
-    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
         return Err(format!("{context} must be a lowercase SHA-256 digest"));
     }
     Ok(())
@@ -121,7 +133,9 @@ fn parse_predictions(value: &Value) -> Result<(String, String, String, Vec<Predi
     let model_id = str_field(value, "model_id", "predictions")?.to_owned();
     digest_field(value, "model_sha256", "predictions")?;
     digest_field(value, "threshold_profile_sha256", "predictions")?;
-    let values = value.get("cases").and_then(Value::as_array)
+    let values = value
+        .get("cases")
+        .and_then(Value::as_array)
         .ok_or_else(|| "predictions.cases must be an array".to_owned())?;
     if values.is_empty() {
         return Err("predictions.cases must not be empty".to_owned());
@@ -135,20 +149,29 @@ fn parse_predictions(value: &Value) -> Result<(String, String, String, Vec<Predi
             return Err(format!("duplicate prediction case_id {case_id}"));
         }
         let response = str_field(item, "response", &ctx)?.to_owned();
-        if !matches!(response.as_str(), "alert" | "clear" | "abstain" | "sensor_invalid") {
+        if !matches!(
+            response.as_str(),
+            "alert" | "clear" | "abstain" | "sensor_invalid"
+        ) {
             return Err(format!("{ctx}.response has unsupported value {response}"));
         }
-        let score_value = item.get("score").ok_or_else(|| format!("{ctx}.score is required"))?;
+        let score_value = item
+            .get("score")
+            .ok_or_else(|| format!("{ctx}.score is required"))?;
         let score = if score_value.is_null() {
             None
         } else {
-            let score = score_value.as_f64().ok_or_else(|| format!("{ctx}.score must be a number or null"))?;
+            let score = score_value
+                .as_f64()
+                .ok_or_else(|| format!("{ctx}.score must be a number or null"))?;
             if !(0.0..=1.0).contains(&score) || !score.is_finite() {
                 return Err(format!("{ctx}.score must be finite and within [0, 1]"));
             }
             Some(score)
         };
-        let cost = item.get("cost").ok_or_else(|| format!("{ctx}.cost is required"))?;
+        let cost = item
+            .get("cost")
+            .ok_or_else(|| format!("{ctx}.cost is required"))?;
         output.push(Prediction {
             case_id,
             response,
@@ -180,16 +203,29 @@ fn parse_manifest(value: &Value) -> Result<(String, String, Vec<String>, Vec<Cas
     }
     let campaign_id = str_field(value, "campaign_id", "manifest")?.to_owned();
     let domain = str_field(value, "evidence_domain", "manifest")?.to_owned();
-    if !matches!(domain.as_str(), "synthetic_fixture" | "simulator" | "physical_hardware") {
+    if !matches!(
+        domain.as_str(),
+        "synthetic_fixture" | "simulator" | "physical_hardware"
+    ) {
         return Err(format!("unsupported evidence_domain {domain}"));
     }
     let platform_id = str_field(value, "platform_id", "manifest")?.to_owned();
-    let axes_values = value.get("holdout_axes").and_then(Value::as_array)
+    let axes_values = value
+        .get("holdout_axes")
+        .and_then(Value::as_array)
         .ok_or_else(|| "manifest.holdout_axes must be an array".to_owned())?;
-    let allowed_axes = ["program", "execution", "device_config", "attack_family", "adaptation_family"];
+    let allowed_axes = [
+        "program",
+        "execution",
+        "device_config",
+        "attack_family",
+        "adaptation_family",
+    ];
     let mut axes = BTreeSet::new();
     for item in axes_values {
-        let axis = item.as_str().ok_or("manifest.holdout_axes entries must be strings")?;
+        let axis = item
+            .as_str()
+            .ok_or("manifest.holdout_axes entries must be strings")?;
         if !allowed_axes.contains(&axis) {
             return Err(format!("unsupported holdout axis {axis}"));
         }
@@ -202,7 +238,9 @@ fn parse_manifest(value: &Value) -> Result<(String, String, Vec<String>, Vec<Cas
             return Err(format!("manifest.holdout_axes must include {required}"));
         }
     }
-    let values = value.get("cases").and_then(Value::as_array)
+    let values = value
+        .get("cases")
+        .and_then(Value::as_array)
         .ok_or_else(|| "manifest.cases must be an array".to_owned())?;
     let mut seen = BTreeSet::new();
     let mut output = Vec::with_capacity(values.len());
@@ -217,10 +255,15 @@ fn parse_manifest(value: &Value) -> Result<(String, String, Vec<String>, Vec<Cas
             return Err(format!("{ctx}.split must be train, validation or test"));
         }
         let sensor_state = str_field(item, "sensor_state", &ctx)?.to_owned();
-        if !matches!(sensor_state.as_str(), "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted") {
+        if !matches!(
+            sensor_state.as_str(),
+            "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted"
+        ) {
             return Err(format!("{ctx}.sensor_state is unsupported"));
         }
-        let adaptation_level = item.get("adaptation_level").and_then(Value::as_u64)
+        let adaptation_level = item
+            .get("adaptation_level")
+            .and_then(Value::as_u64)
             .ok_or_else(|| format!("{ctx}.adaptation_level must be a non-negative integer"))?;
         let meta = CaseMeta {
             case_id,
@@ -234,8 +277,11 @@ fn parse_manifest(value: &Value) -> Result<(String, String, Vec<String>, Vec<Cas
             sensor_state,
         };
         if (meta.adaptation_family_id == "none" && meta.adaptation_level != 0)
-            || (meta.adaptation_family_id != "none" && meta.adaptation_level == 0) {
-            return Err(format!("{ctx}: adaptation_family_id=none requires level 0; a named adaptation family requires a positive level"));
+            || (meta.adaptation_family_id != "none" && meta.adaptation_level == 0)
+        {
+            return Err(format!(
+                "{ctx}: adaptation_family_id=none requires level 0; a named adaptation family requires a positive level"
+            ));
         }
         output.push(meta);
     }
@@ -252,7 +298,9 @@ fn parse_truth(value: &Value) -> Result<(String, BTreeMap<String, Truth>), Strin
         return Err("unsupported truth schema_version".to_owned());
     }
     let campaign_id = str_field(value, "campaign_id", "truth")?.to_owned();
-    let values = value.get("cases").and_then(Value::as_array)
+    let values = value
+        .get("cases")
+        .and_then(Value::as_array)
         .ok_or_else(|| "truth.cases must be an array".to_owned())?;
     let mut output = BTreeMap::new();
     for (index, item) in values.iter().enumerate() {
@@ -264,14 +312,22 @@ fn parse_truth(value: &Value) -> Result<(String, BTreeMap<String, Truth>), Strin
         if !matches!(class.as_str(), "malicious" | "benign") {
             return Err(format!("{ctx}.class must be malicious or benign"));
         }
-        if !matches!(effect.as_str(), "observed" | "not_observed" | "unknown" | "not_applicable") {
+        if !matches!(
+            effect.as_str(),
+            "observed" | "not_observed" | "unknown" | "not_applicable"
+        ) {
             return Err(format!("{ctx}.attack_effect is unsupported"));
         }
         if (class == "benign" && effect != "not_applicable")
-            || (class == "malicious" && effect == "not_applicable") {
+            || (class == "malicious" && effect == "not_applicable")
+        {
             return Err(format!("{ctx}: class and attack_effect semantics conflict"));
         }
-        let truth = Truth { case_id: case_id.clone(), class, effect };
+        let truth = Truth {
+            case_id: case_id.clone(),
+            class,
+            effect,
+        };
         if output.insert(case_id.clone(), truth).is_some() {
             return Err(format!("duplicate truth case_id {case_id}"));
         }
@@ -338,7 +394,10 @@ fn hoeffding_mean_interval(
             "upper": null
         });
     }
-    if values.iter().any(|value| !value.is_finite() || *value < lower_bound || *value > upper_bound) {
+    if values
+        .iter()
+        .any(|value| !value.is_finite() || *value < lower_bound || *value > upper_bound)
+    {
         return json!({
             "method": "two_sided_hoeffding_bounded_group_mean_v1",
             "status": "unavailable_values_outside_declared_bounds",
@@ -349,8 +408,7 @@ fn hoeffding_mean_interval(
     }
     let count = values.len();
     let point = values.iter().sum::<f64>() / count as f64;
-    let epsilon = (upper_bound - lower_bound)
-        * ((2.0 / alpha).ln() / (2.0 * count as f64)).sqrt();
+    let epsilon = (upper_bound - lower_bound) * ((2.0 / alpha).ln() / (2.0 * count as f64)).sqrt();
     json!({
         "method": "two_sided_hoeffding_bounded_group_mean_v1",
         "status": "available_finite_sample_bound",
@@ -384,7 +442,10 @@ fn group_bootstrap_interval(
     };
     let seed_material = format!("{campaign_id}|{axis}|hardsec-group-bootstrap-v1");
     let seed_digest = Sha256::digest(seed_material.as_bytes());
-    let seed_sha256 = seed_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let seed_sha256 = seed_digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     let hoeffding = hoeffding_mean_interval(
         &values,
         0.0,
@@ -468,9 +529,8 @@ fn binomial_lower_tail(k: usize, n: usize, probability: f64) -> f64 {
     for i in 1..=k {
         log_choose += ((n - k + i) as f64).ln() - (i as f64).ln();
     }
-    let log_mass = log_choose
-        + (k as f64) * probability.ln()
-        + ((n - k) as f64) * (-probability).ln_1p();
+    let log_mass =
+        log_choose + (k as f64) * probability.ln() + ((n - k) as f64) * (-probability).ln_1p();
     let mut term = log_mass.exp();
     let mut total = term;
     for i in (1..=k).rev() {
@@ -514,11 +574,14 @@ fn group_failure_bound(
     failure_semantics: &str,
 ) -> Value {
     let group_count = groups.len();
-    let failures = groups.values().filter(|stats| match failure_semantics {
-        "any_attack_miss" => stats.cleared + stats.abstained > 0,
-        "any_benign_false_alert" => stats.detected > 0,
-        _ => unreachable!("group failure semantics fixed by caller"),
-    }).count();
+    let failures = groups
+        .values()
+        .filter(|stats| match failure_semantics {
+            "any_attack_miss" => stats.cleared + stats.abstained > 0,
+            "any_benign_false_alert" => stats.detected > 0,
+            _ => unreachable!("group failure semantics fixed by caller"),
+        })
+        .count();
     let familywise_alpha = 0.05f64;
     let adjusted_alpha = familywise_alpha / 6.0;
     let upper_bound = clopper_pearson_upper(failures, group_count, adjusted_alpha);
@@ -547,7 +610,8 @@ fn group_metric_map(
     metric_key: &str,
     context: &str,
 ) -> Result<BTreeMap<String, f64>, String> {
-    let rows = receipt.get("generalization")
+    let rows = receipt
+        .get("generalization")
         .and_then(|value| value.get(section))
         .and_then(Value::as_array)
         .ok_or_else(|| format!("{context} group rows are unavailable"))?;
@@ -555,10 +619,14 @@ fn group_metric_map(
     for (index, row) in rows.iter().enumerate() {
         let row_context = format!("{context}[{index}]");
         let group_id = str_field(row, group_id_key, &row_context)?.to_owned();
-        let metric = row.get(metric_key).and_then(Value::as_f64)
+        let metric = row
+            .get(metric_key)
+            .and_then(Value::as_f64)
             .ok_or_else(|| format!("{row_context}.{metric_key} must be numeric"))?;
         if !metric.is_finite() || !(0.0..=1.0).contains(&metric) {
-            return Err(format!("{row_context}.{metric_key} must be finite and within [0, 1]"));
+            return Err(format!(
+                "{row_context}.{metric_key} must be finite and within [0, 1]"
+            ));
         }
         if output.insert(group_id.clone(), metric).is_some() {
             return Err(format!("{context} contains duplicate group ID {group_id}"));
@@ -591,7 +659,8 @@ fn paired_group_metric_delta(
     let mut deltas = Vec::with_capacity(candidate.len());
     let mut by_group = Vec::with_capacity(candidate.len());
     for (group_id, candidate_value) in candidate {
-        let baseline_value = baseline.get(group_id)
+        let baseline_value = baseline
+            .get(group_id)
             .ok_or_else(|| format!("baseline missing paired {axis} group {group_id}"))?;
         let improvement = if higher_is_better {
             candidate_value - baseline_value
@@ -609,11 +678,12 @@ fn paired_group_metric_delta(
 
     let group_count = deltas.len();
     let point = deltas.iter().sum::<f64>() / group_count as f64;
-    let seed_material = format!(
-        "{campaign_id}|{axis}|{metric}|hardsec-paired-group-bootstrap-v1"
-    );
+    let seed_material = format!("{campaign_id}|{axis}|{metric}|hardsec-paired-group-bootstrap-v1");
     let seed_digest = Sha256::digest(seed_material.as_bytes());
-    let seed_sha256 = seed_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let seed_sha256 = seed_digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     let hoeffding = hoeffding_mean_interval(
         &deltas,
         -1.0,
@@ -685,9 +755,11 @@ fn paired_model_comparison(
     campaign_id: &str,
     baseline_predictions_sha256: &str,
 ) -> Result<Value, String> {
-    let candidate_campaign = candidate_receipt.get("campaign")
+    let candidate_campaign = candidate_receipt
+        .get("campaign")
         .ok_or("candidate receipt campaign section missing")?;
-    let baseline_campaign = baseline_receipt.get("campaign")
+    let baseline_campaign = baseline_receipt
+        .get("campaign")
         .ok_or("baseline receipt campaign section missing")?;
     if str_field(candidate_campaign, "campaign_id", "candidate.campaign")? != campaign_id
         || str_field(baseline_campaign, "campaign_id", "baseline.campaign")? != campaign_id
@@ -698,10 +770,19 @@ fn paired_model_comparison(
     let baseline_model = str_field(baseline_campaign, "model_id", "baseline.campaign")?;
     let candidate_domain = str_field(candidate_campaign, "evidence_domain", "candidate.campaign")?;
     let baseline_domain = str_field(baseline_campaign, "evidence_domain", "baseline.campaign")?;
-    let candidate_model_sha256 = str_field(candidate_campaign, "model_sha256", "candidate.campaign")?;
+    let candidate_model_sha256 =
+        str_field(candidate_campaign, "model_sha256", "candidate.campaign")?;
     let baseline_model_sha256 = str_field(baseline_campaign, "model_sha256", "baseline.campaign")?;
-    let candidate_threshold_sha256 = str_field(candidate_campaign, "threshold_profile_sha256", "candidate.campaign")?;
-    let baseline_threshold_sha256 = str_field(baseline_campaign, "threshold_profile_sha256", "baseline.campaign")?;
+    let candidate_threshold_sha256 = str_field(
+        candidate_campaign,
+        "threshold_profile_sha256",
+        "candidate.campaign",
+    )?;
+    let baseline_threshold_sha256 = str_field(
+        baseline_campaign,
+        "threshold_profile_sha256",
+        "baseline.campaign",
+    )?;
     if candidate_domain != baseline_domain {
         return Err("paired candidate/baseline evidence domains must match".to_owned());
     }
@@ -816,8 +897,10 @@ fn audit_values(
     manifest_bytes: &[u8],
     truth_bytes: &[u8],
 ) -> Result<Value, String> {
-    let (prediction_campaign, model_id, model_sha, prediction_rows) = parse_predictions(predictions)?;
-    let (manifest_campaign, evidence_domain, holdout_axes, manifest_rows) = parse_manifest(manifest)?;
+    let (prediction_campaign, model_id, model_sha, prediction_rows) =
+        parse_predictions(predictions)?;
+    let (manifest_campaign, evidence_domain, holdout_axes, manifest_rows) =
+        parse_manifest(manifest)?;
     let (truth_campaign, truth_rows) = parse_truth(truth_value)?;
     if prediction_campaign != manifest_campaign || prediction_campaign != truth_campaign {
         return Err("predictions, manifest and truth campaign_id values must match".to_owned());
@@ -831,13 +914,17 @@ fn audit_values(
     for row in prediction_rows {
         prediction_map.insert(row.case_id.clone(), row);
     }
-    let test_ids: BTreeSet<String> = metadata.values()
+    let test_ids: BTreeSet<String> = metadata
+        .values()
         .filter(|case| case.split == "test")
-        .map(|case| case.case_id.clone()).collect();
+        .map(|case| case.case_id.clone())
+        .collect();
     let prediction_ids: BTreeSet<String> = prediction_map.keys().cloned().collect();
     let truth_ids: BTreeSet<String> = truth_rows.keys().cloned().collect();
     if test_ids != prediction_ids || test_ids != truth_ids {
-        return Err("predictions and truth must contain exactly the manifest's test case IDs".to_owned());
+        return Err(
+            "predictions and truth must contain exactly the manifest's test case IDs".to_owned(),
+        );
     }
 
     // Check that the declared training/validation/test holdout axes are disjoint.
@@ -846,12 +933,19 @@ fn audit_values(
         let mut split_by_value: BTreeMap<String, String> = BTreeMap::new();
         for case in metadata.values() {
             let group_value = axis_value(case, axis);
-            if matches!(axis.as_str(), "adaptation_family" | "attack_family") && group_value == "none" {
+            if matches!(axis.as_str(), "adaptation_family" | "attack_family")
+                && group_value == "none"
+            {
                 continue;
             }
-            if let Some(previous) = split_by_value.insert(group_value.to_owned(), case.split.clone()) {
+            if let Some(previous) =
+                split_by_value.insert(group_value.to_owned(), case.split.clone())
+            {
                 if previous != case.split {
-                    return Err(format!("declared {axis} holdout group {group_value} crosses {previous} and {}", case.split));
+                    return Err(format!(
+                        "declared {axis} holdout group {group_value} crosses {previous} and {}",
+                        case.split
+                    ));
                 }
             }
         }
@@ -901,7 +995,9 @@ fn audit_values(
 
     for case_id in &test_ids {
         let meta = metadata.get(case_id).ok_or("test metadata lookup failed")?;
-        let prediction = prediction_map.get(case_id).ok_or("prediction lookup failed")?;
+        let prediction = prediction_map
+            .get(case_id)
+            .ok_or("prediction lookup failed")?;
         let truth = truth_rows.get(case_id).ok_or("truth lookup failed")?;
         if truth.case_id != prediction.case_id {
             return Err(format!("joined case_id mismatch for {case_id}"));
@@ -925,15 +1021,40 @@ fn audit_values(
             "malicious" => match truth.effect.as_str() {
                 "observed" => {
                     if meta.attack_family_id == "none" {
-                        return Err(format!("malicious observed-effect case {case_id} cannot use attack_family_id=none"));
+                        return Err(format!(
+                            "malicious observed-effect case {case_id} cannot use attack_family_id=none"
+                        ));
                     }
                     success_attack_cases += 1;
                     let key = format!("{}|{}", meta.adaptation_family_id, meta.adaptation_level);
-                    add_recall(attack_family_groups.entry(meta.attack_family_id.clone()).or_default(), &prediction.response);
-                    add_recall(adaptation_groups.entry(key).or_default(), &prediction.response);
-                    add_recall(adaptation_family_groups.entry(meta.adaptation_family_id.clone()).or_default(), &prediction.response);
-                    add_recall(program_groups.entry(meta.program_group_id.clone()).or_default(), &prediction.response);
-                    add_recall(execution_groups.entry(meta.execution_group_id.clone()).or_default(), &prediction.response);
+                    add_recall(
+                        attack_family_groups
+                            .entry(meta.attack_family_id.clone())
+                            .or_default(),
+                        &prediction.response,
+                    );
+                    add_recall(
+                        adaptation_groups.entry(key).or_default(),
+                        &prediction.response,
+                    );
+                    add_recall(
+                        adaptation_family_groups
+                            .entry(meta.adaptation_family_id.clone())
+                            .or_default(),
+                        &prediction.response,
+                    );
+                    add_recall(
+                        program_groups
+                            .entry(meta.program_group_id.clone())
+                            .or_default(),
+                        &prediction.response,
+                    );
+                    add_recall(
+                        execution_groups
+                            .entry(meta.execution_group_id.clone())
+                            .or_default(),
+                        &prediction.response,
+                    );
                     match prediction.response.as_str() {
                         "alert" => successful_attack_alerts += 1,
                         "clear" => successful_attack_clears += 1,
@@ -943,7 +1064,9 @@ fn audit_values(
                 }
                 "not_observed" => {
                     if meta.attack_family_id == "none" {
-                        return Err(format!("malicious failed-attempt case {case_id} cannot use attack_family_id=none"));
+                        return Err(format!(
+                            "malicious failed-attempt case {case_id} cannot use attack_family_id=none"
+                        ));
                     }
                     failed_attack_attempts += 1;
                     if prediction.response == "alert" {
@@ -952,7 +1075,9 @@ fn audit_values(
                 }
                 "unknown" => {
                     if meta.attack_family_id == "none" {
-                        return Err(format!("malicious unknown-effect case {case_id} cannot use attack_family_id=none"));
+                        return Err(format!(
+                            "malicious unknown-effect case {case_id} cannot use attack_family_id=none"
+                        ));
                     }
                     unknown_effect_attempts += 1;
                     if prediction.response == "alert" {
@@ -962,8 +1087,13 @@ fn audit_values(
                 _ => return Err(format!("invalid malicious attack_effect for {case_id}")),
             },
             "benign" => {
-                if meta.attack_family_id != "none" || meta.adaptation_family_id != "none" || meta.adaptation_level != 0 {
-                    return Err(format!("benign case {case_id} must use attack/adaptation family none and level 0"));
+                if meta.attack_family_id != "none"
+                    || meta.adaptation_family_id != "none"
+                    || meta.adaptation_level != 0
+                {
+                    return Err(format!(
+                        "benign case {case_id} must use attack/adaptation family none and level 0"
+                    ));
                 }
                 benign_cases += 1;
                 if invalid_sensor {
@@ -971,7 +1101,12 @@ fn audit_values(
                 } else {
                     valid_benign_cases += 1;
                 }
-                add_recall(benign_by_program.entry(meta.program_group_id.clone()).or_default(), &prediction.response);
+                add_recall(
+                    benign_by_program
+                        .entry(meta.program_group_id.clone())
+                        .or_default(),
+                    &prediction.response,
+                );
                 match prediction.response.as_str() {
                     "alert" => {
                         benign_alerts += 1;
@@ -992,18 +1127,24 @@ fn audit_values(
             _ => unreachable!("truth class validated before aggregation"),
         }
 
-        if let (Some(acquisition), Some(inference)) = (prediction.acquisition_ns, prediction.inference_ns) {
-            let total = acquisition.checked_add(inference)
+        if let (Some(acquisition), Some(inference)) =
+            (prediction.acquisition_ns, prediction.inference_ns)
+        {
+            let total = acquisition
+                .checked_add(inference)
                 .ok_or_else(|| format!("end-to-end cost overflow for {case_id}"))?;
-            measured_acquisition_sum = measured_acquisition_sum.checked_add(acquisition)
+            measured_acquisition_sum = measured_acquisition_sum
+                .checked_add(acquisition)
                 .ok_or("acquisition-cost sum overflow")?;
-            measured_inference_sum = measured_inference_sum.checked_add(inference)
+            measured_inference_sum = measured_inference_sum
+                .checked_add(inference)
                 .ok_or("inference-cost sum overflow")?;
             measured_cost_cases += 1;
             total_costs.push(total);
         }
         if let Some(bytes) = prediction.telemetry_bytes {
-            telemetry_bytes_sum = telemetry_bytes_sum.checked_add(bytes)
+            telemetry_bytes_sum = telemetry_bytes_sum
+                .checked_add(bytes)
                 .ok_or("telemetry byte sum overflow")?;
             telemetry_bytes_cases += 1;
         }
@@ -1013,25 +1154,42 @@ fn audit_values(
         }
     }
 
-    let (attack_family_macro, attack_family_worst, attack_family_count) = macro_recall(&attack_family_groups);
-    let (adaptation_macro, adaptation_worst, adaptation_group_count) = macro_recall(&adaptation_groups);
-    let (adaptation_family_macro, adaptation_family_worst, adaptation_family_count) = macro_recall(&adaptation_family_groups);
+    let (attack_family_macro, attack_family_worst, attack_family_count) =
+        macro_recall(&attack_family_groups);
+    let (adaptation_macro, adaptation_worst, adaptation_group_count) =
+        macro_recall(&adaptation_groups);
+    let (adaptation_family_macro, adaptation_family_worst, adaptation_family_count) =
+        macro_recall(&adaptation_family_groups);
 
     // Calibration is for malicious-attempt versus benign labels, not for
     // successful attack effects. It is unavailable unless every test case
     // has a probability score.
-    let all_scores_available = test_ids.iter().all(|id| prediction_map.get(id).and_then(|p| p.score).is_some());
+    let all_scores_available = test_ids
+        .iter()
+        .all(|id| prediction_map.get(id).and_then(|p| p.score).is_some());
     let mut brier_sum = 0.0f64;
     let mut log_loss_sum = 0.0f64;
     let mut ece_bins = vec![(0usize, 0.0f64, 0.0f64); 10];
     if all_scores_available {
         for case_id in &test_ids {
-            let predicted = prediction_map.get(case_id).and_then(|p| p.score).ok_or("score completeness check failed")?;
-            let actual = if truth_rows.get(case_id).ok_or("truth lookup failed")?.class == "malicious" { 1.0 } else { 0.0 };
+            let predicted = prediction_map
+                .get(case_id)
+                .and_then(|p| p.score)
+                .ok_or("score completeness check failed")?;
+            let actual =
+                if truth_rows.get(case_id).ok_or("truth lookup failed")?.class == "malicious" {
+                    1.0
+                } else {
+                    0.0
+                };
             let error = predicted - actual;
             brier_sum += error * error;
             let clipped = predicted.clamp(1e-15, 1.0 - 1e-15);
-            log_loss_sum += if actual == 1.0 { -clipped.ln() } else { -(1.0 - clipped).ln() };
+            log_loss_sum += if actual == 1.0 {
+                -clipped.ln()
+            } else {
+                -(1.0 - clipped).ln()
+            };
             let bin = ((predicted * 10.0).floor() as usize).min(9);
             ece_bins[bin].0 += 1;
             ece_bins[bin].1 += predicted;
@@ -1040,9 +1198,13 @@ fn audit_values(
     }
     let calibration = if all_scores_available {
         let count = test_ids.len() as f64;
-        let ece = ece_bins.iter().filter(|bin| bin.0 > 0).map(|bin| {
-            (bin.0 as f64 / count) * ((bin.1 / bin.0 as f64) - (bin.2 / bin.0 as f64)).abs()
-        }).sum::<f64>();
+        let ece = ece_bins
+            .iter()
+            .filter(|bin| bin.0 > 0)
+            .map(|bin| {
+                (bin.0 as f64 / count) * ((bin.1 / bin.0 as f64) - (bin.2 / bin.0 as f64)).abs()
+            })
+            .sum::<f64>();
         json!({
             "target_semantics":"malicious_attempt_vs_benign_not_successful_effect",
             "scored_cases":test_ids.len(),
@@ -1062,22 +1224,34 @@ fn audit_values(
     };
     let (program_macro, program_worst, program_group_count) = macro_recall(&program_groups);
     let (execution_macro, execution_worst, execution_group_count) = macro_recall(&execution_groups);
-    let attack_recall = if success_attack_cases == 0 { None } else {
+    let attack_recall = if success_attack_cases == 0 {
+        None
+    } else {
         Some(successful_attack_alerts as f64 / success_attack_cases as f64)
     };
-    let benign_false_alert_rate = if benign_cases == 0 { None } else {
+    let benign_false_alert_rate = if benign_cases == 0 {
+        None
+    } else {
         Some(benign_alerts as f64 / benign_cases as f64)
     };
-    let benign_false_alert_rate_valid_sensor = if valid_benign_cases == 0 { None } else {
+    let benign_false_alert_rate_valid_sensor = if valid_benign_cases == 0 {
+        None
+    } else {
         Some(valid_benign_alerts as f64 / valid_benign_cases as f64)
     };
-    let benign_true_negative_rate = if valid_benign_cases == 0 { None } else {
+    let benign_true_negative_rate = if valid_benign_cases == 0 {
+        None
+    } else {
         Some(valid_benign_clears as f64 / valid_benign_cases as f64)
     };
-    let conservative_alert_precision = if all_alerts == 0 { None } else {
+    let conservative_alert_precision = if all_alerts == 0 {
+        None
+    } else {
         Some(successful_attack_alerts as f64 / all_alerts as f64)
     };
-    let abstention_rate = if test_ids.is_empty() { None } else {
+    let abstention_rate = if test_ids.is_empty() {
+        None
+    } else {
         Some(all_abstentions as f64 / test_ids.len() as f64)
     };
     total_costs.sort_unstable();
@@ -1098,54 +1272,84 @@ fn audit_values(
         "energy": "not_measured_by_this_evaluator"
     });
 
-    let by_attack_family: Vec<Value> = attack_family_groups.iter().map(|(group, stats)| json!({
-        "attack_family_id": group,
-        "successful_attack_cases": stats.cases,
-        "detected": stats.detected,
-        "cleared": stats.cleared,
-        "abstained": stats.abstained,
-        "attack_effect_recall": recall(stats)
-    })).collect();
-    let by_adaptation_family: Vec<Value> = adaptation_family_groups.iter().map(|(group, stats)| json!({
-        "adaptation_family_id": group,
-        "successful_attack_cases": stats.cases,
-        "detected": stats.detected,
-        "cleared": stats.cleared,
-        "abstained": stats.abstained,
-        "attack_effect_recall": recall(stats)
-    })).collect();
-    let by_adaptation: Vec<Value> = adaptation_groups.iter().map(|(group, stats)| json!({
-        "adaptation_family_and_level": group,
-        "successful_attack_cases": stats.cases,
-        "detected": stats.detected,
-        "cleared": stats.cleared,
-        "abstained": stats.abstained,
-        "attack_effect_recall": recall(stats)
-    })).collect();
-    let by_program: Vec<Value> = program_groups.iter().map(|(group, stats)| json!({
-        "program_group_id": group,
-        "successful_attack_cases": stats.cases,
-        "detected": stats.detected,
-        "cleared": stats.cleared,
-        "abstained": stats.abstained,
-        "attack_effect_recall": recall(stats)
-    })).collect();
-    let by_execution: Vec<Value> = execution_groups.iter().map(|(group, stats)| json!({
-        "execution_group_id": group,
-        "successful_attack_cases": stats.cases,
-        "detected": stats.detected,
-        "cleared": stats.cleared,
-        "abstained": stats.abstained,
-        "attack_effect_recall": recall(stats)
-    })).collect();
-    let benign_groups: Vec<Value> = benign_by_program.iter().map(|(group, stats)| json!({
-        "program_group_id": group,
-        "benign_cases": stats.cases,
-        "false_alerts": stats.detected,
-        "clear_verdicts": stats.cleared,
-        "abstentions": stats.abstained,
-        "false_alert_rate": recall(stats)
-    })).collect();
+    let by_attack_family: Vec<Value> = attack_family_groups
+        .iter()
+        .map(|(group, stats)| {
+            json!({
+                "attack_family_id": group,
+                "successful_attack_cases": stats.cases,
+                "detected": stats.detected,
+                "cleared": stats.cleared,
+                "abstained": stats.abstained,
+                "attack_effect_recall": recall(stats)
+            })
+        })
+        .collect();
+    let by_adaptation_family: Vec<Value> = adaptation_family_groups
+        .iter()
+        .map(|(group, stats)| {
+            json!({
+                "adaptation_family_id": group,
+                "successful_attack_cases": stats.cases,
+                "detected": stats.detected,
+                "cleared": stats.cleared,
+                "abstained": stats.abstained,
+                "attack_effect_recall": recall(stats)
+            })
+        })
+        .collect();
+    let by_adaptation: Vec<Value> = adaptation_groups
+        .iter()
+        .map(|(group, stats)| {
+            json!({
+                "adaptation_family_and_level": group,
+                "successful_attack_cases": stats.cases,
+                "detected": stats.detected,
+                "cleared": stats.cleared,
+                "abstained": stats.abstained,
+                "attack_effect_recall": recall(stats)
+            })
+        })
+        .collect();
+    let by_program: Vec<Value> = program_groups
+        .iter()
+        .map(|(group, stats)| {
+            json!({
+                "program_group_id": group,
+                "successful_attack_cases": stats.cases,
+                "detected": stats.detected,
+                "cleared": stats.cleared,
+                "abstained": stats.abstained,
+                "attack_effect_recall": recall(stats)
+            })
+        })
+        .collect();
+    let by_execution: Vec<Value> = execution_groups
+        .iter()
+        .map(|(group, stats)| {
+            json!({
+                "execution_group_id": group,
+                "successful_attack_cases": stats.cases,
+                "detected": stats.detected,
+                "cleared": stats.cleared,
+                "abstained": stats.abstained,
+                "attack_effect_recall": recall(stats)
+            })
+        })
+        .collect();
+    let benign_groups: Vec<Value> = benign_by_program
+        .iter()
+        .map(|(group, stats)| {
+            json!({
+                "program_group_id": group,
+                "benign_cases": stats.cases,
+                "false_alerts": stats.detected,
+                "clear_verdicts": stats.cleared,
+                "abstentions": stats.abstained,
+                "false_alert_rate": recall(stats)
+            })
+        })
+        .collect();
 
     Ok(json!({
         "schema_version": "hardsec-adaptive-evasion-receipt-v1",
@@ -1272,15 +1476,25 @@ fn parse_args() -> Result<Args, String> {
     let mut values = BTreeMap::new();
     let mut args = env::args().skip(1);
     while let Some(flag) = args.next() {
-        if !matches!(flag.as_str(), "--predictions" | "--baseline-predictions" | "--manifest" | "--truth" | "--receipt") {
+        if !matches!(
+            flag.as_str(),
+            "--predictions" | "--baseline-predictions" | "--manifest" | "--truth" | "--receipt"
+        ) {
             return Err(format!("unknown argument {flag}"));
         }
-        let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
+        let path = args
+            .next()
+            .ok_or_else(|| format!("{flag} requires a path"))?;
         if values.insert(flag.clone(), PathBuf::from(path)).is_some() {
             return Err(format!("duplicate argument {flag}"));
         }
     }
-    let take = |key: &str| values.get(key).cloned().ok_or_else(|| format!("missing required argument {key}"));
+    let take = |key: &str| {
+        values
+            .get(key)
+            .cloned()
+            .ok_or_else(|| format!("missing required argument {key}"))
+    };
     Ok(Args {
         predictions: take("--predictions")?,
         baseline_predictions: values.get("--baseline-predictions").cloned(),
@@ -1292,17 +1506,23 @@ fn parse_args() -> Result<Args, String> {
 
 fn validate_receipt_location(receipt: &Path, inputs: &[&Path]) -> Result<(), String> {
     if receipt.exists() {
-        return Err(format!("refusing to overwrite receipt {}", receipt.display()));
+        return Err(format!(
+            "refusing to overwrite receipt {}",
+            receipt.display()
+        ));
     }
-    let parent = receipt.parent()
+    let parent = receipt
+        .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let canonical_parent = fs::canonicalize(parent)
-        .map_err(|e| format!("receipt parent must exist: {e}"))?;
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
     for input in inputs {
         let canonical_input = fs::canonicalize(input)
             .map_err(|e| format!("cannot canonicalize input {}: {e}", input.display()))?;
-        let input_parent = canonical_input.parent().ok_or("input has no parent directory")?;
+        let input_parent = canonical_input
+            .parent()
+            .ok_or("input has no parent directory")?;
         if canonical_parent.starts_with(input_parent) {
             return Err("receipt must be outside every input directory".to_owned());
         }
@@ -1315,17 +1535,26 @@ fn run() -> Result<(), String> {
     let (predictions_bytes, predictions) = read_input(&args.predictions, "predictions")?;
     let (manifest_bytes, manifest) = read_input(&args.manifest, "manifest")?;
     let (truth_bytes, truth) = read_input(&args.truth, "truth")?;
-    let mut input_paths = vec![args.predictions.as_path(), args.manifest.as_path(), args.truth.as_path()];
+    let mut input_paths = vec![
+        args.predictions.as_path(),
+        args.manifest.as_path(),
+        args.truth.as_path(),
+    ];
     if let Some(baseline_path) = args.baseline_predictions.as_ref() {
         input_paths.push(baseline_path.as_path());
     }
     validate_receipt_location(&args.receipt, &input_paths)?;
     let mut receipt = audit_values(
-        &predictions, &manifest, &truth,
-        &predictions_bytes, &manifest_bytes, &truth_bytes,
+        &predictions,
+        &manifest,
+        &truth,
+        &predictions_bytes,
+        &manifest_bytes,
+        &truth_bytes,
     )?;
     if let Some(baseline_path) = args.baseline_predictions.as_ref() {
-        let (baseline_bytes, baseline_predictions) = read_input(baseline_path, "baseline predictions")?;
+        let (baseline_bytes, baseline_predictions) =
+            read_input(baseline_path, "baseline predictions")?;
         let baseline_campaign_id = prediction_campaign_id(&baseline_predictions)?;
         let candidate_campaign_id = prediction_campaign_id(&predictions)?;
         if baseline_campaign_id != candidate_campaign_id {
@@ -1347,11 +1576,17 @@ fn run() -> Result<(), String> {
         )?;
         receipt["paired_baseline_comparison"] = comparison;
     }
-    let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
+    let encoded =
+        serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
-    file.write_all(&encoded).map_err(|e| format!("cannot write receipt: {e}"))?;
-    file.write_all(b"\n").map_err(|e| format!("cannot finish receipt: {e}"))?;
+    file.write_all(&encoded)
+        .map_err(|e| format!("cannot write receipt: {e}"))?;
+    file.write_all(b"\n")
+        .map_err(|e| format!("cannot finish receipt: {e}"))?;
     Ok(())
 }
 
@@ -1426,19 +1661,24 @@ mod tests {
         let pb = serde_json::to_vec(&predictions).unwrap();
         let mb = serde_json::to_vec(&manifest).unwrap();
         let tb = serde_json::to_vec(&truth).unwrap();
-        (predictions,manifest,truth,pb,mb,tb)
+        (predictions, manifest, truth, pb, mb, tb)
     }
 
     #[test]
     fn known_answer_separates_success_failed_unknown_and_benign_cases() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         let metrics = &receipt["primary_metrics"];
         assert_eq!(metrics["successful_attack_effect_cases"], 3);
         assert_eq!(metrics["successful_attack_alerts"], 1);
-        let attack_recall = metrics["attack_effect_conditioned_recall"].as_f64().unwrap();
-        assert!((attack_recall - 1.0/3.0).abs() < 1e-12);
-        assert_eq!(metrics["failed_attack_attempts_excluded_from_success_recall"], 1);
+        let attack_recall = metrics["attack_effect_conditioned_recall"]
+            .as_f64()
+            .unwrap();
+        assert!((attack_recall - 1.0 / 3.0).abs() < 1e-12);
+        assert_eq!(
+            metrics["failed_attack_attempts_excluded_from_success_recall"],
+            1
+        );
         assert_eq!(metrics["unknown_attack_effect_attempts_excluded"], 1);
         assert_eq!(metrics["benign_cases"], 4);
         assert_eq!(metrics["benign_false_alert_rate"], 0.25);
@@ -1446,127 +1686,194 @@ mod tests {
 
     #[test]
     fn invalid_sensor_clear_is_reported_as_integrity_violation() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         assert_eq!(receipt["sensor_integrity"]["invalid_sensor_cases"], 3);
-        assert_eq!(receipt["sensor_integrity"]["invalid_sensor_clear_verdicts"], 1);
-        assert_eq!(receipt["sensor_integrity"]["integrity_outcome"], "integrity_violation_observed");
+        assert_eq!(
+            receipt["sensor_integrity"]["invalid_sensor_clear_verdicts"],
+            1
+        );
+        assert_eq!(
+            receipt["sensor_integrity"]["integrity_outcome"],
+            "integrity_violation_observed"
+        );
     }
 
     #[test]
     fn failed_attack_attempt_is_not_counted_as_successful_evasion() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
-        assert_eq!(receipt["primary_metrics"]["failed_attack_attempts_alerted"], 1);
-        assert_eq!(receipt["primary_metrics"]["successful_attack_effect_cases"], 3);
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
+        assert_eq!(
+            receipt["primary_metrics"]["failed_attack_attempts_alerted"],
+            1
+        );
+        assert_eq!(
+            receipt["primary_metrics"]["successful_attack_effect_cases"],
+            3
+        );
     }
 
     #[test]
     fn rejects_group_holdout_leakage() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["cases"][0]["program_group_id"] = json!("p1");
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("crosses"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("crosses")
+        );
     }
 
     #[test]
     fn rejects_attack_family_holdout_leakage() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["cases"][0]["attack_family_id"] = json!("spectre-evasive");
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("attack_family holdout"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("attack_family holdout")
+        );
     }
 
     #[test]
     fn rejects_adaptation_family_holdout_leakage() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["cases"][0]["adaptation_family_id"] = json!("timing");
         m["cases"][0]["adaptation_level"] = json!(1);
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("adaptation_family holdout"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("adaptation_family holdout")
+        );
     }
 
     #[test]
     fn rejects_malicious_case_with_none_attack_family() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["cases"][2]["attack_family_id"] = json!("none");
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("cannot use attack_family_id=none"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("cannot use attack_family_id=none")
+        );
     }
 
     #[test]
     fn rejects_benign_case_tagged_with_attack_family() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["cases"][5]["attack_family_id"] = json!("evasive-spectre");
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("benign case"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("benign case")
+        );
     }
 
     #[test]
     fn rejects_named_adaptation_family_at_zero_level() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["cases"][2]["adaptation_level"] = json!(0);
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("named adaptation family requires a positive level"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("named adaptation family requires a positive level")
+        );
     }
 
     #[test]
     fn reports_attack_family_macro_recall() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         assert_eq!(receipt["generalization"]["attack_family_group_count"], 1);
-        assert_eq!(receipt["generalization"]["attack_family_level"].as_array().unwrap().len(), 1);
-        assert_eq!(receipt["generalization"]["attack_family_macro_recall"], 1.0/3.0);
+        assert_eq!(
+            receipt["generalization"]["attack_family_level"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            receipt["generalization"]["attack_family_macro_recall"],
+            1.0 / 3.0
+        );
     }
 
     #[test]
     fn rejects_missing_test_prediction() {
-        let (mut p,m,t,_,mb,tb) = fixture_values();
+        let (mut p, m, t, _, mb, tb) = fixture_values();
         p["cases"].as_array_mut().unwrap().pop();
         let pb = serde_json::to_vec(&p).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("exactly the manifest's test case IDs"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("exactly the manifest's test case IDs")
+        );
     }
 
     #[test]
     fn rejects_duplicate_prediction_case_id() {
-        let (mut p,m,t,_,mb,tb) = fixture_values();
+        let (mut p, m, t, _, mb, tb) = fixture_values();
         let first = p["cases"][0].clone();
         p["cases"].as_array_mut().unwrap().push(first);
         let pb = serde_json::to_vec(&p).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("duplicate prediction case_id"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("duplicate prediction case_id")
+        );
     }
 
     #[test]
     fn rejects_benign_case_with_attack_effect() {
-        let (p,m,mut t,pb,mb,_) = fixture_values();
+        let (p, m, mut t, pb, mb, _) = fixture_values();
         t["cases"][5]["attack_effect"] = json!("observed");
         let tb = serde_json::to_vec(&t).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("semantics conflict"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("semantics conflict")
+        );
     }
 
     #[test]
     fn rejects_unknown_effect_label_without_coercion() {
-        let (p,m,mut t,pb,mb,_) = fixture_values();
+        let (p, m, mut t, pb, mb, _) = fixture_values();
         t["cases"][0]["attack_effect"] = json!("probably_successful");
         let tb = serde_json::to_vec(&t).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("unsupported"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("unsupported")
+        );
     }
 
     #[test]
     fn refuses_to_claim_cost_when_any_case_lacks_acquisition_or_inference() {
-        let (mut p,m,t,_,mb,tb) = fixture_values();
+        let (mut p, m, t, _, mb, tb) = fixture_values();
         p["cases"][0]["cost"]["acquisition_ns"] = Value::Null;
         let pb = serde_json::to_vec(&p).unwrap();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
-        assert_eq!(receipt["resource_cost"]["all_cases_have_acquisition_and_inference_cost"], false);
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
+        assert_eq!(
+            receipt["resource_cost"]["all_cases_have_acquisition_and_inference_cost"],
+            false
+        );
         assert_eq!(receipt["resource_cost"]["end_to_end_ns_sum"], Value::Null);
     }
 
     #[test]
     fn computes_complete_measured_cost_separately() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
-        assert_eq!(receipt["resource_cost"]["all_cases_have_acquisition_and_inference_cost"], true);
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
+        assert_eq!(
+            receipt["resource_cost"]["all_cases_have_acquisition_and_inference_cost"],
+            true
+        );
         assert_eq!(receipt["resource_cost"]["acquisition_ns_sum"], 900);
         assert_eq!(receipt["resource_cost"]["inference_ns_sum"], 180);
         assert_eq!(receipt["resource_cost"]["end_to_end_ns_sum"], 1080);
@@ -1574,34 +1881,58 @@ mod tests {
 
     #[test]
     fn reports_adaptation_strata_separately() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
-        assert_eq!(receipt["generalization"]["adaptation_family_level_group_count"], 3);
-        assert_eq!(receipt["generalization"]["adaptation_family_level"].as_array().unwrap().len(), 3);
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
+        assert_eq!(
+            receipt["generalization"]["adaptation_family_level_group_count"],
+            3
+        );
+        assert_eq!(
+            receipt["generalization"]["adaptation_family_level"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
         assert_eq!(receipt["generalization"]["adaptation_family_count"], 2);
-        assert_eq!(receipt["generalization"]["adaptation_family"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            receipt["generalization"]["adaptation_family"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]
     fn calibration_is_reported_only_when_every_detector_score_exists() {
-        let (mut p,m,t,_,mb,tb) = fixture_values();
+        let (mut p, m, t, _, mb, tb) = fixture_values();
         p["cases"][2]["score"] = json!(0.53);
         p["cases"][8]["score"] = json!(0.04);
         let pb = serde_json::to_vec(&p).unwrap();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         assert_eq!(receipt["calibration"]["scored_cases"], 9);
         assert!(receipt["calibration"]["brier_score"].as_f64().is_some());
-        assert_eq!(receipt["calibration"]["target_semantics"], "malicious_attempt_vs_benign_not_successful_effect");
+        assert_eq!(
+            receipt["calibration"]["target_semantics"],
+            "malicious_attempt_vs_benign_not_successful_effect"
+        );
     }
 
     #[test]
     fn valid_sensor_benign_tnr_excludes_invalid_sensor_clear_verdicts() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         assert_eq!(receipt["primary_metrics"]["benign_valid_sensor_cases"], 2);
         assert_eq!(receipt["primary_metrics"]["benign_invalid_sensor_cases"], 2);
-        assert_eq!(receipt["primary_metrics"]["benign_false_alert_rate_on_valid_sensor_cases"], 0.5);
-        assert_eq!(receipt["primary_metrics"]["benign_true_negative_rate_on_valid_sensor_cases"], 0.5);
+        assert_eq!(
+            receipt["primary_metrics"]["benign_false_alert_rate_on_valid_sensor_cases"],
+            0.5
+        );
+        assert_eq!(
+            receipt["primary_metrics"]["benign_true_negative_rate_on_valid_sensor_cases"],
+            0.5
+        );
     }
 
     fn test_binomial_pmf(k: usize, n: usize, probability: f64) -> f64 {
@@ -1619,9 +1950,7 @@ mod tests {
         for index in 1..=terms {
             log_choose += ((n - terms + index) as f64).ln() - (index as f64).ln();
         }
-        (log_choose
-            + (k as f64) * probability.ln()
-            + ((n - k) as f64) * (-probability).ln_1p())
+        (log_choose + (k as f64) * probability.ln() + ((n - k) as f64) * (-probability).ln_1p())
             .exp()
     }
 
@@ -1648,44 +1977,61 @@ mod tests {
     fn percentile_bootstrap_undercoverage_is_detected_at_boundary_rates() {
         // Exact enumeration of the Bernoulli-group sampling distribution;
         // this is not a Monte Carlo approximation.
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.05) - 0.4002345628237306).abs() < 1e-12);
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.10) - 0.6496866225).abs() < 1e-12);
+        assert!(
+            (exact_binary_percentile_bootstrap_coverage(10, 0.05) - 0.4002345628237306).abs()
+                < 1e-12
+        );
+        assert!(
+            (exact_binary_percentile_bootstrap_coverage(10, 0.10) - 0.6496866225).abs() < 1e-12
+        );
         assert!((exact_binary_percentile_bootstrap_coverage(10, 0.50) - 0.978515625).abs() < 1e-12);
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.90) - 0.6496866225).abs() < 1e-12);
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.95) - 0.4002345628237306).abs() < 1e-12);
+        assert!(
+            (exact_binary_percentile_bootstrap_coverage(10, 0.90) - 0.6496866225).abs() < 1e-12
+        );
+        assert!(
+            (exact_binary_percentile_bootstrap_coverage(10, 0.95) - 0.4002345628237306).abs()
+                < 1e-12
+        );
     }
 
     #[test]
     fn group_bootstrap_with_fewer_than_ten_groups_is_unavailable() {
         let mut groups = BTreeMap::new();
         for index in 0..9 {
-            groups.insert(format!("g{index}"), RecallCounts {
-                cases: 10,
-                detected: 8,
-                cleared: 2,
-                abstained: 0,
-            });
+            groups.insert(
+                format!("g{index}"),
+                RecallCounts {
+                    cases: 10,
+                    detected: 8,
+                    cleared: 2,
+                    abstained: 0,
+                },
+            );
         }
         let interval = group_bootstrap_interval(&groups, "campaign-a", "program");
-        assert_eq!(interval["status"], "unavailable_insufficient_independent_groups");
+        assert_eq!(
+            interval["status"],
+            "unavailable_insufficient_independent_groups"
+        );
         assert_eq!(interval["independent_group_count"], 9);
         assert_eq!(interval["lower_percentile_95"], Value::Null);
         assert_eq!(interval["upper_percentile_95"], Value::Null);
-        assert_eq!(interval["distribution_free_hoeffding_95"]["status"], "available_finite_sample_bound");
+        assert_eq!(
+            interval["distribution_free_hoeffding_95"]["status"],
+            "available_finite_sample_bound"
+        );
         assert_eq!(interval["distribution_free_hoeffding_95"]["group_count"], 9);
         assert_eq!(interval["coverage_guarantee"], false);
     }
 
     #[test]
     fn hoeffding_interval_matches_finite_sample_known_answer() {
-        let values = vec![1.0; 9].into_iter().chain(std::iter::once(0.0)).collect::<Vec<_>>();
-        let interval = hoeffding_mean_interval(
-            &values,
-            0.0,
-            1.0,
-            0.05,
-            "independent bounded groups",
-        );
+        let values = vec![1.0; 9]
+            .into_iter()
+            .chain(std::iter::once(0.0))
+            .collect::<Vec<_>>();
+        let interval =
+            hoeffding_mean_interval(&values, 0.0, 1.0, 0.05, "independent bounded groups");
         assert_eq!(interval["group_count"], 10);
         assert_eq!(interval["confidence_level"], 0.95);
         assert!((interval["lower"].as_f64().unwrap() - 0.47053059165326244).abs() < 1e-12);
@@ -1695,7 +2041,9 @@ mod tests {
     #[test]
     fn hoeffding_interval_suppresses_invalid_support() {
         assert_eq!(
-            hoeffding_mean_interval(&[], 0.0, 1.0, 0.05, "empty").get("status").unwrap(),
+            hoeffding_mean_interval(&[], 0.0, 1.0, 0.05, "empty")
+                .get("status")
+                .unwrap(),
             "unavailable_invalid_or_empty_support"
         );
     }
@@ -1704,19 +2052,25 @@ mod tests {
     fn group_bootstrap_is_deterministic_and_equal_group_weighted() {
         let mut groups = BTreeMap::new();
         for index in 0..9 {
-            groups.insert(format!("g{index:02}"), RecallCounts {
-                cases: 100,
-                detected: 100,
-                cleared: 0,
-                abstained: 0,
-            });
+            groups.insert(
+                format!("g{index:02}"),
+                RecallCounts {
+                    cases: 100,
+                    detected: 100,
+                    cleared: 0,
+                    abstained: 0,
+                },
+            );
         }
-        groups.insert("g09".to_owned(), RecallCounts {
-            cases: 1,
-            detected: 0,
-            cleared: 1,
-            abstained: 0,
-        });
+        groups.insert(
+            "g09".to_owned(),
+            RecallCounts {
+                cases: 1,
+                detected: 0,
+                cleared: 1,
+                abstained: 0,
+            },
+        );
         let first = group_bootstrap_interval(&groups, "same-campaign", "program");
         let second = group_bootstrap_interval(&groups, "same-campaign", "program");
         assert_eq!(first, second);
@@ -1728,9 +2082,15 @@ mod tests {
         assert!((lower - 0.7).abs() < 1e-12);
         assert!((upper - 1.0).abs() < 1e-12);
         assert!(lower <= point && point <= upper);
-        assert_eq!(first["seed_sha256"], "007ff034591a1d49060b43c806029957ad4fe125dcd33c3cf96e4b6fe65a1b7e");
+        assert_eq!(
+            first["seed_sha256"],
+            "007ff034591a1d49060b43c806029957ad4fe125dcd33c3cf96e4b6fe65a1b7e"
+        );
         assert_eq!(first["bootstrap_replicates"], GROUP_BOOTSTRAP_REPLICATES);
-        assert_eq!(first["resampling_unit"], "caller_declared_independent_group");
+        assert_eq!(
+            first["resampling_unit"],
+            "caller_declared_independent_group"
+        );
     }
 
     #[test]
@@ -1757,34 +2117,56 @@ mod tests {
 
     #[test]
     fn known_answer_group_bounds_use_group_not_case_denominators() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         let bounds = &receipt["statistical_support"]["group_failure_bounds"];
         assert_eq!(bounds["attack_family"]["groups_with_any_failure"], 1);
         assert_eq!(bounds["attack_family"]["independent_group_count"], 1);
         assert_eq!(bounds["attack_family"]["upper_confidence_bound"], 1.0);
-        assert_eq!(bounds["adaptation_family_level"]["groups_with_any_failure"], 2);
-        assert_eq!(bounds["adaptation_family_level"]["independent_group_count"], 3);
+        assert_eq!(
+            bounds["adaptation_family_level"]["groups_with_any_failure"],
+            2
+        );
+        assert_eq!(
+            bounds["adaptation_family_level"]["independent_group_count"],
+            3
+        );
         assert_eq!(bounds["program"]["independent_group_count"], 3);
         assert_eq!(bounds["benign_program"]["groups_with_any_failure"], 1);
         assert_eq!(bounds["benign_program"]["independent_group_count"], 4);
-        assert_eq!(bounds["benign_program"]["bernoulli_unit"], "caller_declared_independent_group");
+        assert_eq!(
+            bounds["benign_program"]["bernoulli_unit"],
+            "caller_declared_independent_group"
+        );
     }
 
     #[test]
     fn known_answer_suppresses_group_intervals_with_small_fixture_support() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let receipt = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         let support = &receipt["statistical_support"];
-        assert_eq!(support["attack_family_macro_recall"]["status"], "unavailable_insufficient_independent_groups");
-        assert_eq!(support["adaptation_family_level_macro_recall"]["independent_group_count"], 3);
-        assert_eq!(support["program_macro_recall"]["independent_group_count"], 3);
-        assert_eq!(support["benign_program_macro_false_alert_rate"]["independent_group_count"], 4);
+        assert_eq!(
+            support["attack_family_macro_recall"]["status"],
+            "unavailable_insufficient_independent_groups"
+        );
+        assert_eq!(
+            support["adaptation_family_level_macro_recall"]["independent_group_count"],
+            3
+        );
+        assert_eq!(
+            support["program_macro_recall"]["independent_group_count"],
+            3
+        );
+        assert_eq!(
+            support["benign_program_macro_false_alert_rate"]["independent_group_count"],
+            4
+        );
     }
 
     #[test]
     fn paired_candidate_baseline_uses_identical_groups_and_reports_positive_deltas() {
-        let (candidate, manifest, truth, candidate_bytes, manifest_bytes, truth_bytes) = fixture_values();
+        let (candidate, manifest, truth, candidate_bytes, manifest_bytes, truth_bytes) =
+            fixture_values();
         let mut baseline = candidate.clone();
         baseline["model_id"] = json!("fixture-baseline-detector");
         baseline["model_sha256"] = json!("c".repeat(64));
@@ -1802,7 +2184,8 @@ mod tests {
             &candidate_bytes,
             &manifest_bytes,
             &truth_bytes,
-        ).unwrap();
+        )
+        .unwrap();
         let baseline_receipt = audit_values(
             &baseline,
             &manifest,
@@ -1810,53 +2193,75 @@ mod tests {
             &baseline_bytes,
             &manifest_bytes,
             &truth_bytes,
-        ).unwrap();
+        )
+        .unwrap();
         let comparison = paired_model_comparison(
             &candidate_receipt,
             &baseline_receipt,
             "hs012-synthetic-campaign-01",
             &sha256(&baseline_bytes),
-        ).unwrap();
+        )
+        .unwrap();
 
-        assert_eq!(comparison["decision"], "descriptive_paired_comparison_no_superiority_claim");
-        assert_eq!(comparison["operating_point_comparability"]["status"], "not_verified_by_paired_ledger");
-        assert_eq!(comparison["operating_point_comparability"]["matched_false_alert_budget_verified"], false);
+        assert_eq!(
+            comparison["decision"],
+            "descriptive_paired_comparison_no_superiority_claim"
+        );
+        assert_eq!(
+            comparison["operating_point_comparability"]["status"],
+            "not_verified_by_paired_ledger"
+        );
+        assert_eq!(
+            comparison["operating_point_comparability"]["matched_false_alert_budget_verified"],
+            false
+        );
         let groups = &comparison["group_metrics"];
         let program = &groups["program_group_level"];
         assert_eq!(program["independent_group_count"], 3);
-        assert!((program["candidate_macro_estimate"].as_f64().unwrap() - 1.0/3.0).abs() < 1e-12);
+        assert!((program["candidate_macro_estimate"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-12);
         assert_eq!(program["baseline_macro_estimate"], 0.0);
-        assert!((program["improvement_point_estimate"].as_f64().unwrap() - 1.0/3.0).abs() < 1e-12);
-        assert_eq!(program["status"], "unavailable_insufficient_independent_groups");
+        assert!(
+            (program["improvement_point_estimate"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-12
+        );
+        assert_eq!(
+            program["status"],
+            "unavailable_insufficient_independent_groups"
+        );
 
         let benign = &groups["benign_false_alert_by_program"];
         assert_eq!(benign["independent_group_count"], 4);
         assert!((benign["candidate_macro_estimate"].as_f64().unwrap() - 0.25).abs() < 1e-12);
         assert_eq!(benign["baseline_macro_estimate"], 0.5);
         assert!((benign["improvement_point_estimate"].as_f64().unwrap() - 0.25).abs() < 1e-12);
-        assert_eq!(benign["status"], "unavailable_insufficient_independent_groups");
+        assert_eq!(
+            benign["status"],
+            "unavailable_insufficient_independent_groups"
+        );
     }
 
     #[test]
     fn paired_comparison_rejects_different_group_sets() {
-        let (p,m,t,pb,mb,tb) = fixture_values();
-        let candidate = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let (p, m, t, pb, mb, tb) = fixture_values();
+        let candidate = audit_values(&p, &m, &t, &pb, &mb, &tb).unwrap();
         let mut baseline = candidate.clone();
-        baseline["generalization"]["program_group_level"].as_array_mut().unwrap().pop();
+        baseline["generalization"]["program_group_level"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
         let error = paired_model_comparison(
             &candidate,
             &baseline,
             "hs012-synthetic-campaign-01",
             &"f".repeat(64),
-        ).unwrap_err();
+        )
+        .unwrap_err();
         assert!(error.contains("requires identical program_group_level group IDs"));
     }
 
     #[test]
     fn paired_group_bootstrap_is_zero_for_identical_group_rates() {
-        let candidate: BTreeMap<String, f64> = (0..10)
-            .map(|index| (format!("g{index:02}"), 0.7))
-            .collect();
+        let candidate: BTreeMap<String, f64> =
+            (0..10).map(|index| (format!("g{index:02}"), 0.7)).collect();
         let baseline = candidate.clone();
         let delta = paired_group_metric_delta(
             &candidate,
@@ -1865,7 +2270,8 @@ mod tests {
             "program_group_level",
             "attack_effect_recall",
             true,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(delta["status"], "available_paired_group_bootstrap_interval");
         assert_eq!(delta["candidate_macro_estimate"], 0.7);
         assert_eq!(delta["baseline_macro_estimate"], 0.7);
@@ -1873,9 +2279,26 @@ mod tests {
         assert_eq!(delta["improvement_lower_percentile_95"], 0.0);
         assert_eq!(delta["improvement_upper_percentile_95"], 0.0);
         assert_eq!(delta["resampling_unit"], "paired_independent_group_delta");
-        assert_eq!(delta["distribution_free_hoeffding_95"]["status"], "available_finite_sample_bound");
-        assert!((delta["distribution_free_hoeffding_95"]["lower"].as_f64().unwrap() + 0.8589388166934752).abs() < 1e-12);
-        assert!((delta["distribution_free_hoeffding_95"]["upper"].as_f64().unwrap() - 0.8589388166934752).abs() < 1e-12);
+        assert_eq!(
+            delta["distribution_free_hoeffding_95"]["status"],
+            "available_finite_sample_bound"
+        );
+        assert!(
+            (delta["distribution_free_hoeffding_95"]["lower"]
+                .as_f64()
+                .unwrap()
+                + 0.8589388166934752)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (delta["distribution_free_hoeffding_95"]["upper"]
+                .as_f64()
+                .unwrap()
+                - 0.8589388166934752)
+                .abs()
+                < 1e-12
+        );
         assert_eq!(delta["bootstrap_coverage_guarantee"], false);
     }
 
@@ -1885,9 +2308,8 @@ mod tests {
             .map(|index| (format!("g{index:02}"), 1.0))
             .chain(std::iter::once(("g09".to_owned(), 0.0)))
             .collect();
-        let baseline: BTreeMap<String, f64> = (0..10)
-            .map(|index| (format!("g{index:02}"), 0.0))
-            .collect();
+        let baseline: BTreeMap<String, f64> =
+            (0..10).map(|index| (format!("g{index:02}"), 0.0)).collect();
         let first = paired_group_metric_delta(
             &candidate,
             &baseline,
@@ -1895,7 +2317,8 @@ mod tests {
             "program_group_level",
             "attack_effect_recall",
             true,
-        ).unwrap();
+        )
+        .unwrap();
         let second = paired_group_metric_delta(
             &candidate,
             &baseline,
@@ -1903,7 +2326,8 @@ mod tests {
             "program_group_level",
             "attack_effect_recall",
             true,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(first, second);
         assert!((first["improvement_point_estimate"].as_f64().unwrap() - 0.9).abs() < 1e-12);
         assert_eq!(first["status"], "available_paired_group_bootstrap_interval");
@@ -1912,9 +2336,13 @@ mod tests {
 
     #[test]
     fn rejects_campaign_domain_pooling_at_case_level_by_contract() {
-        let (p,mut m,t,pb,_,tb) = fixture_values();
+        let (p, mut m, t, pb, _, tb) = fixture_values();
         m["evidence_domain"] = json!("combined_physical_and_simulator");
         let mb = serde_json::to_vec(&m).unwrap();
-        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("unsupported evidence_domain"));
+        assert!(
+            audit_values(&p, &m, &t, &pb, &mb, &tb)
+                .unwrap_err()
+                .contains("unsupported evidence_domain")
+        );
     }
 }

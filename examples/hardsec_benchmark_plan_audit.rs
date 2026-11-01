@@ -8,7 +8,7 @@
 //! Usage:
 //!   hardsec_benchmark_plan_audit --plan plan.json --receipt plan-receipt.json
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::env;
@@ -20,29 +20,54 @@ use std::process::ExitCode;
 const PLAN_SCHEMA: &str = "hardsec-hardware-benchmark-plan-v1";
 const RECEIPT_SCHEMA: &str = "hardsec-hardware-benchmark-plan-receipt-v1";
 const REQUIRED_BASELINES: &[&str] = &[
-    "dt_hpc", "rf_hpc", "svm_hpc", "nb_hpc", "dt_instruction",
-    "hpc_instruction_normalized", "t-smade", "tong-2026-augmentation",
-    "mandal-2024-interleaving", "robust-statistics",
+    "dt_hpc",
+    "rf_hpc",
+    "svm_hpc",
+    "nb_hpc",
+    "dt_instruction",
+    "hpc_instruction_normalized",
+    "t-smade",
+    "tong-2026-augmentation",
+    "mandal-2024-interleaving",
+    "robust-statistics",
 ];
 const REQUIRED_CANDIDATES: &[&str] = &[
-    "symthaea-hdc", "symthaea-liquid", "symthaea-selective-cascade",
+    "symthaea-hdc",
+    "symthaea-liquid",
+    "symthaea-selective-cascade",
 ];
 const REQUIRED_SPLITS: &[&str] = &[
-    "random_window_diagnostic", "contiguous_temporal_block", "execution_holdout",
-    "program_binary_holdout", "attack_family_holdout", "adaptation_family_holdout",
-    "device_configuration_holdout", "cross_platform_holdout",
+    "random_window_diagnostic",
+    "contiguous_temporal_block",
+    "execution_holdout",
+    "program_binary_holdout",
+    "attack_family_holdout",
+    "adaptation_family_holdout",
+    "device_configuration_holdout",
+    "cross_platform_holdout",
 ];
 const REQUIRED_METRICS: &[&str] = &[
-    "attack_effect_conditioned_recall", "false_alerts_per_device_hour",
-    "worst_attack_family_recall", "worst_adaptation_group_recall",
-    "p95_time_to_detection", "end_to_end_overhead", "sensor_invalid_silent_clear_count",
+    "attack_effect_conditioned_recall",
+    "false_alerts_per_device_hour",
+    "worst_attack_family_recall",
+    "worst_adaptation_group_recall",
+    "p95_time_to_detection",
+    "end_to_end_overhead",
+    "sensor_invalid_silent_clear_count",
 ];
 const REQUIRED_NEGATIVE_CONTROLS: &[&str] = &[
-    "duplicate_trace", "repeat_iteration", "replay_trace", "overlapping_windows",
-    "cross_split_parentage", "within_group_label_permutation",
-    "full_dataset_preprocessing_leak", "simultaneous_counter_interference",
-    "counter_event_aliasing", "counter_scaling_mismatch",
-    "sensor_missing_stale_misaligned", "invalid_sensor_clear",
+    "duplicate_trace",
+    "repeat_iteration",
+    "replay_trace",
+    "overlapping_windows",
+    "cross_split_parentage",
+    "within_group_label_permutation",
+    "full_dataset_preprocessing_leak",
+    "simultaneous_counter_interference",
+    "counter_event_aliasing",
+    "counter_scaling_mismatch",
+    "sensor_missing_stale_misaligned",
+    "invalid_sensor_clear",
     "attacker_threshold_adaptation",
 ];
 
@@ -53,28 +78,43 @@ struct Args {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn fail(context: &str, message: &str) -> String {
     format!("{context}: {message}")
 }
 
-fn object<'a>(value: &'a Value, context: &str) -> Result<&'a serde_json::Map<String, Value>, String> {
-    value.as_object().ok_or_else(|| fail(context, "must be an object"))
+fn object<'a>(
+    value: &'a Value,
+    context: &str,
+) -> Result<&'a serde_json::Map<String, Value>, String> {
+    value
+        .as_object()
+        .ok_or_else(|| fail(context, "must be an object"))
 }
 
 fn str_value<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
-    let result = value.get(key).and_then(Value::as_str)
+    let result = value
+        .get(key)
+        .and_then(Value::as_str)
         .ok_or_else(|| fail(context, &format!("{key} must be a string")))?;
     if result.trim().is_empty() || result.chars().any(char::is_control) {
-        return Err(fail(context, &format!("{key} must be non-empty and contain no control characters")));
+        return Err(fail(
+            context,
+            &format!("{key} must be non-empty and contain no control characters"),
+        ));
     }
     Ok(result)
 }
 
 fn number(value: &Value, key: &str, context: &str) -> Result<f64, String> {
-    let result = value.get(key).and_then(Value::as_f64)
+    let result = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| fail(context, &format!("{key} must be numeric")))?;
     if !result.is_finite() {
         return Err(fail(context, &format!("{key} must be finite")));
@@ -83,7 +123,10 @@ fn number(value: &Value, key: &str, context: &str) -> Result<f64, String> {
 }
 
 fn usize_value(value: &Value, key: &str, context: &str) -> Result<usize, String> {
-    value.get(key).and_then(Value::as_u64).and_then(|v| usize::try_from(v).ok())
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .and_then(|v| usize::try_from(v).ok())
         .ok_or_else(|| fail(context, &format!("{key} must be a non-negative integer")))
 }
 
@@ -100,21 +143,31 @@ fn required_string_set(
     required: &[&str],
     context: &str,
 ) -> Result<usize, String> {
-    let records = value.get(field).and_then(Value::as_array)
+    let records = value
+        .get(field)
+        .and_then(Value::as_array)
         .ok_or_else(|| fail(context, &format!("{field} must be an array")))?;
     let mut found = BTreeSet::new();
     for item in records {
-        let item = item.as_str().ok_or_else(|| fail(context, &format!("{field} entries must be strings")))?;
+        let item = item
+            .as_str()
+            .ok_or_else(|| fail(context, &format!("{field} entries must be strings")))?;
         if item.trim().is_empty() {
             return Err(fail(context, &format!("{field} entries must not be empty")));
         }
         if !found.insert(item.to_owned()) {
-            return Err(fail(context, &format!("{field} contains duplicate entry {item}")));
+            return Err(fail(
+                context,
+                &format!("{field} contains duplicate entry {item}"),
+            ));
         }
     }
     for expected in required {
         if !found.contains(*expected) {
-            return Err(fail(context, &format!("{field} is missing required entry {expected}")));
+            return Err(fail(
+                context,
+                &format!("{field} is missing required entry {expected}"),
+            ));
         }
     }
     Ok(found.len())
@@ -126,7 +179,9 @@ fn required_arm_ids(
     required: &[&str],
     context: &str,
 ) -> Result<usize, String> {
-    let records = value.get(field).and_then(Value::as_array)
+    let records = value
+        .get(field)
+        .and_then(Value::as_array)
         .ok_or_else(|| fail(context, &format!("{field} must be an array")))?;
     let mut found = BTreeSet::new();
     for (index, record) in records.iter().enumerate() {
@@ -144,17 +199,26 @@ fn required_arm_ids(
     }
     for expected in required {
         if !found.contains(*expected) {
-            return Err(fail(context, &format!("{field} is missing required arm {expected}")));
+            return Err(fail(
+                context,
+                &format!("{field} is missing required arm {expected}"),
+            ));
         }
     }
     Ok(found.len())
 }
 
 fn required_dataset_sources(plan: &Value) -> Result<usize, String> {
-    let records = plan.get("dataset_sources").and_then(Value::as_array)
+    let records = plan
+        .get("dataset_sources")
+        .and_then(Value::as_array)
         .ok_or_else(|| fail("plan", "dataset_sources must be an array"))?;
     let expected = [
-        ("harpy-v-physical-v2", "10.34810/DATA2538", "physical_hardware"),
+        (
+            "harpy-v-physical-v2",
+            "10.34810/DATA2538",
+            "physical_hardware",
+        ),
         ("harpy-v-gem5-v1-1", "10.34810/DATA2711", "simulator"),
         ("harpy-v-gem5-100c", "10.34810/DATA3542", "simulator"),
     ];
@@ -170,7 +234,12 @@ fn required_dataset_sources(plan: &Value) -> Result<usize, String> {
         if !seen_ids.insert(id.to_owned()) || !seen_dois.insert(doi.to_owned()) {
             return Err(fail(&context, "dataset IDs and DOIs must be unique"));
         }
-        if !matches!(status, "metadata_discovered_archive_unverified" | "archive_bytes_verified" | "provenance_verified") {
+        if !matches!(
+            status,
+            "metadata_discovered_archive_unverified"
+                | "archive_bytes_verified"
+                | "provenance_verified"
+        ) {
             return Err(fail(&context, "unsupported dataset availability_status"));
         }
     }
@@ -181,11 +250,17 @@ fn required_dataset_sources(plan: &Value) -> Result<usize, String> {
                 && record.get("evidence_domain").and_then(Value::as_str) == Some(domain)
         });
         if !matching {
-            return Err(fail("plan.dataset_sources", &format!("missing or mismatched dataset {id}")));
+            return Err(fail(
+                "plan.dataset_sources",
+                &format!("missing or mismatched dataset {id}"),
+            ));
         }
     }
     if records.len() != expected.len() {
-        return Err(fail("plan.dataset_sources", "v1 requires exactly the three catalogued HARPY-V source datasets"));
+        return Err(fail(
+            "plan.dataset_sources",
+            "v1 requires exactly the three catalogued HARPY-V source datasets",
+        ));
     }
     Ok(records.len())
 }
@@ -213,89 +288,222 @@ fn audit_plan(plan: &Value, plan_bytes: &[u8]) -> Result<Value, String> {
     }
     let benchmark_id = str_value(plan, "benchmark_id", "plan")?.to_owned();
     if str_value(plan, "status", "plan")? != "planned" {
-        return Err(fail("plan", "this auditor currently accepts status=planned only"));
+        return Err(fail(
+            "plan",
+            "this auditor currently accepts status=planned only",
+        ));
     }
     if root.len() != 17 {
-        return Err(fail("plan", "top-level field count does not match the v1 contract"));
+        return Err(fail(
+            "plan",
+            "top-level field count does not match the v1 contract",
+        ));
     }
 
     let dataset_source_count = required_dataset_sources(plan)?;
-    let domains = required_string_set(plan, "evidence_domains",
-        &["synthetic_fixture", "simulator", "physical_hardware"], "plan")?;
-    let separation = plan.get("evidence_separation").ok_or("plan.evidence_separation missing")?;
+    let domains = required_string_set(
+        plan,
+        "evidence_domains",
+        &["synthetic_fixture", "simulator", "physical_hardware"],
+        "plan",
+    )?;
+    let separation = plan
+        .get("evidence_separation")
+        .ok_or("plan.evidence_separation missing")?;
     let _ = object(separation, "plan.evidence_separation")?;
-    for key in ["no_domain_pooling", "source_lineage_required", "exact_input_digests_required",
-        "truth_oracle_independent", "threshold_frozen_on_validation", "energy_requires_measurement"] {
+    for key in [
+        "no_domain_pooling",
+        "source_lineage_required",
+        "exact_input_digests_required",
+        "truth_oracle_independent",
+        "threshold_frozen_on_validation",
+        "energy_requires_measurement",
+    ] {
         bool_true(separation, key, "plan.evidence_separation")?;
     }
 
-    let platform = plan.get("minimum_platform_scope").ok_or("plan.minimum_platform_scope missing")?;
+    let platform = plan
+        .get("minimum_platform_scope")
+        .ok_or("plan.minimum_platform_scope missing")?;
     let _ = object(platform, "plan.minimum_platform_scope")?;
-    let physical = usize_value(platform, "physical_microarchitectures", "plan.minimum_platform_scope")?;
+    let physical = usize_value(
+        platform,
+        "physical_microarchitectures",
+        "plan.minimum_platform_scope",
+    )?;
     let isa = usize_value(platform, "isa_families", "plan.minimum_platform_scope")?;
     if physical < 3 || isa < 2 {
-        return Err(fail("plan.minimum_platform_scope", "cross-platform scope requires at least 3 physical microarchitectures and 2 ISA families"));
+        return Err(fail(
+            "plan.minimum_platform_scope",
+            "cross-platform scope requires at least 3 physical microarchitectures and 2 ISA families",
+        ));
     }
 
     let split_count = required_string_set(plan, "split_ladder", REQUIRED_SPLITS, "plan")?;
     let baseline_count = required_arm_ids(plan, "baseline_arms", REQUIRED_BASELINES, "plan")?;
     let candidate_count = required_arm_ids(plan, "candidate_arms", REQUIRED_CANDIDATES, "plan")?;
-    let attack_family_count = required_string_set(plan, "attack_families", &[
-        "spectre_evasive_nop", "spectre_evasive_memory", "spectre_v1_v2_rsb",
-        "flush_reload_flush_flush", "tlb_eviction_page_walk", "interrupt_timing_timer_drift",
-        "probabilistic_interleaving", "counter_aware_adaptation", "workload_mimicry",
-    ], "plan")?;
-    let nuisance_count = required_string_set(plan, "nuisance_factors", &[
-        "cpu_contention", "memory_contention", "cache_contention", "branch_contention",
-        "io_contention", "phase_shift", "multiprocess_interference", "counter_multiplexing",
-        "sampling_jitter", "counter_reset_overflow",
-    ], "plan")?;
+    let attack_family_count = required_string_set(
+        plan,
+        "attack_families",
+        &[
+            "spectre_evasive_nop",
+            "spectre_evasive_memory",
+            "spectre_v1_v2_rsb",
+            "flush_reload_flush_flush",
+            "tlb_eviction_page_walk",
+            "interrupt_timing_timer_drift",
+            "probabilistic_interleaving",
+            "counter_aware_adaptation",
+            "workload_mimicry",
+        ],
+        "plan",
+    )?;
+    let nuisance_count = required_string_set(
+        plan,
+        "nuisance_factors",
+        &[
+            "cpu_contention",
+            "memory_contention",
+            "cache_contention",
+            "branch_contention",
+            "io_contention",
+            "phase_shift",
+            "multiprocess_interference",
+            "counter_multiplexing",
+            "sampling_jitter",
+            "counter_reset_overflow",
+        ],
+        "plan",
+    )?;
     let metric_count = required_string_set(plan, "primary_metrics", REQUIRED_METRICS, "plan")?;
-    let negative_control_count = required_string_set(plan, "negative_controls", REQUIRED_NEGATIVE_CONTROLS, "plan")?;
+    let negative_control_count = required_string_set(
+        plan,
+        "negative_controls",
+        REQUIRED_NEGATIVE_CONTROLS,
+        "plan",
+    )?;
 
-    let targets = plan.get("aspirational_targets").ok_or("plan.aspirational_targets missing")?;
+    let targets = plan
+        .get("aspirational_targets")
+        .ok_or("plan.aspirational_targets missing")?;
     let _ = object(targets, "plan.aspirational_targets")?;
-    let pooled = number(targets, "pooled_attack_effect_recall_min", "plan.aspirational_targets")?;
-    let worst = number(targets, "worst_family_recall_min", "plan.aspirational_targets")?;
-    let fpd = number(targets, "benign_false_alerts_per_device_hour_max", "plan.aspirational_targets")?;
-    let delay = usize_value(targets, "p95_detection_delay_sampling_windows_max", "plan.aspirational_targets")?;
-    let median_overhead = number(targets, "median_end_to_end_overhead_fraction_max", "plan.aspirational_targets")?;
-    let p95_overhead = number(targets, "p95_end_to_end_overhead_fraction_max", "plan.aspirational_targets")?;
-    let silent_clears = usize_value(targets, "invalid_sensor_silent_clears_max", "plan.aspirational_targets")?;
+    let pooled = number(
+        targets,
+        "pooled_attack_effect_recall_min",
+        "plan.aspirational_targets",
+    )?;
+    let worst = number(
+        targets,
+        "worst_family_recall_min",
+        "plan.aspirational_targets",
+    )?;
+    let fpd = number(
+        targets,
+        "benign_false_alerts_per_device_hour_max",
+        "plan.aspirational_targets",
+    )?;
+    let delay = usize_value(
+        targets,
+        "p95_detection_delay_sampling_windows_max",
+        "plan.aspirational_targets",
+    )?;
+    let median_overhead = number(
+        targets,
+        "median_end_to_end_overhead_fraction_max",
+        "plan.aspirational_targets",
+    )?;
+    let p95_overhead = number(
+        targets,
+        "p95_end_to_end_overhead_fraction_max",
+        "plan.aspirational_targets",
+    )?;
+    let silent_clears = usize_value(
+        targets,
+        "invalid_sensor_silent_clears_max",
+        "plan.aspirational_targets",
+    )?;
     let scope_note = str_value(targets, "scope_note", "plan.aspirational_targets")?;
-    if !(0.0..=1.0).contains(&pooled) || !(0.0..=1.0).contains(&worst)
-        || fpd <= 0.0 || delay == 0 || median_overhead < 0.0 || p95_overhead < median_overhead
-        || silent_clears != 0 || !scope_note.to_lowercase().contains("not achieved") {
-        return Err(fail("plan.aspirational_targets", "target values or aspirational scope note violate v1 constraints"));
+    if !(0.0..=1.0).contains(&pooled)
+        || !(0.0..=1.0).contains(&worst)
+        || fpd <= 0.0
+        || delay == 0
+        || median_overhead < 0.0
+        || p95_overhead < median_overhead
+        || silent_clears != 0
+        || !scope_note.to_lowercase().contains("not achieved")
+    {
+        return Err(fail(
+            "plan.aspirational_targets",
+            "target values or aspirational scope note violate v1 constraints",
+        ));
     }
 
-    let stats = plan.get("statistical_support").ok_or("plan.statistical_support missing")?;
+    let stats = plan
+        .get("statistical_support")
+        .ok_or("plan.statistical_support missing")?;
     let _ = object(stats, "plan.statistical_support")?;
     let endpoint_alpha = number(stats, "endpoint_alpha", "plan.statistical_support")?;
     let family_alpha = number(stats, "family_wise_alpha", "plan.statistical_support")?;
-    let endpoints = usize_value(stats, "bonferroni_group_risk_endpoint_count", "plan.statistical_support")?;
+    let endpoints = usize_value(
+        stats,
+        "bonferroni_group_risk_endpoint_count",
+        "plan.statistical_support",
+    )?;
     if !close(endpoint_alpha, 0.05) || !close(family_alpha, 0.05) || endpoints != 6 {
-        return Err(fail("plan.statistical_support", "v1 reference support requires alpha=0.05 and six Bonferroni endpoints"));
+        return Err(fail(
+            "plan.statistical_support",
+            "v1 reference support requires alpha=0.05 and six Bonferroni endpoints",
+        ));
     }
     let expected = [
-        ("zero_failure_independent_groups_for_upper_risk_le_0_05_single_endpoint", zero_failure_groups(0.05, 0.05)?),
-        ("zero_failure_independent_groups_for_upper_risk_le_0_01_single_endpoint", zero_failure_groups(0.05, 0.01)?),
-        ("zero_failure_independent_groups_for_upper_risk_le_0_05_six_endpoints", zero_failure_groups(0.05 / 6.0, 0.05)?),
-        ("zero_failure_independent_groups_for_upper_risk_le_0_01_six_endpoints", zero_failure_groups(0.05 / 6.0, 0.01)?),
+        (
+            "zero_failure_independent_groups_for_upper_risk_le_0_05_single_endpoint",
+            zero_failure_groups(0.05, 0.05)?,
+        ),
+        (
+            "zero_failure_independent_groups_for_upper_risk_le_0_01_single_endpoint",
+            zero_failure_groups(0.05, 0.01)?,
+        ),
+        (
+            "zero_failure_independent_groups_for_upper_risk_le_0_05_six_endpoints",
+            zero_failure_groups(0.05 / 6.0, 0.05)?,
+        ),
+        (
+            "zero_failure_independent_groups_for_upper_risk_le_0_01_six_endpoints",
+            zero_failure_groups(0.05 / 6.0, 0.01)?,
+        ),
     ];
     for (field, value) in expected {
         if usize_value(stats, field, "plan.statistical_support")? != value {
-            return Err(fail("plan.statistical_support", &format!("{field} must equal {value}")));
+            return Err(fail(
+                "plan.statistical_support",
+                &format!("{field} must equal {value}"),
+            ));
         }
     }
-    bool_true(stats, "iid_group_assumption_must_be_justified", "plan.statistical_support")?;
-    bool_true(stats, "windows_do_not_increase_independent_group_support", "plan.statistical_support")?;
+    bool_true(
+        stats,
+        "iid_group_assumption_must_be_justified",
+        "plan.statistical_support",
+    )?;
+    bool_true(
+        stats,
+        "windows_do_not_increase_independent_group_support",
+        "plan.statistical_support",
+    )?;
 
-    let rules = plan.get("report_rules").ok_or("plan.report_rules missing")?;
+    let rules = plan
+        .get("report_rules")
+        .ok_or("plan.report_rules missing")?;
     let _ = object(rules, "plan.report_rules")?;
-    for key in ["paper_faithful_and_nested_reproduction_separate", "no_random_window_confirmatory_claim",
-        "one_class_fold_mixed_precision_f1_mcc_na", "failed_runs_preserved", "na_reason_required",
-        "simulator_physical_synthetic_separate"] {
+    for key in [
+        "paper_faithful_and_nested_reproduction_separate",
+        "no_random_window_confirmatory_claim",
+        "one_class_fold_mixed_precision_f1_mcc_na",
+        "failed_runs_preserved",
+        "na_reason_required",
+        "simulator_physical_synthetic_separate",
+    ] {
         bool_true(rules, key, "plan.report_rules")?;
     }
 
@@ -355,7 +563,9 @@ fn parse_args() -> Result<Args, String> {
             "--receipt" => &mut receipt,
             _ => return Err(format!("unknown argument {flag}")),
         };
-        let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
+        let path = args
+            .next()
+            .ok_or_else(|| format!("{flag} requires a path"))?;
         if target.replace(PathBuf::from(path)).is_some() {
             return Err(format!("duplicate argument {flag}"));
         }
@@ -368,12 +578,22 @@ fn parse_args() -> Result<Args, String> {
 
 fn validate_receipt_location(receipt: &Path, plan: &Path) -> Result<(), String> {
     if receipt.exists() {
-        return Err(format!("refusing to overwrite receipt {}", receipt.display()));
+        return Err(format!(
+            "refusing to overwrite receipt {}",
+            receipt.display()
+        ));
     }
-    let parent = receipt.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    let canonical_parent = fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
-    let canonical_plan = fs::canonicalize(plan).map_err(|e| format!("cannot canonicalize plan: {e}"))?;
-    let plan_parent = canonical_plan.parent().ok_or("plan has no parent directory")?;
+    let parent = receipt
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
+    let canonical_plan =
+        fs::canonicalize(plan).map_err(|e| format!("cannot canonicalize plan: {e}"))?;
+    let plan_parent = canonical_plan
+        .parent()
+        .ok_or("plan has no parent directory")?;
     if canonical_parent.starts_with(plan_parent) {
         return Err("receipt must be outside the plan directory".to_owned());
     }
@@ -385,11 +605,17 @@ fn run() -> Result<(), String> {
     let (plan_bytes, plan) = read_input(&args.plan)?;
     validate_receipt_location(&args.receipt, &args.plan)?;
     let receipt = audit_plan(&plan, &plan_bytes)?;
-    let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
+    let encoded =
+        serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
-    file.write_all(&encoded).map_err(|e| format!("cannot write receipt: {e}"))?;
-    file.write_all(b"\n").map_err(|e| format!("cannot finish receipt: {e}"))?;
+    file.write_all(&encoded)
+        .map_err(|e| format!("cannot write receipt: {e}"))?;
+    file.write_all(b"\n")
+        .map_err(|e| format!("cannot finish receipt: {e}"))?;
     Ok(())
 }
 
@@ -408,7 +634,8 @@ mod tests {
     use super::*;
 
     fn fixture() -> (Value, Vec<u8>) {
-        let bytes = include_bytes!("../tests/fixtures/hardsec/hardware-benchmark-plan-v1.json").to_vec();
+        let bytes =
+            include_bytes!("../tests/fixtures/hardsec/hardware-benchmark-plan-v1.json").to_vec();
         let value = serde_json::from_slice(&bytes).unwrap();
         (value, bytes)
     }
@@ -428,18 +655,33 @@ mod tests {
         assert_eq!(receipt["coverage"]["baseline_arm_count"], 10);
         assert_eq!(receipt["coverage"]["candidate_arm_count"], 3);
         assert_eq!(receipt["coverage"]["split_count"], 8);
-        assert_eq!(receipt["statistical_support"]["six_endpoint_zero_failure_groups_for_5_percent_risk"], 94);
-        assert_eq!(receipt["statistical_support"]["six_endpoint_zero_failure_groups_for_1_percent_risk"], 477);
-        assert_eq!(receipt["statistical_support"]["effective_sample_size_estimate"], Value::Null);
+        assert_eq!(
+            receipt["statistical_support"]["six_endpoint_zero_failure_groups_for_5_percent_risk"],
+            94
+        );
+        assert_eq!(
+            receipt["statistical_support"]["six_endpoint_zero_failure_groups_for_1_percent_risk"],
+            477
+        );
+        assert_eq!(
+            receipt["statistical_support"]["effective_sample_size_estimate"],
+            Value::Null
+        );
     }
-
 
     #[test]
     fn rejects_missing_harpy_v_gem5_100c_source_record() {
         let (mut plan, _) = fixture();
-        plan["dataset_sources"].as_array_mut().unwrap().retain(|v| v["id"] != "harpy-v-gem5-100c");
+        plan["dataset_sources"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|v| v["id"] != "harpy-v-gem5-100c");
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("missing or mismatched dataset harpy-v-gem5-100c"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("missing or mismatched dataset harpy-v-gem5-100c")
+        );
     }
 
     #[test]
@@ -447,13 +689,20 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["split_ladder"] = json!(["execution_holdout"]);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("random_window_diagnostic"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("random_window_diagnostic")
+        );
     }
 
     #[test]
     fn rejects_missing_tsmade_baseline() {
         let (mut plan, _) = fixture();
-        plan["baseline_arms"].as_array_mut().unwrap().retain(|v| v["id"] != "t-smade");
+        plan["baseline_arms"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|v| v["id"] != "t-smade");
         let bytes = encoded(&plan);
         assert!(audit_plan(&plan, &bytes).unwrap_err().contains("t-smade"));
     }
@@ -463,7 +712,11 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["baseline_arms"][1]["id"] = json!("dt_hpc");
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("duplicate arm id"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("duplicate arm id")
+        );
     }
 
     #[test]
@@ -471,7 +724,11 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["evidence_separation"]["no_domain_pooling"] = json!(false);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("no_domain_pooling must be true"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("no_domain_pooling must be true")
+        );
     }
 
     #[test]
@@ -479,15 +736,24 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["minimum_platform_scope"]["physical_microarchitectures"] = json!(1);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("at least 3 physical"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("at least 3 physical")
+        );
     }
 
     #[test]
     fn rejects_wrong_clopper_pearson_support_arithmetic() {
         let (mut plan, _) = fixture();
-        plan["statistical_support"]["zero_failure_independent_groups_for_upper_risk_le_0_05_six_endpoints"] = json!(10);
+        plan["statistical_support"]["zero_failure_independent_groups_for_upper_risk_le_0_05_six_endpoints"] =
+            json!(10);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("must equal 94"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("must equal 94")
+        );
     }
 
     #[test]
@@ -495,23 +761,41 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["aspirational_targets"]["invalid_sensor_silent_clears_max"] = json!(1);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("target values"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("target values")
+        );
     }
 
     #[test]
     fn rejects_missing_adaptation_family_attack_scenario() {
         let (mut plan, _) = fixture();
-        plan["attack_families"].as_array_mut().unwrap().retain(|v| v != "probabilistic_interleaving");
+        plan["attack_families"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|v| v != "probabilistic_interleaving");
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("probabilistic_interleaving"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("probabilistic_interleaving")
+        );
     }
 
     #[test]
     fn rejects_missing_invalid_sensor_negative_control() {
         let (mut plan, _) = fixture();
-        plan["negative_controls"].as_array_mut().unwrap().retain(|v| v != "invalid_sensor_clear");
+        plan["negative_controls"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|v| v != "invalid_sensor_clear");
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("invalid_sensor_clear"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("invalid_sensor_clear")
+        );
     }
 
     #[test]
@@ -519,7 +803,11 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["evidence_separation"]["threshold_frozen_on_validation"] = json!(false);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("threshold_frozen_on_validation"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("threshold_frozen_on_validation")
+        );
     }
 
     #[test]
@@ -527,6 +815,10 @@ mod tests {
         let (mut plan, _) = fixture();
         plan["report_rules"]["simulator_physical_synthetic_separate"] = json!(false);
         let bytes = encoded(&plan);
-        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("simulator_physical_synthetic_separate"));
+        assert!(
+            audit_plan(&plan, &bytes)
+                .unwrap_err()
+                .contains("simulator_physical_synthetic_separate")
+        );
     }
 }
