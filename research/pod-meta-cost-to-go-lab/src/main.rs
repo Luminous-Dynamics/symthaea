@@ -1,19 +1,19 @@
 use pod_meta_cost_to_go_lab::{
-    ActionTrajectory, BudgetLedger, CapCalibrationPoint, CapCurrentPrediction,
-    CensoringWeightReceipt, CompletedCalibrationExample, DecisionDrivenCapConfig,
-    DecisionDrivenCapState, EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt,
-    ForecastReceipt, FrontierCostCoefficients, HistoricalCostBaseline,
-    InterventionAssignmentEvidence, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
-    LandmarkTerminal, LastObservedActionForecaster, LinearProofFrontierCostModel,
-    MatchedInterventionSet, OnlineCompetingTerminal, OnlineCostDimension,
-    OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
-    OnlineSelectionLedger, PrefixBudgetReceipt, PrefixForecaster, PrefixReplayEngine,
-    PrefixReplayEvaluator, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
-    ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
-    SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
+    ActionTrajectory, BudgetLedger, BudgetedActionContext, CandidateOperationForecast,
+    CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt, CompletedCalibrationExample,
+    DecisionDrivenCapConfig, DecisionDrivenCapState, EffectDisposition, ForecastId,
+    ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
+    HistoricalCostBaseline, InterventionAssignmentEvidence, JointCostEnvelope, LandmarkEpisode,
+    LandmarkIpcwConfig, LandmarkTerminal, LastObservedActionForecaster,
+    LinearProofFrontierCostModel, MatchedInterventionSet, OnlineCompetingTerminal,
+    OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
+    OnlinePredictionStatement, OnlineSelectionLedger, PrefixBudgetReceipt, PrefixForecaster,
+    PrefixReplayEngine, PrefixReplayEvaluator, ProofFrontierFeatures, ReconciliationOutcome,
+    RemainingCostForecast, ReservationId, ResourceVector, SelectedProofCalibrationExample,
+    SelectedProofEnvelope, SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, TrajectoryActionKind,
     TrajectoryActionReceipt, TrajectoryTerminalRecord, assess_completion_feasibility,
-    assess_joint_resource_fit, calibrate_landmark_ipcw,
+    assess_joint_resource_fit, calibrate_landmark_ipcw, select_budget_feasible_pareto,
 };
 
 fn online_statement(id: u64, episode: u64, decision: u64, tick: u64) -> OnlinePredictionStatement {
@@ -110,6 +110,9 @@ fn prefix_outcome(
 }
 
 fn trajectory_features(unresolved: u64) -> ProofFrontierFeatures {
+    if unresolved == 0 {
+        return ProofFrontierFeatures::default();
+    }
     ProofFrontierFeatures {
         unresolved_obligations: unresolved,
         mandatory_obligations: unresolved,
@@ -1446,5 +1449,102 @@ fn main() {
         "INTERVENTION_SET_ROW\tpre-state-negative-control\t{}",
         mismatched_intervention.validate()
             == Err(pod_meta_cost_to_go_lab::InterventionSetError::PreStateMismatch)
+    );
+    let action_context = BudgetedActionContext {
+        pre_state_digest: [111; 32],
+        frontier_digest: [112; 32],
+        candidate_pool_digest: [113; 32],
+        admissible_operation_families: vec![2, 3, 4, 5],
+        remaining_budget: ResourceVector::new(100, 10, 20, 10, 40, 50),
+        minimum_support: 8,
+        model_digest: [114; 32],
+        policy_digest: [115; 32],
+    };
+    let action_forecasts = vec![
+        CandidateOperationForecast {
+            operation_family: 2,
+            pre_state_digest: [111; 32],
+            frontier_digest: [112; 32],
+            candidate_pool_digest: [113; 32],
+            model_digest: [114; 32],
+            policy_digest: [115; 32],
+            predicted_proof_progress: 1,
+            remaining_q50: ResourceVector::new(20, 2, 3, 1, 5, 5),
+            remaining_q90: ResourceVector::new(30, 3, 4, 2, 8, 8),
+            remaining_q95: ResourceVector::new(40, 4, 5, 3, 10, 10),
+            mandatory_verification_reserve: ResourceVector::new(5, 1, 1, 0, 1, 1),
+            support_count: 16,
+            shift_status: ShiftStatus::InDomain,
+        },
+        CandidateOperationForecast {
+            operation_family: 3,
+            pre_state_digest: [111; 32],
+            frontier_digest: [112; 32],
+            candidate_pool_digest: [113; 32],
+            model_digest: [114; 32],
+            policy_digest: [115; 32],
+            predicted_proof_progress: 3,
+            remaining_q50: ResourceVector::new(24, 2, 3, 1, 5, 5),
+            remaining_q90: ResourceVector::new(35, 3, 4, 2, 8, 8),
+            remaining_q95: ResourceVector::new(45, 4, 5, 3, 10, 10),
+            mandatory_verification_reserve: ResourceVector::new(5, 1, 1, 0, 1, 1),
+            support_count: 16,
+            shift_status: ShiftStatus::InDomain,
+        },
+        CandidateOperationForecast {
+            operation_family: 4,
+            pre_state_digest: [111; 32],
+            frontier_digest: [112; 32],
+            candidate_pool_digest: [113; 32],
+            model_digest: [114; 32],
+            policy_digest: [115; 32],
+            predicted_proof_progress: 9,
+            remaining_q50: ResourceVector::new(10, 1, 2, 0, 4, 4),
+            remaining_q90: ResourceVector::new(110, 2, 3, 1, 5, 5),
+            remaining_q95: ResourceVector::new(120, 3, 4, 2, 7, 7),
+            mandatory_verification_reserve: ResourceVector::ZERO,
+            support_count: 16,
+            shift_status: ShiftStatus::InDomain,
+        },
+        CandidateOperationForecast {
+            operation_family: 5,
+            pre_state_digest: [111; 32],
+            frontier_digest: [112; 32],
+            candidate_pool_digest: [113; 32],
+            model_digest: [114; 32],
+            policy_digest: [115; 32],
+            predicted_proof_progress: 2,
+            remaining_q50: ResourceVector::new(5, 1, 1, 0, 2, 2),
+            remaining_q90: ResourceVector::new(7, 2, 2, 4, 3, 3),
+            remaining_q95: ResourceVector::new(9, 3, 3, 5, 4, 4),
+            mandatory_verification_reserve: ResourceVector::ZERO,
+            support_count: 16,
+            shift_status: ShiftStatus::InDomain,
+        },
+    ];
+    let budgeted_pareto =
+        select_budget_feasible_pareto(&action_context, &action_forecasts).unwrap();
+    println!(
+        "BUDGETED_PARETO_ROW\tfrontier\t{}\t{}\t{}\t{}\t{}",
+        budgeted_pareto.assessments.len(),
+        budgeted_pareto.pareto_operation_families.len(),
+        budgeted_pareto.pareto_operation_families[0],
+        budgeted_pareto.pareto_operation_families[1],
+        budgeted_pareto.pareto_operation_families[2]
+    );
+    let infeasible_count = budgeted_pareto
+        .assessments
+        .iter()
+        .filter(|assessment| {
+            matches!(
+                assessment.disposition,
+                pod_meta_cost_to_go_lab::CandidateDisposition::BudgetInfeasible
+            )
+        })
+        .count();
+    println!(
+        "BUDGETED_PARETO_ROW\tbudget-negative-control\t{}\t{}",
+        infeasible_count,
+        budgeted_pareto.pareto_operation_families.contains(&4)
     );
 }

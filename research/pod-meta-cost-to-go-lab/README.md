@@ -20,6 +20,7 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - an online replay ledger records selected prediction statements and delayed exact, coverage-bit, unknown, censored, and competing-terminal feedback.
 - a deterministic prefix-replay evaluator scores progressive forecasts against verified completion costs while preserving censored, competing-terminal, and pending outcomes.
 - a disjoint task-family historical baseline provides empirical q50/q90/q95 cost estimates and a global fallback for unseen task families.
+- a budget-feasible Pareto action selector filters shifted/under-supported/over-budget candidates and returns non-dominated operations without scalarizing six resources.
 
 ## Run
 
