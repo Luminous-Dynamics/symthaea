@@ -281,17 +281,22 @@ fn normalized_words(input: &str) -> Vec<String> {
 }
 
 fn contains_word_sequence(haystack: &[String], needle: &[String]) -> bool {
-    !needle.is_empty() && haystack.windows(needle.len()).any(|window| window == needle)
+    !needle.is_empty()
+        && haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
 }
 
 fn shared_shingle_count(left: &[String], right: &[String], width: usize) -> usize {
     if left.len() < width || right.len() < width {
         return 0;
     }
-    let left_shingles: BTreeSet<Vec<&str>> = left.windows(width)
+    let left_shingles: BTreeSet<Vec<&str>> = left
+        .windows(width)
         .map(|window| window.iter().map(String::as_str).collect())
         .collect();
-    let right_shingles: BTreeSet<Vec<&str>> = right.windows(width)
+    let right_shingles: BTreeSet<Vec<&str>> = right
+        .windows(width)
         .map(|window| window.iter().map(String::as_str).collect())
         .collect();
     left_shingles.intersection(&right_shingles).count()
@@ -334,10 +339,7 @@ fn extract_json_objects(input: &str) -> Vec<&str> {
     objects
 }
 
-fn matching_answer_items(
-    body: &str,
-    bundle: &FreshChallengeBundleV1,
-) -> BTreeSet<String> {
+fn matching_answer_items(body: &str, bundle: &FreshChallengeBundleV1) -> BTreeSet<String> {
     let mut matched = BTreeSet::new();
     for object in extract_json_objects(body) {
         if let Ok(solution) = serde_json::from_str::<ExactLinearSolutionV1>(object) {
@@ -354,7 +356,12 @@ fn matching_answer_items(
 fn analyze_response_body(
     body: &str,
     bundle: &FreshChallengeBundleV1,
-) -> (SearchExposureClassV1, Vec<String>, SearchFindingMethodV1, u16) {
+) -> (
+    SearchExposureClassV1,
+    Vec<String>,
+    SearchFindingMethodV1,
+    u16,
+) {
     let body_words = normalized_words(body);
     let mut context_items = BTreeSet::new();
     let mut exact_context = false;
@@ -363,9 +370,7 @@ fn analyze_response_body(
         if task_words.len() >= 8 && contains_word_sequence(&body_words, &task_words) {
             exact_context = true;
             context_items.insert(task.item_id.clone());
-        } else if task_words.len() >= 12
-            && shared_shingle_count(&body_words, &task_words, 6) >= 2
-        {
+        } else if task_words.len() >= 12 && shared_shingle_count(&body_words, &task_words, 6) >= 2 {
             // Candidate lexical duplicate only; this is not semantic matching.
             context_items.insert(task.item_id.clone());
         }
@@ -460,7 +465,9 @@ pub fn analyze_search_time_response_bodies(
     {
         return Err("body evidence count exceeds search event limit".to_owned());
     }
-    let expected_events: BTreeMap<u64, &SearchTimeEventV1> = trace.events.iter()
+    let expected_events: BTreeMap<u64, &SearchTimeEventV1> = trace
+        .events
+        .iter()
         .filter(|event| {
             event.disposition == SearchEventDispositionV1::Allowed && event.response_bytes > 0
         })
@@ -476,13 +483,18 @@ pub fn analyze_search_time_response_bodies(
         if record.content_type.trim().is_empty() {
             return Err("response-body evidence requires a content type".to_owned());
         }
-        let event = expected_events.get(&record.event_sequence)
-            .ok_or_else(|| format!("response-body evidence references non-body event {}", record.event_sequence))?;
+        let event = expected_events.get(&record.event_sequence).ok_or_else(|| {
+            format!(
+                "response-body evidence references non-body event {}",
+                record.event_sequence
+            )
+        })?;
         let byte_len = record.body_text.len();
         if byte_len > SEARCH_MAX_BODY_BYTES {
             return Err("individual retained response body exceeds 16 MiB safety bound".to_owned());
         }
-        total_body_bytes = total_body_bytes.checked_add(byte_len)
+        total_body_bytes = total_body_bytes
+            .checked_add(byte_len)
             .ok_or_else(|| "total retained response body size overflowed".to_owned())?;
         if total_body_bytes > SEARCH_MAX_TOTAL_BODY_BYTES {
             return Err("total retained response bodies exceed 128 MiB safety bound".to_owned());
@@ -493,7 +505,10 @@ pub fn analyze_search_time_response_bodies(
             || event.response_sha256.as_deref() != Some(record.response_sha256.as_str())
             || event.response_bytes != byte_len as u64
         {
-            return Err(format!("retained response body does not match event {} receipt", record.event_sequence));
+            return Err(format!(
+                "retained response body does not match event {} receipt",
+                record.event_sequence
+            ));
         }
         let (exposure_class, matched_item_ids, method, confidence_permille) =
             analyze_response_body(&record.body_text, bundle);
@@ -512,7 +527,9 @@ pub fn analyze_search_time_response_bodies(
             return Err("duplicate unavailable body event sequence".to_owned());
         }
         if !expected_events.contains_key(sequence) {
-            return Err(format!("unavailable body sequence {sequence} is not a response-bearing allowed event"));
+            return Err(format!(
+                "unavailable body sequence {sequence} is not a response-bearing allowed event"
+            ));
         }
     }
     if !evidence_sequences.is_disjoint(&unavailable) {
@@ -521,7 +538,10 @@ pub fn analyze_search_time_response_bodies(
     let accounted: BTreeSet<u64> = evidence_sequences.union(&unavailable).copied().collect();
     let expected: BTreeSet<u64> = expected_events.keys().copied().collect();
     if accounted != expected {
-        return Err("every response-bearing allowed event must be retained or explicitly unavailable".to_owned());
+        return Err(
+            "every response-bearing allowed event must be retained or explicitly unavailable"
+                .to_owned(),
+        );
     }
     findings.sort_by_key(|finding| finding.event_sequence);
     let mut artifact = SearchTimeExposureFindingsV1 {
@@ -918,18 +938,28 @@ pub fn audit_search_time_findings(
         .iter()
         .map(|event| (event.sequence, event))
         .collect();
-    let expected_body_events: BTreeSet<u64> = trace.events.iter()
+    let expected_body_events: BTreeSet<u64> = trace
+        .events
+        .iter()
         .filter(|event| {
             event.disposition == SearchEventDispositionV1::Allowed && event.response_bytes > 0
         })
         .map(|event| event.sequence)
         .collect();
-    let declared_unavailable: BTreeSet<u64> =
-        findings.unavailable_body_event_sequences.iter().copied().collect();
+    let declared_unavailable: BTreeSet<u64> = findings
+        .unavailable_body_event_sequences
+        .iter()
+        .copied()
+        .collect();
     if declared_unavailable.len() != findings.unavailable_body_event_sequences.len()
-        || declared_unavailable.iter().any(|sequence| !expected_body_events.contains(sequence))
+        || declared_unavailable
+            .iter()
+            .any(|sequence| !expected_body_events.contains(sequence))
     {
-        return Err("unavailable body event sequences must be unique response-bearing allowed events".to_owned());
+        return Err(
+            "unavailable body event sequences must be unique response-bearing allowed events"
+                .to_owned(),
+        );
     }
     let mut seen = BTreeSet::new();
     let mut metadata = 0_u64;
@@ -959,7 +989,9 @@ pub fn audit_search_time_findings(
         }
         validate_digest(&finding.evidence_sha256, "finding.evidence_sha256")?;
         if event.response_sha256.as_deref() != Some(finding.evidence_sha256.as_str()) {
-            return Err("finding evidence digest does not match its event response digest".to_owned());
+            return Err(
+                "finding evidence digest does not match its event response digest".to_owned(),
+            );
         }
         if matches!(
             finding.exposure_class,
@@ -996,14 +1028,21 @@ pub fn audit_search_time_findings(
             SearchExposureClassV1::Unknown => unknown += 1,
         }
     }
-    if findings.response_body_event_count != u64::try_from(expected_body_events.len()).map_err(|_| "response body event count exceeds u64")?
-        || findings.response_body_evidence_count != u64::try_from(findings.findings.len()).map_err(|_| "body evidence count exceeds u64")?
+    if findings.response_body_event_count
+        != u64::try_from(expected_body_events.len())
+            .map_err(|_| "response body event count exceeds u64")?
+        || findings.response_body_evidence_count
+            != u64::try_from(findings.findings.len())
+                .map_err(|_| "body evidence count exceeds u64")?
     {
         return Err("findings response-body coverage counts do not match trace".to_owned());
     }
     let covered: BTreeSet<u64> = seen.union(&declared_unavailable).copied().collect();
     if !seen.is_disjoint(&declared_unavailable) || covered != expected_body_events {
-        return Err("every response-bearing event must have retained evidence or be explicitly unavailable".to_owned());
+        return Err(
+            "every response-bearing event must have retained evidence or be explicitly unavailable"
+                .to_owned(),
+        );
     }
     let response_body_event_count = findings.response_body_event_count;
     let response_body_evidence_count = findings.response_body_evidence_count;
@@ -1250,12 +1289,19 @@ mod tests {
             .collect();
         assert_eq!(expected_finding_fields, actual_finding_fields);
 
-        let expected_body_fields: BTreeSet<String> =
-            body_schema["items"]["properties"].as_object().unwrap()
-                .keys().cloned().collect();
-        let actual_body_fields: BTreeSet<String> =
-            serde_json::to_value(&body_record).unwrap().as_object().unwrap()
-                .keys().cloned().collect();
+        let expected_body_fields: BTreeSet<String> = body_schema["items"]["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let actual_body_fields: BTreeSet<String> = serde_json::to_value(&body_record)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(expected_body_fields, actual_body_fields);
     }
 
@@ -1286,17 +1332,16 @@ mod tests {
         let mut config = config;
         config.generator_config_sha256 =
             crate::fresh_instance::canonical_config_digest(&config).unwrap();
-        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
-            &config,
-            &[0x91; 32],
-        ).unwrap();
+        let bundle =
+            crate::fresh_instance::generate_fresh_challenge_bundle(&config, &[0x91; 32]).unwrap();
 
         let cases = [
             (
                 format!(
                     "{} {}",
                     bundle.public_packet.tasks[0].item_id,
-                    serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap()
+                    serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution)
+                        .unwrap()
                 ),
                 SearchExposureClassV1::AnswerBearing,
             ),
@@ -1326,12 +1371,8 @@ mod tests {
                 response_sha256: search_response_body_digest(&body),
                 body_text: body.clone(),
             };
-            let findings = analyze_search_time_response_bodies(
-                &trace,
-                &bundle,
-                &[evidence],
-                &[],
-            ).unwrap();
+            let findings =
+                analyze_search_time_response_bodies(&trace, &bundle, &[evidence], &[]).unwrap();
             assert_eq!(findings.findings.len(), 1);
             assert_eq!(findings.findings[0].exposure_class, expected_class);
             let public_output = serde_json::to_string(&findings).unwrap();
@@ -1368,10 +1409,8 @@ mod tests {
         let mut config = config;
         config.generator_config_sha256 =
             crate::fresh_instance::canonical_config_digest(&config).unwrap();
-        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
-            &config,
-            &[0x94; 32],
-        ).unwrap();
+        let bundle =
+            crate::fresh_instance::generate_fresh_challenge_bundle(&config, &[0x94; 32]).unwrap();
         let body = serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap();
         let (class, items, _, _) = analyze_response_body(&body, &bundle);
         assert_eq!(class, SearchExposureClassV1::Unknown);
@@ -1405,11 +1444,10 @@ mod tests {
         let mut config = config;
         config.generator_config_sha256 =
             crate::fresh_instance::canonical_config_digest(&config).unwrap();
-        let bundle = crate::fresh_instance::generate_fresh_challenge_bundle(
-            &config,
-            &[0x93; 32],
-        ).unwrap();
-        let solution = serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap();
+        let bundle =
+            crate::fresh_instance::generate_fresh_challenge_bundle(&config, &[0x93; 32]).unwrap();
+        let solution =
+            serde_json::to_string(&bundle.sealed_oracle_packet.entries[0].solution).unwrap();
         let body = format!(
             "{} {{\"tool_result\":{{\"answer\":{solution}}},\"other\":\"metadata\"}}",
             bundle.public_packet.tasks[0].item_id
@@ -1426,8 +1464,12 @@ mod tests {
             response_sha256: search_response_body_digest(&body),
             body_text: body.clone(),
         };
-        let findings = analyze_search_time_response_bodies(&trace, &bundle, &[evidence], &[]).unwrap();
-        assert_eq!(findings.findings[0].exposure_class, SearchExposureClassV1::AnswerBearing);
+        let findings =
+            analyze_search_time_response_bodies(&trace, &bundle, &[evidence], &[]).unwrap();
+        assert_eq!(
+            findings.findings[0].exposure_class,
+            SearchExposureClassV1::AnswerBearing
+        );
         assert!(!serde_json::to_string(&findings).unwrap().contains(&body));
     }
 
@@ -1488,12 +1530,16 @@ mod tests {
                 },
             },
             &[0x92; 32],
-        ).unwrap();
+        )
+        .unwrap();
         trace.challenge_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
         trace.model_checkpoint_sha256 = bundle.public_packet.model_checkpoint_sha256.clone();
         seal_search_time_trace(&mut trace).unwrap();
-        assert!(analyze_search_time_response_bodies(&trace, &bundle, &[], &[])
-            .unwrap_err().contains("every response-bearing allowed event"));
+        assert!(
+            analyze_search_time_response_bodies(&trace, &bundle, &[], &[])
+                .unwrap_err()
+                .contains("every response-bearing allowed event")
+        );
         let findings = analyze_search_time_response_bodies(&trace, &bundle, &[], &[1]).unwrap();
         let audit = audit_search_time_findings(&trace, &findings).unwrap();
         assert_eq!(audit.body_evidence_coverage_permille, Some(0));
