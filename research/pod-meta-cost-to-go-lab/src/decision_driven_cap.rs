@@ -27,6 +27,7 @@ pub struct CapCurrentPrediction {
     pub frontier_digest: [u8; 32],
     pub model_digest: [u8; 32],
     pub score_model_digest: [u8; 32],
+    pub selection_policy_digest: [u8; 32],
     pub feature_cohort_digest: [u8; 32],
     pub selection_score: u64,
     pub predicted_cost: u128,
@@ -97,6 +98,7 @@ pub enum DecisionDrivenCapError {
     MissingCurrentFrontierDigest,
     CurrentModelMismatch,
     CurrentScoreModelMismatch,
+    CurrentSelectionPolicyMismatch,
     CurrentCohortMismatch,
     CurrentHoldoutOverlap,
     InvalidCalibrationExampleId,
@@ -260,6 +262,9 @@ fn validate_current(
     if current.score_model_digest != config.score_model_digest {
         return Err(DecisionDrivenCapError::CurrentScoreModelMismatch);
     }
+    if current.selection_policy_digest != config.selection_policy_digest {
+        return Err(DecisionDrivenCapError::CurrentSelectionPolicyMismatch);
+    }
     if current.feature_cohort_digest != config.feature_cohort_digest {
         return Err(DecisionDrivenCapError::CurrentCohortMismatch);
     }
@@ -368,6 +373,7 @@ mod tests {
             holdout_partition_digest: [1; 32],
             model_digest: [2; 32],
             score_model_digest: [7; 32],
+            selection_policy_digest: [8; 32],
             feature_cohort_digest: [3; 32],
             selection_score: score,
             predicted_cost: predicted,
