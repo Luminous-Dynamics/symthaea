@@ -81,7 +81,8 @@
         "replicate_id",
         "seed",
         "uninformative_metric_value",
-        "positive_control_metric_value"
+        "positive_control_metric_value",
+        "perfect_metric_value"
       ],
       "properties": {
         "effect_magnitude": {
@@ -100,6 +101,9 @@
           "type": "number"
         },
         "positive_control_metric_value": {
+          "type": "number"
+        },
+        "perfect_metric_value": {
           "type": "number"
         }
       }
