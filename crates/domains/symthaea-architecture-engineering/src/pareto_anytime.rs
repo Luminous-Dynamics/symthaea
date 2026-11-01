@@ -1134,6 +1134,28 @@ pub fn resolve_and_append_artifact_verified_promotion<R: EvidenceArtifactResolve
     Ok((event_sha256, receipt))
 }
 
+const SYNTHETIC_OBJECTIVE_COST_MODEL_ID: &str =
+    "symthaea.synthetic-objective-evaluation-unit.v0.1";
+
+#[derive(Serialize)]
+struct SyntheticObjectiveEvaluationCostModel {
+    schema: &'static str,
+    version: &'static str,
+    unit: &'static str,
+    charge_per_attempt_microunits: u64,
+}
+
+/// Digest of the exact synthetic cost formula used by the deterministic optimizer recorder.
+/// Physical compute, latency, memory and energy are deliberately not estimated by this model.
+pub fn synthetic_objective_evaluation_cost_model_sha256() -> Result<String, AnytimeError> {
+    digest_serializable(&SyntheticObjectiveEvaluationCostModel {
+        schema: "symthaea.architecture-engineering.synthetic-objective-cost-model",
+        version: "0.1.0",
+        unit: "one_objective_evaluation_attempt",
+        charge_per_attempt_microunits: 1,
+    })
+}
+
 /// Captures deterministic optimizer objective evaluations in the shared anytime format.
 ///
 /// This recorder uses synthetic objective-evaluation units only. It deliberately records
@@ -1158,12 +1180,19 @@ impl<'a> AnytimeRecorder<'a> {
                 "deterministic optimizer recorder requires exactly EvaluatorCalls and NormalizedChargeMicrounits; physical meters must come from a measured execution adapter",
             ));
         }
-        if !history.header.cost_model_id.contains("synthetic")
-            && !history.header.cost_model_id.contains("objective-evaluation-unit")
+        let expected_cost_model_sha256 = synthetic_objective_evaluation_cost_model_sha256()?;
+        if history.header.cost_model_id != SYNTHETIC_OBJECTIVE_COST_MODEL_ID
+            || history.header.cost_model_sha256 != expected_cost_model_sha256
         {
             return Err(AnytimeError::new(
-                "recorder.cost_model_id",
-                "deterministic optimizer recorder requires an explicitly synthetic objective-evaluation cost model",
+                "recorder.cost_model",
+                "deterministic optimizer recorder requires the exact versioned one-unit-per-objective-evaluation cost model and digest",
+            ));
+        }
+        if !history.events.is_empty() {
+            return Err(AnytimeError::new(
+                "recorder.history",
+                "a fresh deterministic optimizer run requires an empty run-specific history; resume support is not implemented",
             ));
         }
         let mut attempts = BTreeMap::new();
