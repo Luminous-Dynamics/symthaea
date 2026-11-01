@@ -800,6 +800,49 @@ mod tests {
         )
     }
 
+    fn piano_identity_map() -> ScoreNoteIdentityMapV1 {
+        ScoreNoteIdentityMapV1::new(
+            "a".repeat(64),
+            2,
+            vec![
+                ScoreNoteIdentityV1 {
+                    note_index: 0,
+                    note_id: "pno-note-1".to_string(),
+                    part_id: 8,
+                    instrument_id: "piano".to_string(),
+                    source_model_id: Some("piano.model-a".to_string()),
+                    onset: BeatPosition::new(0, 1).unwrap(),
+                    duration: BeatPosition::new(2, 1).unwrap(),
+                },
+                ScoreNoteIdentityV1 {
+                    note_index: 1,
+                    note_id: "pno-note-2".to_string(),
+                    part_id: 8,
+                    instrument_id: "piano".to_string(),
+                    source_model_id: Some("piano.model-a".to_string()),
+                    onset: BeatPosition::new(2, 1).unwrap(),
+                    duration: BeatPosition::new(2, 1).unwrap(),
+                },
+            ],
+        )
+    }
+
+    fn piano_pedal_event() -> PerformanceGestureEvent {
+        PerformanceGestureEvent {
+            event_id: "piano-damper-depth-1".to_string(),
+            instrument_id: "piano".to_string(),
+            source_model_id: Some("piano.model-a".to_string()),
+            target: GestureTarget::Part { part_id: 8 },
+            at: BeatPosition::new(1, 1).unwrap(),
+            parameter: GestureParameter::PianoDamperPedalDepth,
+            value: GestureValue::Scalar {
+                amount: 0.2,
+                unit: GestureUnit::Normalized,
+            },
+            interpolation: crate::performance_gesture::GestureInterpolation::Linear,
+        }
+    }
+
     fn gesture_event() -> PerformanceGestureEvent {
         PerformanceGestureEvent {
             event_id: "bow-force-event-1".to_string(),
@@ -933,6 +976,98 @@ mod tests {
                 &"a".repeat(64), 2, &identity_map(), &gesture_event()
             )
             .is_ok());
+    }
+
+    #[test]
+    fn piano_half_pedal_counterfactual_binds_part_scope_and_model() {
+        let identity_map = piano_identity_map();
+        let source_event = piano_pedal_event();
+        let mut value = receipt();
+        value.note_identity_map_sha256 = identity_map.identity_map_sha256.clone();
+        value.protocol_sha256 = "4".repeat(64);
+        value.gesture_event_sha256 = source_event.canonical_sha256().unwrap();
+        value.source_manifest_sha256 = "5".repeat(64);
+        value.renderer_id = "muse.physical-piano-model".to_string();
+        value.renderer_build_sha256 = "6".repeat(64);
+        value.feature_extractor_config_sha256 = "7".repeat(64);
+        value.event_id = source_event.event_id.clone();
+        value.instrument_id = "piano".to_string();
+        value.source_model_id = "piano.model-a".to_string();
+        value.target = GestureTarget::Part { part_id: 8 };
+        value.parameter = GestureParameter::PianoDamperPedalDepth;
+        value.baseline_value = GestureValue::Scalar {
+            amount: 0.2,
+            unit: GestureUnit::Normalized,
+        };
+        value.intervention_value = GestureValue::Scalar {
+            amount: 0.8,
+            unit: GestureUnit::Normalized,
+        };
+        value.baseline_features = vec![
+            FeatureMeasurement {
+                target: GestureTarget::Part { part_id: 8 },
+                instrument_id: "piano".to_string(),
+                source_model_id: Some("piano.model-a".to_string()),
+                feature_id: "pedal_decay_ms".to_string(),
+                value: 800.0,
+                unit: FeatureUnit::Milliseconds,
+            },
+            FeatureMeasurement {
+                target: GestureTarget::Part { part_id: 8 },
+                instrument_id: "piano".to_string(),
+                source_model_id: Some("piano.model-a".to_string()),
+                feature_id: "note_attack_ms".to_string(),
+                value: 18.0,
+                unit: FeatureUnit::Milliseconds,
+            },
+        ];
+        value.intervention_features = vec![
+            FeatureMeasurement {
+                target: GestureTarget::Part { part_id: 8 },
+                instrument_id: "piano".to_string(),
+                source_model_id: Some("piano.model-a".to_string()),
+                feature_id: "pedal_decay_ms".to_string(),
+                value: 1200.0,
+                unit: FeatureUnit::Milliseconds,
+            },
+            FeatureMeasurement {
+                target: GestureTarget::Part { part_id: 8 },
+                instrument_id: "piano".to_string(),
+                source_model_id: Some("piano.model-a".to_string()),
+                feature_id: "note_attack_ms".to_string(),
+                value: 19.0,
+                unit: FeatureUnit::Milliseconds,
+            },
+        ];
+        value.expected_effects = vec![ExpectedFeatureEffect {
+            target: GestureTarget::Part { part_id: 8 },
+            feature_id: "pedal_decay_ms".to_string(),
+            unit: FeatureUnit::Milliseconds,
+            minimum_abs_delta: 200.0,
+            direction: ExpectedDirection::Increase,
+        }];
+        value.side_effect_budgets = vec![SideEffectBudget {
+            target: GestureTarget::Part { part_id: 8 },
+            feature_id: "note_attack_ms".to_string(),
+            unit: FeatureUnit::Milliseconds,
+            maximum_abs_delta: 2.0,
+        }];
+        value.seal();
+
+        assert!(value.verify().is_ok());
+        assert!(value.verify_against_event_and_identity_map(
+            &"a".repeat(64),
+            2,
+            &identity_map,
+            &source_event,
+        ).is_ok());
+
+        value.intervention_value = GestureValue::Scalar {
+            amount: 0.8,
+            unit: GestureUnit::Hertz,
+        };
+        value.seal();
+        assert!(value.verify().is_err());
     }
 
     #[test]
