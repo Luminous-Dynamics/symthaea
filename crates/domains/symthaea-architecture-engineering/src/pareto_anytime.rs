@@ -23,7 +23,7 @@ use super::pareto_objectives::{
 };
 
 const SCHEMA: &str = "symthaea.architecture-engineering.pareto-anytime";
-const VERSION: &str = "0.3.0";
+const VERSION: &str = "0.4.0";
 const TARGET_PLAN_SCHEMA: &str = "symthaea.architecture-engineering.anytime-target-plan";
 const TARGET_PLAN_VERSION: &str = "0.1.0";
 
@@ -1567,6 +1567,8 @@ fn event_digest(
 pub enum TargetAttainmentStatus {
     Reached,
     NotReachedByBudget,
+    /// The frozen target metrics are deterministic-archive metrics and do not apply to noisy mode.
+    NotApplicableInNoisyMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1801,7 +1803,11 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                 first_archive_sha256: Some(first.archive_sha256),
                 first_resources: Some(first.resources),
                 first_resource_qualified: Some(first.resource_qualified),
-                final_metric_value: item.final_snapshot.metric_value,
+                final_metric_value: if header.noisy_observation_plan_sha256.is_some() {
+                    None
+                } else {
+                    item.final_snapshot.metric_value
+                },
                 final_archive_sha256: item.final_snapshot.archive_sha256,
                 final_resources: item.final_resources,
                 final_elapsed_wall_millis: item.final_elapsed_wall_millis,
@@ -1813,7 +1819,11 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                 metric: item.target.metric,
                 threshold: item.target.threshold,
                 minimum_evidence_level: item.target.minimum_evidence_level,
-                status: TargetAttainmentStatus::NotReachedByBudget,
+                status: if header.noisy_observation_plan_sha256.is_some() {
+                    TargetAttainmentStatus::NotApplicableInNoisyMode
+                } else {
+                    TargetAttainmentStatus::NotReachedByBudget
+                },
                 first_event_ordinal: None,
                 first_objective_evaluation_attempt_count: None,
                 first_elapsed_wall_millis: None,
