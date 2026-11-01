@@ -89,6 +89,7 @@ pub struct TimeImmParsedTable {
     pub entity_id: u64,
     pub source_file_sha256: [u8; 32],
     pub availability_policy_sha256: [u8; 32],
+    pub timestamp_zone_sha256: [u8; 32],
     pub row_count: u64,
     pub events: Vec<EventRecord>,
     /// Maximum quantization error bound per numeric feature.
@@ -167,6 +168,7 @@ impl fmt::Display for TimeImmAdapterError {
 }
 impl std::error::Error for TimeImmAdapterError {}
 
+#[derive(Debug)]
 pub struct TimeImmCsvAdapter {
     config: TimeImmAdapterConfig,
 }
@@ -258,7 +260,9 @@ impl TimeImmCsvAdapter {
 
         let mut events = Vec::new();
         let mut seen_event_ids = BTreeSet::new();
-        let mut max_rounding_error_by_feature = BTreeMap::new();
+        let mut max_rounding_error_by_feature: BTreeMap<String, f64> = self.config.features.iter()
+            .map(|feature| (feature.column_name.clone(), 0.5 * 10_f64.powi(feature.decimal_scale as i32)))
+            .collect();
         let mut row_count = 0_u64;
         for (row_index, row_result) in reader.records().enumerate() {
             let row_number = u64::try_from(row_index).map_err(|_| TimeImmAdapterError::SourceSequenceOverflow)?;
@@ -327,6 +331,7 @@ impl TimeImmCsvAdapter {
             entity_id,
             source_file_sha256,
             availability_policy_sha256: self.config.availability_policy.sha256(),
+            timestamp_zone_sha256: timestamp_zone_sha256(self.config.naive_timestamp_zone.as_ref()),
             row_count,
             events,
             max_rounding_error_by_feature,
@@ -426,6 +431,24 @@ impl TimeImmCsvAdapter {
             max_rounding_error_by_feature: BTreeMap::new(),
         })
     }
+}
+
+fn timestamp_zone_sha256(zone: Option<&NaiveTimestampZone>) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(b"SYMTHAEA-TIME-IMM-TIMESTAMP-ZONE-V1\\0");
+    match zone {
+        None => h.update([0]),
+        Some(NaiveTimestampZone::FixedOffsetSeconds(seconds)) => {
+            h.update([1]);
+            h.update(seconds.to_le_bytes());
+        }
+        Some(NaiveTimestampZone::Iana(name)) => {
+            h.update([2]);
+            h.update(u64::try_from(name.len()).unwrap_or(u64::MAX).to_le_bytes());
+            h.update(name.as_bytes());
+        }
+    }
+    h.finalize().into()
 }
 
 fn header_indexes(headers: &StringRecord) -> Result<BTreeMap<String, usize>, TimeImmAdapterError> {
