@@ -65,6 +65,10 @@ pub struct SelfCritiqueScoringRequestV1 {
     /// backend omitted per-step logprobs; the report exposes that coverage.
     pub initial_entropy_nats: Vec<f64>,
     pub critique_entropy_nats: Vec<f64>,
+    /// Actual returned vLLM probability values for every observed token step.
+    /// Required in top-K mode to expose omitted probability mass.
+    pub initial_topk_probability_steps: Option<Vec<Vec<f64>>>,
+    pub critique_topk_probability_steps: Option<Vec<Vec<f64>>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -97,6 +101,8 @@ pub struct SelfCritiqueScoreReportV1 {
     pub critique_missing_entropy_steps: u64,
     pub initial_entropy_sequence_sha256: String,
     pub critique_entropy_sequence_sha256: String,
+    pub initial_topk_diagnostics: Option<TopKTailSummaryV1>,
+    pub critique_topk_diagnostics: Option<TopKTailSummaryV1>,
     pub padded_cosine_similarity: f64,
     pub length_penalty: f64,
     /// Higher means more entropy-path similarity under the declared probe.
@@ -106,6 +112,102 @@ pub struct SelfCritiqueScoreReportV1 {
     pub independently_authenticated: bool,
     pub confirmatory_eligible: bool,
     pub claim_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TopKTailSummaryV1 {
+    pub observed_token_steps: u64,
+    pub mean_returned_probability_mass_permille: f64,
+    pub mean_unreturned_tail_mass_permille: f64,
+    /// Mean of -q*ln(q), a conservative lower bound on the omitted tail entropy.
+    pub mean_tail_entropy_lower_nats: f64,
+    /// Mean of -q*ln(q/(V-n_returned)), the uniform-tail upper bound.
+    pub mean_tail_entropy_upper_nats: f64,
+    pub mean_raw_returned_topk_entropy_nats: f64,
+}
+
+fn summarize_topk_tail(
+    steps: &[Vec<f64>],
+    supplied_entropy: &[f64],
+    vocabulary_size: u32,
+    label: &str,
+) -> Result<TopKTailSummaryV1, String> {
+    if steps.is_empty() || steps.len() != supplied_entropy.len() {
+        return Err(format!("{label} top-K probability steps must match observed entropy steps"));
+    }
+    let mut probability_mass = 0.0;
+    let mut tail_mass = 0.0;
+    let mut tail_lower = 0.0;
+    let mut tail_upper = 0.0;
+    let mut raw_entropy = 0.0;
+    for (index, probabilities) in steps.iter().enumerate() {
+        if probabilities.is_empty()
+            || probabilities.len() > 10_000
+            || probabilities.len() >= vocabulary_size as usize
+        {
+            return Err(format!("{label} top-K step {index} has invalid returned probability count"));
+        }
+        if probabilities
+            .iter()
+            .any(|probability| !probability.is_finite() || *probability < 0.0 || *probability > 1.0)
+        {
+            return Err(format!("{label} top-K step {index} contains an invalid probability"));
+        }
+        let mass = probabilities.iter().sum::<f64>();
+        if !mass.is_finite() || mass > 1.0 + 1.0e-6 {
+            return Err(format!("{label} top-K step {index} probability mass exceeds one"));
+        }
+        let entropy = probabilities
+            .iter()
+            .filter(|probability| **probability > 0.0)
+            .map(|probability| -probability * probability.ln())
+            .sum::<f64>();
+        if (entropy - supplied_entropy[index]).abs() > 1.0e-6 {
+            return Err(format!(
+                "{label} top-K entropy at step {index} does not match the returned probability values"
+            ));
+        }
+        let missing_mass = (1.0 - mass).max(0.0);
+        let missing_categories = vocabulary_size as usize - probabilities.len();
+        let lower = if missing_mass == 0.0 {
+            0.0
+        } else {
+            -missing_mass * missing_mass.ln()
+        };
+        let upper = if missing_mass == 0.0 {
+            0.0
+        } else {
+            -missing_mass * (missing_mass / missing_categories as f64).ln()
+        };
+        probability_mass += mass;
+        tail_mass += missing_mass;
+        tail_lower += lower;
+        tail_upper += upper;
+        raw_entropy += entropy;
+    }
+    let count = steps.len() as f64;
+    let summary = TopKTailSummaryV1 {
+        observed_token_steps: steps.len() as u64,
+        mean_returned_probability_mass_permille: probability_mass / count * 1_000.0,
+        mean_unreturned_tail_mass_permille: tail_mass / count * 1_000.0,
+        mean_tail_entropy_lower_nats: tail_lower / count,
+        mean_tail_entropy_upper_nats: tail_upper / count,
+        mean_raw_returned_topk_entropy_nats: raw_entropy / count,
+    };
+    let numbers = [
+        summary.mean_returned_probability_mass_permille,
+        summary.mean_unreturned_tail_mass_permille,
+        summary.mean_tail_entropy_lower_nats,
+        summary.mean_tail_entropy_upper_nats,
+        summary.mean_raw_returned_topk_entropy_nats,
+    ];
+    if numbers.iter().any(|value| !value.is_finite())
+        || summary.mean_tail_entropy_lower_nats > summary.mean_tail_entropy_upper_nats + 1.0e-10
+    {
+        return Err(format!("{label} top-K tail diagnostics are invalid"));
+    }
+    Ok(summary)
 }
 
 fn valid_digest(value: &str) -> bool {
@@ -268,10 +370,18 @@ pub fn score_self_critique_request(
             if top_k == 0 || vocabulary <= top_k {
                 return Err("top_k must be positive and vocabulary_size must exceed top_k".to_owned());
             }
+            if request.initial_topk_probability_steps.is_none()
+                || request.critique_topk_probability_steps.is_none()
+            {
+                return Err("top-K raw-partial mode requires returned probability vectors for both generations".to_owned());
+            }
         }
         EntropySourceV1::FullVocabSoftmaxExact => {
-            if request.requested_top_k.is_some() {
-                return Err("full_vocab_softmax_exact must not declare requested_top_k".to_owned());
+            if request.requested_top_k.is_some()
+                || request.initial_topk_probability_steps.is_some()
+                || request.critique_topk_probability_steps.is_some()
+            {
+                return Err("full_vocab_softmax_exact must not declare top-K metadata or truncated probability vectors".to_owned());
             }
             if request
                 .vocabulary_size
@@ -281,6 +391,27 @@ pub fn score_self_critique_request(
             }
         }
     }
+
+    let (initial_topk_diagnostics, critique_topk_diagnostics) =
+        match request.entropy_source {
+            EntropySourceV1::VllmTopKRawPartial => {
+                let vocabulary = request.vocabulary_size
+                    .ok_or_else(|| "top-K vocabulary size missing".to_owned())?;
+                let initial_steps = request.initial_topk_probability_steps.as_ref()
+                    .ok_or_else(|| "initial top-K probability steps missing".to_owned())?;
+                let critique_steps = request.critique_topk_probability_steps.as_ref()
+                    .ok_or_else(|| "critique top-K probability steps missing".to_owned())?;
+                (
+                    Some(summarize_topk_tail(
+                        initial_steps, &request.initial_entropy_nats, vocabulary, "initial",
+                    )?),
+                    Some(summarize_topk_tail(
+                        critique_steps, &request.critique_entropy_nats, vocabulary, "critique",
+                    )?),
+                )
+            }
+            EntropySourceV1::FullVocabSoftmaxExact => (None, None),
+        };
 
     let (padded_cosine_similarity, length_penalty, contamination_score) =
         penalized_entropy_cosine(
@@ -334,6 +465,8 @@ pub fn score_self_critique_request(
         critique_missing_entropy_steps: critique_missing,
         initial_entropy_sequence_sha256,
         critique_entropy_sequence_sha256,
+        initial_topk_diagnostics,
+        critique_topk_diagnostics,
         padded_cosine_similarity,
         length_penalty,
         contamination_score,
