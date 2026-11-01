@@ -289,6 +289,25 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
     if trace.operations.is_empty() {
         push_error(errors, "trace has no operations");
     }
+    if parse_revision(&trace.initial_state.authority_revision).is_none() {
+        push_error(errors, "initial authority revision is not canonical rev-N");
+    }
+
+    let mut initial_sources = BTreeSet::new();
+    for cursor in &trace.initial_state.source_cursors {
+        if !initial_sources.insert(&cursor.source_id) {
+            push_error(errors, format!("duplicate initial source cursor {}", cursor.source_id));
+        }
+        if !valid_digest(&cursor.predecessor_digest) {
+            push_error(errors, format!("initial source {} has malformed predecessor digest", cursor.source_id));
+        }
+    }
+    let mut initial_logs = BTreeSet::new();
+    for cursor in &trace.initial_state.log_cursors {
+        if !initial_logs.insert(&cursor.log_origin_id) {
+            push_error(errors, format!("duplicate initial log cursor {}", cursor.log_origin_id));
+        }
+    }
 
     let mut operation_map = HashMap::<&str, &Operation>::new();
     for operation in &trace.operations {
@@ -365,6 +384,12 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
         if !fault_ids.insert(&fault.fault_id) {
             push_error(errors, format!("duplicate fault ID {}", fault.fault_id));
         }
+        if !["process_crash", "power_loss_image", "io_error", "response_loss", "network_partition", "network_delay", "serialization_failure", "member_restart", "snapshot_restore", "witness_unavailable"].contains(&fault.class.as_str()) {
+            push_error(errors, format!("fault {} has unsupported class {}", fault.fault_id, fault.class));
+        }
+        if fault.action.is_empty() {
+            push_error(errors, format!("fault {} has empty action", fault.fault_id));
+        }
         match operation_map.get(fault.target_op_id.as_str()) {
             Some(target) => {
                 if target.runner_id != fault.runner_id {
@@ -372,6 +397,20 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
                 }
                 if fault.at_ns < target.invoked_at_ns || fault.at_ns > target.completed_at_ns {
                     push_error(errors, format!("fault {} falls outside target operation interval", fault.fault_id));
+                }
+                let required_kind = match fault.class.as_str() {
+                    "response_loss" | "serialization_failure" => "advance",
+                    "snapshot_restore" => "restore_verify",
+                    _ => target.kind.as_str(),
+                };
+                if target.kind != required_kind {
+                    push_error(errors, format!("fault {} targets incompatible operation kind", fault.fault_id));
+                }
+                if fault.class == "response_loss" && target.expected_result.outcome != "indeterminate" {
+                    push_error(errors, format!("response-loss fault {} is not recorded as indeterminate", fault.fault_id));
+                }
+                if fault.class == "serialization_failure" && target.expected_result.outcome != "retryable_abort" {
+                    push_error(errors, format!("serialization fault {} is not recorded as retryable_abort", fault.fault_id));
                 }
             }
             None => push_error(errors, format!("fault {} targets missing operation {}", fault.fault_id, fault.target_op_id)),
@@ -398,6 +437,23 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
     for digest in [&trace.initial_state.state_digest, &trace.initial_state.policy_digest, &trace.final_observation.state_digest, &trace.final_observation.policy_digest] {
         if !catalog.contains(digest.as_str()) {
             push_error(errors, format!("state/policy digest absent from fixture catalog: {digest}"));
+        }
+    }
+    for witness in &trace.witness_observations {
+        for digest in [&witness.state_digest, &witness.signed_record_digest] {
+            if !catalog.contains(digest.as_str()) {
+                push_error(errors, format!("witness {} references digest absent from fixture catalog", witness.sequence));
+            }
+        }
+        if let Some(previous) = witness.predecessor_witness_digest.as_deref() {
+            if !catalog.contains(previous) {
+                push_error(errors, format!("witness {} predecessor digest absent from fixture catalog", witness.sequence));
+            }
+        }
+    }
+    for receipt in &trace.final_observation.accepted_receipts {
+        if !catalog.contains(receipt.receipt_digest.as_str()) {
+            push_error(errors, format!("final receipt {} digest absent from fixture catalog", receipt.receipt_id));
         }
     }
     for operation in &trace.operations {
@@ -689,14 +745,27 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
         results.insert(operation.op_id.clone(), computed);
     }
 
-    let expected_sources: BTreeMap<String, SourceCursor> = trace.final_observation.source_cursors.iter().cloned().map(|x| (x.source_id.clone(), x)).collect();
-    let expected_logs: BTreeMap<String, String> = trace.final_observation.log_cursors.iter().map(|x| (x.log_origin_id.clone(), x.checkpoint.clone())).collect();
-    let expected_receipts: BTreeMap<String, ModelReceipt> = trace.final_observation.accepted_receipts.iter().map(|x| {
-        (x.receipt_id.clone(), ModelReceipt {
-            receipt_digest: x.receipt_digest.clone(),
-            acceptance_revision: parse_revision(&x.receipt_acceptance_revision).unwrap_or(u64::MAX),
-        })
-    }).collect();
+    let mut expected_sources = BTreeMap::<String, SourceCursor>::new();
+    for cursor in &trace.final_observation.source_cursors {
+        if expected_sources.insert(cursor.source_id.clone(), cursor.clone()).is_some() {
+            push_error(errors, format!("duplicate final source cursor {}", cursor.source_id));
+        }
+    }
+    let mut expected_logs = BTreeMap::<String, String>::new();
+    for cursor in &trace.final_observation.log_cursors {
+        if expected_logs.insert(cursor.log_origin_id.clone(), cursor.checkpoint.clone()).is_some() {
+            push_error(errors, format!("duplicate final log cursor {}", cursor.log_origin_id));
+        }
+    }
+    let mut expected_receipts = BTreeMap::<String, ModelReceipt>::new();
+    for receipt in &trace.final_observation.accepted_receipts {
+        if expected_receipts.insert(receipt.receipt_id.clone(), ModelReceipt {
+            receipt_digest: receipt.receipt_digest.clone(),
+            acceptance_revision: parse_revision(&receipt.receipt_acceptance_revision).unwrap_or(u64::MAX),
+        }).is_some() {
+            push_error(errors, format!("duplicate final receipt {}", receipt.receipt_id));
+        }
+    }
     if state.revision != parse_revision(&trace.final_observation.authority_revision).unwrap_or(u64::MAX) {
         push_error(errors, "final authority revision differs from replayed revision");
     }
@@ -850,8 +919,10 @@ mod tests {
 
     #[test]
     fn unknown_fields_are_rejected_by_strict_deserialization() {
-        let raw = br#"{"suite_id":"basalt-storage-conformance-trace","version":1,"untrusted_extra":true}"#;
-        assert!(serde_json::from_slice::<Trace>(raw).is_err());
+        let raw = include_bytes!("../../../benchmarks/basalt/storage-conformance-trace.v1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(raw).unwrap();
+        value.as_object_mut().unwrap().insert("untrusted_extra".to_string(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<Trace>(value).is_err());
     }
 
     #[test]
