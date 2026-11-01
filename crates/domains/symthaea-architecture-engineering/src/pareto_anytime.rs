@@ -879,14 +879,7 @@ fn validate_and_apply_event(
                 }
             };
 
-            state.objective_attempts = next_objective_attempts;
-            state.evaluation_ids.insert(evaluation_id.clone());
-            state.attempts.insert(candidate_id.clone(), *attempt);
-            state.decisions.entry(candidate_id.clone())
-                .or_insert_with(|| decision_sha256.clone());
-            state.decision_owners.entry(decision_sha256.clone())
-                .or_insert_with(|| candidate_id.clone());
-            if let Some(candidate) = new_candidate {
+            if let Some(candidate) = &new_candidate {
                 if let Some(existing) = state.successful.get(candidate_id) {
                     if existing.candidate != candidate.candidate
                         || existing.decision_sha256 != candidate.decision_sha256
@@ -896,12 +889,19 @@ fn validate_and_apply_event(
                             "repeated deterministic evaluation changed objective/evidence output for the same decision; noisy replication requires a separate aggregation contract",
                         ));
                     }
-                    // Exact duplicate evaluation is retained and charged in the event tape,
-                    // but does not duplicate the candidate in the Pareto archive or downgrade
-                    // an already-promoted evidence level.
-                } else {
-                    state.successful.insert(candidate_id.clone(), candidate);
                 }
+            }
+
+            // All fallible validation is complete. Only now mutate the incremental state.
+            state.objective_attempts = next_objective_attempts;
+            state.evaluation_ids.insert(evaluation_id.clone());
+            state.attempts.insert(candidate_id.clone(), *attempt);
+            state.decisions.entry(candidate_id.clone())
+                .or_insert_with(|| decision_sha256.clone());
+            state.decision_owners.entry(decision_sha256.clone())
+                .or_insert_with(|| candidate_id.clone());
+            if let Some(candidate) = new_candidate {
+                state.successful.entry(candidate_id.clone()).or_insert(candidate);
             }
         }
         AnytimeAction::CandidateVerification {
@@ -1861,6 +1861,69 @@ mod tests {
         let mut tampered = receipt.clone();
         tampered.target_results[0].first_event_ordinal = Some(1);
         assert!(verify_anytime_run_receipt(&history, &tampered).is_err());
+    }
+
+    #[test]
+    fn rejected_duplicate_evaluation_does_not_mutate_incremental_state() {
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: 0,
+            completed_elapsed_millis: 0,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "candidate-a:1".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 1,
+                decision_sha256: H3.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.0, 1.0]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H4.to_owned()),
+                failure_reason: None,
+            },
+        }).unwrap();
+
+        let rejected = history.append(AnytimeEventDraft {
+            started_elapsed_millis: 0,
+            completed_elapsed_millis: 0,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "candidate-a:2".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 2,
+                decision_sha256: H3.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.1, 1.0]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H5.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(rejected.is_err());
+        assert_eq!(history.events().len(), 1);
+
+        let valid_repeat = history.append(AnytimeEventDraft {
+            started_elapsed_millis: 0,
+            completed_elapsed_millis: 0,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "candidate-a:2".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 2,
+                decision_sha256: H3.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.0, 1.0]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H4.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(valid_repeat.is_ok());
+        assert_eq!(history.events().len(), 2);
+        history.validate().unwrap();
     }
 
     #[test]
