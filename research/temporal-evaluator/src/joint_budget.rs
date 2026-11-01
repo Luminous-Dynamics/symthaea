@@ -74,8 +74,27 @@ pub struct JointBudgetContext {
     pub model_sha256: [u8; 32],
     pub initial_state_sha256: [u8; 32],
     pub candidate_feature_sha256: [u8; 32],
+    /// Digest of the evaluator-owned action IDs and compatibility constraints.
+    pub action_registry_sha256: [u8; 32],
     pub total_exposure_us: u64,
     pub resource_budget: JointResourceUse,
+}
+
+impl JointBudgetContext {
+    fn validate(&self) -> Result<(), JointBudgetError> {
+        if self.episode_id == 0
+            || self.task_sha256 == [0; 32]
+            || self.future_stream_sha256 == [0; 32]
+            || self.model_sha256 == [0; 32]
+            || self.initial_state_sha256 == [0; 32]
+            || self.candidate_feature_sha256 == [0; 32]
+            || self.action_registry_sha256 == [0; 32]
+            || self.total_exposure_us == 0
+        {
+            return Err(JointBudgetError::InvalidContextCommitment);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -126,6 +145,7 @@ pub enum JointBudgetError {
     UnknownActionId { action_id: u64 },
     ContextMismatch,
     DuplicateRunId { run_id: u64 },
+    InvalidContextCommitment,
     IncompleteEnumeration { expected: usize, actual: usize },
     DuplicateSubset { mask: u64 },
     MissingSubset { mask: u64 },
@@ -146,6 +166,7 @@ impl fmt::Display for JointBudgetError {
             Self::UnknownActionId { action_id } => write!(f, "unknown joint action ID {action_id}"),
             Self::ContextMismatch => write!(f, "joint subset runs differ in task, future stream, model, initial state, feature snapshot, horizon or resource budget"),
             Self::DuplicateRunId { run_id } => write!(f, "duplicate joint subset run ID {run_id}"),
+            Self::InvalidContextCommitment => write!(f, "joint oracle context contains a zero/missing identity or commitment"),
             Self::IncompleteEnumeration { expected, actual } => write!(f, "exact joint oracle requires {expected} subsets, received {actual}"),
             Self::DuplicateSubset { mask } => write!(f, "duplicate joint subset mask {mask:#x}"),
             Self::MissingSubset { mask } => write!(f, "missing joint subset mask {mask:#x}"),
@@ -212,6 +233,10 @@ pub fn qualify_joint_subsets(
     let mut run_ids = BTreeSet::new();
 
     for run in runs {
+        run.context.validate()?;
+        if run.run_id == 0 {
+            return Err(JointBudgetError::DuplicateRunId { run_id: 0 });
+        }
         if let Some(reference) = context_reference {
             if reference != &run.context {
                 return Err(JointBudgetError::ContextMismatch);
@@ -409,6 +434,7 @@ mod tests {
             model_sha256: [3; 32],
             initial_state_sha256: [4; 32],
             candidate_feature_sha256: [5; 32],
+            action_registry_sha256: [6; 32],
             total_exposure_us: 100,
             resource_budget: JointResourceUse {
                 persistent_bytes: 100,
@@ -586,6 +612,22 @@ mod tests {
         assert_eq!(
             qualify_joint_subsets(&conflicting_registry, &runs, &[10, 20]),
             Err(JointBudgetError::CandidateSubsetInfeasible)
+        );
+    }
+
+    #[test]
+    fn action_registry_commitment_and_context_identity_are_required() {
+        let mut runs = all_four_runs();
+        runs[1].context.action_registry_sha256 = [8; 32];
+        assert_eq!(
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
+            Err(JointBudgetError::ContextMismatch)
+        );
+        let mut runs = all_four_runs();
+        runs[0].context.action_registry_sha256 = [0; 32];
+        assert_eq!(
+            qualify_joint_subsets(&registry(&[(10, 0), (20, 0)]), &runs, &[10]),
+            Err(JointBudgetError::InvalidContextCommitment)
         );
     }
 
