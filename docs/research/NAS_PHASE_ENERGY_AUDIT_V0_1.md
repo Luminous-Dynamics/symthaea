@@ -64,7 +64,7 @@ Accepted-success outcomes are explicit per benchmark. `incorrect`, `failed`, and
 
 Exactly one outcome row per marker event is required:
 
-`event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count`
+`event_id,outcome,artifact_sha256,device_session_sha256,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count`
 
 Allowed outcome values:
 - `correct`
@@ -76,7 +76,7 @@ Allowed outcome values:
 
 The input digest is mandatory. Correct, incorrect and fallback outcomes require an output/result digest. Quality metric and value must be supplied together or both omitted. Deadline is an explicit boolean; retries are counted.
 
-The per-event outcome digest binds the outcome row to the energy receipt. It does not prove that the outcome is semantically correct; the pinned task-outcome evaluator and its independent verification are separate evidence requirements.
+Each outcome row also binds the exact candidate artifact and physical device/session receipt that produced the event. The per-event outcome digest binds artifact, device session, input/result identities, task outcome, quality value, deadline and retries to the energy receipt. The device-session digest must resolve to physical device identity and readback evidence through the acquisition/provenance layer. It does not prove that the outcome is semantically correct; the pinned task-outcome evaluator and its independent verification are separate evidence requirements.
 
 ## Integration method
 
@@ -132,7 +132,7 @@ The receipt binds:
 - voltage, sample rate and gap policy;
 - per-phase and whole-event energy, duration and boundary-alignment bounds;
 - unattributed energy/time;
-- per-event outcome, input/output digests, quality value, deadline and retries;
+- per-event candidate artifact and device-session digests, outcome/input/output digests, quality value, deadline and retries;
 - counts and mean energy of successful completed events;
 - canonical, domain-separated receipt digest.
 
