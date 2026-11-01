@@ -457,6 +457,7 @@ pub struct PrequentialExecutionTrace {
     pub run_id: String,
     pub candidate_id: String,
     pub candidate_artifact_sha256: String,
+    pub candidate_configuration_sha256: String,
     pub dataset_sha256: String,
     pub initial_model_state_sha256: String,
     /// Exact phase-energy and metrology receipt commitments for this candidate/run.
@@ -520,6 +521,7 @@ pub struct PrequentialAuditReceipt {
     pub run_id: String,
     pub candidate_id: String,
     pub candidate_artifact_sha256: String,
+    pub candidate_configuration_sha256: String,
     pub dataset_sha256: String,
     pub execution_trace_sha256: String,
     pub energy_receipt_sha256: String,
@@ -578,6 +580,7 @@ pub fn audit_prequential_execution(
     }
     for (field, value) in [
         ("candidate_artifact_sha256", trace.candidate_artifact_sha256.as_str()),
+        ("candidate_configuration_sha256", trace.candidate_configuration_sha256.as_str()),
         ("dataset_sha256", trace.dataset_sha256.as_str()),
         ("initial_model_state_sha256", trace.initial_model_state_sha256.as_str()),
         ("energy_receipt_sha256", trace.energy_receipt_sha256.as_str()),
@@ -1014,6 +1017,7 @@ pub fn audit_prequential_execution(
         run_id: trace.run_id.clone(),
         candidate_id: trace.candidate_id.clone(),
         candidate_artifact_sha256: trace.candidate_artifact_sha256.clone(),
+        candidate_configuration_sha256: trace.candidate_configuration_sha256.clone(),
         dataset_sha256: dataset.dataset_sha256.clone(),
         execution_trace_sha256: trace.execution_trace_sha256.clone(),
         energy_receipt_sha256: trace.energy_receipt_sha256.clone(),
@@ -1424,6 +1428,7 @@ mod tests {
             run_id: "prequential-test-run".into(),
             candidate_id: "hdc-ltc-fixed-fixture".into(),
             candidate_artifact_sha256: sha('b'),
+            candidate_configuration_sha256: sha('c'),
             dataset_sha256: dataset.dataset_sha256.clone(),
             initial_model_state_sha256: sha('a'),
             energy_receipt_sha256: sha('c'),
