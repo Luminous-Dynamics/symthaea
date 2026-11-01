@@ -165,7 +165,6 @@ def simulate_cell(
     log_eta = np.zeros((len(etas), streams))
     log_nat_single = np.zeros(streams)
     lambda_eta = np.zeros((len(etas), streams, dimension), dtype=np.float64)
-    lambda_single = np.zeros((streams, dimension), dtype=np.float64)
     crossed = {
         key: np.zeros(streams, dtype=bool)
         for key in (
@@ -326,7 +325,7 @@ def run_benchmark(
         "warmup": 5,
         "bet_learning_rates": [0.025, 0.05, 0.10, 0.20],
         "prior_over_learning_rates": "uniform_fixed_ex_ante",
-        "covariance_envelope": "Sigma(0.5) + 1.2 I",
+        "covariance_envelope": "0.8 I + 0.8 11^T (projective for every finite d)",
         "declared_equicorrelation_interval": [0.2, 0.8],
         "noise_models": list(noise_models),
         "scenarios": list(scenarios),
