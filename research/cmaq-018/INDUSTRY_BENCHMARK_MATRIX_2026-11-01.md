@@ -163,3 +163,6 @@ The action-bank implementation now has a structured-channel sibling. This is imp
 Require separate, versioned channels for object geometry/pose, linear and angular motion, contact state/probability, visibility/occlusion, object existence, task utility and terminal risk. Report channel units and sample counts independently. Use same-draw paired effects within each channel; never subtract quantiles across channels or pool unlike dimensions.
 
 A planner may create a scalar utility only through a frozen utility/constraint definition with declared weights, units and failure penalties. That scalar is a downstream decision functional, not a replacement for the full physical-belief diagnostics.
+
+
+Structured channels now distinguish state fidelity from action utility. An action may be selected only through one explicitly named TaskUtility channel; physical state, contact, visibility and terminal-risk channels remain independent diagnostics/constraints. This avoids reward-hacking a scalar objective that hides a physically implausible future.
