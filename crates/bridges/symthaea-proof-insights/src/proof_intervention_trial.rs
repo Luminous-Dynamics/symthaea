@@ -370,16 +370,4 @@ pub fn validate_plan(value: &Value) -> Result<usize> {
     Ok(pairs.len())
 }
 
-fn refresh_pair_ids_and_orders(value: &mut Value) -> Result<()> {
-    let seed = string(value, "/randomization/seed_sha256")?.to_owned();
-    let (arm_ids, _) = parse_arm_ids(value)?;
-    let pairs = value["pairs"].as_array_mut().context("pairs array")?;
-    for pair in pairs {
-        let pair_id = expected_pair_id(pair)?;
-        pair["pair_id"] = json!(pair_id);
-        let order = expected_execution_order(&seed, &pair_id, &arm_ids)?;
-        pair["execution_order"] = json!(order);
-    }
-    Ok(())
-}
 
