@@ -15,6 +15,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 enum Mode {
     Help,
@@ -100,7 +101,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["branches"][0]["base_snapshot_sha256"] = Value::from("f".repeat(64));
     must_reject("snapshot identity substitution", bad)?;
 
-    let expected = hex::encode(sha2::Sha256::digest(&bytes));
+    let expected = hex::encode(Sha256::digest(&bytes));
     if snapshot_branch_receipt::verify_bytes(&bytes, Some(&expected)).is_err() {
         bail!("receipt verifier rejected matching exact-byte digest");
     }
@@ -187,9 +188,8 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn lower_hex_is_case_sensitive_and_fixed_width() {
-        assert_eq!(hex::encode(sha2::Sha256::digest(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    fn sha256_matches_standard_test_vector() {
+        assert_eq!(hex::encode(Sha256::digest(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
-    use sha2::Digest;
 }
