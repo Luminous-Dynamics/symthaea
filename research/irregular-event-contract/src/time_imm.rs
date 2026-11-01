@@ -499,7 +499,7 @@ fn is_missing(value: &str) -> bool {
     matches!(value.trim().to_ascii_lowercase().as_str(), "" | "na" | "n/a" | "nan" | "null")
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum DecimalParseError { Invalid, Overflow }
 
 fn decimal_to_scaled(value: &str, decimal_scale: i8) -> Result<(i64, f64), DecimalParseError> {
