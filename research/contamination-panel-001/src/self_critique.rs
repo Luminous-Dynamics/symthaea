@@ -490,6 +490,14 @@ mod tests {
     }
 
     fn request(source: EntropySourceV1) -> SelfCritiqueScoringRequestV1 {
+        let raw_partial_entropy = -(0.5_f64 * 0.5_f64.ln() + 0.3_f64 * 0.3_f64.ln());
+        let topk_mode = matches!(source, EntropySourceV1::VllmTopKRawPartial);
+        let entropy = if topk_mode {
+            vec![raw_partial_entropy; 3]
+        } else {
+            vec![0.5, 1.0, 0.5]
+        };
+        let probabilities = vec![vec![0.5, 0.3]; 3];
         SelfCritiqueScoringRequestV1 {
             schema: SELF_CRITIQUE_REQUEST_SCHEMA.to_owned(),
             sample_id: "item-001".to_owned(),
@@ -502,8 +510,8 @@ mod tests {
             critique_prompt_sha256: digest('1'),
             entropy_extractor_sha256: digest('2'),
             entropy_source: source,
-            requested_top_k: matches!(source, EntropySourceV1::VllmTopKRawPartial).then_some(50),
-            vocabulary_size: Some(151_936),
+            requested_top_k: topk_mode.then_some(2),
+            vocabulary_size: Some(if topk_mode { 4 } else { 151_936 }),
             initial_decode: GreedyDecodeEvidenceV1 {
                 greedy: true,
                 temperature: 0.0,
@@ -518,8 +526,10 @@ mod tests {
             },
             initial_generated_token_count: 3,
             critique_generated_token_count: 3,
-            initial_entropy_nats: vec![0.5, 1.0, 0.5],
-            critique_entropy_nats: vec![0.5, 1.0, 0.5],
+            initial_entropy_nats: entropy.clone(),
+            critique_entropy_nats: entropy,
+            initial_topk_probability_steps: topk_mode.then(|| probabilities.clone()),
+            critique_topk_probability_steps: topk_mode.then_some(probabilities),
         }
     }
 
@@ -598,6 +608,41 @@ mod tests {
         assert!(report.released_topk_entropy_reproduction);
         assert_eq!(report.initial_missing_entropy_steps, 1);
         assert_eq!(report.initial_entropy_coverage_permille, 750);
+    }
+
+    #[test]
+    fn topk_partial_entropy_reports_omitted_tail_bounds() {
+        let r = request(EntropySourceV1::VllmTopKRawPartial);
+        let report = score_self_critique_request(&r).unwrap();
+        let initial = report.initial_topk_diagnostics.unwrap();
+        let critique = report.critique_topk_diagnostics.unwrap();
+        assert_eq!(initial.observed_token_steps, 3);
+        assert!((initial.mean_returned_probability_mass_permille - 800.0).abs() < 1.0e-9);
+        assert!((initial.mean_unreturned_tail_mass_permille - 200.0).abs() < 1.0e-9);
+        assert!(initial.mean_tail_entropy_lower_nats < initial.mean_tail_entropy_upper_nats);
+        assert_eq!(initial, critique);
+    }
+
+    #[test]
+    fn topk_entropy_must_match_supplied_probability_values() {
+        let mut r = request(EntropySourceV1::VllmTopKRawPartial);
+        r.initial_entropy_nats[0] += 0.1;
+        assert!(score_self_critique_request(&r).is_err());
+    }
+
+    #[test]
+    fn topk_probability_mass_cannot_exceed_one() {
+        let mut r = request(EntropySourceV1::VllmTopKRawPartial);
+        r.initial_topk_probability_steps.as_mut().unwrap()[0] = vec![0.9, 0.2];
+        assert!(score_self_critique_request(&r).is_err());
+    }
+
+    #[test]
+    fn exact_full_vocabulary_mode_has_no_topk_tail_artifacts() {
+        let r = request(EntropySourceV1::FullVocabSoftmaxExact);
+        let report = score_self_critique_request(&r).unwrap();
+        assert!(report.initial_topk_diagnostics.is_none());
+        assert!(report.critique_topk_diagnostics.is_none());
     }
 
     #[test]
