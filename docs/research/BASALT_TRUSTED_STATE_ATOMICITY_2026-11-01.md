@@ -221,7 +221,7 @@ The model uses a stable source cursor key across observer-profile and boot chang
 - monotonic signer/witness policy versions and policy-bundle binding;
 - one model transition that advances source cursor, log cursor, policy versions and accepted-receipt record together.
 
-The built-in command emits a JSON report with per-case outcomes and explicit hard-false fields for anti-rollback qualification, signature verification and storage durability qualification. Unit tests add edge cases beyond the 15-case command conformance set.
+The built-in command emits a JSON report with per-case outcomes and explicit hard-false fields for anti-rollback qualification, signature verification and storage durability qualification. Unit tests add edge cases beyond the 17-case command conformance set.
 
 **Model boundary:** the model consumes evidence classifications supplied by upstream adapters. It checks their shape and state-transition linkage, not their cryptographic truth. The model is in-memory; assignment after a successful revision comparison models the atomic state transition but does not establish filesystem crash consistency, linearizability of a real backend, protection against snapshot restoration, checkpoint freshness, or production anti-rollback. No such claim is promoted.
 
