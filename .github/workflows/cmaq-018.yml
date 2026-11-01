@@ -309,7 +309,7 @@ jobs:
           assert information_fixture["options"][1]["net_information_value"] == -0.5
 
           def canonical_information_option_digest(option):
-              payload = bytearray(b"cmaq-018-evsi-option-v0.1\\0")
+              payload = bytearray(b"cmaq-018-evsi-option-v0.1\0")
 
               def append_text(value):
                   encoded = value.encode("utf-8")
