@@ -20173,6 +20173,7 @@ dependencies = [
 name = "symthaea-vision-manifold"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "candle-core 0.8.4",
  "candle-nn 0.8.4",
  "criterion",
