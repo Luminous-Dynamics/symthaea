@@ -1284,6 +1284,21 @@ mod tests {
     }
 
     #[test]
+    fn dropped_features_are_zero_filled_before_model_observation() {
+        let stream = generate_temporal_drift_stream(&stream_config()).unwrap();
+        let mut dropped = 0usize;
+        for observation in &stream.observations {
+            for feature in 0..4 {
+                if observation.missing_feature_mask & (1 << feature) != 0 {
+                    dropped += 1;
+                    assert_eq!(observation.features[feature], 0);
+                }
+            }
+        }
+        assert!(dropped > 0);
+    }
+
+    #[test]
     fn stream_digest_rejects_event_tampering() {
         let mut stream = generate_temporal_drift_stream(&stream_config()).unwrap();
         stream.delayed_labels[0].label ^= 1;
