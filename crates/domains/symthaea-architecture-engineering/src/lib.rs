@@ -33,6 +33,7 @@ pub mod noisy_replicate_evidence;
 pub mod pareto_evsi_oracle;
 pub mod pareto_sequential_policy;
 pub mod pareto_robust_decision;
+pub mod correlated_noise_benchmark;
 pub mod pareto_benchmarks;
 pub mod pareto_nsga2;
 pub mod pareto_moead;
