@@ -31,8 +31,9 @@ use crate::predictive::PredictiveCodingHierarchy;
 use crate::training::{BpttResult, ManifoldTrainer};
 use crate::types::{
     DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION, DelayedHorizonEvaluatorState, DilationEstimate,
-    HorizonAccumulatorState, MANIFOLD_STATE_SCHEMA_VERSION, ManifoldHealth, ManifoldState,
-    ModalityTemporalContextState, ObjectHypothesisState, ObjectMemoryState,
+    HorizonAccumulatorState, HorizonForecastReceiptState, HorizonForecastReceiptStatus,
+    DEFAULT_MAX_HORIZON_FORECAST_RECEIPTS, MANIFOLD_STATE_SCHEMA_VERSION, ManifoldHealth,
+    ManifoldState, ModalityTemporalContextState, ObjectHypothesisState, ObjectMemoryState,
     PendingHorizonForecastState, SceneFrameMetadata, SceneMatch, SceneMemoryState,
     SurpriseMapState, TrackedObjectState, VisionConfig, VisionTelemetry, VisualModality,
     VisualWorkingMemoryState, WorkingMemorySlotState,
@@ -4530,6 +4531,34 @@ impl VisionManifold {
     }
 }
 
+fn visual_hv_blake3(hv: &ContinuousHV) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-vision-hv-v1\\0");
+    hasher.update(&(hv.dim() as u64).to_le_bytes());
+    for value in hv.as_slice() {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Fingerprint the direct transition terms used by the current closed-form CfC jump.
+/// This is not a full checkpoint hash; source belief and observation are bound separately.
+fn transition_parameter_blake3(manifold: &VisionManifold) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-vision-cfc-transition-params-v1\\0");
+    hasher.update(visual_hv_blake3(&manifold.weight_hv).as_bytes());
+    hasher.update(&manifold.tau_base.to_bits().to_le_bytes());
+    hasher.update(&manifold.config.input_blend.to_bits().to_le_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn is_lower_hex_blake3(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 /// Multi-horizon prediction accuracy snapshot.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HorizonAccuracy {
@@ -4563,14 +4592,28 @@ pub struct HorizonAccuracy {
     /// Forecasts discarded because the scoring observation arrived too late.
     #[serde(default)]
     pub expired_forecasts: Vec<u64>,
+    /// Number of retained per-forecast scoring/expiry receipts.
+    #[serde(default)]
+    pub score_receipt_count: usize,
+    /// Number of oldest per-forecast receipts evicted by the bounded ledger.
+    #[serde(default)]
+    pub evicted_score_receipts: u64,
     /// Frame at which this was evaluated.
     pub frame_sequence: u64,
 }
 
 #[derive(Clone)]
 struct PendingHorizonForecast {
+    forecast_id: u64,
     horizon_index: usize,
+    source_frame_sequence: Option<u64>,
+    issued_at_seconds: f64,
     due_time: f64,
+    source_observation_blake3: Option<String>,
+    source_belief_blake3: Option<String>,
+    predictor_parameter_blake3: Option<String>,
+    prediction_blake3: String,
+    persistence_blake3: String,
     predicted: ContinuousHV,
     persistence: ContinuousHV,
 }
@@ -4601,6 +4644,10 @@ pub struct DelayedHorizonEvaluator {
     accumulators: Vec<HorizonAccumulator>,
     max_pending_per_horizon: usize,
     max_lateness_factor: f32,
+    next_forecast_id: u64,
+    score_receipts: Vec<HorizonForecastReceiptState>,
+    max_score_receipts: usize,
+    evicted_score_receipts: u64,
 }
 
 impl DelayedHorizonEvaluator {
@@ -4614,11 +4661,27 @@ impl DelayedHorizonEvaluator {
         horizons: Vec<(f32, String)>,
         max_pending_per_horizon: usize,
     ) -> Result<Self, String> {
+        Self::with_limits(
+            horizons,
+            max_pending_per_horizon,
+            DEFAULT_MAX_HORIZON_FORECAST_RECEIPTS,
+        )
+    }
+
+    /// Create a delayed evaluator with explicit pending and receipt-ledger bounds.
+    pub fn with_limits(
+        horizons: Vec<(f32, String)>,
+        max_pending_per_horizon: usize,
+        max_score_receipts: usize,
+    ) -> Result<Self, String> {
         if horizons.is_empty() {
             return Err("at least one prediction horizon is required".to_string());
         }
         if max_pending_per_horizon == 0 {
             return Err("max_pending_per_horizon must be > 0".to_string());
+        }
+        if max_score_receipts == 0 {
+            return Err("max_score_receipts must be > 0".to_string());
         }
         let mut previous = 0.0f32;
         for (index, (horizon, label)) in horizons.iter().enumerate() {
@@ -4645,6 +4708,10 @@ impl DelayedHorizonEvaluator {
             accumulators: vec![HorizonAccumulator::default(); count],
             max_pending_per_horizon,
             max_lateness_factor: 4.0,
+            next_forecast_id: 1,
+            score_receipts: Vec::new(),
+            max_score_receipts,
+            evicted_score_receipts: 0,
         })
     }
 
