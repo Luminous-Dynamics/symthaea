@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Fifty-four Rust test functions are authored (16 event contract, 11 bitemporal revision, 8 purged-split, 9 train-only-scaler, 10 Time-IMM adapter tests) for delayed-observation non-leakage,
+Fifty-five Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 9 train-only-scaler, 10 Time-IMM adapter tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -42,8 +42,12 @@ sequence. Corrections append `Supersede` records and removals append
 
 Transactions are atomic and share one recorded-at timestamp; committed
 transaction timestamps strictly increase. A record cannot be committed before
-its declared availability. Corrections preserve entity/modality/source identity
-and must target the latest active revision. As-known queries apply both a
+its declared availability. Corrections preserve entity/modality/source/source-sequence identity
+and must target the latest active revision. The ledger maintains revision-ID,
+per-event-chain, latest-revision, active-source-sequence and entity-to-event
+indexes. Single appends are preflighted without cloning the full log; atomic
+batches clone once. As-known queries binary-search each event's transaction-time
+ordered revision chain, and an explicit consistency audit rebuilds the indexes. As-known queries apply both a
 valid-time cutoff and a knowledge-time cutoff, so a later correction/retraction
 cannot rewrite an earlier decision view.
 
@@ -53,7 +57,7 @@ does not replace Broca's existing day-granularity bitemporal source ledger
 alternative-justification composition (PR #9292). This adapter layer only
 records source-event history and does not maintain derived proofs.
 
-The 11 additional bitemporal test functions cover late correction and
+The 12 additional bitemporal test functions cover late correction and
 retraction visibility, independent valid/knowledge clocks, source-identity
 preservation, transaction atomicity, revision sequencing, target rules,
 availability-before-commit rejection, source sequence collision rejection,
@@ -133,30 +137,3 @@ fixed-point quantization, file/row provenance, record identity and schema
 failures. The crate now has 54 source-authored test functions total. No build or
 test has run.
 
-
-## Microsecond bitemporal event revisions
-
-The crate also provides an append-only `BitemporalEventLedger` for event
-corrections and retractions. Event time is the world-time coordinate;
-`recorded_at_us` is transaction/knowledge time. As-known queries choose the
-latest revision visible at the requested knowledge time, then apply the
-world-time cutoff. A later correction/retraction cannot rewrite an earlier
-as-known result. Revisions preserve entity, modality, source and source-local
-sequence identity; transactions are atomic and use one timestamp.
-
-This is event-point validity (event_time <= valid_at), not a replacement for
-the day-interval assertion API in Broca's #9109/#9292 bitemporal ledger.
-
-## CSV adapters
-
-`csv_adapter` parses Time-IMM-style numeric `date_time,record_id,feature...`
-and unstructured text tables. It never silently infers arrival time: callers
-must explicitly choose an availability column or the labeled
-`EventTimeAssumedImmediate` approximation. Naive timestamps are parsed as UTC
-only when explicitly enabled. Numeric values use exact fixed-point millionths;
-unstructured payloads use content-addressed opaque references.
-
-The eight CSV tests cover irregular numeric rows, explicit availability,
-late-arrival filtering, missing values, exact decimal conversion, opaque text
-payloads, record/column validation and timezone assumptions. None has been
-compiled or run.
