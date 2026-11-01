@@ -416,9 +416,8 @@ fn self_test(path: &PathBuf, calibration_path: &PathBuf) -> Result<()> {
     }
     let calibration_bytes = fs::read(calibration_path)
         .with_context(|| format!("read calibration fixture {}", calibration_path.display()))?;
-    let mut calibration_value: Value =
+    let calibration_value: Value =
         serde_json::from_slice(&calibration_bytes).context("parse calibration fixture for negative controls")?;
-    let summary = calibration.clone();
     let mut bad_calibration = calibration_value.clone();
     bad_calibration["worst_action_ece_ppm"] = json!(1);
     must_reject_calibration("claimed worst-action ECE differs from bin statistics", bad_calibration)?;
