@@ -134,7 +134,6 @@ fn validate_observed_transition(
     current_hv: &ContinuousHV,
     next_hv: &ContinuousHV,
     evidence: &ObservedTransitionEvidence,
-    learning_rate: f32,
 ) -> Result<(), String> {
     for (name, digest) in [
         ("source_history_sha256", &evidence.source_history_sha256),
@@ -182,9 +181,6 @@ fn validate_observed_transition(
         || !next_hv.as_slice().iter().all(|value| value.is_finite())
     {
         return Err("observed transition contains non-finite vector values".into());
-    }
-    if !learning_rate.is_finite() || !(0.0..=1.0).contains(&learning_rate) || learning_rate == 0.0 {
-        return Err("learning rate must be finite and in (0, 1]".into());
     }
     Ok(())
 }
@@ -318,8 +314,10 @@ impl JepaEngine {
             current_hv,
             next_observed_hv,
             evidence,
-            learning_rate,
         )?;
+        if !learning_rate.is_finite() || !(0.0..=1.0).contains(&learning_rate) || learning_rate == 0.0 {
+            return Err("learning rate must be finite and in (0, 1]".into());
+        }
         Ok(self.train_step(
             current_hv,
             next_observed_hv,
@@ -340,7 +338,6 @@ impl JepaEngine {
             current_hv,
             next_observed_hv,
             evidence,
-            self.config.learning_rate.max(f32::MIN_POSITIVE),
         )?;
         Ok(self.forward(
             current_hv,
@@ -540,6 +537,39 @@ mod tests {
         assert!(result.predictions.iter().all(|item| {
             item.predicted_latent.iter().all(|value| value.is_finite())
         }));
+    }
+
+    #[test]
+    fn action_set_predictions_are_invariant_to_candidate_row_order() {
+        let engine = make_engine();
+        let current = random_hv(541);
+        let history = "a".repeat(64);
+        let manifest = "b".repeat(64);
+        let forward = engine
+            .predict_action_set_one_step(
+                &current, &history, &manifest,
+                &[
+                    ActionCandidate { action_id: 70, action_index: 2 },
+                    ActionCandidate { action_id: 20, action_index: 4 },
+                ],
+            )
+            .unwrap();
+        let reversed = engine
+            .predict_action_set_one_step(
+                &current, &history, &manifest,
+                &[
+                    ActionCandidate { action_id: 20, action_index: 4 },
+                    ActionCandidate { action_id: 70, action_index: 2 },
+                ],
+            )
+            .unwrap();
+        for expected in &forward.predictions {
+            let actual = reversed.predictions.iter()
+                .find(|candidate| candidate.action_id == expected.action_id)
+                .unwrap();
+            assert_eq!(actual.action_index, expected.action_index);
+            assert_eq!(actual.predicted_latent, expected.predicted_latent);
+        }
     }
 
     #[test]
