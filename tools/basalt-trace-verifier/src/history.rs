@@ -48,9 +48,9 @@ struct SearchContext<'a> {
 }
 
 fn state_fingerprint(state: &ModelState) -> String {
-    let bytes = serde_json::to_vec(state)
+    let serialized = serde_json::to_string(state)
         .expect("ModelState only contains serializable deterministic ordered fields");
-    sha256_label(&bytes)
+    sha256_label(&serialized)
 }
 
 fn expected_optional_matches<T: PartialEq>(expected: &Option<T>, actual: &Option<T>) -> bool {
