@@ -282,9 +282,18 @@ impl TestTreeNode for ConditionalContinuationNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OptionalStoppingAction {
-    /// Stop at this history and use the test value at the current node.
+    /// Stop this test process at the current node.
     StopAtCurrentHistory,
     /// Continue observing the next conditional outcome.
+    ContinueObserving,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AdaptiveContinuationAction {
+    /// Stop the first-stage experiment and launch its conditional continuation.
+    LaunchConditionalContinuation,
+    /// Continue gathering observations in the first-stage filtration.
     ContinueObserving,
 }
 
@@ -485,9 +494,9 @@ fn validate_probability_tree<N: TestTreeNode>(
         }
         let stop_value = node.test_value();
         let (optimal_value, action) = if continue_value > stop_value {
-            (continue_value, OptionalStoppingAction::ContinueObserving)
+            (continue_value, AdaptiveContinuationAction::ContinueObserving)
         } else {
-            (stop_value, OptionalStoppingAction::StopAtCurrentHistory)
+            (stop_value, AdaptiveContinuationAction::LaunchConditionalContinuation)
         };
         optimal_values.insert(node.node_id().to_owned(), optimal_value);
         optimal_actions.insert(node.node_id().to_owned(), action);
@@ -544,7 +553,7 @@ pub struct StoppingHistoryReport {
     pub continuation_maximum_optional_stopping_size: f64,
     pub continuation_terminal_leaf_size: f64,
     pub combined_policy_value: f64,
-    pub optimal_action: OptionalStoppingAction,
+    pub optimal_action: AdaptiveContinuationAction,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -639,7 +648,7 @@ pub fn analyze_finite_stopping_continuation(
     // Maximize the total rejection probability over every adaptive policy:
     // launch the conditional continuation now, or keep observing and choose later.
     let mut combined_values = BTreeMap::new();
-    let mut combined_actions = BTreeMap::new();
+    let mut combined_actions: BTreeMap<String, AdaptiveContinuationAction> = BTreeMap::new();
     let mut bottom_up = plan.history_nodes.iter().collect::<Vec<_>>();
     bottom_up.sort_by_key(|node| Reverse(
         history_summary.depths.get(&node.node_id).copied().unwrap_or(0)
@@ -740,7 +749,7 @@ pub fn analyze_finite_stopping_continuation(
             continuation_terminal_leaf_size: terminal_leaf_size,
             combined_policy_value: combined_values.get(&node.node_id).copied().unwrap_or(f64::NAN),
             optimal_action: combined_actions.get(&node.node_id).copied().unwrap_or(
-                OptionalStoppingAction::StopAtCurrentHistory
+                AdaptiveContinuationAction::LaunchConditionalContinuation
             ),
         });
     }
@@ -951,9 +960,9 @@ mod tests {
         assert!((report.maximum_adaptive_continuation_size - 0.039).abs() < 1e-12);
         assert!(report.maximum_adaptive_continuation_size <= report.significance_level);
         let root = report.histories.iter().find(|row| row.node_id == "root").unwrap();
-        assert_eq!(root.optimal_action, OptionalStoppingAction::ContinueObserving);
+        assert_eq!(root.optimal_action, AdaptiveContinuationAction::ContinueObserving);
         let late = report.histories.iter().find(|row| row.node_id == "late").unwrap();
-        assert_eq!(late.optimal_action, OptionalStoppingAction::StopAtCurrentHistory);
+        assert_eq!(late.optimal_action, AdaptiveContinuationAction::LaunchConditionalContinuation);
         assert!((late.combined_policy_value - 0.025).abs() < 1e-12);
         let first_process_root = report.maximum_first_process_optional_stopping_policy
             .iter().find(|decision| decision.node_id == "root").unwrap();
