@@ -8,6 +8,7 @@ on:
       - "crates/bridges/symthaea-proof-insights/src/bin/allocate_proof_search_budget.rs"
       - "crates/bridges/symthaea-proof-insights/src/benchmark_integrity.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/verify_benchmark_integrity.rs"
+      - "crates/bridges/symthaea-proof-insights/src/bin/verify_sorrydb_run_integrity.rs"
       - "data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/**"
       - "crates/bridges/symthaea-proof-insights/src/proof_search_calibration.rs"
       - "data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/**"
@@ -108,6 +109,15 @@ jobs:
                       if row["new_axiom_names"]:
                           errors.append("verified success introduces an unapproved axiom")
               return errors
+
+          bad = copy.deepcopy(fixture)
+          bad["evidence_class"] = "measured_run"
+          schema_must_reject("measured run without an eligible task-integrity receipt", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["task_integrity"] = {"receipt_sha256":"a" * 64,"task_id_sha256":"b" * 64,"integrity_status":"pending"}
+          bad["evidence_class"] = "measured_run"
+          schema_must_reject("measured run with pending task-integrity receipt", bad)
 
           bad = copy.deepcopy(fixture)
           bad["task"]["source_path"] = "../outside.lean"
@@ -577,6 +587,9 @@ jobs:
           snapshot_fixture="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/snapshot-branch-receipt.synthetic.json"
           cargo run --locked --bin verify_snapshot_branch_receipt -- --self-test "$snapshot_fixture"
           cargo run --locked --bin verify_benchmark_integrity -- --self-test \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/fixtures/benchmark-integrity.synthetic.json"
+          cargo run --locked --bin verify_sorrydb_run_integrity -- --self-test \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/run-receipt.synthetic.json" \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/fixtures/benchmark-integrity.synthetic.json"
           python - "$snapshot_fixture" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json" "$RUNNER_TEMP/pitb-r5-ledger.synthetic.json" <<'PY'
           import hashlib
