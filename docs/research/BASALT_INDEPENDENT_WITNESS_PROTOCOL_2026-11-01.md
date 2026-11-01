@@ -194,7 +194,7 @@ A hash chain alone does not prove a response is the latest head. An attacker cou
 4. The verifier requires `q = 2f+1` valid responses from distinct active members, all for the same head and same nonce.
 5. It fetches/verifies the checkpoint chain to the pinned genesis/known checkpoint and compares the returned head to the restored store's observed state.
 
-The fresh nonce prevents replay of an earlier response to a different challenge. Quorum intersection supplies the freshness argument: with `n=3f+1`, `q=2f+1`, and at most `f` Byzantine members, any read quorum intersects a previously committed write quorum in at least `f+1` members, including at least one honest member. This argument depends on honest members persisting a checkpoint before signing and never signing conflicting heads.
+The `challenge_nonce` field carries the exact fresh nonce. It prevents replay of an earlier response to a different challenge. Quorum intersection supplies the freshness argument: with `n=3f+1`, `q=2f+1`, and at most `f` Byzantine members, any read quorum intersects a previously committed write quorum in at least `f+1` members, including at least one honest member. This argument depends on honest members persisting a checkpoint before signing and never signing conflicting heads.
 
 If the verifier cannot obtain a valid consistent read quorum, it reports `anti_rollback_unknown`. It never falls back to the local DB revision, an old cached witness pointer, or a best-effort single-node response.
 
@@ -203,12 +203,12 @@ The nonce is not a replacement for the witness quorum; it prevents replay while 
 ## Trust roots, key rotation and revocation
 
 Trust bootstrap must happen outside the database being qualified:
-- the verifier has a pinned trust-root digest/version delivered through a separate provisioning/release channel; the root also pins the initial witness-set metadata digest;
+- the verifier has a pinned trust-root digest/version delivered through a separate provisioning/release channel; the root's `initial_witness_set_digest` pins the initial witness-set metadata digest;
 - the root private keys are offline or in a separately controlled signing ceremony;
 - witness members do not control the root keys that authorize their own replacement;
 - the DB administrator and its backup operator cannot modify root metadata or witness membership.
 
-The root payload is described by `witness-trust-root-payload.v1.schema.json`. Its signatures are verified against the previously pinned root metadata.
+The root payload is described by `witness-trust-root-payload.v1.schema.json`. Its signatures are verified against the previously pinned root metadata. Every successor root must set `previous_trust_root_digest` to the digest of the currently trusted root and increment `trust_root_version` by exactly one.
 
 ### Root rotation
 
