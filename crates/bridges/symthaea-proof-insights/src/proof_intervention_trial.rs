@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result, bail};
-use serde_json::{Value, json};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const VERSION: &str = "pitb.proof-intervention-trial-plan.v0";
