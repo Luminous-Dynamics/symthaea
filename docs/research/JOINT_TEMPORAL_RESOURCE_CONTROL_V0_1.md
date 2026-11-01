@@ -70,12 +70,13 @@ The separate evaluator module enumerates every subset of up to 16 declared
 action IDs using an evaluator-owned action registry. Nonzero conflict-group IDs
 mark mutually exclusive alternatives; subsets containing two members of the
 same group are enumerated but excluded from the feasible frontier and cannot be
-qualified as candidate plans. Each run binds identical:
-- episode and task commitment;
+qualified as candidate plans. Each run binds identical, nonzero identities and commitments:
+- episode ID and task commitment;
 - hidden future-stream commitment;
 - model digest;
 - initial-state digest;
 - candidate-visible feature snapshot;
+- evaluator-owned action-registry digest (action IDs and mutual-exclusion groups);
 - episode horizon and resource budget.
 
 For every subset, the evaluator records measured resource use and each of the
@@ -221,7 +222,7 @@ do not lower them after seeing results.
 ## 11. Implementation status and limits
 
 Candidate controller: 12 Rust test functions authored.  
-Evaluator oracle: 12 Rust test functions authored.  
+Evaluator oracle: 13 Rust test functions authored.  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
 The controller and oracle are research prototypes, not production schedulers.
