@@ -296,16 +296,12 @@ fn build_systemd_run_arguments(
     let mut args = vec![
         "--user".into(),
         "--scope".into(),
-        "--wait".into(),
         "--pipe".into(),
         format!("--property=MemoryMax={}", spec.memory_max_bytes),
         "--property=MemorySwapMax=0".into(),
         format!("--property=CPUQuota={}%", spec.cpu_quota_percent),
         format!("--property=TasksMax={}", spec.tasks_max),
-        "--property=NoNewPrivileges=yes".into(),
-        "--property=PrivateNetwork=yes".into(),
-        "--property=ProtectHome=yes".into(),
-        "--property=ProtectSystem=strict".into(),
+        format!("--property=RuntimeMaxSec={}ms", spec.wall_timeout_ms),
         "--".into(),
         spec.bubblewrap_executable.clone(),
     ];
@@ -431,17 +427,14 @@ mod tests {
     }
 
     #[test]
-    fn systemd_plan_binds_memory_swap_cpu_task_and_host_privilege_limits() {
+    fn systemd_scope_plan_binds_memory_swap_cpu_task_and_runtime_limits() {
         let plan = build_candidate_sandbox_plan(&spec()).unwrap();
         for required in [
             "--property=MemoryMax=134217728",
             "--property=MemorySwapMax=0",
             "--property=CPUQuota=100%",
             "--property=TasksMax=16",
-            "--property=NoNewPrivileges=yes",
-            "--property=PrivateNetwork=yes",
-            "--property=ProtectHome=yes",
-            "--property=ProtectSystem=strict",
+            "--property=RuntimeMaxSec=30000ms",
         ] {
             assert!(plan.systemd_run_arguments.iter().any(|arg| arg == required));
         }
