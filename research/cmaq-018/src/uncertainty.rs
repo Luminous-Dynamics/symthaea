@@ -835,7 +835,7 @@ pub fn select_constrained_structured_action(
         for constraint in constraints {
             let channel = bank.channels.iter()
                 .find(|channel| channel.channel_id == constraint.channel_id)
-                .expect("constraints were resolved above");
+                .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
             let interval = central_interval(&channel.outcome_samples[row], adjusted_nominal)?;
             let passes = match constraint.relation {
                 ConstraintRelation::UpperAtMost => interval.upper <= constraint.threshold,
@@ -947,7 +947,7 @@ pub fn evaluate_information_probabilities(
         let mut best_index = 0usize;
         let mut brier = 0.0;
         for index in 0..observation.outcome_ids.len() {
-            let target = f64::from(index == realized_index);
+            let target = if index == realized_index { 1.0 } else { 0.0 };
             let error = observation.probabilities[index] - target;
             brier += error * error;
             if observation.probabilities[index] > observation.probabilities[best_index]
