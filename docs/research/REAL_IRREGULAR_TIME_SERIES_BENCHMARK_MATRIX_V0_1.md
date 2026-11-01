@@ -234,3 +234,26 @@ dataset-level evidence.
 Do not silently replace the official protocol or present clean-split numbers
 as official leaderboard results. The new splitter does not itself fix the
 full-record normalizer; train-only scaler fitting remains an adapter task.
+
+
+## 11. Clean-split scaler implementation
+
+The event-contract crate now has a `TrainOnlyStandardizer` bound to the
+purged split plan. It fits deterministic per-entity/per-feature moments only
+from unique raw observation IDs represented in training windows. Observations
+reused across overlapping training histories are counted once; conflicting
+values for an identical raw-observation identity fail closed. Validation, test
+and purged-window values are not read. It reports counts, means and sample
+standard deviations (ddof=1), uses Welford accumulation, and refuses a forged
+split plan whose per-entity boundary/purge assignment is inconsistent.
+
+This is the clean-comparison preprocessing path. The official IMM-TSF path
+still needs to be reproduced as released, including its full-record scaler,
+then reported separately. The adapter must omit missing values from numeric
+moments while retaining their explicit missingness mask. No imputation is
+performed by this scaler.
+
+Nine source-authored scaler tests cover validation/test isolation, overlap
+deduplication, conflicting duplicate rejection, entity/feature separation,
+constant/singleton handling, input-order determinism, split plan validation,
+and non-finite values.
