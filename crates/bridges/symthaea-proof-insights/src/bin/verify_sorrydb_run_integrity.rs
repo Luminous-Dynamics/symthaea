@@ -118,6 +118,7 @@ fn make_eligible_integrity(mut value: Value, run: &Value) -> Result<Value> {
     let sorry_id = string(run, "/task/sorry_id")?.to_owned();
     let repository_commit = string(run, "/task/repository_commit")?.to_owned();
     let repository_remote = string(run, "/task/repository_remote")?.to_owned();
+    let repository_branch = string(run, "/task/repository_branch")?.to_owned();
     let source_path = string(run, "/task/source_path")?.to_owned();
     let lean_version = string(run, "/task/lean_version")?.to_owned();
 
@@ -128,6 +129,7 @@ fn make_eligible_integrity(mut value: Value, run: &Value) -> Result<Value> {
     value["dataset"]["task_id"] = json!(sha256_hex(sorry_id.as_bytes()));
 
     value["target"]["repository_remote"] = json!(repository_remote);
+    value["target"]["repository_branch"] = json!(repository_branch);
     value["target"]["repository_commit"] = json!(repository_commit);
     value["target"]["source_path"] = json!(source_path);
     value["target"]["start_line"] = run["task"]["start_line"].clone();
