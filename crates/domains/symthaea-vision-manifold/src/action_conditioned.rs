@@ -24,6 +24,8 @@ pub struct ActionConditionedForecastReceipt {
     pub model_checkpoint_sha256: String,
     pub action_id: u64,
     pub action_set_size: usize,
+    pub action_set_sha256: String,
+    pub model_weights_sha256: String,
     pub horizon_seconds: f32,
     /// Number of supervised updates completed before this forecast was issued.
     pub model_version: u64,
@@ -35,7 +37,7 @@ pub struct ActionConditionedForecastReceipt {
     pub forecast_sha256: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionConditionedCandidateAction {
     pub action_id: u64,
     pub action_descriptor_sha256: String,
@@ -47,6 +49,7 @@ pub struct PendingActionConditionedForecastState {
     pub receipt: ActionConditionedForecastReceipt,
     pub autonomous_base_prediction: Vec<f32>,
     pub action_embedding: Vec<f32>,
+    pub action_weights_used: Vec<f32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -88,7 +91,7 @@ pub struct ActionConditionedForecastScore {
     pub model_version_after: u64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionConditionedObservedOutcome {
     pub forecast_id: u64,
     pub actual_future_hv: Vec<f32>,
@@ -201,15 +204,13 @@ impl ActionConditionedVisualResidualPredictor {
         let next_id = self.next_forecast_id.checked_add(1)
             .ok_or(ActionConditionedPredictorError::ForecastIdExhausted)?;
         let forecast_id = self.next_forecast_id;
-        let predicted_future_hv: Vec<f32> = autonomous_base_prediction
-            .iter()
-            .zip(action_embedding)
-            .zip(&self.action_weights)
-            .map(|((&base, &action), &weight)| base + action * weight)
-            .collect();
-        if predicted_future_hv.iter().any(|v| !v.is_finite()) {
-            return Err(ActionConditionedPredictorError::NonFiniteValue);
-        }
+        let predicted_future_hv = predict_action_residual(
+            autonomous_base_prediction, action_embedding, &self.action_weights
+        )?;
+        let action_set_sha256 = hash_action_descriptors(&[(
+            action_id,
+            action_descriptor_sha256.to_owned(),
+        )]);
         let predicted_future_hv_sha256 = hash_f32_vector(
             b"vis005-action-conditioned-prediction-v1",
             &predicted_future_hv,
@@ -224,6 +225,11 @@ impl ActionConditionedVisualResidualPredictor {
             model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
             action_id,
             action_set_size: 1,
+            action_set_sha256,
+            model_weights_sha256: hash_f32_vector(
+                b"vis005-action-conditioned-residual-weights-v1",
+                &self.action_weights,
+            ),
             horizon_seconds,
             model_version: self.training_steps,
             autonomous_base_prediction_sha256: hash_f32_vector(
@@ -243,6 +249,7 @@ impl ActionConditionedVisualResidualPredictor {
             receipt: receipt.clone(),
             autonomous_base_prediction: autonomous_base_prediction.to_vec(),
             action_embedding: action_embedding.to_vec(),
+            action_weights_used: self.action_weights.clone(),
         };
         self.pending.insert(forecast_id, pending);
         self.next_forecast_id = next_id;
@@ -310,19 +317,24 @@ impl ActionConditionedVisualResidualPredictor {
         }
 
         let model_version = self.training_steps;
+        let action_descriptors: Vec<(u64, String)> = ordered.iter()
+            .map(|candidate| (
+                candidate.action_id,
+                candidate.action_descriptor_sha256.clone(),
+            ))
+            .collect();
+        let action_set_sha256 = hash_action_descriptors(&action_descriptors);
+        let model_weights_sha256 = hash_f32_vector(
+            b"vis005-action-conditioned-residual-weights-v1",
+            &self.action_weights,
+        );
         let mut receipts = Vec::with_capacity(ordered.len());
         let mut pending_records = Vec::with_capacity(ordered.len());
         for (offset, candidate) in ordered.iter().enumerate() {
             let forecast_id = self.next_forecast_id + offset as u64;
-            let predicted_future_hv: Vec<f32> = autonomous_base_prediction
-                .iter()
-                .zip(&candidate.action_embedding)
-                .zip(&self.action_weights)
-                .map(|((&base, &action), &weight)| base + action * weight)
-                .collect();
-            if predicted_future_hv.iter().any(|v| !v.is_finite()) {
-                return Err(ActionConditionedPredictorError::NonFiniteValue);
-            }
+            let predicted_future_hv = predict_action_residual(
+                autonomous_base_prediction, &candidate.action_embedding, &self.action_weights
+            )?;
             let predicted_future_hv_sha256 = hash_f32_vector(
                 b"vis005-action-conditioned-prediction-v1",
                 &predicted_future_hv,
@@ -337,6 +349,8 @@ impl ActionConditionedVisualResidualPredictor {
                 model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
                 action_id: candidate.action_id,
                 action_set_size: candidates.len(),
+                action_set_sha256: action_set_sha256.clone(),
+                model_weights_sha256: model_weights_sha256.clone(),
                 horizon_seconds,
                 model_version,
                 autonomous_base_prediction_sha256: hash_f32_vector(
@@ -358,6 +372,7 @@ impl ActionConditionedVisualResidualPredictor {
                     receipt: receipt.clone(),
                     autonomous_base_prediction: autonomous_base_prediction.to_vec(),
                     action_embedding: candidate.action_embedding.clone(),
+                    action_weights_used: self.action_weights.clone(),
                 },
             ));
             receipts.push(receipt);
@@ -407,6 +422,8 @@ impl ActionConditionedVisualResidualPredictor {
                 || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
                 || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
                 || receipt.action_set_size != first.action_set_size
+                || receipt.action_set_sha256 != first.action_set_sha256
+                || receipt.model_weights_sha256 != first.model_weights_sha256
                 || receipt.model_version != first.model_version
                 || receipt.model_version != self.training_steps
             {
@@ -417,6 +434,17 @@ impl ActionConditionedVisualResidualPredictor {
         action_ids.sort_unstable();
         if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(ActionConditionedPredictorError::DuplicateActionId);
+        }
+        let descriptors: Vec<(u64, String)> = pending_records.iter()
+            .map(|pending| (
+                pending.receipt.action_id,
+                pending.receipt.action_descriptor_sha256.clone(),
+            ))
+            .collect();
+        let mut descriptors = descriptors;
+        descriptors.sort_unstable_by_key(|(action_id, _)| *action_id);
+        if hash_action_descriptors(&descriptors) != first.action_set_sha256 {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
         }
         let next_training_step = self.training_steps.checked_add(1)
             .ok_or(ActionConditionedPredictorError::ForecastIdExhausted)?;
@@ -538,6 +566,9 @@ impl ActionConditionedVisualResidualPredictor {
     ) -> Result<ActionConditionedForecastScore, ActionConditionedPredictorError> {
         let pending = self.pending.get(&forecast_id)
             .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
+        if pending.receipt.action_set_size != 1 {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
         if actual_future_hv.len() != self.dim {
             return Err(ActionConditionedPredictorError::InvalidVectorDimension);
         }
@@ -680,6 +711,8 @@ impl ActionConditionedVisualResidualPredictor {
                 || !is_lower_hex_sha256(&receipt.model_checkpoint_sha256)
                 || !is_lower_hex_sha256(&receipt.autonomous_base_prediction_sha256)
                 || !is_lower_hex_sha256(&receipt.action_embedding_sha256)
+                || !is_lower_hex_sha256(&receipt.action_set_sha256)
+                || !is_lower_hex_sha256(&receipt.model_weights_sha256)
                 || !is_lower_hex_sha256(&receipt.predicted_future_hv_sha256)
                 || !is_lower_hex_sha256(&receipt.forecast_sha256)
                 || hash_f32_vector(
@@ -691,6 +724,22 @@ impl ActionConditionedVisualResidualPredictor {
                     &forecast.action_embedding,
                 ) != receipt.action_embedding_sha256
                 || hash_f32_vector(
+                    b"vis005-action-conditioned-residual-weights-v1",
+                    &forecast.action_weights_used,
+                ) != receipt.model_weights_sha256
+                || predict_action_residual(
+                    &forecast.autonomous_base_prediction,
+                    &forecast.action_embedding,
+                    &forecast.action_weights_used,
+                ).map_or(true, |predicted| {
+                    predicted.iter().zip(&receipt.predicted_future_hv)
+                        .any(|(left, right)| left.to_bits() != right.to_bits())
+                })
+                || receipt.action_set_sha256 != hash_action_descriptors(&[(
+                    receipt.action_id,
+                    receipt.action_descriptor_sha256.clone(),
+                )]) && receipt.action_set_size == 1
+                || hash_f32_vector(
                     b"vis005-action-conditioned-prediction-v1",
                     &receipt.predicted_future_hv,
                 ) != receipt.predicted_future_hv_sha256
@@ -698,13 +747,15 @@ impl ActionConditionedVisualResidualPredictor {
                 || receipt.predicted_future_hv.len() != self.dim
                 || forecast.autonomous_base_prediction.len() != self.dim
                 || forecast.action_embedding.len() != self.dim
+                || forecast.action_weights_used.len() != self.dim
                 || !is_lower_hex_sha256(&receipt.history_sha256)
                 || !is_lower_hex_sha256(&receipt.action_manifest_sha256)
                 || !is_lower_hex_sha256(&receipt.action_descriptor_sha256)
                 || !receipt.horizon_seconds.is_finite()
                 || receipt.horizon_seconds <= 0.0
                 || receipt.predicted_future_hv.iter().chain(&forecast.autonomous_base_prediction)
-                    .chain(&forecast.action_embedding).any(|v| !v.is_finite())
+                    .chain(&forecast.action_embedding)
+                    .chain(&forecast.action_weights_used).any(|v| !v.is_finite())
                 || pending.insert(receipt.forecast_id, forecast.clone()).is_some()
             {
                 return Err(ActionConditionedPredictorError::InvalidCheckpointState);
@@ -729,6 +780,36 @@ impl ActionConditionedVisualResidualPredictor {
         self.learning_rate = learning_rate;
         Ok(())
     }
+}
+
+fn hash_action_descriptors(action_descriptors: &[(u64, String)]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"vis005-action-conditioned-action-set-v1\0");
+    hasher.update((action_descriptors.len() as u64).to_le_bytes());
+    for (action_id, descriptor_sha256) in action_descriptors {
+        hasher.update(action_id.to_le_bytes());
+        hash_text(&mut hasher, descriptor_sha256);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn predict_action_residual(
+    base: &[f32],
+    action: &[f32],
+    weights: &[f32],
+) -> Result<Vec<f32>, ActionConditionedPredictorError> {
+    if base.len() != action.len() || action.len() != weights.len() {
+        return Err(ActionConditionedPredictorError::InvalidVectorDimension);
+    }
+    let predicted: Vec<f32> = base.iter()
+        .zip(action)
+        .zip(weights)
+        .map(|((&base, &action), &weight)| base + action * weight)
+        .collect();
+    if predicted.iter().any(|value| !value.is_finite()) {
+        return Err(ActionConditionedPredictorError::NonFiniteValue);
+    }
+    Ok(predicted)
 }
 
 fn hash_f32_vector(domain: &[u8], values: &[f32]) -> String {
@@ -758,6 +839,8 @@ fn hash_forecast_receipt(receipt: &ActionConditionedForecastReceipt) -> String {
     hash_text(&mut hasher, &receipt.model_checkpoint_sha256);
     hasher.update(receipt.action_id.to_le_bytes());
     hasher.update((receipt.action_set_size as u64).to_le_bytes());
+    hash_text(&mut hasher, &receipt.action_set_sha256);
+    hash_text(&mut hasher, &receipt.model_weights_sha256);
     hasher.update(receipt.horizon_seconds.to_bits().to_le_bytes());
     hasher.update(receipt.model_version.to_le_bytes());
     hash_text(&mut hasher, &receipt.autonomous_base_prediction_sha256);
@@ -824,6 +907,14 @@ mod tests {
             hash_f32_vector(b"vis005-action-conditioned-prediction-v1", &base)
         );
         assert_eq!(receipt.forecast_sha256, hash_forecast_receipt(&receipt));
+        assert_eq!(receipt.action_set_size, 1);
+        assert_eq!(
+            receipt.model_weights_sha256,
+            hash_f32_vector(
+                b"vis005-action-conditioned-residual-weights-v1",
+                &[0.0, 0.0],
+            )
+        );
         assert_eq!(model.pending_forecast_count(), 1);
     }
 
