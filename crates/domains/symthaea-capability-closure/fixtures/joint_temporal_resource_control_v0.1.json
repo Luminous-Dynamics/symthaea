@@ -83,7 +83,9 @@
     "keeps_infeasible_subsets_out_of_frontier": true,
     "oracle_exposure_visible_to_candidate": false,
     "action_registry": "evaluator-owned action ids with conflict_group constraints",
-    "infeasible_conflict_group_subsets_excluded": true
+    "infeasible_conflict_group_subsets_excluded": true,
+    "context_requires_nonzero_action_registry_digest": true,
+    "action_registry_binding": "action_registry_sha256"
   },
   "targets_not_results": {
     "zero_future_leakage": true,
@@ -93,7 +95,7 @@
   },
   "validation_status": {
     "candidate_test_functions_authored": 12,
-    "evaluator_test_functions_authored": 12,
+    "evaluator_test_functions_authored": 13,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
