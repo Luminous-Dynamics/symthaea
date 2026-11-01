@@ -196,3 +196,16 @@ Partial timestamps and transitions between timed and untimed event modes are rej
 Only then does it append an \`ArtifactVerified\` event with the verifier receipt digest and charged resource vector. \`resolve_and_append_artifact_verified_promotion\` composes this with the explicit bounded resolver interface in \`evidence_artifact.rs\`.
 
 These APIs establish artifact byte integrity only. They do not establish semantic correctness, held-out scientific validity, authenticated verifier signatures, or resource-meter truth. EventTape/OS resource attestation and domain-specific verification remain separate integration steps.
+
+
+### Exact search configuration binding
+
+The frozen anytime header now binds an explicit \`search_config_sha256\` in addition to algorithm build, evaluator build, verifier build and execution environment. Each NSGA-II, MOEA/D-DE and SMS-EMOA trace-enabled entry point computes the exact config digest from the same validated config used by the optimizer, and rejects a history whose digest differs.
+
+SMS-EMOA also requires the history's objective specifications and hypervolume reference point to equal the configuration used by its environmental-selection operator. This prevents trace receipts from comparing a run under one selection reference to an analysis plan that silently claims another. For NSGA-II and MOEA/D-DE, objective order/direction is checked against the frozen minimization problem contract; their objective scaling remains an explicit analysis-plan choice.
+
+### Timing and synthetic accounting correction
+
+Event start/completion timestamps and receipt elapsed time are optional. A run is consistently timed or consistently untimed; partial timestamps and clock-mode transitions are rejected. Synthetic optimizer traces use no timestamps, so target/run receipts report unknown elapsed wall time. They do not encode an artificial zero-latency claim.
+
+The synthetic cost model is no longer accepted by a substring in its human-readable name. \`AnytimeRecorder\` requires the exact versioned cost-model ID and the SHA-256 digest of its canonical formula (one normalized synthetic unit per objective-evaluation attempt). Physical meters remain unknown and are not estimated.
