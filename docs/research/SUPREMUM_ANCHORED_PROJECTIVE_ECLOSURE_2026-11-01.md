@@ -207,6 +207,19 @@ Thus the portfolio remains valid and the intersection-local values remain additi
 
 The helper is build_additive_anchored_portfolio_e_paths in validation/supremum_anchored_eclosure.py. Tests verify exact convex-mixture arithmetic, baseline retention, closure feasibility, and rejection of invalid/post-hoc weight vectors.
 
+A reproducible synthetic stress runner is included at validation/benchmark_supremum_anchored_portfolios.py. It uses Bernoulli likelihood-ratio e-processes under p0=.001, one weighted anytime-e baseline, and four alternative-specific auxiliary e-process experts, each transformed by an admissible running-maximum adjuster. It measures all-null, sparse mild/strong, and dense regimes; reports estimated SupFDR with Monte Carlo standard error, power, baseline retention and extra discoveries; and compares each fixed expert with the fixed-prior portfolio. The best single expert selected after looking at the same run is reported only as an invalid oracle ceiling, not as a valid procedure.
+
+Run:
+
+```bash
+python validation/benchmark_supremum_anchored_portfolios.py \
+  --seed 97802 --n 100 --streams 5000 --horizon 30 \
+  --output anchored-portfolios.json
+```
+
+This remains a synthetic model-specific benchmark, not an industry-wide SOTA comparison. Its statistical guarantee follows from the likelihood-ratio e-processes, admissible adjusters and ex-ante budget condition, not from the simulated SupFDR estimate. Tests are authored but not run from a repository checkout.
+
+
 ### Scaling benchmark
 
 Run the exact-rational selector benchmark:
