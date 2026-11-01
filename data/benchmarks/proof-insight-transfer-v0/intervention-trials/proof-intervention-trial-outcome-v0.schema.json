@@ -354,10 +354,24 @@
       },
       "then": {
         "properties": {
+          "target_integrity_passed": {
+            "const": true
+          },
+          "target_integrity_receipt_path": {
+            "$ref": "#/$defs/relative_path"
+          },
+          "target_integrity_receipt_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
           "run_receipt_path": {
             "$ref": "#/$defs/relative_path"
           }
-        }
+        },
+        "required": [
+          "target_integrity_receipt_path",
+          "target_integrity_receipt_sha256",
+          "run_receipt_path"
+        ]
       }
     },
     {
