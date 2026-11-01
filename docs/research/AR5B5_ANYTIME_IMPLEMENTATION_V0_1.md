@@ -231,3 +231,7 @@ The generic anytime attempt counter includes both deterministic and noisy object
 ### Noisy-mode target applicability correction — schema 0.4.0
 
 The generic anytime receipt's target list is defined over the deterministic verified Pareto archive. In noisy mode, successful replicates are not inserted into that deterministic archive. Reporting those targets as \`NotReachedByBudget\` would therefore be misleading. The status enum now includes \`NotApplicableInNoisyMode\`; noisy-mode receipts return that status and no final deterministic metric value. Noisy Pareto confidence classifications remain in the separate joint noisy report.
+
+### Joint noisy/anytime report schema
+
+The joint reconstruction receipt has its own schema identifier and version `0.1.0`, independent of the noisy observation plan/report schema (`0.2.0`) and the anytime history/receipt schema (`0.4.0`). Its digest binds both nested receipts and the exact history tip.
