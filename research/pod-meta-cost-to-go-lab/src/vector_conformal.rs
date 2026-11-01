@@ -213,9 +213,9 @@ pub struct JointCostBound {
     pub frontier_digest: [u8; 32],
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum JointCostEnvelope {
-    Bounded(JointCostBound),
+    Bounded(Box<JointCostBound>),
     Unbounded {
         target_coverage: f64,
         calibration_count: usize,
@@ -369,7 +369,7 @@ impl SplitVectorConformalCalibrator {
                     prediction.uncertainty_scale,
                     threshold,
                 )?;
-                Ok(JointCostEnvelope::Bounded(JointCostBound {
+                Ok(JointCostEnvelope::Bounded(Box::new(JointCostBound {
                     upper,
                     target_coverage: self.target_coverage,
                     calibration_count: self.calibration_count,
@@ -378,7 +378,7 @@ impl SplitVectorConformalCalibrator {
                     calibration_digest: self.calibration_digest,
                     calibration_cohort_digest: self.calibration_cohort_digest,
                     frontier_digest: prediction.frontier_digest,
-                }))
+                })))
             }
         }
     }
@@ -388,7 +388,7 @@ impl SplitVectorConformalCalibrator {
 /// reserve fits the actual ledger. Completion probability is a separate gate;
 /// this function makes no claim about it and never enforces the physical cap.
 pub fn assess_joint_resource_fit(
-    envelope: JointCostEnvelope,
+    envelope: &JointCostEnvelope,
     mandatory_verification_reserve: ResourceVector,
     ledger: &crate::BudgetLedger,
 ) -> JointBudgetDecision {
