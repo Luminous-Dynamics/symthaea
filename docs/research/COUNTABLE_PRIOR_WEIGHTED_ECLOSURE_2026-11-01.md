@@ -137,6 +137,28 @@ This is a universal coding prior, not a universally optimal power allocation. Fo
 
 A data-adaptively selected prior is not covered. A hyperprior mixture of fixed priors with fixed top-level weights is valid when those weights sum to at most one.
 
+
+### Prior-mass sensitivity: a first deterministic benchmark
+
+The new script validation/benchmark_countable_prior_penalties.py compares the gamma-gap code prior against two valid product-prior families on fixed intersection motifs:
+
+- polynomial product: lambda_i = i^-2, with Z = product_i(1+i^-2)-1 = sinh(pi)/pi-1;
+- geometric product: lambda_i = 2^-i, with Z = product_i(1+2^-i)-1, numerically evaluated with a tail bound;
+- gamma-gap code: pi_S = 2^-L(S), exactly normalized by Kraft's identity.
+
+The table reports -log2(pi_S), in bits. Lower is more prior mass. These are allocation penalties, **not power or validity measurements**.
+
+| Intersection S | Gamma-gap bits | Polynomial-product bits | Geometric-product bits |
+|---|---:|---:|---:|
+| {1000} | 20 | 21.35 | 1000.47 |
+| {100,101,102,103,104} | 22 | 68.14 | 510.47 |
+| {1000,1001,1002,1003,1004} | 28 | 101.11 | 5010.47 |
+| {1,10,100,1000} | 45 | 41.28 | 1111.47 |
+
+This exposes the prior's inductive bias: the gap code assigns substantially more mass to high-index contiguous clusters, while a product prior penalizes every absolute index. The gap code is not uniformly better; for the sparse set shown, its penalty is larger than the polynomial product prior. The global hypothesis-to-index mapping is itself a modelling choice and must be fixed before evidence collection. A deployable benchmark should also test sensitivity to admissible index permutations or use a pre-registered hierarchical mixture over indexings.
+
+This benchmark does not estimate power, FDR, or SupFDR. Those require valid stochastic e-process generators and matched decision rules.
+
 ## 5. Finite-family oracle
 
 The implementation adds:
@@ -146,7 +168,9 @@ The implementation adds:
 - exhaustive local closure checking over all nonempty subsets of the active family;
 - fail-closed behavior for missing component processes, malformed IDs, negative values, incomplete paths, and a finite active-subset prior mass above one;
 - enumeration of locally certified rejection sets for a finite active family;
-- exact finite-truth fixtures checking pathwise mixture domination and a finite-prefix prior-budget audit.
+- exact finite-truth fixtures checking pathwise mixture domination and a finite-prefix prior-budget audit;
+- validation/benchmark_countable_prior_penalties.py — deterministic allocation-penalty comparison for the code, polynomial-product, and geometric-product priors;
+- validation/test_countable_prior_penalties.py — reproducibility, normalization, cluster-bias and input-validation tests.
 
 The oracle is exponential by design: it checks 2^|I_t|-1 local constraints. It is a reference implementation, not a production algorithm. The component e-process law, common filtration, signed event provenance, and real-world activation timing are not inferred from supplied paths.
 
