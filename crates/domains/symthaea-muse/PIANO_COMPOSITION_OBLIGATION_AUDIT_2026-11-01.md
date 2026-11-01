@@ -197,3 +197,8 @@ Automated FMD/FAD/CLAP or the symbolic verifier may explain specific properties.
 6. Connect to #9729's blind listening protocol only after mechanical obligation semantics and artifact lineage are stable.
 
 No training run, renderer capability, compile, test, or listener result is claimed by this design note. The next source PR should be narrow and should not be opened as merge-ready until exact-head Rust checks and independent fixture evidence exist.
+
+
+## Implementation handoff
+
+The implementation work is tracked separately in [#9797 — Verify typed compositional obligations against realized scores](https://github.com/Luminous-Dynamics/symthaea/issues/9797). The issue turns the audit findings into explicit work packages and adversarial fixtures. This document remains a design addendum; #9797 is the source implementation target.
