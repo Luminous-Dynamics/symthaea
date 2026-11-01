@@ -1606,6 +1606,32 @@ mod tests {
     }
 
     #[test]
+    fn success_policy_cannot_promote_incorrect_failed_or_unattempted_outcomes() {
+        let mut invalid = protocol(0.0);
+        invalid.accepted_success_outcomes = vec![
+            ApplicationEventOutcome::Correct,
+            ApplicationEventOutcome::Incorrect,
+        ];
+        invalid.protocol_sha256 = compute_application_phase_protocol_sha256(&invalid).unwrap();
+        assert!(validate_application_phase_protocol(&invalid).is_err());
+    }
+
+    #[test]
+    fn rejects_outcome_input_and_result_digest_tampering() {
+        let invalid_input = outcomes("correct", true).replace(&sha('a'), "bad-digest");
+        assert!(audit_application_phase_energy(
+            samples(), &markers(10_000, 10_000), &invalid_input,
+            trace_config(), &mapping(), &protocol(0.0),
+        ).unwrap_err().to_string().contains("input_sha256"));
+
+        let invalid_output = outcomes("correct", true).replace(&sha('b'), "bad-digest");
+        assert!(audit_application_phase_energy(
+            samples(), &markers(10_000, 10_000), &invalid_output,
+            trace_config(), &mapping(), &protocol(0.0),
+        ).unwrap_err().to_string().contains("output_sha256"));
+    }
+
+    #[test]
     fn rejects_missing_or_duplicate_outcome_records() {
         let empty = "event_id,outcome,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n";
         assert!(audit_application_phase_energy(
