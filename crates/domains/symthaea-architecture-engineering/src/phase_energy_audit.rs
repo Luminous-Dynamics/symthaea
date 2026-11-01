@@ -116,6 +116,8 @@ pub struct ApplicationPhaseProtocolManifest {
     pub phases: Vec<ApplicationPhaseDefinition>,
     /// Explicit statuses considered successful for this application. Incorrect/Failed/NotAttempted are forbidden.
     pub accepted_success_outcomes: Vec<ApplicationEventOutcome>,
+    /// Digest of the task-specific evaluator that classifies Correct/Incorrect/Fallback outcomes.
+    pub outcome_evaluator_sha256: String,
     /// A complete event is only labelled complete if unassigned gaps are within this limit.
     pub maximum_unattributed_gap_ms: f64,
     pub protocol_sha256: String,
@@ -319,6 +321,12 @@ pub fn validate_application_phase_protocol(
     }
     if protocol.benchmark_id.trim().is_empty() || protocol.protocol_id.trim().is_empty() {
         return Err(PhaseEnergyAuditError::new("phase_protocol.identity", "benchmark and protocol IDs must be non-empty"));
+    }
+    if !is_sha256(&protocol.outcome_evaluator_sha256) {
+        return Err(PhaseEnergyAuditError::new(
+            "phase_protocol.outcome_evaluator_sha256",
+            "must be lowercase SHA-256 hex",
+        ));
     }
     if protocol.phases.is_empty()
         || !protocol.phases.iter().any(|phase| phase.required)
@@ -1398,6 +1406,7 @@ mod tests {
                 ApplicationPhaseDefinition { phase_id: "postprocess".into(), order: 2, required: true },
             ],
             accepted_success_outcomes: vec![ApplicationEventOutcome::Correct],
+            outcome_evaluator_sha256: sha('c'),
             maximum_unattributed_gap_ms: max_gap_ms,
             protocol_sha256: String::new(),
         };
@@ -1560,8 +1569,11 @@ mod tests {
                 "e2,e1,postprocess,END,40000,5,logic-analyzer-clock,gpio-sync-1\n",
             )
         );
+        let one_outcome = outcomes("correct", true);
+        let second_outcome = one_outcome.lines().nth(1).unwrap().replacen("e1,", "e2,", 1);
+        let both_outcomes = format!("{one_outcome}{second_outcome}\n");
         assert!(audit_application_phase_energy(
-            samples(), &marker, &outcomes("correct", true), trace_config(), &mapping(), &protocol(0.0),
+            samples(), &marker, &both_outcomes, trace_config(), &mapping(), &protocol(0.0),
         ).unwrap_err().to_string().contains("only one application event"));
     }
 
