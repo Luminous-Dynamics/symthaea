@@ -90,10 +90,10 @@ pub fn alpha_from_ratio_q16(ratio_q16: u32) -> u16 {
     interpolated.min(Q15_ONE as u64) as u16
 }
 
-/// Compute alpha from integer microsecond durations without floating point.
+/// Compute alpha from u32 integer-microsecond durations without floating point.
 ///
-/// The ratio is floored to Q16.16 before lookup. A zero tau is always rejected;
-/// very large ratios are saturated by alpha_from_ratio_q16.
+/// The Q16.16 ratio uses a u64 intermediate, avoiding u128 division on 32-bit targets.
+/// The ratio is floored before lookup. A zero tau is rejected; ratios above 12 saturate.
 pub fn alpha_from_dt_tau_us(
     dt_us: u32,
     tau_us: u32,
