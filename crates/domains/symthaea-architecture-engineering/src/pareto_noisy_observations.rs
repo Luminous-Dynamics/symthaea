@@ -137,7 +137,7 @@ pub struct NoisyReplicate {
     pub evidence_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct CandidateSamples {
     decision_sha256: String,
     samples: BTreeMap<String, NoisyReplicate>,
@@ -189,7 +189,7 @@ pub struct NoisyParetoReport {
     /// Conditional family-wise confidence guarantee for the candidate/objective/prefix family.
     pub nominal_familywise_confidence: f64,
     /// True only as a schema/provenance assertion; statistical independence is an experimental assumption.
-    pub independent_seed_provenance_present: bool,
+    pub unique_replicate_seeds_enforced: bool,
     pub report_sha256: String,
 }
 
@@ -201,7 +201,7 @@ struct NoisyReportPayload<'a> {
     plan_sha256: &'a str,
     candidate_summaries: &'a [NoisyCandidateSummary],
     nominal_familywise_confidence: f64,
-    independent_seed_provenance_present: bool,
+    unique_replicate_seeds_enforced: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -290,11 +290,15 @@ impl NoisyParetoStudy {
         if self.candidates.len() > self.plan.max_candidates {
             return Err(NoisyParetoError::new("candidates", "candidate count exceeds frozen limit"));
         }
+        let mut expected_owners = BTreeMap::<String, String>::new();
         for (candidate_id, state) in &self.candidates {
             if candidate_id.trim().is_empty() || state.samples.is_empty() {
                 return Err(NoisyParetoError::new("candidates", "candidate IDs and observation sets must be non-empty"));
             }
             validate_sha256(&state.decision_sha256, "candidate.decision_sha256")?;
+            if expected_owners.insert(state.decision_sha256.clone(), candidate_id.clone()).is_some() {
+                return Err(NoisyParetoError::new("candidate.decision_sha256", "identical decision digest appears under multiple candidate IDs"));
+            }
             if state.samples.values().any(|sample| {
                 sample.replicate_id.trim().is_empty()
                     || sample.objective_values.len() != self.plan.objective_specs.len()
@@ -314,6 +318,12 @@ impl NoisyParetoStudy {
                     }
                 }
             }
+            if sample_seeds != state.seeds {
+                return Err(NoisyParetoError::new("candidate.seeds", "cached seed index differs from the retained replicate set"));
+            }
+        }
+        if expected_owners != self.decision_owners {
+            return Err(NoisyParetoError::new("decision_owners", "decision ownership index differs from candidate records"));
         }
         Ok(())
     }
@@ -372,7 +382,7 @@ impl NoisyParetoStudy {
             plan_sha256: &plan_sha256,
             candidate_summaries: &summaries,
             nominal_familywise_confidence,
-            independent_seed_provenance_present: true,
+            unique_replicate_seeds_enforced: true,
         };
         let report_sha256 = digest_serializable(&payload)?;
         Ok(NoisyParetoReport {
@@ -382,7 +392,7 @@ impl NoisyParetoStudy {
             plan_sha256,
             candidate_summaries: summaries,
             nominal_familywise_confidence,
-            independent_seed_provenance_present: true,
+            unique_replicate_seeds_enforced: true,
             report_sha256,
         })
     }
