@@ -428,7 +428,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("score-lara-paper") => score_lara_cli(&args),
-        Some("score-lara-paper") => score_lara_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
             "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | score-lara-paper | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
