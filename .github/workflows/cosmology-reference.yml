@@ -1,0 +1,52 @@
+name: Cosmology Reference Oracle
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/physics/cosmology.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "crates/domains/symthaea-cosmology-bench/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/cosmology-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cosmology-reference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  focused-reference-tests:
+    name: Focused Cosmology Reference Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Test FLRW analytic and adaptive reference oracles
+        run: cargo test -p symthaea-core expansion_history_tests
+
+      - name: Test checksum, parser, and weighted-chain audit controls
+        run: cargo test -p symthaea-cosmology-bench
+
+      # Run formatting after tests so formatting drift does not hide compiler
+      # or scientific-test diagnostics on a queued/contended runner.
+      - name: Check cosmology module formatting
+        if: always()
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/physics/cosmology.rs
+
+      - name: Check chain-auditor formatting
+        if: always()
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-cosmology-bench/src/lib.rs crates/domains/symthaea-cosmology-bench/src/main.rs
