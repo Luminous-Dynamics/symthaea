@@ -2323,14 +2323,17 @@ where
 
     transaction.execute(
         "INSERT INTO basalt_accepted_receipts
-         (receipt_digest, host_id, source_id, partition_id, generation,
-          previous_seal_digest, seal_digest, observer_profile_digest,
-          boot_incarnation_digest, log_id, tree_size, root_digest,
-          checkpoint_digest, signer_policy_version, witness_policy_version,
-          policy_bundle_digest)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+         (receipt_digest, accepted_revision, host_id, source_id, partition_id, generation,
+          previous_seal_digest, seal_digest, observer_profile_digest, boot_incarnation_digest,
+          profile_transition_evidence_digest, boot_transition_evidence_digest,
+          log_origin_transition_evidence_digest, policy_transition_evidence_digest,
+          log_id, tree_size, root_digest, checkpoint_digest,
+          signer_policy_version, witness_policy_version, policy_bundle_digest)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
         params![
             receipt.receipt_digest,
+            receipt.accepted_revision.to_string(),
             receipt.source.provisioned_host_id,
             receipt.source.source_id,
             receipt.source.partition_id,
@@ -2339,6 +2342,10 @@ where
             receipt.seal_digest,
             receipt.observer_profile_digest,
             receipt.boot_incarnation_digest,
+            receipt.profile_transition_evidence_digest,
+            receipt.boot_transition_evidence_digest,
+            receipt.log_origin_transition_evidence_digest,
+            receipt.policy_transition_evidence_digest,
             receipt.checkpoint.log_id,
             receipt.checkpoint.tree_size.to_string(),
             receipt.checkpoint.root_digest,
@@ -2435,11 +2442,16 @@ pub fn trusted_state_digest(state: &TrustedState) -> String {
         hash_state_string(&mut hasher, &receipt.source.source_id);
         hash_state_string(&mut hasher, &receipt.source.partition_id);
         hash_state_u64(&mut hasher, receipt.generation);
+        hash_state_u64(&mut hasher, receipt.accepted_revision);
         hash_state_optional_string(&mut hasher, receipt.previous_seal_digest.as_deref());
         hash_state_string(&mut hasher, &receipt.seal_digest);
         hash_state_string(&mut hasher, &receipt.receipt_digest);
         hash_state_string(&mut hasher, &receipt.observer_profile_digest);
         hash_state_string(&mut hasher, &receipt.boot_incarnation_digest);
+        hash_state_optional_string(&mut hasher, receipt.profile_transition_evidence_digest.as_deref());
+        hash_state_optional_string(&mut hasher, receipt.boot_transition_evidence_digest.as_deref());
+        hash_state_optional_string(&mut hasher, receipt.log_origin_transition_evidence_digest.as_deref());
+        hash_state_optional_string(&mut hasher, receipt.policy_transition_evidence_digest.as_deref());
         hash_state_string(&mut hasher, &receipt.checkpoint.log_id);
         hash_state_u64(&mut hasher, receipt.checkpoint.tree_size);
         hash_state_string(&mut hasher, &receipt.checkpoint.root_digest);
