@@ -632,9 +632,8 @@ mod tests {
         );
 
         let mut malformed = observed_evidence(&current, &next, 2);
-        malformed.target_observed_at_seconds = malformed.requested_target_time_seconds
-            + malformed.max_target_lateness_seconds
-            + 0.001;
+        malformed.target_observed_at_seconds =
+            malformed.requested_target_time_seconds + malformed.max_target_lateness_seconds + 0.001;
         assert!(
             candidate
                 .train_observed_transition(&current, &next, &malformed, 0.001)
