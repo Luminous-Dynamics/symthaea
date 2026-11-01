@@ -460,7 +460,7 @@ fn run() -> Result<(), String> {
         let reused_nested_receipt_hashes = partition_count + 1;
 
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{},{},{:?},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{},{},{:?},true",
             n_units,
             CANDIDATE.len(),
             verified.model_sha256,
@@ -488,7 +488,6 @@ fn run() -> Result<(), String> {
             reused_nested_receipt_hashes,
             phi_s.map(|value| format!("{value:.17}")).unwrap_or_else(|| "UNRESOLVED".to_string()),
             result_status,
-            true
         );
     }
     Ok(())
