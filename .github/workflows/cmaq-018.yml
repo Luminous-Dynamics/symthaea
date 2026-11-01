@@ -204,6 +204,19 @@ jobs:
                           payload.extend(struct.pack("<d", value))
               return hashlib.sha256(payload).hexdigest()
 
+          channel_ids = [channel["channel_id"] for channel in structured_bank["channels"]]
+          assert len(set(channel_ids)) == len(channel_ids)
+          assert all(
+              channel["channel_id"] == channel["channel_id"].strip()
+              and channel["unit"] == channel["unit"].strip()
+              for channel in structured_bank["channels"]
+          )
+          assert all(
+              math.isfinite(value)
+              for channel in structured_bank["channels"]
+              for row in channel["outcome_samples"]
+              for value in row
+          )
           structured_digest = canonical_structured_bank_digest(structured_bank)
           assert structured_digest == structured_bank["joint_draw_bank_sha256"]
           assert structured_digest == (
@@ -218,6 +231,12 @@ jobs:
           hostile_structured["channels"][1]["channel_id"] = hostile_structured["channels"][0]["channel_id"]
           assert len({channel["channel_id"] for channel in hostile_structured["channels"]}) != len(
               hostile_structured["channels"]
+          )
+          hostile_structured = json.loads(json.dumps(structured_bank))
+          hostile_structured["channels"][0]["unit"] = " probability "
+          assert any(
+              channel["unit"] != channel["unit"].strip()
+              for channel in hostile_structured["channels"]
           )
           hostile_structured = json.loads(json.dumps(structured_bank))
           hostile_structured["channels"][0]["outcome_samples"][0].pop()
