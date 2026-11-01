@@ -460,6 +460,61 @@ mod tests {
     }
 
     #[test]
+    fn pinned_pyphi_macro_mapping_families_match_golden_digests() {
+        let cases = [
+            (
+                MacroUnitSpec::coarse_grain(vec![0, 1], &[2], 4).unwrap(),
+                "6d1d396bb5b5f94064365e9b44763ea3f3075352dc7d7c0a3b6a3f3d0f972821",
+                "fc06f1aab62575d065424397a324069528bd4aabc0a602751f4696d88953cf93",
+                vec![false, false, false, true],
+            ),
+            (
+                MacroUnitSpec::coarse_grain(vec![0, 1], &[1], 4).unwrap(),
+                "8052c095831eaee3bb42b7ffd57f1cf63d942538dd2162f7a485f409c6b5bd7d",
+                "00b9c35b2761de5b901bc567261d04d39e11cbe7c215b54aa2d201b519e2d300",
+                vec![false, true, true, false],
+            ),
+            (
+                MacroUnitSpec::coarse_grain(vec![0, 1, 2], &[1, 2], 8).unwrap(),
+                "62ade755a0ef46f57971dc503afb5f1cc93fef158b9665adae73fad761e8db52",
+                "6d825aa3fa9732c13d517bc59fedc881efea104f75dbce5509c796853777ed52",
+                vec![false, true, true, true, true, true, true, false],
+            ),
+            (
+                MacroUnitSpec::blackbox(vec![0, 1], 2, &[0], 16).unwrap(),
+                "08f99240dd532f416f4853b61a56df4bb1be44db17ed466dd4625ef78ac35a2a",
+                "ede247fce344bf530d5dc78c57d3c21656fe0f89782173465ac904103e6d0add",
+                (0..16).map(|state| ((state >> 2) & 1) != 0).collect(),
+            ),
+            (
+                MacroUnitSpec::blackbox(vec![0, 1], 2, &[0, 1], 16).unwrap(),
+                "e055a4cd3c35ea97d152b41ef3dda99b26b0bcecddb3402592f010ef1af6f41a",
+                "f45aacca7d060506aad312cc42b65d97069f807227cabcbf8da483d95002f034",
+                (0..16).map(|state| ((state >> 2) & 0b11) == 0b11).collect(),
+            ),
+            (
+                MacroUnitSpec::blackbox(vec![0, 1, 2], 2, &[1, 2], 64).unwrap(),
+                "a591b01aecb7a615d38e275299e93a9f7da970b7f23fad630cb98de617888061",
+                "5f23fea7a3d427b498b1d885abcf4b20f72da3bcd745df0dc0399908ce2631c7",
+                (0..64).map(|state| ((state >> 4) & 0b11) == 0b11).collect(),
+            ),
+        ];
+
+        assert_eq!(cases.len(), 6);
+        for (unit, expected_mapping_sha, expected_spec_sha, expected_mapping) in cases {
+            assert_eq!(unit.mapping_sha256(), expected_mapping_sha);
+            assert_eq!(unit.spec_sha256(), expected_spec_sha);
+            assert!(!unit.complement_flipped());
+            assert_eq!(
+                (0..unit.mapping_entries())
+                    .map(|state| unit.map_sequence_state(state).unwrap())
+                    .collect::<Vec<_>>(),
+                expected_mapping
+            );
+        }
+    }
+
+    #[test]
     fn mapping_digest_binds_constituents_and_temporal_grain() {
         let mapping = vec![false, false, true, true];
         let base = MacroUnitSpec::new(vec![0, 1], 1, mapping.clone(), 4).unwrap();
