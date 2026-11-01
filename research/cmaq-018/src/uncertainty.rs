@@ -95,6 +95,8 @@ pub struct NetDecisionValueMetrics {
 pub enum AbstainReason {
     NoIntervalDominantAction,
     AmbiguousDominantActions,
+    NoConstraintFeasibleActions,
+    NoPositiveInformationValue,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -233,6 +235,9 @@ pub enum IntervalError {
     InvalidVisualChannelDescriptor,
     StructuredChannelSampleCardinalityMismatch,
     NonUtilitySelectionChannel,
+    InvalidInformationOption,
+    InvalidOutcomeProbabilities,
+    NegativeExpectedInformationValue,
 }
 
 /// Construct a central empirical interval from predictive samples.
@@ -621,6 +626,78 @@ pub enum StructuredActionDecision {
     Abstain { reason: AbstainReason },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConstraintRelation {
+    UpperAtMost,
+    LowerAtLeast,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StructuredActionConstraint {
+    pub channel_id: String,
+    pub kind: VisualBeliefChannelKind,
+    pub relation: ConstraintRelation,
+    pub threshold: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConstrainedSelectionBasis {
+    FeasibleOnly,
+    UtilityDominance,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConstrainedActionDecision {
+    Selected {
+        action_id: u64,
+        basis: ConstrainedSelectionBasis,
+    },
+    Abstain {
+        reason: AbstainReason,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InformationAcquisitionOption {
+    pub query_id: String,
+    pub action_ids: Vec<u64>,
+    /// Probability of each information outcome; must sum to one.
+    pub outcome_probabilities: Vec<f64>,
+    /// Conditional action utilities indexed [information outcome][action row].
+    pub conditional_action_utilities: Vec<Vec<f64>>,
+    /// All-in query cost expressed in the same preregistered utility units.
+    pub acquisition_cost: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InformationOptionEvaluation {
+    pub query_id: String,
+    pub prior_best_action_id: u64,
+    pub best_action_by_outcome: Vec<u64>,
+    pub expected_utility_without_information: f64,
+    pub expected_utility_after_information: f64,
+    pub expected_value_of_sample_information: f64,
+    pub acquisition_cost: f64,
+    pub net_information_value: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InformationAcquisitionChoice {
+    AcquireBestQuery,
+    Abstain {
+        reason: AbstainReason,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InformationAcquisitionEvaluation {
+    /// Evaluations sorted by query_id, independent of caller order.
+    pub options: Vec<InformationOptionEvaluation>,
+    pub choice: InformationAcquisitionChoice,
+    pub selected_query_id: Option<String>,
+}
+
+
 /// Select using only one explicitly named TaskUtility channel. Geometry,
 /// contact and risk channels remain constraints/diagnostics; this function
 /// never silently scalarizes or combines them with utility.
@@ -656,6 +733,243 @@ pub fn select_structured_task_action(
             action_id: actions[action_index].0,
         },
         RobustActionDecision::Abstain { reason } => StructuredActionDecision::Abstain { reason },
+    })
+}
+
+/// Apply explicit non-utility constraints before selecting on a named utility channel.
+///
+/// Constraint semantics are interval-based: UpperAtMost requires the complete
+/// predictive upper bound to be at or below the threshold; LowerAtLeast
+/// requires the complete lower bound to be at or above it. A sole feasible
+/// action is reported as FeasibleOnly, not as utility-dominant. With multiple
+/// feasible actions, a unique utility-dominant action is required; otherwise
+/// the selector abstains. This is conditional on simultaneous channel coverage
+/// and is not physical actuator authority.
+pub fn select_constrained_structured_action(
+    bank: &StructuredJointActionSetSamples,
+    utility_channel_id: &str,
+    constraints: &[StructuredActionConstraint],
+    nominal_coverage: f64,
+) -> Result<ConstrainedActionDecision, IntervalError> {
+    validate_structured_joint_action_set(bank)?;
+    validate_nominal_coverage(nominal_coverage)?;
+    let utility = bank
+        .channels
+        .iter()
+        .find(|channel| channel.channel_id == utility_channel_id)
+        .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
+    if utility.kind != VisualBeliefChannelKind::TaskUtility {
+        return Err(IntervalError::NonUtilitySelectionChannel);
+    }
+
+    let mut seen_constraints = Vec::with_capacity(constraints.len());
+    for constraint in constraints {
+        if constraint.channel_id.trim().is_empty()
+            || constraint.channel_id.trim() != constraint.channel_id
+            || !constraint.threshold.is_finite()
+            || constraint.channel_id == utility_channel_id
+            || seen_constraints.contains(&constraint.channel_id.as_str())
+        {
+            return Err(IntervalError::InvalidVisualChannelDescriptor);
+        }
+        let channel = bank
+            .channels
+            .iter()
+            .find(|channel| channel.channel_id == constraint.channel_id)
+            .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
+        if channel.kind != constraint.kind || channel.kind == VisualBeliefChannelKind::TaskUtility {
+            return Err(IntervalError::InvalidVisualChannelDescriptor);
+        }
+        seen_constraints.push(constraint.channel_id.as_str());
+    }
+
+    let mut action_rows: Vec<(u64, usize)> = bank
+        .action_ids
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, id)| (id, index))
+        .collect();
+    action_rows.sort_unstable_by_key(|(id, _)| *id);
+
+    let mut feasible = Vec::new();
+    for (action_id, row) in action_rows {
+        let mut action_is_feasible = true;
+        for constraint in constraints {
+            let channel = bank.channels.iter()
+                .find(|channel| channel.channel_id == constraint.channel_id)
+                .expect("constraints were resolved above");
+            let interval = central_interval(&channel.outcome_samples[row], nominal_coverage)?;
+            let passes = match constraint.relation {
+                ConstraintRelation::UpperAtMost => interval.upper <= constraint.threshold,
+                ConstraintRelation::LowerAtLeast => interval.lower >= constraint.threshold,
+            };
+            if !passes {
+                action_is_feasible = false;
+                break;
+            }
+        }
+        if action_is_feasible {
+            feasible.push((action_id, row));
+        }
+    }
+
+    if feasible.is_empty() {
+        return Ok(ConstrainedActionDecision::Abstain {
+            reason: AbstainReason::NoConstraintFeasibleActions,
+        });
+    }
+    if feasible.len() == 1 {
+        return Ok(ConstrainedActionDecision::Selected {
+            action_id: feasible[0].0,
+            basis: ConstrainedSelectionBasis::FeasibleOnly,
+        });
+    }
+
+    let intervals = feasible.iter()
+        .map(|(_, row)| central_interval(&utility.outcome_samples[*row], nominal_coverage))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(match select_interval_dominant_action(&intervals)? {
+        RobustActionDecision::Certified { action_index } => ConstrainedActionDecision::Selected {
+            action_id: feasible[action_index].0,
+            basis: ConstrainedSelectionBasis::UtilityDominance,
+        },
+        RobustActionDecision::Abstain { reason } => ConstrainedActionDecision::Abstain { reason },
+    })
+}
+
+fn best_action_index(action_ids: &[u64], utilities: &[f64]) -> usize {
+    let mut best = 0usize;
+    for index in 1..utilities.len() {
+        if utilities[index] > utilities[best]
+            || (utilities[index].to_bits() == utilities[best].to_bits()
+                && action_ids[index] < action_ids[best])
+        {
+            best = index;
+        }
+    }
+    best
+}
+
+fn evaluate_information_option(
+    option: &InformationAcquisitionOption,
+) -> Result<InformationOptionEvaluation, IntervalError> {
+    if option.query_id.trim().is_empty()
+        || option.query_id.trim() != option.query_id
+        || !option.acquisition_cost.is_finite()
+        || option.acquisition_cost < 0.0
+        || option.action_ids.len() < 2
+        || option.outcome_probabilities.is_empty()
+        || option.conditional_action_utilities.len() != option.outcome_probabilities.len()
+    {
+        return Err(IntervalError::InvalidInformationOption);
+    }
+
+    let mut action_ids = option.action_ids.clone();
+    action_ids.sort_unstable();
+    if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateActionId);
+    }
+
+    let mut probability_sum = 0.0;
+    for probability in &option.outcome_probabilities {
+        if !probability.is_finite() || *probability < 0.0 || *probability > 1.0 {
+            return Err(IntervalError::InvalidOutcomeProbabilities);
+        }
+        probability_sum += probability;
+    }
+    if !probability_sum.is_finite() || (probability_sum - 1.0).abs() > 1e-9 {
+        return Err(IntervalError::InvalidOutcomeProbabilities);
+    }
+
+    let mut prior_action_values = vec![0.0; option.action_ids.len()];
+    for (outcome_index, utilities) in option.conditional_action_utilities.iter().enumerate() {
+        if utilities.len() != option.action_ids.len()
+            || utilities.iter().any(|utility| !utility.is_finite())
+        {
+            return Err(IntervalError::InvalidInformationOption);
+        }
+        for (action_index, utility) in utilities.iter().enumerate() {
+            prior_action_values[action_index] +=
+                option.outcome_probabilities[outcome_index] * utility;
+        }
+    }
+    if prior_action_values.iter().any(|value| !value.is_finite()) {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
+
+    let prior_best_index = best_action_index(&option.action_ids, &prior_action_values);
+    let expected_utility_without_information = prior_action_values[prior_best_index];
+    let mut expected_utility_after_information = 0.0;
+    let mut best_action_by_outcome = Vec::with_capacity(option.outcome_probabilities.len());
+    for (outcome_index, utilities) in option.conditional_action_utilities.iter().enumerate() {
+        let best_index = best_action_index(&option.action_ids, utilities);
+        best_action_by_outcome.push(option.action_ids[best_index]);
+        expected_utility_after_information +=
+            option.outcome_probabilities[outcome_index] * utilities[best_index];
+    }
+    if !expected_utility_after_information.is_finite() {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
+    let raw_value = expected_utility_after_information - expected_utility_without_information;
+    if raw_value < -1e-9 {
+        return Err(IntervalError::NegativeExpectedInformationValue);
+    }
+    let expected_value_of_sample_information = raw_value.max(0.0);
+    let net_information_value = expected_value_of_sample_information - option.acquisition_cost;
+    if !net_information_value.is_finite() {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
+    Ok(InformationOptionEvaluation {
+        query_id: option.query_id.clone(),
+        prior_best_action_id: option.action_ids[prior_best_index],
+        best_action_by_outcome,
+        expected_utility_without_information,
+        expected_utility_after_information,
+        expected_value_of_sample_information,
+        acquisition_cost: option.acquisition_cost,
+        net_information_value,
+    })
+}
+
+/// Evaluate candidate evidence-acquisition queries using expected value of
+/// sample information (EVSI), not entropy reduction alone.
+///
+/// Conditional utilities/probabilities are supplied by the decision model and
+/// must be calibrated for the target population. Costs must be all-in and
+/// converted to the same preregistered utility scale. Acquires only the
+/// highest-net-value query when its expected value strictly exceeds cost.
+pub fn evaluate_information_acquisition(
+    options: &[InformationAcquisitionOption],
+) -> Result<InformationAcquisitionEvaluation, IntervalError> {
+    let mut evaluations = Vec::with_capacity(options.len());
+    let mut seen_ids = Vec::with_capacity(options.len());
+    for option in options {
+        if seen_ids.contains(&option.query_id.as_str()) {
+            return Err(IntervalError::InvalidInformationOption);
+        }
+        seen_ids.push(option.query_id.as_str());
+        evaluations.push(evaluate_information_option(option)?);
+    }
+    evaluations.sort_by(|left, right| left.query_id.cmp(&right.query_id));
+    let best = evaluations.iter()
+        .filter(|evaluation| evaluation.net_information_value > 0.0)
+        .max_by(|left, right| {
+            left.net_information_value.total_cmp(&right.net_information_value)
+                .then_with(|| right.query_id.cmp(&left.query_id))
+        });
+    let selected_query_id = best.map(|evaluation| evaluation.query_id.clone());
+    let choice = if selected_query_id.is_some() {
+        InformationAcquisitionChoice::AcquireBestQuery
+    } else {
+        InformationAcquisitionChoice::Abstain {
+            reason: AbstainReason::NoPositiveInformationValue,
+        }
+    };
+    Ok(InformationAcquisitionEvaluation {
+        options: evaluations,
+        choice,
+        selected_query_id,
     })
 }
 
@@ -1470,6 +1784,186 @@ mod tests {
         assert_eq!(
             select_structured_task_action(&bank, "missing.utility", 0.8),
             Err(IntervalError::InvalidVisualChannelDescriptor)
+        );
+    }
+
+
+    #[test]
+    fn constrained_structured_selection_keeps_risk_separate_from_utility() {
+        let mut bank = structured_visual_bank_fixture();
+        bank.channels.push(VisualBeliefChannelSamples {
+            channel_id: "terminal.risk".into(),
+            kind: VisualBeliefChannelKind::TerminalRisk,
+            unit: "probability".into(),
+            outcome_samples: vec![
+                vec![0.10, 0.12, 0.11, 0.09, 0.10],
+                vec![0.50, 0.52, 0.51, 0.49, 0.50],
+                vec![0.40, 0.42, 0.41, 0.39, 0.40],
+            ],
+        });
+        bank.joint_draw_bank_sha256 = compute_structured_joint_draw_bank_sha256(&bank).unwrap();
+        let risk_cap = [StructuredActionConstraint {
+            channel_id: "terminal.risk".into(),
+            kind: VisualBeliefChannelKind::TerminalRisk,
+            relation: ConstraintRelation::UpperAtMost,
+            threshold: 0.2,
+        }];
+        assert_eq!(
+            select_constrained_structured_action(&bank, "task.utility", &risk_cap, 0.8).unwrap(),
+            ConstrainedActionDecision::Selected {
+                action_id: 17,
+                basis: ConstrainedSelectionBasis::FeasibleOnly,
+            }
+        );
+
+        let no_feasible = [StructuredActionConstraint {
+            threshold: 0.05,
+            ..risk_cap[0].clone()
+        }];
+        assert_eq!(
+            select_constrained_structured_action(&bank, "task.utility", &no_feasible, 0.8).unwrap(),
+            ConstrainedActionDecision::Abstain {
+                reason: AbstainReason::NoConstraintFeasibleActions,
+            }
+        );
+
+        let permissive = [StructuredActionConstraint {
+            threshold: 0.8,
+            ..risk_cap[0].clone()
+        }];
+        assert_eq!(
+            select_constrained_structured_action(&bank, "task.utility", &permissive, 0.8).unwrap(),
+            ConstrainedActionDecision::Selected {
+                action_id: 17,
+                basis: ConstrainedSelectionBasis::UtilityDominance,
+            }
+        );
+    }
+
+    #[test]
+    fn constrained_structured_selection_rejects_duplicate_or_mistyped_constraints() {
+        let bank = structured_visual_bank_fixture();
+        let duplicate = [
+            StructuredActionConstraint {
+                channel_id: "gripper.contact_probability".into(),
+                kind: VisualBeliefChannelKind::Contact,
+                relation: ConstraintRelation::LowerAtLeast,
+                threshold: 0.7,
+            },
+            StructuredActionConstraint {
+                channel_id: "gripper.contact_probability".into(),
+                kind: VisualBeliefChannelKind::Contact,
+                relation: ConstraintRelation::LowerAtLeast,
+                threshold: 0.6,
+            },
+        ];
+        assert_eq!(
+            select_constrained_structured_action(&bank, "task.utility", &duplicate, 0.8),
+            Err(IntervalError::InvalidVisualChannelDescriptor)
+        );
+        let mistyped = [StructuredActionConstraint {
+            channel_id: "gripper.contact_probability".into(),
+            kind: VisualBeliefChannelKind::TerminalRisk,
+            relation: ConstraintRelation::UpperAtMost,
+            threshold: 0.3,
+        }];
+        assert_eq!(
+            select_constrained_structured_action(&bank, "task.utility", &mistyped, 0.8),
+            Err(IntervalError::InvalidVisualChannelDescriptor)
+        );
+    }
+
+    fn info_option(
+        query_id: &str,
+        cost: f64,
+        probabilities: Vec<f64>,
+        utilities: Vec<Vec<f64>>,
+    ) -> InformationAcquisitionOption {
+        InformationAcquisitionOption {
+            query_id: query_id.into(),
+            action_ids: vec![17, 3],
+            outcome_probabilities: probabilities,
+            conditional_action_utilities: utilities,
+            acquisition_cost: cost,
+        }
+    }
+
+    #[test]
+    fn evsi_selects_only_information_with_positive_net_decision_value() {
+        let informative = info_option(
+            "camera_peek",
+            1.0,
+            vec![0.5, 0.5],
+            vec![vec![6.0, 3.0], vec![2.0, 7.0]],
+        );
+        let expensive = info_option(
+            "expensive_probe",
+            2.0,
+            vec![0.5, 0.5],
+            vec![vec![6.0, 3.0], vec![2.0, 7.0]],
+        );
+        let evaluation = evaluate_information_acquisition(&[expensive, informative]).unwrap();
+        assert_eq!(evaluation.choice, InformationAcquisitionChoice::AcquireBestQuery);
+        assert_eq!(evaluation.selected_query_id.as_deref(), Some("camera_peek"));
+        assert_eq!(evaluation.options[0].query_id, "camera_peek");
+        assert_eq!(evaluation.options[0].prior_best_action_id, 3);
+        assert_eq!(evaluation.options[0].best_action_by_outcome, vec![17, 3]);
+        assert_eq!(evaluation.options[0].expected_utility_without_information, 5.0);
+        assert_eq!(evaluation.options[0].expected_utility_after_information, 6.5);
+        assert_eq!(evaluation.options[0].expected_value_of_sample_information, 1.5);
+        assert_eq!(evaluation.options[0].net_information_value, 0.5);
+        assert_eq!(evaluation.options[1].net_information_value, -0.5);
+    }
+
+    #[test]
+    fn evsi_abstains_when_information_cost_exceeds_its_decision_value() {
+        let option = info_option(
+            "camera_peek",
+            2.0,
+            vec![0.5, 0.5],
+            vec![vec![6.0, 3.0], vec![2.0, 7.0]],
+        );
+        let evaluation = evaluate_information_acquisition(&[option]).unwrap();
+        assert_eq!(
+            evaluation.choice,
+            InformationAcquisitionChoice::Abstain {
+                reason: AbstainReason::NoPositiveInformationValue,
+            }
+        );
+        assert_eq!(evaluation.selected_query_id, None);
+    }
+
+    #[test]
+    fn evsi_rejects_invalid_probabilities_costs_and_action_shapes() {
+        let bad_probability = info_option(
+            "bad",
+            0.0,
+            vec![0.4, 0.4],
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        );
+        assert_eq!(
+            evaluate_information_acquisition(&[bad_probability]),
+            Err(IntervalError::InvalidOutcomeProbabilities)
+        );
+        let bad_cost = info_option(
+            "bad_cost",
+            -1.0,
+            vec![0.5, 0.5],
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        );
+        assert_eq!(
+            evaluate_information_acquisition(&[bad_cost]),
+            Err(IntervalError::InvalidInformationOption)
+        );
+        let bad_shape = info_option(
+            "bad_shape",
+            0.0,
+            vec![0.5, 0.5],
+            vec![vec![1.0], vec![0.0, 1.0]],
+        );
+        assert_eq!(
+            evaluate_information_acquisition(&[bad_shape]),
+            Err(IntervalError::InvalidInformationOption)
         );
     }
 
