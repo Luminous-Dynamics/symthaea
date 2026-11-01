@@ -938,4 +938,178 @@ mod tests {
         }
         assert_eq!(left.report().unwrap(), right.report().unwrap());
     }
+
+    fn noisy_history(plan: &NoisyObservationPlan) -> AnytimeHistory {
+        let target_plan = AnytimeTargetPlan::new(vec![
+            AnytimeTarget {
+                target_id: "recorded-hv".to_owned(),
+                metric: AnytimeTargetMetric::Hypervolume,
+                threshold: 0.1,
+                minimum_evidence_level: super::super::pareto_anytime::EvidenceLevel::Recorded,
+            },
+        ], vec![vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
+        let specs = plan.objective_specs.iter().map(|spec| ParetoObjectiveSpec {
+            objective_id: spec.objective_id.clone(),
+            direction: spec.direction,
+            scale_lower: spec.observation_lower_bound,
+            scale_upper: spec.observation_upper_bound,
+        }).collect::<Vec<_>>();
+        let header = AnytimeHistoryHeader::new(
+            "noisy-run",
+            "0123456789abcdef0123456789abcdef01234567",
+            "noisy-reference-sampler",
+            H1,
+            H2,
+            "fixed-noisy-evaluator",
+            H2,
+            "independent-verifier",
+            H3,
+            H4,
+            "noisy-zdt-like",
+            17,
+            specs,
+            vec![-0.1, -0.1],
+            target_plan,
+            "measured-noisy-cost-v0.1",
+            H2,
+            20,
+            vec![
+                ResourceMeter::EvaluatorCalls,
+                ResourceMeter::NormalizedChargeMicrounits,
+            ],
+        ).unwrap().with_noisy_observation_plan(plan.plan_sha256().unwrap()).unwrap();
+        AnytimeHistory::new(header).unwrap()
+    }
+
+    fn append_noisy_observation(
+        history: &mut AnytimeHistory,
+        plan: &NoisyObservationPlan,
+        candidate_id: &str,
+        decision_sha256: &str,
+        replicate_id: &str,
+        sample_seed: u64,
+        outcome: EvaluationOutcome,
+        objective_values: Option<Vec<f64>>,
+        evidence_sha256: Option<&str>,
+        failure_reason: Option<&str>,
+    ) -> Result<String, super::super::pareto_anytime::AnytimeError> {
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateNoisyObservation {
+                observation_plan_sha256: plan.plan_sha256().unwrap(),
+                candidate_id: candidate_id.to_owned(),
+                decision_sha256: decision_sha256.to_owned(),
+                replicate_id: replicate_id.to_owned(),
+                sample_seed,
+                outcome,
+                objective_values,
+                evidence_sha256: evidence_sha256.map(str::to_owned),
+                failure_reason: failure_reason.map(str::to_owned),
+            },
+        })
+    }
+
+    #[test]
+    fn noisy_anytime_replay_charges_failures_but_excludes_them_from_samples() {
+        let plan = plan();
+        let mut history = noisy_history(&plan);
+        append_noisy_observation(&mut history, &plan, "candidate-a", H1, "a-1", 1,
+            EvaluationOutcome::Succeeded, Some(vec![0.9, 0.1]), Some(H3), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-a", H1, "a-2", 2,
+            EvaluationOutcome::Succeeded, Some(vec![0.8, 0.2]), Some(H4), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-b", H2, "b-1", 11,
+            EvaluationOutcome::Succeeded, Some(vec![0.1, 0.9]), Some(H3), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-b", H2, "b-2", 12,
+            EvaluationOutcome::Succeeded, Some(vec![0.2, 0.8]), Some(H4), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-a", H1, "a-failed", 3,
+            EvaluationOutcome::TimedOut, None, None, Some("replicate acquisition timed out")).unwrap();
+
+        let report = analyze_noisy_anytime_history(&plan, &history).unwrap();
+        assert_eq!(report.attempted_observation_count, 5);
+        assert_eq!(report.successful_replicate_count, 4);
+        assert_eq!(report.failed_observation_count, 1);
+        assert_eq!(report.anytime_receipt.objective_evaluation_attempt_count, 5);
+        assert_eq!(report.anytime_receipt.total_resources.evaluator_calls, Some(5));
+        assert_eq!(report.anytime_receipt.total_resources.normalized_charge_microunits, Some(5));
+        assert_eq!(report.noisy_pareto_report.candidate_summaries.len(), 2);
+        assert!(report.noisy_pareto_report.candidate_summaries.iter().all(|item| item.sample_count == 2));
+        verify_noisy_anytime_campaign_report(&plan, &history, &report).unwrap();
+
+        let mut tampered = report.clone();
+        tampered.failed_observation_count = 0;
+        assert!(verify_noisy_anytime_campaign_report(&plan, &history, &tampered).is_err());
+    }
+
+    #[test]
+    fn noisy_anytime_replay_rejects_a_plan_not_frozen_in_the_header() {
+        let frozen = plan();
+        let history = noisy_history(&frozen);
+        let mut changed = frozen.clone();
+        changed.noise_model_sha256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert!(analyze_noisy_anytime_history(&changed, &history).is_err());
+    }
+
+    #[test]
+    fn noisy_event_rejects_unregistered_plan_digest_and_deterministic_mixing() {
+        let plan = plan();
+        let mut history = noisy_history(&plan);
+        let wrong_plan = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        let rejected = history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateNoisyObservation {
+                observation_plan_sha256: wrong_plan.to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                decision_sha256: H1.to_owned(),
+                replicate_id: "wrong-plan".to_owned(),
+                sample_seed: 3,
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.5, 0.5]),
+                evidence_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(rejected.is_err());
+        assert!(history.events().is_empty());
+
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateNoisyObservation {
+                observation_plan_sha256: plan.plan_sha256().unwrap(),
+                candidate_id: "candidate-a".to_owned(),
+                decision_sha256: H1.to_owned(),
+                replicate_id: "valid-noisy".to_owned(),
+                sample_seed: 4,
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.5, 0.5]),
+                evidence_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+        }).unwrap();
+        let deterministic = history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "deterministic-mix".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 1,
+                decision_sha256: H1.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.5, 0.5]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(deterministic.is_err());
+        assert_eq!(history.events().len(), 1);
+    }
+
 }
