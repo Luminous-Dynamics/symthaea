@@ -113,14 +113,14 @@ This conditional-expectation derivation is mathematical, but the code cannot inf
 
 The new validator, validation/predictable_arrival_eclosure.py, adds a canonical event ledger with two event kinds:
 
-- activation_commit: commits a new hypothesis against the digest of the filtration-visible state before the current round.
+- activation_commit: commits a new hypothesis against a digest of the recorded event prefix before the current round.
 - evidence_increment: records one nonnegative one-step factor for an already committed active hypothesis.
 
-Within each round, all activation commits must precede every evidence increment. Every active coordinate must then have exactly one increment event; use factor one when no new evidence is observed. Sequence numbers are contiguous, rounds are ordered, and all IDs must belong to the predeclared finite catalogue. The catalogue hash binds IDs, priority scores, utilities and costs. State digests bind each activation to prior activations and prior evidence.
+Within each round, all activation commits must precede every evidence increment. Every active coordinate must then have exactly one increment event; use factor one when no new evidence is observed. Sequence numbers are contiguous, rounds are ordered, and all IDs must belong to the predeclared finite catalogue. The catalogue hash binds IDs, priority scores, utilities and costs. State digests bind each activation to prior recorded activations and prior recorded evidence. They do not automatically include external covariates, private policy state, or side-channel inputs used by the arrival rule; each such input must be included in the committed record or independently hashed and attested.
 
 The ledger audit detects activation after current-round evidence, future-state or stale-state commitment digests, unknown or duplicate arrivals, increments for inactive coordinates, missing or duplicate active-coordinate increments, event reordering and malformed round horizons.
 
-**Security boundary:** this is a structural and hash-chain audit, not a trusted timestamp, signature, or append-only storage service. A production deployment needs signed activation receipts, a trusted sequencer or append-only/WORM log, explicit clock semantics, and an external attestation that the catalogue was fixed before the stream began. A hash proves binding to supplied bytes; it does not prove when those bytes were created.
+**Security boundary:** this is a structural and hash-chain audit, not a trusted timestamp, signature, complete-filtration recorder, or append-only storage service. A production deployment needs signed activation receipts, a trusted sequencer or append-only/WORM log, explicit clock semantics, a committed digest of every external input consulted by the arrival policy, and an external attestation that the catalogue was fixed before the stream began. A hash proves binding to supplied bytes; it does not prove when those bytes were created or that no input was omitted.
 
 ## 5. Exact fixture
 
@@ -140,7 +140,7 @@ The fixture checks pathwise receipts and exact optimizer replay; it is not a Mon
 
 ## 6. Negative controls and tests
 
-The test module, validation/test_predictable_arrival_eclosure.py, covers a later arrival committed after earlier evidence; state-digest sensitivity to prior evidence; activation-after-evidence rejection; stale/tampered commitment rejection; arrivals outside the deterministic finite envelope; missing, duplicate and inactive-coordinate increments; contiguous sequence and fixed-horizon enforcement; result receipt tampering; prefix invariance under changes to future evidence; and exact base-selection feasibility and utility optimality replay.
+The test module, validation/test_predictable_arrival_eclosure.py, covers a later arrival committed after earlier evidence; state-digest sensitivity to prior evidence; activation-after-evidence rejection; canonical same-round activation order; strict integer sequence numbering; stale/tampered commitment rejection; arrivals outside the deterministic finite envelope; missing, duplicate and inactive-coordinate increments; contiguous sequence and fixed-horizon enforcement; result receipt tampering; prefix invariance under changes to future evidence; and exact base-selection feasibility and utility optimality replay.
 
 Run from the repository root:
 
