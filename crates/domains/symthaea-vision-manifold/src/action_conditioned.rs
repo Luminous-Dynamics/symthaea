@@ -9,22 +9,27 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionConditionedForecastReceipt {
+    pub schema_version: u32,
     pub forecast_id: u64,
     pub history_sha256: String,
     pub source_frame_sequence: u64,
     pub action_manifest_sha256: String,
     pub action_descriptor_sha256: String,
+    pub model_checkpoint_sha256: String,
     pub action_id: u64,
     pub horizon_seconds: f32,
     /// Number of supervised updates completed before this forecast was issued.
     pub model_version: u64,
     /// Predicted future visual-manifold state; still a prediction, never an observation.
     pub predicted_future_hv: Vec<f32>,
+    pub predicted_future_hv_sha256: String,
+    pub forecast_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,9 +60,17 @@ pub struct ActionConditionedPredictorState {
     pub pending: Vec<PendingActionConditionedForecastState>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionConditionedForecastScore {
+    pub schema_version: u32,
     pub forecast_id: u64,
+    pub history_sha256: String,
+    pub action_manifest_sha256: String,
+    pub action_descriptor_sha256: String,
+    pub model_checkpoint_sha256: String,
+    pub forecast_sha256: String,
+    pub observed_future_hv_sha256: String,
+    pub score_sha256: String,
     pub action_id: u64,
     pub source_frame_sequence: u64,
     pub observed_frame_sequence: u64,
@@ -146,6 +159,7 @@ impl ActionConditionedVisualResidualPredictor {
         source_frame_sequence: u64,
         action_manifest_sha256: &str,
         action_descriptor_sha256: &str,
+        model_checkpoint_sha256: &str,
         action_id: u64,
         horizon_seconds: f32,
         autonomous_base_prediction: &[f32],
@@ -154,6 +168,7 @@ impl ActionConditionedVisualResidualPredictor {
         if !is_lower_hex_sha256(history_sha256)
             || !is_lower_hex_sha256(action_manifest_sha256)
             || !is_lower_hex_sha256(action_descriptor_sha256)
+            || !is_lower_hex_sha256(model_checkpoint_sha256)
         {
             return Err(ActionConditionedPredictorError::InvalidDigest);
         }
@@ -181,17 +196,26 @@ impl ActionConditionedVisualResidualPredictor {
         if predicted_future_hv.iter().any(|v| !v.is_finite()) {
             return Err(ActionConditionedPredictorError::NonFiniteValue);
         }
-        let receipt = ActionConditionedForecastReceipt {
+        let predicted_future_hv_sha256 = hash_f32_vector(
+            b"vis005-action-conditioned-prediction-v1",
+            &predicted_future_hv,
+        );
+        let mut receipt = ActionConditionedForecastReceipt {
+            schema_version: ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION,
             forecast_id,
             history_sha256: history_sha256.to_owned(),
             source_frame_sequence,
             action_manifest_sha256: action_manifest_sha256.to_owned(),
             action_descriptor_sha256: action_descriptor_sha256.to_owned(),
+            model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
             action_id,
             horizon_seconds,
             model_version: self.training_steps,
             predicted_future_hv,
+            predicted_future_hv_sha256,
+            forecast_sha256: String::new(),
         };
+        receipt.forecast_sha256 = hash_forecast_receipt(&receipt);
         let pending = PendingActionConditionedForecastState {
             receipt: receipt.clone(),
             autonomous_base_prediction: autonomous_base_prediction.to_vec(),
@@ -210,11 +234,15 @@ impl ActionConditionedVisualResidualPredictor {
         history_sha256: &str,
         source_frame_sequence: u64,
         action_manifest_sha256: &str,
+        model_checkpoint_sha256: &str,
         horizon_seconds: f32,
         autonomous_base_prediction: &[f32],
         candidates: &[ActionConditionedCandidateAction],
     ) -> Result<Vec<ActionConditionedForecastReceipt>, ActionConditionedPredictorError> {
-        if !is_lower_hex_sha256(history_sha256) || !is_lower_hex_sha256(action_manifest_sha256) {
+        if !is_lower_hex_sha256(history_sha256)
+            || !is_lower_hex_sha256(action_manifest_sha256)
+            || !is_lower_hex_sha256(model_checkpoint_sha256)
+        {
             return Err(ActionConditionedPredictorError::InvalidDigest);
         }
         if !horizon_seconds.is_finite() || horizon_seconds <= 0.0 {
@@ -272,17 +300,26 @@ impl ActionConditionedVisualResidualPredictor {
             if predicted_future_hv.iter().any(|v| !v.is_finite()) {
                 return Err(ActionConditionedPredictorError::NonFiniteValue);
             }
-            let receipt = ActionConditionedForecastReceipt {
+            let predicted_future_hv_sha256 = hash_f32_vector(
+                b"vis005-action-conditioned-prediction-v1",
+                &predicted_future_hv,
+            );
+            let mut receipt = ActionConditionedForecastReceipt {
+                schema_version: ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION,
                 forecast_id,
                 history_sha256: history_sha256.to_owned(),
                 source_frame_sequence,
                 action_manifest_sha256: action_manifest_sha256.to_owned(),
                 action_descriptor_sha256: candidate.action_descriptor_sha256.clone(),
+                model_checkpoint_sha256: model_checkpoint_sha256.to_owned(),
                 action_id: candidate.action_id,
                 horizon_seconds,
                 model_version,
                 predicted_future_hv,
+                predicted_future_hv_sha256,
+                forecast_sha256: String::new(),
             };
+            receipt.forecast_sha256 = hash_forecast_receipt(&receipt);
             pending_records.push((
                 forecast_id,
                 PendingActionConditionedForecastState {
@@ -356,8 +393,20 @@ impl ActionConditionedVisualResidualPredictor {
         let base_hv = symthaea_core::hdc::ContinuousHV::from_vec(base.clone());
         let prediction_error = 1.0 - actual.similarity(&predicted).clamp(-1.0, 1.0);
         let autonomous_baseline_error = 1.0 - actual.similarity(&base_hv).clamp(-1.0, 1.0);
-        let score = ActionConditionedForecastScore {
+        let observed_future_hv_sha256 = hash_f32_vector(
+            b"vis005-observed-future-visual-hv-v1",
+            actual_future_hv,
+        );
+        let mut score = ActionConditionedForecastScore {
+            schema_version: ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION,
             forecast_id,
+            history_sha256: pending.receipt.history_sha256.clone(),
+            action_manifest_sha256: pending.receipt.action_manifest_sha256.clone(),
+            action_descriptor_sha256: pending.receipt.action_descriptor_sha256.clone(),
+            model_checkpoint_sha256: pending.receipt.model_checkpoint_sha256.clone(),
+            forecast_sha256: pending.receipt.forecast_sha256.clone(),
+            observed_future_hv_sha256,
+            score_sha256: String::new(),
             action_id: pending.receipt.action_id,
             source_frame_sequence: pending.receipt.source_frame_sequence,
             observed_frame_sequence,
@@ -370,6 +419,16 @@ impl ActionConditionedVisualResidualPredictor {
             model_version_before: self.training_steps,
             model_version_after: self.training_steps.saturating_add(1),
         };
+        score.score_sha256 = hash_forecast_score(&score);
+        if [
+            score.prediction_error,
+            score.autonomous_baseline_error,
+            score.improvement_over_autonomous_baseline,
+            score.mean_squared_error,
+        ].iter().any(|value| !value.is_finite())
+        {
+            return Err(ActionConditionedPredictorError::NonFiniteUpdate);
+        }
         self.pending.remove(&forecast_id);
         self.action_weights = updated_weights;
         self.training_steps = self.training_steps.saturating_add(1);
@@ -423,9 +482,18 @@ impl ActionConditionedVisualResidualPredictor {
         let mut pending = BTreeMap::new();
         for forecast in &state.pending {
             let receipt = &forecast.receipt;
-            if receipt.forecast_id == 0
+            if receipt.schema_version != ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION
+                || receipt.forecast_id == 0
                 || receipt.forecast_id >= state.next_forecast_id
                 || receipt.model_version > state.training_steps
+                || !is_lower_hex_sha256(&receipt.model_checkpoint_sha256)
+                || !is_lower_hex_sha256(&receipt.predicted_future_hv_sha256)
+                || !is_lower_hex_sha256(&receipt.forecast_sha256)
+                || hash_f32_vector(
+                    b"vis005-action-conditioned-prediction-v1",
+                    &receipt.predicted_future_hv,
+                ) != receipt.predicted_future_hv_sha256
+                || hash_forecast_receipt(receipt) != receipt.forecast_sha256
                 || receipt.predicted_future_hv.len() != self.dim
                 || forecast.autonomous_base_prediction.len() != self.dim
                 || forecast.action_embedding.len() != self.dim
@@ -460,6 +528,63 @@ impl ActionConditionedVisualResidualPredictor {
         self.learning_rate = learning_rate;
         Ok(())
     }
+}
+
+fn hash_f32_vector(domain: &[u8], values: &[f32]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update((values.len() as u64).to_le_bytes());
+    for value in values {
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn hash_text(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hash_forecast_receipt(receipt: &ActionConditionedForecastReceipt) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"vis005-action-conditioned-forecast-receipt-v1\0");
+    hasher.update(receipt.schema_version.to_le_bytes());
+    hasher.update(receipt.forecast_id.to_le_bytes());
+    hash_text(&mut hasher, &receipt.history_sha256);
+    hasher.update(receipt.source_frame_sequence.to_le_bytes());
+    hash_text(&mut hasher, &receipt.action_manifest_sha256);
+    hash_text(&mut hasher, &receipt.action_descriptor_sha256);
+    hash_text(&mut hasher, &receipt.model_checkpoint_sha256);
+    hasher.update(receipt.action_id.to_le_bytes());
+    hasher.update(receipt.horizon_seconds.to_bits().to_le_bytes());
+    hasher.update(receipt.model_version.to_le_bytes());
+    hash_text(&mut hasher, &receipt.predicted_future_hv_sha256);
+    format!("{:x}", hasher.finalize())
+}
+
+fn hash_forecast_score(score: &ActionConditionedForecastScore) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"vis005-action-conditioned-score-receipt-v1\0");
+    hasher.update(score.schema_version.to_le_bytes());
+    hasher.update(score.forecast_id.to_le_bytes());
+    hash_text(&mut hasher, &score.history_sha256);
+    hash_text(&mut hasher, &score.action_manifest_sha256);
+    hash_text(&mut hasher, &score.action_descriptor_sha256);
+    hash_text(&mut hasher, &score.model_checkpoint_sha256);
+    hash_text(&mut hasher, &score.forecast_sha256);
+    hash_text(&mut hasher, &score.observed_future_hv_sha256);
+    hasher.update(score.action_id.to_le_bytes());
+    hasher.update(score.source_frame_sequence.to_le_bytes());
+    hasher.update(score.observed_frame_sequence.to_le_bytes());
+    hasher.update(score.observation_delay_seconds.to_bits().to_le_bytes());
+    hasher.update(score.lateness_seconds.to_bits().to_le_bytes());
+    hasher.update(score.prediction_error.to_bits().to_le_bytes());
+    hasher.update(score.autonomous_baseline_error.to_bits().to_le_bytes());
+    hasher.update(score.improvement_over_autonomous_baseline.to_bits().to_le_bytes());
+    hasher.update(score.mean_squared_error.to_bits().to_le_bytes());
+    hasher.update(score.model_version_before.to_le_bytes());
+    hasher.update(score.model_version_after.to_le_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 fn is_lower_hex_sha256(value: &str) -> bool {
