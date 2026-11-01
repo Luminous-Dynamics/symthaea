@@ -697,6 +697,10 @@ pub fn validate_mlperf_tiny_pairwise_comparability(
         || left.measurement_scope != right.measurement_scope
         || left.target_id != right.target_id
         || left.board_revision != right.board_revision
+        || left.sram_budget_bytes != right.sram_budget_bytes
+        || left.protected_sram_reserve_bytes != right.protected_sram_reserve_bytes
+        || left.flash_budget_bytes != right.flash_budget_bytes
+        || left.p95_deadline_us != right.p95_deadline_us
         || left.cpu_core != right.cpu_core
         || left.accelerator_profile != right.accelerator_profile
         || left.hardware_tier != right.hardware_tier
@@ -924,6 +928,117 @@ mod tests {
         assert!(validate_mlperf_tiny_static_contract(&contract).is_ok());
         run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
         validate_mlperf_tiny_static_run(&contract, &run).unwrap();
+    }
+
+    #[test]
+    fn closed_contract_rejects_reference_weight_substitution() {
+        let mut contract = closed_contract(MlperfTinyTask::KeywordSpotting);
+        contract.candidate_weights_sha256 = sha('9');
+        contract.contract_sha256 = compute_mlperf_tiny_contract_sha256(&contract).unwrap();
+        assert!(validate_mlperf_tiny_static_contract(&contract).is_err());
+    }
+
+    #[test]
+    fn run_receipt_enforces_memory_and_latency_budgets() {
+        let contract = closed_contract(MlperfTinyTask::KeywordSpotting);
+        let mut run = MlperfTinyStaticRunReceipt {
+            schema: RUN_SCHEMA.into(),
+            version: VERSION.into(),
+            run_id: "budget-run".into(),
+            contract_sha256: contract.contract_sha256.clone(),
+            candidate_artifact_sha256: contract.candidate_artifact_sha256.clone(),
+            candidate_configuration_sha256: contract.candidate_configuration_sha256.clone(),
+            target_id: contract.target_id.clone(),
+            board_revision: contract.board_revision.clone(),
+            cpu_core: contract.cpu_core.clone(),
+            accelerator_profile: contract.accelerator_profile.clone(),
+            hardware_tier: contract.hardware_tier,
+            device_session_sha256: sha('a'),
+            measurement_protocol_sha256: sha('b'),
+            quality_result: MlperfTinyQualityResult::Top1Accuracy {
+                score_ppm: 910_000,
+                sample_count: 100,
+            },
+            latency_samples_us: vec![100, 200, 300, 400],
+            p50_latency_us: 200,
+            p95_latency_us: 400,
+            p99_latency_us: 400,
+            peak_sram_bytes: contract.sram_budget_bytes - contract.protected_sram_reserve_bytes + 1,
+            flash_bytes: 1024,
+            energy: None,
+            evaluator_output_sha256: sha('c'),
+            runner_receipt_sha256: sha('d'),
+            run_receipt_sha256: String::new(),
+        };
+        run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
+        assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
+
+        run.peak_sram_bytes = 1024;
+        run.flash_bytes = contract.flash_budget_bytes + 1;
+        run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
+        assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
+
+        run.flash_bytes = 1024;
+        run.latency_samples_us = vec![100_000, 100_000];
+        run.p50_latency_us = 100_000;
+        run.p95_latency_us = 100_000;
+        run.p99_latency_us = 100_000;
+        run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
+        assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
+    }
+
+    #[test]
+    fn run_energy_requires_replicated_uncertainty_and_exact_receipts() {
+        let contract = closed_contract(MlperfTinyTask::KeywordSpotting);
+        let mut run = MlperfTinyStaticRunReceipt {
+            schema: RUN_SCHEMA.into(),
+            version: VERSION.into(),
+            run_id: "energy-run".into(),
+            contract_sha256: contract.contract_sha256.clone(),
+            candidate_artifact_sha256: contract.candidate_artifact_sha256.clone(),
+            candidate_configuration_sha256: contract.candidate_configuration_sha256.clone(),
+            target_id: contract.target_id.clone(),
+            board_revision: contract.board_revision.clone(),
+            cpu_core: contract.cpu_core.clone(),
+            accelerator_profile: contract.accelerator_profile.clone(),
+            hardware_tier: contract.hardware_tier,
+            device_session_sha256: sha('a'),
+            measurement_protocol_sha256: sha('b'),
+            quality_result: MlperfTinyQualityResult::Top1Accuracy {
+                score_ppm: 910_000,
+                sample_count: 100,
+            },
+            latency_samples_us: vec![100, 200, 300, 400],
+            p50_latency_us: 200,
+            p95_latency_us: 400,
+            p99_latency_us: 400,
+            peak_sram_bytes: 1024,
+            flash_bytes: 1024,
+            energy: Some(MlperfTinyEnergyObservation {
+                scope: contract.measurement_scope,
+                energy_uj: 10.0,
+                expanded_uncertainty_uj: 0.5,
+                replicate_count: 5,
+                uncertainty_receipt_sha256: sha('c'),
+                measurement_receipt_sha256: sha('d'),
+                raw_power_trace_sha256: sha('e'),
+            }),
+            evaluator_output_sha256: sha('f'),
+            runner_receipt_sha256: sha('1'),
+            run_receipt_sha256: String::new(),
+        };
+        run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
+        validate_mlperf_tiny_static_run(&contract, &run).unwrap();
+
+        let energy = run.energy.as_mut().unwrap();
+        energy.replicate_count = 1;
+        run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
+        assert!(validate_mlperf_tiny_static_run(&contract, &run).is_err());
+    }
+
+    #[test]
+    fn percentile_rank_arithmetic_fails_closed_on_overflow() {
+        assert!(nearest_rank_percentile_u64(&[1], usize::MAX, usize::MAX).is_err());
     }
 
     #[test]
