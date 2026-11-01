@@ -18,7 +18,7 @@ pub struct SelectionReceipt {
     pub selected_operation_family: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SelectedProofCalibrationExample {
     pub selection: SelectionReceipt,
     pub prediction: FrontierCostPrediction,
@@ -596,7 +596,7 @@ mod tests {
     #[test]
     fn mixed_operation_families_are_not_pooled() {
         let rows = [example(1, 1), example(2, 2)];
-        let mut second = rows[1];
+        let mut second = rows[1].clone();
         second.selection.selected_operation_family = 10;
         assert_eq!(
             SelectionConditionedConformalCalibrator::fit(
