@@ -34,3 +34,62 @@ jobs:
 
       - name: Run dependency-free contract and fixture tests
         run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract -v
+
+  pyphi-reference:
+    name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
+    needs: digest-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prepare commit-bound evidence directory
+        shell: bash
+        run: mkdir -p target/pyphi-reference
+
+      - name: Install exact PyPhi reference artifact
+        shell: bash
+        run: python -m pip install --disable-pip-version-check "pyphi==2.0.0rc4"
+
+      - name: Capture Python and PyPhi environment
+        shell: bash
+        run: |
+          {
+            echo "git_commit=${GITHUB_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo
+            python --version
+            python -m pip show pyphi
+            echo
+            python -m pip freeze
+          } > target/pyphi-reference/environment.txt
+
+      - name: Execute published IIT 4.0 (2023) reference anchors
+        shell: bash
+        run: |
+          set -o pipefail
+          python validation/generate_pyphi_reference_fixtures.py \
+            --output target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json
+
+      - name: Verify the generated reference artifact is fully qualified
+        shell: bash
+        run: |
+          python -c 'import json, pathlib; p=pathlib.Path("target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json"); d=json.loads(p.read_text()); assert d["status"] == "PASS", d["status"]; assert d["summary"]["passed_anchor_count"] == 6 and d["summary"]["failed_anchor_count"] == 0, d["summary"]; assert d["provenance"]["version"] == "2.0.0rc4"; assert d["provenance"]["formalism"] == "IIT_4_0_2023"; print("PASS: six pinned PyPhi anchors; upstream reference smoke test only")'
+
+      - name: Upload pinned PyPhi reference evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: pyphi-iit4-2023-reference-${{ github.sha }}
+          path: target/pyphi-reference/
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 6
