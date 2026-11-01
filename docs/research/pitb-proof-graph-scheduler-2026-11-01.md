@@ -35,7 +35,7 @@ The unit of search should no longer be a monolithic proof attempt or a single op
 - A dependency edge means that a declaration's proof or plan consumes another declaration.
 - Helpers move through open, provisional, stable and discarded lifecycle states.
 - A stable lemma requires a kernel proof receipt and stable prerequisites.
-- A provisional helper may be used, but its dependents remain rollback-sensitive.
+- A provisional helper is still being proved; it can itself enter the ready frontier, but dependent goals are not ready until the helper is stable and kernel-verified.
 - Discarding a helper invalidates its transitive dependents; unrelated proof work is retained.
 - A stable declaration cannot depend on a provisional or discarded lemma.
 
@@ -91,6 +91,7 @@ The verifier checks:
 - cross-declaration dependencies are acyclic;
 - a discarded helper has no active transitive dependents;
 - stable declarations have kernel proof receipts, no sorryAx, stable prerequisites, and only closed goals;
+- provisional helpers block dependent goals until promotion to stable, while their own open proof goals remain schedulable;
 - proof-step goal digests match the exact parent goal state;
 - applied transitions carry checker identity and transition receipts;
 - terminal steps carry kernel-verified proof receipts;
