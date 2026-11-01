@@ -83,6 +83,8 @@ The current branch adds:
 - crates/bridges/symthaea-proof-insights/src/bin/verify_proof_graph_state.rs
 - a focused workflow schema check and Rust self-test
 
+The deterministic goal-batching policy is `pitb.shared-stable-helper-batch.v0`: it derives the ready frontier from the declaration DAG, groups goals by shared stable-helper dependencies (or by declaration-local context where there is no shared helper), chooses the largest group with a lexical tie-break, and truncates to `max_selected_goals`. It emits an explicit `stop` when the ready frontier is empty. Both policy ID and cap are part of the frozen scheduler decision.
+
 The verifier checks:
 - unique declaration, goal and step IDs;
 - all lemma and subgoal references resolve;
@@ -94,7 +96,8 @@ The verifier checks:
 - terminal steps carry kernel-verified proof receipts;
 - AND/OR goal dependencies are acyclic and closed goals have a completed hyperedge;
 - the ready frontier is independently recomputed and matches the declared frontier;
-- selected goal groups are subsets of the ready frontier;
+- the selected goal batch exactly matches the deterministic shared-helper policy and registered cap;
+- an empty frontier forces a no-model-call stop rather than invented work;
 - deterministic automation carries no specialist model call; and
 - router, specialist and Lean costs reconcile under every resource cap.
 
