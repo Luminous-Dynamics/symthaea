@@ -7,6 +7,8 @@
 //! It enforces pinned-source/elaboration/axiom/probe/reviewer receipt joins and
 //! keeps "compiled" distinct from "semantically approved".
 
+#![allow(dead_code)] // Shared by multiple standalone PITB verifier binaries with different entry points.
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
