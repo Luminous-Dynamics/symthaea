@@ -23,14 +23,14 @@ jobs:
       - name: Format standalone verifier files in ephemeral workspace
         run: |
           cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml
-          mkdir -p "$RUNNER_TEMP/basalt-formatted/tools/basalt-trace-verifier/src"
-          cp tools/basalt-trace-verifier/src/lib.rs "$RUNNER_TEMP/basalt-formatted/tools/basalt-trace-verifier/src/lib.rs"
-          cp tools/basalt-trace-verifier/src/main.rs "$RUNNER_TEMP/basalt-formatted/tools/basalt-trace-verifier/src/main.rs"
-          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/basalt-formatted/source-head.txt"
+          mkdir -p "basalt-formatted/tools/basalt-trace-verifier/src"
+          cp tools/basalt-trace-verifier/src/lib.rs "basalt-formatted/tools/basalt-trace-verifier/src/lib.rs"
+          cp tools/basalt-trace-verifier/src/main.rs "basalt-formatted/tools/basalt-trace-verifier/src/main.rs"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "basalt-formatted/source-head.txt"
       - name: Upload formatted source candidate
         uses: actions/upload-artifact@v4
         with:
           name: basalt-rustfmt-candidate-${{ github.sha }}
-          path: "$RUNNER_TEMP/basalt-formatted/"
+          path: "basalt-formatted/"
           if-no-files-found: error
           retention-days: 1
