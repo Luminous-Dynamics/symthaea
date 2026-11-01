@@ -4,13 +4,18 @@
   "title": "BASALT DSSE witness envelope v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["payloadType", "payload", "signatures"],
+  "required": [
+    "payloadType",
+    "payload",
+    "signatures"
+  ],
   "properties": {
     "payloadType": {
       "enum": [
         "application/vnd.luminous.basalt.witness-checkpoint.v1+json",
         "application/vnd.luminous.basalt.witness-head-response.v1+json",
-        "application/vnd.luminous.basalt.witness-set-metadata.v1+json"
+        "application/vnd.luminous.basalt.witness-set-metadata.v1+json",
+        "application/vnd.luminous.basalt.witness-trust-root.v1+json"
       ]
     },
     "payload": {
@@ -24,7 +29,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["keyid", "sig"],
+        "required": [
+          "keyid",
+          "sig"
+        ],
         "properties": {
           "keyid": {
             "type": "string",
