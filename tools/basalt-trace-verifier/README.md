@@ -44,7 +44,7 @@ The standalone package is intentionally not a root workspace member. It uses a p
 - It does not test process crashes, filesystem ordering, power loss, hardware flush behavior, replication or physical restore.
 - It does not qualify performance, availability or any storage engine.
 
-The optional `--schema` argument binds the schema file's SHA-256 into the report. The current CLI runs the deterministic reference fixture. The library additionally exposes `verify_observed_history(&Trace, &HistorySearchConfig)`, which searches for a legal order subject to causal constraints and a hard state-expansion budget. It currently uses the same strict Rust Trace types; it does not claim to ingest the backend-observation JSON schema or implement full JSON Schema Draft 2020-12 validation.
+The optional `--schema` argument binds the schema file's SHA-256 into the report. The current CLI runs the deterministic reference fixture. The history-search API ignores the fixture's declared reference order; `reference_linearization_order` defaults empty when deserializing an observed history. The library additionally exposes `verify_observed_history(&Trace, &HistorySearchConfig)`, which searches for a legal order subject to causal constraints and a hard state-expansion budget. It currently uses the same strict Rust Trace types; it does not claim to ingest the backend-observation JSON schema or implement full JSON Schema Draft 2020-12 validation.
 
 ## Result interpretation
 
