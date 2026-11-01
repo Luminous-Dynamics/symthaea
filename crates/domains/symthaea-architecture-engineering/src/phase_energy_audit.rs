@@ -329,6 +329,15 @@ pub fn validate_application_phase_protocol(
     {
         return Err(PhaseEnergyAuditError::new("phase_protocol.phases", "at least one required phase, required first/last boundary phases, and a finite non-negative gap tolerance are required"));
     }
+    if protocol.accepted_success_outcomes.is_empty()
+        || protocol.accepted_success_outcomes.iter().any(|outcome| outcome.is_intrinsically_unsuccessful())
+        || protocol.accepted_success_outcomes.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(PhaseEnergyAuditError::new(
+            "phase_protocol.accepted_success_outcomes",
+            "success outcomes must be non-empty, unique, strictly sorted, and cannot include incorrect/failed/not_attempted",
+        ));
+    }
     let mut ids = HashSet::with_capacity(protocol.phases.len());
     for (index, phase) in protocol.phases.iter().enumerate() {
         if phase.phase_id.trim().is_empty() || !ids.insert(phase.phase_id.as_str()) {
@@ -420,6 +429,150 @@ fn parse_samples(
         segments.entry(segment_id).or_default().push(Sample { time_ms, current_ua });
     }
     Ok((segments, trace_receipt.receipt.receipt_sha256))
+}
+
+fn parse_event_outcomes(
+    outcomes_csv: &str,
+) -> Result<BTreeMap<String, (ApplicationEventOutcomeEvidence, String)>, PhaseEnergyAuditError> {
+    let mut reader = ReaderBuilder::new().has_headers(true).flexible(false).trim(Trim::All)
+        .from_reader(outcomes_csv.as_bytes());
+    let headers = reader.headers().map_err(|e| PhaseEnergyAuditError::new("outcomes.header", e.to_string()))?.clone();
+    let columns = parse_header(
+        &headers,
+        &[
+            "event_id",
+            "outcome",
+            "input_sha256",
+            "output_sha256",
+            "quality_metric_id",
+            "quality_value",
+            "deadline_met",
+            "retry_count",
+        ],
+        "outcomes",
+    )?;
+
+    let mut outcomes = BTreeMap::new();
+    for (index, record) in reader.records().enumerate() {
+        let row_number = index + 2;
+        let row = record.map_err(|e| {
+            PhaseEnergyAuditError::new(format!("outcomes.row[{row_number}]"), e.to_string())
+        })?;
+        let event_id = field(&row, &columns, "event_id", row_number, "outcomes")?.to_owned();
+        if event_id.trim().is_empty() {
+            return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].event_id"),
+                "must be non-empty",
+            ));
+        }
+        let outcome_text = field(&row, &columns, "outcome", row_number, "outcomes")?;
+        let outcome: ApplicationEventOutcome = match outcome_text {
+            "correct" => ApplicationEventOutcome::Correct,
+            "incorrect" => ApplicationEventOutcome::Incorrect,
+            "abstained" => ApplicationEventOutcome::Abstained,
+            "fallback" => ApplicationEventOutcome::Fallback,
+            "failed" => ApplicationEventOutcome::Failed,
+            "not_attempted" => ApplicationEventOutcome::NotAttempted,
+            other => return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].outcome"),
+                format!("unknown application outcome {other:?}"),
+            )),
+        };
+        let input_sha256 = field(&row, &columns, "input_sha256", row_number, "outcomes")?.to_owned();
+        if !is_sha256(&input_sha256) {
+            return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].input_sha256"),
+                "must be lowercase SHA-256 hex",
+            ));
+        }
+        let output_text = field(&row, &columns, "output_sha256", row_number, "outcomes")?;
+        let output_sha256 = if output_text.is_empty() {
+            None
+        } else {
+            if !is_sha256(output_text) {
+                return Err(PhaseEnergyAuditError::new(
+                    format!("outcomes.row[{row_number}].output_sha256"),
+                    "must be empty or lowercase SHA-256 hex",
+                ));
+            }
+            Some(output_text.to_owned())
+        };
+        if matches!(
+            outcome,
+            ApplicationEventOutcome::Correct
+                | ApplicationEventOutcome::Incorrect
+                | ApplicationEventOutcome::Fallback
+        ) && output_sha256.is_none()
+        {
+            return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].output_sha256"),
+                "correct, incorrect and fallback outcomes require an output/result digest",
+            ));
+        }
+
+        let quality_metric_text = field(&row, &columns, "quality_metric_id", row_number, "outcomes")?;
+        let quality_value_text = field(&row, &columns, "quality_value", row_number, "outcomes")?;
+        let (quality_metric_id, quality_value) = match (quality_metric_text.is_empty(), quality_value_text.is_empty()) {
+            (true, true) => (None, None),
+            (false, false) => {
+                if quality_metric_text.trim().is_empty() {
+                    return Err(PhaseEnergyAuditError::new(
+                        format!("outcomes.row[{row_number}].quality_metric_id"),
+                        "must be non-empty when quality_value is supplied",
+                    ));
+                }
+                let value = parse_finite(quality_value_text, "quality_value", row_number, "outcomes")?;
+                (Some(quality_metric_text.to_owned()), Some(value))
+            }
+            _ => return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].quality"),
+                "quality_metric_id and quality_value must either both be present or both be empty",
+            )),
+        };
+
+        let deadline_met = match field(&row, &columns, "deadline_met", row_number, "outcomes")? {
+            "true" => true,
+            "false" => false,
+            other => return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].deadline_met"),
+                format!("expected true or false, got {other:?}"),
+            )),
+        };
+        let retry_count = field(&row, &columns, "retry_count", row_number, "outcomes")?
+            .parse::<u32>()
+            .map_err(|_| PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].retry_count"),
+                "must be a non-negative integer",
+            ))?;
+
+        let evidence = ApplicationEventOutcomeEvidence {
+            event_id: event_id.clone(),
+            outcome,
+            input_sha256,
+            output_sha256,
+            quality_metric_id,
+            quality_value,
+            deadline_met,
+            retry_count,
+        };
+        let bytes = serde_json::to_vec(&evidence).map_err(|error| {
+            PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}]"),
+                format!("cannot serialize canonical outcome evidence: {error}"),
+            )
+        })?;
+        let evidence_sha256 = digest(OUTCOME_DOMAIN, &bytes);
+        if outcomes.insert(event_id.clone(), (evidence, evidence_sha256)).is_some() {
+            return Err(PhaseEnergyAuditError::new(
+                format!("outcomes.row[{row_number}].event_id"),
+                format!("duplicate outcome record for event {event_id:?}"),
+            ));
+        }
+    }
+    if outcomes.is_empty() {
+        return Err(PhaseEnergyAuditError::new("outcomes.rows", "at least one event outcome is required"));
+    }
+    Ok(outcomes)
 }
 
 fn marker_time_to_ppk2_ms(
