@@ -300,17 +300,14 @@ pub fn load_pinned_trust_store(
 /// only the verifier's trusted key identities count toward the quorum.
 pub fn verify_witness_envelope(
     envelope_bytes: &[u8],
-    trust: &TrustStore,
     trust_store_bytes: &[u8],
     expected_trust_store_sha256: &str,
     expected_payload_type: &str,
     quorum_kind: QuorumKind,
 ) -> Result<VerifiedWitnessPayload, String> {
+    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
     let actual_trust_digest = sha256_prefixed(trust_store_bytes);
-    if actual_trust_digest != expected_trust_store_sha256 {
-        return Err("trust store changed after pin verification".to_string());
-    }
-    let prepared = prepare_trust_store(trust, actual_trust_digest.clone())?;
+    let prepared = prepare_trust_store(&trust, actual_trust_digest.clone())?;
 
     // Deserialize a strict local mirror first: Serde rejects duplicate struct fields,
     // and deny_unknown_fields prevents permissive envelope reinterpretation.
@@ -475,8 +472,7 @@ mod tests {
         let pin = sha256_prefixed(&trust_bytes);
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
         let verified = verify_witness_envelope(
-            &envelope,
-            &trust,
+            &envelope ,
             &trust_bytes,
             &pin,
             TEST_PAYLOAD_TYPE,
@@ -496,8 +492,7 @@ mod tests {
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..2]);
         assert!(
             verify_witness_envelope(
-                &envelope,
-                &trust,
+                &envelope ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -526,8 +521,7 @@ mod tests {
         let raw = envelope.to_json().unwrap();
         assert!(
             verify_witness_envelope(
-                &raw,
-                &trust,
+                &raw ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -546,8 +540,7 @@ mod tests {
         let envelope = sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, TEST_PAYLOAD, &seeds[..3]);
         assert!(
             verify_witness_envelope(
-                &envelope,
-                &trust,
+                &envelope ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -573,8 +566,7 @@ mod tests {
         })).unwrap();
         assert!(
             verify_witness_envelope(
-                &raw,
-                &trust,
+                &raw ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -594,8 +586,7 @@ mod tests {
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, noncanonical, &seeds[..3]);
         assert!(
             verify_witness_envelope(
-                &envelope,
-                &trust,
+                &envelope ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -620,8 +611,7 @@ mod tests {
         );
         assert!(
             verify_witness_envelope(
-                duplicate.as_bytes(),
-                &trust,
+                duplicate.as_bytes() ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -641,8 +631,7 @@ mod tests {
         let envelope = sign_payload(TEST_PAYLOAD_TYPE, payload, &seeds[..3]);
         assert!(
             verify_witness_envelope(
-                &envelope,
-                &trust,
+                &envelope ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
@@ -693,8 +682,7 @@ mod tests {
             .unwrap();
         assert!(
             verify_witness_envelope(
-                &envelope,
-                &trust,
+                &envelope ,
                 &bytes,
                 &pin,
                 TEST_PAYLOAD_TYPE,
