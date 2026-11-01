@@ -253,8 +253,7 @@ fn capture_profile(
             evidence_id.clone(),
             "urn:hardsec:android:proc:cpuinfo:allowlisted-features".to_owned(),
             canonical.as_bytes(),
-            "only allowlisted CPU feature tokens retained; raw /proc/cpuinfo discarded"
-                .to_owned(),
+            "only allowlisted CPU feature tokens retained; raw /proc/cpuinfo discarded".to_owned(),
         );
         cpu_feature_evidence_ids.push(evidence_id);
     }
@@ -275,13 +274,12 @@ fn capture_profile(
         pmu_evidence_ids.push(evidence_id);
     }
 
-    let patch_level_binding_status = if security_patch_level.is_some()
-        || vendor_security_patch_level.is_some()
-    {
-        "software_reported"
-    } else {
-        "not_measured"
-    };
+    let patch_level_binding_status =
+        if security_patch_level.is_some() || vendor_security_patch_level.is_some() {
+            "software_reported"
+        } else {
+            "not_measured"
+        };
 
     json!({
         "schema_version": "hardsec-mobile-device-profile-v1",
@@ -394,8 +392,7 @@ fn run_adb(adb_path: &str, shell_args: &[&str]) -> Result<String, String> {
         // Do not echo stderr: ADB may include the connected device serial.
         return Err("ADB shell command failed; raw command output was suppressed".to_owned());
     }
-    String::from_utf8(output.stdout)
-        .map_err(|_| "ADB command returned non-UTF-8 output".to_owned())
+    String::from_utf8(output.stdout).map_err(|_| "ADB command returned non-UTF-8 output".to_owned())
 }
 
 fn collect_from_runner<F>(mut runner: F) -> Result<Value, String>
@@ -404,8 +401,9 @@ where
 {
     let mut properties = Properties::new();
     for key in PROPERTY_KEYS {
-        let value = runner(&["getprop", key])
-            .map_err(|_| "ADB property capture failed; raw device output was suppressed".to_owned())?;
+        let value = runner(&["getprop", key]).map_err(|_| {
+            "ADB property capture failed; raw device output was suppressed".to_owned()
+        })?;
         properties.insert(key, value.trim().to_owned());
     }
 
@@ -456,7 +454,10 @@ mod tests {
         values.insert("ro.boot.flash.locked", "1".to_owned());
         values.insert("ro.boot.vbmeta.device_state", "locked".to_owned());
         values.insert("ro.boot.verifiedbootstate", "green".to_owned());
-        values.insert("ro.build.fingerprint", "google/husky/husky:16/fixture/123:user/release-keys".to_owned());
+        values.insert(
+            "ro.build.fingerprint",
+            "google/husky/husky:16/fixture/123:user/release-keys".to_owned(),
+        );
         values
     }
 
@@ -465,20 +466,20 @@ mod tests {
         let properties = fixture_properties();
         let mut calls: Vec<Vec<String>> = Vec::new();
         let profile = collect_from_runner(|arguments| {
-            calls.push(arguments.iter().map(|argument| (*argument).to_owned()).collect());
+            calls.push(
+                arguments
+                    .iter()
+                    .map(|argument| (*argument).to_owned())
+                    .collect(),
+            );
             if arguments.len() == 2 && arguments[0] == "getprop" {
-                Ok(properties
-                    .get(arguments[1])
-                    .cloned()
-                    .unwrap_or_default())
+                Ok(properties.get(arguments[1]).cloned().unwrap_or_default())
             } else if arguments.len() == 2
                 && arguments[0] == "cat"
                 && arguments[1] == "/proc/cpuinfo"
             {
                 Ok("Features : fp asimd mte paca pacg bti\n".to_owned())
-            } else if arguments.len() == 2
-                && arguments[0] == "simpleperf"
-                && arguments[1] == "list"
+            } else if arguments.len() == 2 && arguments[0] == "simpleperf" && arguments[1] == "list"
             {
                 Ok("List of hardware events:\ncpu-cycles\ninstructions\n".to_owned())
             } else {
@@ -489,12 +490,16 @@ mod tests {
 
         assert_eq!(calls.len(), PROPERTY_KEYS.len() + 2);
         assert!(calls.iter().all(|call| call.first().is_some_and(|command| {
-            command == "getprop" || (command == "cat" && call.get(1).is_some_and(|value| value == "/proc/cpuinfo"))
+            command == "getprop"
+                || (command == "cat" && call.get(1).is_some_and(|value| value == "/proc/cpuinfo"))
                 || (command == "simpleperf" && call.get(1).is_some_and(|value| value == "list"))
         })));
         assert!(!calls.iter().any(|call| call.join(" ").contains("serial")));
         assert!(!calls.iter().any(|call| call.join(" ").contains("devices")));
-        assert_eq!(profile["boot_integrity"]["bootloader_locked"], "not_measured");
+        assert_eq!(
+            profile["boot_integrity"]["bootloader_locked"],
+            "not_measured"
+        );
         assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
     }
 
@@ -512,15 +517,35 @@ mod tests {
     fn reported_boot_properties_never_promote_attestation_fields() {
         let profile = capture_profile(
             &fixture_properties(),
-            Some("Features : fp asimd aes mte paca pacg bti\nFeatures : fp asimd aes mte paca pacg bti\n"),
+            Some(
+                "Features : fp asimd aes mte paca pacg bti\nFeatures : fp asimd aes mte paca pacg bti\n",
+            ),
             Some("List of hardware events:\ncpu-cycles\ninstructions\ncache-misses\n"),
         );
-        assert_eq!(profile["boot_integrity"]["reported_bootloader_lock_state"], "locked_reported");
-        assert_eq!(profile["boot_integrity"]["reported_verified_boot_state"], "green_reported");
-        assert_eq!(profile["boot_integrity"]["bootloader_locked"], "not_measured");
-        assert_eq!(profile["boot_integrity"]["verified_boot_state"], "not_measured");
-        assert_eq!(profile["boot_integrity"]["attestation_security_level"], "not_measured");
-        assert_eq!(profile["boot_integrity"]["certificate_chain_status"], "not_measured");
+        assert_eq!(
+            profile["boot_integrity"]["reported_bootloader_lock_state"],
+            "locked_reported"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["reported_verified_boot_state"],
+            "green_reported"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["bootloader_locked"],
+            "not_measured"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["verified_boot_state"],
+            "not_measured"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["attestation_security_level"],
+            "not_measured"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["certificate_chain_status"],
+            "not_measured"
+        );
     }
 
     #[test]
@@ -528,19 +553,40 @@ mod tests {
         let mut properties = fixture_properties();
         properties.insert("ro.boot.vbmeta.device_state", "unlocked".to_owned());
         let profile = capture_profile(&properties, None, None);
-        assert_eq!(profile["boot_integrity"]["reported_bootloader_lock_state"], "conflicting_reports");
-        assert_eq!(profile["boot_integrity"]["bootloader_locked"], "not_measured");
+        assert_eq!(
+            profile["boot_integrity"]["reported_bootloader_lock_state"],
+            "conflicting_reports"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["bootloader_locked"],
+            "not_measured"
+        );
     }
 
     #[test]
     fn missing_properties_remain_unknown_or_not_measured() {
         let profile = capture_profile(&Properties::new(), None, None);
-        assert_eq!(profile["device"]["product_family"], "Unknown Android device");
+        assert_eq!(
+            profile["device"]["product_family"],
+            "Unknown Android device"
+        );
         assert_eq!(profile["device"]["os_version"], Value::Null);
-        assert_eq!(profile["boot_integrity"]["reported_bootloader_lock_state"], "unknown");
-        assert_eq!(profile["boot_integrity"]["reported_verified_boot_state"], "unknown");
+        assert_eq!(
+            profile["boot_integrity"]["reported_bootloader_lock_state"],
+            "unknown"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["reported_verified_boot_state"],
+            "unknown"
+        );
         assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
-        assert_eq!(profile["pmu_acquisition"]["available_events"].as_array().unwrap().len(), 0);
+        assert_eq!(
+            profile["pmu_acquisition"]["available_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
     }
 
     #[test]
@@ -549,7 +595,10 @@ mod tests {
             "Processor : 0\nFeatures : fp asimd mte paca pacg bti\nProcessor : 1\nFeatures : fp asimd paca pacg\n",
         );
         assert_eq!(feature_support(&rows, &["mte"]), "unknown");
-        assert_eq!(feature_support(&rows, &["paca", "pacg"]), "on_device_reported");
+        assert_eq!(
+            feature_support(&rows, &["paca", "pacg"]),
+            "on_device_reported"
+        );
         assert_eq!(feature_support(&rows, &["bti"]), "unknown");
     }
 
@@ -561,10 +610,19 @@ mod tests {
             Some("List of hardware events:\ncpu-cycles\ninstructions\nbranch-misses\n"),
         );
         assert_eq!(profile["pmu_acquisition"]["interface"], "simpleperf");
-        assert_eq!(profile["pmu_acquisition"]["available_events"], json!(["branch-misses", "cpu-cycles", "instructions"]));
+        assert_eq!(
+            profile["pmu_acquisition"]["available_events"],
+            json!(["branch-misses", "cpu-cycles", "instructions"])
+        );
         assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
-        assert_eq!(profile["pmu_acquisition"]["multiplexing_status"], "not_measured");
-        assert_eq!(profile["pmu_acquisition"]["observer_effect_status"], "not_measured");
+        assert_eq!(
+            profile["pmu_acquisition"]["multiplexing_status"],
+            "not_measured"
+        );
+        assert_eq!(
+            profile["pmu_acquisition"]["observer_effect_status"],
+            "not_measured"
+        );
         assert_eq!(profile["claim_ceiling"]["pmu_measurement_qualified"], false);
     }
 
@@ -578,14 +636,30 @@ mod tests {
         assert!(!output.contains(&raw_fingerprint));
         assert!(!output.contains("Processor"));
         assert!(!output.contains("Features"));
-        assert!(profile["device"]["build_fingerprint_sha256"].as_str().unwrap().len() == 64);
+        assert!(
+            profile["device"]["build_fingerprint_sha256"]
+                .as_str()
+                .unwrap()
+                .len()
+                == 64
+        );
     }
 
     #[test]
     fn profile_contains_no_stable_identifiers_or_raw_attestation_fields() {
         let profile = capture_profile(&fixture_properties(), None, None);
-        let output = serde_json::to_string(&profile).unwrap().to_ascii_lowercase();
-        for forbidden in ["imei", "meid", "imsi", "iccid", "serial_number", "android_id", "attestation_certificate_der"] {
+        let output = serde_json::to_string(&profile)
+            .unwrap()
+            .to_ascii_lowercase();
+        for forbidden in [
+            "imei",
+            "meid",
+            "imsi",
+            "iccid",
+            "serial_number",
+            "android_id",
+            "attestation_certificate_der",
+        ] {
             assert!(!output.contains(forbidden));
         }
     }
@@ -599,9 +673,18 @@ mod tests {
         );
         assert_eq!(profile["evidence_domain"], "physical_device_capture");
         assert_eq!(profile["device"]["product_family"], "Pixel 8 Pro");
-        assert_eq!(profile["boot_integrity"]["reported_verified_boot_state"], "green_reported");
-        assert_eq!(profile["boot_integrity"]["verified_boot_state"], "not_measured");
-        assert_eq!(profile["boot_integrity"]["attestation_security_level"], "not_measured");
+        assert_eq!(
+            profile["boot_integrity"]["reported_verified_boot_state"],
+            "green_reported"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["verified_boot_state"],
+            "not_measured"
+        );
+        assert_eq!(
+            profile["boot_integrity"]["attestation_security_level"],
+            "not_measured"
+        );
         assert_eq!(
             profile["hardware_protections"]["memory_tagging"]["hardware_support"],
             "on_device_reported"
@@ -612,7 +695,10 @@ mod tests {
         );
         assert_eq!(profile["pmu_acquisition"]["interface"], "simpleperf");
         assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
-        assert_eq!(profile["claim_ceiling"]["runtime_integrity_verified"], false);
+        assert_eq!(
+            profile["claim_ceiling"]["runtime_integrity_verified"],
+            false
+        );
         assert_eq!(profile["claim_ceiling"]["pmu_measurement_qualified"], false);
     }
 
@@ -626,8 +712,13 @@ mod tests {
         }));
         assert!(evidence.iter().any(|entry| {
             entry["evidence_id"] == "adbprop-ro-build-fingerprint"
-                && entry["claim_scope"] == "ADB build fingerprint is hashed and discarded; digest only"
+                && entry["claim_scope"]
+                    == "ADB build fingerprint is hashed and discarded; digest only"
         }));
-        assert!(evidence.iter().all(|entry| entry["source_type"] == "on_device_property"));
+        assert!(
+            evidence
+                .iter()
+                .all(|entry| entry["source_type"] == "on_device_property")
+        );
     }
 }
