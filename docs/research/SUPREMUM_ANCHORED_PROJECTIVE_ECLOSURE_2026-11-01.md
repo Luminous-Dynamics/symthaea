@@ -4,26 +4,27 @@
 
 ## 1. Pathwise budget construction
 
-Let B_t be a baseline rejection-set process. For each coordinate i, define
+Let B_t be a baseline rejection-set process. For each coordinate i, define the projective ever-rejected indicator
 
-    a_i,t = 1{i in B_t} / (|B_t| vee 1)
-    G_i,t = max_{u <= t} a_i,u
+    J_i,t = 1{there exists u <= t with i in B_u}.
 
-Assume the baseline comes with **ex-ante coordinatewise path budgets** q_i >= 0 satisfying
+Assume the baseline comes with **ex-ante coordinatewise risk budgets** q_i >= 0 satisfying
 
-    E[ sup_t a_i,t / alpha | H_i ] <= q_i,
+    P_Hi(i is ever rejected by the baseline) <= alpha*q_i,
     sum_i q_i <= 1.
 
 For any intersection S, define
 
     c_S = sum_{i in S} q_i
-    A_S,t = (1/alpha) * sum_{i in S} G_i,t.
+    A_S,t = (1/alpha) * sum_{i in S} J_i,t.
 
 Then A_S,t is adapted and nondecreasing, and
 
-    E[ sup_t A_S,t | H_S ] <= c_S.
+    E_HS[ sup_t A_S,t ] <= c_S.
 
-This follows from sup_t sum_i a_i,t <= sum_i sup_t a_i,t and linearity of expectation. It requires the coordinatewise path budgets to hold under every distribution in H_S. The easy sufficient condition is a bound under each H_i separately, because H_S implies H_i for each i in S.
+This follows from linearity of expectation and the coordinatewise ever-rejection bounds. The bound must hold under every distribution in H_S; it is sufficient that it holds under each marginal null H_i because H_S implies every H_i for i in S.
+
+The ever-rejected indicator is deliberately more conservative than the denominator-sensitive baseline contribution. It is projective when the baseline decision for coordinate i depends only on its own evidence stream and fixed ex-ante q_i. An arbitrary global baseline may make the event "i is ever rejected" depend on unrelated coordinates; such a baseline needs a separate extension-invariance proof before this construction can be called projective.
 
 Now let F_S,t be an auxiliary **anytime-adjusted** local evidence process with
 
@@ -47,8 +48,9 @@ Thus the running-supremum budget of each local e-collection is at most one. No i
 For every t and every S,
 
     FDP_S(B_t)
-      = sum_{i in S} a_i,t
-      <= sum_{i in S} G_i,t
+      = |B_t intersect S| / (|B_t| vee 1)
+      <= |B_t intersect S|
+      <= sum_{i in S} J_i,t
       = alpha A_S,t
       <= alpha E_S,t.
 
@@ -88,7 +90,7 @@ A global SupFDR statement alone need not provide useful c_S<1 for arbitrary S. I
 
 For a countable universe, the construction requires:
 - a fixed ex-ante sequence q_i >= 0 with sum_i q_i <= 1;
-- a predictable baseline path and coordinate contributions;
+- a predictable, extension-stable coordinate-local ever-rejection process J_i,t;
 - an auxiliary local path-adjuster F_S,t for every relevant finite or countable intersection S;
 - a validity result for the actual true-null intersection I_0, including its countably infinite case;
 - extension-coherent local certificates that do not change when future hypotheses are appended.
