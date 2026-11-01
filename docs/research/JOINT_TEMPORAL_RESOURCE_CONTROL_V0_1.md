@@ -230,7 +230,7 @@ exclusion counts in O(n * 2^n). Benchmark the evaluator runtime at the 16-factor
 ceiling and use a preregistered factorial/covering design for larger problems
 rather than silently extending the exact claim.
 
-Eight additional source-level tests cover additive controls, isolated
+Nine additional source-level tests cover additive controls, isolated
 three-way and four-way synergy, antagonistic higher-order effects,
 incompatible/over-budget exclusions, digest mismatch and enumeration errors.
 
@@ -346,8 +346,8 @@ do not lower them after seeing results.
 Candidate controller: 12 Rust test functions authored.  
 Evaluator exact subset oracle: 15 Rust test functions authored.  
 Evaluator pairwise interaction attribution: 6 Rust test functions authored.  
-Evaluator higher-order interaction decomposition: 8 Rust test functions authored.  
-**Total: 41 source-authored test functions across the joint controller, exact subset oracle and interaction modules; none have run.**  
+Evaluator higher-order interaction decomposition: 9 Rust test functions authored.  
+**Total: 42 source-authored test functions across the joint controller, exact subset oracle and interaction modules; none have run.**  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
 The controller and oracle are research prototypes, not production schedulers.
