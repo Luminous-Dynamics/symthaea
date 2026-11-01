@@ -271,6 +271,8 @@ pub struct LatencyMeasurement {
     pub boundary: ResourceBoundary,
     pub warmup_count: u64,
     pub measured_sample_count: u64,
+    /// Wall-clock interval over which throughput was measured.
+    pub measurement_window_us: u64,
     pub p50_us: u64,
     pub p95_us: u64,
     pub p99_us: u64,
@@ -347,6 +349,11 @@ pub struct BenchmarkRunManifest {
     pub task_id: String,
     pub horizon_id: String,
     pub protocol_mode: ProtocolMode,
+    /// What observations, future covariates and task-oracle fields the
+    /// candidate was permitted to access.
+    pub information_contract_sha256: [u8; 32],
+    /// Exact evaluator/metric implementation and scoring protocol identity.
+    pub evaluation_protocol_sha256: [u8; 32],
     pub random_seed: u64,
     pub dataset: DatasetIdentity,
     pub split: SplitIdentity,
@@ -477,6 +484,8 @@ impl BenchmarkRunManifest {
             &self.split.validation_membership_sha256,
             &self.split.test_membership_sha256,
             &self.split.purged_membership_sha256,
+            &self.information_contract_sha256,
+            &self.evaluation_protocol_sha256,
             &self.preprocessing.adapter_config_sha256,
             &self.preprocessing.preprocessing_pipeline_sha256,
             &self.model.architecture_sha256,
@@ -550,12 +559,14 @@ impl BenchmarkRunManifest {
         self.latency.boundary.validate()?;
         if self.latency.boundary.scope == MeasurementScope::TrainingPipeline
             || self.latency.measured_sample_count == 0
+            || self.latency.measurement_window_us == 0
             || self.latency.p50_us == 0
             || self.latency.p50_us > self.latency.p95_us
             || self.latency.p95_us > self.latency.p99_us
             || self.latency.throughput_milli_per_second == 0
             || self.latency.peak_memory_bytes == 0
             || self.latency.deadline_misses > self.latency.measured_sample_count
+            || self.latency.deadline_us == Some(0)
             || (self.latency.deadline_us.is_none() && self.latency.deadline_misses != 0)
         {
             return Err(ManifestError::InvalidLatencyStatistics);
@@ -618,6 +629,8 @@ impl BenchmarkRunManifest {
         hash_text(&mut h, &self.task_id)?;
         hash_text(&mut h, &self.horizon_id)?;
         h.update([self.protocol_mode.code()]);
+        h.update(self.information_contract_sha256);
+        h.update(self.evaluation_protocol_sha256);
         h.update(self.random_seed.to_le_bytes());
 
         hash_text(&mut h, &self.dataset.repository_url)?;
@@ -748,6 +761,7 @@ fn hash_latency(hasher: &mut Sha256, latency: &LatencyMeasurement) -> Result<(),
     hash_boundary(hasher, &latency.boundary)?;
     hasher.update(latency.warmup_count.to_le_bytes());
     hasher.update(latency.measured_sample_count.to_le_bytes());
+    hasher.update(latency.measurement_window_us.to_le_bytes());
     hasher.update(latency.p50_us.to_le_bytes());
     hasher.update(latency.p95_us.to_le_bytes());
     hasher.update(latency.p99_us.to_le_bytes());
@@ -812,6 +826,8 @@ mod tests {
             task_id: "EPA-Air".into(),
             horizon_id: "24h".into(),
             protocol_mode: ProtocolMode::LeakageControlled,
+            information_contract_sha256: digest(30),
+            evaluation_protocol_sha256: digest(31),
             random_seed: 2026,
             dataset: DatasetIdentity {
                 repository_url: "https://github.com/blacksnail789521/Time-IMM".into(),
@@ -864,6 +880,7 @@ mod tests {
                 boundary: boundary(MeasurementScope::EndToEndInference),
                 warmup_count: 20,
                 measured_sample_count: 100,
+                measurement_window_us: 10_000_000,
                 p50_us: 1_000,
                 p95_us: 1_500,
                 p99_us: 2_000,
@@ -897,6 +914,30 @@ mod tests {
         assert_eq!(left.sha256().unwrap(), right.sha256().unwrap());
         left.stages.push(PipelineStage::ModelInference);
         assert_eq!(left.sha256(), Err(ManifestError::DuplicatePipelineStage));
+    }
+
+    #[test]
+    fn information_and_evaluation_protocols_are_digest_bound() {
+        let base = valid_manifest().canonical_sha256().unwrap();
+        let mut changed = valid_manifest();
+        changed.information_contract_sha256 = digest(32);
+        assert_ne!(base, changed.canonical_sha256().unwrap());
+        let mut changed = valid_manifest();
+        changed.evaluation_protocol_sha256 = digest(33);
+        assert_ne!(base, changed.canonical_sha256().unwrap());
+        let mut changed = valid_manifest();
+        changed.information_contract_sha256 = [0; 32];
+        assert_eq!(changed.validate(), Err(ManifestError::ZeroDigest));
+    }
+
+    #[test]
+    fn latency_throughput_requires_a_positive_measurement_window() {
+        let mut manifest = valid_manifest();
+        manifest.latency.measurement_window_us = 0;
+        assert_eq!(manifest.validate(), Err(ManifestError::InvalidLatencyStatistics));
+        let mut manifest = valid_manifest();
+        manifest.latency.deadline_us = Some(0);
+        assert_eq!(manifest.validate(), Err(ManifestError::InvalidLatencyStatistics));
     }
 
     #[test]
