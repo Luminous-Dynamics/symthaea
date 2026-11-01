@@ -13,6 +13,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::pareto_anytime::{AnytimeError, AnytimeHistory, AnytimeRecorder, EvaluationOutcome};
 use super::pareto_benchmarks::{dtlz2_three_objectives, zdt1_objectives};
 use super::pareto_objectives::{
     analyze_pareto, exact_hypervolume, ObjectiveDirection, ParetoAnalysisPlan,
@@ -250,7 +251,25 @@ pub fn run_smsemoa_zdt1(
                 .map(|values| values.to_vec())
                 .map_err(|error| SmsEmoaError::new("zdt1", error.to_string()))
         },
+        None,
     )
+}
+
+pub fn run_smsemoa_zdt1_with_history(
+    config: &SmsEmoaConfig,
+    decision_dimensions: usize,
+    history: &mut AnytimeHistory,
+) -> Result<SmsEmoaRunReport, SmsEmoaError> {
+    if decision_dimensions < 2 || config.objective_specs.len() != 2 {
+        return Err(SmsEmoaError::new("dimensions", "ZDT1 requires at least two decision variables and two objective specifications"));
+    }
+    let budget = config.population_size.checked_add(config.offspring_evaluations)
+        .ok_or_else(|| SmsEmoaError::new("config", "evaluation budget overflows usize"))?;
+    let mut recorder = make_anytime_recorder(history, "zdt1", config, 2, budget)?;
+    run_smsemoa("zdt1", config, decision_dimensions, 2, |decision| {
+        zdt1_objectives(decision).map(|values| values.to_vec())
+            .map_err(|error| SmsEmoaError::new("zdt1", error.to_string()))
+    }, Some(&mut recorder))
 }
 
 pub fn run_smsemoa_dtlz2(
@@ -273,7 +292,25 @@ pub fn run_smsemoa_dtlz2(
                 .map(|values| values.to_vec())
                 .map_err(|error| SmsEmoaError::new("dtlz2", error.to_string()))
         },
+        None,
     )
+}
+
+pub fn run_smsemoa_dtlz2_with_history(
+    config: &SmsEmoaConfig,
+    decision_dimensions: usize,
+    history: &mut AnytimeHistory,
+) -> Result<SmsEmoaRunReport, SmsEmoaError> {
+    if decision_dimensions < 3 || config.objective_specs.len() != 3 {
+        return Err(SmsEmoaError::new("dimensions", "three-objective DTLZ2 requires at least three decision variables and three objective specifications"));
+    }
+    let budget = config.population_size.checked_add(config.offspring_evaluations)
+        .ok_or_else(|| SmsEmoaError::new("config", "evaluation budget overflows usize"))?;
+    let mut recorder = make_anytime_recorder(history, "dtlz2-3obj", config, 3, budget)?;
+    run_smsemoa("dtlz2-3obj", config, decision_dimensions, 3, |decision| {
+        dtlz2_three_objectives(decision).map(|values| values.to_vec())
+            .map_err(|error| SmsEmoaError::new("dtlz2", error.to_string()))
+    }, Some(&mut recorder))
 }
 
 fn run_smsemoa<F>(
@@ -282,6 +319,7 @@ fn run_smsemoa<F>(
     decision_dimensions: usize,
     objective_dimensions: usize,
     evaluator: F,
+    mut recorder: Option<&mut AnytimeRecorder<'_>>,
 ) -> Result<SmsEmoaRunReport, SmsEmoaError>
 where
     F: Fn(&[f64]) -> Result<Vec<f64>, SmsEmoaError>,
@@ -297,7 +335,18 @@ where
 
     for ordinal in 0..config.population_size {
         let decision = (0..decision_dimensions).map(|_| rng.unit_f64()).collect::<Vec<_>>();
-        let objectives = evaluate_checked(&evaluator, &decision, objective_dimensions)?;
+        let objectives = match evaluate_checked(&evaluator, &decision, objective_dimensions) {
+            Ok(values) => values,
+            Err(error) => {
+                if let Some(recorder) = &mut recorder {
+                    recorder.record_failure(&decision, EvaluationOutcome::Failed, error.to_string()).map_err(map_anytime_error)?;
+                }
+                return Err(error);
+            }
+        };
+        if let Some(recorder) = &mut recorder {
+            recorder.record_success(&decision, &objectives, true, Vec::new()).map_err(map_anytime_error)?;
+        }
         let utility = transform_objectives(&objectives, &config.objective_specs)?;
         objective_evaluations = checked_add_usize(objective_evaluations, 1, "objective_evaluations")?;
         population.push(Individual {
@@ -332,7 +381,18 @@ where
             config.mutation_distribution_index,
             &mut rng,
         );
-        let objectives = evaluate_checked(&evaluator, &child, objective_dimensions)?;
+        let objectives = match evaluate_checked(&evaluator, &child, objective_dimensions) {
+            Ok(values) => values,
+            Err(error) => {
+                if let Some(recorder) = &mut recorder {
+                    recorder.record_failure(&child, EvaluationOutcome::Failed, error.to_string()).map_err(map_anytime_error)?;
+                }
+                return Err(error);
+            }
+        };
+        if let Some(recorder) = &mut recorder {
+            recorder.record_success(&child, &objectives, true, Vec::new()).map_err(map_anytime_error)?;
+        }
         let utility = transform_objectives(&objectives, &config.objective_specs)?;
         objective_evaluations = checked_add_usize(objective_evaluations, 1, "objective_evaluations")?;
 
@@ -756,6 +816,35 @@ pub fn analyze_smsemoa_report(
     ).map_err(map_pareto_error)?;
     let analysis = analyze_pareto(&plan).map_err(map_pareto_error)?;
     Ok(SmsEmoaParetoAnalysis { plan, analysis })
+}
+
+fn make_anytime_recorder<'a>(
+    history: &'a mut AnytimeHistory,
+    problem_id: &str,
+    config: &SmsEmoaConfig,
+    objective_dimensions: usize,
+    expected_attempts: usize,
+) -> Result<AnytimeRecorder<'a>, SmsEmoaError> {
+    if history.header().algorithm_id != ALGORITHM_ID
+        || history.header().problem_id != problem_id
+        || history.header().seed != config.seed
+    {
+        return Err(SmsEmoaError::new("anytime.header", "history algorithm, problem, or seed differs from this SMS-EMOA run"));
+    }
+    if config.objective_specs.len() != objective_dimensions
+        || history.header().objective_specs != config.objective_specs
+        || config.objective_specs.iter().any(|spec| spec.direction != ObjectiveDirection::Minimize)
+    {
+        return Err(SmsEmoaError::new("anytime.objective_specs", "history objective definitions differ from SMS-EMOA configuration"));
+    }
+    if history.header().max_objective_evaluation_attempts < u64::try_from(expected_attempts).unwrap_or(u64::MAX) {
+        return Err(SmsEmoaError::new("anytime.max_objective_evaluation_attempts", "history attempt budget is below the optimizer's exact budget"));
+    }
+    AnytimeRecorder::new(history).map_err(map_anytime_error)
+}
+
+fn map_anytime_error(error: AnytimeError) -> SmsEmoaError {
+    SmsEmoaError::new(error.path, error.message)
 }
 
 fn map_pareto_error(error: ParetoError) -> SmsEmoaError {
