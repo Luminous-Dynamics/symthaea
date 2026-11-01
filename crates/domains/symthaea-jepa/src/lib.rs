@@ -195,13 +195,14 @@ pub fn candidate_set_sha256(
         hasher.update(candidate.action_id.to_le_bytes());
         hasher.update([candidate.action_index]);
     }
-    Ok(digest_to_hex(hasher.finalize().as_slice()))
+    Ok(digest_to_hex(&hasher.finalize()))
 }
 
 fn digest_to_hex(digest: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(digest.len() * 2);
     for byte in digest {
+        let byte = *byte;
         output.push(HEX[(byte >> 4) as usize] as char);
         output.push(HEX[(byte & 0x0f) as usize] as char);
     }
@@ -491,7 +492,7 @@ impl JepaEngine {
         }
 
         let source_embedding_sha256 = embedding_sha256(current_hv);
-        let candidate_set_sha256 = candidate_set_sha256(action_manifest_sha256, candidates)?;
+        let candidate_set_digest = candidate_set_sha256(action_manifest_sha256, candidates)?;
         let context = self.context.encode(current_hv);
         let predictions = candidates
             .iter()
@@ -514,7 +515,7 @@ impl JepaEngine {
             source_history_sha256: source_history_sha256.to_string(),
             source_embedding_sha256,
             action_manifest_sha256: action_manifest_sha256.to_string(),
-            candidate_set_sha256,
+            candidate_set_sha256: candidate_set_digest,
             predictions,
         })
     }
@@ -620,15 +621,21 @@ mod tests {
 
         let mut malformed = observed_evidence(&current, &next, 2);
         malformed.target_sequence = malformed.source_sequence;
-        assert!(candidate
-            .train_observed_transition(&current, &next, &malformed, 0.001)
-            .is_err());
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
 
-        let mut malformed = observed_evidence(2);
-        malformed.target_observed_at_seconds = malformed.action_ended_at_seconds;
-        assert!(candidate
-            .train_observed_transition(&current, &next, &malformed, 0.001)
-            .is_err());
+        let mut malformed = observed_evidence(&current, &next, 2);
+        malformed.target_observed_at_seconds = malformed.requested_target_time_seconds
+            + malformed.max_target_lateness_seconds
+            + 0.001;
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, 0.001)
+                .is_err()
+        );
 
         let malformed = observed_evidence(&current, &next, 250);
         assert!(candidate
@@ -636,11 +643,12 @@ mod tests {
             .is_err());
 
         let malformed = observed_evidence(&current, &next, 2);
-        assert!(candidate
-            .train_observed_transition(&current, &next, &malformed, f32::NAN)
-            .is_err());
+        assert!(
+            candidate
+                .train_observed_transition(&current, &next, &malformed, f32::NAN)
+                .is_err()
+        );
     }
-
 
     #[test]
     fn observed_transition_rejects_cross_episode_missing_branch_and_forecast_order_errors() {
