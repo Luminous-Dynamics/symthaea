@@ -412,7 +412,6 @@ fn analyze_response_body(
     let metadata_terms = [
         bundle.public_packet.batch_id.as_str(),
         bundle.public_packet.benchmark_id.as_str(),
-        bundle.public_packet.benchmark_version.as_str(),
         bundle.public_packet.task_family.as_str(),
     ];
     let metadata_found = metadata_terms.iter().any(|term| {
