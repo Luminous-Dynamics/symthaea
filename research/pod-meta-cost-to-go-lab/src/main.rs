@@ -665,8 +665,12 @@ fn main() {
     println!("SELECTION_CONFORMAL_ROW\tselected-sample-too-small\tunbounded");
 
     let mut online_full = OnlineSelectionLedger::new();
-    online_full.append_statement(online_statement(1, 601, 1, 1)).unwrap();
-    online_full.append_statement(online_statement(2, 602, 1, 2)).unwrap();
+    online_full
+        .append_statement(online_statement(1, 601, 1, 1))
+        .unwrap();
+    online_full
+        .append_statement(online_statement(2, 602, 1, 2))
+        .unwrap();
     online_full
         .append_feedback(online_feedback(
             1,
