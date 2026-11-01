@@ -1,5 +1,6 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, CensoringWeightReceipt, CompletedCalibrationExample, EffectDisposition,
+    BudgetLedger, CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt,
+    CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState, EffectDisposition,
     ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
     JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
     LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
@@ -663,6 +664,123 @@ fn main() {
         SelectedProofEnvelope::Unbounded { .. }
     ));
     println!("SELECTION_CONFORMAL_ROW\tselected-sample-too-small\tunbounded");
+
+    let cap_config = DecisionDrivenCapConfig {
+        resource_dimension: OnlineCostDimension::Tokens,
+        alpha_numerator: 1,
+        alpha_denominator: 4,
+        base_threshold: 5,
+        threshold_increment_per_selected: 2,
+        holdout_partition_digest: [61; 32],
+        model_digest: [62; 32],
+        score_model_digest: [63; 32],
+        selection_policy_digest: [64; 32],
+        feature_cohort_digest: [65; 32],
+    };
+    let cap_holdout = [
+        CapCalibrationPoint {
+            example_id: 1,
+            holdout_partition_digest: [61; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 4,
+            predicted_cost: 10,
+            observed_remaining_to_verified_proof: ResourceVector::new(11, 0, 0, 0, 0, 0),
+            meter_receipt_digest: [66; 32],
+            completion_verifier_digest: [67; 32],
+        },
+        CapCalibrationPoint {
+            example_id: 2,
+            holdout_partition_digest: [61; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 5,
+            predicted_cost: 10,
+            observed_remaining_to_verified_proof: ResourceVector::new(12, 0, 0, 0, 0, 0),
+            meter_receipt_digest: [68; 32],
+            completion_verifier_digest: [69; 32],
+        },
+        CapCalibrationPoint {
+            example_id: 3,
+            holdout_partition_digest: [61; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 5,
+            predicted_cost: 10,
+            observed_remaining_to_verified_proof: ResourceVector::new(13, 0, 0, 0, 0, 0),
+            meter_receipt_digest: [70; 32],
+            completion_verifier_digest: [71; 32],
+        },
+    ];
+    let mut cap_state = DecisionDrivenCapState::new();
+    let cap_first = pod_meta_cost_to_go_lab::apply_decision_driven_cap(
+        cap_config,
+        &mut cap_state,
+        &cap_holdout,
+        CapCurrentPrediction {
+            example_id: 700,
+            frontier_digest: [72; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 5,
+            predicted_cost: 20,
+        },
+    )
+    .unwrap();
+    println!(
+        "CAP_DECISION_ROW\tfixed-holdout\t{}\t{}\t{}\t{}",
+        cap_first.selected,
+        cap_first.selection_threshold,
+        cap_first.calibration_example_ids.len(),
+        cap_first.residual_quantile.unwrap_or(u128::MAX)
+    );
+    let cap_second = pod_meta_cost_to_go_lab::apply_decision_driven_cap(
+        cap_config,
+        &mut cap_state,
+        &cap_holdout,
+        CapCurrentPrediction {
+            example_id: 701,
+            frontier_digest: [73; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 6,
+            predicted_cost: 20,
+        },
+    )
+    .unwrap();
+    println!(
+        "CAP_DECISION_ROW\tprior-selection-state\t{}\t{}\t{}\t{}",
+        cap_second.selected,
+        cap_second.selection_threshold,
+        cap_second.calibration_example_ids.len(),
+        cap_second.residual_quantile.unwrap_or(u128::MAX)
+    );
+    let cap_unbounded = pod_meta_cost_to_go_lab::apply_decision_driven_cap(
+        cap_config,
+        &mut cap_state,
+        &[],
+        CapCurrentPrediction {
+            example_id: 702,
+            frontier_digest: [74; 32],
+            model_digest: [62; 32],
+            score_model_digest: [63; 32],
+            feature_cohort_digest: [65; 32],
+            selection_score: 9,
+            predicted_cost: 20,
+        },
+    )
+    .unwrap();
+    println!(
+        "CAP_DECISION_ROW\tinsufficient-holdout\t{}\t{}\t{}",
+        cap_unbounded.selected,
+        cap_unbounded.interval.is_some_and(|interval| interval.upper.is_none()),
+        cap_unbounded.calibration_example_ids.len()
+    );
 
     let mut online_full = OnlineSelectionLedger::new();
     online_full
