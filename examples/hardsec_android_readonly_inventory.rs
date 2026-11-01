@@ -404,7 +404,8 @@ where
 {
     let mut properties = Properties::new();
     for key in PROPERTY_KEYS {
-        let value = runner(&["getprop", key])?;
+        let value = runner(&["getprop", key])
+            .map_err(|_| "ADB property capture failed; raw device output was suppressed".to_owned())?;
         properties.insert(key, value.trim().to_owned());
     }
 
@@ -587,6 +588,32 @@ mod tests {
         for forbidden in ["imei", "meid", "imsi", "iccid", "serial_number", "android_id", "attestation_certificate_der"] {
             assert!(!output.contains(forbidden));
         }
+    }
+
+    #[test]
+    fn captured_profile_keeps_attestation_and_measurement_claims_not_measured() {
+        let profile = capture_profile(
+            &fixture_properties(),
+            Some("Features : fp asimd mte paca pacg bti\\n"),
+            Some("List of hardware events:\\ncpu-cycles\\n"),
+        );
+        assert_eq!(profile["evidence_domain"], "physical_device_capture");
+        assert_eq!(profile["device"]["product_family"], "Pixel 8 Pro");
+        assert_eq!(profile["boot_integrity"]["reported_verified_boot_state"], "green_reported");
+        assert_eq!(profile["boot_integrity"]["verified_boot_state"], "not_measured");
+        assert_eq!(profile["boot_integrity"]["attestation_security_level"], "not_measured");
+        assert_eq!(
+            profile["hardware_protections"]["memory_tagging"]["hardware_support"],
+            "on_device_reported"
+        );
+        assert_eq!(
+            profile["hardware_protections"]["memory_tagging"]["runtime_state"],
+            "not_measured"
+        );
+        assert_eq!(profile["pmu_acquisition"]["interface"], "simpleperf");
+        assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
+        assert_eq!(profile["claim_ceiling"]["runtime_integrity_verified"], false);
+        assert_eq!(profile["claim_ceiling"]["pmu_measurement_qualified"], false);
     }
 
     #[test]
