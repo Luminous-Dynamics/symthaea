@@ -58,3 +58,4 @@ Reference: [History-Aware Conformal Prediction Sets for Censored Time-to-Event O
 ## 6. Qualification controls
 
 The unit tests cover weighted threshold selection, at-risk filtering, effective sample size, censoring positivity failure, competing-risk rejection, landmark consistency, history / partition binding, shifted predictions, digest requirements, duplicate episodes, and invalid miscoverage. The deterministic CLI matrix emits one weighted survivor calibration plus positivity and competing-risk negative controls.
+The public Rust API groups these knobs in `LandmarkIpcwConfig` rather than accepting positional scalar/digest arguments. This makes the landmark, miscoverage, positivity floor, predictor, censoring model, calibration partition, nuisance-training partition, and target cohort explicit at the call site.
