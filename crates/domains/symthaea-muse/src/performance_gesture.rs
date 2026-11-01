@@ -1015,11 +1015,12 @@ mod tests {
             part_id: 1,
             note_id: "lead-note-2".to_string(),
         };
-        let mut wrong_time = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
+        gesture.at = BeatPosition::new(3, 1).unwrap();
+        let mut second_note_target = PerformanceGestureTrackV1::new(vec![gesture.clone()]);
         wrong_time.bind_to_score_sha256("a".repeat(64));
         // A time inside the second note is valid; the ID is never reconstructed
         // from pitch, timing or its position in the event stream.
-        assert!(wrong_time
+        assert!(second_note_target
             .validate_against_identity_map(&"a".repeat(64), 2, &map)
             .is_ok());
 
@@ -1128,6 +1129,7 @@ mod tests {
         );
         gesture.target = GestureTarget::Part { part_id: 1 };
         gesture.instrument_id = "violin".to_string();
+        gesture.source_model_id = Some("violin.model-a".to_string());
         let mut track = PerformanceGestureTrackV1::new(vec![gesture]);
         track.bind_to_score_sha256("a".repeat(64));
         assert!(track.validate_against_identity_map(&"a".repeat(64), 2, &map)
