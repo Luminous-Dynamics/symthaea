@@ -25,7 +25,7 @@ External methods must be assigned to the guarantee lane they actually prove. The
 |---|---|---|
 | Xu, Fischer & Ramdas (UAI 2026), online e-closure and compound e-values | One-pass online FDR under arbitrary dependence; paper reports strict power improvements and O(log t) decisions | Primary arbitrary-dependence online-FDR baseline. Match its stream/arrival contract; do not treat it as automatically solving repeated evidence updates for previously active hypotheses or SupFDR. |
 | LORD variants, SAFFRON, ADDIS, GAI/weighted GAI++, LOND/e-LOND, alpha spending | Established sequential online procedures; include p-value and e-value variants where available | Use only methods whose assumptions and error target match the comparison cell. Freeze tuning parameters before confirmatory runs. |
-| Bioconductor onlineFDR 2.18.0 and Python online-fdr parity suite | Reference implementations for online procedures and asynchronous lifecycles | Pin package versions and parity-test method adapters. The current Python package describes sequential, asynchronous and batch APIs plus e-BH/e-LOND, and reports parity checks against onlineFDR 2.18.0. |
+| Bioconductor onlineFDR 2.20.0 and Python online-fdr parity suite | Reference implementations for online procedures and asynchronous lifecycles | Pin package versions and parity-test method adapters. The current Python package describes sequential, asynchronous and batch APIs plus e-BH/e-LOND, and reports parity checks against onlineFDR 2.20.0. |
 | Tavyrikov, Goeman & de Heide (EJS 2026), carefree multiple testing with e-processes | SupFDR / FDR-sup with running suprema and adjusters under arbitrary dependence | Primary persistent-guarantee comparator. Do not use raw e-BH on unadjusted running suprema as a valid baseline. |
 | CRAN eClosure 0.9.7 (published 2026-10-21) | Batch closed BH, closed e-BH, closed Su and closed BY | Batch-only baseline. It is useful for fixed-horizon final-set comparisons, not a direct online arrival or repeated-monitoring comparator. |
 | seqcomp 0.3.0 adaptive betting (fixed fraction, aGRAPA, ONS-m, quantile heuristic) | Bet-selection comparators for bounded score-difference martingales and sequential model comparison | Compare at the betting-strategy layer only after translating and proving the exact increment/null assumptions. Its own vignette shows no universal best rule across temporal regimes; do not call our diagonal-preconditioned projected update novel merely because it is vector-valued. |
@@ -35,6 +35,17 @@ External methods must be assigned to the guarantee lane they actually prove. The
 | #9712 scalar and #9751 vector predictable betting | Structured shared-filtration conditional-mgf setting | Model-assisted power lane only; compare against the affine fallback under exactly the same null law and active-set policy. |
 
 The 2026 dynamic e-closure theory and the 2026 UAI online e-closure paper both use the phrase "online e-closure" but target different online problem formulations. Every adapter must state whether evidence for an already active hypothesis can continue evolving after later hypotheses arrive. This is a first-class benchmark dimension, not an implementation detail.
+
+### External reference pins
+
+- UAI 2026 online e-closure/compound e-values: https://proceedings.mlr.press/v337/xu26a.html
+- Dynamic e-closure theory: https://riannedeheide.github.io/research/dynamic-e-closure/
+- SupFDR/FDR-sup adjusters: https://doi.org/10.1214/26-EJS2546
+- Bioconductor onlineFDR 2.20.0 (release 3.23): https://bioconductor.org/packages/release/bioc/html/onlineFDR.html
+- CRAN seqcomp 0.3.0: https://www.stat.ethz.ch/CRAN/web/packages/seqcomp/index.html
+- seqcomp adaptive-betting vignette: https://www.stat.ethz.ch/CRAN/web/packages/seqcomp/vignettes/adaptive_betting.html
+- CRAN eClosure 0.9.7 (published 2026-10-21): https://mirror.nju.edu.cn/CRAN/web/packages/eClosure/index.html
+
 
 ## 2. Comparison contract
 
