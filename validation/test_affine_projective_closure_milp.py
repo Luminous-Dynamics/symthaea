@@ -26,6 +26,7 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
         )
         meta = model["metadata"]
         self.assertEqual(meta["model_variables"], 21)
+        self.assertEqual(model["variables"]["r"]["type"], "continuous")
         self.assertEqual(meta["model_constraint_rows"], 10 + 2 + 2 + 1)
         self.assertEqual(meta["closure_constraints_covered"], 2**10 - 1)
         self.assertEqual(len(model["constraints"]["closure_auxiliary"]), 10)
