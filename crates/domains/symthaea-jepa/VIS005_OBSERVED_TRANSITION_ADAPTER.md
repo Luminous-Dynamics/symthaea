@@ -18,6 +18,7 @@ The struct carries:
 - source and target raw-observation digests;
 - source and target embedding digests;
 - canonical action-manifest digest;
+- a JEPA-recomputed action-binding digest over the manifest digest, stable action ID and discrete action index;
 - episode, branch and forecast IDs;
 - distinct source/target observation IDs and monotonic sequence numbers;
 - stable action ID and its discrete JEPA action index;
@@ -26,7 +27,7 @@ The struct carries:
 
 train_observed_transition and evaluate_observed_transition reject:
 - unsupported evidence schema versions;
-- malformed lowercase SHA-256 identifiers;
+- malformed lowercase SHA-256 identifiers or an action ID/index binding digest mismatch;
 - empty or repeated observation IDs;
 - non-increasing observation sequence;
 - non-finite or temporally misordered timestamps;
@@ -52,7 +53,7 @@ This API:
 5. evaluates every candidate action against the same encoded context;
 6. returns action-indexed latent point predictions and a canonical candidate-set digest.
 
-The candidate-set digest is invariant to row order and binds the full action-manifest digest plus sorted (action_id, action_index) pairs. The manifest digest must itself be generated and authenticated by the upstream adapter from canonical action descriptors, units and action-space version.
+The candidate-set digest is invariant to row order and binds the full action-manifest digest plus sorted (action_id, action_index) pairs. For a single observed transition, a separate action-binding digest is recomputed from the manifest digest, stable action ID and discrete JEPA action index. The manifest digest must itself be generated and authenticated by the upstream adapter from canonical action descriptors, units and action-space version.
 
 These outputs are deterministic point predictions. Do not promote repeated calls, candidate rows or latent dimensions into a posterior sample bank. This API is a point-prediction comparator / explicit-action-head interface. CMAQ-018 remains the separate uncertainty and paired-effect evaluator.
 
@@ -88,6 +89,7 @@ The crate now tests:
 - rejection of invalid sequence, cross-branch identity omissions, forecast/action ordering, target-time ordering and excessive observation lateness;
 - rejection of out-of-range action indices and invalid learning rates;
 - rejection when the exact source/target embedding bytes do not match the supplied embedding digests;
+- rejection when the stable action ID is substituted without updating its manifest/index binding digest;
 - common-context action-set prediction and identity preservation;
 - row-order invariance of candidate-set digest and named-action outputs;
 - duplicate action identity/index rejection;
