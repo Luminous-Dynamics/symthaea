@@ -400,7 +400,10 @@ pub fn score_self_critique_request(
         ),
         (&request.initial_response_sha256, "initial_response_sha256"),
         (&request.critique_prompt_sha256, "critique_prompt_sha256"),
-        (&request.entropy_extractor_sha256, "entropy_extractor_sha256"),
+        (
+            &request.entropy_extractor_sha256,
+            "entropy_extractor_sha256",
+        ),
         (
             &request.initial_decode.generation_config_sha256,
             "initial generation_config_sha256",
