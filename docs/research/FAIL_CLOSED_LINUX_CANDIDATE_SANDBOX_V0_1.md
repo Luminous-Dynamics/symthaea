@@ -1,0 +1,76 @@
+# Fail-closed Linux candidate sandbox supervisor v0.1
+
+Tracking: [#9865](https://github.com/Luminous-Dynamics/symthaea/issues/9865)  
+Parent: [bounded candidate protocol PR #9863](https://github.com/Luminous-Dynamics/symthaea/pull/9863)
+
+## Decision
+
+A candidate policy trait and a bounded wire codec are not security boundaries. Confirmatory benchmark candidates must execute in a separate process whose filesystem, namespaces, capabilities, syscalls and resource limits are externally enforced.
+
+The first target is Linux/NixOS using Bubblewrap for namespaces and filesystem construction, systemd/cgroup v2 for resource enforcement, and an architecture-pinned seccomp BPF profile.
+
+## Critical fail-closed rule
+
+Do not use Bubblewrap `--unshare-all` as the qualification profile. Current Bubblewrap documentation describes it as expanding to try variants for user and cgroup namespaces; a try variant can skip that namespace when unavailable. Instead, explicitly require every namespace the runner depends on:
+
+`--unshare-user --unshare-pid --unshare-net --unshare-ipc --unshare-uts --unshare-cgroup`
+
+A missing namespace, permission, feature or controller must fail the run before the candidate executable is launched. The launcher must not remove an unsupported flag and retry.
+
+Bubblewrap also provides separate flags for read-only bind mounts, minimal proc/dev, clearing environment, new session, dropping capabilities, seccomp filters and killing children when the wrapper/parent dies. Use only the explicitly pinned options verified on the actual runner. [Upstream Bubblewrap options](https://github.com/containers/bubblewrap/blob/main/bwrap.xml).
+
+## Filesystem plan
+
+The candidate should see only:
+- its exact immutable executable;
+- each exact runtime closure object individually bound read-only;
+- minimal `/proc` and `/dev`;
+- ephemeral tmpfs `/tmp` and an empty home/working directory;
+- standard input/output pipes for the candidate protocol.
+
+Do not expose `/nix/store` wholesale: it can contain unrelated artifacts and potentially evaluator material. Do not expose host `/home`, data paths, caches, credentials, SSH agents, Docker sockets or broad `/run`. Use `--clearenv` and set a minimal explicit environment.
+
+The Nix store closure is derived from the pinned executable/runtime and independently hashed. Runtime path enumeration itself must be included in the launch receipt. The evaluator's dataset, seed schedule, hidden labels, oracle digest and private result store remain outside the candidate mount/descriptor/environment/IPC namespaces.
+
+## Namespace and syscall plan
+
+Required namespaces: user, PID, network, IPC, UTS and cgroup. Do not share the host network. Start a new session, drop all capabilities, and make the candidate die with the supervisor.
+
+Load a versioned seccomp BPF filter through Bubblewrap's documented FD interface. Build and test profiles per supported architecture and runtime. Minimum deny surfaces include ptrace, mount, setns, unshare, bpf, perf_event_open, open_by_handle_at, userfaultfd and socket/network syscalls. A generic filter can break thread/runtime behavior or leave escape surfaces; the final profile requires kernel and application adversarial testing. It is not sufficient to merely document a deny-list.
+
+## Cgroup/resource plan
+
+Use a transient systemd unit and cgroup v2 for external enforcement:
+- `MemoryMax` and `MemorySwapMax=0`;
+- `CPUQuota` (plus external wall-clock timeout);
+- `TasksMax`;
+- read back the effective systemd properties and actual cgroup control files before starting/accepting the candidate result.
+
+Official systemd resource-control documentation maps these properties to cgroup v2 controllers and describes CPU quotas. Availability, delegation and controller activation are host-dependent; a requested property string is not evidence that the effective resource limit was enforced. Verify actual values and fail closed. [systemd.resource-control](https://freedesktop.org/software/systemd/man/latest/systemd.resource-control.html).
+
+The supervisor should cap stdout/stderr and frame I/O independently, kill on wall-clock deadline, malformed frame, unexpected extra bytes, resource termination or supervisor error, and record the exact reason.
+
+## Receipt separation
+
+1. Launch receipt: candidate digest, Nix closure digest, Bubblewrap executable/version, exact argv, seccomp profile digest/architecture, systemd properties, effective cgroup path/control values, kernel identity and supervisor digest.
+2. Candidate output receipt: protocol request/action digests, bounded stderr digest, exit code, termination reason and elapsed wall time.
+3. Evaluator receipt: separately bound oracle digest, task/split identity, evaluator digest and recomputed per-task/per-subject metrics.
+4. System receipt: physical target, firmware/compiler/runtime, raw latency/power traces, instrument calibration and measurement uncertainty.
+
+A frame SHA-256 is corruption detection, not sender authentication. A receipt hash is integrity binding, not a signature or hardware attestation. A process sandbox cannot establish that the Linux kernel, firmware or power instrument is honest.
+
+## Validation ladder
+
+Before any confirmatory run:
+- verify exact binary, runtime closure and supervisor digests;
+- prove all mandatory namespaces are created;
+- prove network access is unavailable;
+- inspect mount table from inside and prove evaluator/private paths are absent;
+- prove capabilities are empty and seccomp profile active;
+- verify resource limits by reading the actual candidate cgroup;
+- run process-spawn, fork-bomb, memory-exhaustion, CPU-spin, file-read, descriptor, protocol-malformation, timeout and supervisor-kill negative controls;
+- independently replay all receipts.
+
+## Status
+
+This file records the design and implementation tranches. No supervisor executable, seccomp filter, cgroup verifier or adversarial integration test is implemented by this document. The design is not yet a qualified security boundary.
