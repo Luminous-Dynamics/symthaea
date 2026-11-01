@@ -1283,7 +1283,7 @@ mod tests {
     fn temporal_stream_is_deterministic_and_replayable() {
         let first = generate_temporal_drift_stream(&stream_config()).unwrap();
         let second = generate_temporal_drift_stream(&stream_config()).unwrap();
-        assert_eq!(first, second);
+        assert!(first == second);
         validate_temporal_stream_dataset(&first).unwrap();
     }
 
