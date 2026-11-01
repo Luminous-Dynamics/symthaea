@@ -171,7 +171,7 @@
           "const": 18
         },
         "computed_state_count": {
-          "const": 19
+          "const": 18
         },
         "all_state_queries_match_vector": {
           "const": true
