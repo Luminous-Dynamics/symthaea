@@ -4,6 +4,7 @@ use crate::liquid_state::{FixedPointLiquidState, LiquidStateError};
 use crate::packed_hdc::{
     Classification, InsertOutcome, MemoryError, PackedHdcMemory, PackedHv,
 };
+use crate::scalar_encoder::{ScalarEncoderError, ScalarLevelEncoder};
 use crate::time_constant::{alpha_from_dt_tau_us, TimeConstantError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,6 +97,16 @@ impl<const DIM: usize, const CLASSES: usize, const SLOTS: usize, const WORDS: us
         self.associative_memory.predict(query)
     }
 
+    /// Encode fixed quantized feature levels, then classify using the packed exemplar memory.
+    pub fn classify_features<const LEVELS: usize, const FEATURES: usize>(
+        &self,
+        encoder: &ScalarLevelEncoder<LEVELS, FEATURES, WORDS>,
+        feature_levels: &[usize; FEATURES],
+    ) -> Result<Option<Classification>, ScalarEncoderError> {
+        let query = encoder.encode(feature_levels)?;
+        Ok(self.associative_memory.predict(&query))
+    }
+
     /// Static payload size for the liquid state and fixed exemplar memory.
     /// Includes the per-class usize counters in the target's native usize width.
     pub const fn persistent_payload_bytes() -> Option<usize> {
@@ -127,6 +138,21 @@ mod tests {
         assert_eq!(result.class_index, 1);
         assert_eq!(result.hamming_distance, 0);
         assert_eq!(result.similarity_q15, 32_767);
+    }
+
+    #[test]
+    fn composed_core_encodes_quantized_features_before_classification() {
+        let codebook = [
+            PackedHv::<1>::from_words([0b0001]),
+            PackedHv::<1>::from_words([0b0010]),
+        ];
+        let encoder = ScalarLevelEncoder::<2, 3, 1>::new(codebook, [0, 1, 2]).unwrap();
+        let mut core = BoundedEdgeCore::<4, 2, 2, 1>::new().unwrap();
+        let query = encoder.encode(&[0, 1, 0]).unwrap();
+        core.remember(1, query).unwrap();
+        let prediction = core.classify_features(&encoder, &[0, 1, 0]).unwrap().unwrap();
+        assert_eq!(prediction.class_index, 1);
+        assert_eq!(prediction.hamming_distance, 0);
     }
 
     #[test]
