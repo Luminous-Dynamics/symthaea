@@ -2218,6 +2218,8 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
         }
     }
 
+    validate_accepted_history(&state)?;
+
     for (key, cursor) in &state.source_cursors {
         let accepted = state
             .accepted_receipts
@@ -2248,6 +2250,146 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
         anyhow::bail!("persisted trusted-state digest mismatch");
     }
     Ok(state)
+}
+
+fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
+    if state.accepted_receipts.len() as u64 != state.revision {
+        anyhow::bail!(
+            "accepted receipt count {} does not match state revision {}",
+            state.accepted_receipts.len(),
+            state.revision
+        );
+    }
+
+    let mut ordered: Vec<&AcceptedReceipt> = state.accepted_receipts.values().collect();
+    ordered.sort_by_key(|receipt| receipt.accepted_revision);
+
+    let mut expected_revision = 1_u64;
+    let mut previous_policy: Option<&PolicyVersions> = None;
+    let mut by_source = BTreeMap::<SourceKey, Vec<&AcceptedReceipt>>::new();
+
+    for receipt in &ordered {
+        if receipt.accepted_revision != expected_revision {
+            anyhow::bail!(
+                "accepted receipt revision gap: expected {}, got {}",
+                expected_revision,
+                receipt.accepted_revision
+            );
+        }
+        expected_revision = expected_revision
+            .checked_add(1)
+            .ok_or_else(|| anyhow::anyhow!("accepted receipt revision overflows"))?;
+
+        match previous_policy {
+            None => {
+                if !receipt
+                    .policy_transition_evidence_digest
+                    .as_deref()
+                    .is_some_and(valid_digest)
+                {
+                    anyhow::bail!("initial signer/witness policy lacks transition evidence");
+                }
+            }
+            Some(previous) => {
+                if receipt.policy_versions.signer < previous.signer
+                    || receipt.policy_versions.witness < previous.witness
+                {
+                    anyhow::bail!("accepted receipt history contains a policy rollback");
+                }
+                let versions_same = receipt.policy_versions.signer == previous.signer
+                    && receipt.policy_versions.witness == previous.witness;
+                if versions_same {
+                    if receipt.policy_versions.bundle_digest != previous.bundle_digest
+                        || receipt.policy_transition_evidence_digest.is_some()
+                    {
+                        anyhow::bail!("policy bundle changed without a version transition");
+                    }
+                } else if !receipt
+                    .policy_transition_evidence_digest
+                    .as_deref()
+                    .is_some_and(valid_digest)
+                {
+                    anyhow::bail!("policy version advancement lacks transition evidence");
+                }
+            }
+        }
+        previous_policy = Some(&receipt.policy_versions);
+        by_source
+            .entry(receipt.source.clone())
+            .or_default()
+            .push(*receipt);
+    }
+
+    if expected_revision.checked_sub(1) != Some(state.revision) {
+        anyhow::bail!("accepted receipt revision history does not close at state revision");
+    }
+
+    for (source_key, history) in &mut by_source {
+        history.sort_by_key(|receipt| receipt.generation);
+        let Some(first) = history.first() else {
+            continue;
+        };
+        if first.generation != 1 || first.previous_seal_digest.is_some() {
+            anyhow::bail!("source history for {:?} does not begin at generation one", source_key);
+        }
+        if first.profile_transition_evidence_digest.is_some()
+            || first.boot_transition_evidence_digest.is_some()
+            || first.log_origin_transition_evidence_digest.is_some()
+        {
+            anyhow::bail!("source bootstrap carries an unexpected continuity transition");
+        }
+
+        for pair in history.windows(2) {
+            let previous = pair[0];
+            let current = pair[1];
+            let expected_generation = previous
+                .generation
+                .checked_add(1)
+                .ok_or_else(|| anyhow::anyhow!("source generation overflows in accepted history"))?;
+            if current.generation != expected_generation
+                || current.previous_seal_digest.as_deref() != Some(previous.seal_digest.as_str())
+            {
+                anyhow::bail!("source history has a generation gap or predecessor mismatch");
+            }
+
+            let profile_changed =
+                current.observer_profile_digest != previous.observer_profile_digest;
+            match (
+                profile_changed,
+                current.profile_transition_evidence_digest.as_deref(),
+            ) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => anyhow::bail!("observer profile transition lacks valid evidence"),
+                (false, Some(_)) => anyhow::bail!("unexpected observer profile transition evidence"),
+                (false, None) => {}
+            }
+
+            let boot_changed =
+                current.boot_incarnation_digest != previous.boot_incarnation_digest;
+            match (
+                boot_changed,
+                current.boot_transition_evidence_digest.as_deref(),
+            ) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => anyhow::bail!("boot-incarnation transition lacks valid evidence"),
+                (false, Some(_)) => anyhow::bail!("unexpected boot transition evidence"),
+                (false, None) => {}
+            }
+
+            let log_changed = current.checkpoint.log_id != previous.checkpoint.log_id;
+            match (
+                log_changed,
+                current.log_origin_transition_evidence_digest.as_deref(),
+            ) {
+                (true, Some(digest)) if valid_digest(digest) => {}
+                (true, _) => anyhow::bail!("log-origin transition lacks valid continuity evidence"),
+                (false, Some(_)) => anyhow::bail!("unexpected log-origin transition evidence"),
+                (false, None) => {}
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn write_sqlite_transition<F>(
