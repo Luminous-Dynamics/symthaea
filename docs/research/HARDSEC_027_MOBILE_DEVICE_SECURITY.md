@@ -37,6 +37,12 @@ Apple's September 2025 Memory Integrity Enforcement (MIE) description says the i
 
 For a first project, Android is the practical acquisition target because the user has a Pixel 8 Pro and Android publishes developer-facing MTE and Simpleperf tooling. An Apple MIE device should remain a separate reference lane unless a legitimate research device and measurement method are available. Do not infer Apple's internal MIE status from a model string alone.
 
+### Adjacent mobile attack-surface research
+
+- A 2024 IEEE Transactions on Dependable and Secure Computing study demonstrated cross-app side channels from Android sensor multiplexing, including spectral covert channels and coarse app profiling using standard mobile services. This justifies treating sensor-hub scheduling as a first-class measurement and privacy surface, not merely reading CPU counters. See [Shepherd et al., DOI 10.1109/TDSC.2023.3323732](https://doi.org/10.1109/TDSC.2023.3323732).
+- USENIX Security 2025 research analysed kernel drivers reachable by untrusted apps across 131 Android devices and reported attack surface beyond GPU drivers. This motivates device-family and vendor-driver holdouts, not a single Pixel-only evaluation. See [The Doom of Device Drivers](https://www.usenix.org/conference/usenixsecurity25/presentation/maar-doom).
+- The USENIX WOOT 2026 *SoK: Insecurity of Cellular Basebands* systematizes baseband vulnerability research and emphasizes the complexity and proprietary nature of cellular baseband implementations. This makes the modem a distinct evidence boundary: Android app/kernel telemetry cannot be assumed to observe or attest its internal state. See [Carnot & Francillon, WOOT 2026](https://www.usenix.org/conference/woot26/presentation/carnot).
+
 ## 3. First implementation slice
 
 The PR adds:
