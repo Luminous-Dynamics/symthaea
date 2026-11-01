@@ -79,6 +79,16 @@ impl OnlineFeedbackDisposition {
         matches!(self, Self::ActionOutcomeUnknown { .. })
     }
 
+    fn action_id_digest(self) -> Option<[u8; 32]> {
+        match self {
+            Self::ActionOutcomeUnknown { action_id_digest }
+            | Self::ExactVerifiedCost { action_id_digest, .. }
+            | Self::CoverageBitOnly { action_id_digest, .. }
+            | Self::RightCensored { action_id_digest, .. }
+            | Self::CompetingTerminal { action_id_digest, .. } => Some(action_id_digest),
+        }
+    }
+
     fn validate(self) -> Result<(), OnlineSelectionError> {
         match self {
             Self::ActionOutcomeUnknown { action_id_digest } => {
@@ -255,7 +265,11 @@ impl OnlineSelectionLedger {
             .statements
             .get(&receipt.statement_id)
             .ok_or(OnlineSelectionError::StatementNotFound)?;
-        if receipt.receipt_sequence != self.last_feedback_sequence + 1 {
+        let expected_sequence = self
+            .last_feedback_sequence
+            .checked_add(1)
+            .ok_or(OnlineSelectionError::FeedbackSequenceOverflow)?;
+        if receipt.receipt_sequence != expected_sequence {
             return Err(OnlineSelectionError::InvalidFeedbackSequence);
         }
         if receipt.received_at_tick < self.last_feedback_tick {
@@ -276,6 +290,17 @@ impl OnlineSelectionLedger {
             }
             if receipt.disposition.is_interim() {
                 return Err(OnlineSelectionError::RepeatedUnknownFeedback);
+            }
+            let prior_action = previous
+                .disposition
+                .action_id_digest()
+                .ok_or(OnlineSelectionError::MissingActionIdentity)?;
+            let final_action = receipt
+                .disposition
+                .action_id_digest()
+                .ok_or(OnlineSelectionError::MissingActionIdentity)?;
+            if final_action != prior_action {
+                return Err(OnlineSelectionError::ActionIdentityMismatch);
             }
         }
 
