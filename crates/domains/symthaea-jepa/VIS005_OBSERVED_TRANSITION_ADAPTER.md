@@ -18,9 +18,11 @@ The struct carries:
 - source and target raw-observation digests;
 - source and target embedding digests;
 - canonical action-manifest digest;
+- episode, branch and forecast IDs;
 - distinct source/target observation IDs and monotonic sequence numbers;
 - stable action ID and its discrete JEPA action index;
-- source observation, action start/end and target observation timestamps.
+- source observation, forecast issue, action start/end, requested target and actual target timestamps;
+- maximum permitted target-observation lateness.
 
 train_observed_transition and evaluate_observed_transition reject:
 - unsupported evidence schema versions;
@@ -28,12 +30,15 @@ train_observed_transition and evaluate_observed_transition reject:
 - empty or repeated observation IDs;
 - non-increasing observation sequence;
 - non-finite or temporally misordered timestamps;
+- missing episode/branch/forecast IDs or a target observation later than its declared lateness budget;
 - action indices outside the configured discrete action space;
 - input dimensions different from JepaConfig.input_dim;
 - non-finite embeddings;
 - embedding digest mismatch.
 
 The crate recomputes the source/target embedding SHA-256 over a domain-separated canonical byte encoding: domain tag, little-endian u64 dimension, then each exact f32 IEEE-754 bit pattern in little-endian order. This binds the values supplied to JEPA. It does not prove that the HDC embeddings were honestly derived from the raw observation bytes; the adapter must bind those bytes and digests independently.
+
+The transition clock requires source observation ≤ forecast issuance ≤ action start ≤ requested target ≤ actual target, and action end ≥ action start. The actual target may be late only within the explicitly declared maximum lateness. This preserves a precise requested horizon while allowing bounded sensor timing jitter.
 
 The learning method additionally rejects zero, negative, non-finite or greater-than-one learning rates. The evaluator path does not update model weights.
 
@@ -80,7 +85,7 @@ Until then:
 The crate now tests:
 - accepted future-observation transition training;
 - rejection of malformed digests and evidence schema;
-- rejection of invalid sequence and action/observation time ordering;
+- rejection of invalid sequence, cross-branch identity omissions, forecast/action ordering, target-time ordering and excessive observation lateness;
 - rejection of out-of-range action indices and invalid learning rates;
 - rejection when the exact source/target embedding bytes do not match the supplied embedding digests;
 - common-context action-set prediction and identity preservation;
