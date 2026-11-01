@@ -1,4 +1,4 @@
-use pod_meta_efficiency_lab::{run_matrix, Policy};
+use pod_meta_efficiency_lab::{Policy, run_matrix};
 
 fn main() {
     println!(
@@ -29,9 +29,15 @@ fn main() {
             row.redundant_operation_count,
             row.wasted_operation_cost,
             row.correct_abstention,
-            row.cost_to_first_sufficient_proof.map(|x| x.to_string()).unwrap_or_else(|| "-".into()),
-            row.oracle_min_cost.map(|x| x.to_string()).unwrap_or_else(|| "-".into()),
-            row.cost_regret.map(|x| x.to_string()).unwrap_or_else(|| "-".into()),
+            row.cost_to_first_sufficient_proof
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "-".into()),
+            row.oracle_min_cost
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "-".into()),
+            row.cost_regret
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "-".into()),
         );
     }
 }
