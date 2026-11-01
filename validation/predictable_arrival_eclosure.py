@@ -80,11 +80,14 @@ def activation_state_digest(
     activation_history: Sequence[Sequence[Any]],
     evidence_history: Sequence[Sequence[Any]],
 ) -> str:
-    """Digest the filtration-visible state immediately before one round.
+    """Digest the *recorded* prefix state immediately before one round.
 
     History tuples are (round, hypothesis_id) for activations and
-    (round, hypothesis_id, factor) for evidence increments. The digest is a
-    tamper-evident binding, not a digital signature or trusted timestamp.
+    (round, hypothesis_id, factor) for evidence increments. Every external
+    covariate or other input consulted by the arrival policy must also be
+    committed in the event log by the caller; this digest cannot discover
+    omitted filtration information. It is a tamper-evident binding, not a
+    digital signature or trusted timestamp.
     """
     rows, catalogue_sha256 = _catalogue(hypotheses)
     known = {row["id"] for row in rows}
@@ -137,7 +140,7 @@ def _replay_arrival_ledger(
             raise TypeError("ledger events must be mappings")
         seq = event.get("seq")
         round_index = event.get("round")
-        if isinstance(seq, bool) or seq != expected_seq:
+        if isinstance(seq, bool) or not isinstance(seq, int) or seq != expected_seq:
             raise ValueError("ledger sequence numbers must be contiguous and ordered")
         if isinstance(round_index, bool) or not isinstance(round_index, int):
             raise ValueError("event round must be an integer")
@@ -384,7 +387,24 @@ def verify_predictable_arrival_capacity_result(
             "optimality_verified": False,
         }
 
+    if result.get("schema") != "symthaea-predictable-arrival-capacity-v1":
+        failures.append(("result_schema_mismatch",))
+    if result.get("share_policy") != share_policy:
+        failures.append(("share_policy_receipt_mismatch",))
+    if result.get("alpha") != fraction_pair(as_fraction(alpha)):
+        failures.append(("alpha_receipt_mismatch",))
+
     audit = result.get("arrival_audit", {})
+    if audit.get("schema") != "symthaea-predictable-arrival-audit-v1" or audit.get("valid") is not True:
+        failures.append(("arrival_audit_schema_or_validity_mismatch",))
+    if audit.get("round_count") != len(cumulative_capacity):
+        failures.append(("arrival_round_count_mismatch",))
+    if audit.get("catalogue_ids") != [row["id"] for row in replay["catalogue"]]:
+        failures.append(("catalogue_id_receipt_mismatch",))
+    if audit.get("activation_commitments_checked") != replay["activation_checks"]:
+        failures.append(("activation_count_receipt_mismatch",))
+    if audit.get("evidence_increments_checked") != replay["evidence_checks"]:
+        failures.append(("evidence_count_receipt_mismatch",))
     if audit.get("catalogue_sha256") != replay["catalogue_sha256"]:
         failures.append(("catalogue_digest_mismatch",))
     if audit.get("ledger_sha256") != replay["ledger_sha256"]:
@@ -398,6 +418,8 @@ def verify_predictable_arrival_capacity_result(
     selection = result.get("selection", {})
     if selection.get("schema") != "symthaea-self-financing-projective-eclosure-v1":
         failures.append(("selection_schema_mismatch",))
+    if selection.get("share_policy") != share_policy:
+        failures.append(("selection_share_policy_mismatch",))
     base_check = verify_self_financing_sequence(
         selection.get("decisions", []),
         replay["increment_paths"],
