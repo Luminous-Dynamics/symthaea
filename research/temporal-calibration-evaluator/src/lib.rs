@@ -29,6 +29,11 @@ pub struct CalibrationSample {
     pub feedback_sequence: u64,
     pub episode_id: u64,
     pub model_sha256: [u8; 32],
+    /// Commitment to the evaluator-validated treatment/control pair and
+    /// matched episode context.
+    pub paired_intervention_sha256: [u8; 32],
+    /// Digest of the finalized receipt whose outcome became eligible for use.
+    pub finalized_receipt_sha256: [u8; 32],
     pub forecast_issued_at_us: u64,
     /// Time at which the outcome became eligible for release.
     pub feedback_available_at_us: u64,
@@ -91,6 +96,7 @@ pub enum CalibrationError {
     EmptyFitPartition,
     EmptyHoldoutPartition,
     ModelDigestMismatch { sequence: u64 },
+    MissingEvidenceCommitment { sequence: u64 },
     InvalidFeedbackTimestamp { sequence: u64 },
     NonIncreasingSequence { partition: &'static str, sequence: u64 },
     NonIncreasingForecastTime { partition: &'static str, sequence: u64 },
@@ -108,6 +114,7 @@ impl fmt::Display for CalibrationError {
             Self::EmptyFitPartition => write!(f, "calibration fit partition is empty"),
             Self::EmptyHoldoutPartition => write!(f, "calibration holdout partition is empty"),
             Self::ModelDigestMismatch { sequence } => write!(f, "model digest mismatch at feedback sequence {sequence}"),
+            Self::MissingEvidenceCommitment { sequence } => write!(f, "paired intervention or finalized receipt commitment is missing at feedback sequence {sequence}"),
             Self::InvalidFeedbackTimestamp { sequence } => write!(f, "feedback at sequence {sequence} was available before its forecast was issued"),
             Self::NonIncreasingSequence { partition, sequence } => write!(f, "{partition} feedback sequence is not strictly increasing at {sequence}"),
             Self::NonIncreasingForecastTime { partition, sequence } => write!(f, "{partition} forecast issue time is not strictly increasing at sequence {sequence}"),
@@ -200,6 +207,13 @@ fn validate_partition(
     for (index, sample) in samples.iter().enumerate() {
         if sample.model_sha256 != expected_model_sha256 {
             return Err(CalibrationError::ModelDigestMismatch {
+                sequence: sample.feedback_sequence,
+            });
+        }
+        if sample.paired_intervention_sha256 == [0; 32]
+            || sample.finalized_receipt_sha256 == [0; 32]
+        {
+            return Err(CalibrationError::MissingEvidenceCommitment {
                 sequence: sample.feedback_sequence,
             });
         }
@@ -319,6 +333,8 @@ mod tests {
             feedback_sequence: sequence,
             episode_id,
             model_sha256: [7; 32],
+            paired_intervention_sha256: [sequence as u8; 32],
+            finalized_receipt_sha256: [episode_id as u8; 32],
             forecast_issued_at_us: issued,
             feedback_available_at_us: available,
             predicted_reduction: predicted,
@@ -377,6 +393,16 @@ mod tests {
             audit_temporal_value_calibration([7; 32], &fit, &holdout),
             Err(CalibrationError::ModelDigestMismatch { sequence: 3 })
         ));
+    }
+
+    #[test]
+    fn missing_pair_or_receipt_commitment_is_rejected() {
+        let (mut fit, holdout) = partitions();
+        fit[0].paired_intervention_sha256 = [0; 32];
+        assert_eq!(
+            audit_temporal_value_calibration([7; 32], &fit, &holdout),
+            Err(CalibrationError::MissingEvidenceCommitment { sequence: 1 })
+        );
     }
 
     #[test]
