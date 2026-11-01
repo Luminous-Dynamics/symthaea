@@ -383,6 +383,10 @@ mod tests {
         let reg = registry(&[(10, 0), (20, 0)]);
         let runs = four_runs(&reg, [[100, 100, 100], [90, 90, 90], [80, 80, 80], [70, 70, 70]]);
         let report = analyze_joint_interactions(&reg, &runs).unwrap();
+        let main_effect = &report.action_marginals[0];
+        assert_eq!(main_effect.eligible_contexts, 2);
+        assert_eq!(main_effect.exposure_reduction.wrong_belief_reduction.sum, 20);
+        assert_eq!(main_effect.exposure_reduction.wrong_belief_reduction.samples, 2);
         let pair = &report.pairwise_interactions[0];
         assert_eq!(pair.eligible_contexts, 1);
         assert_eq!(pair.interaction.wrong_belief_reduction.sum, 0);
