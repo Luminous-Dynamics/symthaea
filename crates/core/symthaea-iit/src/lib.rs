@@ -2989,6 +2989,96 @@ impl AnalysisRequest {
     }
 }
 
+/// Primitive IIT 4.0 (2023) repertoire calculation whose output ordering
+/// must be bound into a differential-test request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrimitiveRepertoireOperation {
+    CauseRepertoire,
+    EffectRepertoire,
+    ForwardCauseLikelihood,
+}
+
+impl PrimitiveRepertoireOperation {
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::CauseRepertoire => "iit4_cause_repertoire",
+            Self::EffectRepertoire => "iit4_effect_repertoire",
+            Self::ForwardCauseLikelihood => "iit4_forward_cause_likelihood",
+        }
+    }
+}
+
+/// SHA-256 identity for one ordered IIT 4.0 (2023) primitive repertoire request.
+///
+/// Candidate systems are canonicalized as sets. Mechanism and purview order
+/// are preserved because the repertoire vector's bit ordering is defined by
+/// the requested purview order. This digest is separate from the system-level
+/// analysis request digest and is intended for cross-language primitive
+/// differential fixtures.
+pub fn primitive_repertoire_request_sha256(
+    model: &BinaryCausalModel,
+    state: &[bool],
+    candidate_system: &[usize],
+    mechanism: &[usize],
+    purview: &[usize],
+    formalism: FormalismProfile,
+    operation: PrimitiveRepertoireOperation,
+) -> Result<String, RepertoireError> {
+    model.check_state(state)?;
+    if candidate_system.is_empty() {
+        return Err(ModelError::EmptyCandidateSystem.into());
+    }
+    model.validate_subset(candidate_system, "candidate_system")?;
+    model.validate_subset(mechanism, "mechanism")?;
+    model.validate_subset(purview, "purview")?;
+
+    if formalism != FormalismProfile::Iit4_0_2023 {
+        return Err(ModelError::IncompatibleQuantity {
+            quantity: operation.id(),
+            formalism: formalism.id(),
+        }
+        .into());
+    }
+    for unit in mechanism {
+        if !candidate_system.contains(unit) {
+            return Err(RepertoireError::SubsetOutsideSystem {
+                subset: "mechanism",
+                unit: *unit,
+            });
+        }
+    }
+    for unit in purview {
+        if !candidate_system.contains(unit) {
+            return Err(RepertoireError::SubsetOutsideSystem {
+                subset: "purview",
+                unit: *unit,
+            });
+        }
+    }
+
+    let mut candidate = candidate_system.to_vec();
+    candidate.sort_unstable();
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"SYMTHAEA-IIT-PRIMITIVE-REQUEST\\0v0.1\\0");
+    bytes.extend_from_slice(&model.canonical_bytes());
+    bytes.extend(state.iter().map(|on| u8::from(*on)));
+    bytes.extend_from_slice(&(candidate.len() as u32).to_le_bytes());
+    for unit in candidate {
+        bytes.extend_from_slice(&(unit as u32).to_le_bytes());
+    }
+    bytes.push(0);
+    bytes.extend_from_slice(formalism.id().as_bytes());
+    bytes.push(0);
+    bytes.extend_from_slice(operation.id().as_bytes());
+    for indices in [mechanism, purview] {
+        bytes.extend_from_slice(&(indices.len() as u32).to_le_bytes());
+        for unit in indices {
+            bytes.extend_from_slice(&(*unit as u32).to_le_bytes());
+        }
+    }
+    Ok(hex_digest(&bytes))
+}
+
 /// PyPhi numerics.eq: symmetric relative tolerance with an absolute floor.
 fn pyphi_eq(left: f64, right: f64, epsilon: f64) -> bool {
     if !left.is_finite() || !right.is_finite() {
@@ -3958,6 +4048,37 @@ mod tests {
             ),
             Err(ModelError::DuplicateCandidateUnit { unit: 0 })
         ));
+    }
+
+    #[test]
+    fn primitive_repertoire_request_digest_matches_python_golden_vector() {
+        let model = two_unit_model();
+        let digest = primitive_repertoire_request_sha256(
+            &model,
+            &[true, false],
+            &[0, 1],
+            &[1],
+            &[1, 0],
+            FormalismProfile::Iit4_0_2023,
+            PrimitiveRepertoireOperation::CauseRepertoire,
+        )
+        .unwrap();
+        assert_eq!(
+            digest,
+            "fa7932cb3687359cbdfb692dd2a4136a1665c13ddf414bc4a391fc11dd6b3bdf"
+        );
+
+        let reversed_purview = primitive_repertoire_request_sha256(
+            &model,
+            &[true, false],
+            &[1, 0],
+            &[1],
+            &[0, 1],
+            FormalismProfile::Iit4_0_2023,
+            PrimitiveRepertoireOperation::CauseRepertoire,
+        )
+        .unwrap();
+        assert_ne!(digest, reversed_purview);
     }
 
     #[test]
