@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-open-world-eig-output-v1.schema.json",
+  "title": "Open-world connectome EIG report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "unresolved_hypothesis_id",
+    "ranked_experiments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-open-world-eig-v1"
+    },
+    "unresolved_hypothesis_id": {
+      "const": "OTHER_OR_UNRESOLVED"
+    },
+    "ranked_experiments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ranked_experiment"
+      }
+    }
+  },
+  "$defs": {
+    "ranked_experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "score"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "$ref": "#/$defs/score"
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "cost",
+        "unresolved_prior_mass",
+        "worst_case_scenario_id",
+        "best_case_scenario_id",
+        "worst_case_information_gain_bits",
+        "best_case_information_gain_bits",
+        "worst_case_information_gain_bits_per_cost",
+        "best_case_information_gain_bits_per_cost",
+        "scenario_scores"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unresolved_prior_mass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "worst_case_scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "best_case_scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worst_case_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "best_case_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "worst_case_information_gain_bits_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "best_case_information_gain_bits_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scenario_scores": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scenario_score"
+          }
+        }
+      }
+    },
+    "scenario_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "information_gain_bits",
+        "information_gain_bits_per_cost"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "information_gain_bits_per_cost": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
