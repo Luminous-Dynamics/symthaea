@@ -12,6 +12,7 @@ mod basalt_linux_probe;
 mod basalt_linux_smoke;
 mod basalt_process_lineage;
 mod basalt_event_delivery;
+mod basalt_trusted_state;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -140,6 +141,8 @@ enum Commands {
         #[arg(long)]
         seal: PathBuf,
     },
+    /// Run the pure BASALT trusted-state reference-model conformance checks.
+    BasaltTrustedStateModelCheck,
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -292,6 +295,13 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.integrity_passed {
                 anyhow::bail!("BASALT source-epoch seal integrity verification failed");
+            }
+        }
+        Commands::BasaltTrustedStateModelCheck => {
+            let report = basalt_trusted_state::run_conformance();
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.passed {
+                anyhow::bail!("BASALT trusted-state reference-model conformance failed");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
