@@ -1,0 +1,294 @@
+{
+  "schema": "symthaea.nixos_evaluator_isolation",
+  "version": "0.1.0",
+  "issue": 9621,
+  "parent_security_issue": 9437,
+  "branch": "research/evaluator-isolation-nixos-20261101",
+  "status": "research_prototype_authored_not_deployed",
+  "nixos_module": {
+    "path": "research/evaluator-isolation/nixos-module.nix",
+    "default_enabled": false,
+    "state_directory": "/var/lib/symthaea-temporal-eval",
+    "run_mode": "serial_only_fixed_paths",
+    "services": [
+      "symthaea-temporal-taskgen",
+      "symthaea-temporal-candidate",
+      "symthaea-temporal-evaluator"
+    ],
+    "order": [
+      "taskgen",
+      "candidate",
+      "evaluator"
+    ],
+    "systemd_version_minimum_for_LoadCredentialEncrypted": 254,
+    "users": {
+      "generator": {
+        "user": "symthaea-temporal-generator",
+        "groups": [
+          "symthaea-temporal-generator",
+          "symthaea-temporal-public",
+          "symthaea-temporal-oracle"
+        ]
+      },
+      "candidate": {
+        "user": "symthaea-temporal-candidate",
+        "groups": [
+          "symthaea-temporal-candidate",
+          "symthaea-temporal-public",
+          "symthaea-temporal-exchange"
+        ]
+      },
+      "evaluator": {
+        "user": "symthaea-temporal-evaluator",
+        "groups": [
+          "symthaea-temporal-evaluator",
+          "symthaea-temporal-public",
+          "symthaea-temporal-oracle",
+          "symthaea-temporal-exchange"
+        ]
+      }
+    },
+    "directories": [
+      {
+        "path": "public",
+        "owner": "generator",
+        "group": "public",
+        "mode": "2750",
+        "generator": "read_write",
+        "candidate": "read_only",
+        "evaluator": "read_only"
+      },
+      {
+        "path": "oracle",
+        "owner": "generator",
+        "group": "oracle",
+        "mode": "2750",
+        "generator": "read_write",
+        "candidate": "inaccessible",
+        "evaluator": "read_only"
+      },
+      {
+        "path": "exchange",
+        "owner": "candidate",
+        "group": "exchange",
+        "mode": "2710",
+        "generator": "inaccessible",
+        "candidate": "read_write",
+        "evaluator": "traverse_and_read_known_filename"
+      },
+      {
+        "path": "candidate-work",
+        "owner": "candidate",
+        "group": "candidate",
+        "mode": "0700",
+        "generator": "inaccessible",
+        "candidate": "read_write",
+        "evaluator": "inaccessible"
+      },
+      {
+        "path": "evaluator-private",
+        "owner": "evaluator",
+        "group": "evaluator",
+        "mode": "0700",
+        "generator": "inaccessible",
+        "candidate": "inaccessible",
+        "evaluator": "read_write"
+      },
+      {
+        "path": "evaluator-private/replay-ledger",
+        "owner": "evaluator",
+        "group": "evaluator",
+        "mode": "0700",
+        "generator": "inaccessible",
+        "candidate": "inaccessible",
+        "evaluator": "read_write"
+      },
+      {
+        "path": "receipts",
+        "owner": "evaluator",
+        "group": "evaluator",
+        "mode": "0700",
+        "generator": "inaccessible",
+        "candidate": "inaccessible",
+        "evaluator": "read_write"
+      }
+    ],
+    "isolation_directives": [
+      "ProtectSystem=strict",
+      "ProtectHome=true",
+      "PrivateTmp=true",
+      "PrivateDevices=true",
+      "PrivateNetwork=true",
+      "PrivateIPC=true",
+      "ProtectHostname=true",
+      "RestrictAddressFamilies=AF_UNIX",
+      "NoNewPrivileges=true",
+      "CapabilityBoundingSet=",
+      "AmbientCapabilities=",
+      "RestrictSUIDSGID=true",
+      "LockPersonality=true",
+      "MemoryDenyWriteExecute=true",
+      "RestrictNamespaces=true",
+      "ProtectKernelTunables=true",
+      "ProtectKernelModules=true",
+      "ProtectKernelLogs=true",
+      "ProtectControlGroups=true",
+      "ProtectClock=true",
+      "ProtectProc=invisible",
+      "ProcSubset=pid",
+      "SystemCallArchitectures=native",
+      "SystemCallFilter=@system-service,openat2,flock,fsync,fdatasync",
+      "ProtectKernelLogs=true",
+      "StandardOutput=null_for_taskgen_and_candidate",
+      "explicit_syscall_allowlist_openat2_flock_fsync_fdatasync"
+    ],
+    "optional_host_sockets_hidden": [
+      "/run/dbus/system_bus_socket",
+      "/run/systemd/private",
+      "/run/systemd/journal/socket",
+      "/run/systemd/journal/stdout",
+      "/nix/var/nix/daemon-socket/socket",
+      "/run/docker.sock",
+      "/run/containerd/containerd.sock",
+      "/run/udev/control",
+      "/run/NetworkManager/private",
+      "/run/avahi-daemon/socket",
+      "/run/podman/podman.sock"
+    ],
+    "credentials": {
+      "generator": "taskgen-seed",
+      "evaluator": "receipt-signing-key",
+      "candidate_receives_none": true,
+      "mechanism": "LoadCredentialEncrypted",
+      "source_paths_are_nix_store": false
+    },
+    "limitations": [
+      "serial_only",
+      "no_run_scoped_subdirectories",
+      "no_working_generator_candidate_evaluator_binaries_wired",
+      "no_host_adversarial_tests"
+    ],
+    "state_root_mode": "0711"
+  },
+  "artifact_intake": {
+    "path": "research/evaluator-isolation/src/lib.rs",
+    "syscall": "openat2",
+    "resolve_flags": [
+      "RESOLVE_BENEATH",
+      "RESOLVE_NO_SYMLINKS",
+      "RESOLVE_NO_MAGICLINKS"
+    ],
+    "open_flags": [
+      "O_NOFOLLOW",
+      "O_NONBLOCK",
+      "O_CLOEXEC"
+    ],
+    "private_copy_flags": [
+      "O_CREAT",
+      "O_EXCL",
+      "O_CLOEXEC",
+      "O_NOFOLLOW"
+    ],
+    "private_copy_mode": "0600",
+    "checks": [
+      "single_path_component",
+      "regular_file",
+      "single_hard_link",
+      "maximum_size",
+      "copy_length",
+      "source_metadata_pre_post",
+      "sha256_of_exact_copied_bytes"
+    ],
+    "fallback_on_ENOSYS": false,
+    "tests_authored": 5,
+    "tests_executed": false
+  },
+  "receipts": {
+    "path": "research/evaluator-isolation/src/receipt.rs",
+    "crate": "ed25519-dalek",
+    "version": "3.0.0",
+    "encoding": "canonical_domain_separated_little_endian_v1",
+    "verification": "VerifyingKey::verify_strict",
+    "key_id": "first_16_bytes_sha256_of_allowlisted_public_key",
+    "signing_key_load": "systemd_credential_openat2_no_symlink_single_link_32_bytes_private_mode",
+    "secret_seed_zeroization": true,
+    "bound_fields": [
+      "run_id",
+      "nonce",
+      "monotonic_counter",
+      "issued_at_unix_ns",
+      "task_sha256",
+      "oracle_commitment_sha256",
+      "candidate_prediction_sha256",
+      "model_sha256",
+      "config_sha256",
+      "evaluator_profile_sha256",
+      "TED_wrong_belief_abstention_missing",
+      "bytes_used",
+      "retained_byte_us",
+      "compute_used",
+      "refreshes_used",
+      "observations_used",
+      "read_bytes",
+      "write_bytes",
+      "measured_energy_nj",
+      "disposition",
+      "failure_code"
+    ],
+    "replay_ledger": {
+      "path": "evaluator-private/replay-ledger",
+      "directory_mode": "0700",
+      "protection": [
+        "evaluator_uid_owner",
+        "no_group_other_permissions",
+        "flock_per_key_counter",
+        "O_EXCL_nonce_marker",
+        "O_EXCL_run_marker",
+        "O_EXCL_counter_marker",
+        "fsync_markers",
+        "fsync_counter_and_directory"
+      ],
+      "backup_rollback_protection": "not yet; requires protected monotonic storage or independent reconciliation",
+      "distributed": false,
+      "directory_owner": "evaluator_uid",
+      "directory_permissions_enforced": true,
+      "counter_file_owner": "evaluator_uid",
+      "counter_file_mode": "0600"
+    },
+    "tests_authored": 14,
+    "tests_executed": false,
+    "not_wired_to_evaluator_binary": true,
+    "validation_rules": [
+      "exposure_sum_not_greater_than_episode",
+      "resource_overrun_requires_out_of_budget_disposition",
+      "completed_energy_budget_requires_measured_energy",
+      "completed_failure_code_zero",
+      "non_completed_failure_code_nonzero"
+    ],
+    "measured_energy_absent_on_failed_run": "permitted_and_recorded_as_missing_not_zero"
+  },
+  "validation": {
+    "local_kernel": "Linux 6.18.57 x86_64",
+    "openat2_syscall_test": "passed_on_temporary_directory",
+    "local_systemd_analyze_version": "257.9",
+    "synthetic_equivalent_unit_verify": "passed",
+    "actual_nixos_unit_generation_verify": false,
+    "systemd_analyze_security": "not_run_no_systemd_pid1_bus",
+    "nix_evaluation": false,
+    "cargo_build": false,
+    "rustfmt": false,
+    "clippy": false,
+    "rust_tests": false,
+    "target_host_deployment": false,
+    "uid_isolation_attacks": false,
+    "procfs_attacks": false,
+    "unix_socket_attacks": false,
+    "symlink_hardlink_toctou_attacks": false,
+    "signed_receipt_replay_campaign": false,
+    "systemd_analyze_verify_synthetic_equivalent_units": "passed_systemd_257_9",
+    "nix_module_evaluation": false,
+    "source_authored_tests": 19,
+    "openat2_syscall_local": "passed_linux_6_18_57"
+  },
+  "claim_ceiling": "Source prototype plus synthetic systemd unit syntax and local openat2 availability checks only. No verified sandbox, security claim, working end-to-end evaluator, signing pipeline or replay-qualified production system."
+}
