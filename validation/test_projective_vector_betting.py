@@ -8,6 +8,7 @@ from projective_vector_betting import (
     coordinate_local_bets,
     equicorrelation_covariance,
     equicorrelation_envelope,
+    projective_equicorrelation_envelope,
     fixed_log_mixture,
     gaussian_log_factor_expectation,
     matrix_dominates,
@@ -115,6 +116,21 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
         state.observe([1.0, 1.0])
         with self.assertRaises(ValueError):
             state.bets([True, False])
+
+    def test_projective_covariance_envelope_is_dimension_consistent(self):
+        for d in range(2, 21):
+            envelope = projective_equicorrelation_envelope(d, 0.2, 0.8)
+            for rho_step in range(21):
+                rho = 0.2 + 0.03 * rho_step
+                self.assertTrue(
+                    matrix_dominates(envelope, equicorrelation_covariance(d, rho))
+                )
+            if d > 2:
+                smaller = projective_equicorrelation_envelope(d - 1, 0.2, 0.8)
+                self.assertEqual(
+                    [row[: d - 1] for row in envelope[: d - 1]],
+                    smaller,
+                )
 
     def test_preconditioned_bet_ignores_dormant_extension(self):
         envelope3 = equicorrelation_envelope(3, 0.2, 0.8, 0.5)
