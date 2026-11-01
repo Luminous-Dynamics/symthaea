@@ -1004,9 +1004,8 @@ fn verify_return_motif_obligation(
                 .into(),
         ));
     }
-    if target[0].onset.beats
-        <= source.last().expect("source has at least two notes").onset.beats
-    {
+    let source_last = source[source.len() - 1];
+    if target[0].onset.beats < source_last.onset.beats + source_last.duration_beats {
         return Err(ObligationSemanticError::Contradiction(
             "obligation-motif-return-not-later",
             "target motif occurrence does not follow its source occurrence".into(),
@@ -1030,7 +1029,9 @@ fn verify_return_motif_obligation(
             .iter()
             .zip(&target)
             .all(|(left, right)| left.midi == right.midi);
-    let transposed_match = source.len() == target.len() && interval_match;
+    let transposed_match = source.len() == target.len()
+        && interval_match
+        && target[0].midi != source[0].midi;
     let rhythm_ok = rhythm_similarity.is_some_and(|similarity| similarity >= 0.90);
 
     let matched = match expected {
@@ -1049,11 +1050,15 @@ fn verify_return_motif_obligation(
             if target.len() >= source.len() {
                 false
             } else {
-                let fragment = target_intervals.len();
-                source_intervals
-                    .windows(fragment)
-                    .any(|window| window == target_intervals.as_slice())
-                    && (0.45..=1.0).contains(&duration_scale)
+                (0..=source.len() - target.len()).any(|start| {
+                    let source_fragment = &source[start..start + target.len()];
+                    note_intervals(source_fragment) == target_intervals
+                        && normalized_duration_similarity(
+                            &durations(source_fragment),
+                            &durations(&target),
+                        )
+                        .is_some_and(|similarity| similarity >= 0.90)
+                }) && (0.25..1.0).contains(&duration_scale)
             }
         }
         ObligationMotifTransformationV1::Restored => {
