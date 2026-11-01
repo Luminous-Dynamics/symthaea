@@ -21,7 +21,7 @@ Every connection sets and verifies:
 - `foreign_keys=ON`;
 - a 5-second busy timeout;
 - bounded state cardinalities: 128 log cursors, 4,096 source cursors and 100,000 accepted receipts;
-- on Unix, reject an existing symlink/non-regular file and set the database file mode to 0600. The containing directory must still be trusted against concurrent path replacement.
+- open with rusqlite's SQLITE_OPEN_NOFOLLOW (without URI parsing), reject an existing symlink/non-regular file, and set the database file mode to 0600 on Unix. The containing directory must still be trusted against concurrent path replacement.
 
 The backend starts each state mutation with `BEGIN IMMEDIATE`. It reads the complete current trusted state after obtaining the SQLite writer transaction, checks both the revision and exact expected state snapshot, then writes the source cursor, log cursor, accepted receipt and policy/revision record before committing.
 
