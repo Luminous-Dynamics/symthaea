@@ -299,7 +299,6 @@ fn audit_corpus_and_oracle(
         return Err("corpus or oracle canonical digest does not match contents".to_owned());
     }
     let mut document_map = BTreeMap::new();
-    let mut document_families = BTreeSet::new();
     for document in &corpus.documents {
         if document.document_id.trim().is_empty()
             || document.source_family_id.trim().is_empty()
@@ -319,7 +318,6 @@ fn audit_corpus_and_oracle(
         {
             return Err(format!("document {} content hash or byte length mismatch", document.document_id));
         }
-        document_families.insert(document.source_family_id.as_str());
     }
     if oracle.task_id != corpus.task.task_id {
         return Err("oracle task ID differs from candidate corpus task".to_owned());
