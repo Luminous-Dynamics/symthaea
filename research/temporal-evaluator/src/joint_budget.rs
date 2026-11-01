@@ -17,6 +17,8 @@ pub const MAX_EXACT_JOINT_ACTIONS: usize = 16;
 pub struct JointActionDefinition {
     pub action_id: u64,
     pub conflict_group: u64,
+    /// Digest of canonical evaluator-owned operation kind and parameters.
+    pub action_semantics_sha256: [u8; 32],
 }
 
 /// Canonical evaluator-side digest of the action ID and compatibility registry.
@@ -45,8 +47,14 @@ pub fn action_registry_sha256(
         .map_err(|_| JointBudgetError::ArithmeticOverflow)?
         .to_le_bytes());
     for item in sorted {
+        if item.action_semantics_sha256 == [0; 32] {
+            return Err(JointBudgetError::InvalidActionSemanticsDigest {
+                action_id: item.action_id,
+            });
+        }
         hasher.update(item.action_id.to_le_bytes());
         hasher.update(item.conflict_group.to_le_bytes());
+        hasher.update(item.action_semantics_sha256);
     }
     Ok(hasher.finalize().into())
 }
@@ -173,6 +181,7 @@ pub struct JointBudgetQualification {
 pub enum JointBudgetError {
     TooManyActions { requested: usize, maximum: usize },
     ZeroActionId,
+    InvalidActionSemanticsDigest { action_id: u64 },
     DuplicateActionId { action_id: u64 },
     UnsortedOrDuplicateSelection,
     UnknownActionId { action_id: u64 },
@@ -194,6 +203,7 @@ impl fmt::Display for JointBudgetError {
         match self {
             Self::TooManyActions { requested, maximum } => write!(f, "exact joint oracle supports at most {maximum} actions, received {requested}"),
             Self::ZeroActionId => write!(f, "joint action ID must be nonzero"),
+            Self::InvalidActionSemanticsDigest { action_id } => write!(f, "joint action {action_id} has a zero semantic contract digest"),
             Self::DuplicateActionId { action_id } => write!(f, "duplicate joint action ID {action_id}"),
             Self::UnsortedOrDuplicateSelection => write!(f, "joint action IDs must be strictly ascending and unique"),
             Self::UnknownActionId { action_id } => write!(f, "unknown joint action ID {action_id}"),
@@ -457,9 +467,14 @@ mod tests {
     use super::*;
 
     fn registry(items: &[(u64, u64)]) -> Vec<JointActionDefinition> {
-        items.iter().map(|(action_id, conflict_group)| JointActionDefinition {
-            action_id: *action_id,
-            conflict_group: *conflict_group,
+        items.iter().map(|(action_id, conflict_group)| {
+            let mut action_semantics_sha256 = [0_u8; 32];
+            action_semantics_sha256[..8].copy_from_slice(&action_id.to_le_bytes());
+            JointActionDefinition {
+                action_id: *action_id,
+                conflict_group: *conflict_group,
+                action_semantics_sha256,
+            }
         }).collect()
     }
 
@@ -679,8 +694,12 @@ mod tests {
         let base = action_registry_sha256(&registry(&[(10, 0), (20, 0)])).unwrap();
         let reordered = action_registry_sha256(&registry(&[(20, 0), (10, 0)])).unwrap();
         let constrained = action_registry_sha256(&registry(&[(10, 9), (20, 9)])).unwrap();
+        let mut changed_semantics = registry(&[(10, 0), (20, 0)]);
+        changed_semantics[0].action_semantics_sha256 = [99; 32];
+        let changed_contract = action_registry_sha256(&changed_semantics).unwrap();
         assert_eq!(base, reordered);
         assert_ne!(base, constrained);
+        assert_ne!(base, changed_contract);
     }
 
     #[test]
