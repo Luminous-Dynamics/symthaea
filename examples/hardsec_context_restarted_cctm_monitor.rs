@@ -1553,8 +1553,13 @@ mod tests {
             decisions[1]["abstention_reason"],
             "context_assignment_not_accepted"
         );
-        assert_eq!(decisions[1]["single_start_log_wealth_context"], 0.0);
-        assert_eq!(decisions[1]["restart_log_e_value_context"], 0.0);
+        // The selected context is unknown and therefore has no reference
+        // process or wealth state; absence is represented as JSON null.
+        assert_eq!(
+            decisions[1]["single_start_log_wealth_context"],
+            Value::Null
+        );
+        assert_eq!(decisions[1]["restart_log_e_value_context"], Value::Null);
         assert_eq!(decisions[2]["abstention_reason"], Value::Null);
     }
 
