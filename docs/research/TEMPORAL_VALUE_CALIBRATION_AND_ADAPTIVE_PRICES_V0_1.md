@@ -54,7 +54,7 @@ Then compute raw and corrected holdout errors on later episodes:
 
 `corrected_prediction_j = predicted_reduction_j + bias_j`
 
-The audit reports per-axis fit sample count, holdout sample count, fitted bias, raw/corrected holdout bias and raw/corrected holdout MAE.
+Each record also binds a nonzero paired-intervention commitment and finalized-receipt digest. The audit reports per-axis fit sample count, holdout sample count, fitted bias, raw/corrected holdout bias and raw/corrected holdout MAE.
 
 ### Causality / time boundary
 
@@ -87,7 +87,7 @@ The larger architecture now has a natural separation:
 
 The new idea is **temporal economics**: every information-processing action has an expected future benefit, an explicit physical cost, a validity horizon, and an evidence status. The system learns the exchange rates empirically, but keeps physical resource limits non-fungible.
 
-A subsequent version should test contextual per-dimension target utilization, multiple time constants, drift detectors for price oscillation, and a receding-horizon proposal generator. It should not turn all resources into one arbitrary currency.
+A subsequent version should test multiple time constants, drift detectors for price oscillation, and a receding-horizon proposal generator. It should not turn all resources into one arbitrary currency.
 
 ## 5. Competitive qualification matrix
 
@@ -171,9 +171,9 @@ Use randomized evaluator-side paired interventions to estimate causal action val
 
 ## 9. Execution / evidence status
 
-- Candidate adaptive pricing: source authored; ten tests authored.
-- Evaluator calibration audit: source authored; eight tests authored.
-- **18 Rust test functions authored; none compiled or executed.**
+- Candidate adaptive pricing: source authored; eleven tests authored.
+- Evaluator calibration audit: source authored; nine tests authored.
+- **20 Rust test functions authored; none compiled or executed.**
 - No cargo, rustc, rustfmt or Nix executable was found in the current authoring container.
 - No benchmark, price stability, calibration gain, energy result or SOTA improvement is claimed.
 - The candidate and evaluator packages are separate, but this is not an OS security boundary. Receipt authentication and evaluator isolation remain prerequisites.
