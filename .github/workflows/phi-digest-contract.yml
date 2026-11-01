@@ -286,12 +286,15 @@ jobs:
           assert all(len(set(p["mip_tie_cut_sha256s"])) == p["mip_tie_count"] for p in points)
           assert all(p["mip_default_resolved_tie_count"] == 1 for p in points)
           assert all(p["mip_default_resolved_cut_sha256s"] == [p["mip_cut_sha256"]] for p in points)
+          assert all(len(p["mip_tie_lex_key_hexes"]) == p["mip_tie_count"] for p in points)
+          assert all(p["mip_default_resolved_lex_key_hex"] == min(p["mip_tie_lex_key_hexes"]) for p in points)
           partition_counts = [len(p["partition_scores"]) for p in points]
           assert len(set(partition_counts)) == 1 and partition_counts[0] == data["summary"]["partition_count_per_point"]
           assert data["summary"]["partition_score_row_count"] == sum(partition_counts)
           for point in points:
               cut_hashes = [score["cut_sha256"] for score in point["partition_scores"]]
               assert len(cut_hashes) == len(set(cut_hashes))
+              assert all(len(score["lex_key_hex"]) > 0 for score in point["partition_scores"])
               assert point["mip_cut_sha256"] in cut_hashes
               assert set(point["mip_tie_cut_sha256s"]).issubset(set(cut_hashes))
               assert all(math.isfinite(score["signed_phi"]) and math.isfinite(score["normalized_phi"]) for score in point["partition_scores"])
