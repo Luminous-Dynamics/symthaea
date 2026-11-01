@@ -21,7 +21,7 @@ pub struct JointActionDefinition {
     pub action_semantics_sha256: [u8; 32],
 }
 
-/// Canonical evaluator-side digest of the action ID and compatibility registry.
+/// Canonical evaluator-side digest of sorted action IDs, conflict groups and action-contract digests.
 pub fn action_registry_sha256(
     registry: &[JointActionDefinition],
 ) -> Result<[u8; 32], JointBudgetError> {
@@ -690,7 +690,7 @@ mod tests {
     }
 
     #[test]
-    fn registry_digest_binds_ids_and_exclusivity_groups() {
+    fn registry_digest_binds_ids_groups_and_semantic_contracts() {
         let base = action_registry_sha256(&registry(&[(10, 0), (20, 0)])).unwrap();
         let reordered = action_registry_sha256(&registry(&[(20, 0), (10, 0)])).unwrap();
         let constrained = action_registry_sha256(&registry(&[(10, 9), (20, 9)])).unwrap();
@@ -700,6 +700,16 @@ mod tests {
         assert_eq!(base, reordered);
         assert_ne!(base, constrained);
         assert_ne!(base, changed_contract);
+    }
+
+    #[test]
+    fn zero_action_semantics_digest_is_rejected() {
+        let mut invalid = registry(&[(10, 0), (20, 0)]);
+        invalid[0].action_semantics_sha256 = [0; 32];
+        assert_eq!(
+            action_registry_sha256(&invalid),
+            Err(JointBudgetError::InvalidActionSemanticsDigest { action_id: 10 })
+        );
     }
 
     #[test]
