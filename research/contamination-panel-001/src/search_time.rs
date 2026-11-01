@@ -5,10 +5,7 @@
 //! it does not prove that the perimeter captured every possible channel.
 //! Independent signer, proxy, sandbox and custody verification are separate.
 
-use crate::{
-    fresh_instance::parse_timestamp,
-    hash_domain,
-};
+use crate::{fresh_instance::parse_timestamp, hash_domain};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -221,7 +218,9 @@ fn all_known_channels() -> BTreeSet<SearchInformationChannelV1> {
         SearchInformationChannelV1::MountedFile,
         SearchInformationChannelV1::AgentMemory,
         SearchInformationChannelV1::Other,
-    ].into_iter().collect()
+    ]
+    .into_iter()
+    .collect()
 }
 
 fn event_digest(event: &SearchTimeEventV1) -> Result<String, String> {
@@ -248,22 +247,25 @@ fn findings_digest(findings: &SearchTimeExposureFindingsV1) -> Result<String, St
     Ok(hash_domain(b"search-time-findings.v1", &bytes))
 }
 
-pub fn seal_search_time_events(
-    events: &mut [SearchTimeEventV1],
-) -> Result<(), String> {
+pub fn seal_search_time_events(events: &mut [SearchTimeEventV1]) -> Result<(), String> {
     let mut previous = SEARCH_TRACE_GENESIS.to_owned();
     let mut last_timestamp: Option<String> = None;
     for (index, event) in events.iter_mut().enumerate() {
-        let expected_sequence = u64::try_from(index + 1)
-            .map_err(|_| "search event sequence exceeds u64")?;
+        let expected_sequence =
+            u64::try_from(index + 1).map_err(|_| "search event sequence exceeds u64")?;
         if event.sequence != expected_sequence {
             return Err("search event sequences must start at 1 and be contiguous".to_owned());
         }
         if event.invocation_id.trim().is_empty() || event.provider_or_tool.trim().is_empty() {
-            return Err("search event invocation and provider/tool identities must be nonempty".to_owned());
+            return Err(
+                "search event invocation and provider/tool identities must be nonempty".to_owned(),
+            );
         }
         parse_timestamp(&event.occurred_at_utc, "search_event.occurred_at_utc")?;
-        if last_timestamp.as_ref().is_some_and(|last| event.occurred_at_utc < *last) {
+        if last_timestamp
+            .as_ref()
+            .is_some_and(|last| event.occurred_at_utc < *last)
+        {
             return Err("search event timestamps must be monotonic with sequence".to_owned());
         }
         validate_digest(&event.destination_sha256, "destination_sha256")?;
@@ -271,14 +273,20 @@ pub fn seal_search_time_events(
         match event.disposition {
             SearchEventDispositionV1::Blocked => {
                 if event.response_bytes != 0 || event.response_sha256.is_some() {
-                    return Err("blocked search events cannot claim received response bytes".to_owned());
+                    return Err(
+                        "blocked search events cannot claim received response bytes".to_owned()
+                    );
                 }
             }
             SearchEventDispositionV1::Allowed => {
                 match (event.response_bytes, event.response_sha256.as_deref()) {
                     (0, None) => {}
-                    (0, Some(_)) => return Err("zero-byte response cannot have a response digest".to_owned()),
-                    (_, None) => return Err("accepted response bytes require a response digest".to_owned()),
+                    (0, Some(_)) => {
+                        return Err("zero-byte response cannot have a response digest".to_owned());
+                    }
+                    (_, None) => {
+                        return Err("accepted response bytes require a response digest".to_owned());
+                    }
                     (_, Some(digest)) => validate_digest(digest, "response_sha256")?,
                 }
             }
@@ -292,15 +300,13 @@ pub fn seal_search_time_events(
     Ok(())
 }
 
-pub fn seal_search_time_trace(
-    trace: &mut SearchTimeExposureTraceV1,
-) -> Result<(), String> {
+pub fn seal_search_time_trace(trace: &mut SearchTimeExposureTraceV1) -> Result<(), String> {
     if trace.events.len() > SEARCH_MAX_EVENTS {
         return Err(format!("search trace exceeds {SEARCH_MAX_EVENTS} events"));
     }
     seal_search_time_events(&mut trace.events)?;
-    trace.event_count = u64::try_from(trace.events.len())
-        .map_err(|_| "search event count exceeds u64")?;
+    trace.event_count =
+        u64::try_from(trace.events.len()).map_err(|_| "search event count exceeds u64")?;
     trace.trace_root_sha256.clear();
     trace.trace_root_sha256 = trace_digest(trace)?;
     Ok(())
@@ -340,8 +346,11 @@ pub fn audit_search_time_trace(
         trace.instrumented_channels.iter().copied().collect();
     let unobserved: BTreeSet<SearchInformationChannelV1> =
         trace.unobserved_channels.iter().copied().collect();
-    let allowlisted_destinations: BTreeSet<&str> =
-        trace.allowlisted_destination_sha256s.iter().map(String::as_str).collect();
+    let allowlisted_destinations: BTreeSet<&str> = trace
+        .allowlisted_destination_sha256s
+        .iter()
+        .map(String::as_str)
+        .collect();
     for digest in &trace.allowlisted_destination_sha256s {
         validate_digest(digest, "allowlisted_destination_sha256s[]")?;
     }
@@ -355,12 +364,16 @@ pub fn audit_search_time_trace(
     }
     match trace.access_mode {
         SearchAccessModeV1::Allowlisted if allowlisted_destinations.is_empty() => {
-            return Err("allowlisted access mode requires at least one destination digest".to_owned());
+            return Err(
+                "allowlisted access mode requires at least one destination digest".to_owned(),
+            );
         }
         SearchAccessModeV1::NetworkDisabled | SearchAccessModeV1::Unrestricted
             if !allowlisted_destinations.is_empty() =>
         {
-            return Err("network-disabled and unrestricted modes must not carry an allowlist".to_owned());
+            return Err(
+                "network-disabled and unrestricted modes must not carry an allowlist".to_owned(),
+            );
         }
         _ => {}
     }
@@ -385,18 +398,23 @@ pub fn audit_search_time_trace(
     let mut issues = Vec::new();
 
     for (index, event) in trace.events.iter().enumerate() {
-        let expected_sequence = u64::try_from(index + 1)
-            .map_err(|_| "search event sequence exceeds u64")?;
+        let expected_sequence =
+            u64::try_from(index + 1).map_err(|_| "search event sequence exceeds u64")?;
         sequence_complete &= event.sequence == expected_sequence;
         if event.sequence != expected_sequence {
-            issues.push(format!("event at index {index} has non-contiguous sequence"));
+            issues.push(format!(
+                "event at index {index} has non-contiguous sequence"
+            ));
         }
         if event.invocation_id.trim().is_empty()
             || event.provider_or_tool.trim().is_empty()
             || !invocation_ids.insert(event.invocation_id.as_str())
         {
             request_receipts_complete = false;
-            issues.push(format!("event {} has missing or duplicate invocation/provider identity", event.sequence));
+            issues.push(format!(
+                "event {} has missing or duplicate invocation/provider identity",
+                event.sequence
+            ));
         }
         request_receipts_complete &= valid_digest(&event.request_sha256);
         if !valid_digest(&event.request_sha256) {
@@ -409,12 +427,16 @@ pub fn audit_search_time_trace(
         if let Some(response_digest) = event.response_sha256.as_deref() {
             response_receipts_complete &= valid_digest(response_digest);
             if !valid_digest(response_digest) {
-                issues.push(format!("event {} has invalid response digest", event.sequence));
+                issues.push(format!(
+                    "event {} has invalid response digest",
+                    event.sequence
+                ));
             }
         }
         match event.disposition {
             SearchEventDispositionV1::Allowed => {
-                allowed_count = allowed_count.checked_add(1)
+                allowed_count = allowed_count
+                    .checked_add(1)
                     .ok_or_else(|| "allowed event count overflowed".to_owned())?;
                 if event.response_bytes > 0 && event.response_sha256.is_none() {
                     response_receipts_complete = false;
@@ -426,10 +448,14 @@ pub fn audit_search_time_trace(
                     match trace.access_mode {
                         SearchAccessModeV1::NetworkDisabled => {
                             network_disabled_respected = false;
-                            issues.push(format!("network-disabled trace contains allowed network event {}", event.sequence));
+                            issues.push(format!(
+                                "network-disabled trace contains allowed network event {}",
+                                event.sequence
+                            ));
                         }
                         SearchAccessModeV1::Allowlisted
-                            if !allowlisted_destinations.contains(event.destination_sha256.as_str()) =>
+                            if !allowlisted_destinations
+                                .contains(event.destination_sha256.as_str()) =>
                         {
                             allowlist_respected = false;
                             issues.push(format!("allowed network event {} targets a destination outside the declared allowlist", event.sequence));
@@ -439,34 +465,56 @@ pub fn audit_search_time_trace(
                 }
             }
             SearchEventDispositionV1::Blocked => {
-                blocked_count = blocked_count.checked_add(1)
+                blocked_count = blocked_count
+                    .checked_add(1)
                     .ok_or_else(|| "blocked event count overflowed".to_owned())?;
                 if event.response_bytes != 0 || event.response_sha256.is_some() {
                     blocked_events_clean = false;
-                    issues.push(format!("blocked event {} claims response bytes", event.sequence));
+                    issues.push(format!(
+                        "blocked event {} claims response bytes",
+                        event.sequence
+                    ));
                 }
             }
         }
         if !instrumented.contains(&event.channel) {
             channels_instrumented = false;
-            issues.push(format!("event {} channel is not declared instrumented", event.sequence));
+            issues.push(format!(
+                "event {} channel is not declared instrumented",
+                event.sequence
+            ));
         }
         if parse_timestamp(&event.occurred_at_utc, "search_event.occurred_at_utc").is_err() {
             timestamps_valid = false;
-            issues.push(format!("event {} has invalid UTC timestamp", event.sequence));
+            issues.push(format!(
+                "event {} has invalid UTC timestamp",
+                event.sequence
+            ));
         }
-        if last_timestamp.as_ref().is_some_and(|last| event.occurred_at_utc < *last) {
+        if last_timestamp
+            .as_ref()
+            .is_some_and(|last| event.occurred_at_utc < *last)
+        {
             timestamps_valid = false;
-            issues.push(format!("event {} timestamp moves backwards", event.sequence));
+            issues.push(format!(
+                "event {} timestamp moves backwards",
+                event.sequence
+            ));
         }
         if event.previous_event_sha256 != previous {
             event_hashes_valid = false;
-            issues.push(format!("event {} previous digest does not match chain", event.sequence));
+            issues.push(format!(
+                "event {} previous digest does not match chain",
+                event.sequence
+            ));
         }
         let expected_event_digest = event_digest(event)?;
         if event.event_sha256 != expected_event_digest {
             event_hashes_valid = false;
-            issues.push(format!("event {} digest does not match contents", event.sequence));
+            issues.push(format!(
+                "event {} digest does not match contents",
+                event.sequence
+            ));
         }
         previous = event.event_sha256.clone();
         last_timestamp = Some(event.occurred_at_utc.clone());
@@ -490,7 +538,9 @@ pub fn audit_search_time_trace(
         issues.push("instrumented plus unobserved declarations do not cover every known information channel".to_owned());
     }
     if !trace.unobserved_channels.is_empty() {
-        issues.push("trace declares information channels outside the instrumentation perimeter".to_owned());
+        issues.push(
+            "trace declares information channels outside the instrumentation perimeter".to_owned(),
+        );
     }
     let valid = trace_root_matches
         && hash_chain_replayed
@@ -508,7 +558,8 @@ pub fn audit_search_time_trace(
         "all_known_channel_types_declared_instrumented_not_independently_qualified"
     } else {
         "partial_or_unobserved_information_channels"
-    }.to_owned();
+    }
+    .to_owned();
     Ok(SearchTimeExposureAuditV1 {
         schema: SEARCH_AUDIT_SCHEMA.to_owned(),
         valid,
@@ -560,8 +611,11 @@ pub fn audit_search_time_findings(
     if findings.findings.len() > SEARCH_MAX_EVENTS {
         return Err(format!("search findings exceed {SEARCH_MAX_EVENTS}"));
     }
-    let event_by_sequence: BTreeMap<u64, &SearchTimeEventV1> =
-        trace.events.iter().map(|event| (event.sequence, event)).collect();
+    let event_by_sequence: BTreeMap<u64, &SearchTimeEventV1> = trace
+        .events
+        .iter()
+        .map(|event| (event.sequence, event))
+        .collect();
     let mut seen = BTreeSet::new();
     let mut allowed_events = true;
     let mut metadata = 0_u64;
@@ -571,20 +625,35 @@ pub fn audit_search_time_findings(
     let mut matched_items = 0_u64;
     for finding in &findings.findings {
         if !seen.insert(finding.event_sequence) {
-            return Err("at most one normalized exposure finding is allowed per event sequence".to_owned());
+            return Err(
+                "at most one normalized exposure finding is allowed per event sequence".to_owned(),
+            );
         }
-        let event = event_by_sequence.get(&finding.event_sequence)
-            .ok_or_else(|| format!("finding references unknown event {}", finding.event_sequence))?;
+        let event = event_by_sequence
+            .get(&finding.event_sequence)
+            .ok_or_else(|| {
+                format!(
+                    "finding references unknown event {}",
+                    finding.event_sequence
+                )
+            })?;
         if event.disposition != SearchEventDispositionV1::Allowed {
             allowed_events = false;
-            return Err(format!("finding references blocked event {}", finding.event_sequence));
+            return Err(format!(
+                "finding references blocked event {}",
+                finding.event_sequence
+            ));
         }
         validate_digest(&finding.evidence_sha256, "finding.evidence_sha256")?;
         if matches!(
             finding.exposure_class,
             SearchExposureClassV1::ContextBearing | SearchExposureClassV1::AnswerBearing
-        ) && finding.matched_item_ids.is_empty() {
-            return Err("context/answer-bearing findings must reference at least one benchmark item".to_owned());
+        ) && finding.matched_item_ids.is_empty()
+        {
+            return Err(
+                "context/answer-bearing findings must reference at least one benchmark item"
+                    .to_owned(),
+            );
         }
         if event.response_bytes == 0 || event.response_sha256.is_none() {
             return Err("exposure finding requires a received response body".to_owned());
@@ -601,7 +670,8 @@ pub fn audit_search_time_findings(
                 return Err("finding item IDs must be unique and nonempty".to_owned());
             }
         }
-        matched_items = matched_items.checked_add(unique_items.len() as u64)
+        matched_items = matched_items
+            .checked_add(unique_items.len() as u64)
             .ok_or_else(|| "matched item count overflowed".to_owned())?;
         match finding.exposure_class {
             SearchExposureClassV1::MetadataOnly => metadata += 1,
@@ -653,7 +723,11 @@ mod tests {
             } else {
                 None
             },
-            response_bytes: if disposition == SearchEventDispositionV1::Allowed { 32 } else { 0 },
+            response_bytes: if disposition == SearchEventDispositionV1::Allowed {
+                32
+            } else {
+                0
+            },
             occurred_at_utc: time.to_owned(),
             disposition,
             previous_event_sha256: String::new(),
@@ -687,8 +761,18 @@ mod tests {
             ],
             unobserved_channels: Vec::new(),
             events: vec![
-                event(1, SearchInformationChannelV1::LocalCache, SearchEventDispositionV1::Allowed, "2026-10-31T18:00:00Z"),
-                event(2, SearchInformationChannelV1::WebSearch, SearchEventDispositionV1::Blocked, "2026-10-31T18:00:01Z"),
+                event(
+                    1,
+                    SearchInformationChannelV1::LocalCache,
+                    SearchEventDispositionV1::Allowed,
+                    "2026-10-31T18:00:00Z",
+                ),
+                event(
+                    2,
+                    SearchInformationChannelV1::WebSearch,
+                    SearchEventDispositionV1::Blocked,
+                    "2026-10-31T18:00:01Z",
+                ),
             ],
             event_count: 0,
             trace_root_sha256: String::new(),
@@ -722,51 +806,97 @@ mod tests {
     fn strict_trace_and_finding_schemas_match_rust_serialization() {
         let trace_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schema/search-time-exposure-trace.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let audit_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schema/search-time-exposure-audit.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let findings_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schema/search-time-exposure-findings.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let findings_audit_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schema/search-time-exposure-findings-audit.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
 
         let trace = trace();
         let trace_audit = audit_search_time_trace(&trace).unwrap();
         let findings = findings(&trace);
         let findings_audit = audit_search_time_findings(&trace, &findings).unwrap();
         for (schema, value, version) in [
-            (&trace_schema, serde_json::to_value(&trace).unwrap(), SEARCH_TRACE_SCHEMA),
-            (&audit_schema, serde_json::to_value(&trace_audit).unwrap(), SEARCH_AUDIT_SCHEMA),
-            (&findings_schema, serde_json::to_value(&findings).unwrap(), SEARCH_FINDINGS_SCHEMA),
-            (&findings_audit_schema, serde_json::to_value(&findings_audit).unwrap(), SEARCH_FINDINGS_AUDIT_SCHEMA),
+            (
+                &trace_schema,
+                serde_json::to_value(&trace).unwrap(),
+                SEARCH_TRACE_SCHEMA,
+            ),
+            (
+                &audit_schema,
+                serde_json::to_value(&trace_audit).unwrap(),
+                SEARCH_AUDIT_SCHEMA,
+            ),
+            (
+                &findings_schema,
+                serde_json::to_value(&findings).unwrap(),
+                SEARCH_FINDINGS_SCHEMA,
+            ),
+            (
+                &findings_audit_schema,
+                serde_json::to_value(&findings_audit).unwrap(),
+                SEARCH_FINDINGS_AUDIT_SCHEMA,
+            ),
         ] {
-            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
-            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
-                .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
-                .keys().cloned().collect();
-            let actual: BTreeSet<String> = value.as_object().unwrap()
-                .keys().cloned().collect();
+            assert_eq!(
+                schema["properties"]["schema"]["const"].as_str(),
+                Some(version)
+            );
+            let required: BTreeSet<String> = schema["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_str().unwrap().to_owned())
+                .collect();
+            let properties: BTreeSet<String> = schema["properties"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap().keys().cloned().collect();
             assert_eq!(required, properties);
             assert_eq!(actual, properties);
         }
-        let expected_event_fields: BTreeSet<String> =
-            trace_schema["properties"]["events"]["items"]["properties"]
-                .as_object().unwrap().keys().cloned().collect();
-        let actual_event_fields: BTreeSet<String> =
-            serde_json::to_value(&trace.events[0]).unwrap().as_object().unwrap()
-                .keys().cloned().collect();
+        let expected_event_fields: BTreeSet<String> = trace_schema["properties"]["events"]["items"]
+            ["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let actual_event_fields: BTreeSet<String> = serde_json::to_value(&trace.events[0])
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(expected_event_fields, actual_event_fields);
 
         let expected_finding_fields: BTreeSet<String> =
             findings_schema["properties"]["findings"]["items"]["properties"]
-                .as_object().unwrap().keys().cloned().collect();
-        let actual_finding_fields: BTreeSet<String> =
-            serde_json::to_value(&findings.findings[0]).unwrap().as_object().unwrap()
-                .keys().cloned().collect();
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+        let actual_finding_fields: BTreeSet<String> = serde_json::to_value(&findings.findings[0])
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(expected_finding_fields, actual_finding_fields);
     }
 
@@ -806,7 +936,12 @@ mod tests {
             SearchInformationChannelV1::RemoteMcp,
         ] {
             let mut trace = trace();
-            trace.events[0] = event(1, channel, SearchEventDispositionV1::Allowed, "2026-10-31T18:00:00Z");
+            trace.events[0] = event(
+                1,
+                channel,
+                SearchEventDispositionV1::Allowed,
+                "2026-10-31T18:00:00Z",
+            );
             seal_search_time_trace(&mut trace).unwrap();
             let audit = audit_search_time_trace(&trace).unwrap();
             assert!(!audit.valid);
@@ -850,8 +985,12 @@ mod tests {
     #[test]
     fn unobserved_or_undeclared_channels_prevent_validity() {
         let mut trace = trace();
-        trace.instrumented_channels.retain(|channel| *channel != SearchInformationChannelV1::AgentMemory);
-        trace.unobserved_channels.push(SearchInformationChannelV1::AgentMemory);
+        trace
+            .instrumented_channels
+            .retain(|channel| *channel != SearchInformationChannelV1::AgentMemory);
+        trace
+            .unobserved_channels
+            .push(SearchInformationChannelV1::AgentMemory);
         seal_search_time_trace(&mut trace).unwrap();
         let audit = audit_search_time_trace(&trace).unwrap();
         assert!(!audit.valid);
@@ -859,9 +998,15 @@ mod tests {
         assert!(audit.all_known_channel_types_accounted_for);
 
         let mut trace = trace();
-        trace.instrumented_channels.retain(|channel| *channel != SearchInformationChannelV1::LocalCache);
+        trace
+            .instrumented_channels
+            .retain(|channel| *channel != SearchInformationChannelV1::LocalCache);
         seal_search_time_trace(&mut trace).unwrap();
-        assert!(!audit_search_time_trace(&trace).unwrap().all_event_channels_declared_instrumented);
+        assert!(
+            !audit_search_time_trace(&trace)
+                .unwrap()
+                .all_event_channels_declared_instrumented
+        );
     }
 
     #[test]
