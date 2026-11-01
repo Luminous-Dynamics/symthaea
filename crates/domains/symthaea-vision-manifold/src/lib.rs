@@ -42,8 +42,9 @@ pub mod types;
 
 pub use action_conditioned::{
     ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION, ActionConditionedCandidateAction,
-    ActionConditionedForecastReceipt, ActionConditionedForecastScore,
-    ActionConditionedObservedOutcome, ActionConditionedPredictorState,
+    evaluate_action_response_set, ActionConditionedForecastReceipt,
+    ActionConditionedForecastScore, ActionConditionedObservedOutcome,
+    ActionResponseMetrics, ActionConditionedPredictorState,
     ActionConditionedPredictorError, ActionConditionedVisualResidualPredictor,
     PendingActionConditionedForecastState,
 };
