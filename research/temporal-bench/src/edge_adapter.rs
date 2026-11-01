@@ -311,6 +311,9 @@ pub struct SeedAssignment {
 pub struct CandidateArtifact {
     pub candidate_id: String,
     pub family: BaselineFamily,
+    /// Exact public source revision (Git commit or immutable vendor release identifier).
+    pub source_revision: String,
+    pub dependency_lock_sha256: [u8; 32],
     pub artifact_sha256: [u8; 32],
     pub configuration_sha256: [u8; 32],
 }
@@ -401,6 +404,8 @@ pub fn compute_temporal_benchmark_manifest_sha256(
     for candidate in &manifest.candidates {
         hash_text(&mut hasher, &candidate.candidate_id);
         hash_baseline(&mut hasher, candidate.family);
+        hash_text(&mut hasher, &candidate.source_revision);
+        hasher.bytes(&candidate.dependency_lock_sha256);
         hasher.bytes(&candidate.artifact_sha256);
         hasher.bytes(&candidate.configuration_sha256);
     }
@@ -444,7 +449,9 @@ pub fn validate_temporal_benchmark_manifest(
     let mut candidate_families = BTreeSet::new();
     for (index, candidate) in manifest.candidates.iter().enumerate() {
         if candidate.candidate_id.trim().is_empty()
+            || candidate.source_revision.trim().is_empty()
             || !candidate_ids.insert(candidate.candidate_id.as_str())
+            || !digest_is_nonzero(&candidate.dependency_lock_sha256)
             || !digest_is_nonzero(&candidate.artifact_sha256)
             || !digest_is_nonzero(&candidate.configuration_sha256)
         {
@@ -666,9 +673,11 @@ pub fn compute_evaluator_result_receipt_sha256(receipt: &EvaluatorResultReceipt)
 }
 
 pub fn validate_evaluator_result_receipt(
+    manifest: &TemporalBenchmarkManifest,
     candidate: &CandidateOutputReceipt,
     receipt: &EvaluatorResultReceipt,
 ) -> Result<(), EdgeAdapterError> {
+    validate_candidate_output_receipt(manifest, candidate)?;
     if receipt.schema != EVALUATOR_SCHEMA || receipt.version != VERSION {
         return Err(EdgeAdapterError::new("evaluator_receipt.schema_version", "unsupported schema/version"));
     }
@@ -747,6 +756,8 @@ pub struct SystemMeasurementReceipt {
     pub flash_bytes: u64,
     /// Complete application-event measurand, not model-only inference energy.
     pub mean_energy_per_successful_event_uj: f64,
+    pub successful_event_count: u64,
+    pub energy_repeat_count: u64,
     pub expanded_energy_uncertainty_uj: f64,
     pub energy_uncertainty_receipt_sha256: [u8; 32],
     pub raw_power_trace_sha256: [u8; 32],
@@ -799,6 +810,8 @@ pub fn compute_system_measurement_receipt_sha256(receipt: &SystemMeasurementRece
     hasher.u64(receipt.peak_sram_bytes);
     hasher.u64(receipt.flash_bytes);
     hasher.u64(receipt.mean_energy_per_successful_event_uj.to_bits());
+    hasher.u64(receipt.successful_event_count);
+    hasher.u64(receipt.energy_repeat_count);
     hasher.u64(receipt.expanded_energy_uncertainty_uj.to_bits());
     hasher.bytes(&receipt.energy_uncertainty_receipt_sha256);
     hasher.bytes(&receipt.raw_power_trace_sha256);
@@ -813,7 +826,7 @@ pub fn validate_system_measurement_receipt(
 ) -> Result<(), EdgeAdapterError> {
     validate_temporal_benchmark_manifest(manifest)?;
     validate_candidate_output_receipt(manifest, candidate)?;
-    validate_evaluator_result_receipt(candidate, evaluator)?;
+    validate_evaluator_result_receipt(manifest, candidate, evaluator)?;
     if manifest.track != BenchmarkTrack::System {
         return Err(EdgeAdapterError::new("system_track", "system receipt is not accepted on the Algorithm track"));
     }
@@ -870,6 +883,8 @@ pub fn validate_system_measurement_receipt(
     }
     if !receipt.mean_energy_per_successful_event_uj.is_finite()
         || receipt.mean_energy_per_successful_event_uj <= 0.0
+        || receipt.successful_event_count == 0
+        || receipt.energy_repeat_count < 2
         || !receipt.expanded_energy_uncertainty_uj.is_finite()
         || receipt.expanded_energy_uncertainty_uj < 0.0
     {
@@ -904,6 +919,8 @@ mod tests {
             CandidateArtifact {
                 candidate_id: format!("baseline-{index:02}"),
                 family: *family,
+                source_revision: "a".repeat(40),
+                dependency_lock_sha256: hash(index as u8 + 30),
                 artifact_sha256: hash(index as u8 + 1),
                 configuration_sha256: hash(index as u8 + 40),
             }
@@ -1044,12 +1061,12 @@ mod tests {
         let manifest = manifest(BenchmarkTrack::Algorithm);
         let candidate = candidate_receipt(&manifest);
         let evaluator = evaluator_receipt(&candidate);
-        validate_evaluator_result_receipt(&candidate, &evaluator).unwrap();
+        validate_evaluator_result_receipt(&manifest, &candidate, &evaluator).unwrap();
 
         let mut missing_metric = evaluator.clone();
         missing_metric.metrics.pop();
         missing_metric.evaluator_receipt_sha256 = compute_evaluator_result_receipt_sha256(&missing_metric);
-        assert!(validate_evaluator_result_receipt(&candidate, &missing_metric).is_err());
+        assert!(validate_evaluator_result_receipt(&manifest, &candidate, &missing_metric).is_err());
     }
 
     #[test]
@@ -1080,6 +1097,8 @@ mod tests {
             peak_sram_bytes: 128 * 1024,
             flash_bytes: 512 * 1024,
             mean_energy_per_successful_event_uj: 25.0,
+            successful_event_count: 20,
+            energy_repeat_count: 5,
             expanded_energy_uncertainty_uj: 1.0,
             energy_uncertainty_receipt_sha256: hash(26),
             raw_power_trace_sha256: hash(27),
