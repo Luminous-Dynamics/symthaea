@@ -223,9 +223,7 @@ impl MatchedInterventionSet {
     /// cost in all six resource dimensions and immediate proof progress.
     /// No weighted scalar score is constructed. Complexity is O(k^2) in the
     /// number of admissible operation families.
-    pub fn pareto_summary(
-        &self,
-    ) -> Result<InterventionParetoSummary, InterventionSetError> {
+    pub fn pareto_summary(&self) -> Result<InterventionParetoSummary, InterventionSetError> {
         self.validate()?;
         let mut alternatives = Vec::with_capacity(self.trials.len());
         for trial in &self.trials {
@@ -245,13 +243,14 @@ impl MatchedInterventionSet {
                 .get(1)
                 .ok_or(InterventionSetError::TrialOutcomeNotVerified)?
                 .frontier_features;
-            let immediate_proof_progress = i128::try_from(first.frontier_features.unresolved_obligations)
-                .map_err(|_| InterventionSetError::ArithmeticOverflow)?
-                .checked_sub(
-                    i128::try_from(next_frontier.unresolved_obligations)
-                        .map_err(|_| InterventionSetError::ArithmeticOverflow)?,
-                )
-                .ok_or(InterventionSetError::ArithmeticOverflow)?;
+            let immediate_proof_progress =
+                i128::try_from(first.frontier_features.unresolved_obligations)
+                    .map_err(|_| InterventionSetError::ArithmeticOverflow)?
+                    .checked_sub(
+                        i128::try_from(next_frontier.unresolved_obligations)
+                            .map_err(|_| InterventionSetError::ArithmeticOverflow)?,
+                    )
+                    .ok_or(InterventionSetError::ArithmeticOverflow)?;
             alternatives.push(InterventionAlternativeOutcome {
                 operation_family: first.operation_family,
                 first_action_cost: first.measured_cost,
@@ -263,10 +262,10 @@ impl MatchedInterventionSet {
 
         let mut frontier_operation_families = Vec::new();
         for candidate in &alternatives {
-            let dominated = alternatives
-                .iter()
-                .any(|other| other.operation_family != candidate.operation_family
-                    && dominates(*other, *candidate));
+            let dominated = alternatives.iter().any(|other| {
+                other.operation_family != candidate.operation_family
+                    && dominates(*other, *candidate)
+            });
             if !dominated {
                 frontier_operation_families.push(candidate.operation_family);
             }
@@ -336,8 +335,7 @@ fn dominates(
     let candidate_cost = resource_values(candidate.verified_remaining_cost);
     let other_cost = resource_values(other.verified_remaining_cost);
     let no_worse_on_resources = (0..6).all(|index| candidate_cost[index] <= other_cost[index]);
-    let no_worse_on_progress =
-        candidate.immediate_proof_progress >= other.immediate_proof_progress;
+    let no_worse_on_progress = candidate.immediate_proof_progress >= other.immediate_proof_progress;
     let strictly_better = (0..6).any(|index| candidate_cost[index] < other_cost[index])
         || candidate.immediate_proof_progress > other.immediate_proof_progress;
     no_worse_on_resources && no_worse_on_progress && strictly_better
@@ -567,12 +565,13 @@ mod tests {
         let family_two = summary.alternatives[0];
         let family_three = summary.alternatives[1];
         let family_four = summary.alternatives[2];
-        assert!(family_two.verified_remaining_cost.tokens
-            < family_three.verified_remaining_cost.tokens);
-        assert!(family_two.immediate_proof_progress
-            < family_three.immediate_proof_progress);
-        assert!(family_three.verified_remaining_cost.tokens
-            < family_four.verified_remaining_cost.tokens);
+        assert!(
+            family_two.verified_remaining_cost.tokens < family_three.verified_remaining_cost.tokens
+        );
+        assert!(family_two.immediate_proof_progress < family_three.immediate_proof_progress);
+        assert!(
+            family_three.verified_remaining_cost.tokens < family_four.verified_remaining_cost.tokens
+        );
         assert_eq!(
             family_three.immediate_proof_progress,
             family_four.immediate_proof_progress
