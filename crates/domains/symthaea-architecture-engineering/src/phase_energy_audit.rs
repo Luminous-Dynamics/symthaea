@@ -119,7 +119,7 @@ pub struct ApplicationPhaseProtocolManifest {
     /// Digest of the task-specific evaluator that classifies Correct/Incorrect/Fallback outcomes.
     pub outcome_evaluator_sha256: String,
     /// A complete event is only labelled complete if unassigned gaps are within this limit.
-    pub maximum_unattributed_gap_ms: f64,
+    pub maximum_unattributed_duration_ms: f64,
     pub protocol_sha256: String,
 }
 
@@ -197,7 +197,7 @@ pub struct PhaseEnergyAuditReceipt {
     pub expected_sample_rate_hz: f64,
     pub sample_rate_tolerance_fraction: f64,
     pub maximum_sample_gap_ratio: f64,
-    pub maximum_unattributed_gap_ms: f64,
+    pub maximum_unattributed_duration_ms: f64,
     pub event_count: usize,
     pub complete_phase_coverage_events: usize,
     pub unattributed_interval_events: usize,
@@ -332,8 +332,8 @@ pub fn validate_application_phase_protocol(
         || !protocol.phases.iter().any(|phase| phase.required)
         || !protocol.phases.first().is_some_and(|phase| phase.required)
         || !protocol.phases.last().is_some_and(|phase| phase.required)
-        || !protocol.maximum_unattributed_gap_ms.is_finite()
-        || protocol.maximum_unattributed_gap_ms < 0.0
+        || !protocol.maximum_unattributed_duration_ms.is_finite()
+        || protocol.maximum_unattributed_duration_ms < 0.0
     {
         return Err(PhaseEnergyAuditError::new("phase_protocol.phases", "at least one required phase, required first/last boundary phases, and a finite non-negative gap tolerance are required"));
     }
@@ -931,7 +931,7 @@ pub fn audit_application_phase_energy(
         let unattributed_duration = unattributed_duration.max(0.0);
         let unattributed_energy = unattributed_energy.max(0.0);
         let status = if !missing_phase_ids.is_empty()
-            || unattributed_duration > protocol.maximum_unattributed_gap_ms
+            || unattributed_duration > protocol.maximum_unattributed_duration_ms
         {
             PhaseEnergyEventStatus::UnattributedIntervalsPresent
         } else {
@@ -999,7 +999,7 @@ pub fn audit_application_phase_energy(
         expected_sample_rate_hz: trace_config.expected_sample_rate_hz,
         sample_rate_tolerance_fraction: trace_config.sample_rate_tolerance_fraction,
         maximum_sample_gap_ratio: trace_config.maximum_gap_ratio,
-        maximum_unattributed_gap_ms: protocol.maximum_unattributed_gap_ms,
+        maximum_unattributed_duration_ms: protocol.maximum_unattributed_duration_ms,
         event_count: event_metrics.len(),
         complete_phase_coverage_events: complete_count,
         unattributed_interval_events: unattributed_count,
@@ -1055,8 +1055,8 @@ pub fn validate_phase_energy_audit_receipt(
         || !(0.0..=1.0).contains(&receipt.sample_rate_tolerance_fraction)
         || !receipt.maximum_sample_gap_ratio.is_finite()
         || receipt.maximum_sample_gap_ratio < 1.0
-        || !receipt.maximum_unattributed_gap_ms.is_finite()
-        || receipt.maximum_unattributed_gap_ms < 0.0
+        || !receipt.maximum_unattributed_duration_ms.is_finite()
+        || receipt.maximum_unattributed_duration_ms < 0.0
     {
         return Err(PhaseEnergyAuditError::new("receipt.inventory_or_config", "invalid byte/event inventory or trace configuration"));
     }
@@ -1280,7 +1280,7 @@ pub fn validate_phase_energy_audit_receipt(
                     || !close(end - start, duration)
                     || !close(duration - declared_duration, gap_duration)
                     || !close(energy - declared_energy, gap_energy)
-                    || gap_duration > receipt.maximum_unattributed_gap_ms
+                    || gap_duration > receipt.maximum_unattributed_duration_ms
                         && event.status == PhaseEnergyEventStatus::CompletePhaseCoverage
                     || !event.missing_phase_ids.is_empty()
                         && event.status == PhaseEnergyEventStatus::CompletePhaseCoverage
@@ -1407,7 +1407,7 @@ mod tests {
             ],
             accepted_success_outcomes: vec![ApplicationEventOutcome::Correct],
             outcome_evaluator_sha256: sha('c'),
-            maximum_unattributed_gap_ms: max_gap_ms,
+            maximum_unattributed_duration_ms: max_gap_ms,
             protocol_sha256: String::new(),
         };
         value.protocol_sha256 = compute_application_phase_protocol_sha256(&value).unwrap();
@@ -1464,6 +1464,10 @@ mod tests {
         let event = &result.receipt.events[0];
         assert_eq!(event.status, PhaseEnergyEventStatus::CompletePhaseCoverage);
         assert_eq!(event.phase_windows.len(), 3);
+        assert!(event.accepted_success_outcome);
+        assert!(event.deadline_met);
+        assert_eq!(result.receipt.successful_completed_events, 1);
+        assert!((result.receipt.mean_energy_per_successful_event_uj.unwrap() - 0.132).abs() < 1e-12);
         assert!((event.total_event_energy_uj.unwrap() - 0.132).abs() < 1e-12);
         assert!((event.phase_windows.iter().map(|window| window.energy_uj).sum::<f64>() - 0.132).abs() < 1e-12);
         verify_phase_energy_receipt_against_sources(
