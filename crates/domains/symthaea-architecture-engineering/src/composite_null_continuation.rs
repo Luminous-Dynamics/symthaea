@@ -805,6 +805,53 @@ mod tests {
     }
 
     #[test]
+    fn an_omitted_null_model_is_not_claimed_to_be_covered() {
+        let model = CompositeNullModel {
+            model_id: "declared-null-a".into(),
+            first_stage_outcomes: vec![CompositeFirstStageOutcome {
+                outcome_id: "screen".into(),
+                null_probability: 1.0,
+                interim_test_value: 0.05,
+            }],
+            continuation_branches: vec![CompositeContinuationBranch {
+                first_stage_outcome_id: "screen".into(),
+                second_stage_outcomes: vec![
+                    CompositeSecondStageOutcome {
+                        outcome_id: "hit".into(),
+                        conditional_null_probability: 0.1,
+                        rejection_probability: 0.5,
+                    },
+                    CompositeSecondStageOutcome {
+                        outcome_id: "miss".into(),
+                        conditional_null_probability: 0.9,
+                        rejection_probability: 0.0,
+                    },
+                ],
+            }],
+        };
+        let mut second_model = model.clone();
+        second_model.model_id = "declared-null-b".into();
+        let plan = CompositeNullContinuationPlan::new(
+            "omitted-null-negative-control",
+            0.05,
+            vec![model, second_model],
+        ).unwrap();
+        let report = analyze_composite_null_continuation(&plan).unwrap();
+        assert!((report.maximum_composite_size_over_null_family - 0.05).abs() < 1e-12);
+
+        // A third, omitted null that always produces the hit path is not in H.
+        // The declared-family theorem makes no promise for this distribution.
+        let hit_value = report.terminal_paths.iter()
+            .find(|path| path.first_stage_outcome_id == "screen"
+                && path.second_stage_outcome_id == "hit")
+            .unwrap()
+            .composite_rejection_probability;
+        let omitted_null_size = 1.0 * hit_value;
+        assert!((omitted_null_size - 0.5).abs() < 1e-12);
+        assert!(omitted_null_size > report.significance_level);
+    }
+
+    #[test]
     fn canonical_order_and_report_tampering_are_detected() {
         let plan = fixture();
         let report = analyze_composite_null_continuation(&plan).unwrap();
