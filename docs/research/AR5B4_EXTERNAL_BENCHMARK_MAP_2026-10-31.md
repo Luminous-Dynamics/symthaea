@@ -319,3 +319,65 @@ Sources:
 - When the Specification Emerges: Benchmarking Faithfulness Loss in Long-Horizon Coding Agents (SLUMP), Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.76/
 
 Claim boundary: these are external benchmark findings, not results for Symthaea. They motivate protocol additions; do not claim our verifier is superior until reproduced on a pinned compatible task set.
+
+
+### Noisy/expensive multi-objective Bayesian optimization — November 2026
+
+The evolutionary reference set is not enough for expensive or noisy objectives. Add a dedicated Bayesian MOO stratum, with exact task/noise/reference/budget pinning:
+
+- **ParEGO / qNParEGO:** random scalarization baselines; useful for preference-region coverage and batch comparisons.
+- **qEHVI / qNEHVI:** expected hypervolume improvement and noisy expected hypervolume improvement. The current BoTorch tutorial recommends qNEHVI in noisy or batch settings and demonstrates qNParEGO, qEHVI, qNEHVI and random baselines on Branin-Currin with independent additive observation noise.
+- **JES / PESMO:** information-theoretic multi-objective acquisition methods; evaluate the extra model/acquisition computation as part of all-in cost.
+- **TS-TCH / random scalarizations:** Paria et al. (UAI 2020) provides a flexible scalarization framework. A current noisy scaled-DTLZ2 leaderboard lists TS-TCH, NParEGO, JES, SPMO, Sobol and NEHVI as comparison methods.
+- **Sobol/random:** required low-complexity exploration controls, not ceremonial baselines.
+
+SOTA2 Research currently lists a five-objective noisy scaled-DTLZ2 comparison with 30 independent runs (TS-TCH, NParEGO, JES, SPMO, Sobol, NEHVI). Its reported means/standard deviations make it a useful baseline-discovery source, but the page does not remove the need to reproduce the exact scaling, noise, reference front/point, evaluation budget and model settings before a matched claim. Its separate ten-objective scaled-DTLZ2 page is a different problem stratum; do not pool those results with the five-objective task.
+
+The new Rust analysis primitive is \`pareto_noisy_observations.rs\` (exported from the architecture-engineering crate). It uses bounded-observation Hoeffding intervals with summable alpha spending, and distinguishes certain dominance, possible dominance and unresolved trade-offs. This is an analysis primitive only: it is not a Bayesian optimizer, does not prove observation independence, and is not yet integrated into EventTape/Anytime resource accounting.
+
+Tracked in [Issue #9659](https://github.com/Luminous-Dynamics/symthaea/issues/9659). Protocol and statistical assumptions: \`AR5B5_NOISY_PARETO_CONFIDENCE_V0_1.md\`.
+
+Sources:
+- BoTorch noisy, parallel MOO tutorial (qEHVI, qNEHVI, qNParEGO): https://botorch.org/docs/v0.17.2/tutorials/multi_objective_bo
+- TS-TCH / random scalarization framework: https://proceedings.mlr.press/v115/paria20a.html
+- Noisy scaled-DTLZ2 5-objective leaderboard: https://www.sota2.com/research/sota/multi-objective-optimization-on-noisy-scaled-dtlz2-5-objectives
+- Noisy scaled-DTLZ2 10-objective leaderboard: https://www.sota2.com/research/sota/multiobjective-optimization-on-scaled-dtlz2-10-objectives-hv
+- COCO official noisy and bi-objective data archives: https://coco-platform.org/data-archive/index.html
+
+### Repository-level engineering optimization — FormulaCode
+
+FormulaCode (ICML 2026, PMLR 306) is an important real-world reference for complete agentic optimization. Its paper describes 957 scientific-Python performance bottlenecks, expert-authored patches and an average of 264.6 community-maintained performance workloads per task. It evaluates triage, diagnosis and resolution under correctness and multi-objective performance constraints.
+
+Use FormulaCode as an external engineering-search stratum, with dataset revision/task IDs/workloads/toolchains pinned. Do not imply its Python tasks directly test Rust/Nix capability. Build a separately named Rust/Nix adaptation with frozen source commits, multiple workloads, expert reference patches, reproducible builds, correctness constraints, and objective vectors for runtime, latency, memory, energy, build/test cost, and reliability.
+
+Tracked in [Issue #9660](https://github.com/Luminous-Dynamics/symthaea/issues/9660).
+
+Source: https://proceedings.mlr.press/v306/sehgal26a.html
+
+### Scientific verifier diagnosis — BioSciReview-Bench
+
+BioSciReview-Bench (REALM 2026) evaluates silent scientific bugs using 200 manually reviewed synthetic bioinformatics snippets (100 matched correct/buggy pairs). It separates bug detection, line localization, and full diagnosis by exact line and category. Reported detection F1 is 0.94–0.99, while full diagnosis is 0.74–0.89 F1. The gap is a strong reason not to report verifier accuracy as one scalar.
+
+Add separate benchmark outputs for:
+- defect detection;
+- localization quality;
+- causal category/claim diagnosis;
+- evidence sufficiency;
+- false-negative and false-positive costs.
+
+This is a verifier benchmark stratum, not evidence that a benchmarked verifier generalizes to production scientific pipelines.
+
+Source: https://aclanthology.org/2026.realm-1.65/
+
+### New noisy confidence analysis implementation checkpoint
+
+\`pareto_noisy_observations.rs\` now provides:
+- frozen certified per-observation bounds;
+- candidate/objective family-wise alpha budgeting;
+- summable per-prefix alpha spending \`alpha_n = alpha_coord / (n(n+1))\`;
+- Hoeffding intervals for repeated objective measurements;
+- certain/possible/unresolved Pareto dominance;
+- canonical replicate records, seed uniqueness within candidate, evidence digests and deterministic report receipts;
+- append-time validation that is incremental after one full reconstruction for deserialized studies.
+
+The module's confidence guarantee is conditional on independent bounded observations and an honest sampling process. Unique seed IDs are not proof of independence; correlated noise, drift and shared physical samples need explicit models. Tests remain authored/unexecuted. EventTape/Anytime resource integration and matched qNEHVI/ParEGO/JES/TS-TCH baselines are tracked in #9659. No benchmark result or SOTA claim is established.
