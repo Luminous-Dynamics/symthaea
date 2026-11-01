@@ -38,6 +38,7 @@ pub mod anytime_test_induction;
 pub mod optional_continuation;
 pub mod composite_null_continuation;
 pub mod finite_stopping_continuation;
+pub mod power_optimal_continuation;
 pub mod pareto_robust_decision;
 pub mod pareto_wasserstein_decision;
 pub mod correlated_noise_benchmark;
