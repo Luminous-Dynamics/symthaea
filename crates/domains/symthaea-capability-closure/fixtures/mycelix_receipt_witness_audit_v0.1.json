@@ -1,0 +1,41 @@
+{
+  "schema": "symthaea.mycelix_receipt_witness_audit.v0.1",
+  "tracking_issue": 9642,
+  "cross_repository_issue": "https://github.com/Luminous-Dynamics/mycelix/issues/5630",
+  "source_subject": {
+    "repository": "Luminous-Dynamics/mycelix",
+    "commit": "512ba1e9a9ec7371739835410559305f7c7497cb",
+    "paths": [
+      "mycelix-workspace/happs/consensus/zomes/rbbft/coordinator/src/lib.rs",
+      "mycelix-workspace/happs/consensus/zomes/rbbft/integrity/src/lib.rs"
+    ]
+  },
+  "observations": {
+    "vote_uniqueness_guard_observed": false,
+    "vote_author_binding_observed_in_integrity": false,
+    "validator_membership_snapshot_bound_to_tally": false,
+    "round_and_vote_phase_filtered_in_tally": false,
+    "defensive_voter_dedup_in_tally": false,
+    "committed_block_contains_reconstructable_signer_certificate": false,
+    "external_monotonic_rollback_anchor_implemented": false,
+    "forty_five_percent_byzantine_fault_bound_proved_by_inspected_checks": false
+  },
+  "claim_class": "source_bound_qualification_blocker",
+  "live_exploit_executed": false,
+  "multi_agent_adversarial_tests_executed": false,
+  "conductor_snapshot_restore_executed": false,
+  "tpm_adapter_executed": false,
+  "decision": "do_not_qualify_current_rbbft_zome_as_sole_checkpoint_witness",
+  "allowed_interim_role": "audit_publication_and_peer_validation_only",
+  "required_successor": [
+    "fixed_membership_snapshot",
+    "action_author_bound_votes",
+    "per_validator_per_instance_phase_uniqueness",
+    "equivocation_records",
+    "phase_and_round_separation",
+    "integer_or_rational_weight_arithmetic",
+    "reconstructable_quorum_certificate",
+    "durable_external_monotonic_anchor",
+    "partition_restart_and_snapshot_restore_tests"
+  ]
+}
