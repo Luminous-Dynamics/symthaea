@@ -190,7 +190,7 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
         }
         for dependency in &dependencies {
             if !declarations.contains_key(dependency) && !declaration_rows.iter().any(|item| {
-                item.get("declaration_id").and_then(Value::as_str) == Some(dependency)
+                item.get("declaration_id").and_then(Value::as_str) == Some(dependency.as_str())
             }) {
                 bail!("declaration {id} references missing dependency {dependency}");
             }
