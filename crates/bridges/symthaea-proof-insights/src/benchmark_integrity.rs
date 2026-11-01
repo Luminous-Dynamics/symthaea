@@ -250,6 +250,9 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     }
     check_digest(&task_id, "dataset.task_id", 64)?;
     check_digest(&statement_sha256, "target.statement_sha256", 64)?;
+    if string(value, "/target/source_coordinate_system")? != SOURCE_COORDINATE_SYSTEM {
+        bail!("unsupported or ambiguous source coordinate system");
+    }
     let task_manifest = string(value, "/dataset/task_manifest_sha256")?;
     check_digest(task_manifest, "dataset.task_manifest_sha256", 64)?;
     let _ = optional_digest_field(value, "/reviewer_key_registry_sha256")?;
@@ -259,6 +262,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     for pointer in [
         "/target/source_file_sha256",
         "/target/source_span_sha256",
+        "/target/source_coordinate_system",
         "/reviewer_key_registry_sha256",
         "/target/statement_sha256",
         "/environment/lean_binary_sha256",
@@ -462,6 +466,44 @@ fn optional_digest_field<'a>(value: &'a Value, pointer: &str) -> Result<Option<&
     }
 }
 
+const SOURCE_COORDINATE_SYSTEM: &str =
+    "lean-filemap-line-1-column-0-unicode-codepoint-v0";
+
+fn line_column_to_byte_offset(
+    source: &str,
+    line_starts: &[usize],
+    line_number: u64,
+    column: u64,
+) -> Result<usize> {
+    if line_number == 0 {
+        bail!("source lines are one-based");
+    }
+    let line_index = usize::try_from(line_number - 1).context("line number does not fit usize")?;
+    let line_start = *line_starts
+        .get(line_index)
+        .context("source coordinate line is beyond end of file")?;
+    let mut line_end = line_starts
+        .get(line_index + 1)
+        .copied()
+        .map(|next_start| next_start.saturating_sub(1))
+        .unwrap_or(source.len());
+    // Treat CRLF as one line break while preserving its exact bytes in a
+    // multiline source slice. The column coordinate excludes both CR and LF.
+    if line_end > line_start && source.as_bytes()[line_end - 1] == b'\r' {
+        line_end -= 1;
+    }
+    let line_text = &source[line_start..line_end];
+    let column = usize::try_from(column).context("source column does not fit usize")?;
+    if column == 0 {
+        return Ok(line_start);
+    }
+    match line_text.char_indices().nth(column) {
+        Some((byte_offset, _)) => Ok(line_start + byte_offset),
+        None if line_text.chars().count() == column => Ok(line_end),
+        None => bail!("source column exceeds the Unicode-codepoint length of its line"),
+    }
+}
+
 fn source_span_sha256(
     source_bytes: &[u8],
     start_line: u64,
@@ -473,34 +515,21 @@ fn source_span_sha256(
     if start_line == 0 || end_line < start_line {
         bail!("source span has invalid line coordinates");
     }
-    let lines: Vec<&str> = source.lines().collect();
-    let first_index = usize::try_from(start_line - 1).context("start line does not fit usize")?;
-    let last_index = usize::try_from(end_line - 1).context("end line does not fit usize")?;
-    let first = *lines.get(first_index).context("source span starts beyond end of file")?;
-    let last = *lines.get(last_index).context("source span ends beyond end of file")?;
-    let first_chars: Vec<char> = first.chars().collect();
-    let last_chars: Vec<char> = last.chars().collect();
-    let start = usize::try_from(start_column).context("start column does not fit usize")?;
-    let end = usize::try_from(end_column).context("end column does not fit usize")?;
-    if start > first_chars.len() || end > last_chars.len()
-        || (start_line == end_line && end < start)
-    {
-        bail!("source span columns exceed source line bounds or are reversed");
-    }
-
-    let mut selected = String::new();
-    if first_index == last_index {
-        selected.extend(first_chars[start..end].iter().copied());
-    } else {
-        selected.extend(first_chars[start..].iter().copied());
-        for line in lines.iter().take(last_index).skip(first_index + 1) {
-            selected.push('\n');
-            selected.push_str(line);
+    let mut line_starts = vec![0_usize];
+    for (index, byte) in source.as_bytes().iter().enumerate() {
+        if *byte == b'\n' {
+            line_starts.push(index + 1);
         }
-        selected.push('\n');
-        selected.extend(last_chars[..end].iter().copied());
     }
-    Ok(hex::encode(Sha256::digest(selected.as_bytes())))
+    let start = line_column_to_byte_offset(source, &line_starts, start_line, start_column)?;
+    let end = line_column_to_byte_offset(source, &line_starts, end_line, end_column)?;
+    if end <= start {
+        bail!("source span must have positive byte length and nondecreasing coordinates");
+    }
+    let selected = source_bytes
+        .get(start..end)
+        .context("source span byte offsets are outside the source file")?;
+    Ok(hex::encode(Sha256::digest(selected)))
 }
 
 fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usize> {
@@ -724,6 +753,7 @@ fn verify_reviewer_signature(
         ("/source_path", "/target/source_path"),
         ("/source_file_sha256", "/target/source_file_sha256"),
         ("/source_span_sha256", "/target/source_span_sha256"),
+        ("/source_coordinate_system", "/target/source_coordinate_system"),
         ("/review_scope", "/semantic_review/review_scope"),
     ] {
         if string(&attestation, attestation_path)? != string(receipt, receipt_path)? {
@@ -861,16 +891,17 @@ mod source_span_tests {
     use super::*;
 
     #[test]
-    fn source_span_uses_unicode_codepoint_columns() {
-        let source = "a ∃ β sorry";
+    fn source_span_uses_unicode_codepoint_columns_not_utf16_columns() {
+        let source = "a 😀 sorry";
         let expected = hex::encode(Sha256::digest(b"sorry"));
-        assert_eq!(source_span_sha256(source.as_bytes(), 1, 6, 1, 11).unwrap(), expected);
+        assert_eq!(source_span_sha256(source.as_bytes(), 1, 4, 1, 9).unwrap(), expected);
+        assert!(source_span_sha256(source.as_bytes(), 1, 5, 1, 10).is_err());
     }
 
     #[test]
-    fn source_span_preserves_newline_boundaries_for_multiline_targets() {
-        let source = "alpha\nbeta\ngamma";
-        let expected = hex::encode(Sha256::digest(b"lpha\nbeta\ngam"));
+    fn source_span_preserves_original_crlf_bytes_for_multiline_ranges() {
+        let source = "alpha\r\nbeta\r\ngamma";
+        let expected = hex::encode(Sha256::digest(b"lpha\r\nbeta\r\ngam"));
         assert_eq!(source_span_sha256(source.as_bytes(), 1, 1, 3, 3).unwrap(), expected);
     }
 
@@ -879,6 +910,7 @@ mod source_span_tests {
         assert!(source_span_sha256(b"short", 1, 0, 1, 99).is_err());
         assert!(source_span_sha256(b"short", 1, 4, 1, 2).is_err());
         assert!(source_span_sha256(b"short", 2, 0, 1, 1).is_err());
+        assert!(source_span_sha256(b"short", 1, 0, 1, 0).is_err());
     }
 }
 
