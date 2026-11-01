@@ -19,7 +19,7 @@ use std::{
     env,
     error::Error,
     fs,
-    io::{self, BufRead},
+    io::{self, BufRead, Read},
     path::Path,
     process,
 };
@@ -286,7 +286,10 @@ fn read_file_bounded(path: &str, maximum_bytes: u64) -> Result<Vec<u8>, Box<dyn 
         )
         .into());
     }
-    let bytes = fs::read(path)?;
+    let file = fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    file.take(maximum_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)?;
     if bytes.len() as u64 > maximum_bytes {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
