@@ -57,19 +57,17 @@ def _normalize_path(
     return normalized
 
 
-def coordinate_running_contributions(
+def coordinate_ever_rejected(
     baseline_path: Sequence[frozenset[str]], universe: Iterable[str]
 ) -> dict[str, tuple[Fraction, ...]]:
-    """Running maxima of a_i,t = 1{i in B_t}/(|B_t| vee 1)."""
+    """Coordinate-local ever-rejected indicators, stable under universe extension."""
     ids = _ids(universe)
-    peaks = {i: Fraction(0) for i in ids}
+    seen = {i: False for i in ids}
     result: dict[str, list[Fraction]] = {i: [] for i in ids}
     for rejected in baseline_path:
-        contribution = Fraction(1, len(rejected)) if rejected else Fraction(0)
         for i in ids:
-            if i in rejected:
-                peaks[i] = max(peaks[i], contribution)
-            result[i].append(peaks[i])
+            seen[i] = seen[i] or i in rejected
+            result[i].append(Fraction(1) if seen[i] else Fraction(0))
     return {i: tuple(values) for i, values in result.items()}
 
 
@@ -86,8 +84,8 @@ def build_supremum_anchored_certificates(
     """Build E_{S,t}=A_{S,t}+(1-c_S)F_{S,t} with exact rational arithmetic.
 
     External statistical contract:
-      E[sup_t a_i,t / alpha | H_i] <= q_i, sum_i q_i <= 1;
-      E[sup_t F_S,t | H_S] <= 1.
+      P_Hi(i is ever rejected by the coordinate-local baseline) <= alpha*q_i,
+      sum_i q_i <= 1; and E[sup_t F_S,t | H_S] <= 1.
     """
     ids = _ids(universe)
     if not ids:
@@ -112,7 +110,7 @@ def build_supremum_anchored_certificates(
     if set(adjusted_auxiliary) != set(subsets):
         raise ValueError("adjusted_auxiliary must contain every nonempty intersection")
 
-    peaks = coordinate_running_contributions(baseline, ids)
+    ever = coordinate_ever_rejected(baseline, ids)
     output: dict[frozenset[str], tuple[Fraction, ...]] = {}
     for intersection in subsets:
         aux = tuple(_q(x) for x in adjusted_auxiliary[intersection])
@@ -125,7 +123,7 @@ def build_supremum_anchored_certificates(
             raise ValueError("intersection coordinate budget exceeds one")
         residual = 1 - c_s
         output[intersection] = tuple(
-            sum((peaks[i][t] / a for i in intersection), Fraction(0))
+            sum((ever[i][t] / a for i in intersection), Fraction(0))
             + residual * aux[t]
             for t in range(horizon)
         )
