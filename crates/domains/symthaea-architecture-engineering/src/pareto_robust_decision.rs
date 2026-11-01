@@ -323,6 +323,28 @@ mod tests {
     }
 
     #[test]
+    fn two_world_solver_matches_independent_closed_form_grid() {
+        for p0 in [0.0_f64, 0.1, 0.5, 0.9, 1.0] {
+            for radius in [0.0_f64, 0.05, 0.2, 0.5, 1.0] {
+                for (loss0, loss1) in [(0.0_f64, 10.0_f64), (10.0, 0.0), (4.0, 4.0), (2.0, 7.0)] {
+                    let p = [p0, 1.0 - p0];
+                    let loss = [loss0, loss1];
+                    let (q, used) = maximize_tv(&p, &loss, radius);
+                    let low = (p0 - radius).max(0.0);
+                    let high = (p0 + radius).min(1.0);
+                    let expected_q0 = if loss0 > loss1 { high }
+                        else if loss0 < loss1 { low } else { p0 };
+                    let expected_risk = expected_q0 * loss0 + (1.0 - expected_q0) * loss1;
+                    assert!((q[0] - expected_q0).abs() < 1e-12);
+                    assert!((dot(&q, &loss) - expected_risk).abs() < 1e-10);
+                    assert!((used - (expected_q0 - p0).abs()).abs() < 1e-12);
+                    assert!((q[0] + q[1] - 1.0).abs() < 1e-12);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn canonical_input_order_reconstructs_identical_report() {
         let p = model();
         let mut reversed = p.clone();
