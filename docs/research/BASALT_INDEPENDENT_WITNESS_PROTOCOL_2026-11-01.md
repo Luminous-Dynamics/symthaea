@@ -87,10 +87,10 @@ The witness must bind the complete accepted state, not only a local integer revi
 The manifest includes:
 
 - authority ID, incarnation ID and epoch;
-- authority revision and active policy revision/digest;
+- authority revision and active policy revision, signer/witness policy versions, policy bundle digest and its policy digest binding;
 - all source cursors, keyed by the full stable tuple (provisioned host ID, source ID, partition ID);
 - all retained transparency-log cursors;
-- the complete accepted-receipt history, including immutable acceptance revision, predecessor, receipt/seal digests, profile/boot identities, transition-evidence references, checkpoint identity/evidence and original policy context.
+- the complete accepted-receipt history, including immutable acceptance revision, predecessor, receipt/seal digests, profile/boot identities, all profile/boot/log-origin/policy transition-evidence references, checkpoint identity/evidence and original signer/witness policy versions and bundle digest.
 
 Do not hash only the latest receipt or cursor. This would fail to bind historical acceptance state and permit deletion or substitution of earlier history to go unnoticed.
 
@@ -99,7 +99,7 @@ Canonical array ordering is normative:
 - log cursors sorted by UTF-8 bytes of `log_origin_id`;
 - accepted receipts sorted by their numeric `receipt_acceptance_revision` (parsed from canonical decimal strings), then by receipt digest as a defensive tie-break. Equal acceptance revisions are invalid and never legitimized by the tie-break.
 
-Every counter is encoded as a canonical decimal string. No floating point values are allowed in the state manifest. The state digest is:
+Every counter is encoded as a canonical decimal string. No floating point values are allowed in the state manifest. The top-level `policy_digest` MUST equal the active `policy_bundle_digest`; the signer/witness version tuple is retained separately so that the digest does not erase the policy revision context. The state digest is:
 
 ```text
 state_digest =
@@ -128,6 +128,8 @@ The checkpoint payload schema is `witness-checkpoint-payload.v1.schema.json`. It
 
 A checkpoint may also carry optional transition-availability references in a later compatible extension: immutable accepted-receipt digest and content-addressed receipt/history bundle digest. These references are necessary if BASALT chooses to rebuild a restored database by replaying witness-accepted transitions. The witness signs the digest; the full data remains retrievable from independently replicated immutable storage.
 
+The checkpoint payload also carries `transition_bundle_digest`: a digest of the canonical ordered set of accepted transition receipts since the predecessor checkpoint. It is null only for an authorized genesis record. This permits a recovery service to fetch transition content by digest and rebuild a projection; the content itself must live in separately replicated immutable storage. A missing bundle makes rebuilding incomplete even though rollback detection can still succeed.
+
 The checkpoint digest is independent of the signature set so it remains stable when the same payload is re-signed by an overlapping key set:
 
 ```text
@@ -146,7 +148,7 @@ The DSSE signatures authenticate the canonical payload bytes through PAE. The ch
 
 For a witness member to sign a new checkpoint it must:
 
-1. verify the trusted root and current witness-set metadata;
+1. verify the trusted root and current witness-set metadata, including the initial/rotated witness-set digest chain;
 2. verify the proposed authority ID/incarnation/epoch is allowed;
 3. require `sequence = current_head.sequence + 1`;
 4. require `previous_checkpoint_digest = current_head.checkpoint_digest`;
@@ -201,7 +203,7 @@ The nonce is not a replacement for the witness quorum; it prevents replay while 
 ## Trust roots, key rotation and revocation
 
 Trust bootstrap must happen outside the database being qualified:
-- the verifier has a pinned trust-root digest/version delivered through a separate provisioning/release channel;
+- the verifier has a pinned trust-root digest/version delivered through a separate provisioning/release channel; the root also pins the initial witness-set metadata digest;
 - the root private keys are offline or in a separately controlled signing ceremony;
 - witness members do not control the root keys that authorize their own replacement;
 - the DB administrator and its backup operator cannot modify root metadata or witness membership.
