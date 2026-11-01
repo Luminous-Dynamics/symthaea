@@ -289,6 +289,58 @@ fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn match_search_time_bodies_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 8 {
+        return Err(
+            "usage: contamination-panel-bench match-search-time-bodies <trace.json> <public-packet.json> <sealed-oracle.json> <manifest.json> <response-bodies.json> <unavailable-event-sequences.json> <findings.json>"
+                .into(),
+        );
+    }
+    let trace_bytes = fs::read(&args[1])?;
+    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
+        return Err("search-time trace exceeds 256 MiB safety bound".into());
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
+    let trace_audit = audit_search_time_trace(&trace).map_err(io::Error::other)?;
+    if !trace_audit.valid {
+        return Err("search-time trace failed integrity audit".into());
+    }
+    let bundle = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[2])?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[3])?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[4])?)?,
+    };
+    let body_bytes = fs::read(&args[5])?;
+    if body_bytes.len() > SEARCH_MAX_TOTAL_BODY_BYTES + 32 * 1024 * 1024 {
+        return Err("response-body evidence file exceeds 160 MiB safety bound".into());
+    }
+    let response_bodies: Vec<SearchCapturedResponseBodyV1> = serde_json::from_slice(&body_bytes)?;
+    let unavailable_bytes = fs::read(&args[6])?;
+    if unavailable_bytes.len() > SEARCH_MAX_FINDINGS_BYTES {
+        return Err("unavailable event-sequence file exceeds 64 MiB safety bound".into());
+    }
+    let unavailable: Vec<u64> = serde_json::from_slice(&unavailable_bytes)?;
+    let findings = analyze_search_time_response_bodies(
+        &trace,
+        &bundle,
+        &response_bodies,
+        &unavailable,
+    ).map_err(io::Error::other)?;
+    write_bytes(&args[7], &serde_json::to_vec_pretty(&findings)?)?;
+    println!(
+        "body_events={} inspected={} unavailable={} metadata={} context={} answer={} unknown={}",
+        findings.response_body_event_count,
+        findings.response_body_evidence_count,
+        findings.unavailable_body_event_sequences.len(),
+        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::MetadataOnly).count(),
+        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::ContextBearing).count(),
+        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::AnswerBearing).count(),
+        findings.findings.iter().filter(|item| item.exposure_class == contamination_panel_bench::search_time::SearchExposureClassV1::Unknown).count()
+    );
+    println!("Raw bodies and sealed answers were used locally and are not copied to the findings artifact.");
+    Ok(())
+}
+
 fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 3 {
         return Err(
@@ -550,11 +602,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-fresh") => audit_fresh_cli(&args),
         Some("score-fresh") => score_fresh_cli(&args),
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
+        Some("match-search-time-bodies") => match_search_time_bodies_cli(&args),
         Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
         Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | match-search-time-bodies | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
