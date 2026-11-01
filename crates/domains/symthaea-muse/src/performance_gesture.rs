@@ -47,17 +47,17 @@ impl BeatPosition {
         self.denominator
     }
 
-    fn is_canonical(self) -> bool {
+    pub(crate) fn is_canonical(self) -> bool {
         self.denominator > 0
             && gcd_u64(self.numerator, self.denominator as u64) == 1
     }
 
-    fn cmp_exact(self, other: Self) -> Ordering {
+    pub(crate) fn cmp_exact(self, other: Self) -> Ordering {
         ((self.numerator as u128) * (other.denominator as u128))
             .cmp(&((other.numerator as u128) * (self.denominator as u128)))
     }
 
-    fn checked_add(self, other: Self) -> Option<Self> {
+    pub(crate) fn checked_add(self, other: Self) -> Option<Self> {
         let numerator = (self.numerator as u128)
             .checked_mul(other.denominator as u128)?
             .checked_add(
@@ -84,7 +84,7 @@ fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
     left.max(1)
 }
 
-fn is_sha256_hex(value: &str) -> bool {
+pub(crate) fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -598,7 +598,7 @@ impl PerformanceGestureTrackV1 {
     }
 }
 
-fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) -> bool {
+pub(crate) fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) -> bool {
     match (parameter, value) {
         (
             GestureParameter::BowSpeed
@@ -658,7 +658,7 @@ fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) ->
     }
 }
 
-fn scalar_domain_is_valid(
+pub(crate) fn scalar_domain_is_valid(
     parameter: GestureParameter,
     amount: f64,
     unit: GestureUnit,
