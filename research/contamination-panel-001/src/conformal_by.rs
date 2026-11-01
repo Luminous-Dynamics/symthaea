@@ -606,9 +606,7 @@ pub fn analyze_conformal_by(
     let mut q_levels = config.target_fdr_permille.clone();
     q_levels.sort_unstable();
     q_levels.dedup();
-    if q_levels != config.target_fdr_permille
-        || q_levels.iter().any(|q| !(1..=1_000).contains(q))
-    {
+    if q_levels != config.target_fdr_permille || q_levels.iter().any(|q| !(1..=1_000).contains(q)) {
         return Err(
             "BY target FDR levels must be unique, ascending and in [1, 1000] permille".to_owned(),
         );
