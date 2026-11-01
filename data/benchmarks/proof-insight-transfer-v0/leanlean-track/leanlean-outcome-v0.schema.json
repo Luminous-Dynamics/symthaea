@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/leanlean-outcome-v0.schema.json",
+  "title": "PITB LeanLean per-repository outcome v0",
+  "description": "One task × arm × replicate record for repository-scale proof compression. This is separate from SorryDB and theorem-family transfer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence_class", "run_status", "task", "arm", "environment", "budget", "resources", "outcome", "receipts"],
+  "properties": {
+    "schema_version": {"const": "pitb.leanlean.outcome.v0"},
+    "evidence_class": {"enum": ["synthetic_contract_fixture", "measured_run"]},
+    "run_status": {"enum": ["not_attempted", "measured", "failed", "unknown"]},
+    "task": {"$ref": "#/$defs/task"},
+    "arm": {"$ref": "#/$defs/arm"},
+    "environment": {"$ref": "#/$defs/environment"},
+    "budget": {"$ref": "#/$defs/budget"},
+    "resources": {"$ref": "#/$defs/resources"},
+    "outcome": {"$ref": "#/$defs/outcome"},
+    "receipts": {"$ref": "#/$defs/receipts"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"evidence_class": {"const": "synthetic_contract_fixture"}}, "required": ["evidence_class"]},
+      "then": {
+        "properties": {
+          "run_status": {"const": "not_attempted"},
+          "environment": {"properties": {"baseline_build_status": {"const": "not_run"}, "candidate_build_status": {"const": "not_run"}}},
+          "resources": {"properties": {"wall_ms": {"const": 0}, "model_calls": {"const": 0}, "tokens": {"const": 0}, "tool_calls": {"const": 0}, "lean_cpu_ms": {"const": 0}, "peak_rss_bytes": {"const": 0}, "cost_microusd": {"const": 0}}},
+          "outcome": {"properties": {"status": {"const": "not_attempted"}, "official_compression_score": {"type": "null"}, "candidate_tokens": {"type": "null"}, "candidate_protected_declarations": {"type": "null"}, "comparator_passed": {"type": "null"}, "clean_rebuild_passed": {"type": "null"}}},
+          "receipts": {"properties": {"candidate_tree_sha256": {"type": "null"}, "candidate_commit": {"type": "null"}, "comparator_receipt_sha256": {"type": "null"}, "baseline_build_receipt_sha256": {"type": "null"}, "candidate_build_receipt_sha256": {"type": "null"}, "action_log_sha256": {"type": "null"}}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {"const": "measured_run"},
+          "run_status": {"const": "measured"},
+          "outcome": {"properties": {"status": {"const": "verified_success"}}, "required": ["status"]}
+        },
+        "required": ["evidence_class", "run_status", "outcome"]
+      },
+      "then": {
+        "properties": {
+          "environment": {"properties": {"baseline_build_status": {"const": "passed"}, "candidate_build_status": {"const": "passed"}}},
+          "outcome": {"properties": {"official_compression_score": {"type": "number", "minimum": 0, "maximum": 1}, "candidate_tokens": {"type": "integer", "minimum": 0}, "candidate_protected_declarations": {"const": 620}, "comparator_passed": {"const": true}, "clean_rebuild_passed": {"const": true}, "missing_protected_declarations": {"const": 0}, "unapproved_axiom_changes": {"const": 0}, "unapproved_trust_changes": {"const": 0}}},
+          "receipts": {"properties": {"candidate_tree_sha256": {"$ref": "#/$defs/sha256"}, "candidate_commit": {"$ref": "#/$defs/sha1"}, "comparator_receipt_sha256": {"$ref": "#/$defs/sha256"}, "baseline_build_receipt_sha256": {"$ref": "#/$defs/sha256"}, "candidate_build_receipt_sha256": {"$ref": "#/$defs/sha256"}, "action_log_sha256": {"$ref": "#/$defs/sha256"}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"outcome": {"properties": {"status": {"const": "verified_success"}}}, "required": ["outcome"]},
+      "then": {"properties": {"run_status": {"const": "measured"}, "evidence_class": {"const": "measured_run"}}}
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "sha1": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cohort_id", "task_id", "repository_remote", "repository_commit", "repository_license", "token_band", "baseline_stripped_tokens", "protected_declaration_count", "protected_declarations_sha256"],
+      "properties": {
+        "cohort_id": {"const": "leanlean_20260914"},
+        "task_id": {"$ref": "#/$defs/sha256"},
+        "repository_remote": {"type": "string", "format": "uri"},
+        "repository_commit": {"$ref": "#/$defs/sha1"},
+        "repository_license": {"type": "string", "minLength": 1},
+        "token_band": {"enum": ["le_10k", "10k_50k", "50k_250k", "gt_250k"]},
+        "baseline_stripped_tokens": {"type": "integer", "minimum": 1},
+        "protected_declaration_count": {"const": 620},
+        "protected_declarations_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "arm": {
+      "type": "object", "additionalProperties": false,
+      "required": ["arm_id", "model_id", "model_version", "harness_version", "prompt_sha256", "config_sha256"],
+      "properties": {
+        "arm_id": {"enum": ["L0", "L1", "L2", "L3", "L4", "L5"]},
+        "model_id": {"type": "string", "minLength": 1},
+        "model_version": {"type": "string", "minLength": 1},
+        "harness_version": {"type": "string", "minLength": 1},
+        "prompt_sha256": {"$ref": "#/$defs/sha256"},
+        "config_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lean_toolchain", "lean_strip_version", "comparator_source_commit", "comparator_bundle_sha256", "baseline_build_status", "candidate_build_status"],
+      "properties": {
+        "lean_toolchain": {"type": "string", "minLength": 1},
+        "lean_strip_version": {"type": "string", "minLength": 1},
+        "comparator_source_commit": {"$ref": "#/$defs/sha1"},
+        "comparator_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "baseline_build_status": {"enum": ["not_run", "passed", "failed", "unknown"]},
+        "candidate_build_status": {"enum": ["not_run", "passed", "failed", "unknown"]}
+      }
+    },
+    "budget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["max_wall_ms", "max_model_calls", "max_tokens", "max_tool_calls", "max_lean_cpu_ms", "max_peak_rss_bytes", "max_cost_microusd"],
+      "properties": {
+        "max_wall_ms": {"type": "integer", "minimum": 1, "maximum": 43200000},
+        "max_model_calls": {"type": "integer", "minimum": 1},
+        "max_tokens": {"type": "integer", "minimum": 1},
+        "max_tool_calls": {"type": "integer", "minimum": 1},
+        "max_lean_cpu_ms": {"type": "integer", "minimum": 1},
+        "max_peak_rss_bytes": {"type": "integer", "minimum": 1, "maximum": 68719476736},
+        "max_cost_microusd": {"type": "integer", "minimum": 0}
+      }
+    },
+    "resources": {
+      "type": "object", "additionalProperties": false,
+      "required": ["wall_ms", "model_calls", "tokens", "tool_calls", "lean_cpu_ms", "peak_rss_bytes", "cost_microusd"],
+      "properties": {
+        "wall_ms": {"type": "integer", "minimum": 0},
+        "model_calls": {"type": "integer", "minimum": 0},
+        "tokens": {"type": "integer", "minimum": 0},
+        "tool_calls": {"type": "integer", "minimum": 0},
+        "lean_cpu_ms": {"type": "integer", "minimum": 0},
+        "peak_rss_bytes": {"type": "integer", "minimum": 0},
+        "cost_microusd": {"type": "integer", "minimum": 0}
+      }
+    },
+    "outcome": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "official_compression_score", "candidate_tokens", "candidate_protected_declarations", "comparator_passed", "clean_rebuild_passed", "missing_protected_declarations", "unapproved_axiom_changes", "unapproved_trust_changes"],
+      "properties": {
+        "status": {"enum": ["not_attempted", "verified_success", "comparator_failed", "build_failed", "timeout", "runner_unavailable", "unknown"]},
+        "official_compression_score": {"oneOf": [{"type": "null"}, {"type": "number", "minimum": 0, "maximum": 1}]},
+        "candidate_tokens": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 0}]},
+        "candidate_protected_declarations": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 0}]},
+        "comparator_passed": {"type": ["boolean", "null"]},
+        "clean_rebuild_passed": {"type": ["boolean", "null"]},
+        "missing_protected_declarations": {"type": "integer", "minimum": 0},
+        "unapproved_axiom_changes": {"type": "integer", "minimum": 0},
+        "unapproved_trust_changes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "receipts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidate_tree_sha256", "candidate_commit", "comparator_receipt_sha256", "baseline_build_receipt_sha256", "candidate_build_receipt_sha256", "action_log_sha256"],
+      "properties": {
+        "candidate_tree_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "candidate_commit": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha1"}]},
+        "comparator_receipt_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "baseline_build_receipt_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "candidate_build_receipt_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "action_log_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+      }
+    }
+  }
+}
