@@ -4,7 +4,7 @@ mod benchmark_integrity;
 use std::{
     env,
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitCode,
 };
 
@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 
 enum Mode {
     Help,
-    Verify { run_path: PathBuf, integrity_path: PathBuf },
+    Verify { run_path: PathBuf, integrity_path: PathBuf, evidence_root: PathBuf },
     SelfTest { run_path: PathBuf, integrity_path: PathBuf },
 }
 
@@ -97,11 +97,14 @@ fn verify_binding(run: &Value, integrity: &benchmark_integrity::IntegritySummary
     Ok(())
 }
 
-fn verify_pair(run_bytes: &[u8], integrity_bytes: &[u8]) -> Result<benchmark_integrity::IntegritySummary> {
+fn verify_pair(run_bytes: &[u8], integrity_bytes: &[u8], evidence_root: &Path) -> Result<benchmark_integrity::IntegritySummary> {
     let run: Value = serde_json::from_slice(run_bytes).context("parse SorryDB run receipt")?;
     let expected = string(&run, "/task_integrity/receipt_sha256")?;
-    let integrity =
-        benchmark_integrity::verify_bytes(integrity_bytes, Some(expected))?;
+    let integrity = benchmark_integrity::verify_bytes_with_evidence_root(
+        integrity_bytes,
+        Some(expected),
+        evidence_root,
+    )?;
     verify_binding(&run, &integrity)?;
     Ok(integrity)
 }
@@ -114,7 +117,24 @@ fn digest_string_list(rows: &Value, path: &str) -> Result<String> {
     Ok(sha256_hex(&serde_json::to_vec(items)?))
 }
 
-fn make_eligible_integrity(mut value: Value, run: &Value) -> Result<Value> {
+fn write_evidence_artifact(
+    evidence_root: &Path,
+    relative_path: &str,
+    bytes: &[u8],
+) -> Result<Value> {
+    let path = evidence_root.join(relative_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create evidence directory {}", parent.display()))?;
+    }
+    fs::write(&path, bytes).with_context(|| format!("write evidence artifact {}", path.display()))?;
+    Ok(json!({
+        "path":relative_path,
+        "sha256":sha256_hex(bytes)
+    }))
+}
+
+fn make_eligible_integrity(mut value: Value, run: &Value, evidence_root: &Path) -> Result<Value> {
     let sorry_id = string(run, "/task/sorry_id")?.to_owned();
     let repository_commit = string(run, "/task/repository_commit")?.to_owned();
     let repository_remote = string(run, "/task/repository_remote")?.to_owned();
@@ -138,11 +158,45 @@ fn make_eligible_integrity(mut value: Value, run: &Value) -> Result<Value> {
     value["target"]["end_column"] = run["task"]["end_column"].clone();
 
     value["environment"]["lean_toolchain"] = json!(lean_version);
-    value["environment"]["lake_manifest_sha256"] = run["environment"]["lake_manifest_sha256"].clone();
+
+    let source_bytes = b"theorem Synthetic.example : True := by trivial\n";
+    let informal_bytes = b"A synthetic proposition used only to test the evidence bundle.\n";
+    let lean_bytes = b"synthetic-lean-binary-v0";
+    let lake_bytes = b"{\"version\":1}\n";
+    let root_module_bytes = b"synthetic-root-module-v0";
+    let elaboration_bytes = br#"{"status":"passed","target":"synthetic"}"#;
+    let used_axioms_bytes = b"[]";
+    let allowlist_bytes = br#"["Classical.choice","Quot.sound","propext"]"#;
+    let counterexample_bytes = br#"{"status":"not_found","method":"synthetic"}"#;
+    let vacuity_bytes = br#"{"status":"no_counterexample_found","method":"synthetic"}"#;
+    let reviewer_bytes = br#"{"reviewer":"synthetic-reviewer-not-real","decision":"approved"}"#;
+
+    value["target"]["source_file_sha256"] = json!(sha256_hex(source_bytes));
+    value["target"]["expected_informal_statement_sha256"] = json!(sha256_hex(informal_bytes));
+    value["environment"]["lean_binary_sha256"] = json!(sha256_hex(lean_bytes));
+    value["environment"]["lake_manifest_sha256"] = json!(sha256_hex(lake_bytes));
+    value["environment"]["root_module_sha256"] = json!(sha256_hex(root_module_bytes));
 
     value["elaboration"]["status"] = json!("passed");
     value["elaboration"]["checked_statement_sha256"] = value["target"]["statement_sha256"].clone();
-    value["elaboration"]["receipt_sha256"] = json!("c".repeat(64));
+    value["elaboration"]["receipt_sha256"] = json!(sha256_hex(elaboration_bytes));
+    value["counterexample_audit"]["receipt_sha256"] = json!(sha256_hex(counterexample_bytes));
+    value["vacuity_audit"]["receipt_sha256"] = json!(sha256_hex(vacuity_bytes));
+    value["semantic_review"]["reviewer_attestation_sha256"] = json!(sha256_hex(reviewer_bytes));
+
+    value["evidence_artifacts"] = json!({
+        "source_file":write_evidence_artifact(evidence_root,"source/Synthetic/Example.lean",source_bytes)?,
+        "informal_statement":write_evidence_artifact(evidence_root,"spec/problem.txt",informal_bytes)?,
+        "lean_binary":write_evidence_artifact(evidence_root,"toolchain/lean",lean_bytes)?,
+        "lake_manifest":write_evidence_artifact(evidence_root,"project/lake-manifest.json",lake_bytes)?,
+        "root_module":write_evidence_artifact(evidence_root,"project/Synthetic.olean",root_module_bytes)?,
+        "elaboration_receipt":write_evidence_artifact(evidence_root,"receipts/elaboration.json",elaboration_bytes)?,
+        "used_axioms_manifest":write_evidence_artifact(evidence_root,"manifests/used-axioms.json",used_axioms_bytes)?,
+        "allowlist_manifest":write_evidence_artifact(evidence_root,"manifests/allowlist.json",allowlist_bytes)?,
+        "counterexample_receipt":write_evidence_artifact(evidence_root,"receipts/counterexample.json",counterexample_bytes)?,
+        "vacuity_receipt":write_evidence_artifact(evidence_root,"receipts/vacuity.json",vacuity_bytes)?,
+        "reviewer_attestation":write_evidence_artifact(evidence_root,"review/reviewer-attestation.json",reviewer_bytes)?
+    });
 
     // Keep all axiom manifests canonical and sorted, even in the synthetic example.
     value["axioms"]["used_axioms"] = json!([]);
@@ -173,9 +227,9 @@ fn json_bytes(value: &Value) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn must_reject(label: &str, run: Value, integrity_bytes: &[u8]) -> Result<()> {
+fn must_reject(label: &str, run: Value, integrity_bytes: &[u8], evidence_root: &Path) -> Result<()> {
     let run_bytes = json_bytes(&run)?;
-    if verify_pair(&run_bytes, integrity_bytes).is_ok() {
+    if verify_pair(&run_bytes, integrity_bytes, evidence_root).is_ok() {
         bail!("SorryDB integrity join accepted negative control: {label}");
     }
     println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: {label}");
@@ -189,6 +243,13 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     let mut run: Value = serde_json::from_slice(&run_bytes).context("parse synthetic run fixture")?;
     let integrity: Value =
         serde_json::from_slice(&integrity_bytes).context("parse synthetic integrity fixture")?;
+    let evidence_root = env::temp_dir().join(format!("pitb-sorrydb-evidence-{}", std::process::id()));
+    if evidence_root.exists() {
+        fs::remove_dir_all(&evidence_root)
+            .with_context(|| format!("clear stale evidence root {}", evidence_root.display()))?;
+    }
+    fs::create_dir_all(&evidence_root)
+        .with_context(|| format!("create evidence root {}", evidence_root.display()))?;
 
     run["task_integrity"] = Value::Null;
     if verify_pair(&run_bytes, &integrity_bytes).is_ok() {
@@ -196,9 +257,13 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     }
     println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: no-run fixture is not an eligible measured task");
 
-    let eligible = make_eligible_integrity(integrity, &run)?;
+    let eligible = make_eligible_integrity(integrity, &run, &evidence_root)?;
     let integrity_bytes = json_bytes(&eligible)?;
-    let integrity_summary = benchmark_integrity::verify_bytes(&integrity_bytes, None)?;
+    let integrity_summary = benchmark_integrity::verify_bytes_with_evidence_root(
+        &integrity_bytes,
+        None,
+        &evidence_root,
+    )?;
     if integrity_summary.integrity_status != "eligible" {
         bail!("synthetic eligible integrity fixture did not derive eligible status");
     }
@@ -209,67 +274,104 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
         "integrity_status":"eligible"
     });
     let run_bytes = json_bytes(&run)?;
-    verify_pair(&run_bytes, &integrity_bytes)?;
-    println!("PITB_SORRYDB_INTEGRITY_JOIN_PASS: exact integrity bytes joined to task, source span and Lean environment");
+    verify_pair(&run_bytes, &integrity_bytes, &evidence_root)?;
+    println!("PITB_SORRYDB_INTEGRITY_JOIN_PASS: exact integrity receipt and eleven evidence artifacts joined to task, source span and Lean environment");
+
+    let source_artifact = evidence_root.join("source/Synthetic/Example.lean");
+    let original_source = fs::read(&source_artifact)?;
+    fs::write(&source_artifact, b"tampered after receipt creation")?;
+    if verify_pair(&run_bytes, &integrity_bytes, &evidence_root).is_ok() {
+        bail!("tampered source artifact unexpectedly passed evidence bundle verification");
+    }
+    fs::write(&source_artifact, &original_source)?;
+    println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: referenced source artifact byte tampering");
+
+    let escaped_path = evidence_root.join("source/escape.lean");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let outside = evidence_root.parent().unwrap_or(&evidence_root).join("pitb-integrity-outside");
+        fs::write(&outside, b"outside evidence root")?;
+        symlink(&outside, &escaped_path)?;
+        let mut escaped: Value = serde_json::from_slice(&integrity_bytes)?;
+        escaped["evidence_artifacts"]["source_file"]["path"] = json!("source/escape.lean");
+        let escaped_bytes = json_bytes(&escaped)?;
+        if benchmark_integrity::verify_bytes_with_evidence_root(&escaped_bytes, None, &evidence_root).is_ok() {
+            bail!("evidence bundle verifier accepted a symlink escaping the evidence root");
+        }
+        fs::remove_file(&escaped_path)?;
+        fs::remove_file(&outside)?;
+        println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: evidence-root symlink escape");
+    }
 
     let mut bad = run.clone();
     bad["task"]["repository_commit"] = json!("0".repeat(40));
     bad["environment"]["repository_commit"] = json!("0".repeat(40));
-    must_reject("repository commit substitution", bad, &integrity_bytes)?;
+    must_reject("repository commit substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task"]["repository_branch"] = json!("other-branch");
-    must_reject("repository branch substitution", bad, &integrity_bytes)?;
+    must_reject("repository branch substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task"]["source_path"] = json!("Synthetic/Neighbor.lean");
-    must_reject("source file substitution", bad, &integrity_bytes)?;
+    must_reject("source file substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task"]["start_line"] = json!(13);
-    must_reject("source span substitution", bad, &integrity_bytes)?;
+    must_reject("source span substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task"]["lean_version"] = json!("leanprover/lean4:v4.other");
     bad["environment"]["lean_version"] = json!("leanprover/lean4:v4.other");
-    must_reject("Lean toolchain substitution", bad, &integrity_bytes)?;
+    must_reject("Lean toolchain substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["environment"]["lake_manifest_sha256"] = json!("0".repeat(64));
-    must_reject("Lake manifest substitution", bad, &integrity_bytes)?;
+    must_reject("Lake manifest substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task"]["sorry_id"] = json!("different-sorry-id");
-    must_reject("task ID substitution", bad, &integrity_bytes)?;
+    must_reject("task ID substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task_integrity"]["receipt_sha256"] = json!("0".repeat(64));
-    must_reject("integrity receipt digest substitution", bad, &integrity_bytes)?;
+    must_reject("integrity receipt digest substitution", bad, &integrity_bytes, &evidence_root)?;
 
     let mut bad = run.clone();
     bad["task_integrity"]["integrity_status"] = json!("pending");
-    must_reject("pending target integrity", bad, &integrity_bytes)?;
+    must_reject("pending target integrity", bad, &integrity_bytes, &evidence_root)?;
 
     println!("PITB_SORRYDB_INTEGRITY_SELF_TEST_PASS");
+    fs::remove_dir_all(&evidence_root)
+        .with_context(|| format!("remove evidence root {}", evidence_root.display()))?;
     Ok(())
 }
 
 fn parse_mode() -> Result<Mode> {
     let mut args = env::args().skip(1);
     let Some(action) = args.next() else {
-        bail!("expected --verify RUN_RECEIPT INTEGRITY_RECEIPT, --self-test RUN_FIXTURE INTEGRITY_FIXTURE, or --help");
+        bail!("expected --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT, --self-test RUN_FIXTURE INTEGRITY_FIXTURE, or --help");
     };
     if matches!(action.as_str(), "--help" | "-h") {
         return Ok(Mode::Help);
     }
     let run_path = PathBuf::from(args.next().context("missing SorryDB run receipt path")?);
     let integrity_path = PathBuf::from(args.next().context("missing benchmark integrity receipt path")?);
-    if args.next().is_some() {
-        bail!("too many command arguments");
-    }
     match action.as_str() {
-        "--verify" => Ok(Mode::Verify { run_path, integrity_path }),
-        "--self-test" => Ok(Mode::SelfTest { run_path, integrity_path }),
+        "--verify" => {
+            let evidence_root = PathBuf::from(args.next().context("missing evidence root directory")?);
+            if args.next().is_some() {
+                bail!("too many --verify arguments");
+            }
+            Ok(Mode::Verify { run_path, integrity_path, evidence_root })
+        }
+        "--self-test" => {
+            if args.next().is_some() {
+                bail!("--self-test accepts only run and integrity fixture paths");
+            }
+            Ok(Mode::SelfTest { run_path, integrity_path })
+        }
         _ => bail!("unknown action {action}"),
     }
 }
@@ -277,20 +379,21 @@ fn parse_mode() -> Result<Mode> {
 fn run() -> Result<()> {
     match parse_mode()? {
         Mode::Help => {
-            println!("Usage: verify_sorrydb_run_integrity --verify RUN_RECEIPT INTEGRITY_RECEIPT | --self-test RUN_FIXTURE INTEGRITY_FIXTURE");
+            println!("Usage: verify_sorrydb_run_integrity --verify RUN_RECEIPT INTEGRITY_RECEIPT EVIDENCE_ROOT | --self-test RUN_FIXTURE INTEGRITY_FIXTURE");
             Ok(())
         }
         Mode::SelfTest { run_path, integrity_path } => self_test(&run_path, &integrity_path),
-        Mode::Verify { run_path, integrity_path } => {
+        Mode::Verify { run_path, integrity_path, evidence_root } => {
             let run_bytes = fs::read(&run_path).with_context(|| format!("read run receipt {}", run_path.display()))?;
             let integrity_bytes =
                 fs::read(&integrity_path).with_context(|| format!("read integrity receipt {}", integrity_path.display()))?;
-            let summary = verify_pair(&run_bytes, &integrity_bytes)?;
+            let summary = verify_pair(&run_bytes, &integrity_bytes, &evidence_root)?;
             println!(
                 "PITB_SORRYDB_INTEGRITY_PASS: task={} snapshot={} commit={} status={}",
                 summary.source_task_id, summary.snapshot_id, summary.repository_commit, summary.integrity_status
             );
             println!("PITB_SORRYDB_INTEGRITY_SHA256: {}", summary.receipt_sha256);
+            println!("PITB_SORRYDB_EVIDENCE_ARTIFACTS_PASS: {}", summary.verified_evidence_artifact_count);
             Ok(())
         }
     }
