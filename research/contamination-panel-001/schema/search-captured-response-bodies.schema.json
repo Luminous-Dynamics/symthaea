@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-captured-response-body-v1.json",
+  "title": "Evaluator-only captured search response body v1",
+  "type": "array",
+  "maxItems": 1000000,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "event_sequence",
+      "content_type",
+      "body_text",
+      "response_sha256"
+    ],
+    "properties": {
+      "event_sequence": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "content_type": {
+        "type": "string",
+        "minLength": 1
+      },
+      "body_text": {
+        "type": "string",
+        "maxLength": 16777216
+      },
+      "response_sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}
