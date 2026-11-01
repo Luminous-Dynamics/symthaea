@@ -1,68 +1,142 @@
 {
-  "schema_version":"pitb.proof-graph-state.v0",
-  "evidence_class":"synthetic_contract_fixture",
-  "task":{
-    "task_id":"1111111111111111111111111111111111111111111111111111111111111111",
-    "repository_commit":"2222222222222222222222222222222222222222",
-    "environment_sha256":"3333333333333333333333333333333333333333333333333333333333333333",
-    "target_manifest_sha256":"4444444444444444444444444444444444444444444444444444444444444444"
+  "schema_version": "pitb.proof-graph-state.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "task": {
+    "task_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "repository_commit": "2222222222222222222222222222222222222222",
+    "environment_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "target_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
   },
-  "root_declaration_ids":["target-main"],
-  "declarations":[
+  "root_declaration_ids": [
+    "target-main",
+    "target-secondary"
+  ],
+  "declarations": [
     {
-      "declaration_id":"target-main","kind":"target",
-      "statement_sha256":"5555555555555555555555555555555555555555555555555555555555555555",
-      "lifecycle_state":"open","dependency_ids":["helper-normalize"],
-      "proof_receipt_sha256":null,"kernel_verified":false,"contains_sorry_ax":false,"axiom_names":[]
+      "declaration_id": "target-main",
+      "kind": "target",
+      "statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "lifecycle_state": "open",
+      "dependency_ids": [
+        "helper-normalize"
+      ],
+      "proof_receipt_sha256": null,
+      "kernel_verified": false,
+      "contains_sorry_ax": false,
+      "axiom_names": []
     },
     {
-      "declaration_id":"helper-normalize","kind":"helper",
-      "statement_sha256":"6666666666666666666666666666666666666666666666666666666666666666",
-      "lifecycle_state":"stable","dependency_ids":[],
-      "proof_receipt_sha256":"7777777777777777777777777777777777777777777777777777777777777777",
-      "kernel_verified":true,"contains_sorry_ax":false,"axiom_names":["Classical.choice","propext"]
-    }
-  ],
-  "goal_nodes":[
-    {
-      "goal_id":"goal-target-root","declaration_id":"target-main",
-      "normalized_goal_sha256":"8888888888888888888888888888888888888888888888888888888888888888",
-      "status":"open","closure_proof_sha256":null,"closure_receipt_sha256":null,
-      "closure_kernel_verified":false,"closure_contains_sorry_ax":false
+      "declaration_id": "target-secondary",
+      "kind": "target",
+      "statement_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "lifecycle_state": "open",
+      "dependency_ids": [
+        "helper-normalize"
+      ],
+      "proof_receipt_sha256": null,
+      "kernel_verified": false,
+      "contains_sorry_ax": false,
+      "axiom_names": []
     },
     {
-      "goal_id":"goal-helper-root","declaration_id":"helper-normalize",
-      "normalized_goal_sha256":"9999999999999999999999999999999999999999999999999999999999999999",
-      "status":"closed","closure_proof_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "closure_receipt_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "closure_kernel_verified":true,"closure_contains_sorry_ax":false
+      "declaration_id": "helper-normalize",
+      "kind": "helper",
+      "statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "lifecycle_state": "stable",
+      "dependency_ids": [],
+      "proof_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "kernel_verified": true,
+      "contains_sorry_ax": false,
+      "axiom_names": [
+        "Classical.choice",
+        "propext"
+      ]
     }
   ],
-  "proof_steps":[
+  "goal_nodes": [
     {
-      "step_id":"step-helper-terminal","parent_goal_id":"goal-helper-root",
-      "goal_state_sha256":"9999999999999999999999999999999999999999999999999999999999999999",
-      "status":"applied","subgoal_ids":[],
-      "transition_checker_id":"lean4-kernel-transition-v0",
-      "transition_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "terminal_proof_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "terminal_receipt_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "terminal_kernel_verified":true,"terminal_contains_sorry_ax":false
+      "goal_id": "goal-target-root",
+      "declaration_id": "target-main",
+      "normalized_goal_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "status": "open",
+      "closure_proof_sha256": null,
+      "closure_receipt_sha256": null,
+      "closure_kernel_verified": false,
+      "closure_contains_sorry_ax": false
+    },
+    {
+      "goal_id": "goal-helper-root",
+      "declaration_id": "helper-normalize",
+      "normalized_goal_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "status": "closed",
+      "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "closure_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "closure_kernel_verified": true,
+      "closure_contains_sorry_ax": false
+    },
+    {
+      "goal_id": "goal-target-secondary",
+      "declaration_id": "target-secondary",
+      "normalized_goal_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "status": "open",
+      "closure_proof_sha256": null,
+      "closure_receipt_sha256": null,
+      "closure_kernel_verified": false,
+      "closure_contains_sorry_ax": false
     }
   ],
-  "scheduler_decision":{
-    "decision_id":"synthetic-proof-graph-decision-001",
-    "ready_frontier_goal_ids":["goal-target-root"],
-    "selected_goal_ids":["goal-target-root"],
-    "specialist":"proof_writer","reasoning_effort":"medium","max_specialist_calls":1,
-    "routing_policy_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-    "decision_receipt_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  "proof_steps": [
+    {
+      "step_id": "step-helper-terminal",
+      "parent_goal_id": "goal-helper-root",
+      "goal_state_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "status": "applied",
+      "subgoal_ids": [],
+      "transition_checker_id": "lean4-kernel-transition-v0",
+      "transition_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "terminal_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "terminal_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "terminal_kernel_verified": true,
+      "terminal_contains_sorry_ax": false
+    }
+  ],
+  "scheduler_decision": {
+    "decision_id": "synthetic-proof-graph-decision-001",
+    "ready_frontier_goal_ids": [
+      "goal-target-root",
+      "goal-target-secondary"
+    ],
+    "selected_goal_ids": [
+      "goal-target-root",
+      "goal-target-secondary"
+    ],
+    "specialist": "proof_writer",
+    "reasoning_effort": "medium",
+    "max_specialist_calls": 1,
+    "routing_policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "decision_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
   },
-  "resource_ledger":{
-    "budget":{"model_calls":8,"tool_calls":40,"tokens":50000,"wall_ms":60000,"lean_cpu_ms":30000,"cost_microusd":5000000},
-    "actual":{
-      "router_model_calls":1,"specialist_model_calls":1,"model_calls":2,"tool_calls":8,"tokens":12000,"wall_ms":10000,"lean_cpu_ms":8000,
-      "router_cost_microusd":100000,"specialist_cost_microusd":400000,"lean_cost_microusd":10000,"cost_microusd":510000
+  "resource_ledger": {
+    "budget": {
+      "model_calls": 8,
+      "tool_calls": 40,
+      "tokens": 50000,
+      "wall_ms": 60000,
+      "lean_cpu_ms": 30000,
+      "cost_microusd": 5000000
+    },
+    "actual": {
+      "router_model_calls": 1,
+      "specialist_model_calls": 1,
+      "model_calls": 2,
+      "tool_calls": 8,
+      "tokens": 12000,
+      "wall_ms": 10000,
+      "lean_cpu_ms": 8000,
+      "router_cost_microusd": 100000,
+      "specialist_cost_microusd": 400000,
+      "lean_cost_microusd": 10000,
+      "cost_microusd": 510000
     }
   }
 }
