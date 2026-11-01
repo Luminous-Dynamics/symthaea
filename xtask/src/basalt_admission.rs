@@ -94,6 +94,8 @@ pub struct AdmissionReason {
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct AdmissionReport {
     pub report_version: u32,
+    /// This evaluator reduces supplied outcomes; it does not authenticate the profile or verify evidence.
+    pub reference_only: bool,
     pub status: AdmissionStatus,
     pub admission_allowed: bool,
     pub obligations: Vec<ObligationEvaluation>,
@@ -104,7 +106,9 @@ pub struct AdmissionReport {
 ///
 /// This function trusts neither a caller-provided aggregate verdict nor a
 /// cached admission_allowed field: neither is accepted in the input model.
-/// The obligation outcomes are inputs from separately verified components.
+/// The caller must authenticate the selected profile and obtain obligation
+/// outcomes from independent verifiers before using this reduction. This
+/// reference module itself verifies neither profile authenticity nor evidence.
 pub fn evaluate(input: &AdmissionInput) -> AdmissionReport {
     let mut reasons = Vec::new();
     let mut obligations = Vec::new();
@@ -444,6 +448,7 @@ fn report(
 ) -> AdmissionReport {
     AdmissionReport {
         report_version: 1,
+        reference_only: true,
         status,
         admission_allowed: status == AdmissionStatus::Valid,
         obligations,
