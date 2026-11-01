@@ -787,10 +787,12 @@ fn validate_and_apply_event(
                     "identical decision bytes must share one canonical candidate ID",
                 ));
             }
-            if state.successful.contains_key(candidate_id) {
+            if state.successful.contains_key(candidate_id)
+                && !matches!(outcome, EvaluationOutcome::Succeeded)
+            {
                 return Err(AnytimeError::new(
                     format!("{path}.candidate_id"),
-                    "candidate can be admitted successfully only once in v0.1",
+                    "an admitted deterministic candidate cannot be retried after success",
                 ));
             }
 
@@ -876,7 +878,21 @@ fn validate_and_apply_event(
             state.decision_owners.entry(decision_sha256.clone())
                 .or_insert_with(|| candidate_id.clone());
             if let Some(candidate) = new_candidate {
-                state.successful.insert(candidate_id.clone(), candidate);
+                if let Some(existing) = state.successful.get(candidate_id) {
+                    if existing.candidate != candidate.candidate
+                        || existing.decision_sha256 != candidate.decision_sha256
+                    {
+                        return Err(AnytimeError::new(
+                            format!("{path}.candidate_id"),
+                            "repeated deterministic evaluation changed objective/evidence output for the same decision; noisy replication requires a separate aggregation contract",
+                        ));
+                    }
+                    // Exact duplicate evaluation is retained and charged in the event tape,
+                    // but does not duplicate the candidate in the Pareto archive or downgrade
+                    // an already-promoted evidence level.
+                } else {
+                    state.successful.insert(candidate_id.clone(), candidate);
+                }
             }
         }
         AnytimeAction::CandidateVerification {
@@ -998,6 +1014,175 @@ fn validate_and_apply_event(
     state.previous_digest = event.event_sha256.clone();
     Ok(())
 }
+/// Captures deterministic optimizer objective evaluations in the shared anytime format.
+///
+/// This recorder uses synthetic objective-evaluation units only. It deliberately records
+/// wall/CPU/energy/memory as Unknown rather than inventing physical measurements. Use an
+/// EventTape/resource adapter for real execution measurements.
+pub struct AnytimeRecorder<'a> {
+    history: &'a mut AnytimeHistory,
+    attempts: BTreeMap<String, u32>,
+}
+
+impl<'a> AnytimeRecorder<'a> {
+    pub fn new(history: &'a mut AnytimeHistory) -> Result<Self, AnytimeError> {
+        history.validate()?;
+        let required = history.header.required_resource_meters.iter().copied().collect::<BTreeSet<_>>();
+        let expected = [
+            ResourceMeter::EvaluatorCalls,
+            ResourceMeter::NormalizedChargeMicrounits,
+        ].into_iter().collect::<BTreeSet<_>>();
+        if required != expected {
+            return Err(AnytimeError::new(
+                "recorder.required_resource_meters",
+                "deterministic optimizer recorder requires exactly EvaluatorCalls and NormalizedChargeMicrounits; physical meters must come from a measured execution adapter",
+            ));
+        }
+        if !history.header.cost_model_id.contains("synthetic")
+            && !history.header.cost_model_id.contains("objective-evaluation-unit")
+        {
+            return Err(AnytimeError::new(
+                "recorder.cost_model_id",
+                "deterministic optimizer recorder requires an explicitly synthetic objective-evaluation cost model",
+            ));
+        }
+        let mut attempts = BTreeMap::new();
+        for event in &history.events {
+            if let AnytimeAction::CandidateEvaluation { candidate_id, attempt, .. } = &event.action {
+                attempts.insert(candidate_id.clone(), *attempt);
+            }
+        }
+        Ok(Self { history, attempts })
+    }
+
+    pub fn history(&self) -> &AnytimeHistory {
+        self.history
+    }
+
+    pub fn record_success(
+        &mut self,
+        decision: &[f64],
+        objective_values: &[f64],
+        feasible: bool,
+        constraint_violations: Vec<String>,
+    ) -> Result<String, AnytimeError> {
+        if objective_values.iter().any(|value| !value.is_finite()) {
+            return Err(AnytimeError::new("recorder.objective_values", "objective values must be finite"));
+        }
+        if (feasible && !constraint_violations.is_empty())
+            || (!feasible && (constraint_violations.is_empty() || constraint_violations.iter().any(|v| v.trim().is_empty())))
+        {
+            return Err(AnytimeError::new("recorder.constraint_violations", "feasibility and explicit violations disagree"));
+        }
+        let (candidate_id, decision_sha256) = decision_candidate_identity(decision)?;
+        let evidence_sha256 = evaluation_evidence_sha256(&candidate_id, objective_values, feasible, &constraint_violations)?;
+        self.append_evaluation(
+            candidate_id,
+            decision_sha256,
+            EvaluationOutcome::Succeeded,
+            Some(objective_values.to_vec()),
+            Some(feasible),
+            constraint_violations,
+            Some(evidence_sha256),
+            None,
+        )
+    }
+
+    pub fn record_failure(
+        &mut self,
+        decision: &[f64],
+        outcome: EvaluationOutcome,
+        failure_reason: impl Into<String>,
+    ) -> Result<String, AnytimeError> {
+        if outcome == EvaluationOutcome::Succeeded {
+            return Err(AnytimeError::new("recorder.outcome", "record_failure cannot record Succeeded"));
+        }
+        let (candidate_id, decision_sha256) = decision_candidate_identity(decision)?;
+        self.append_evaluation(
+            candidate_id,
+            decision_sha256,
+            outcome,
+            None,
+            None,
+            Vec::new(),
+            None,
+            Some(failure_reason.into()),
+        )
+    }
+
+    fn append_evaluation(
+        &mut self,
+        candidate_id: String,
+        decision_sha256: String,
+        outcome: EvaluationOutcome,
+        objective_values: Option<Vec<f64>>,
+        feasible: Option<bool>,
+        constraint_violations: Vec<String>,
+        evidence_sha256: Option<String>,
+        failure_reason: Option<String>,
+    ) -> Result<String, AnytimeError> {
+        let attempt = self.attempts.get(&candidate_id).copied().unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| AnytimeError::new("recorder.attempt", "candidate attempt counter overflow"))?;
+        let evaluation_id = format!("{}:{attempt}", candidate_id);
+        let mut resources = ResourceCost::unknown();
+        resources.evaluator_calls = Some(1);
+        resources.normalized_charge_microunits = Some(1);
+        // Synthetic deterministic benchmarks have no measured wall-clock duration.
+        // Zero-length monotonic intervals preserve ordering without claiming latency.
+        let event_sha256 = self.history.append(AnytimeEventDraft {
+            started_elapsed_millis: 0,
+            completed_elapsed_millis: 0,
+            resources,
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id,
+                candidate_id: candidate_id.clone(),
+                attempt,
+                decision_sha256,
+                outcome,
+                objective_values,
+                feasible,
+                constraint_violations,
+                evidence_sha256,
+                failure_reason,
+            },
+        })?;
+        self.attempts.insert(candidate_id, attempt);
+        Ok(event_sha256)
+    }
+}
+
+/// Stable identity for an exact finite decision vector. The length and IEEE-754 bit patterns
+/// are encoded explicitly; JSON formatting and platform text formatting are not identity.
+pub fn decision_candidate_identity(decision: &[f64]) -> Result<(String, String), AnytimeError> {
+    if decision.is_empty() || decision.iter().any(|value| !value.is_finite()) {
+        return Err(AnytimeError::new("decision", "decision vector must be non-empty and finite"));
+    }
+    let mut bytes = Vec::with_capacity(8 + decision.len() * 8);
+    let length = u64::try_from(decision.len())
+        .map_err(|_| AnytimeError::new("decision", "decision vector length exceeds u64"))?;
+    bytes.extend_from_slice(&length.to_le_bytes());
+    for value in decision {
+        bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+    }
+    let digest = digest_bytes(&bytes);
+    Ok((format!("candidate-{digest}"), digest))
+}
+
+fn evaluation_evidence_sha256(
+    candidate_id: &str,
+    objective_values: &[f64],
+    feasible: bool,
+    constraint_violations: &[String],
+) -> Result<String, AnytimeError> {
+    digest_serializable(&(candidate_id, objective_values, feasible, constraint_violations))
+}
+
+fn digest_bytes(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct CandidateState {
     candidate: ParetoCandidate,
