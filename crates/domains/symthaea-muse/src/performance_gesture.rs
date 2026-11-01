@@ -1228,9 +1228,24 @@ mod tests {
     }
     #[test]
     fn piano_controls_have_distinct_units_and_scope() {
-        let mut pedal = event(
+        let make_piano_event = |event_id: &str,
+                                parameter: GestureParameter,
+                                value: GestureValue,
+                                interpolation: GestureInterpolation| {
+            let mut value = event(
+                event_id,
+                BeatPosition::new(1, 1).unwrap(),
+                parameter,
+                value,
+                interpolation,
+            );
+            value.instrument_id = "piano".to_string();
+            value.target = GestureTarget::Part { part_id: 2 };
+            value
+        };
+
+        let damper_depth = make_piano_event(
             "damper-depth",
-            BeatPosition::new(1, 1).unwrap(),
             GestureParameter::PianoDamperPedalDepth,
             GestureValue::Scalar {
                 amount: 0.45,
@@ -1238,26 +1253,93 @@ mod tests {
             },
             GestureInterpolation::Linear,
         );
-        pedal.instrument_id = "piano".to_string();
-        pedal.target = GestureTarget::Part { part_id: 2 };
-        assert!(PerformanceGestureTrackV1::new(vec![pedal.clone()]).validate().is_ok());
+        assert!(PerformanceGestureTrackV1::new(vec![damper_depth.clone()])
+            .validate()
+            .is_ok());
 
-        pedal.instrument_id = "violin".to_string();
-        assert!(PerformanceGestureTrackV1::new(vec![pedal]).validate().is_err());
-
-        let mut sostenuto = event(
+        let sostenuto = make_piano_event(
             "sostenuto",
-            BeatPosition::new(1, 1).unwrap(),
             GestureParameter::PianoSostenutoPedal,
             GestureValue::Boolean { value: true },
             GestureInterpolation::Step,
         );
-        sostenuto.instrument_id = "piano".to_string();
-        sostenuto.target = GestureTarget::Note {
+        assert!(PerformanceGestureTrackV1::new(vec![sostenuto])
+            .validate()
+            .is_ok());
+
+        let una_corda = make_piano_event(
+            "una-corda",
+            GestureParameter::PianoUnaCordaPedal,
+            GestureValue::Boolean { value: true },
+            GestureInterpolation::Step,
+        );
+        assert!(PerformanceGestureTrackV1::new(vec![una_corda])
+            .validate()
+            .is_ok());
+
+        let string_resonance = make_piano_event(
+            "string-resonance",
+            GestureParameter::PianoStringResonance,
+            GestureValue::Scalar {
+                amount: 0.7,
+                unit: GestureUnit::Normalized,
+            },
+            GestureInterpolation::Linear,
+        );
+        assert!(PerformanceGestureTrackV1::new(vec![string_resonance])
+            .validate()
+            .is_ok());
+
+        let hammer_hardness = make_piano_event(
+            "hammer-hardness",
+            GestureParameter::PianoHammerHardness,
+            GestureValue::Scalar {
+                amount: 0.6,
+                unit: GestureUnit::Normalized,
+            },
+            GestureInterpolation::Linear,
+        );
+        assert!(PerformanceGestureTrackV1::new(vec![hammer_hardness])
+            .validate()
+            .is_ok());
+
+        let mut wrong_instrument = damper_depth.clone();
+        wrong_instrument.instrument_id = "violin".to_string();
+        assert!(PerformanceGestureTrackV1::new(vec![wrong_instrument])
+            .validate()
+            .is_err());
+
+        let mut wrong_unit = damper_depth.clone();
+        wrong_unit.value = GestureValue::Scalar {
+            amount: 0.45,
+            unit: GestureUnit::Hertz,
+        };
+        assert!(PerformanceGestureTrackV1::new(vec![wrong_unit])
+            .validate()
+            .is_err());
+
+        let mut note_scoped = damper_depth;
+        note_scoped.target = GestureTarget::Note {
             part_id: 2,
             note_id: "note-17".to_string(),
         };
-        assert!(PerformanceGestureTrackV1::new(vec![sostenuto]).validate().is_err());
+        assert!(PerformanceGestureTrackV1::new(vec![note_scoped])
+            .validate()
+            .is_err());
+
+        let mut soft_piano = make_piano_event(
+            "soft-piano-resonance",
+            GestureParameter::PianoStringResonance,
+            GestureValue::Scalar {
+                amount: 0.5,
+                unit: GestureUnit::Normalized,
+            },
+            GestureInterpolation::Linear,
+        );
+        soft_piano.instrument_id = "piano.pp".to_string();
+        assert!(PerformanceGestureTrackV1::new(vec![soft_piano])
+            .validate()
+            .is_ok());
     }
 
     #[test]
