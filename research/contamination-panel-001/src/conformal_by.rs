@@ -157,7 +157,9 @@ fn valid_identifier(value: &str, label: &str) -> Result<(), String> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(&byte))
     {
-        Err(format!("{label} must be a nonempty opaque ASCII identifier"))
+        Err(format!(
+            "{label} must be a nonempty opaque ASCII identifier"
+        ))
     } else {
         Ok(())
     }
@@ -179,9 +181,7 @@ pub fn compute_calibration_report_sha256(
 /// Every term ceil(1e6/i) is >= 1e6/i, so the sum is an upper bound.
 pub fn harmonic_upper_micros(hypothesis_count: u64) -> Result<u64, String> {
     if hypothesis_count == 0 || hypothesis_count > MAX_BY_HYPOTHESES as u64 {
-        return Err(format!(
-            "BY family size must be in 1..={MAX_BY_HYPOTHESES}"
-        ));
+        return Err(format!("BY family size must be in 1..={MAX_BY_HYPOTHESES}"));
     }
     let mut sum = 0_u64;
     for index in 1..=hypothesis_count {
@@ -218,8 +218,7 @@ pub fn by_rejection_cutoff(
     }
     let family_size = sorted_p_values.len() as u64;
     if sorted_p_values.windows(2).any(|pair| {
-        compare_rational(pair[0].0, pair[0].1, pair[1].0, pair[1].1)
-            == std::cmp::Ordering::Greater
+        compare_rational(pair[0].0, pair[0].1, pair[1].0, pair[1].1) == std::cmp::Ordering::Greater
     }) {
         return Err("BY p-values must be sorted in nondecreasing exact-rational order".to_owned());
     }
@@ -232,9 +231,7 @@ pub fn by_rejection_cutoff(
             return Err("BY input p-values must be rational values in (0, 1]".to_owned());
         }
         let rank = index as u64 + 1;
-        let left = u128::from(*numerator)
-            * u128::from(family_size)
-            * u128::from(harmonic_micros);
+        let left = u128::from(*numerator) * u128::from(family_size) * u128::from(harmonic_micros);
         let right = u128::from(target_fdr_permille)
             * u128::from(rank)
             * u128::from(1_000_u64)
@@ -278,14 +275,10 @@ fn adjusted_p_value_upper(
         // adjusted-p scaled to permille is
         // 1000 * p * m * H_m / rank.
         // H_m <= harmonic_micros/1e6; ceiling makes this conservative.
-        let scaled_numerator = u128::from(numerator)
-            * u128::from(family_size)
-            * u128::from(harmonic_micros);
-        let scaled_denominator =
-            u128::from(denominator) * u128::from(rank) * u128::from(1_000_u64);
-        let adjusted_ceiling = scaled_numerator
-            .div_ceil(scaled_denominator)
-            .min(1_000) as u64;
+        let scaled_numerator =
+            u128::from(numerator) * u128::from(family_size) * u128::from(harmonic_micros);
+        let scaled_denominator = u128::from(denominator) * u128::from(rank) * u128::from(1_000_u64);
+        let adjusted_ceiling = scaled_numerator.div_ceil(scaled_denominator).min(1_000) as u64;
         suffix_min = suffix_min.min(adjusted_ceiling);
         output[index] = ByAdjustedPValueV1 {
             numerator: suffix_min,
@@ -306,7 +299,9 @@ fn build_families(
 
     for observation in &source_report.scored_test_p_values {
         if !valid_digest(&observation.calibration_group_sha256) {
-            return Err("calibration report contains an invalid calibration-group digest".to_owned());
+            return Err(
+                "calibration report contains an invalid calibration-group digest".to_owned(),
+            );
         }
         valid_identifier(&observation.sample_id, "sample_id")?;
         valid_identifier(&observation.detector_id, "detector_id")?;
@@ -317,15 +312,22 @@ fn build_families(
             || observation.normalized_risk_score
                 > observation.cluster_max_normalized_risk_score + f64::EPSILON
         {
-            return Err("calibration report has invalid item or cluster-maximum risk scores".to_owned());
+            return Err(
+                "calibration report has invalid item or cluster-maximum risk scores".to_owned(),
+            );
         }
         let numerator = observation.conformal_p_value.numerator;
         let denominator = observation.conformal_p_value.denominator;
         if numerator == 0 || denominator == 0 || numerator > denominator {
-            return Err("calibration report contains an invalid rational conformal p-value".to_owned());
+            return Err(
+                "calibration report contains an invalid rational conformal p-value".to_owned(),
+            );
         }
         if observation.calibration_clean_support + 1 != denominator {
-            return Err("conformal p-value denominator does not match clean calibration support + 1".to_owned());
+            return Err(
+                "conformal p-value denominator does not match clean calibration support + 1"
+                    .to_owned(),
+            );
         }
         let key = HypothesisKey {
             detector_id: observation.detector_id.clone(),
@@ -365,8 +367,7 @@ fn build_families(
     }
 
     for (group_sha, hypotheses) in canonical_by_group {
-        let mut detector_cluster_sets =
-            BTreeMap::<(String, String), BTreeSet<String>>::new();
+        let mut detector_cluster_sets = BTreeMap::<(String, String), BTreeSet<String>>::new();
         for hypothesis in hypotheses.values() {
             detector_cluster_sets
                 .entry((
@@ -381,7 +382,10 @@ fn build_families(
             .next()
             .cloned()
             .ok_or_else(|| "calibration report has an empty detector group".to_owned())?;
-        if detector_cluster_sets.values().any(|clusters| clusters != &expected_clusters) {
+        if detector_cluster_sets
+            .values()
+            .any(|clusters| clusters != &expected_clusters)
+        {
             return Err("detectors in one calibration group must have the same cluster hypothesis set for joint BY adjustment".to_owned());
         }
         let mut cluster_truth = BTreeMap::<String, GroundTruthV1>::new();
@@ -392,13 +396,14 @@ fn build_families(
                 hypothesis.ground_truth,
             ) && previous != hypothesis.ground_truth
             {
-                return Err("ground-truth label differs across detectors for one source cluster".to_owned());
+                return Err(
+                    "ground-truth label differs across detectors for one source cluster".to_owned(),
+                );
             }
             let items = cluster_items
                 .entry(hypothesis.key.source_cluster_id.clone())
                 .or_default();
-            let current: BTreeSet<String> =
-                hypothesis.item_sample_ids.iter().cloned().collect();
+            let current: BTreeSet<String> = hypothesis.item_sample_ids.iter().cloned().collect();
             if items.is_empty() {
                 *items = current;
             } else if *items != current {
@@ -544,10 +549,12 @@ fn analyze_family(
     let detector_count = if key.detector_id == "all_detectors" {
         result_hypotheses
             .iter()
-            .map(|hypothesis| (
-                hypothesis.detector_id.clone(),
-                hypothesis.detector_version.clone(),
-            ))
+            .map(|hypothesis| {
+                (
+                    hypothesis.detector_id.clone(),
+                    hypothesis.detector_version.clone(),
+                )
+            })
             .collect::<BTreeSet<_>>()
             .len() as u64
     } else {
@@ -574,7 +581,9 @@ pub fn analyze_conformal_by(
         return Err(format!("config schema must be {CONFORMAL_BY_CONFIG_SCHEMA}"));
     }
     if source_report.schema != crate::detector_calibration::CALIBRATION_REPORT_SCHEMA {
-        return Err("BY input does not use the supported detector calibration report schema".to_owned());
+        return Err(
+            "BY input does not use the supported detector calibration report schema".to_owned(),
+        );
     }
     valid_identifier(&config.adjustment_id, "adjustment_id")?;
     if !valid_digest(&config.source_calibration_study_sha256)
@@ -586,23 +595,20 @@ pub fn analyze_conformal_by(
     if config.family_scopes.is_empty() || config.family_scopes.len() > 2 {
         return Err("BY family scopes must contain one or both supported scopes".to_owned());
     }
-    let unique_scopes: BTreeSet<ByFamilyScopeV1> =
-        config.family_scopes.iter().copied().collect();
+    let unique_scopes: BTreeSet<ByFamilyScopeV1> = config.family_scopes.iter().copied().collect();
     if unique_scopes.len() != config.family_scopes.len() {
         return Err("BY family scopes must be unique".to_owned());
     }
-    if config.target_fdr_permille.is_empty()
-        || config.target_fdr_permille.len() > MAX_BY_Q_LEVELS
-    {
+    if config.target_fdr_permille.is_empty() || config.target_fdr_permille.len() > MAX_BY_Q_LEVELS {
         return Err("BY target FDR levels must be nonempty and bounded".to_owned());
     }
     let mut q_levels = config.target_fdr_permille.clone();
     q_levels.sort_unstable();
     q_levels.dedup();
-    if q_levels != config.target_fdr_permille
-        || q_levels.iter().any(|q| !(1..=1_000).contains(q))
-    {
-        return Err("BY target FDR levels must be unique, ascending and in [1, 1000] permille".to_owned());
+    if q_levels != config.target_fdr_permille || q_levels.iter().any(|q| !(1..=1_000).contains(q)) {
+        return Err(
+            "BY target FDR levels must be unique, ascending and in [1, 1000] permille".to_owned(),
+        );
     }
     if source_report.scored_test_p_values.is_empty()
         || source_report.scored_test_p_values.len() > MAX_BY_HYPOTHESES
@@ -615,7 +621,10 @@ pub fn analyze_conformal_by(
     if !valid_digest(&config.source_calibration_report_sha256)
         || config.source_calibration_report_sha256 != source_report_sha
     {
-        return Err("BY config source calibration report digest does not match exact report content".to_owned());
+        return Err(
+            "BY config source calibration report digest does not match exact report content"
+                .to_owned(),
+        );
     }
     let config_bytes = canonical_json(config, "BY config")?;
     let config_sha = hash_domain(b"conformal-by-config.v1", &config_bytes);
@@ -666,9 +675,7 @@ pub fn analyze_conformal_by(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::detector_calibration::{
-        CalibratedTestScoreV1, DetectorCalibrationReportV1,
-    };
+    use crate::detector_calibration::{CalibratedTestScoreV1, DetectorCalibrationReportV1};
 
     fn q(numerator: u64, denominator: u64) -> (u64, u64) {
         (numerator, denominator)
@@ -678,8 +685,24 @@ mod tests {
         let group = "a".repeat(64);
         let mut rows = Vec::new();
         for (detector, version, values) in [
-            ("det-a", "v1", vec![(1, 101, GroundTruthV1::Contaminated), (10, 101, GroundTruthV1::Clean), (5, 101, GroundTruthV1::Contaminated)]),
-            ("det-b", "v2", vec![(2, 101, GroundTruthV1::Contaminated), (20, 101, GroundTruthV1::Clean), (6, 101, GroundTruthV1::Contaminated)]),
+            (
+                "det-a",
+                "v1",
+                vec![
+                    (1, 101, GroundTruthV1::Contaminated),
+                    (10, 101, GroundTruthV1::Clean),
+                    (5, 101, GroundTruthV1::Contaminated),
+                ],
+            ),
+            (
+                "det-b",
+                "v2",
+                vec![
+                    (2, 101, GroundTruthV1::Contaminated),
+                    (20, 101, GroundTruthV1::Clean),
+                    (6, 101, GroundTruthV1::Contaminated),
+                ],
+            ),
         ] {
             for (cluster, (numerator, denominator, truth)) in values.into_iter().enumerate() {
                 for item in 0..2 {
@@ -770,7 +793,10 @@ mod tests {
     fn by_exact_rational_comparison_does_not_use_float_boundaries() {
         let harmonic = harmonic_upper_micros(1).unwrap();
         assert_eq!(by_rejection_cutoff(&[q(1, 100)], 100, harmonic).unwrap(), 1);
-        assert_eq!(by_rejection_cutoff(&[q(101, 10_000)], 10, harmonic).unwrap(), 0);
+        assert_eq!(
+            by_rejection_cutoff(&[q(101, 10_000)], 10, harmonic).unwrap(),
+            0
+        );
     }
 
     #[test]
@@ -793,7 +819,11 @@ mod tests {
         let families = build_families(&report, &config.family_scopes).unwrap();
         assert_eq!(families.len(), 2);
         assert!(families.values().all(|family| family.len() == 3));
-        assert!(families.values().all(|family| family[0].item_sample_ids.len() == 2));
+        assert!(
+            families
+                .values()
+                .all(|family| family[0].item_sample_ids.len() == 2)
+        );
     }
 
     #[test]
@@ -809,9 +839,9 @@ mod tests {
     #[test]
     fn joint_scope_rejects_detector_cluster_set_mismatch() {
         let mut report = source_report();
-        report.scored_test_p_values.retain(|row| {
-            !(row.detector_id == "det-b" && row.source_cluster_id == "cluster-2")
-        });
+        report
+            .scored_test_p_values
+            .retain(|row| !(row.detector_id == "det-b" && row.source_cluster_id == "cluster-2"));
         assert!(build_families(&report, &[ByFamilyScopeV1::AllDetectorsPerGroup]).is_err());
     }
 
@@ -819,26 +849,17 @@ mod tests {
     fn same_cluster_p_value_must_bind_same_cluster_maximum() {
         let mut report = source_report();
         report.scored_test_p_values[1].cluster_max_normalized_risk_score += 0.01;
-        assert!(build_families(
-            &report,
-            &[ByFamilyScopeV1::PerDetectorPerGroup]
-        )
-        .is_err());
+        assert!(build_families(&report, &[ByFamilyScopeV1::PerDetectorPerGroup]).is_err());
     }
 
     #[test]
     fn detectors_must_share_cluster_item_ids_for_joint_family() {
         let mut report = source_report();
-        report.scored_test_p_values.retain(|row| {
-            !(row.detector_id == "det-b" && row.sample_id == "cluster-0-item-1")
-        });
-        report.scored_locked_test_observation_count =
-            report.scored_test_p_values.len() as u64;
-        assert!(build_families(
-            &report,
-            &[ByFamilyScopeV1::AllDetectorsPerGroup]
-        )
-        .is_err());
+        report
+            .scored_test_p_values
+            .retain(|row| !(row.detector_id == "det-b" && row.sample_id == "cluster-0-item-1"));
+        report.scored_locked_test_observation_count = report.scored_test_p_values.len() as u64;
+        assert!(build_families(&report, &[ByFamilyScopeV1::AllDetectorsPerGroup]).is_err());
     }
 
     #[test]
