@@ -1,7 +1,8 @@
 use pod_meta_cost_to_go_lab::{
     BudgetLedger, CensoringWeightReceipt, CompletedCalibrationExample, EffectDisposition,
     ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
-    JointCostEnvelope, LandmarkEpisode, LandmarkTerminal, LinearProofFrontierCostModel,
+    JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
+    LinearProofFrontierCostModel,
     ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast, ReservationId,
     ResourceVector, ShiftStatus, SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome,
     assess_completion_feasibility, assess_joint_resource_fit, calibrate_landmark_ipcw,
