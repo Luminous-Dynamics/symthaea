@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 55,
+    "rust_test_functions_authored": 56,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -47,7 +47,7 @@
     "event_contract_test_functions_authored": 16,
     "bitemporal_test_functions_authored": 12,
     "purged_split_test_functions_authored": 8,
-    "train_only_scaler_test_functions_authored": 9,
+    "train_only_scaler_test_functions_authored": 10,
     "time_imm_adapter_test_functions_authored": 10
   },
   "opaque_payload_contract": {
@@ -131,7 +131,12 @@
       "mean",
       "sample_std"
     ],
-    "physical_measurement_claim": false
+    "physical_measurement_claim": false,
+    "value_timestamp_required": true,
+    "observation_must_be_within_history_interval": true,
+    "observation_must_precede_forecast_origin": true,
+    "validation_test_and_purged_values_skipped_before_numeric_inspection": true,
+    "test_functions_authored": 10
   },
   "time_imm_adapter": {
     "module": "research/irregular-event-contract/src/time_imm.rs",
