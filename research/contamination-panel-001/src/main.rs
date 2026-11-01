@@ -25,7 +25,7 @@ use std::{
 };
 
 fn decode_hex(input: &str) -> Result<Vec<u8>, String> {
-    if input.len() % 2 != 0 {
+    if !input.len().is_multiple_of(2) {
         return Err("seed hex must contain an even number of characters".to_owned());
     }
     let mut output = Vec::with_capacity(input.len() / 2);
@@ -47,10 +47,10 @@ fn hex_nibble(value: u8) -> Result<u8, String> {
 }
 
 fn write_bytes(path: &str, contents: &[u8]) -> Result<(), Box<dyn Error>> {
-    if let Some(parent) = Path::new(path).parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = Path::new(path).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
     }
     fs::write(path, contents)?;
     Ok(())
