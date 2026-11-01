@@ -842,15 +842,15 @@ enum ObligationSemanticError {
     Contradiction(&'static str, String),
 }
 
-fn ordered_obligation_events<'a>(
+fn resolve_obligation_events<'a>(
     composition: &'a ListenCompositionBundle,
     ids: &[String],
     label: &str,
 ) -> Result<Vec<&'a SymbolicNoteEvent>, ObligationSemanticError> {
-    if ids.len() < 2 {
+    if ids.is_empty() {
         return Err(ObligationSemanticError::Contradiction(
             "obligation-semantic-event-count",
-            format!("{label} must reference at least two score notes"),
+            format!("{label} must reference at least one score note"),
         ));
     }
     let mut seen = BTreeSet::new();
@@ -887,6 +887,21 @@ fn ordered_obligation_events<'a>(
         notes.push(note);
     }
     notes.sort_by(|left, right| left.onset.beats.total_cmp(&right.onset.beats));
+    Ok(notes)
+}
+
+fn ordered_obligation_events<'a>(
+    composition: &'a ListenCompositionBundle,
+    ids: &[String],
+    label: &str,
+) -> Result<Vec<&'a SymbolicNoteEvent>, ObligationSemanticError> {
+    if ids.len() < 2 {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-semantic-event-count",
+            format!("{label} must reference at least two score notes"),
+        ));
+    }
+    let notes = resolve_obligation_events(composition, ids, label)?;
     if notes.windows(2).any(|pair| {
         pair[0].onset.beats >= pair[1].onset.beats
             || pair[0].voice_role != pair[1].voice_role
@@ -954,6 +969,12 @@ fn verify_return_motif_obligation(
         })?;
     let source = ordered_obligation_events(composition, source_event_ids, "motif source")?;
     let target = ordered_obligation_events(composition, target_event_ids, "motif return")?;
+    if source.len() < 2 || target.len() < 2 {
+        return Err(ObligationSemanticError::Contradiction(
+            "obligation-semantic-event-count",
+            "motif source and return must each contain at least two score notes".into(),
+        ));
+    }
 
     if definition.degrees.len() != source.len()
         || definition.durations_beats.len() != source.len()
@@ -1084,7 +1105,7 @@ fn verify_obligation_semantics(
                     "voice ID is empty".into(),
                 ));
             }
-            let notes = ordered_obligation_events(composition, target_event_ids, "voice entrance")?;
+            let notes = resolve_obligation_events(composition, target_event_ids, "voice entrance")?;
             if notes
                 .iter()
                 .any(|note| note.voice_role.eq_ignore_ascii_case(voice_id))
@@ -1098,12 +1119,7 @@ fn verify_obligation_semantics(
             }
         }
         ObligationKindV1::ReachClimax => {
-            let mut notes = Vec::new();
-            for id in target_event_ids {
-                if let Some(note) = composition.notes.iter().find(|note| note.id == *id) {
-                    notes.push(note);
-                }
-            }
+            let notes = resolve_obligation_events(composition, target_event_ids, "climax")?;
             if notes
                 .iter()
                 .any(|note| note.emphasis.eq_ignore_ascii_case("climax"))
@@ -1428,6 +1444,13 @@ pub fn verify_composer_trace(
             });
         }
 
+        if transition.definition.is_none() {
+            issues.push(TraceVerificationIssue {
+                code: "obligation-definition-missing".into(),
+                record_id: id.clone(),
+                message: "Lifecycle transition has no typed obligation definition; semantic fulfillment cannot be established.".into(),
+            });
+        }
         if let Some(definition) = transition.definition.as_ref() {
             if let Some(previous) = definitions.get(transition.obligation_id.as_str()) {
                 if *previous != definition {
@@ -1444,11 +1467,7 @@ pub fn verify_composer_trace(
 
         if transition.to == ObligationState::Fulfilled {
             match transition.definition.as_ref() {
-                None => issues.push(TraceVerificationIssue {
-                    code: "obligation-definition-missing".into(),
-                    record_id: id.clone(),
-                    message: "Legacy fulfilled transition has no typed definition; semantic fulfillment is insufficiently evidenced.".into(),
-                }),
+                None => {},
                 Some(definition) if transition.score_event_ids.is_empty()
                     || transition.score_event_ids.iter().any(|event| !events.contains_key(event.as_str())) => {}
                 Some(definition) => {
