@@ -49,6 +49,8 @@ pub struct NoisyObjectiveSpec {
     pub observation_lower_bound: f64,
     /// Certified upper bound for every single-replicate observation, not a normalization anchor.
     pub observation_upper_bound: f64,
+    /// Digest of the independent certificate supporting these observation bounds.
+    pub bounds_certificate_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -57,6 +59,10 @@ pub struct NoisyObservationPlan {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    pub sampling_protocol_id: String,
+    pub sampling_protocol_sha256: String,
+    pub noise_model_id: String,
+    pub noise_model_sha256: String,
     pub objective_specs: Vec<NoisyObjectiveSpec>,
     /// Family-wise error budget across the frozen candidate/objective family and all prefixes.
     pub familywise_alpha: f64,
@@ -69,6 +75,10 @@ pub struct NoisyObservationPlan {
 impl NoisyObservationPlan {
     pub fn new(
         campaign_id: impl Into<String>,
+        sampling_protocol_id: impl Into<String>,
+        sampling_protocol_sha256: impl Into<String>,
+        noise_model_id: impl Into<String>,
+        noise_model_sha256: impl Into<String>,
         objective_specs: Vec<NoisyObjectiveSpec>,
         familywise_alpha: f64,
         max_candidates: usize,
@@ -78,6 +88,10 @@ impl NoisyObservationPlan {
             schema: SCHEMA.to_owned(),
             version: VERSION.to_owned(),
             campaign_id: campaign_id.into(),
+            sampling_protocol_id: sampling_protocol_id.into(),
+            sampling_protocol_sha256: sampling_protocol_sha256.into(),
+            noise_model_id: noise_model_id.into(),
+            noise_model_sha256: noise_model_sha256.into(),
             objective_specs,
             familywise_alpha,
             max_candidates,
@@ -91,9 +105,14 @@ impl NoisyObservationPlan {
         if self.schema != SCHEMA || self.version != VERSION {
             return Err(NoisyParetoError::new("plan.schema", "unsupported noisy-observation schema/version"));
         }
-        if self.campaign_id.trim().is_empty() {
-            return Err(NoisyParetoError::new("plan.campaign_id", "campaign ID must be non-empty"));
+        if self.campaign_id.trim().is_empty()
+            || self.sampling_protocol_id.trim().is_empty()
+            || self.noise_model_id.trim().is_empty()
+        {
+            return Err(NoisyParetoError::new("plan", "campaign, sampling protocol, and noise model IDs must be non-empty"));
         }
+        validate_sha256(&self.sampling_protocol_sha256, "plan.sampling_protocol_sha256")?;
+        validate_sha256(&self.noise_model_sha256, "plan.noise_model_sha256")?;
         if !(2..=16).contains(&self.objective_specs.len()) {
             return Err(NoisyParetoError::new("plan.objective_specs", "v0.1 uncertainty-front analysis supports two through sixteen objectives"));
         }
@@ -113,6 +132,7 @@ impl NoisyObservationPlan {
             if objective.objective_id.trim().is_empty() || !ids.insert(objective.objective_id.as_str()) {
                 return Err(NoisyParetoError::new(format!("plan.objective_specs[{index}].objective_id"), "objective IDs must be non-empty and unique"));
             }
+            validate_sha256(&objective.bounds_certificate_sha256, &format!("plan.objective_specs[{index}].bounds_certificate_sha256"))?;
             if !objective.observation_lower_bound.is_finite()
                 || !objective.observation_upper_bound.is_finite()
                 || objective.observation_lower_bound >= objective.observation_upper_bound
@@ -564,18 +584,24 @@ mod tests {
     fn plan() -> NoisyObservationPlan {
         NoisyObservationPlan::new(
             "noisy-zdt-like",
+            "independent-counter-based-replicates-v0.1",
+            H3,
+            "bounded-additive-fixed-noise-v0.1",
+            H4,
             vec![
                 NoisyObjectiveSpec {
                     objective_id: "quality".to_owned(),
                     direction: ObjectiveDirection::Maximize,
                     observation_lower_bound: 0.0,
                     observation_upper_bound: 1.0,
+                    bounds_certificate_sha256: H1.to_owned(),
                 },
                 NoisyObjectiveSpec {
                     objective_id: "cost".to_owned(),
                     direction: ObjectiveDirection::Minimize,
                     observation_lower_bound: 0.0,
                     observation_upper_bound: 1.0,
+                    bounds_certificate_sha256: H2.to_owned(),
                 },
             ],
             0.05,
@@ -605,6 +631,10 @@ mod tests {
 
         assert!(NoisyObservationPlan::new(
             "too-many-candidates",
+            plan.sampling_protocol_id.clone(),
+            plan.sampling_protocol_sha256.clone(),
+            plan.noise_model_id.clone(),
+            plan.noise_model_sha256.clone(),
             plan.objective_specs.clone(),
             0.05,
             1_000_001,
