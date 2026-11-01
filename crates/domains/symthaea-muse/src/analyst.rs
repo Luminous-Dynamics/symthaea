@@ -862,7 +862,7 @@ fn resolve_obligation_events<'a>(
                 format!("{label} repeats score event {id}"),
             ));
         }
-        let mut matches = composition.notes.iter().filter(|note| note.id == *id);
+        let mut matches = composition.notes.iter().filter(|note| note.id.as_str() == id.as_str());
         let Some(note) = matches.next() else {
             return Err(ObligationSemanticError::Contradiction(
                 "obligation-semantic-event-missing",
