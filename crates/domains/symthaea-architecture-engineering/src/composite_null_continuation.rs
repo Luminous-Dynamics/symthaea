@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, error::Error, fmt};
+use std::{collections::{BTreeMap, BTreeSet}, error::Error, fmt};
 
 const PLAN_SCHEMA: &str = "symthaea.architecture-engineering.composite-null-continuation-plan";
 const PLAN_VERSION: &str = "0.1.0";
@@ -464,6 +464,13 @@ pub fn analyze_composite_null_continuation(
         }
     }
 
+    let composite_by_path = terminal_paths.iter().map(|path| {
+        (
+            (path.first_stage_outcome_id.as_str(), path.second_stage_outcome_id.as_str()),
+            path.composite_rejection_probability,
+        )
+    }).collect::<BTreeMap<_, _>>();
+
     let mut model_reports = Vec::with_capacity(plan.null_models.len());
     let mut maximum_composite_size = 0.0_f64;
     for model in &plan.null_models {
@@ -488,13 +495,22 @@ pub fn analyze_composite_null_continuation(
             let joint_own = first.null_probability * conditional_size;
             kahan_add(&mut own_continued_size, &mut own_compensation, joint_own);
 
-            let composite_conditional_size = compensated_sum(branch.second_stage_outcomes.iter().map(|second| {
-                let composite = terminal_paths.iter().find(|path| {
-                    path.first_stage_outcome_id == first.outcome_id
-                        && path.second_stage_outcome_id == second.outcome_id
-                }).map(|path| path.composite_rejection_probability).unwrap_or(f64::NAN);
-                second.conditional_null_probability * composite
-            }));
+            let mut composite_conditional_size = 0.0;
+            let mut composite_conditional_compensation = 0.0;
+            for second in &branch.second_stage_outcomes {
+                let composite = composite_by_path
+                    .get(&(first.outcome_id.as_str(), second.outcome_id.as_str()))
+                    .copied()
+                    .ok_or_else(|| CompositeContinuationError::new(
+                        "report.terminal_paths",
+                        "composite terminal path is missing from the reconstructed path table",
+                    ))?;
+                kahan_add(
+                    &mut composite_conditional_size,
+                    &mut composite_conditional_compensation,
+                    second.conditional_null_probability * composite,
+                );
+            }
             let joint_composite = first.null_probability * composite_conditional_size;
             kahan_add(&mut composite_size, &mut composite_compensation, joint_composite);
 
