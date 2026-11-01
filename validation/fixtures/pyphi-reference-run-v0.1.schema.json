@@ -48,7 +48,10 @@
         "source_url",
         "evaluation_sha256",
         "reference_manifest_sha256",
-        "analysis_request_digest_semantics"
+        "analysis_request_digest_semantics",
+        "upstream_builder_tpm_max_abs_deviation",
+        "upstream_builder_tpm_tolerance",
+        "model_input_semantics"
       ],
       "properties": {
         "distribution": {
@@ -102,6 +105,19 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "analysis_request_digest_semantics": {
+          "type": "string",
+          "minLength": 20
+        },
+        "upstream_builder_tpm_max_abs_deviation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upstream_builder_tpm_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "model_input_semantics": {
           "type": "string",
           "minLength": 20
         }
