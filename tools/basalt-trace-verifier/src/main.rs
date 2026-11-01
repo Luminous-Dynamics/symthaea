@@ -22,7 +22,7 @@ fn main() -> ExitCode {
         }
     }
     let Some(path) = trace_path else {
-        eprintln!("usage: basalt-trace-verifier --trace TRACE.json [--out REPORT.json]");
+        eprintln!("usage: basalt-trace-verifier --trace TRACE.json [--schema SCHEMA.json] [--out REPORT.json]");
         return ExitCode::from(2);
     };
     let raw = match fs::read(&path) {
