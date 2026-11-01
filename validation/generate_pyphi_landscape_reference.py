@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from validation.iit_digest_contract import (
+from iit_digest_contract import (
     analysis_request_digest,
     canonical_model_bytes,
     evaluation_digest,
