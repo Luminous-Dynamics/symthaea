@@ -1,5 +1,7 @@
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::env;
+use std::fs;
 
 const PROFILE_BYTES: &[u8] = include_bytes!(
     "../tests/fixtures/hardsec/mobile-device-v1/pixel-8-pro-capability-fixture.json"
@@ -215,13 +217,13 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn report(profile: &Value) -> Value {
+fn report(profile: &Value, profile_bytes: &[u8]) -> Value {
     json!({
         "schema_version": "hardsec-mobile-device-profile-audit-v1",
         "result": "profile_shape_and_privacy_audit_passed",
         "claim_scope": "profile_shape_privacy_and_evidence_source_contract_only",
         "profile_id": profile["profile_id"],
-        "profile_sha256": sha256_hex(PROFILE_BYTES),
+        "profile_sha256": sha256_hex(profile_bytes),
         "evidence_domain": profile["evidence_domain"],
         "device_class": {
             "platform": profile["device"]["platform"],
@@ -235,6 +237,8 @@ fn report(profile: &Value) -> Value {
             "secure_element_hardware_support": profile["hardware_protections"]["secure_element"]["hardware_support"],
             "secure_element_runtime_state": profile["hardware_protections"]["secure_element"]["runtime_state"],
             "boot_state": profile["boot_integrity"]["verified_boot_state"],
+            "reported_bootloader_lock_state": profile["boot_integrity"]["reported_bootloader_lock_state"],
+            "reported_verified_boot_state": profile["boot_integrity"]["reported_verified_boot_state"],
             "attestation_security_level": profile["boot_integrity"]["attestation_security_level"]
         },
         "measurement": {
@@ -255,18 +259,51 @@ fn report(profile: &Value) -> Value {
             "physical_attack_resistance_established": profile["claim_ceiling"]["physical_attack_resistance_established"],
             "evidence_sources": profile["evidence"].as_array().map_or(0, Vec::len),
             "device_was_queried": profile["evidence_domain"] == "physical_device_lab"
+                || profile["evidence_domain"] == "physical_device_capture"
         },
         "limitations": profile["claim_ceiling"]["limitations"]
     })
 }
 
+fn load_profile_bytes() -> Result<Vec<u8>, String> {
+    let mut arguments = env::args().skip(1);
+    match arguments.next() {
+        None => Ok(PROFILE_BYTES.to_vec()),
+        Some(flag) if flag == "--profile" => {
+            let path = arguments
+                .next()
+                .ok_or_else(|| "--profile requires a file path".to_owned())?;
+            if arguments.next().is_some() {
+                return Err("unexpected extra command-line argument".to_owned());
+            }
+            fs::read(path).map_err(|_| "profile file could not be read".to_owned())
+        }
+        Some(_) => Err("supported argument: --profile <path>".to_owned()),
+    }
+}
+
 fn main() {
-    let profile: Value =
-        serde_json::from_slice(PROFILE_BYTES).expect("parse embedded mobile capability profile");
-    validate_profile(&profile).expect("mobile capability profile must satisfy its contract");
+    let profile_bytes = match load_profile_bytes() {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            eprintln!("HARDSEC mobile profile audit failed: {error}");
+            std::process::exit(2);
+        }
+    };
+    let profile: Value = match serde_json::from_slice(&profile_bytes) {
+        Ok(profile) => profile,
+        Err(_) => {
+            eprintln!("HARDSEC mobile profile audit failed: invalid JSON profile");
+            std::process::exit(2);
+        }
+    };
+    if let Err(error) = validate_profile(&profile) {
+        eprintln!("HARDSEC mobile profile audit failed: {error}");
+        std::process::exit(2);
+    }
     println!(
         "{}",
-        serde_json::to_string_pretty(&report(&profile))
+        serde_json::to_string_pretty(&report(&profile, &profile_bytes))
             .expect("serialize mobile profile audit receipt")
     );
 }
@@ -378,7 +415,7 @@ mod tests {
     #[test]
     fn receipt_binds_exact_profile_fixture_bytes() {
         let profile = fixture();
-        let value = report(&profile);
+        let value = report(&profile, PROFILE_BYTES);
         assert_eq!(value["profile_sha256"], sha256_hex(PROFILE_BYTES));
         assert_eq!(value["qualification"]["device_was_queried"], false);
         assert_eq!(value["privacy"]["forbidden_identifier_fields_found"], false);
