@@ -25,6 +25,7 @@ pub struct SelectedProofCalibrationExample {
     /// Remaining resource cost from the selected pre-action state through
     /// independently verified sufficient proof.
     pub observed_remaining_to_verified_proof: ResourceVector,
+    pub meter_receipt_digest: [u8; 32],
     pub completion_verifier_digest: [u8; 32],
 }
 
@@ -49,6 +50,7 @@ pub enum SelectionCalibrationError {
     SelectionPolicyMismatch,
     SelectedPopulationMismatch,
     MissingCompletionVerifier,
+    MissingMeterReceipt,
     ShiftedCalibrationPrediction,
     InvalidPredictionScale,
     ResourceOverflow,
@@ -198,6 +200,12 @@ impl SelectionConditionedConformalCalibrator {
             if is_zero(example.completion_verifier_digest) {
                 return Err(SelectionCalibrationError::MissingCompletionVerifier);
             }
+            if is_zero(example.meter_receipt_digest) {
+                return Err(SelectionCalibrationError::MissingMeterReceipt);
+            }
+            if example.prediction.features.validate().is_err() {
+                return Err(SelectionCalibrationError::InvalidPredictionIdentity);
+            }
             match selected_family {
                 Some(family) if family != example.selection.selected_operation_family => {
                     return Err(SelectionCalibrationError::SelectedPopulationMismatch);
@@ -266,6 +274,9 @@ impl SelectionConditionedConformalCalibrator {
         }
         if !resource_vector_positive(prediction.uncertainty_scale) {
             return Err(SelectionCalibrationError::InvalidPredictionScale);
+        }
+        if prediction.features.validate().is_err() {
+            return Err(SelectionCalibrationError::InvalidPredictionIdentity);
         }
         if prediction.shift_status != ShiftStatus::InDomain {
             return Ok(SelectedProofEnvelope::Unbounded {
@@ -424,6 +435,7 @@ mod tests {
             selection: selection(id, 9),
             prediction: prediction(),
             observed_remaining_to_verified_proof: vector(10 + score * 2),
+            meter_receipt_digest: [9; 32],
             completion_verifier_digest: [8; 32],
         }
     }
@@ -573,6 +585,23 @@ mod tests {
                 CALIBRATION
             ),
             Err(SelectionCalibrationError::MissingCompletionVerifier)
+        );
+    }
+
+    #[test]
+    fn meter_receipt_is_required_for_selected_resource_cost() {
+        let mut row = example(23, 1);
+        row.meter_receipt_digest = [0; 32];
+        assert_eq!(
+            SelectionConditionedConformalCalibrator::fit(
+                &[row],
+                0.10,
+                MODEL,
+                POLICY,
+                POPULATION,
+                CALIBRATION
+            ),
+            Err(SelectionCalibrationError::MissingMeterReceipt)
         );
     }
 
