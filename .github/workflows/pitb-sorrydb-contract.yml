@@ -560,21 +560,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-jsonschema/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/benchmark-integrity-receipt-v0.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/fixtures/benchmark-integrity.synthetic.json" <<'PY'
+          "$RUNNER_TEMP/pitb-sorrydb-jsonschema/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/benchmark-integrity-receipt-v0.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/fixtures/benchmark-integrity.synthetic.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/reviewer-key-registry-v0.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/benchmark-integrity/reviewer-attestation-v0.schema.json" <<'PY'
           import json
           import sys
           from pathlib import Path
           from jsonschema import Draft202012Validator, FormatChecker
-          schema_path, fixture_path = map(Path, sys.argv[1:])
-          schema = json.loads(schema_path.read_text())
+          receipt_schema_path, fixture_path, registry_schema_path, attestation_schema_path = map(Path, sys.argv[1:])
+          receipt_schema = json.loads(receipt_schema_path.read_text())
           fixture = json.loads(fixture_path.read_text())
-          Draft202012Validator.check_schema(schema)
-          Draft202012Validator(schema, format_checker=FormatChecker()).validate(fixture)
+          registry_schema = json.loads(registry_schema_path.read_text())
+          attestation_schema = json.loads(attestation_schema_path.read_text())
+          for schema in (receipt_schema, registry_schema, attestation_schema):
+              Draft202012Validator.check_schema(schema)
+          Draft202012Validator(receipt_schema, format_checker=FormatChecker()).validate(fixture)
           assert fixture["evidence_class"] == "synthetic_contract_fixture"
           assert fixture["integrity_status"] == "not_attempted"
+          assert fixture["evidence_artifacts"] is None
+          assert fixture["reviewer_key_registry_sha256"] is None
           assert fixture["elaboration"]["status"] == "not_run"
           assert fixture["semantic_review"]["status"] == "not_reviewed"
-          print("PITB_BENCHMARK_INTEGRITY_SCHEMA_PASS: synthetic no-run fixture; no eligibility claim")
+          print("PITB_BENCHMARK_INTEGRITY_SCHEMA_PASS: no-run fixture plus strict reviewer registry and attestation schemas; no eligibility claim")
           PY
       - name: Validate two-level proof graph schema and shared-helper fixture
         shell: bash
