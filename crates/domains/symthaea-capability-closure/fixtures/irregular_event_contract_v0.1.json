@@ -19,7 +19,8 @@
   "measurement_variants": [
     "observed_fixed_point",
     "missing_with_reason",
-    "censored_interval"
+    "censored_interval",
+    "opaque_content_addressed_payload"
   ],
   "known_future_covariates": {
     "separate_type": true,
@@ -36,11 +37,25 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 15,
+    "rust_test_functions_authored": 16,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
     "rust_tests_executed": false,
     "external_dataset_adapter_executed": false
+  },
+  "opaque_payload_contract": {
+    "fields": [
+      "payload_sha256",
+      "payload_bytes",
+      "encoding_id"
+    ],
+    "allowed_examples": [
+      "text",
+      "audio",
+      "image",
+      "embedding"
+    ],
+    "payload_bytes_stored_outside_event_record": true
   }
 }
