@@ -245,12 +245,8 @@ impl MatchedInterventionSet {
                 .ok_or(InterventionSetError::TrialOutcomeNotVerified)?
                 .frontier_features;
             let immediate_proof_progress =
-                i128::try_from(first.frontier_features.unresolved_obligations)
-                    .map_err(|_| InterventionSetError::ArithmeticOverflow)?
-                    .checked_sub(
-                        i128::try_from(next_frontier.unresolved_obligations)
-                            .map_err(|_| InterventionSetError::ArithmeticOverflow)?,
-                    )
+                i128::from(first.frontier_features.unresolved_obligations)
+                    .checked_sub(i128::from(next_frontier.unresolved_obligations))
                     .ok_or(InterventionSetError::ArithmeticOverflow)?;
             alternatives.push(InterventionAlternativeOutcome {
                 operation_family: first.operation_family,
@@ -302,12 +298,8 @@ impl MatchedInterventionSet {
                 .get(1)
                 .ok_or(InterventionSetError::TrialOutcomeNotVerified)?
                 .frontier_features;
-            let progress = i128::try_from(first.frontier_features.unresolved_obligations)
-                .map_err(|_| InterventionSetError::ArithmeticOverflow)?
-                .checked_sub(
-                    i128::try_from(next_frontier.unresolved_obligations)
-                        .map_err(|_| InterventionSetError::ArithmeticOverflow)?,
-                )
+            let progress = i128::from(first.frontier_features.unresolved_obligations)
+                .checked_sub(i128::from(next_frontier.unresolved_obligations))
                 .ok_or(InterventionSetError::ArithmeticOverflow)?;
             observed.push((first.operation_family, cost, progress));
         }
