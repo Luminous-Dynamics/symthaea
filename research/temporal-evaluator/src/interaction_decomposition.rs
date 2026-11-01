@@ -414,8 +414,11 @@ mod tests {
         let reg = registry(&[0, 0, 0]);
         let runs = full_table(&reg, |mask| {
             let benefit = mask.count_ones() as i64 * 10 - if mask == 0b111 { 35 } else { 0 };
-            let benefit = u64::try_from(benefit.max(0)).unwrap();
-            [1_000 - benefit, 1_500 - benefit, 2_000 - benefit]
+            [
+                u64::try_from(1_000_i64 - benefit).unwrap(),
+                u64::try_from(1_500_i64 - benefit).unwrap(),
+                u64::try_from(2_000_i64 - benefit).unwrap(),
+            ]
         });
         let report = decompose_higher_order_interactions(&reg, &runs).unwrap();
         assert_eq!(term(&report, 0b111).dividend.unwrap().wrong_belief_us, -35);
