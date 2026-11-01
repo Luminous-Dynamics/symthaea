@@ -32,13 +32,22 @@ pub const SEARCH_POWER_MAX_BLOCK_TRIALS: u64 = 5_000_000;
 pub enum SearchPowerPrimaryContrastV1 {
     AllowlistedMinusNetworkDisabled,
     UnrestrictedMinusNetworkDisabled,
+    UnrestrictedMinusAllowlisted,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchPowerMultiplicityV1 {
+    SinglePrimary,
+    BonferroniThreeContrasts,
 }
 
 impl SearchPowerPrimaryContrastV1 {
     fn treated_condition(self) -> SearchTrialConditionV1 {
         match self {
             Self::AllowlistedMinusNetworkDisabled => SearchTrialConditionV1::Allowlisted,
-            Self::UnrestrictedMinusNetworkDisabled => SearchTrialConditionV1::Unrestricted,
+            Self::UnrestrictedMinusNetworkDisabled
+            | Self::UnrestrictedMinusAllowlisted => SearchTrialConditionV1::Unrestricted,
         }
     }
 }
@@ -49,17 +58,27 @@ pub struct SearchTimePowerConfigV1 {
     pub schema: String,
     pub design_id: String,
     pub primary_contrast: SearchPowerPrimaryContrastV1,
+    pub multiplicity_method: SearchPowerMultiplicityV1,
     pub candidate_block_counts: Vec<u32>,
     pub monte_carlo_repetitions: u32,
     pub baseline_score_permille: f64,
+    pub score_floor_permille: u16,
+    pub score_ceiling_permille: u16,
     pub smallest_effect_of_interest_permille: f64,
     pub shared_block_noise_sd_permille: f64,
     pub arm_residual_noise_sd_permille: f64,
     pub within_block_correlation_permille: u16,
     pub effect_heterogeneity_sd_permille: f64,
     pub run_order_effect_permille: f64,
-    /// Whole run blocks lost completely, modeled as missing completely at random.
+    /// Score shift applied to each later run after an earlier network-enabled arm.
+    pub carryover_after_network_access_permille: f64,
+    /// Whole-block MCAR loss. Any loss invalidates the entire Monte Carlo replicate.
     pub missing_block_rate_permille: u16,
+    /// Independent budget-truncation loss applied at the block level.
+    pub budget_truncation_rate_permille: u16,
+    /// Extra failure probability when any simulated arm falls below the threshold.
+    pub outcome_dependent_failure_rate_permille: u16,
+    pub failure_score_threshold_permille: u16,
     pub alpha_permille: u16,
     pub maximum_type_i_upper_permille: u16,
     pub minimum_power_lower_permille: u16,
@@ -87,13 +106,24 @@ pub struct SearchPowerSimulationOutcomeV1 {
     pub planned_repetitions: u32,
     pub estimable_repetitions: u32,
     pub inconclusive_repetitions: u32,
+    /// Conservative rejection/power rate with all planned Monte Carlo repetitions
+    /// in the denominator; inconclusive replicates count as no rejection.
     pub rejection_rate: SearchPowerProportionIntervalV1,
+    /// Conditional rejection rate among fully estimable repetitions.
+    pub estimable_rejection_rate: SearchPowerProportionIntervalV1,
+    /// Coverage among fully estimable repetitions only.
     pub coverage_rate: SearchPowerProportionIntervalV1,
+    pub completion_rate: SearchPowerProportionIntervalV1,
+    pub inconclusive_rate: SearchPowerProportionIntervalV1,
     pub mean_estimated_effect_permille: Option<f64>,
     pub mean_bias_permille: Option<f64>,
     pub mean_standard_error_permille: Option<f64>,
     pub mean_completed_blocks: Option<f64>,
     pub clipped_score_fraction_permille: Option<f64>,
+    pub total_planned_blocks: u64,
+    pub total_missing_blocks: u64,
+    pub total_budget_truncated_blocks: u64,
+    pub total_outcome_dependent_failures: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -113,6 +143,11 @@ pub struct SearchTimePowerReportV1 {
     pub schema: String,
     pub design_id: String,
     pub primary_contrast: SearchPowerPrimaryContrastV1,
+    pub multiplicity_method: SearchPowerMultiplicityV1,
+    pub effective_test_alpha_permille: u16,
+    pub score_floor_permille: u16,
+    pub score_ceiling_permille: u16,
+    pub carryover_after_network_access_permille: f64,
     pub configuration_sha256: String,
     pub simulation_seed_commitment_sha256: String,
     pub monte_carlo_repetitions: u32,
