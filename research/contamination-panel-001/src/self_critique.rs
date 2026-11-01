@@ -19,6 +19,8 @@ pub const SELF_CRITIQUE_PAPER_IMPLEMENTATION_ID: &str =
     "symthaea.self_critique.penalized_entropy_cosine.v1";
 pub const MAX_ENTROPY_STEPS: usize = 32_768;
 pub const MAX_GENERATED_TOKENS: u64 = 65_536;
+pub const MAX_FULL_VOCAB_PROBABILITY_CELLS: usize = 25_000_000;
+pub const FULL_VOCAB_MASS_TOLERANCE: f64 = 1.0e-4;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -69,6 +71,10 @@ pub struct SelfCritiqueScoringRequestV1 {
     /// Required in top-K mode to expose omitted probability mass.
     pub initial_topk_probability_steps: Option<Vec<Vec<f64>>>,
     pub critique_topk_probability_steps: Option<Vec<Vec<f64>>>,
+    /// Full softmax probability vector at every observed generated-token step.
+    /// Required only for full_vocab_softmax_exact.
+    pub initial_full_vocab_probability_steps: Option<Vec<Vec<f64>>>,
+    pub critique_full_vocab_probability_steps: Option<Vec<Vec<f64>>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -209,6 +215,55 @@ fn summarize_topk_tail(
         return Err(format!("{label} top-K tail diagnostics are invalid"));
     }
     Ok(summary)
+}
+
+fn compute_full_vocab_entropy(
+    steps: &[Vec<f64>],
+    supplied_entropy: &[f64],
+    vocabulary_size: u32,
+    label: &str,
+) -> Result<Vec<f64>, String> {
+    if steps.is_empty() || steps.len() != supplied_entropy.len() {
+        return Err(format!("{label} full-vocabulary probability steps must match observed entropy steps"));
+    }
+    let total_cells = steps.iter().try_fold(0_usize, |total, step| {
+        total.checked_add(step.len())
+            .ok_or_else(|| format!("{label} full-vocabulary cell count overflows"))
+    })?;
+    if total_cells > MAX_FULL_VOCAB_PROBABILITY_CELLS {
+        return Err(format!("{label} full-vocabulary input exceeds {MAX_FULL_VOCAB_PROBABILITY_CELLS} probability cells"));
+    }
+    let mut entropies = Vec::with_capacity(steps.len());
+    for (index, probabilities) in steps.iter().enumerate() {
+        if probabilities.len() != vocabulary_size as usize {
+            return Err(format!(
+                "{label} full-vocabulary step {index} must contain exactly {vocabulary_size} probabilities"
+            ));
+        }
+        if probabilities.iter().any(|probability| {
+            !probability.is_finite() || *probability < 0.0 || *probability > 1.0
+        }) {
+            return Err(format!("{label} full-vocabulary step {index} contains an invalid probability"));
+        }
+        let mass = probabilities.iter().sum::<f64>();
+        if !mass.is_finite() || (mass - 1.0).abs() > FULL_VOCAB_MASS_TOLERANCE {
+            return Err(format!(
+                "{label} full-vocabulary step {index} probabilities must sum to one within tolerance"
+            ));
+        }
+        let entropy = probabilities
+            .iter()
+            .filter(|probability| **probability > 0.0)
+            .map(|probability| -probability * probability.ln())
+            .sum::<f64>();
+        if !entropy.is_finite() || (entropy - supplied_entropy[index]).abs() > 1.0e-5 {
+            return Err(format!(
+                "{label} full-vocabulary entropy at step {index} does not match the complete probability vector"
+            ));
+        }
+        entropies.push(entropy);
+    }
+    Ok(entropies)
 }
 
 fn valid_digest(value: &str) -> bool {
@@ -373,8 +428,10 @@ pub fn score_self_critique_request(
             }
             if request.initial_topk_probability_steps.is_none()
                 || request.critique_topk_probability_steps.is_none()
+                || request.initial_full_vocab_probability_steps.is_some()
+                || request.critique_full_vocab_probability_steps.is_some()
             {
-                return Err("top-K raw-partial mode requires returned probability vectors for both generations".to_owned());
+                return Err("top-K raw-partial mode requires only returned top-K probability vectors".to_owned());
             }
         }
         EntropySourceV1::FullVocabSoftmaxExact => {
@@ -384,11 +441,13 @@ pub fn score_self_critique_request(
             {
                 return Err("full_vocab_softmax_exact must not declare top-K metadata or truncated probability vectors".to_owned());
             }
-            if request
-                .vocabulary_size
-                .is_some_and(|vocabulary| vocabulary < 2)
+            if request.vocabulary_size.is_none_or(|vocabulary| vocabulary < 2) {
+                return Err("full_vocab_softmax_exact requires vocabulary_size >= 2".to_owned());
+            }
+            if request.initial_full_vocab_probability_steps.is_none()
+                || request.critique_full_vocab_probability_steps.is_none()
             {
-                return Err("full-vocabulary size, when supplied, must be at least 2".to_owned());
+                return Err("full_vocab_softmax_exact requires complete probability vectors for both generations".to_owned());
             }
         }
     }
@@ -413,7 +472,21 @@ pub fn score_self_critique_request(
                     )?),
                 )
             }
-            EntropySourceV1::FullVocabSoftmaxExact => (None, None),
+            EntropySourceV1::FullVocabSoftmaxExact => {
+                let vocabulary = request.vocabulary_size
+                    .ok_or_else(|| "full vocabulary size missing".to_owned())?;
+                let initial_steps = request.initial_full_vocab_probability_steps.as_ref()
+                    .ok_or_else(|| "initial full-vocabulary probabilities missing".to_owned())?;
+                let critique_steps = request.critique_full_vocab_probability_steps.as_ref()
+                    .ok_or_else(|| "critique full-vocabulary probabilities missing".to_owned())?;
+                compute_full_vocab_entropy(
+                    initial_steps, &request.initial_entropy_nats, vocabulary, "initial",
+                )?;
+                compute_full_vocab_entropy(
+                    critique_steps, &request.critique_entropy_nats, vocabulary, "critique",
+                )?;
+                (None, None)
+            },
         };
 
     let (padded_cosine_similarity, length_penalty, contamination_score) =
@@ -533,6 +606,8 @@ mod tests {
             critique_entropy_nats: entropy,
             initial_topk_probability_steps: topk_mode.then(|| probabilities.clone()),
             critique_topk_probability_steps: topk_mode.then_some(probabilities),
+            initial_full_vocab_probability_steps: None,
+            critique_full_vocab_probability_steps: None,
         }
     }
 
@@ -660,6 +735,37 @@ mod tests {
         let report = score_self_critique_request(&r).unwrap();
         assert!(report.initial_topk_diagnostics.is_none());
         assert!(report.critique_topk_diagnostics.is_none());
+    }
+
+    #[test]
+    fn exact_full_vocabulary_entropy_is_recomputed_from_complete_distribution() {
+        let mut r = request(EntropySourceV1::FullVocabSoftmaxExact);
+        let steps = vec![vec![0.5, 0.25, 0.125, 0.125]; 3];
+        let entropy = steps[0]
+            .iter()
+            .map(|p| -p * p.ln())
+            .sum::<f64>();
+        r.vocabulary_size = Some(4);
+        r.initial_entropy_nats = vec![entropy; 3];
+        r.critique_entropy_nats = vec![entropy; 3];
+        r.initial_full_vocab_probability_steps = Some(steps.clone());
+        r.critique_full_vocab_probability_steps = Some(steps);
+        let report = score_self_critique_request(&r).unwrap();
+        assert!((report.contamination_score - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn exact_full_vocabulary_rejects_partial_or_unnormalized_distributions() {
+        let mut r = request(EntropySourceV1::FullVocabSoftmaxExact);
+        r.vocabulary_size = Some(3);
+        r.initial_full_vocab_probability_steps = Some(vec![vec![0.5, 0.25]; 3]);
+        r.critique_full_vocab_probability_steps = Some(vec![vec![0.5, 0.25]; 3]);
+        assert!(score_self_critique_request(&r).is_err());
+
+        r.vocabulary_size = Some(4);
+        r.initial_full_vocab_probability_steps = Some(vec![vec![0.5, 0.25, 0.125, 0.0]; 3]);
+        r.critique_full_vocab_probability_steps = Some(vec![vec![0.5, 0.25, 0.125, 0.0]; 3]);
+        assert!(score_self_critique_request(&r).is_err());
     }
 
     #[test]
