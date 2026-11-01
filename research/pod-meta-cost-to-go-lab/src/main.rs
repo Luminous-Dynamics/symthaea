@@ -368,7 +368,7 @@ fn main() {
     let joint_envelope = vector_calibrator
         .predict_upper(frontier_prediction)
         .unwrap();
-    let JointCostEnvelope::Bounded(joint_bound) = joint_envelope else {
+    let JointCostEnvelope::Bounded(ref joint_bound) = joint_envelope else {
         panic!("nine exchangeable completed cases support a finite 90% conformal rank");
     };
     let joint_fit = assess_joint_resource_fit(
