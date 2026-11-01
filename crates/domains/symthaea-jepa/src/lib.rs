@@ -156,7 +156,7 @@ pub fn embedding_sha256(hv: &ContinuousHV) -> String {
     for value in hv.as_slice() {
         hasher.update(value.to_bits().to_le_bytes());
     }
-    digest_to_hex(hasher.finalize().as_slice())
+    digest_to_hex(&hasher.finalize())
 }
 
 /// Canonical digest of the frozen action IDs and their discrete JEPA indices.
@@ -167,6 +167,17 @@ pub fn candidate_set_sha256(
 ) -> Result<String, String> {
     if !is_lower_hex_sha256(action_manifest_sha256) {
         return Err("action_manifest_sha256 must be a lowercase SHA-256 digest".into());
+    }
+    if candidates.len() < 2 {
+        return Err("at least two action candidates are required".into());
+    }
+    for (index, candidate) in candidates.iter().enumerate() {
+        if candidates[..index].iter().any(|previous| {
+            previous.action_id == candidate.action_id
+                || previous.action_index == candidate.action_index
+        }) {
+            return Err("candidate action IDs and action indices must be unique".into());
+        }
     }
     let mut ordered = candidates.to_vec();
     ordered.sort_by_key(|candidate| candidate.action_id);
@@ -603,6 +614,18 @@ mod tests {
         assert!(engine
             .train_observed_transition(&current, &next, &evidence, 0.001)
             .is_err());
+    }
+
+    #[test]
+    fn jepa_digest_helpers_match_sha256_known_answer() {
+        assert_eq!(
+            digest_to_hex(&Sha256::digest(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        let left = random_hv(551);
+        let right = random_hv(551);
+        assert_eq!(embedding_sha256(&left), embedding_sha256(&right));
+        assert_eq!(embedding_sha256(&left).len(), 64);
     }
 
     #[test]
