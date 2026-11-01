@@ -309,7 +309,7 @@ fn generate_stream(config: &TemporalStreamConfig) -> Result<TemporalStreamDatase
     for index in 0..config.event_count {
         let is_ood = rng.below(PPM) < config.out_of_distribution_rate_ppm as u64;
         let scale = if is_ood { 4i32 } else { 1i32 };
-        let features = std::array::from_fn(|_| {
+        let latent_features = std::array::from_fn(|_| {
             ((rng.below(2049) as i32 - 1024) * scale) as i16
         });
         let mut missing_feature_mask = 0u8;
@@ -318,9 +318,14 @@ fn generate_stream(config: &TemporalStreamConfig) -> Result<TemporalStreamDatase
                 missing_feature_mask |= 1 << feature;
             }
         }
+        // Ground truth uses the latent complete signal. Model-facing observations zero-fill
+        // dropped features and expose only the missingness mask, never the hidden values.
+        let observed_features = std::array::from_fn(|feature| {
+            if missing_feature_mask & (1 << feature) != 0 { 0 } else { latent_features[feature] }
+        });
         let (target_regime, fraction) = drift_fraction(config, index);
-        let score_a = regime_score(0, &features);
-        let score_b = regime_score(target_regime, &features);
+        let score_a = regime_score(0, &latent_features);
+        let score_b = regime_score(target_regime, &latent_features);
         let score = score_a * (PPM as i64 - fraction as i64) + score_b * fraction as i64;
         let label = u8::from(score >= 0);
         let regime_id = if fraction >= 500_000 { target_regime } else { 0 };
@@ -339,7 +344,7 @@ fn generate_stream(config: &TemporalStreamConfig) -> Result<TemporalStreamDatase
         observations.push(TemporalObservation {
             event_index: index,
             timestamp_us,
-            features,
+            features: observed_features,
             missing_feature_mask,
         });
         delayed_labels.push(DelayedGroundTruth {
