@@ -92,7 +92,7 @@ systemctl cat symthaea-temporal-candidate.service
 systemctl cat symthaea-temporal-evaluator.service
 ```
 
-Then execute the host attack suite in the README. systemd-analyze security is diagnostic and not a proof. PrivateNetwork=yes is not a blanket AF_UNIX restriction; inspect and deny relevant host sockets explicitly. systemd may be unable to apply some namespace restrictions on a host lacking the required kernel features; never assume that directives alone establish isolation.
+Then execute the host attack suite in the README. systemd-analyze security is diagnostic and not a proof. PrivateNetwork=yes isolates host AF_UNIX abstract-namespace sockets, but filesystem-path AF_UNIX sockets remain accessible unless hidden with mount/path controls. PrivateIPC=yes does not isolate AF_UNIX sockets. Inspect the actual filesystem socket inventory and deny endpoints not required by the workload. systemd may be unable to apply some namespace restrictions on a host lacking the required kernel features; never assume that directives alone establish isolation.
 
 ## 6. Evidence to preserve
 
