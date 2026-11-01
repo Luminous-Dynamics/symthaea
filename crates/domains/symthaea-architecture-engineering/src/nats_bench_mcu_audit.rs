@@ -807,7 +807,7 @@ mod tests {
     #[test]
     fn accepts_measured_candidate_exactly_at_published_flash_boundary() {
         let (mut hardware, accuracy, failures, contract) = fixture();
-        hardware = hardware.replacen(",100,380,", ",746,380,", 1);
+        hardware = hardware.replacen(",100,380,", ",746,1024,", 1);
         let audit = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
             .expect("the published model-size limit is inclusive");
         assert_eq!(audit.candidates[0].int8_model_kb, 746.0);
@@ -856,6 +856,15 @@ mod tests {
         let error = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
             .expect_err("NaN must never enter a benchmark objective");
         assert!(error.to_string().contains("finite positive"));
+    }
+
+    #[test]
+    fn accepts_v2_failure_outcome_alias() {
+        let (hardware, accuracy, failures, contract) = fixture();
+        let failures = failures.replace("stage", "outcome");
+        let audit = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
+            .expect("the documented v2 outcome alias should be accepted");
+        assert_eq!(audit.receipt.infeasible_candidates, 1);
     }
 
     #[test]
