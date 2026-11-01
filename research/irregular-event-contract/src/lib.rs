@@ -85,6 +85,7 @@ pub enum ContractError {
     DuplicateSourceSequence {
         entity_id: u64,
         modality_id: u32,
+        source_id: u64,
         source_sequence: u64,
     },
     InvalidDecimalScale { scale: i8 },
@@ -107,7 +108,7 @@ impl fmt::Display for ContractError {
             Self::ZeroSourceDigest => write!(f, "source digest must be nonzero"),
             Self::DuplicateEventId { event_id } => write!(f, "duplicate event ID {event_id}"),
             Self::DuplicateSourceSequence { entity_id, modality_id, source_sequence } => {
-                write!(f, "duplicate source sequence {source_sequence} for entity {entity_id}, modality {modality_id}")
+                write!(f, "duplicate source sequence {source_sequence} for entity {entity_id}, modality {modality_id}, source {source_id}")
             }
             Self::InvalidDecimalScale { scale } => write!(f, "decimal scale {scale} is outside the supported range [-9, 9]"),
             Self::EmptyCensoredInterval => write!(f, "censored interval must have at least one bound"),
@@ -353,7 +354,7 @@ mod tests {
     fn duplicate_source_sequences_are_scoped_per_entity_and_modality() {
         let events = vec![observed(1, 1, 10, 10, 0), observed(2, 1, 11, 12, 0)];
         assert_eq!(validate_event_batch(&events), Err(ContractError::DuplicateSourceSequence {
-            entity_id: 1, modality_id: 1, source_sequence: 0,
+            entity_id: 1, modality_id: 1, source_id: 1, source_sequence: 0,
         }));
         let valid = vec![observed(1, 1, 10, 10, 0), observed(2, 2, 11, 12, 0)];
         assert_eq!(validate_event_batch(&valid), Ok(()));
