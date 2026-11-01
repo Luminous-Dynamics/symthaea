@@ -2343,6 +2343,66 @@ mod tests {
         )
     }
 
+    fn objective_contract(mode: EventTapeObjectiveMode) -> EventTapeObjectiveContract {
+        let objective_specs = match mode {
+            EventTapeObjectiveMode::DeterministicVector => vec![
+                EventTapeObjectiveSpec {
+                    objective_id: "quality".to_owned(),
+                    direction: ObjectiveDirection::Maximize,
+                    observation_lower_bound: None,
+                    observation_upper_bound: None,
+                    bounds_certificate_sha256: None,
+                },
+                EventTapeObjectiveSpec {
+                    objective_id: "cost".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    observation_lower_bound: None,
+                    observation_upper_bound: None,
+                    bounds_certificate_sha256: None,
+                },
+            ],
+            EventTapeObjectiveMode::NoisyReplicates => vec![
+                EventTapeObjectiveSpec {
+                    objective_id: "quality".to_owned(),
+                    direction: ObjectiveDirection::Maximize,
+                    observation_lower_bound: Some(0.0),
+                    observation_upper_bound: Some(1.0),
+                    bounds_certificate_sha256: Some(H1.to_owned()),
+                },
+                EventTapeObjectiveSpec {
+                    objective_id: "cost".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    observation_lower_bound: Some(0.0),
+                    observation_upper_bound: Some(1.0),
+                    bounds_certificate_sha256: Some(H2.to_owned()),
+                },
+            ],
+        };
+        let noisy = mode == EventTapeObjectiveMode::NoisyReplicates;
+        EventTapeObjectiveContract {
+            schema: OBJECTIVE_CONTRACT_SCHEMA.to_owned(),
+            version: OBJECTIVE_CONTRACT_VERSION.to_owned(),
+            mode,
+            objective_specs,
+            reference_point_raw: vec![0.0, 0.0],
+            sampling_protocol_id: noisy.then(|| "counter-stream-v1".to_owned()),
+            sampling_protocol_sha256: noisy.then(|| H3.to_owned()),
+            noise_model_id: noisy.then(|| "bounded-noise-v1".to_owned()),
+            noise_model_sha256: noisy.then(|| H4.to_owned()),
+            familywise_alpha: noisy.then_some(0.05),
+            max_candidates: noisy.then_some(10),
+            minimum_replicates: noisy.then_some(2),
+        }
+    }
+
+    fn header_with_objective_contract(mode: EventTapeObjectiveMode) -> EventTapeHeader {
+        let mut header = header(ExecutionMode::Sequential, 1, 100);
+        let contract = objective_contract(mode);
+        header.objective_contract_sha256 = Some(contract.contract_sha256().unwrap());
+        header.objective_contract = Some(contract);
+        header
+    }
+
     #[test]
     fn sequential_tape_hashes_history_and_conserves_charged_budget() {
         let mut tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
