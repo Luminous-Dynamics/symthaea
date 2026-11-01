@@ -110,7 +110,7 @@ fn run() -> Result<(), String> {
         let median_ns = median_duration(&mut samples).as_nanos();
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
         println!(
-            "{},{},{},{},{},{},{},{},{:.17},{}",
+            "{},{},{},{},{},{},{},{},{:.17},true",
             n_units,
             CANDIDATE.len(),
             n_units - CANDIDATE.len(),
@@ -120,7 +120,6 @@ fn run() -> Result<(), String> {
             median_ns,
             min_ns,
             output_sum,
-            true,
         );
     }
     Ok(())
