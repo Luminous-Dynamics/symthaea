@@ -557,6 +557,12 @@ impl BenchmarkRunManifest {
             }
         }
         self.latency.boundary.validate()?;
+        if self.latency.measured_sample_count == 0
+            || self.latency.measurement_window_us == 0
+            || self.latency.throughput_milli_per_second == 0
+        {
+            return Err(ManifestError::InvalidLatencyStatistics);
+        }
         let expected_throughput_milli = u128::from(self.latency.measured_sample_count)
             .checked_mul(1_000_000_000)
             .ok_or(ManifestError::ArithmeticOverflow)?
@@ -567,8 +573,6 @@ impl BenchmarkRunManifest {
             return Err(ManifestError::InvalidLatencyStatistics);
         }
         if self.latency.boundary.scope == MeasurementScope::TrainingPipeline
-            || self.latency.measured_sample_count == 0
-            || self.latency.measurement_window_us == 0
             || self.latency.p50_us == 0
             || self.latency.p50_us > self.latency.p95_us
             || self.latency.p95_us > self.latency.p99_us
@@ -1038,6 +1042,13 @@ mod tests {
         let mut manifest = valid_manifest();
         manifest.latency.deadline_us = None;
         manifest.latency.deadline_misses = 1;
+        assert_eq!(manifest.validate(), Err(ManifestError::InvalidLatencyStatistics));
+    }
+
+    #[test]
+    fn zero_measurement_window_rejects_without_division() {
+        let mut manifest = valid_manifest();
+        manifest.latency.measurement_window_us = 0;
         assert_eq!(manifest.validate(), Err(ManifestError::InvalidLatencyStatistics));
     }
 
