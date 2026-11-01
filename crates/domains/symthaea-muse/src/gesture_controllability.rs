@@ -45,6 +45,7 @@ pub enum ExpectedDirection {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FeatureMeasurement {
+    pub target: GestureTarget,
     pub feature_id: String,
     pub value: f64,
     pub unit: FeatureUnit,
@@ -53,6 +54,7 @@ pub struct FeatureMeasurement {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExpectedFeatureEffect {
+    pub target: GestureTarget,
     pub feature_id: String,
     pub unit: FeatureUnit,
     pub minimum_abs_delta: f64,
@@ -62,6 +64,7 @@ pub struct ExpectedFeatureEffect {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SideEffectBudget {
+    pub target: GestureTarget,
     pub feature_id: String,
     pub unit: FeatureUnit,
     pub maximum_abs_delta: f64,
@@ -207,6 +210,7 @@ impl GestureCounterfactualReceiptV1 {
                 .zip(self.intervention_features.iter())
             {
                 if baseline.feature_id != intervention.feature_id
+                    || baseline.target != intervention.target
                     || baseline.unit != intervention.unit
                 {
                     issues.push("baseline/intervention feature identities or units differ".to_string());
@@ -225,12 +229,12 @@ impl GestureCounterfactualReceiptV1 {
             .iter()
             .map(|effect| effect.feature_id.as_str())
             .collect();
-        if self
-            .side_effect_budgets
-            .iter()
-            .any(|budget| expected_ids.contains(budget.feature_id.as_str()))
-        {
-            issues.push("a feature cannot be both an expected effect and a side-effect budget".to_string());
+        if self.side_effect_budgets.iter().any(|budget| {
+            self.expected_effects.iter().any(|effect| {
+                effect.feature_id == budget.feature_id && effect.target == budget.target
+            })
+        }) {
+            issues.push("the same target feature cannot be both an expected effect and a side-effect budget".to_string());
         }
 
         let baseline_index = feature_index(&self.baseline_features);
@@ -283,6 +287,10 @@ impl GestureCounterfactualReceiptV1 {
             };
             if baseline.unit != budget.unit || intervention.unit != budget.unit {
                 issues.push(format!("side-effect feature {} has a unit mismatch", budget.feature_id));
+                continue;
+            }
+            if baseline.target != budget.target || intervention.target != budget.target {
+                issues.push(format!("side-effect feature {} does not belong to its declared target", budget.feature_id));
                 continue;
             }
             let signed_delta = intervention.value - baseline.value;
@@ -407,6 +415,7 @@ impl GestureCounterfactualReceiptV1 {
         hash_measurements(&mut hasher, &self.intervention_features);
         hasher.update((self.expected_effects.len() as u64).to_be_bytes());
         for effect in &self.expected_effects {
+            hash_target(&mut hasher, &effect.target);
             hash_string(&mut hasher, &effect.feature_id);
             hasher.update([feature_unit_code(effect.unit)]);
             hasher.update(effect.minimum_abs_delta.to_bits().to_be_bytes());
@@ -414,6 +423,7 @@ impl GestureCounterfactualReceiptV1 {
         }
         hasher.update((self.side_effect_budgets.len() as u64).to_be_bytes());
         for budget in &self.side_effect_budgets {
+            hash_target(&mut hasher, &budget.target);
             hash_string(&mut hasher, &budget.feature_id);
             hasher.update([feature_unit_code(budget.unit)]);
             hasher.update(budget.maximum_abs_delta.to_bits().to_be_bytes());
@@ -530,6 +540,7 @@ fn hash_value(hasher: &mut Sha256, value: &GestureValue) {
 fn hash_measurements(hasher: &mut Sha256, measurements: &[FeatureMeasurement]) {
     hasher.update((measurements.len() as u64).to_be_bytes());
     for measurement in measurements {
+        hash_target(hasher, &measurement.target);
         hash_string(hasher, &measurement.feature_id);
         hasher.update(measurement.value.to_bits().to_be_bytes());
         hasher.update([feature_unit_code(measurement.unit)]);
@@ -604,11 +615,19 @@ mod tests {
             intervention_output_sha256: "f".repeat(64),
             baseline_features: vec![
                 FeatureMeasurement {
+                    target: GestureTarget::Note {
+                    part_id: 4,
+                    note_id: "vln-note-1".to_string(),
+                },
                     feature_id: "onset_latency_ms".to_string(),
                     value: 18.0,
                     unit: FeatureUnit::Milliseconds,
                 },
                 FeatureMeasurement {
+                    target: GestureTarget::Note {
+                    part_id: 4,
+                    note_id: "vln-note-1".to_string(),
+                },
                     feature_id: "spectral_centroid_hz".to_string(),
                     value: 1800.0,
                     unit: FeatureUnit::Hertz,
@@ -627,12 +646,20 @@ mod tests {
                 },
             ],
             expected_effects: vec![ExpectedFeatureEffect {
+                target: GestureTarget::Note {
+                    part_id: 4,
+                    note_id: "vln-note-1".to_string(),
+                },
                 feature_id: "spectral_centroid_hz".to_string(),
                 unit: FeatureUnit::Hertz,
                 minimum_abs_delta: 100.0,
                 direction: ExpectedDirection::Increase,
             }],
             side_effect_budgets: vec![SideEffectBudget {
+                target: GestureTarget::Note {
+                    part_id: 4,
+                    note_id: "vln-note-1".to_string(),
+                },
                 feature_id: "onset_latency_ms".to_string(),
                 unit: FeatureUnit::Milliseconds,
                 maximum_abs_delta: 3.0,
@@ -686,6 +713,45 @@ mod tests {
             .unwrap_err()
             .iter()
             .any(|issue| issue.contains("side-effect budget exceeded")));
+    }
+
+    #[test]
+    fn detects_cross_note_leakage_with_a_note_scoped_side_effect_budget() {
+        let mut value = receipt();
+        let other_target = GestureTarget::Note {
+            part_id: 4,
+            note_id: "vln-note-2".to_string(),
+        };
+        value.baseline_features.push(FeatureMeasurement {
+            target: other_target.clone(),
+            feature_id: "other_note_level".to_string(),
+            value: 0.3,
+            unit: FeatureUnit::Normalized,
+        });
+        value.intervention_features.push(FeatureMeasurement {
+            target: other_target.clone(),
+            feature_id: "other_note_level".to_string(),
+            value: 0.3,
+            unit: FeatureUnit::Normalized,
+        });
+        value.baseline_features.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
+        value.intervention_features.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
+        value.side_effect_budgets.push(SideEffectBudget {
+            target: other_target,
+            feature_id: "other_note_level".to_string(),
+            unit: FeatureUnit::Normalized,
+            maximum_abs_delta: 0.0,
+        });
+        value.side_effect_budgets.sort_by(|a, b| a.feature_id.cmp(&b.feature_id));
+        value.seal();
+        assert!(value.verify().is_ok());
+
+        value.intervention_features.iter_mut()
+            .find(|feature| feature.feature_id == "other_note_level")
+            .unwrap().value = 0.31;
+        value.seal();
+        assert!(value.verify().unwrap_err().iter()
+            .any(|issue| issue.contains("side-effect budget exceeded for other_note_level")));
     }
 
     #[test]
