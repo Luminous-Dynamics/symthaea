@@ -3462,6 +3462,13 @@ mod artifact_evaluator_tests_v1 {
 
     #[test]
     fn frozen_artifacts_round_trip_and_score_in_a_fresh_evaluator_api() {
+        let expected_suite = generate_poar_graph_suite(1729, DatasetSplit::Test);
+        let expected_case_count = expected_suite.case_count();
+        let expected_target_claim_count = expected_suite
+            .planner_cases()
+            .iter()
+            .map(|case| case.target_claim_ids.len())
+            .sum::<usize>();
         let (planner, oracle, predictions, digest) = artifacts();
         let evaluated = evaluate_poar_artifacts_v1(
             planner.as_bytes(),
@@ -3470,7 +3477,7 @@ mod artifact_evaluator_tests_v1 {
             &digest,
         )
         .expect("valid frozen artifacts");
-        assert_eq!(evaluated.report.case_count(), 16);
+        assert_eq!(evaluated.report.case_count(), expected_case_count);
         assert_eq!(evaluated.report.duplicate_prediction_packets, 0);
         assert_eq!(evaluated.report.unknown_prediction_packets, 0);
         assert_eq!(evaluated.prediction_identity.model_id, "test-model");
@@ -3481,7 +3488,7 @@ mod artifact_evaluator_tests_v1 {
                 .iter()
                 .map(|score| score.target_claims)
                 .sum::<usize>(),
-            18
+            expected_target_claim_count
         );
     }
 
