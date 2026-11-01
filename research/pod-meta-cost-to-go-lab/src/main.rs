@@ -228,4 +228,3 @@ fn main() {
             .unwrap_or_else(|| "-".to_owned())
     );
 }
-}
