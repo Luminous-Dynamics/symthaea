@@ -940,6 +940,61 @@ mod tests {
     }
 
     #[test]
+    fn seeded_optional_stopping_coverage_simulation_is_a_diagnostic_regression() {
+        // This is not a proof of Hoeffding's inequality or replicate independence.
+        // It is a deterministic stress test of the implementation across every prefix.
+        const PATHS: usize = 128;
+        const HORIZON: usize = 128;
+        let mut paths_with_any_miss = 0usize;
+
+        for path_index in 0..PATHS {
+            let mut rng = 0x9e37_79b9_7f4a_7c15u64
+                .wrapping_add(path_index as u64 * 0x9e37_79b9_7f4a_7c15);
+            if rng == 0 {
+                rng = 1;
+            }
+            let mut study = NoisyParetoStudy::new(plan()).unwrap();
+            let mut missed_any_prefix = false;
+
+            for replicate_index in 0..HORIZON {
+                // xorshift64*: deterministic pseudorandom Bernoulli(0.5) diagnostic stream.
+                rng ^= rng >> 12;
+                rng ^= rng << 25;
+                rng ^= rng >> 27;
+                let bits = rng.wrapping_mul(0x2545_f491_4f6c_dd1d);
+                let observation = (bits >> 63) as f64;
+                let sample_seed = bits.max(1);
+
+                study.append(
+                    "candidate-a",
+                    H1,
+                    NoisyReplicate {
+                        replicate_id: format!("path-{path_index:04}-replicate-{replicate_index:04}"),
+                        sample_seed,
+                        objective_values: vec![observation, observation],
+                        evidence_sha256: H2.to_owned(),
+                    },
+                ).unwrap();
+
+                let report = study.report().unwrap();
+                let interval = &report.candidate_summaries[0].confidence_intervals[0];
+                if 0.5 < interval.lower_bound || 0.5 > interval.upper_bound {
+                    missed_any_prefix = true;
+                }
+            }
+            paths_with_any_miss += usize::from(missed_any_prefix);
+        }
+
+        // For the tested coordinate, the frozen alpha allocation is 0.05/(10 candidates * 2 objectives).
+        // The limit is intentionally looser than the expected failure count to avoid treating
+        // a finite Monte Carlo simulation as a statistical proof.
+        assert!(
+            paths_with_any_miss <= 4,
+            "unexpected optional-stopping coverage failures: {paths_with_any_miss}/{PATHS}",
+        );
+    }
+
+    #[test]
     fn report_digest_is_independent_of_observation_insertion_order() {
         let mut left = NoisyParetoStudy::new(plan()).unwrap();
         let mut right = NoisyParetoStudy::new(plan()).unwrap();
