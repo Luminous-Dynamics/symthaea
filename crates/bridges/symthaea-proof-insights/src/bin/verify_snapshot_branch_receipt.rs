@@ -61,12 +61,18 @@ fn self_test(path: &PathBuf) -> Result<()> {
         "status":"candidate_available",
         "candidate_sha256":"b".repeat(64)
     }]);
+    measured["proof_state"]["proof_state_sha256"] =
+        Value::String(snapshot_branch_receipt::compute_live_proof_state_sha256(&measured)?);
     let measured_bytes = serde_json::to_vec(&measured)?;
     let measured_summary = snapshot_branch_receipt::verify_bytes(&measured_bytes, None)?;
     if measured_summary.run_status != "measured" || measured_summary.branch_count != 1 {
         bail!("synthetic measured-shape control returned inconsistent metadata");
     }
     println!("PITB_SNAPSHOT_RECEIPT_MEASURED_SHAPE_PASS: synthetic only; no real snapshot or Lean branch");
+
+    let mut bad = measured.clone();
+    bad["proof_state"]["metavar_context_sha256"] = Value::String("d".repeat(64));
+    must_reject("MetavarContext mutation changes live proof-state identity", bad)?;
 
     let mut bad = measured.clone();
     bad["branches"][0]["mutable_context_isolated"] = Value::Bool(false);
