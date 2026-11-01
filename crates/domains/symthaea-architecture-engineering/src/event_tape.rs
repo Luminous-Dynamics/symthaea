@@ -2127,6 +2127,45 @@ fn same_work(left: &ActionIntent, right: &ActionIntent) -> bool {
             },
         ) => left == right,
         (
+            ActionIntent::EvaluateCandidateVector {
+                candidate_sha256: left_candidate,
+                objective_contract_sha256: left_contract,
+                direction_id: left_direction,
+                ..
+            },
+            ActionIntent::EvaluateCandidateVector {
+                candidate_sha256: right_candidate,
+                objective_contract_sha256: right_contract,
+                direction_id: right_direction,
+                ..
+            },
+        ) => {
+            left_candidate == right_candidate
+                && left_contract == right_contract
+                && left_direction == right_direction
+        }
+        (
+            ActionIntent::ObserveCandidateReplicate {
+                candidate_sha256: left_candidate,
+                objective_contract_sha256: left_contract,
+                decision_sha256: left_decision,
+                direction_id: left_direction,
+                ..
+            },
+            ActionIntent::ObserveCandidateReplicate {
+                candidate_sha256: right_candidate,
+                objective_contract_sha256: right_contract,
+                decision_sha256: right_decision,
+                direction_id: right_direction,
+                ..
+            },
+        ) => {
+            left_candidate == right_candidate
+                && left_contract == right_contract
+                && left_decision == right_decision
+                && left_direction == right_direction
+        }
+        (
             ActionIntent::ProposeDirection {
                 descriptor_sha256: left,
                 ..
