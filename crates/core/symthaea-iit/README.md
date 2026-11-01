@@ -250,21 +250,23 @@ https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/p
 ## Macro-unit identity foundation
 
 The first macro-grain research increment adds a bounded, canonical
-`MacroUnitSpec` representation. It binds an ordered micro-constituent set,
-temporal update grain, truth-table size, canonical mapping digest, and the
-original mapping's complement orientation. Complementary mappings share the
-same unoriented mapping digest while retaining distinct state-label
-orientations in the full spec digest. The sequence-state bit order is explicit:
-oldest micro time first, with the first listed constituent as the least-
-significant bit.
+`MacroUnitSpec` representation plus exact truth-table builders for the two
+default mapping families: ON-count coarse-graining at update grain 1 and
+blackboxing designated output constituents at the final update of a temporal
+window. It binds an ordered micro-constituent set, temporal update grain,
+truth-table size, canonical mapping digest, and the original mapping's
+complement orientation. Complementary mappings share the same unoriented
+mapping digest while retaining distinct state-label orientations in the full
+spec digest. The sequence-state bit order is explicit: oldest micro time first,
+with the first listed constituent as the least-significant bit.
 
 Construction rejects unsorted/duplicate constituents, zero temporal grain,
 overflowing sequence-state domains, constant mappings, incorrect truth-table
-lengths, and mappings above a caller-supplied entry budget. The current code
-does **not** derive macro TPMs, decide whether units satisfy the intrinsic-unit
-criteria, or search across grains. Those stages need separate PyPhi 2.0
-differential fixtures and resource-bound proofs before they can be described as
-implemented. The macro-unit issue is
+lengths, invalid local output selections, and mappings above a caller-supplied
+entry budget. The current code does **not** derive macro TPMs, decide whether
+units satisfy the intrinsic-unit criteria, or search across grains. Those
+stages need separate PyPhi 2.0 differential fixtures and resource-bound proofs
+before they can be described as implemented. The macro-unit issue is
 https://github.com/Luminous-Dynamics/symthaea/issues/9750.
 
 PyPhi 2.0 already implements the macro-unit and grain-search framework; the
