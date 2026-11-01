@@ -531,6 +531,8 @@ jobs:
           assert fixture["policy"]["calibration_manifest_sha256"] == calibration["dataset_manifest_sha256"]
           assert fixture["policy"]["calibration_sample_count"] == calibration["total_sample_count"]
           assert fixture["policy"]["calibration_ece_ppm"] == calibration["worst_action_ece_ppm"]
+          assert fixture["policy"]["evaluation_horizon_id"] == calibration["evaluation_horizon_id"]
+          assert fixture["policy"]["continuation_policy_sha256"] == calibration["continuation_policy_sha256"]
           assert all(action["calibration_receipt_sha256"] == receipt_sha for action in fixture["actions"])
           policy = dict(fixture["policy"])
           claimed_policy_sha = policy.pop("policy_sha256")
