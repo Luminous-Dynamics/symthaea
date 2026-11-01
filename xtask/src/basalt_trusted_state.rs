@@ -20,6 +20,9 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use sha2::{Digest, Sha256};
 
 const MAX_ID_BYTES: usize = 128;
+const MAX_SQLITE_LOG_CURSORS: usize = 128;
+const MAX_SQLITE_SOURCE_CURSORS: usize = 4_096;
+const MAX_SQLITE_ACCEPTED_RECEIPTS: usize = 100_000;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceKey {
@@ -1557,9 +1560,30 @@ impl SqliteTrustedStateStore {
     /// Opens or initializes the local state store with a pinned durability
     /// configuration. The parent directory must already exist.
     pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        // Refuse an existing symlink or non-regular file. The containing
+        // directory must itself be trusted against path replacement.
+        match std::fs::symlink_metadata(path.as_ref()) {
+            Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+                anyhow::bail!("BASALT SQLite state path must be a regular non-symlink file");
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+
         let mut connection = Connection::open(path.as_ref())
             .with_context(|| format!("open BASALT SQLite state store at {}", path.as_ref().display()))?;
         connection.busy_timeout(Duration::from_secs(5))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let metadata = std::fs::symlink_metadata(path.as_ref())?;
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                anyhow::bail!("BASALT SQLite state path changed to a non-regular file");
+            }
+            std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(0o600))?;
+        }
 
         connection.pragma_update(None, "journal_mode", "WAL")?;
         let journal_mode: String =
@@ -1659,6 +1683,29 @@ impl SqliteTrustedStateStore {
                 },
             ));
         }
+        if current.log_cursors.len() >= MAX_SQLITE_LOG_CURSORS
+            && !plan.next_state.log_cursors.contains_key(
+                &plan.next_state.accepted_receipts[&plan.receipt_digest].checkpoint.log_id
+            )
+        {
+            return Err(DurableStoreError::Storage(
+                "BASALT SQLite log-cursor limit reached".to_string(),
+            ));
+        }
+        if current.source_cursors.len() >= MAX_SQLITE_SOURCE_CURSORS
+            && !plan.next_state.source_cursors.contains_key(
+                &plan.next_state.accepted_receipts[&plan.receipt_digest].source
+            )
+        {
+            return Err(DurableStoreError::Storage(
+                "BASALT SQLite source-cursor limit reached".to_string(),
+            ));
+        }
+        if current.accepted_receipts.len() >= MAX_SQLITE_ACCEPTED_RECEIPTS {
+            return Err(DurableStoreError::Storage(
+                "BASALT SQLite accepted-receipt limit reached".to_string(),
+            ));
+        }
 
         let next_revision = current
             .revision
@@ -1734,6 +1781,32 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
         )?;
 
     let revision = parse_sql_u64(&revision_text, "revision")?;
+
+    let log_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM basalt_log_cursors",
+        [],
+        |row| row.get(0),
+    )?;
+    let source_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM basalt_source_cursors",
+        [],
+        |row| row.get(0),
+    )?;
+    let receipt_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM basalt_accepted_receipts",
+        [],
+        |row| row.get(0),
+    )?;
+    if log_count < 0
+        || source_count < 0
+        || receipt_count < 0
+        || log_count as usize > MAX_SQLITE_LOG_CURSORS
+        || source_count as usize > MAX_SQLITE_SOURCE_CURSORS
+        || receipt_count as usize > MAX_SQLITE_ACCEPTED_RECEIPTS
+    {
+        anyhow::bail!("persisted BASALT SQLite state exceeds configured record bounds");
+    }
+
     let policy_versions = match (
         signer_policy_text,
         witness_policy_text,
