@@ -40,5 +40,5 @@ not physical CPU/GPU or energy measurement. The evaluator must measure actual
 outcomes and hardware costs separately.
 
 No Rust build, test, formatting, Clippy, or benchmark has run for this draft.
-See issue #9677 and
+See tracking work item NEURO-SILICON-010 and
 `docs/research/CONTINUAL_PLASTICITY_REPLAY_BASELINES_V0_1.md`.
