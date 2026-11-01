@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/basalt-trace-verifier/**"
       - "benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json"
+      - "benchmarks/basalt/schema/storage-observations.v1.schema.json"
       - "benchmarks/basalt/storage-conformance-trace.v1.json"
       - "docs/research/BASALT_STORAGE_CONFORMANCE_PROTOCOL_2026-11-01.md"
       - ".github/workflows/basalt-trace-verifier.yml"
