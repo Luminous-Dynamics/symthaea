@@ -58,11 +58,20 @@ impl Interval {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct PairedDecisionWorld {
+    pub world_id: String,
+    pub baseline_value: f64,
+    pub after_edit_value: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PairedEffectBounds {
     /// Tighter interval computed from matched baseline/post-edit latent graph worlds.
     pub effect_interval: Interval,
     /// Digest of the paired-world evaluation artifact and shared-world mapping.
     pub evidence_sha256: String,
+    /// Optional exact endpoint pairs evaluated in the same latent graph worlds.
+    pub decision_worlds: Option<Vec<PairedDecisionWorld>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -125,6 +134,13 @@ pub enum EffectMethod {
     PairedSharedWorlds,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionFlipMethod {
+    NotConfigured,
+    MarginalIntervalOuterBound,
+    PairedSharedWorlds,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioImpact {
     pub scenario_id: String,
@@ -140,6 +156,8 @@ pub struct ScenarioImpact {
     pub baseline_decision: DecisionClass,
     pub after_edit_decision: DecisionClass,
     pub decision_flip: DecisionFlipStatus,
+    pub decision_flip_method: DecisionFlipMethod,
+    pub paired_decision_world_count: usize,
     pub materiality_exceeded_possible: bool,
     pub materiality_exceeded_guaranteed: bool,
 }
@@ -193,6 +211,11 @@ pub enum QueryImpactError {
     DecisionThresholdMismatch { query_id: String },
     NonFiniteDerivedValue { query_id: String, scenario_id: String },
     PairedEffectOutsideConservativeBound { query_id: String, scenario_id: String },
+    PairedDecisionWorldsEmpty { query_id: String, scenario_id: String },
+    PairedDecisionWorldsRequireThreshold { query_id: String, scenario_id: String },
+    DuplicatePairedDecisionWorld { query_id: String, scenario_id: String, world_id: String },
+    PairedDecisionValueOutsideMarginal { query_id: String, scenario_id: String, world_id: String },
+    PairedDecisionDifferenceOutsideEffect { query_id: String, scenario_id: String, world_id: String },
     NoQueryScenarios,
 }
 
@@ -247,6 +270,21 @@ impl fmt::Display for QueryImpactError {
             }
             Self::PairedEffectOutsideConservativeBound { query_id, scenario_id } => {
                 write!(f, "query {query_id} scenario {scenario_id} paired effect lies outside its conservative interval bound")
+            }
+            Self::PairedDecisionWorldsEmpty { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} supplied an empty paired decision world set")
+            }
+            Self::PairedDecisionWorldsRequireThreshold { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} supplied paired decision worlds without a decision threshold")
+            }
+            Self::DuplicatePairedDecisionWorld { query_id, scenario_id, world_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} repeats paired decision world {world_id}")
+            }
+            Self::PairedDecisionValueOutsideMarginal { query_id, scenario_id, world_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} paired world {world_id} lies outside a marginal interval")
+            }
+            Self::PairedDecisionDifferenceOutsideEffect { query_id, scenario_id, world_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} paired world {world_id} lies outside the paired effect interval")
             }
             Self::NoQueryScenarios => write!(f, "candidate has no query scenario evaluations"),
         }
@@ -438,20 +476,77 @@ fn analyze_scenario(
         });
     }
 
-    let (baseline_decision, after_edit_decision, decision_flip) =
-        match evaluation.decision_threshold {
-            Some(threshold) => {
-                let baseline = classify_interval(evaluation.baseline, threshold);
-                let after = classify_interval(evaluation.hypothetical_after_edit, threshold);
-                let flip = classify_flip(evaluation.baseline, evaluation.hypothetical_after_edit, threshold);
-                (baseline, after, flip)
+    let (
+        baseline_decision,
+        after_edit_decision,
+        decision_flip,
+        decision_flip_method,
+        paired_decision_world_count,
+    ) = match evaluation.decision_threshold {
+        None => {
+            if evaluation
+                .paired_effect
+                .as_ref()
+                .and_then(|paired| paired.decision_worlds.as_ref())
+                .is_some()
+            {
+                return Err(QueryImpactError::PairedDecisionWorldsRequireThreshold {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                });
             }
-            None => (
+            (
                 DecisionClass::NotConfigured,
                 DecisionClass::NotConfigured,
                 DecisionFlipStatus::NotConfigured,
-            ),
-        };
+                DecisionFlipMethod::NotConfigured,
+                0,
+            )
+        }
+        Some(threshold) => {
+            let baseline = classify_interval(evaluation.baseline, threshold);
+            let after = classify_interval(evaluation.hypothetical_after_edit, threshold);
+            let paired_worlds = evaluation
+                .paired_effect
+                .as_ref()
+                .and_then(|paired| paired.decision_worlds.as_ref());
+            if let Some(worlds) = paired_worlds {
+                let flip_count = worlds
+                    .iter()
+                    .filter(|world| {
+                        (world.baseline_value >= threshold)
+                            != (world.after_edit_value >= threshold)
+                    })
+                    .count();
+                let flip = if flip_count == worlds.len() {
+                    DecisionFlipStatus::Guaranteed
+                } else if flip_count == 0 {
+                    DecisionFlipStatus::Impossible
+                } else {
+                    DecisionFlipStatus::Possible
+                };
+                (
+                    baseline,
+                    after,
+                    flip,
+                    DecisionFlipMethod::PairedSharedWorlds,
+                    worlds.len(),
+                )
+            } else {
+                (
+                    baseline,
+                    after,
+                    classify_flip(
+                        evaluation.baseline,
+                        evaluation.hypothetical_after_edit,
+                        threshold,
+                    ),
+                    DecisionFlipMethod::MarginalIntervalOuterBound,
+                    0,
+                )
+            }
+        }
+    };
 
     Ok(ScenarioImpact {
         scenario_id: evaluation.scenario_id.clone(),
@@ -613,6 +708,55 @@ fn validate_evaluation(
                 query_id: evaluation.query_id.clone(),
                 scenario_id: evaluation.scenario_id.clone(),
             });
+        }
+        if let Some(worlds) = &paired.decision_worlds {
+            if worlds.is_empty() {
+                return Err(QueryImpactError::PairedDecisionWorldsEmpty {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                });
+            }
+            if evaluation.decision_threshold.is_none() {
+                return Err(QueryImpactError::PairedDecisionWorldsRequireThreshold {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                });
+            }
+            let mut world_ids = BTreeSet::new();
+            for world in worlds {
+                validate_id("paired decision world", &world.world_id)?;
+                if !world_ids.insert(world.world_id.clone()) {
+                    return Err(QueryImpactError::DuplicatePairedDecisionWorld {
+                        query_id: evaluation.query_id.clone(),
+                        scenario_id: evaluation.scenario_id.clone(),
+                        world_id: world.world_id.clone(),
+                    });
+                }
+                if !world.baseline_value.is_finite()
+                    || !world.after_edit_value.is_finite()
+                    || world.baseline_value < evaluation.baseline.lower
+                    || world.baseline_value > evaluation.baseline.upper
+                    || world.after_edit_value < evaluation.hypothetical_after_edit.lower
+                    || world.after_edit_value > evaluation.hypothetical_after_edit.upper
+                {
+                    return Err(QueryImpactError::PairedDecisionValueOutsideMarginal {
+                        query_id: evaluation.query_id.clone(),
+                        scenario_id: evaluation.scenario_id.clone(),
+                        world_id: world.world_id.clone(),
+                    });
+                }
+                let effect = world.after_edit_value - world.baseline_value;
+                if !effect.is_finite()
+                    || effect < paired.effect_interval.lower
+                    || effect > paired.effect_interval.upper
+                {
+                    return Err(QueryImpactError::PairedDecisionDifferenceOutsideEffect {
+                        query_id: evaluation.query_id.clone(),
+                        scenario_id: evaluation.scenario_id.clone(),
+                        world_id: world.world_id.clone(),
+                    });
+                }
+            }
         }
     }
     Ok(())
