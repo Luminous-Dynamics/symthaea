@@ -1304,6 +1304,15 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unit_reuse_across_null_and_alternative_calibration_rows() {
+        let plan = nominal_plan();
+        let mut request = request(&plan);
+        request.alternative_rows[0].sampling_unit_ids[0] =
+            request.null_rows[0].sampling_unit_ids[0].clone();
+        assert!(analyze_decision_functional_frontier(&plan, &request).is_err());
+    }
+
+    #[test]
     fn rejects_duplicate_sampling_units() {
         let plan = nominal_plan();
         let mut request = request(&plan);
