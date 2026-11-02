@@ -4,7 +4,7 @@
   "action_manifest_sha256": "8cd89f9287f4cfe2f5b69b6e35fa8b33f74150f6f4850271ab283a95418b48aa",
   "joint_draw_manifest_sha256": "f0fd63f7e8fbc17b1c19e93e7437488528f5db2d254507e93fac1595b7637616",
   "model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-  "bank_sha256": "11c3ccc99d90771444ad3198ff5f6a87494ed167e2da3be2744acb2f64ba523e",
+  "bank_sha256": "55d55bae30ca1b0148d6935d66096eaba73d2e4f79daf9c17435226cff57e91c",
   "source_frame_sequence": 40,
   "issued_at_seconds": 1,
   "horizon_seconds": 0.5,
