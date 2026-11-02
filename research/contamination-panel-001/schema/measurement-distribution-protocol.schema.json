@@ -212,7 +212,7 @@
           },
           "families": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 0,
             "maxItems": 64,
             "items": {
               "type": "object",
