@@ -73,7 +73,14 @@ The exact reference sweep demonstrates that evaluator risk can rise and then fal
 
 The fixture's evaluator risks are synthetic ground truth. The weighted calibration output is a separate synthetic diagnostic using its own sample and worst-case test loss. The two must not be conflated.
 
-## 5. Required benchmark comparisons
+## 5. Pinned external reference implementations
+
+- **CPC:** paper https://proceedings.mlr.press/v306/prinster26a.html; code https://github.com/samuelstanton/conformal-policy-control; inspected main commit `83ba982e14480f5e986cf7776de87a9b7e3d4245` (2026-10-24), MIT. Its CBO implementation estimates constrained-policy normalizers and maximum test weights from Monte Carlo proposals. Reproduce its paper protocol; the Symthaea exact finite-support calculation is a separate discrete reference.
+- **AC-RAC / AC-CP:** paper https://proceedings.mlr.press/v306/zhu26z.html; code https://github.com/Telvc/AC-RAC; inspected main commit `df7194a6fa7b283108b96672833e3f85ecc25835` (2026-05-20), MIT. The repository includes action-specific lambda calibration, per-action coverage/FDR reporting, vectorized-versus-literal-loop tests, cached fast reproduction, and full COVID/MovieLens rerun instructions. Its pinned commit predates the July 2026 proceedings, so verify paper-to-code alignment before calling it definitive.
+
+These are separate comparators: CPC's marginal policy-risk guarantee is not AC-RAC's action-conditional guarantee. Neither is currently reproduced by this Symthaea crate.
+
+## 6. Required benchmark comparisons
 
 1. Safe reference policy.
 2. Unconstrained optimized candidate.
@@ -87,7 +94,7 @@ The fixture's evaluator risks are synthetic ground truth. The weighted calibrati
 
 The exact oracle knows the synthetic environment's ground truth and is never deployable.
 
-## 6. Evaluation metrics
+## 7. Evaluation metrics
 
 - Overall constraint violation probability, with uncertainty.
 - Per-action and per-context/action violation probability.
@@ -99,7 +106,7 @@ The exact oracle knows the synthetic environment's ground truth and is never dep
 - Marginal versus per-action risk gaps.
 - Resource cost and receipt-verification cost.
 
-## 7. Acceptance targets (not results)
+## 8. Acceptance targets (not results)
 
 - Exact policy normalization for every finite-support test.
 - Zero accepted overflow; overflow must fail closed.
@@ -111,7 +118,7 @@ The exact oracle knows the synthetic environment's ground truth and is never dep
 - No beta-selection guarantee without a theorem/reproduction of the paper's selection conditions.
 - No temporal/delayed-feedback guarantee inherited from static CPC/AC-CP.
 
-## 8. Execution and integration
+## 9. Execution and integration
 
 - Symthaea's planner/controller proposes candidate policies and actions.
 - The exact resource-vector controller (#9882) applies deterministic hard constraints first.
