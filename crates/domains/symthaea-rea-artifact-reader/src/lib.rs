@@ -1697,6 +1697,49 @@ mod tests {
     }
 
     #[test]
+    fn rejects_data_descriptor_crc_or_size_substitution() {
+        let path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"descriptor.bin",
+                data: b"payload",
+                flags: DATA_DESCRIPTOR_FLAG,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let mut bytes = fs::read(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        let descriptor_start =
+            LOCAL_HEADER_FIXED_BYTES as usize + b"descriptor.bin".len() + b"payload".len();
+        bytes[descriptor_start + 4] ^= 0x01;
+        let path = write_temp(&bytes);
+        let error = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::InvalidArchive);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn unsupported_compression_method_remains_visible_as_metadata() {
+        let path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"packed.bin",
+                data: b"opaque",
+                flags: 0,
+                method: 99,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let entry = &reader.inventory().entries[0];
+        assert_eq!(entry.compression_method, 99);
+        assert!(!entry.encrypted);
+        assert_eq!(reader.inventory().coverage.status, TraversalStatus::Partial);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn classifies_backslash_parent_traversal_on_unix_hosts() {
         let path = write_temp(&single_entry(b"..\\escape.txt", b"payload"));
         let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
