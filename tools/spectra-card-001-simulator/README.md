@@ -72,3 +72,11 @@ historical trial-level data, directly replicate the 1969 experiment, authorize
 a human electrical intervention, specify an EM source, or establish ESP or a
 new physical mechanism. Any physical active/sham study requires separate
 instrumentation, electrical-safety and ethics review.
+
+## Frozen known-answer campaigns
+
+The six deterministic synthetic worlds and descriptive outputs are frozen in
+`research/spectra-card-001/fixtures/known-answer-v0.1.json`. The Rust test
+replays the exact participant-level contrasts, condition means and schedule
+diagnostic for all six worlds. These are fixture outputs for deterministic
+code replay, not human effect-size expectations or statistical power results.
