@@ -3,7 +3,7 @@ name = "connectome-intervention-contract"
 version = "0.1.0"
 edition = "2024"
 publish = false
-license = "AGPL-3.0-only"
+license = "AGPL-3.0-or-later"
 description = "Fail-closed semantic verifier for connectome intervention benchmark manifests"
 
 [dependencies]
