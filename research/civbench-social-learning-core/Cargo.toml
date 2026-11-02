@@ -43,4 +43,8 @@ path = "src/bin/paper_abm_sweep.rs"
 name = "czaplicka-2025-sweep"
 path = "src/bin/czaplicka_2025_sweep.rs"
 
+[[bin]]
+name = "czaplicka-2025-parity"
+path = "src/bin/czaplicka_2025_parity.rs"
+
 [dependencies]
