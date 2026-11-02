@@ -301,7 +301,23 @@
         "absolute_tolerance": 0.025,
         "status": "aspirational_not_measured"
       }
-    ]
+    ],
+    "baseline_matrix": {
+      "required_families": [
+        "activity_only",
+        "linear_lds_var_glm",
+        "pairwise_effective_response",
+        "graph_constrained_state_space",
+        "cell_type_mechanistic",
+        "anatomical_plus_latent",
+        "degree_type_rewired",
+        "spatial_rewired",
+        "pairwise_additive",
+        "nonlinear_higher_order"
+      ],
+      "unavailable_families": [],
+      "coverage_sha256": null
+    }
   },
   "results": {
     "status": "not_run",
