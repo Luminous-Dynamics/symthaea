@@ -272,6 +272,24 @@ SPECTRA should be compared to mature practice rather than claim a new SOTA from 
 
 Proposed SPECTRA advantage is the integration of calibrated environmental observability, adversarial leakage testing, frozen behavioural inference and immutable experiment lineage. That is a testable engineering objective, not a present performance claim.
 
+## 8.1 Statistical implementation dependencies and admission status
+
+SPECTRA uses the active shared workspace statistics crate; it must not carry a task-local d-prime/ROC/sequential-inference implementation.
+
+Current draft implementation work:
+- [PR #10086](https://github.com/Luminous-Dynamics/symthaea/pull/10086): binary signal-detection counts, raw rates, equal-variance d-prime/criterion, tie-correct ROC/AUC and precision–recall/average precision.
+- [PR #10099](https://github.com/Luminous-Dynamics/symthaea/pull/10099): Bernoulli SPRT for two fixed simple hypotheses and a Hoeffding/union-bound confidence sequence for independent observations in a fixed known bounded interval.
+- [Issue #10094](https://github.com/Luminous-Dynamics/symthaea/issues/10094): reconcile active statistics source, versioned v1.x release documentation, and test/API mismatch.
+
+These PRs are draft and their Rust tests have not been executed in this research session. They are proposed dependencies, not yet admitted production evidence. The optional-stopping methods in particular must not be used until the corresponding PR is reviewed/merged, the active package/version is reconciled, and tests are executed on a pinned toolchain.
+
+Applicability limits:
+- d-prime/criterion use an equal-variance Gaussian model; raw hit/miss/false-alarm/correct-rejection counts remain primary.
+- ROC AUC is ranking discrimination, not calibration; precision–recall/average precision are especially relevant under class imbalance.
+- The SPRT only applies to two predeclared simple Bernoulli hypotheses with independent observations from the declared process.
+- The bounded-mean confidence sequence assumes independent observations in a fixed, known finite support interval. Repeated trials clustered within participants/sessions are not IID observations; use the correct independent unit or a dependence-aware procedure.
+- Neither statistical procedure repairs target leakage, non-blinding, model misspecification, invalid randomization, multiplicity, missingness or causal confounding.
+
 ## 9. First executable milestones
 
 1. **Protocol freeze:** translate this document into the existing SCI-EXP and ENG-EMC profile owners; freeze the exact task and apparatus configuration.
