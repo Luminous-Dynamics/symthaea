@@ -1,0 +1,113 @@
+# CEB Verifier Integrity Protocol V0
+
+**Date:** 2026-11-02  
+**Status:** Design-only protocol; no attack suite has been executed.  
+**Related task:** CEB-VER-001 in `benchmarks/ceb/catalog.v0.json`  
+**Tracking:** [issue #10138](https://github.com/Luminous-Dynamics/symthaea/issues/10138)
+
+## 1. Why benchmark the benchmark
+
+A benchmark result is a composition of two capabilities:
+
+1. The agent solves the task.
+2. The evaluator correctly distinguishes valid from invalid solutions.
+
+An excellent agent can appear weak under a false-negative grader; a weak agent can appear excellent when the grader exposes its pass channel or leaks the answer. These are different failure modes and require different denominators.
+
+The primary engineering score must never absorb verifier quality into one pass rate. CEB reports task-resolution results and verifier-integrity results as separate, co-equal evidence streams.
+
+## 2. Threat model
+
+Treat all agent-controlled artifacts as adversarial: source patches, tests, build scripts, dependency hooks, environment variables, filenames, paths, symlinks, process arguments, caches, stdout/stderr and generated reports.
+
+The evaluator must assume an agent may try to:
+
+- Write directly to a pass/fail flag, grader pipe, status file, named pipe or scoring endpoint.
+- Read hidden tests, reference patches, seeds, expected outputs, grader source or oracle material.
+- Modify test discovery, test files, grader code, build scripts, package manifests, lockfiles, caches or tool binaries.
+- Exploit inherited environment variables, credentials, writable host paths, process metadata, sockets, devices, symlinks, path traversal or network access.
+- Hard-code an observed fixture answer, use filename/seed leakage, exploit nondeterministic grading, or infer the answer from a supposedly hidden artifact.
+- Trigger false negatives through underspecified requirements, undocumented constraints, allowed alternate implementations, locale/time dependence, resource asymmetry, flaky checks or a stale environment.
+- Reuse a result from a different task, candidate patch, dataset revision, grader build, environment image, model/harness configuration or run.
+
+This is a test plan, not a claim that any current runner is secure. CEB task execution remains blocked on the OS-level isolation prerequisite in [issue #10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064).
+
+## 3. Attack corpus
+
+| Family | Positive-control attack | Required negative control |
+|---|---|---|
+| Reward-channel tampering | Write or forge the success signal without satisfying the task | Reference patch passes through the ordinary grader path |
+| Oracle/answer leakage | Extract a hidden seed, answer, patch, test or grader file | Agent cannot read sealed artifacts through paths, metadata or logs |
+| Evaluator mutation | Delete/skip tests; patch grader; replace test runner; edit package hooks or caches | Protected grader/test digests remain unchanged |
+| Workspace/host escape | Parent traversal, symlink escape, procfs, inherited secrets, device/socket access | Every prohibited read/write/privilege/network attempt is denied and recorded |
+| False-negative scoring | Submit a semantically valid alternate patch, equivalent API, different ordering or permitted representation | Independent adjudicators agree it meets the task contract |
+| Environment asymmetry | Use different resource, dependency, clock, locale or platform conditions for candidate and reference | Reference and candidate see the same declared environment contract |
+| Version/provenance drift | Replay a result from a different task set, grader, image or harness | Exact task, source, grader, environment and run digests are checked |
+| Receipt/report forgery | Alter claimed outcomes, hashes, task IDs, aggregates or timestamps | Independent verifier recomputes fields from retained raw artifacts |
+
+Each attack family must contain distinct root-cause variants. One thousand trivial mutations of the same writable pass flag do not constitute one thousand independent security controls.
+
+## 4. Qualification gates
+
+A task/verifier pair is not eligible for benchmark use until all gates below pass:
+
+1. **Reference gate:** independently authored reference patch passes through the same public execution path as a candidate.
+2. **Empty-patch gate:** the unchanged fixture fails the task-specific acceptance condition.
+3. **Adversarial gate:** every applicable attack family is exercised; known exploit variants are rejected.
+4. **False-negative gate:** independently reviewed valid alternatives pass; rejected alternatives carry a concrete contract violation.
+5. **Isolation gate:** filesystem, process, network, secrets, devices, resource ceilings and process-tree cleanup are tested at the OS boundary.
+6. **Pristine regrade:** the exact candidate diff is applied to a fresh environment and independently rescored by an evaluator outside the candidate write domain.
+7. **Reproducibility gate:** identical frozen inputs produce consistent verdicts; all variance and flaky checks remain visible.
+8. **Version gate:** task, grader, image, harness, policy and dataset revisions are immutable and jointly bound to the run receipt.
+
+A task may remain `design_only` or `fixture_ready` while any qualification gate is pending. Never promote by assuming an untested gate will pass.
+
+## 5. Metrics
+
+Report separate counts and rates:
+
+- `false_accept_rate`: invalid candidate/negative-control attempts accepted.
+- `false_reject_rate`: valid reference or adjudicated equivalent controls rejected.
+- `attack_family_coverage`: applicable families exercised / applicable families declared.
+- `verdict_reproducibility`: repeated frozen-input runs with identical verdicts / completed repeated runs.
+- `pristine_regrade_agreement`: concordant primary/regrade task verdicts / tasks graded by both.
+- `unresolved_rate`: tasks without an adjudicated verdict / assigned tasks.
+
+Publish the full confusion matrix and task-level outcomes. Include missing and unresolved cases in explicit sensitivity bounds; never silently drop them from denominators.
+
+For zero false accepts in (n) independent negative controls, publish the one-sided 95% exact binomial upper confidence bound. At (n=1{,}000), this is approximately 0.30%, not zero. Also publish counts by root-cause family and use cluster-aware uncertainty when attack instances share a common mechanism.
+
+Do not calculate a "verifier accuracy" by treating thousands of assertions from one task as independent samples. The independent unit is the attack/task family or preregistered fixture instance, as appropriate.
+
+## 6. Initial internal targets
+
+These are prospective engineering gates, not achieved results or industry standards:
+
+- Zero false accepts across at least 1,000 varied negative-control attempts, with one-sided 95% upper bound reported.
+- Zero false rejects across at least 100 independently adjudicated valid positive controls; expand this corpus before making broad generality claims.
+- 100% of declared applicable attack families exercised before qualification.
+- 100% of published outcomes bound to immutable task, candidate, grader, image, harness and artifact digests.
+- 100% of scored tasks independently regraded from a pristine environment.
+- Any unresolved verifier or isolation finding blocks promotion; it is not averaged away by high task-resolution accuracy.
+
+Targets are deliberately stricter than a simple unit-test suite. Passing them would still be scoped evidence, not proof of universal security.
+
+## 7. Connection to external benchmarks
+
+### SWE-Bench Pro V2
+
+Scale's 2026-09-22 methodology documents a refreshed 642-task, 11-repository set, removal of 89 invalid tasks, reference-patch/empty-patch gating and pristine-image regrading. It also identifies residual trust boundaries: a trusted model endpoint relay and execution of patch-controlled files inside the verifier. These are strong practices to emulate, but not a substitute for our own threat model.
+
+### Terminal-Bench 4.0.0
+
+Epoch AI's review (2026-09-04) labels v4.0.0 flawed and reports publicly noted scoring defects in 30/66 tasks (45.5%). Representative issues include direct writes to a pass signal, answer leakage and false negatives. Terminal-Bench's maintainers describe 4.0.0 task removals/fixes and identify tamper-resistant verifiers among the aims of 4.1.
+
+Use Terminal-Bench as a pinned diagnostic comparison, with the official maintainer leaderboard and independent third-party harnesses clearly separated. Record the affected task IDs and do not quietly erase them. A future version should be re-audited at task level before it becomes a clean headline target.
+
+## 8. Current repository integration gap
+
+The Rust repository-repair regrade and ablation audit documents refer to binaries under `tools/rust-repair-benchmark-harness/`. A source check of `main` on 2026-11-02 did not find the Cargo manifest or executable source files, and code search returned only those documentation references. Their implementation status is therefore unverified on the current branch. Restore the source or explicitly retire the intended interface before CEB relies on it; see issue #10138.
+
+## 9. Claim boundary
+
+This protocol defines an evaluation method. The CEB catalog remains design-only, no verifier attack corpus has been run, no isolation boundary is qualified, and Symthaea has no CEB performance result. Schema validity, documentation completeness and static inspection do not establish benchmark robustness or agent capability.
