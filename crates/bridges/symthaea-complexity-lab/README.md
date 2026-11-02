@@ -20,10 +20,18 @@ lambda^T C = target by checked cross multiplication, rejects malformed
 dimensions/non-positive denominators, and fails closed on i128 overflow.
 It verifies supplied witnesses only; it does not search for a design.
 
+The separate matrix module verifies exact rational factorizations
+`I - M0 = U * V`, giving a certificate for
+`rank(I - M0) <= U.columns`. It does not prove that a suitable M0 exists,
+that M0 has the required polynomial-in-permutation representation, or that
+its support satisfies the paper's degree bound.
+
 The Python independent oracle checked 2,000 deterministic transform tables
-(49,800 coefficient comparisons and 49,800 reconstructed entries) and 2,006
+(49,800 coefficient comparisons and 49,800 reconstructed entries), 2,006
 row-space certificate cases (1,000 valid witnesses, 1,000 one-coordinate
-mutations, and six malformed/overflow controls). These are finite checks only.
+mutations, and six malformed/overflow controls), and 2,002 rational
+`I - M0 = U * V` cases (1,000 valid factorizations, 1,000 mutated matrices
+rejected, and two shape/overflow controls). These are finite checks only.
 
 It is a finite-table reference implementation. Its table size is \((d+1)^n\),
 and the transform takes \(O(n(d+1)^{n+1})\) arithmetic operations. It is
@@ -73,10 +81,13 @@ The formal theorem target remains ETH-002. Proof-carrying design search and the
 separate verifier are tracked in ETH-003:
 https://github.com/Luminous-Dynamics/symthaea/issues/10089
 
-The paper's sharper recursive tensor-contraction proof is tracked in ETH-005:
+The paper's sharper quantitative measurement-design / Taylor-recovery proof is tracked in ETH-005:
 https://github.com/Luminous-Dynamics/symthaea/issues/10095
 
 The weighted/algebraic exact arithmetic qualification is tracked in ETH-006:
 https://github.com/Luminous-Dynamics/symthaea/issues/10096
+
+Dependency-aware reuse of exact lemmas and certificates is tracked in ETH-008:
+https://github.com/Luminous-Dynamics/symthaea/issues/10113
 
 The broader work plan is tracked in ETH-001.
