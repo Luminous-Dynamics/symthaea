@@ -146,8 +146,10 @@ pub enum LearningRule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LearningError {
     GraphPopulationSizeMismatch { graph_nodes: usize, agents: usize },
+    InvalidAgentValue { agent_id: usize, field: &'static str, value: u16 },
     InvalidMinimumKnownNeighbors,
     InvalidEvidenceMargin { margin_bp: u16 },
+    InvalidSelfPriorWeight { weight: u16 },
 }
 
 impl fmt::Display for LearningError {
@@ -157,12 +159,20 @@ impl fmt::Display for LearningError {
                 f,
                 "network has {graph_nodes} nodes but population has {agents} agents"
             ),
+            Self::InvalidAgentValue { agent_id, field, value } => write!(
+                f,
+                "agent {agent_id} has {field} value {value} bp; expected 0..=10000"
+            ),
             Self::InvalidMinimumKnownNeighbors => {
                 write!(f, "minimum known-neighbour count must be positive")
             }
             Self::InvalidEvidenceMargin { margin_bp } => write!(
                 f,
                 "evidence margin {margin_bp} bp exceeds 10,000 bp"
+            ),
+            Self::InvalidSelfPriorWeight { weight } => write!(
+                f,
+                "self-prior weight {weight} bp exceeds 10,000 bp"
             ),
         }
     }
@@ -199,16 +209,41 @@ impl Population {
             });
         }
 
+        for (agent_id, agent) in self.agents.iter().enumerate() {
+            if agent.confidence_bp > 10_000 {
+                return Err(LearningError::InvalidAgentValue {
+                    agent_id,
+                    field: "confidence",
+                    value: agent.confidence_bp,
+                });
+            }
+            if agent.declared_reliability_bp > 10_000 {
+                return Err(LearningError::InvalidAgentValue {
+                    agent_id,
+                    field: "declared reliability",
+                    value: agent.declared_reliability_bp,
+                });
+            }
+        }
+
         match rule {
             LearningRule::ThresholdMajority {
                 minimum_known_neighbors: 0,
             } => return Err(LearningError::InvalidMinimumKnownNeighbors),
             LearningRule::EvidenceWeighted {
-                minimum_margin_bp, ..
-            } if minimum_margin_bp > 10_000 => {
-                return Err(LearningError::InvalidEvidenceMargin {
-                    margin_bp: minimum_margin_bp,
-                });
+                self_prior_weight,
+                minimum_margin_bp,
+            } => {
+                if minimum_margin_bp > 10_000 {
+                    return Err(LearningError::InvalidEvidenceMargin {
+                        margin_bp: minimum_margin_bp,
+                    });
+                }
+                if self_prior_weight > 10_000 {
+                    return Err(LearningError::InvalidSelfPriorWeight {
+                        weight: self_prior_weight,
+                    });
+                }
             }
             _ => {}
         }
@@ -635,6 +670,44 @@ mod tests {
         let graph = Network::from_edges(2, &[(0, 1), (1, 0), (0, 1)]).unwrap();
         assert_eq!(graph.neighbors(0), Some(&[1][..]));
         assert_eq!(graph.neighbors(1), Some(&[0][..]));
+    }
+
+    #[test]
+    fn rejects_out_of_range_confidence_reliability_and_self_prior_weights() {
+        let graph = chain(1);
+        let mut invalid_confidence =
+            Population::new(vec![AgentState::informed(true, 10_001, 0, 0)]);
+        assert_eq!(
+            invalid_confidence.step(&graph, LearningRule::NoLearning),
+            Err(LearningError::InvalidAgentValue {
+                agent_id: 0,
+                field: "confidence",
+                value: 10_001,
+            })
+        );
+
+        let mut invalid_reliability =
+            Population::new(vec![AgentState::informed(true, 0, 0, 10_001)]);
+        assert_eq!(
+            invalid_reliability.step(&graph, LearningRule::NoLearning),
+            Err(LearningError::InvalidAgentValue {
+                agent_id: 0,
+                field: "declared reliability",
+                value: 10_001,
+            })
+        );
+
+        let mut valid_population = Population::new(vec![AgentState::uninformed(0, 0)]);
+        assert_eq!(
+            valid_population.step(
+                &graph,
+                LearningRule::EvidenceWeighted {
+                    self_prior_weight: 10_001,
+                    minimum_margin_bp: 0,
+                }
+            ),
+            Err(LearningError::InvalidSelfPriorWeight { weight: 10_001 })
+        );
     }
 
     #[test]
