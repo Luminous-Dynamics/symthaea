@@ -250,9 +250,9 @@ fn validate_probability_bounds(bounds: ValueBounds, field: &'static str) -> Resu
 /// Intersect [lower, upper] with coefficient * p <= rhs.
 fn intersect_linear_leq(lower: &mut f64, upper: &mut f64, coefficient: f64, rhs: f64) -> bool {
     if coefficient > 0.0 {
-        *upper = upper.min(rhs / coefficient);
+        *upper = (*upper).min(rhs / coefficient);
     } else if coefficient < 0.0 {
-        *lower = lower.max(rhs / coefficient);
+        *lower = (*lower).max(rhs / coefficient);
     } else if rhs < 0.0 {
         return false;
     }
