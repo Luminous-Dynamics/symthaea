@@ -192,7 +192,13 @@
         "source_volume_id",
         "base_graph_snapshot_sha256",
         "hypothetical_result_graph_snapshot_sha256",
-        "candidate_patch_sha256"
+        "candidate_patch_sha256",
+        "candidate_id",
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "query_id",
+        "scenario_id"
       ],
       "properties": {
         "universe_id": {
@@ -260,6 +266,28 @@
         },
         "candidate_patch_sha256": {
           "$ref": "#/$defs/sha"
+        },
+        "candidate_id": {
+          "$ref": "#/$defs/id"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "task_route": {
+          "enum": [
+            "FalseSplitCorrection",
+            "FalseMergeIdentification",
+            "SplitMaskGeneration"
+          ]
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/id"
         }
       }
     }
