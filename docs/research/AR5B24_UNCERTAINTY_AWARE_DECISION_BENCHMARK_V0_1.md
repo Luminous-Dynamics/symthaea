@@ -336,24 +336,6 @@ Required negative controls: deterministic policy assignment with no overlap, zer
 
 The policy utility objective must not compensate for a mandatory guardrail violation. Track required global guardrails and applicable local/stratum guardrails separately from the utility objective. A policy mixture is eligible only if every applicable guardrail's simultaneous one-sided bound clears its predeclared floor/cap. Missing or non-estimable strata return `INDETERMINATE`.
 
-For a linear expected guardrail functional (g), a randomized mixture with weights (q_i) can use:
-- upper-bound guardrail: (sum_i q_i U_{i,g,s,m}leq 	au_{g,s,m});
-- lower-bound guardrail: (sum_i q_i L_{i,g,s,m}geq 	au_{g,s,m}).
-
-This V1 LP form applies only where the expectation is linear under the actual mixture/assignment protocol. Quantiles, CVaR, maxima, nonlinear ratios and pathwise constraints need separate valid formulations.
-
-Spotify Confidence reports that 42% of its experiments are rolled back after global and local guardrail metrics detect regressions. This is a vendor-reported operational statistic, not a universal benchmark rate. The engineering lesson is to measure the value of correctly detecting and discarding harmful changes. Pre-register global and feature-specific local guardrails and inferiority margins before outcomes. Report true regression detection, false rollback, missed harm, worst-stratum harm, abstention and utility jointly. An always-deny method is not a successful guardrail strategy.
-
-Reference: Spotify Confidence, 3 August 2026, *42% of Spotify experiments get rolled back. That's the point.* https://confidence.spotify.com/blog/42-percent-rolled-back
-
-## 17. Treatment-aware preprocessing and variance-reduction controls
-
-Outcome preprocessing is part of the estimand, not an invisible implementation detail.
-
-Compare raw outcomes, a common fixed predeclared cap, pooled percentile winsorization and per-arm percentile winsorization. Report the transformation identity, thresholds, clipping rates by arm/stratum, raw and transformed effects, and threshold sensitivity. A pooled percentile can move with treatment composition and attenuate an effect; per-arm thresholds define different transformations by arm and can change the estimand and finite-sample error behavior. Never label a transformed effect as the raw causal estimand.
-
-Spotify Confidence's 13 October 2026 analysis illustrates this issue and describes fixed-value capping as an alternative whose bias–variance trade-off is predeclared. Its examples and claims are vendor-published; independently reproduce the synthetic mechanisms and use independent public data before claiming a general effect.
-
-Reference: Spotify Confidence, 13 October 2026, *The Hidden Cost of Winsorizing*. https://confidence.spotify.com/blog/capping-vs-winsorizing
-
-Include CUPED and pre-treatment regression adjustment as variance-reduction baselines. Use only valid pre-treatment covariates, freeze the adjustment protocol or use a justified cross-fitting method, and respect cluster/randomization units. Post-treatment covariates and treatment-leaked preprocessing parameters are negative controls. Report sample-size savings only at matched achieved power and unconditional Type-I error.
+For a linear expected guardrail functional `g`, a randomized mixture with weights `q_i` can use:
+- upper-bound guardrail: `sum_i(q_i * U[i,g,s,m]) <= threshold[g,s,m]`;
+- lower-bound guardrail: `sum_i(q_i * L[i,g,s,m]) >= threshold[g,s,m]`.
