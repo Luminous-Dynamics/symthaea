@@ -18,10 +18,14 @@ This is a five-crate Rust workspace:
 
 ## Gold-label boundaries
 
-`gold-graph.v0.json` contains fixture-declared nodes and expected relationships.
-Edges are classified as syntax-declared or expected semantic relationships.
+`gold-graph.v0.json` contains fixture-declared nodes and expected relationships,
+with a one-line declaration anchor for every node (1-based line number and exact
+trimmed line text). Edges are classified as syntax-declared or expected semantic
+relationships.
 No edge is labeled compiler-verified: a future independent Rust Analyzer /
 compiler pass must supply those receipts before such an authority can be assigned.
+The anchors establish source-text provenance only; they are not complete AST spans
+or compiler/LSP semantic locations.
 
 `mutations.v0.json` defines deterministic edit scenarios and expected impact
 sets. They are scenario specifications, not pre-applied patches.
