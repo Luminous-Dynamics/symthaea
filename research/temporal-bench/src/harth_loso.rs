@@ -482,6 +482,215 @@ pub fn validate_harth_loso_receipt(
     Ok(())
 }
 
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HarthSubjectF1Delta {
+    pub test_subject_sha256: [u8; 32],
+    pub baseline_macro_f1_ppm: u32,
+    pub candidate_macro_f1_ppm: u32,
+    /// Candidate minus baseline; positive is an improvement.
+    pub delta_macro_f1_ppm: i64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HarthPairedComparisonAggregate {
+    pub subject_count: u32,
+    pub mean_delta_macro_f1_ppm: i64,
+    pub standard_error_delta_ppm: u32,
+    /// Two-sided 95% paired Student-t interval, df=21, t*=2.0796.
+    /// Bounds are rounded outward and clamped to the possible F1-difference range.
+    pub lower_95_ci_delta_ppm: i64,
+    pub upper_95_ci_delta_ppm: i64,
+    pub improved_subjects: u32,
+    pub unchanged_subjects: u32,
+    pub worsened_subjects: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HarthPairedComparisonReceipt {
+    pub schema: String,
+    pub version: String,
+    pub baseline_receipt_sha256: [u8; 32],
+    pub candidate_receipt_sha256: [u8; 32],
+    pub label_track: HarthLabelTrack,
+    pub subject_deltas: Vec<HarthSubjectF1Delta>,
+    pub aggregate: HarthPairedComparisonAggregate,
+    pub comparison_sha256: [u8; 32],
+}
+
+fn paired_comparison_digest(
+    receipt: &HarthPairedComparisonReceipt,
+) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.harth-paired-losocomparison.v1");
+    hash.bytes(receipt.schema.as_bytes());
+    hash.bytes(receipt.version.as_bytes());
+    hash.bytes(&receipt.baseline_receipt_sha256);
+    hash.bytes(&receipt.candidate_receipt_sha256);
+    hash.u8(receipt.label_track as u8);
+    hash.usize(receipt.subject_deltas.len());
+    for delta in &receipt.subject_deltas {
+        hash.bytes(&delta.test_subject_sha256);
+        hash.u32(delta.baseline_macro_f1_ppm);
+        hash.u32(delta.candidate_macro_f1_ppm);
+        hash.u64(delta.delta_macro_f1_ppm as u64);
+    }
+    hash.u32(receipt.aggregate.subject_count);
+    hash.u64(receipt.aggregate.mean_delta_macro_f1_ppm as u64);
+    hash.u32(receipt.aggregate.standard_error_delta_ppm);
+    hash.u64(receipt.aggregate.lower_95_ci_delta_ppm as u64);
+    hash.u64(receipt.aggregate.upper_95_ci_delta_ppm as u64);
+    hash.u32(receipt.aggregate.improved_subjects);
+    hash.u32(receipt.aggregate.unchanged_subjects);
+    hash.u32(receipt.aggregate.worsened_subjects);
+    hash.finish()
+}
+
+fn calculate_paired_comparison(
+    baseline: &HarthLosoReceipt,
+    candidate: &HarthLosoReceipt,
+) -> Result<HarthPairedComparisonReceipt, HarthLosoError> {
+    validate_harth_loso_receipt(baseline)?;
+    validate_harth_loso_receipt(candidate)?;
+
+    if baseline.dataset_manifest_sha256 != candidate.dataset_manifest_sha256 {
+        return Err(HarthLosoError::new(
+            "comparison.dataset_manifest_sha256",
+            "paired comparison requires the same dataset manifest",
+        ));
+    }
+    if baseline.preprocessing_sha256 != candidate.preprocessing_sha256 {
+        return Err(HarthLosoError::new(
+            "comparison.preprocessing_sha256",
+            "paired comparison requires identical preprocessing",
+        ));
+    }
+    if baseline.label_track != candidate.label_track {
+        return Err(HarthLosoError::new(
+            "comparison.label_track",
+            "paired comparison requires the same label track",
+        ));
+    }
+    if baseline.folds.len() != candidate.folds.len()
+        || baseline.folds.len() != HARTH_SUBJECT_COUNT
+    {
+        return Err(HarthLosoError::new(
+            "comparison.folds",
+            "paired comparison requires exactly the same 22 subject folds",
+        ));
+    }
+
+    let mut subject_deltas = Vec::with_capacity(HARTH_SUBJECT_COUNT);
+    let mut delta_values = Vec::with_capacity(HARTH_SUBJECT_COUNT);
+    let mut improved_subjects = 0_u32;
+    let mut unchanged_subjects = 0_u32;
+    let mut worsened_subjects = 0_u32;
+
+    for index in 0..HARTH_SUBJECT_COUNT {
+        let baseline_fold = &baseline.folds[index];
+        let candidate_fold = &candidate.folds[index];
+        if baseline_fold.test_subject_sha256 != candidate_fold.test_subject_sha256 {
+            return Err(HarthLosoError::new(
+                format!("comparison.subject_deltas[{index}]"),
+                "candidate and baseline folds must use the same held-out participant",
+            ));
+        }
+
+        let baseline_metrics = harth_fold_metrics(baseline.label_track, baseline_fold)?;
+        let candidate_metrics = harth_fold_metrics(candidate.label_track, candidate_fold)?;
+        let delta = i64::from(candidate_metrics.macro_f1_ppm)
+            - i64::from(baseline_metrics.macro_f1_ppm);
+        if delta > 0 {
+            improved_subjects = improved_subjects.saturating_add(1);
+        } else if delta < 0 {
+            worsened_subjects = worsened_subjects.saturating_add(1);
+        } else {
+            unchanged_subjects = unchanged_subjects.saturating_add(1);
+        }
+        delta_values.push(delta as f64);
+        subject_deltas.push(HarthSubjectF1Delta {
+            test_subject_sha256: baseline_fold.test_subject_sha256,
+            baseline_macro_f1_ppm: baseline_metrics.macro_f1_ppm,
+            candidate_macro_f1_ppm: candidate_metrics.macro_f1_ppm,
+            delta_macro_f1_ppm: delta,
+        });
+    }
+
+    let subject_count = subject_deltas.len() as u32;
+    let mean = delta_values.iter().sum::<f64>() / delta_values.len() as f64;
+    let mean_delta = mean.round() as i64;
+    let squared_deviation_sum = delta_values
+        .iter()
+        .map(|delta| {
+            let difference = *delta - mean;
+            difference * difference
+        })
+        .sum::<f64>();
+    let sample_variance = squared_deviation_sum / (delta_values.len() - 1) as f64;
+    let standard_error_f64 = (sample_variance / delta_values.len() as f64).sqrt();
+    let standard_error = standard_error_f64
+        .round()
+        .clamp(0.0, f64::from(u32::MAX)) as u32;
+    // Student-t 97.5th percentile for 21 degrees of freedom.
+    const T_975_DF21: f64 = 2.079_613_844_727_662;
+    let half_width = T_975_DF21 * standard_error_f64;
+    let lower = (mean - half_width).floor().max(-1_000_000.0) as i64;
+    let upper = (mean + half_width).ceil().min(1_000_000.0) as i64;
+
+    let mut receipt = HarthPairedComparisonReceipt {
+        schema: "symthaea.temporal.harth-paired-loso-comparison".to_owned(),
+        version: "0.1.0".to_owned(),
+        baseline_receipt_sha256: baseline.receipt_sha256,
+        candidate_receipt_sha256: candidate.receipt_sha256,
+        label_track: baseline.label_track,
+        subject_deltas,
+        aggregate: HarthPairedComparisonAggregate {
+            subject_count,
+            mean_delta_macro_f1_ppm: mean_delta,
+            standard_error_delta_ppm: standard_error,
+            lower_95_ci_delta_ppm: lower,
+            upper_95_ci_delta_ppm: upper,
+            improved_subjects,
+            unchanged_subjects,
+            worsened_subjects,
+        },
+        comparison_sha256: [0; 32],
+    };
+    receipt.comparison_sha256 = paired_comparison_digest(&receipt);
+    Ok(receipt)
+}
+
+/// Compare two LOSO receipts only when all 22 test subjects, dataset bytes,
+/// preprocessing and label-track semantics match exactly.
+pub fn build_harth_paired_comparison(
+    baseline: &HarthLosoReceipt,
+    candidate: &HarthLosoReceipt,
+) -> Result<HarthPairedComparisonReceipt, HarthLosoError> {
+    calculate_paired_comparison(baseline, candidate)
+}
+
+/// Recompute every paired fold delta, the mean/standard error/95% interval,
+/// subject win counts and comparison digest.
+pub fn validate_harth_paired_comparison(
+    receipt: &HarthPairedComparisonReceipt,
+    baseline: &HarthLosoReceipt,
+    candidate: &HarthLosoReceipt,
+) -> Result<(), HarthLosoError> {
+    let expected = calculate_paired_comparison(baseline, candidate)?;
+    if *receipt != expected {
+        return Err(HarthLosoError::new(
+            "comparison_receipt",
+            "paired comparison does not reproduce from the two LOSO receipts",
+        ));
+    }
+    if receipt.comparison_sha256 != paired_comparison_digest(receipt) {
+        return Err(HarthLosoError::new(
+            "comparison_sha256",
+            "paired comparison digest mismatch",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -684,6 +893,141 @@ mod tests {
         let mut forged_fold = receipt;
         forged_fold.folds[0].confusion_counts[0] += 1;
         assert!(validate_harth_loso_receipt(&forged_fold).is_err());
+    }
+
+    #[test]
+    fn paired_loso_comparison_requires_same_protocol_and_reports_subject_deltas() {
+        fn folds_with_score(diagonal: u64, error: u64) -> Vec<HarthSubjectFold> {
+            let track = HarthLabelTrack::Native12;
+            fold_set(track)
+                .into_iter()
+                .map(|mut fold| {
+                    let classes = track.class_count();
+                    fold.confusion_counts.fill(0);
+                    for class in 0..classes {
+                        fold.confusion_counts[class * classes + class] = diagonal;
+                        fold.confusion_counts[class * classes + (class + 1) % classes] = error;
+                    }
+                    fold
+                })
+                .collect()
+        }
+
+        let baseline = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            candidate(),
+            folds_with_score(80, 20),
+        )
+        .unwrap();
+        let candidate_receipt = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            HarthCandidateIdentity {
+                candidate_id: "candidate-vs-baseline".to_owned(),
+                source_revision: "git:fedcba9876543210".to_owned(),
+                dependency_lock_sha256: [6; 32],
+                artifact_sha256: [7; 32],
+                configuration_sha256: [8; 32],
+            },
+            folds_with_score(90, 10),
+        )
+        .unwrap();
+
+        let paired = build_harth_paired_comparison(&baseline, &candidate_receipt).unwrap();
+        assert_eq!(paired.aggregate.subject_count, 22);
+        assert_eq!(paired.aggregate.mean_delta_macro_f1_ppm, 100_000);
+        assert_eq!(paired.aggregate.standard_error_delta_ppm, 0);
+        assert_eq!(paired.aggregate.lower_95_ci_delta_ppm, 100_000);
+        assert_eq!(paired.aggregate.upper_95_ci_delta_ppm, 100_000);
+        assert_eq!(paired.aggregate.improved_subjects, 22);
+        assert_eq!(paired.aggregate.worsened_subjects, 0);
+        validate_harth_paired_comparison(&paired, &baseline, &candidate_receipt).unwrap();
+    }
+
+    #[test]
+    fn paired_comparison_rejects_dataset_or_preprocessing_mismatch() {
+        let baseline = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            candidate(),
+            fold_set(HarthLabelTrack::Native12),
+        )
+        .unwrap();
+        let candidate_receipt = build_harth_loso_receipt(
+            [9; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            HarthCandidateIdentity {
+                candidate_id: "different-dataset".to_owned(),
+                source_revision: "git:fedcba9876543210".to_owned(),
+                dependency_lock_sha256: [6; 32],
+                artifact_sha256: [7; 32],
+                configuration_sha256: [8; 32],
+            },
+            fold_set(HarthLabelTrack::Native12),
+        )
+        .unwrap();
+        assert!(build_harth_paired_comparison(&baseline, &candidate_receipt).is_err());
+    }
+
+    #[test]
+    fn paired_comparison_rejects_label_track_mismatch() {
+        let baseline = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            candidate(),
+            fold_set(HarthLabelTrack::Native12),
+        )
+        .unwrap();
+        let candidate_receipt = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::SelfPabComparable10,
+            HarthCandidateIdentity {
+                candidate_id: "ten-class".to_owned(),
+                source_revision: "git:fedcba9876543210".to_owned(),
+                dependency_lock_sha256: [6; 32],
+                artifact_sha256: [7; 32],
+                configuration_sha256: [8; 32],
+            },
+            fold_set(HarthLabelTrack::SelfPabComparable10),
+        )
+        .unwrap();
+        assert!(build_harth_paired_comparison(&baseline, &candidate_receipt).is_err());
+    }
+
+    #[test]
+    fn paired_comparison_tampering_is_rejected() {
+        let baseline = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            candidate(),
+            fold_set(HarthLabelTrack::Native12),
+        )
+        .unwrap();
+        let candidate_receipt = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            HarthCandidateIdentity {
+                candidate_id: "candidate".to_owned(),
+                source_revision: "git:fedcba9876543210".to_owned(),
+                dependency_lock_sha256: [6; 32],
+                artifact_sha256: [7; 32],
+                configuration_sha256: [8; 32],
+            },
+            fold_set(HarthLabelTrack::Native12),
+        )
+        .unwrap();
+        let mut paired = build_harth_paired_comparison(&baseline, &candidate_receipt).unwrap();
+        paired.aggregate.mean_delta_macro_f1_ppm = 1;
+        assert!(validate_harth_paired_comparison(&paired, &baseline, &candidate_receipt).is_err());
     }
 
     #[test]
