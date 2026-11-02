@@ -521,21 +521,28 @@ pub fn analyze_noncompensatory_guardrails(
         .iter()
         .map(|row| ((row.policy_id.as_str(), row.requirement_id.as_str()), row))
         .collect::<BTreeMap<_, _>>();
+    let minimum_sample_sizes = request
+        .requirements
+        .iter()
+        .map(|row| (row.requirement_id.as_str(), row.minimum_sample_size))
+        .collect::<BTreeMap<_, _>>();
 
     let mut results = Vec::with_capacity(request.requirements.len());
     for requirement in &request.requirements {
         let mut lower_sum = 0.0;
         let mut upper_sum = 0.0;
-        let mut unavailable_reason = None;
+        let mut unavailable_reason: Option<String> = None;
+        let mut missing_evidence = false;
         for policy_id in weight_map.keys() {
             let probability = weight_map[policy_id];
             let Some(bound) = bound_map.get(&(*policy_id, requirement.requirement_id.as_str())) else {
+                missing_evidence = true;
                 unavailable_reason.get_or_insert_with(|| "MISSING_POLICY_EVIDENCE".to_owned());
                 continue;
             };
-            let requirement_minimum = request.requirements.iter()
-                .find(|candidate| candidate.requirement_id == bound.requirement_id)
-                .map(|candidate| candidate.minimum_sample_size)
+            let requirement_minimum = minimum_sample_sizes
+                .get(requirement.requirement_id.as_str())
+                .copied()
                 .unwrap_or(usize::MAX);
             match bound.availability {
                 GuardrailEvidenceAvailability::NotEstimable => {
@@ -568,7 +575,7 @@ pub fn analyze_noncompensatory_guardrails(
 
         let (decision, lower, upper, reason_code) = if let Some(reason) = unavailable_reason {
             (
-                if reason == "MISSING_POLICY_EVIDENCE" {
+                if missing_evidence {
                     GuardrailCellDecision::MissingEvidence
                 } else {
                     GuardrailCellDecision::NotEstablished
