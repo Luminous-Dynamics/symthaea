@@ -1,0 +1,22 @@
+{
+  "all_final_root_maxima_zero": true,
+  "arithmetic": "fractions; exact, no float",
+  "checks": [
+    "range-add/max tree equals brute-force prefix vector after each event",
+    "root maximum remains exactly zero",
+    "all prefix budgets",
+    "donor caps and own-increment caps",
+    "score nonnegative/monotone",
+    "escrow conservation",
+    "source-local token ordinals"
+  ],
+  "max_nodes_visited_per_update": 20,
+  "note": "The Python node-visit count demonstrates the suffix-update structure; it is not a Rust latency benchmark.",
+  "rounds": 10,
+  "scope": "exact structural differential screen only; not Rust timing or statistical validity",
+  "total_events": 132,
+  "total_tree_nodes_visited": 2434,
+  "total_tree_updates": 132,
+  "traces": 10,
+  "universe": 64
+}
