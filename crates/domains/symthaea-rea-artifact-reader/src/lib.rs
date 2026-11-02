@@ -2002,6 +2002,49 @@ mod tests {
     }
 
     #[test]
+    fn decodes_cp437_fallback_names_without_utf8_flag() {
+        assert_eq!(decode_member_name(b"caf\\x82", 0, &[]).as_deref(), Some("café"));
+        assert_eq!(decode_cp437(&[0x80, 0x82, 0x9c]), "Çé£");
+    }
+
+    #[test]
+    fn accepts_unicode_path_extra_only_when_version_and_raw_name_crc_match() {
+        let raw_name = b"caf\\x82";
+        let unicode_name = "café";
+        let mut extra = Vec::new();
+        push_u16(&mut extra, UNICODE_PATH_EXTRA_ID);
+        push_u16(&mut extra, (5 + unicode_name.len()) as u16);
+        extra.push(1);
+        push_u32(&mut extra, crc32(raw_name));
+        extra.extend_from_slice(unicode_name.as_bytes());
+
+        assert_eq!(
+            valid_unicode_path_extra(raw_name, &extra).as_deref(),
+            Some(unicode_name)
+        );
+        assert_eq!(
+            decode_member_name(raw_name, 0, &extra).as_deref(),
+            Some(unicode_name)
+        );
+
+        let mut wrong_crc = extra.clone();
+        wrong_crc[7] ^= 0x01;
+        assert_eq!(valid_unicode_path_extra(raw_name, &wrong_crc), None);
+        assert_eq!(
+            decode_member_name(raw_name, 0, &wrong_crc).as_deref(),
+            Some("café")
+        );
+
+        let mut wrong_version = extra;
+        wrong_version[4] = 2;
+        assert_eq!(valid_unicode_path_extra(raw_name, &wrong_version), None);
+        assert_eq!(
+            decode_member_name(raw_name, 0, &wrong_version).as_deref(),
+            Some("café")
+        );
+    }
+
+    #[test]
     fn classifies_directory_entries_and_preserves_occurrence() {
         let path = write_temp(&build_zip(
             &[TestEntry {
