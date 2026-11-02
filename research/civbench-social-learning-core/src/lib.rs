@@ -5,8 +5,11 @@
 
 //! Deterministic reference baselines for social-learning experiments.
 //!
-//! This module intentionally implements a binary-belief task. It is a
-//! transparent baseline and does not claim to model human culture generally.
+//! This module intentionally implements a binary-belief baseline and a
+//! separate Reward Network task environment; neither claims to model human
+//! culture generally.
+
+pub mod reward_network;
 
 use core::fmt;
 
