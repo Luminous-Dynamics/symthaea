@@ -300,7 +300,9 @@ impl FepModule {
             tolerance: self.trajectory_config.ode_tolerance,
             max_step: self.trajectory_config.horizon_seconds / 5.0,
             min_step: 1e-8,
-            max_iterations: self.trajectory_config.max_steps,
+            // This is for implicit Newton/fixed-point solvers; explicit DOPRI
+            // work is bounded by OdeSolveLimits below.
+            max_iterations: 50,
         };
         let solver = OdeSolverEngine::new(ode_config, state_dim);
 
