@@ -165,7 +165,7 @@ The implementation deliberately ignores effect magnitude and uses a single fixed
 
 ### Qualification tests and metrics
 
-The Rust module adds thirteen authored tests: rational wealth under beneficial/harmful/tied signs; familywise threshold; latched first crossing; exact integer arithmetic at the 64-pair cap; non-fair assignment and design mismatch rejection; sequential-gap/replay/context failure controls; separate failure exposure; and exact dynamic-programming enumeration of crossing probability through a 20-look finite null tree.
+The Rust module adds fourteen authored tests: rational wealth under beneficial/harmful/tied signs; familywise threshold; latched first crossing; exact integer arithmetic at the 64-pair cap; non-fair assignment and design mismatch rejection; sequential-gap/replay/context failure controls; separate failure exposure; and exact dynamic-programming enumeration of crossing probability through a 20-look finite null tree.
 
 An independent exhaustive sign-sequence calculation gives 4,186 crossings among 1,048,576 sequences by look 20 at familywise α = 0.05 and M = 3. This is 0.399% for one axis, below its 1.667% allocated bound. The authored Rust dynamic-programming test pins this count and verifies the bound at every prefix. This is a finite mathematical regression for the specified design, not evidence about real Symthaea effects.
 
