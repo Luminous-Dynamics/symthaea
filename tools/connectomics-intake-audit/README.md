@@ -33,7 +33,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
   --output split-replay-report.json
 ```
 
-The verifier derives species from source_archive exactly as the upstream split_archive function does, reconstructs operation-bank, junction-control and synapse-control keys, and rejects duplicate keys that would be overwritten by the upstream Python dictionary loader. It hashes all consumed split files with SHA-256. The 14 authored Rust tests are synthetic regression tests and have not been compiled or executed in the authoring environment.
+The verifier derives species from source_archive exactly as the upstream split_archive function does, reconstructs operation-bank, junction-control and synapse-control keys, and rejects duplicate keys that would be overwritten by the upstream Python dictionary loader. It hashes all consumed split files with SHA-256. The 15 authored Rust tests are synthetic regression tests and have not been compiled or executed in the authoring environment.
 
 See docs/neuroscience/CONNECTOME_EXACT_SPLIT_REPLAY_AUDIT_V0.1.md for scope and limitations. This complements rather than replaces connectome_dataset_audit, which checks row identity, labels/routes/masks, operation-group and 50 µm cube separation, neuron-overlap warnings and modality cohorts.
 
