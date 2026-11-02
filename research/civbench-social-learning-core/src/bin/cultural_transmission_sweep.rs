@@ -169,7 +169,7 @@ fn main() {
         for generation in 0..5 {
             let optimal = &optimal_prevalence[generation];
             println!(
-                "{},{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{},{},{}",
                 condition.name,
                 generation,
                 REPLICATES,
