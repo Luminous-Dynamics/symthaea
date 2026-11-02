@@ -154,7 +154,7 @@ fn confusion_metrics(
     let mut total_samples = 0_u64;
 
     for true_class in 0..class_count {
-        let mut true_positive = u128::from(counts[true_class * class_count + true_class]);
+        let true_positive = u128::from(counts[true_class * class_count + true_class]);
         let mut false_negative = 0_u128;
         let mut false_positive = 0_u128;
         let mut true_support = 0_u64;
@@ -197,8 +197,6 @@ fn confusion_metrics(
             supported_class_count = supported_class_count.saturating_add(1);
             class_f1_ppm.push(Some(score));
         }
-        true_positive = 0; // keep all arithmetic above explicitly bounded to u128
-        let _ = true_positive;
     }
 
     if total_samples == 0 || supported_class_count == 0 {
