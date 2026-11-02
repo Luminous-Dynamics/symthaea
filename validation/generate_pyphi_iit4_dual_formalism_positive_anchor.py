@@ -107,6 +107,14 @@ def _sia_summary(sia: Any, candidate: list[int]) -> dict[str, Any]:
             None if sia.intrinsic_information is None
             else _finite(sia.intrinsic_information, "intrinsic_information")
         ),
+        "cause_intrinsic_specification": _finite(
+            state.cause.intrinsic_specification,
+            "cause_intrinsic_specification",
+        ),
+        "effect_intrinsic_specification": _finite(
+            state.effect.intrinsic_specification,
+            "effect_intrinsic_specification",
+        ),
         "intrinsic_differentiation": _direction_map(sia.intrinsic_differentiation),
         "cause_state": _state_vector(state.cause.state),
         "effect_state": _state_vector(state.effect.state),
