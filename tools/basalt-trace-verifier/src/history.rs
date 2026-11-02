@@ -619,7 +619,7 @@ mod tests {
 
         // Make the final authority revision unreachable without changing the valid
         // invocation/response history. The checker must exhaustively reject it.
-        trace.final_observation.authority_revision = "rev-999".to_string();
+        trace.final_observation.log_cursors[0].checkpoint = "unreachable-checkpoint".to_string();
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert_eq!(report.status, "fail", "{:#?}", report.counterexamples);
         assert!(!report.search_budget_exhausted);
