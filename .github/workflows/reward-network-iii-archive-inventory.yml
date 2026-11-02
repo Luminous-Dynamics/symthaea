@@ -1,6 +1,10 @@
 name: Reward Network III v2.0 archive inventory
 
 on:
+  pull_request:
+    paths:
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py"
+      - ".github/workflows/reward-network-iii-archive-inventory.yml"
   push:
     paths:
       - "research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py"
