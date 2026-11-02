@@ -793,12 +793,16 @@ pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, Evidence
 /// Duplicate-key rejection and the 64 MiB bound are deliberately stricter than
 /// upstream's JavaScript object-level schema boundary. For exact object-level
 /// disposition parity on a parsed JSON value, call verify_evidence_value.
-pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
+/// Parse bounded JSON while rejecting duplicate object keys.
+///
+/// This parser is shared by Evidence and EvidenceBundle import. Its duplicate-key
+/// and input-size policy is stricter than upstream JavaScript JSON.parse.
+pub(crate) fn parse_strict_json_bytes(input: &[u8]) -> Result<Value, EvidenceError> {
     if input.len() > MAX_EVIDENCE_JSON_BYTES {
         return Err(EvidenceError::new(
             EvidenceErrorKind::InputTooLarge,
             format!(
-                "Evidence JSON is {} bytes; native importer limit is {} bytes",
+                "JSON input is {} bytes; native importer limit is {} bytes",
                 input.len(),
                 MAX_EVIDENCE_JSON_BYTES
             ),
@@ -809,17 +813,22 @@ pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceEr
     let parsed = StrictJsonValue::deserialize(&mut deserializer).map_err(|error| {
         EvidenceError::new(
             EvidenceErrorKind::InvalidJson,
-            format!("Evidence JSON parsing failed: {error}"),
+            format!("JSON parsing failed: {error}"),
         )
     })?;
     deserializer.end().map_err(|error| {
         EvidenceError::new(
             EvidenceErrorKind::InvalidJson,
-            format!("Evidence JSON has trailing data: {error}"),
+            format!("JSON has trailing data: {error}"),
         )
     })?;
 
-    let mut verified = verify_evidence_value(&parsed.0)?;
+    Ok(parsed.0)
+}
+
+pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
+    let parsed = parse_strict_json_bytes(input)?;
+    let mut verified = verify_evidence_value(&parsed)?;
     verified.raw_file_sha256 = Some(sha256_hex(input));
     Ok(verified)
 }
