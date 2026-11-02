@@ -859,6 +859,7 @@ mod tests {
                 target.context_evaluations.push(CoDecContextEvaluationV1 {
                     context_seed: seed_index as u64 + 10,
                     context_item_set_sha256: compute_codec_context_item_set_sha256(&ids).unwrap(),
+                    target_token_sequence_sha256: target.target_token_sequence_sha256.clone(),
                     context_item_ids: ids,
                     target_token_logprobs: vec![value; 3],
                 });
