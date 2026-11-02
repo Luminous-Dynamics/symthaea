@@ -255,6 +255,7 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     push_missing_hash(value, &["simulator", "equation_manifest_sha256"], "simulator.equation_manifest_sha256", &mut errors);
     push_missing_hash(value, &["simulator", "parameter_manifest_sha256"], "simulator.parameter_manifest_sha256", &mut errors);
     push_missing_hash(value, &["solver", "dependency_lock_sha256"], "solver.dependency_lock_sha256", &mut errors);
+    push_missing_hash(value, &["numerics", "raw_output_manifest_sha256"], "numerics.raw_output_manifest_sha256", &mut errors);
     push_missing_hash(value, &["perturbation", "protocol_sha256"], "perturbation.protocol_sha256", &mut errors);
     push_missing_hash(value, &["perturbation", "waveform_sha256"], "perturbation.waveform_sha256", &mut errors);
     push_missing_hash(value, &["artifacts", "resolved_config_sha256"], "artifacts.resolved_config_sha256", &mut errors);
