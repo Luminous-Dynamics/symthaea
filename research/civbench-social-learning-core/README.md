@@ -20,6 +20,19 @@ The evaluator knows the synthetic ground truth, but the learning policy does not
 
 Updates are synchronous: all agents read the previous state and write the next state. This prevents node iteration order from changing the result.
 
+## Networked cultural learning and algorithmic mediation
+
+The separate `src/networked_mediation.rs` module models a connected ring social graph with configurable long-range shortcuts and a global top-k recommender. It exposes peer-only, recommender-only and hybrid access through a mediation fraction. It tracks demonstration observation, successful acquisition, actual adoption, individual innovation, original-seed lineage, quality coverage, unique lineages, lineage HHI and effective diversity separately.
+
+The `networked-mediation-sweep` binary evaluates 4 shortcut probabilities × 5 mediation fractions (20 conditions), each with 256 common seeds, 32 agents and 8 generations. It reports mean/maximum quality, knowledge coverage, seed-lineage persistence, diversity/concentration, innovation, observation, acquisition, peer adoption and mediated adoption.
+
+This is a simplified mechanism experiment, not a reproduction of Czaplicka, Baumann & Rahwan (2025). Their model has branch/complexity-level cultural traits, finite effort budgets, innovation/social/recommender costs, and an Erdős–Rényi social network. The reference port is separately tracked; do not use this sweep as a reproduction claim.
+
+Run:
+```sh
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin networked-mediation-sweep > networked-mediation-sweep.csv
+```
+
 ## Zero-shot rule transfer
 
 The Reward Network engine exposes `evaluate_zero_shot_transfer`, which applies one frozen policy to multiple named graph profiles and reports policy reward, full-information oracle reward, regret, oracle fraction and invalid moves. Tests compare the same loss-seeking and immediate-greedy rules across two distinct synthetic profiles: the abstract 10-move incentive fixture and a historical-shape 8-transition fixture. The result is a *rule-transfer sanity check*, not evidence that Symthaea's learned representations or human cultural skills transfer across real graph families. Final v2.0 transfer tests must use held-out Zenodo networks grouped by topology/reward-family, not the synthetic fixtures.
