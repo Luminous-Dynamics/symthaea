@@ -298,19 +298,11 @@ pub fn load_pinned_trust_store(
 /// The payload is returned only after DSSE threshold verification and byte-for-byte
 /// RFC 8785 canonical JSON verification. Envelope key IDs remain unauthenticated hints;
 /// only the verifier's trusted key identities count toward the quorum.
-pub fn verify_witness_envelope(
-    envelope_bytes: &[u8],
-    trust_store_bytes: &[u8],
-    expected_trust_store_sha256: &str,
-    expected_payload_type: &str,
-    quorum_kind: QuorumKind,
-) -> Result<VerifiedWitnessPayload, String> {
-    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
-    let actual_trust_digest = sha256_prefixed(trust_store_bytes);
-    let prepared = prepare_trust_store(&trust, actual_trust_digest.clone())?;
 
-    // Deserialize a strict local mirror first: Serde rejects duplicate struct fields,
-    // and deny_unknown_fields prevents permissive envelope reinterpretation.
+fn parse_strict_envelope(
+    envelope_bytes: &[u8],
+    expected_payload_type: &str,
+) -> Result<Envelope, String> {
     let strict: StrictEnvelope = serde_json::from_slice(envelope_bytes)
         .map_err(|error| format!("invalid DSSE envelope JSON: {error}"))?;
     if strict.payload_type != expected_payload_type {
@@ -326,45 +318,44 @@ pub fn verify_witness_envelope(
     }
     for signature in &strict.signatures {
         if !is_lower_hex_64(&signature.keyid) {
-            return Err(
-                "DSSE signature keyid must be 64 lowercase hexadecimal characters".to_string(),
-            );
+            return Err("DSSE signature keyid must be 64 lowercase hexadecimal characters".to_string());
         }
         if signature.sig.is_empty() {
             return Err("DSSE signature bytes must not be empty".to_string());
         }
     }
-
-    let envelope = Envelope {
+    Ok(Envelope {
         payload: strict.payload,
         payload_type: strict.payload_type,
-        signatures: strict
-            .signatures
-            .into_iter()
-            .map(|signature| Signature {
-                keyid: Some(signature.keyid),
-                sig: signature.sig,
-            })
-            .collect(),
-    };
+        signatures: strict.signatures.into_iter().map(|signature| Signature {
+            keyid: Some(signature.keyid),
+            sig: signature.sig,
+        }).collect(),
+    })
+}
 
-    let verifier_refs: Vec<&dyn Verifier> = prepared
-        .verifiers
+fn verify_envelope_with_verifiers(
+    envelope_bytes: &[u8],
+    expected_payload_type: &str,
+    verifiers: &[Ed25519Verifier],
+    threshold: usize,
+    trust_store_sha256: String,
+) -> Result<VerifiedWitnessPayload, String> {
+    if threshold == 0 || threshold > verifiers.len() {
+        return Err(format!("signature threshold {threshold} is invalid for {} active keys", verifiers.len()));
+    }
+    let envelope = parse_strict_envelope(envelope_bytes, expected_payload_type)?;
+    let verifier_refs: Vec<&dyn Verifier> = verifiers
         .iter()
         .map(|verifier| verifier as &dyn Verifier)
         .collect();
-    let threshold = match quorum_kind {
-        QuorumKind::Read => prepared.threshold_read,
-        QuorumKind::Write => prepared.threshold_write,
-    };
     let verified: VerifiedPayload = verify(&envelope, &verifier_refs, threshold)
         .map_err(|error| format!("DSSE threshold verification failed: {error}"))?;
 
     let json: Value = serde_json::from_slice(&verified.payload)
         .map_err(|error| format!("verified payload is not strict JSON: {error}"))?;
-    let canonical = serde_json_canonicalizer::to_vec(&json).map_err(|error| {
-        format!("verified payload cannot be canonicalized as RFC 8785 JCS: {error}")
-    })?;
+    let canonical = serde_json_canonicalizer::to_vec(&json)
+        .map_err(|error| format!("verified payload cannot be canonicalized as RFC 8785 JCS: {error}"))?;
     if canonical != verified.payload {
         return Err("signed payload is not byte-for-byte RFC 8785 canonical JSON".to_string());
     }
@@ -375,10 +366,32 @@ pub fn verify_witness_envelope(
         payload: verified.payload,
         json,
         accepted_key_ids: verified.accepted_keys,
-        trust_store_sha256: prepared.trust_store_sha256,
+        trust_store_sha256,
     })
 }
 
+pub fn verify_witness_envelope(
+    envelope_bytes: &[u8],
+    trust_store_bytes: &[u8],
+    expected_trust_store_sha256: &str,
+    expected_payload_type: &str,
+    quorum_kind: QuorumKind,
+) -> Result<VerifiedWitnessPayload, String> {
+    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
+    let actual_trust_digest = sha256_prefixed(trust_store_bytes);
+    let prepared = prepare_trust_store(&trust, actual_trust_digest.clone())?;
+    let threshold = match quorum_kind {
+        QuorumKind::Read => prepared.threshold_read,
+        QuorumKind::Write => prepared.threshold_write,
+    };
+    verify_envelope_with_verifiers(
+        envelope_bytes,
+        expected_payload_type,
+        &prepared.verifiers,
+        threshold,
+        prepared.trust_store_sha256,
+    )
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
