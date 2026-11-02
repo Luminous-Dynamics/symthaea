@@ -35,8 +35,16 @@
     "high_precision_replay_required_for_authoritative_receipt": true
   },
   "tests": {
-    "rust_test_functions_authored": 10,
+    "rust_test_functions_authored": 12,
     "rust_tests_executed": false,
     "benchmark_executed": false
+  },
+  "replay": {
+    "canonical_owner": "temporal_intervention_evidence_ledger",
+    "verifies_generic_family_look_chain": true,
+    "verifies_pair_identity_and_assignment_binding": true,
+    "replays_pair_outcomes_in_stream_look_order": true,
+    "report_binds_evidence_ledger_sha256": true,
+    "separate_fsd_history_ledger": false
   }
 }
