@@ -642,6 +642,7 @@ mod tests {
                     <= total_terminal_paths * 50_000
             );
         }
+        assert_eq!(crossed_terminal_paths, 4_186);
     }
 
     #[test]
