@@ -10,6 +10,7 @@
 //! culture generally.
 
 pub mod cultural_evolution;
+pub mod networked_mediation;
 pub mod reward_network;
 
 use core::fmt;
