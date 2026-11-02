@@ -20,6 +20,10 @@ The evaluator knows the synthetic ground truth, but the learning policy does not
 
 Updates are synchronous: all agents read the previous state and write the next state. This prevents node iteration order from changing the result.
 
+## Zero-shot rule transfer
+
+The Reward Network engine exposes `evaluate_zero_shot_transfer`, which applies one frozen policy to multiple named graph profiles and reports policy reward, full-information oracle reward, regret, oracle fraction and invalid moves. Tests compare the same loss-seeking and immediate-greedy rules across two distinct synthetic profiles: the abstract 10-move incentive fixture and a historical-shape 8-transition fixture. The result is a *rule-transfer sanity check*, not evidence that Symthaea's learned representations or human cultural skills transfer across real graph families. Final v2.0 transfer tests must use held-out Zenodo networks grouped by topology/reward-family, not the synthetic fixtures.
+
 ## Reward Network III protocol
 
 See [REWARD_NETWORK_III_PROTOCOL_V0_1.md](REWARD_NETWORK_III_PROTOCOL_V0_1.md) for the empirical task definition, study design, published result references, baseline ladder, transfer/correction experiments, and Zenodo ingestion gates. The Rust module `src/reward_network.rs` implements Random, ImmediateGreedy, LossSeeking and LossThenGreedy policies plus a full-information finite-horizon oracle. The oracle is an upper bound, not a participant policy.
