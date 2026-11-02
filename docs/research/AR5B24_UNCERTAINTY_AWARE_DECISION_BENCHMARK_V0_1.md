@@ -287,15 +287,15 @@ Here `TV(P0, Q_aligned) = 0.10`, and expectations become `(0.6, 0.5, 0.4, 0.5)`.
 
 For (K=8), (n=5{,}000), four functionals and family failure budget (delta=0.01), Bonferroni gives (delta_j=0.0025). Scalar Hoeffding gives:
 
-[
-r_j = sqrt{\frac{\ln(1/0.0025)}{2(5000)}}\approx 0.02447747.
-]
+```text
+r_j = sqrt(ln(1 / 0.0025) / (2 * 5000)) = 0.02447747
+```
 
 Using the conservative Weissman slack with family failure 0.01:
 
-[
-r_{TV,slack}=\sqrt{\frac{8\ln 2+\ln(100)}{2(5000)}}\approx 0.03185961.
-]
+```text
+r_TV_slack = sqrt((8 * ln(2) + ln(100)) / (2 * 5000)) = 0.03185961
+```
 
 An independent NumPy formula-level pilot (seed 20261102, 20,000 IID multinomial replications per scenario) observed simultaneous DFCE coverage of 99.855% for F01 and 99.845% for F02. The corresponding exact 95% binomial intervals were approximately [99.792%, 99.903%] and [99.780%, 99.895%]. The sample-based Weissman radius (empirical TV to P0 plus slack) had mean/median/5th–95th percentiles:
 - F01: 0.23190 / 0.23186 / [0.22106, 0.24266].
