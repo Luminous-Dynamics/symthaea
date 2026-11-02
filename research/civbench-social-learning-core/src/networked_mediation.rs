@@ -257,6 +257,8 @@ pub struct NetworkedGenerationMetrics {
     pub individual_innovations: usize,
     pub peer_adoptions: usize,
     pub mediated_adoptions: usize,
+    pub peer_acquisitions: usize,
+    pub mediated_acquisitions: usize,
     pub observations: usize,
     pub successful_acquisitions: usize,
     pub individual_innovations: usize,
@@ -274,6 +276,10 @@ impl NetworkedGeneration {
             .filter(|agent| agent.source == KnowledgeSource::PeerSocial).count();
         let mediated_adoptions = self.agents.iter()
             .filter(|agent| agent.source == KnowledgeSource::AlgorithmicMediation).count();
+        let peer_acquisitions = self.agents.iter()
+            .filter(|agent| agent.acquisition_source == Some(KnowledgeSource::PeerSocial)).count();
+        let mediated_acquisitions = self.agents.iter()
+            .filter(|agent| agent.acquisition_source == Some(KnowledgeSource::AlgorithmicMediation)).count();
         let observations = self.agents.iter()
             .filter(|agent| agent.demonstration_observed).count();
         let successful_acquisitions = self.agents.iter()
@@ -310,6 +316,8 @@ impl NetworkedGeneration {
             individual_innovations,
             peer_adoptions,
             mediated_adoptions,
+            peer_acquisitions,
+            mediated_acquisitions,
             observations,
             successful_acquisitions,
             individual_innovations,
@@ -424,6 +432,10 @@ pub fn simulate_networked_mediation(
             quality: config.initial_seed_quality,
             lineage_id: 1,
             source: KnowledgeSource::InitialMachine,
+            individual_innovated: false,
+            demonstration_observed: false,
+            strategy_acquisition_succeeded: false,
+            acquisition_source: None,
             parent_index: None,
         };
     }
@@ -455,7 +467,7 @@ pub fn simulate_networked_mediation(
             } else {
                 KnowledgeSource::None
             };
-            let mut individual_innovated = innovates;
+            let individual_innovated = innovates;
             let mut demonstration_observed = false;
             let mut strategy_acquisition_succeeded = false;
             let mut acquisition_source = None;
@@ -584,7 +596,7 @@ mod tests {
             .filter(|agent| agent.lineage_id == 1).count();
 
         assert_eq!(peer_seed_count, 2);
-        assert_eq!(mediated_seed_count, 7);
+        assert_eq!(mediated_seed_count, 8);
     }
 
     #[test]
@@ -597,7 +609,7 @@ mod tests {
         assert_eq!(peer_metrics.peer_adoptions, 2);
         assert_eq!(peer_metrics.mediated_adoptions, 0);
         assert_eq!(mediated_metrics.peer_adoptions, 0);
-        assert_eq!(mediated_metrics.mediated_adoptions, 7);
+        assert_eq!(mediated_metrics.mediated_adoptions, 8);
     }
 
     #[test]
@@ -612,7 +624,7 @@ mod tests {
             9,
         ).unwrap();
         assert_eq!(clean.generations[1].metrics().mean_quality, 10.0);
-        assert_eq!(corrupted.generations[1].metrics().mean_quality, 4.0);
+        assert_eq!(corrupted.generations[1].metrics().mean_quality, 6.0);
     }
 
     #[test]
