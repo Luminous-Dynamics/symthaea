@@ -157,6 +157,147 @@ impl BernoulliSprt {
     }
 }
 
+/// A time-uniform confidence interval for a bounded sample mean.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedMeanInterval {
+    pub observations: u64,
+    pub mean: f64,
+    pub radius: f64,
+    pub lower: f64,
+    pub upper: f64,
+    pub confidence: f64,
+}
+
+/// Hoeffding confidence sequence for independent observations in a fixed,
+/// known interval [lower_bound, upper_bound].
+///
+/// At time t, this uses a two-sided spending schedule
+/// alpha_t = 6 * alpha / (pi^2 * t^2). Since the sum over t is alpha, a
+/// union bound gives simultaneous coverage across all inspected times under
+/// the independent bounded-observation model.
+///
+/// This is not valid for arbitrary within-participant serial dependence or
+/// clustered trials. Aggregate at the true independent unit or use a
+/// dependence-aware procedure.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoundedMeanConfidenceSequence {
+    lower_bound: f64,
+    upper_bound: f64,
+    range: f64,
+    alpha: f64,
+    observations: u64,
+    mean: f64,
+}
+
+impl BoundedMeanConfidenceSequence {
+    /// Construct a confidence sequence for a fixed, finite support interval.
+    pub fn new(
+        lower_bound: f64,
+        upper_bound: f64,
+        alpha: f64,
+    ) -> Result<Self, SequentialError> {
+        if !lower_bound.is_finite()
+            || !upper_bound.is_finite()
+            || lower_bound >= upper_bound
+            || !(upper_bound - lower_bound).is_finite()
+        {
+            return Err(SequentialError::InvalidBounds);
+        }
+        if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+            return Err(SequentialError::InvalidProbability("alpha"));
+        }
+
+        Ok(Self {
+            lower_bound,
+            upper_bound,
+            range: upper_bound - lower_bound,
+            alpha,
+            observations: 0,
+            mean: 0.0,
+        })
+    }
+
+    /// Add an observation and return the current time-uniform interval.
+    ///
+    /// Invalid observations are rejected without mutating the accumulator.
+    pub fn observe(&mut self, value: f64) -> Result<BoundedMeanInterval, SequentialError> {
+        if !value.is_finite() || value < self.lower_bound || value > self.upper_bound {
+            return Err(SequentialError::ObservationOutOfBounds);
+        }
+
+        let next_n = self.observations.checked_add(1).ok_or(SequentialError::CountOverflow)?;
+        let next_mean = if self.observations == 0 {
+            value
+        } else {
+            self.mean + (value - self.mean) / next_n as f64
+        };
+        if !next_mean.is_finite() {
+            return Err(SequentialError::NonFiniteStatistic);
+        }
+
+        // log(pi^2 * n^2 / (3 * alpha)) is evaluated additively to avoid
+        // overflow/underflow in the product and ratio.
+        let n = next_n as f64;
+        let log_term = 2.0 * std::f64::consts::PI.ln()
+            + 2.0 * n.ln()
+            - 3.0_f64.ln()
+            - self.alpha.ln();
+        if !log_term.is_finite() || log_term <= 0.0 {
+            return Err(SequentialError::NonFiniteStatistic);
+        }
+
+        let variance_factor = log_term / (2.0 * n);
+        if !variance_factor.is_finite() || variance_factor < 0.0 {
+            return Err(SequentialError::NonFiniteStatistic);
+        }
+
+        // If the radius covers the complete support, clipping gives the full
+        // interval. Cap before multiplying to avoid avoidable overflow.
+        let radius = if variance_factor >= 1.0 {
+            self.range
+        } else {
+            self.range * variance_factor.sqrt()
+        };
+        if !radius.is_finite() {
+            return Err(SequentialError::NonFiniteStatistic);
+        }
+
+        let lower = (next_mean - radius).max(self.lower_bound);
+        let upper = (next_mean + radius).min(self.upper_bound);
+        self.observations = next_n;
+        self.mean = next_mean;
+
+        Ok(BoundedMeanInterval {
+            observations: next_n,
+            mean: next_mean,
+            radius,
+            lower,
+            upper,
+            confidence: 1.0 - self.alpha,
+        })
+    }
+
+    pub fn observations(&self) -> u64 {
+        self.observations
+    }
+
+    pub fn mean(&self) -> Option<f64> {
+        (self.observations > 0).then_some(self.mean)
+    }
+
+    pub fn lower_bound(&self) -> f64 {
+        self.lower_bound
+    }
+
+    pub fn upper_bound(&self) -> f64 {
+        self.upper_bound
+    }
+
+    pub fn alpha(&self) -> f64 {
+        self.alpha
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,4 +350,46 @@ mod tests {
             Err(SequentialError::InvalidProbability("alpha"))
         ));
     }
+
+    #[test]
+    fn bounded_mean_sequence_contains_constant_mean_and_updates_time() {
+        let mut cs = BoundedMeanConfidenceSequence::new(0.0, 1.0, 0.05).unwrap();
+        assert_eq!(cs.mean(), None);
+        let first = cs.observe(0.75).unwrap();
+        let second = cs.observe(0.75).unwrap();
+
+        assert_eq!(first.observations, 1);
+        assert_eq!(second.observations, 2);
+        assert!((second.mean - 0.75).abs() < 1e-12);
+        assert!(first.lower <= 0.75 && first.upper >= 0.75);
+        assert_eq!(second.confidence, 0.95);
+    }
+
+    #[test]
+    fn bounded_mean_sequence_rejects_out_of_support_without_mutation() {
+        let mut cs = BoundedMeanConfidenceSequence::new(0.0, 1.0, 0.05).unwrap();
+        assert_eq!(
+            cs.observe(1.1),
+            Err(SequentialError::ObservationOutOfBounds)
+        );
+        assert_eq!(cs.observations(), 0);
+        assert_eq!(cs.mean(), None);
+        assert_eq!(
+            cs.observe(f64::NAN),
+            Err(SequentialError::ObservationOutOfBounds)
+        );
+    }
+
+    #[test]
+    fn bounded_mean_sequence_rejects_invalid_bounds_and_alpha() {
+        assert_eq!(
+            BoundedMeanConfidenceSequence::new(1.0, 1.0, 0.05),
+            Err(SequentialError::InvalidBounds)
+        );
+        assert_eq!(
+            BoundedMeanConfidenceSequence::new(0.0, 1.0, 0.0),
+            Err(SequentialError::InvalidProbability("alpha"))
+        );
+    }
+
 }
