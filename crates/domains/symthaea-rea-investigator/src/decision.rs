@@ -360,7 +360,6 @@ fn normalized_cost(
 #[derive(Debug)]
 struct CandidateDecisionData {
     result: DecisionAwareExperimentResult,
-    expected_regret: f64,
     worst_regret: f64,
 }
 
@@ -409,7 +408,6 @@ fn evaluate_candidate(
     // averaging posterior vectors directly would be mathematically incorrect.
     let mut shared_policy = Vec::with_capacity(outcomes.len());
     let mut shared_decision_by_outcome = HashMap::new();
-    let mut mixture_probability_by_outcome = HashMap::new();
 
     for (outcome_index, outcome) in outcomes.iter().enumerate() {
         let mixture_mass = scenario_results
@@ -450,7 +448,6 @@ fn evaluate_candidate(
         let (shared_decision_id, _) =
             best_decision(decisions, utility_maps, &mixture_joint);
         shared_decision_by_outcome.insert(outcome.clone(), shared_decision_id.clone());
-        mixture_probability_by_outcome.insert(outcome.clone(), mixture_mass);
         shared_policy.push(SharedPolicyOutcome {
             outcome: outcome.clone(),
             mixture_probability: mixture_mass,
@@ -469,7 +466,7 @@ fn evaluate_candidate(
         let mut regret = 0.0;
         let mut outcome_results = Vec::with_capacity(outcomes.len());
 
-        for (outcome_index, predicted) in scenario.predicted_outcomes.iter().enumerate() {
+        for predicted in &scenario.predicted_outcomes {
             let posterior: BTreeMap<String, f64> = predicted
                 .posterior
                 .iter()
@@ -527,7 +524,6 @@ fn evaluate_candidate(
                 shared_policy_expected_utility: shared_utility,
                 decision_regret,
             });
-            let _ = outcome_index;
         }
 
         let evsi = expected_posterior_utility - baseline_value;
@@ -609,7 +605,6 @@ fn evaluate_candidate(
             shared_policy,
             scenario_results: scenario_decision_results,
         },
-        expected_regret: expected_shared_policy_regret,
         worst_regret: worst_case_shared_policy_regret,
     })
 }
@@ -629,7 +624,7 @@ pub fn plan_next_experiment_decision_aware(
     decisions: &[TerminalDecision],
     config: DecisionAwareConfig,
 ) -> Result<DecisionAwarePlan, DecisionError> {
-    validate_config(config.robust.base)
+    super::validate_config(config.robust.base)
         .map_err(DecisionError::from_planner)?;
     validate_config(config)?;
 
@@ -954,7 +949,7 @@ mod tests {
         ];
         let high_eig_no_action_change = RobustExperimentProposal {
             id: "diagnose-nuisance".into(),
-            outcomes: vec!["a".into(), "b".into(), "c".into()],
+            outcomes: vec!["yes".into(), "no".into()],
             authorization: Authorization::Authorized,
             reversible: true,
             destructive: false,
@@ -967,9 +962,9 @@ mod tests {
         let high_matrix = ScenarioExperimentLikelihood {
             experiment_id: "diagnose-nuisance".into(),
             likelihoods: vec![
-                LikelihoodRow { hypothesis_id: "a".into(), outcome_probabilities: vec![0.98,0.01,0.01] },
-                LikelihoodRow { hypothesis_id: "b".into(), outcome_probabilities: vec![0.01,0.98,0.01] },
-                LikelihoodRow { hypothesis_id: "c".into(), outcome_probabilities: vec![0.01,0.01,0.98] },
+                LikelihoodRow { hypothesis_id: "a".into(), outcome_probabilities: vec![0.99,0.01] },
+                LikelihoodRow { hypothesis_id: "b".into(), outcome_probabilities: vec![0.01,0.99] },
+                LikelihoodRow { hypothesis_id: "c".into(), outcome_probabilities: vec![0.50,0.50] },
             ],
         };
         let low_matrix = ScenarioExperimentLikelihood {
