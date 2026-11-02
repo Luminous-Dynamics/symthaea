@@ -43,18 +43,55 @@ const EVIDENCE_REQUIRED_KEYS: &[&str] = &[
 const EVIDENCE_OPTIONAL_KEYS: &[&str] = &["caller_input_path"];
 
 const SUBJECT_FORMATS: &[&str] = &[
-    "hopper", "analysis-database", "mach-o", "elf", "pe", "dos-mz", "dos-com",
-    "raw-binary", "gamecube-dol", "zip", "ipa", "apk", "msix", "appx", "hap",
-    "hsp", "app-pack", "asar", "ines", "godot-pck", "unityfs", "uimage", "dmg",
-    "pkg", "plist", "javascript", "source-map", "directory", "file", "unknown",
-    "mach-o-universal", "javascript-bundle", "entitlements", "pyinstaller",
-    "node-sea", "dotnet-bundle", "bun-standalone", "intel-hex", "srec",
-    "esp-image", "uf2", "dfuse", "esp-flash-image", "fit",
+    "hopper",
+    "analysis-database",
+    "mach-o",
+    "elf",
+    "pe",
+    "dos-mz",
+    "dos-com",
+    "raw-binary",
+    "gamecube-dol",
+    "zip",
+    "ipa",
+    "apk",
+    "msix",
+    "appx",
+    "hap",
+    "hsp",
+    "app-pack",
+    "asar",
+    "ines",
+    "godot-pck",
+    "unityfs",
+    "uimage",
+    "dmg",
+    "pkg",
+    "plist",
+    "javascript",
+    "source-map",
+    "directory",
+    "file",
+    "unknown",
+    "mach-o-universal",
+    "javascript-bundle",
+    "entitlements",
+    "pyinstaller",
+    "node-sea",
+    "dotnet-bundle",
+    "bun-standalone",
+    "intel-hex",
+    "srec",
+    "esp-image",
+    "uf2",
+    "dfuse",
+    "esp-flash-image",
+    "fit",
 ];
 
 const ARCHITECTURES: &[&str] = &[
-    "x86", "x86_64", "arm", "arm64", "arm64_32", "mips", "6502", "riscv",
-    "powerpc", "m68k", "hexagon",
+    "x86", "x86_64", "arm", "arm64", "arm64_32", "mips", "6502", "riscv", "powerpc", "m68k",
+    "hexagon",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,7 +111,10 @@ pub struct EvidenceError {
 
 impl EvidenceError {
     fn new(kind: EvidenceErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into() }
+        Self {
+            kind,
+            message: message.into(),
+        }
     }
 }
 
@@ -103,7 +143,8 @@ fn schema_error(message: impl Into<String>) -> EvidenceError {
 }
 
 fn object<'a>(value: &'a Value, context: &str) -> Result<&'a Map<String, Value>, EvidenceError> {
-    value.as_object()
+    value
+        .as_object()
         .ok_or_else(|| schema_error(format!("{context} must be a JSON object")))
 }
 
@@ -120,7 +161,9 @@ fn strict_keys(
     }
     for key in map.keys() {
         if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
-            return Err(schema_error(format!("{context} contains unknown field '{key}'")));
+            return Err(schema_error(format!(
+                "{context} contains unknown field '{key}'"
+            )));
         }
     }
     Ok(())
@@ -131,11 +174,13 @@ fn field<'a>(
     key: &str,
     context: &str,
 ) -> Result<&'a Value, EvidenceError> {
-    map.get(key).ok_or_else(|| schema_error(format!("{context}.{key} is required")))
+    map.get(key)
+        .ok_or_else(|| schema_error(format!("{context}.{key} is required")))
 }
 
 fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, EvidenceError> {
-    let value = value.as_str()
+    let value = value
+        .as_str()
         .ok_or_else(|| schema_error(format!("{context} must be a string")))?;
     if value.is_empty() {
         return Err(schema_error(format!("{context} must not be empty")));
@@ -144,7 +189,8 @@ fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, Evide
 }
 
 fn nul_free_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, EvidenceError> {
-    let value = value.as_str()
+    let value = value
+        .as_str()
         .ok_or_else(|| schema_error(format!("{context} must be a string")))?;
     if value.contains('\0') {
         return Err(schema_error(format!("{context} must not contain NUL")));
@@ -154,11 +200,14 @@ fn nul_free_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, Evide
 
 fn is_lower_hex_64(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn validate_sha256(value: &Value, context: &str) -> Result<(), EvidenceError> {
-    let digest = value.as_str()
+    let digest = value
+        .as_str()
         .ok_or_else(|| schema_error(format!("{context} must be a string")))?;
     if !is_lower_hex_64(digest) {
         return Err(schema_error(format!(
@@ -173,10 +222,13 @@ fn validate_prefixed_digest(
     prefix: &str,
     context: &str,
 ) -> Result<(), EvidenceError> {
-    let value = value.as_str()
+    let value = value
+        .as_str()
         .ok_or_else(|| schema_error(format!("{context} must be a string")))?;
     let Some(digest) = value.strip_prefix(prefix) else {
-        return Err(schema_error(format!("{context} must start with '{prefix}'")));
+        return Err(schema_error(format!(
+            "{context} must start with '{prefix}'"
+        )));
     };
     if !is_lower_hex_64(digest) {
         return Err(schema_error(format!(
@@ -198,7 +250,9 @@ fn validate_provider(
     let version = field(map, "version", context)?;
     if nullable_version {
         if !version.is_null() && version.as_str().is_none() {
-            return Err(schema_error(format!("{context}.version must be a string or null")));
+            return Err(schema_error(format!(
+                "{context}.version must be a string or null"
+            )));
         }
         return Ok(());
     }
@@ -213,17 +267,27 @@ fn validate_subject(value: &Value) -> Result<(), EvidenceError> {
 
     let context = "subject";
     let map = object(value, context)?;
-    strict_keys(map, &["name", "digest", "local_path", "format", "architecture"], &[], context)?;
+    strict_keys(
+        map,
+        &["name", "digest", "local_path", "format", "architecture"],
+        &[],
+        context,
+    )?;
     nonempty_string(field(map, "name", context)?, "subject.name")?;
     nul_free_string(field(map, "local_path", context)?, "subject.local_path")?;
 
     let digest = object(field(map, "digest", context)?, "subject.digest")?;
     strict_keys(digest, &["sha256"], &[], "subject.digest")?;
-    validate_sha256(field(digest, "sha256", "subject.digest")?, "subject.digest.sha256")?;
+    validate_sha256(
+        field(digest, "sha256", "subject.digest")?,
+        "subject.digest.sha256",
+    )?;
 
     let format = nonempty_string(field(map, "format", context)?, "subject.format")?;
     if !SUBJECT_FORMATS.contains(&format) {
-        return Err(schema_error(format!("subject.format '{format}' is unsupported")));
+        return Err(schema_error(format!(
+            "subject.format '{format}' is unsupported"
+        )));
     }
 
     let architecture = field(map, "architecture", context)?;
@@ -235,9 +299,12 @@ fn validate_subject(value: &Value) -> Result<(), EvidenceError> {
             )));
         }
         if format == "gamecube-dol" && architecture != "powerpc" {
-            return Err(schema_error("gamecube-dol subjects must declare powerpc architecture"));
+            return Err(schema_error(
+                "gamecube-dol subjects must declare powerpc architecture",
+            ));
         }
-        if format != "raw-binary" && format != "gamecube-dol"
+        if format != "raw-binary"
+            && format != "gamecube-dol"
             && matches!(architecture, "6502" | "m68k")
         {
             return Err(schema_error(format!(
@@ -245,14 +312,18 @@ fn validate_subject(value: &Value) -> Result<(), EvidenceError> {
             )));
         }
     } else if format == "gamecube-dol" {
-        return Err(schema_error("gamecube-dol subjects must declare powerpc architecture"));
+        return Err(schema_error(
+            "gamecube-dol subjects must declare powerpc architecture",
+        ));
     }
 
     Ok(())
 }
 
 fn providers_match(left: &Value, right: &Value) -> bool {
-    ["id", "name", "version"].into_iter().all(|key| left.get(key) == right.get(key))
+    ["id", "name", "version"]
+        .into_iter()
+        .all(|key| left.get(key) == right.get(key))
 }
 
 fn validate_analysis_profile(value: &Value, provider: &Value) -> Result<(), EvidenceError> {
@@ -272,7 +343,9 @@ fn validate_analysis_profile(value: &Value, provider: &Value) -> Result<(), Evid
     validate_sha256(field(map, "digest", context)?, "analysis_profile.digest")?;
 
     if !providers_match(profile_provider, provider) {
-        return Err(schema_error("analysis_profile.provider must exactly match Evidence.provider"));
+        return Err(schema_error(
+            "analysis_profile.provider must exactly match Evidence.provider",
+        ));
     }
 
     let digest_input = serde_json::json!({
@@ -280,7 +353,9 @@ fn validate_analysis_profile(value: &Value, provider: &Value) -> Result<(), Evid
         "parameters": profile_parameters,
     });
     let expected = canonical_sha256(&digest_input)?;
-    let actual = field(map, "digest", context)?.as_str().expect("validated SHA-256 string");
+    let actual = field(map, "digest", context)?
+        .as_str()
+        .expect("validated SHA-256 string");
     if expected != actual {
         return Err(EvidenceError::new(
             EvidenceErrorKind::IdentityMismatch,
@@ -297,13 +372,20 @@ fn validate_environment(value: &Value) -> Result<(), EvidenceError> {
     }
     let context = "environment";
     let map = object(value, context)?;
-    strict_keys(map, &["id", "platform", "architecture", "isolation"], &[], context)?;
+    strict_keys(
+        map,
+        &["id", "platform", "architecture", "isolation"],
+        &[],
+        context,
+    )?;
     for key in ["id", "platform", "architecture"] {
         nonempty_string(field(map, key, context)?, &format!("{context}.{key}"))?;
     }
     let isolation = nonempty_string(field(map, "isolation", context)?, "environment.isolation")?;
     if !["none", "process", "container", "virtual-machine"].contains(&isolation) {
-        return Err(schema_error(format!("environment.isolation '{isolation}' is unsupported")));
+        return Err(schema_error(format!(
+            "environment.isolation '{isolation}' is unsupported"
+        )));
     }
     Ok(())
 }
@@ -313,7 +395,8 @@ fn validate_string_array(
     context: &str,
     nonempty: bool,
 ) -> Result<(), EvidenceError> {
-    let array = value.as_array()
+    let array = value
+        .as_array()
         .ok_or_else(|| schema_error(format!("{context} must be an array")))?;
     if nonempty && array.is_empty() {
         return Err(schema_error(format!("{context} must not be empty")));
@@ -329,7 +412,8 @@ fn validate_string_array(
 }
 
 fn validate_limited_directions(value: &Value, context: &str) -> Result<(), EvidenceError> {
-    let array = value.as_array()
+    let array = value
+        .as_array()
         .ok_or_else(|| schema_error(format!("{context} must be an array")))?;
     let valid = matches!(array.as_slice(),
         [Value::String(one)] if one == "callers" || one == "callees"
@@ -351,7 +435,10 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
     }
     let context = "relationship_coverage";
     let map = object(value, context)?;
-    let status = nonempty_string(field(map, "status", context)?, "relationship_coverage.status")?;
+    let status = nonempty_string(
+        field(map, "status", context)?,
+        "relationship_coverage.status",
+    )?;
 
     match status {
         "complete" => {
@@ -377,7 +464,10 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
                 &["limited_directions", "diagnostics"],
                 context,
             )?;
-            nonempty_string(field(map, "reason", context)?, "relationship_coverage.reason")?;
+            nonempty_string(
+                field(map, "reason", context)?,
+                "relationship_coverage.reason",
+            )?;
         }
         other => {
             return Err(schema_error(format!(
@@ -395,12 +485,10 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
     Ok(())
 }
 
-fn validate_nonnegative_safe_integer(
-    value: &Value,
-    context: &str,
-) -> Result<(), EvidenceError> {
+fn validate_nonnegative_safe_integer(value: &Value, context: &str) -> Result<(), EvidenceError> {
     const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
-    let number = value.as_f64()
+    let number = value
+        .as_f64()
         .ok_or_else(|| schema_error(format!("{context} must be a non-negative safe integer")))?;
     if !number.is_finite() || number < 0.0 || number.fract() != 0.0 || number > MAX_SAFE_INTEGER {
         return Err(schema_error(format!(
@@ -422,7 +510,9 @@ fn validate_location(value: &Value, index: usize) -> Result<(), EvidenceError> {
         "file-offset" => (&["kind", "offset"], ""),
         "file-offset-range" => (&["kind", "start", "end"], ""),
         other => {
-            return Err(schema_error(format!("{context}.kind '{other}' is unsupported")));
+            return Err(schema_error(format!(
+                "{context}.kind '{other}' is unsupported"
+            )));
         }
     };
     strict_keys(map, required, &[], &context)?;
@@ -484,7 +574,9 @@ pub fn validate_evidence_schema(value: &Value) -> Result<(), EvidenceError> {
 
     let confidence = nonempty_string(field(map, "confidence", context)?, "confidence")?;
     if !["observed", "derived", "inferred"].contains(&confidence) {
-        return Err(schema_error(format!("confidence '{confidence}' is unsupported")));
+        return Err(schema_error(format!(
+            "confidence '{confidence}' is unsupported"
+        )));
     }
 
     let authority = nonempty_string(field(map, "authority", context)?, "authority")?;
@@ -494,22 +586,27 @@ pub fn validate_evidence_schema(value: &Value) -> Result<(), EvidenceError> {
         "historical-reference",
         "external-service",
         "analyst-inference",
-    ].contains(&authority)
+    ]
+    .contains(&authority)
     {
-        return Err(schema_error(format!("authority '{authority}' is unsupported")));
+        return Err(schema_error(format!(
+            "authority '{authority}' is unsupported"
+        )));
     }
 
     validate_environment(field(map, "environment", context)?)?;
     validate_string_array(field(map, "limitations", context)?, "limitations", false)?;
     validate_relationship_coverage(field(map, "relationship_coverage", context)?)?;
 
-    let locations = field(map, "locations", context)?.as_array()
+    let locations = field(map, "locations", context)?
+        .as_array()
         .ok_or_else(|| schema_error("locations must be an array"))?;
     for (index, location) in locations.iter().enumerate() {
         validate_location(location, index)?;
     }
 
-    let evidence_links = field(map, "evidence_links", context)?.as_array()
+    let evidence_links = field(map, "evidence_links", context)?
+        .as_array()
         .ok_or_else(|| schema_error("evidence_links must be an array"))?;
     for (index, evidence_link) in evidence_links.iter().enumerate() {
         validate_prefixed_digest(
@@ -655,7 +752,10 @@ pub fn analysis_profile_digest(profile: &Value) -> Result<String, EvidenceError>
 /// Use verify_evidence_value for schema validation plus semantic verification.
 pub fn compute_evidence_id(value: &Value) -> Result<String, EvidenceError> {
     let semantic = semantic_evidence_content(value)?;
-    Ok(format!("{EVIDENCE_ID_PREFIX}{}", canonical_sha256(&semantic)?))
+    Ok(format!(
+        "{EVIDENCE_ID_PREFIX}{}",
+        canonical_sha256(&semantic)?
+    ))
 }
 
 /// Validate the envelope and analysis-profile commitment, then verify Evidence ID.
@@ -780,8 +880,8 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
     where
         E: serde::de::Error,
     {
-        let number = Number::from_f64(value)
-            .ok_or_else(|| E::custom("JSON numbers must be finite"))?;
+        let number =
+            Number::from_f64(value).ok_or_else(|| E::custom("JSON numbers must be finite"))?;
         Ok(StrictJsonValue(Value::Number(number)))
     }
 
@@ -859,7 +959,9 @@ mod tests {
     #[test]
     fn provider_object_key_order_does_not_change_profile_binding_or_identity() {
         let mut evidence = golden();
-        let profile_provider = evidence["analysis_profile"]["provider"].as_object().unwrap();
+        let profile_provider = evidence["analysis_profile"]["provider"]
+            .as_object()
+            .unwrap();
         let mut reordered = Map::new();
         reordered.insert("version".to_owned(), profile_provider["version"].clone());
         reordered.insert("name".to_owned(), profile_provider["name"].clone());
@@ -903,9 +1005,8 @@ mod tests {
     #[test]
     fn rejects_stale_evidence_id_and_tampered_profile() {
         let mut evidence = golden();
-        evidence["evidence_id"] = json!(
-            "ev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        );
+        evidence["evidence_id"] =
+            json!("ev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         assert_eq!(
             verify_evidence_value(&evidence).unwrap_err().kind,
             EvidenceErrorKind::IdentityMismatch
@@ -923,12 +1024,18 @@ mod tests {
     fn optional_caller_path_is_nonsemantic_but_nullable_profile_is_required() {
         let mut evidence = golden();
         let original = compute_evidence_id(&evidence).unwrap();
-        evidence.as_object_mut().unwrap().remove("caller_input_path");
+        evidence
+            .as_object_mut()
+            .unwrap()
+            .remove("caller_input_path");
         assert_eq!(compute_evidence_id(&evidence).unwrap(), original);
         assert!(verify_evidence_value(&evidence).is_ok());
 
         let mut missing_profile = golden();
-        missing_profile.as_object_mut().unwrap().remove("analysis_profile");
+        missing_profile
+            .as_object_mut()
+            .unwrap()
+            .remove("analysis_profile");
         assert_eq!(
             validate_evidence_schema(&missing_profile).unwrap_err().kind,
             EvidenceErrorKind::SchemaViolation
@@ -986,7 +1093,10 @@ mod tests {
         let verified = verify_evidence_json(raw).unwrap();
         assert_eq!(verified.evidence_id, GOLDEN_EVIDENCE_ID);
         let expected_raw_hash = sha256_hex(raw);
-        assert_eq!(verified.raw_file_sha256.as_deref(), Some(expected_raw_hash.as_str()));
+        assert_eq!(
+            verified.raw_file_sha256.as_deref(),
+            Some(expected_raw_hash.as_str())
+        );
         assert_ne!(
             verified.raw_file_sha256.as_deref(),
             Some(verified.semantic_sha256.as_str())
@@ -1030,7 +1140,10 @@ mod tests {
         let new_id = compute_evidence_id(&evidence).unwrap();
         evidence["evidence_id"] = json!(new_id);
         assert!(verify_evidence_value(&evidence).is_ok());
-        assert_eq!(evidence["relationship_coverage"]["status"], json!("unknown"));
+        assert_eq!(
+            evidence["relationship_coverage"]["status"],
+            json!("unknown")
+        );
     }
 
     #[test]
