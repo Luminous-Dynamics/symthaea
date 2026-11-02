@@ -11,9 +11,17 @@ license = "AGPL-3.0-or-later"
 [lib]
 path = "../../crates/domains/symthaea-rea-compat/src/lib.rs"
 
+[[bin]]
+name = "rea-evidence-verify"
+path = "../../crates/domains/symthaea-rea-compat/src/bin/rea-evidence-verify.rs"
+
 [[test]]
 name = "upstream_generated"
 path = "../../crates/domains/symthaea-rea-compat/tests/upstream_generated.rs"
+
+[[test]]
+name = "cli"
+path = "../../crates/domains/symthaea-rea-compat/tests/cli.rs"
 
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
