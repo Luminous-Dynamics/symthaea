@@ -16,6 +16,8 @@ pub const PRIOR_MASS_SCALE: u128 = 1_000_000_000;
 pub struct CandidateSpec {
     pub id: u64,
     pub weight: u64,
+    /// Horizon-independent recipient slot committed before observing this donor's path.
+    pub destination_id: Option<u64>,
     pub reserve_rate_numerator: u64,
     pub reserve_rate_denominator: u64,
 }
@@ -88,6 +90,7 @@ pub enum LedgerError {
     InvalidCandidateOrder,
     InvalidReserveRate,
     InvalidThresholdGrid,
+    InvalidRecipient,
     UnknownCandidate,
     CandidateAlreadyActive,
     CandidateDormant,
@@ -111,7 +114,7 @@ impl std::fmt::Display for LedgerError {
 
 impl std::error::Error for LedgerError {}
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct CandidateState {
     active: bool,
     evidence_value: u128,
@@ -120,7 +123,7 @@ struct CandidateState {
     rate_remainder: u128,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct TokenState {
     donor_id: u64,
     created_round: u64,
@@ -128,7 +131,7 @@ struct TokenState {
     remaining_amount: u128,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DonationLedger {
     specs: Vec<CandidateSpec>,
     index: BTreeMap<u64, usize>,
@@ -155,6 +158,9 @@ impl DonationLedger {
                 || spec.reserve_rate_numerator > spec.reserve_rate_denominator
             {
                 return Err(LedgerError::InvalidReserveRate);
+            }
+            if spec.destination_id.is_some_and(|destination| destination <= spec.id) {
+                return Err(LedgerError::InvalidRecipient);
             }
             weight_sum = weight_sum
                 .checked_add(spec.weight)
@@ -344,6 +350,10 @@ impl DonationLedger {
         let token = self.tokens.get(&token_id).ok_or(LedgerError::UnknownToken)?;
         if recipient_id <= token.donor_id {
             return Err(LedgerError::InvalidTransferDirection);
+        }
+        let donor_position = self.position(token.donor_id)?;
+        if self.specs[donor_position].destination_id != Some(recipient_id) {
+            return Err(LedgerError::InvalidRecipient);
         }
         if round < token.created_round || amount > token.remaining_amount {
             return Err(LedgerError::InvalidTransferAmount);
@@ -607,6 +617,11 @@ mod tests {
             weight,
             reserve_rate_numerator: rate_num,
             reserve_rate_denominator: rate_den,
+            destination_id: match id {
+                10 => Some(20),
+                20 => Some(30),
+                _ => None,
+            },
         }
     }
 
@@ -818,10 +833,10 @@ mod tests {
         }
 
         large.apply(InputEvent::Activate { round: 4, candidate_id: 30 }).unwrap();
-        let token_amount = large.snapshot().unwrap().escrow[0].remaining_amount;
+        let token_amount = large.snapshot().unwrap().escrow[1].remaining_amount;
         large.apply(InputEvent::Credit {
             round: 5,
-            token_id: 1,
+            token_id: 2,
             recipient_id: 30,
             amount: token_amount,
         }).unwrap();
