@@ -770,6 +770,108 @@
       ],
       "target": "zero_hidden_or_unaccounted_tasks; zero_refusal_or_unsupported_denominator_laundering; zero_budget_or_grader_version_mismatch_in_comparable_runs",
       "claim_ceiling": "A valid receipt proves accounting and provenance consistency only; independent graders remain the source of task correctness."
+    },
+    {
+      "id": "external_reverse_engineering_benchmark_alignment",
+      "status": "planned",
+      "external_benchmarks": [
+        {
+          "name": "SRE-Bench",
+          "owner": "DAPLab / Columbia",
+          "updated": "2026-10",
+          "binaries": 262,
+          "private_programs": 19,
+          "deterministic_tasks": 1572,
+          "tasks_per_binary": 6,
+          "domains": [
+            "firmware",
+            "malware",
+            "game",
+            "file_format",
+            "network_protocol"
+          ],
+          "source_languages": [
+            "C",
+            "C++",
+            "Rust",
+            "Go"
+          ],
+          "anti_analysis_mechanisms": 44,
+          "current_public_scoreboard_snapshot": {
+            "model": "GPT-6-Astra",
+            "mean_tasks_passed_per_graded_binary": 5.55,
+            "tasks_possible_per_binary": 6,
+            "graded_binaries": 181,
+            "total_binaries": 262,
+            "fully_solved": 149,
+            "zero_credit": 7,
+            "graded_coverage_fraction": 0.6908396946564885
+          },
+          "reporting_requirements": [
+            "eligible",
+            "attempted",
+            "completed",
+            "graded",
+            "refused",
+            "unsupported",
+            "timeout",
+            "abstained",
+            "score_on_graded",
+            "full_solve_rate",
+            "zero_credit_rate"
+          ],
+          "access_policy": "Use official benchmark access/grader; do not copy private binaries, solutions or graders."
+        },
+        {
+          "name": "Stanford AIMS Decompile-Bench",
+          "dataset_items": 72059,
+          "subjects": [
+            "IDA Pro",
+            "Ghidra"
+          ],
+          "observations": 141131,
+          "published_text_edit_similarity_means": {
+            "ida": 0.206,
+            "ghidra": 0.202
+          },
+          "metric_claim_ceiling": "text similarity only; not executable correctness",
+          "additional_metrics": [
+            "compile_rate",
+            "held_out_test_equivalence",
+            "control_flow_edge_f1",
+            "data_flow_edge_f1",
+            "semantic_localization",
+            "behavior_preserving_edit_cost"
+          ],
+          "license": "Released evaluation dataset CC0-1.0; metric implementation MIT; original projects retain their own licenses."
+        },
+        {
+          "name": "OWASP MAS Crackmes",
+          "android": [
+            "UnCrackable L1",
+            "UnCrackable L2",
+            "UnCrackable L3",
+            "UnCrackable L4",
+            "UnCrackable DRM",
+            "Android License Validator"
+          ],
+          "ios": [
+            "iOS UnCrackable L1",
+            "iOS UnCrackable L2"
+          ],
+          "reporting_requirements": [
+            "artifact_sha256",
+            "platform",
+            "build_identity",
+            "signing_state",
+            "instrumentation_state",
+            "root_jailbreak_state",
+            "oracle_scope"
+          ],
+          "claim_ceiling": "public mobile reverse-engineering challenge performance only; not general MASVS certification"
+        }
+      ],
+      "reporting_invariant": "Every result publishes coverage/denominator, refusals, unsupported, timeouts, abstentions and graded-subset scores. Never count ungraded/refused cases as solved or silently drop them."
     }
   ],
   "promotion_policy": {
