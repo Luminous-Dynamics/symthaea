@@ -87,6 +87,10 @@ pub enum VehicleRtaReason {
     BaselineInputsUnhealthy,
     BaselineControllerUnhealthy,
     BaselineControlPathUnhealthy,
+    AdvancedControllerIdentityInvalid,
+    BaselineControllerIdentityInvalid,
+    ControllerIdentityAliased,
+    BaselineIndependenceEvidenceMissing,
     EnvelopeMarginInsufficient,
     ControllabilityMarginInsufficient,
     CommandDisagreement,
@@ -102,6 +106,12 @@ pub struct VehicleRtaObservation {
     pub state: VehicleState,
     pub advanced_command: VehicleCommand,
     pub baseline_command: VehicleCommand,
+    /// 64-hex identifier for the frozen advanced controller and configuration.
+    pub advanced_controller_digest: String,
+    /// Identifier for the separately implemented baseline controller and configuration.
+    pub baseline_controller_digest: String,
+    /// External record ID for the baseline-independence argument; not authenticated here.
+    pub baseline_independence_evidence_id: Option<String>,
     pub advanced_command_valid: bool,
     pub baseline_profile_admissible: bool,
     /// Independently supplied health of the reversionary controller's inputs.
@@ -130,6 +140,13 @@ pub struct VehicleRtaWitness {
     pub baseline_command: [f32; 3],
     pub envelope_margin: Option<f64>,
     pub controllability_margin: Option<f64>,
+    /// Caller-supplied controller/config identities; not authenticated by this monitor.
+    pub advanced_controller_digest: String,
+    pub baseline_controller_digest: String,
+    pub baseline_independence_evidence_id: Option<String>,
+    /// BLAKE3 over serde_json serialization of the complete input observation, when serializable.
+    /// This is a replay fingerprint, not a signature or evidence-authentication mechanism.
+    pub observation_digest: Option<String>,
 }
 
 /// None selected_command means this contract did not select an action. It is
@@ -138,7 +155,7 @@ pub struct VehicleRtaWitness {
 pub struct VehicleRtaDecision {
     pub schema_version: String,
     pub profile_id: String,
-    /// BLAKE3 of canonical serde_json serialization of VehicleRtaConfig v0.1.
+    /// BLAKE3 over serde_json serialization of VehicleRtaConfig; not a cross-language canonical encoding.
     pub profile_digest: String,
     pub observation_timestamp_s: Option<f64>,
     pub mode: VehicleRtaMode,
@@ -269,6 +286,27 @@ impl VehicleRuntimeAssurance {
         if !observation.baseline_control_path_healthy {
             reasons.push(VehicleRtaReason::BaselineControlPathUnhealthy);
         }
+        let advanced_identity_valid = controller_digest_is_valid(&observation.advanced_controller_digest);
+        let baseline_identity_valid = controller_digest_is_valid(&observation.baseline_controller_digest);
+        if !advanced_identity_valid {
+            reasons.push(VehicleRtaReason::AdvancedControllerIdentityInvalid);
+        }
+        if !baseline_identity_valid {
+            reasons.push(VehicleRtaReason::BaselineControllerIdentityInvalid);
+        }
+        if advanced_identity_valid
+            && baseline_identity_valid
+            && observation.advanced_controller_digest.eq_ignore_ascii_case(&observation.baseline_controller_digest)
+        {
+            reasons.push(VehicleRtaReason::ControllerIdentityAliased);
+        }
+        let baseline_independence_recorded = observation
+            .baseline_independence_evidence_id
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty());
+        if !baseline_independence_recorded {
+            reasons.push(VehicleRtaReason::BaselineIndependenceEvidenceMissing);
+        }
 
         if !observation.envelope_margin.is_finite()
             || !observation.controllability_margin.is_finite()
@@ -297,6 +335,10 @@ impl VehicleRuntimeAssurance {
             && observation.baseline_inputs_healthy
             && observation.baseline_controller_healthy
             && observation.baseline_control_path_healthy
+            && advanced_identity_valid
+            && baseline_identity_valid
+            && !observation.advanced_controller_digest.eq_ignore_ascii_case(&observation.baseline_controller_digest)
+            && baseline_independence_recorded
             && observation.realtime_healthy
             && observation.actuator_healthy
             && command_is_valid(&observation.baseline_command);
@@ -534,7 +576,17 @@ fn witness_for(observation: &VehicleRtaObservation) -> VehicleRtaWitness {
         ],
         envelope_margin: observation.envelope_margin.is_finite().then_some(observation.envelope_margin),
         controllability_margin: observation.controllability_margin.is_finite().then_some(observation.controllability_margin),
+        advanced_controller_digest: observation.advanced_controller_digest.clone(),
+        baseline_controller_digest: observation.baseline_controller_digest.clone(),
+        baseline_independence_evidence_id: observation.baseline_independence_evidence_id.clone(),
+        observation_digest: serde_json::to_vec(observation)
+            .ok()
+            .map(|bytes| blake3::hash(&bytes).to_hex().to_string()),
     }
+}
+
+fn controller_digest_is_valid(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 #[cfg(test)]
@@ -549,6 +601,9 @@ mod tests {
             state,
             advanced_command: VehicleCommand { steering: 0.05, throttle: 0.2, brake: 0.0 },
             baseline_command: VehicleCommand { steering: 0.05, throttle: 0.2, brake: 0.0 },
+            advanced_controller_digest: "a".repeat(64),
+            baseline_controller_digest: "b".repeat(64),
+            baseline_independence_evidence_id: Some("test-fixture-independent-baseline-record".into()),
             advanced_command_valid: true,
             baseline_profile_admissible: true,
             baseline_inputs_healthy: true,
@@ -569,6 +624,45 @@ mod tests {
         config.transition_duration_s = 1.0;
         config.maximum_observation_gap_s = 2.0;
         VehicleRuntimeAssurance::new(config).expect("default profile should validate")
+    }
+
+    #[test]
+    fn requires_distinct_controller_identities_and_an_independence_record() {
+        let mut monitor = monitor();
+        let mut missing = observation(0.0);
+        missing.baseline_independence_evidence_id = None;
+        let decision = monitor.evaluate(&missing);
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.selected_command.is_none());
+        assert!(decision.reasons.contains(&VehicleRtaReason::BaselineIndependenceEvidenceMissing));
+
+        let mut monitor = monitor();
+        let mut aliased = observation(0.0);
+        aliased.baseline_controller_digest = aliased.advanced_controller_digest.clone();
+        let decision = monitor.evaluate(&aliased);
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.reasons.contains(&VehicleRtaReason::ControllerIdentityAliased));
+
+        let mut monitor = monitor();
+        let mut malformed = observation(0.0);
+        malformed.baseline_controller_digest = "not-a-digest".into();
+        let decision = monitor.evaluate(&malformed);
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.reasons.contains(&VehicleRtaReason::BaselineControllerIdentityInvalid));
+    }
+
+    #[test]
+    fn decision_witness_binds_controller_ids_and_serializable_observation() {
+        let mut monitor = monitor();
+        let decision = monitor.evaluate(&observation(0.0));
+        assert_eq!(decision.witness.advanced_controller_digest, "a".repeat(64));
+        assert_eq!(decision.witness.baseline_controller_digest, "b".repeat(64));
+        assert!(decision.witness.observation_digest.is_some());
+
+        let mut invalid = observation(0.1);
+        invalid.advanced_command.throttle = f32::NAN;
+        let decision = monitor.evaluate(&invalid);
+        assert!(decision.witness.observation_digest.is_none());
     }
 
     #[test]
