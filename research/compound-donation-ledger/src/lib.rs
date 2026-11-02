@@ -1661,6 +1661,110 @@ mod tests {
     }
 
     #[test]
+    fn capped_overshoot_horizon_extension_preserves_old_scores() {
+        let make_spec = |id, weight, destination_id| CandidateSpec {
+            id,
+            weight,
+            destination_id,
+            reserve_rate_numerator: 0,
+            reserve_rate_denominator: 1,
+        };
+        let small_specs = vec![
+            make_spec(10, 300_000_000, Some(20)),
+            make_spec(20, 300_000_000, Some(30)),
+        ];
+        let large_specs = vec![
+            make_spec(10, 300_000_000, Some(20)),
+            make_spec(20, 300_000_000, Some(30)),
+            make_spec(30, 200_000_000, Some(40)),
+        ];
+        let mut small = DonationLedger::new_capped_overshoot(small_specs).unwrap();
+        let mut large = DonationLedger::new_capped_overshoot(large_specs).unwrap();
+
+        let prefix = vec![
+            InputEvent::Activate { round: 0, candidate_id: 10 },
+            InputEvent::EvidenceUpdate {
+                round: 1,
+                candidate_id: 10,
+                new_value: 4 * EVIDENCE_ONE,
+            },
+            InputEvent::Activate { round: 2, candidate_id: 20 },
+            InputEvent::Credit {
+                round: 2,
+                token_id: 1,
+                recipient_id: 20,
+                amount: 200_000_000_000_000,
+            },
+            InputEvent::EvidenceUpdate {
+                round: 3,
+                candidate_id: 20,
+                new_value: 4 * EVIDENCE_ONE,
+            },
+        ];
+        for event in prefix {
+            small.apply(event.clone()).unwrap();
+            large.apply(event).unwrap();
+        }
+
+        for id in [10, 20] {
+            assert_eq!(small.weighted_score_for(id), large.weighted_score_for(id));
+        }
+        assert_eq!(
+            small.snapshot().unwrap().escrow[0].remaining_amount,
+            large.snapshot().unwrap().escrow[0].remaining_amount
+        );
+
+        // The longer horizon activates the already precommitted destination
+        // of candidate 20 and credits its token. This must not rewrite either
+        // old candidate's score or prior credit.
+        large.apply(InputEvent::Activate { round: 4, candidate_id: 30 }).unwrap();
+        large.apply(InputEvent::Credit {
+            round: 5,
+            token_id: 2,
+            recipient_id: 30,
+            amount: 200_000_000_000_000,
+        }).unwrap();
+
+        for id in [10, 20] {
+            assert_eq!(small.weighted_score_for(id), large.weighted_score_for(id));
+        }
+        small.validate_invariants().unwrap();
+        large.validate_invariants().unwrap();
+    }
+
+    #[test]
+    fn capped_overshoot_fixed_point_randomized_lipschitz_and_cap_properties() {
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 7;
+            state ^= state >> 9;
+            state ^= state << 8;
+            state
+        };
+
+        for _ in 0..20_000 {
+            let weight = (next() % (WEIGHT_SCALE + 1)) as u128;
+            let previous_x = (next() % (100 * EVIDENCE_ONE + 1)) as u128;
+            let increment = (next() % (100 * EVIDENCE_ONE + 1)) as u128;
+            let current_x = previous_x + increment;
+
+            let reserve = |x: u128| {
+                let weighted = weight.checked_mul(x).unwrap();
+                let threshold = (WEIGHT_SCALE as u128) * EVIDENCE_ONE;
+                let cap = weight * EVIDENCE_ONE;
+                weighted.saturating_sub(threshold).min(cap)
+            };
+
+            let before = reserve(previous_x);
+            let after = reserve(current_x);
+            assert!(after >= before);
+            assert!(after <= weight * previous_x.min(EVIDENCE_ONE));
+            assert!(after <= weight * current_x.min(EVIDENCE_ONE));
+            assert!(after - before <= weight * increment);
+        }
+    }
+
+    #[test]
     fn capped_overshoot_reserve_satisfies_donor_cap_and_own_increment() {
         let weight = 300_000_000_u128;
         let mut previous_value = 0_u128;
