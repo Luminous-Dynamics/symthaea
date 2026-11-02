@@ -113,7 +113,7 @@ The policy allows session mutation, process launches and ADB transport use for r
 Direct Rust API:
 
 ```rust,ignore
-use symthaea::rea_mobile_policy::tool_policy::{
+use symthaea::rea_mobile_policy::{
     authorize_mobile_tool, InvocationScope, MobileToolProfile,
 };
 
