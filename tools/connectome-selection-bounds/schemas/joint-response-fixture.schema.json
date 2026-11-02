@@ -17,10 +17,14 @@
       "additionalProperties": false,
       "required": [
         "joint_prevalence_bounds",
+        "target_given_source_bounds",
         "independence_product_not_assumed"
       ],
       "properties": {
         "joint_prevalence_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "target_given_source_bounds": {
           "$ref": "#/$defs/interval"
         },
         "independence_product_not_assumed": {
