@@ -247,7 +247,11 @@ impl ZipArtifactReader {
 
         let max_member_end = entries
             .iter()
-            .map(|entry| entry.data_descriptor_end.unwrap_or(entry.compressed_data_end))
+            .map(|entry| {
+                entry
+                    .data_descriptor_end
+                    .unwrap_or(entry.compressed_data_end)
+            })
             .max()
             .unwrap_or(preflight.archive_start);
         let opaque_pre_central_directory_bytes = preflight
@@ -265,8 +269,7 @@ impl ZipArtifactReader {
                 .push("encrypted entries are metadata-only and were not decrypted".to_owned());
         }
         if entries.iter().any(|entry| entry.decoded_name.is_none()) {
-            coverage_limitations
-                .push("one or more member names could not be decoded".to_owned());
+            coverage_limitations.push("one or more member names could not be decoded".to_owned());
         }
 
         let inventory = ZipInventory {
@@ -309,8 +312,9 @@ impl ZipArtifactReader {
             .file
             .metadata()
             .map_err(|error| ReaderError::io("cannot stat held archive descriptor", error))?;
-        let selected = fs::symlink_metadata(&self.path)
-            .map_err(|error| ReaderError::io("selected archive path is no longer available", error))?;
+        let selected = fs::symlink_metadata(&self.path).map_err(|error| {
+            ReaderError::io("selected archive path is no longer available", error)
+        })?;
 
         if selected.file_type().is_symlink()
             || !selected.is_file()
@@ -557,14 +561,19 @@ fn parse_end_record_candidate(
         central_offset as u64
     };
     let directory_start = directory_end.checked_sub(directory_bytes).ok_or_else(|| {
-        ReaderError::new(ReaderErrorKind::InvalidArchive, "central-directory range underflows")
-    })?;
-    let archive_start = directory_start.checked_sub(directory_offset).ok_or_else(|| {
         ReaderError::new(
             ReaderErrorKind::InvalidArchive,
-            "archive prefix and central-directory offset are inconsistent",
+            "central-directory range underflows",
         )
     })?;
+    let archive_start = directory_start
+        .checked_sub(directory_offset)
+        .ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "archive prefix and central-directory offset are inconsistent",
+            )
+        })?;
     if archive_start > file_len || directory_start > file_len || directory_end > file_len {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
@@ -619,7 +628,10 @@ fn parse_zip64_end_record(
     let search_start = locator_offset.saturating_sub(limits.max_zip64_record_bytes);
     let search_len = locator_offset - search_start;
     let search_len_usize = usize::try_from(search_len).map_err(|_| {
-        ReaderError::new(ReaderErrorKind::LimitExceeded, "ZIP64 record window is too large")
+        ReaderError::new(
+            ReaderErrorKind::LimitExceeded,
+            "ZIP64 record window is too large",
+        )
     })?;
     file.seek(SeekFrom::Start(search_start))
         .map_err(|error| ReaderError::io("cannot seek to ZIP64 record window", error))?;
@@ -635,7 +647,10 @@ fn parse_zip64_end_record(
             }
             let record_payload_bytes = read_u64(&search[index + 4..index + 12]);
             let record_total = 12u64.checked_add(record_payload_bytes).ok_or_else(|| {
-                ReaderError::new(ReaderErrorKind::InvalidArchive, "ZIP64 record size overflow")
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "ZIP64 record size overflow",
+                )
             })?;
             let absolute_start = search_start + index as u64;
             if absolute_start.checked_add(record_total) != Some(locator_offset) {
@@ -689,12 +704,14 @@ fn parse_zip64_end_record(
             "ZIP64 central-directory size exceeds its physical position",
         )
     })?;
-    let archive_start = directory_start.checked_sub(directory_offset).ok_or_else(|| {
-        ReaderError::new(
-            ReaderErrorKind::InvalidArchive,
-            "ZIP64 central-directory offset is inconsistent with the archive prefix",
-        )
-    })?;
+    let archive_start = directory_start
+        .checked_sub(directory_offset)
+        .ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "ZIP64 central-directory offset is inconsistent with the archive prefix",
+            )
+        })?;
     if archive_start.checked_add(locator_relative_offset) != Some(record_start) {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
@@ -707,7 +724,13 @@ fn parse_zip64_end_record(
             "ZIP64 end record lies outside the selected file",
         ));
     }
-    Ok((total_entries, directory_bytes, directory_offset, record_start, true))
+    Ok((
+        total_entries,
+        directory_bytes,
+        directory_offset,
+        record_start,
+        true,
+    ))
 }
 
 fn read_central_directory(
@@ -718,7 +741,12 @@ fn read_central_directory(
     let directory_end = end_record
         .central_directory_offset
         .checked_add(end_record.central_directory_bytes)
-        .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "central-directory end overflow"))?;
+        .ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "central-directory end overflow",
+            )
+        })?;
     file.seek(SeekFrom::Start(end_record.central_directory_offset))
         .map_err(|error| ReaderError::io("cannot seek to central directory", error))?;
 
@@ -761,16 +789,30 @@ fn read_central_directory(
         let local_offset32 = read_u32(&fixed[42..46]);
 
         enforce_limit("member name", name_len, limits.max_name_bytes)?;
-        enforce_limit("member extra field", extra_len, limits.max_extra_field_bytes)?;
+        enforce_limit(
+            "member extra field",
+            extra_len,
+            limits.max_extra_field_bytes,
+        )?;
         let variable_bytes = name_len
             .checked_add(extra_len)
             .and_then(|bytes| bytes.checked_add(comment_len))
-            .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "central record length overflow"))?;
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "central record length overflow",
+                )
+            })?;
         let next_record = file
             .stream_position()
             .map_err(|error| ReaderError::io("cannot inspect central record position", error))?
             .checked_add(variable_bytes)
-            .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "central record end overflow"))?;
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "central record end overflow",
+                )
+            })?;
         if next_record > directory_end {
             return Err(ReaderError::new(
                 ReaderErrorKind::InvalidArchive,
@@ -778,10 +820,15 @@ fn read_central_directory(
             ));
         }
 
-        let name_len_usize = usize::try_from(name_len)
-            .map_err(|_| ReaderError::new(ReaderErrorKind::LimitExceeded, "member name is too large"))?;
-        let extra_len_usize = usize::try_from(extra_len)
-            .map_err(|_| ReaderError::new(ReaderErrorKind::LimitExceeded, "member extra field is too large"))?;
+        let name_len_usize = usize::try_from(name_len).map_err(|_| {
+            ReaderError::new(ReaderErrorKind::LimitExceeded, "member name is too large")
+        })?;
+        let extra_len_usize = usize::try_from(extra_len).map_err(|_| {
+            ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                "member extra field is too large",
+            )
+        })?;
         let mut raw_name = vec![0u8; name_len_usize];
         let mut extra = vec![0u8; extra_len_usize];
         file.read_exact(&mut raw_name)
@@ -804,22 +851,30 @@ fn read_central_directory(
         )?;
 
         let declared_uncompressed_size = if needs_uncompressed {
-            zip64.uncompressed.ok_or_else(|| missing_zip64_value("uncompressed size"))?
+            zip64
+                .uncompressed
+                .ok_or_else(|| missing_zip64_value("uncompressed size"))?
         } else {
             uncompressed32 as u64
         };
         let declared_compressed_size = if needs_compressed {
-            zip64.compressed.ok_or_else(|| missing_zip64_value("compressed size"))?
+            zip64
+                .compressed
+                .ok_or_else(|| missing_zip64_value("compressed size"))?
         } else {
             compressed32 as u64
         };
         let local_offset = if needs_local_offset {
-            zip64.local_offset.ok_or_else(|| missing_zip64_value("local header offset"))?
+            zip64
+                .local_offset
+                .ok_or_else(|| missing_zip64_value("local header offset"))?
         } else {
             local_offset32 as u64
         };
         let disk_start = if needs_disk_start {
-            zip64.disk_start.ok_or_else(|| missing_zip64_value("disk start"))?
+            zip64
+                .disk_start
+                .ok_or_else(|| missing_zip64_value("disk start"))?
         } else {
             disk_start16 as u32
         };
@@ -837,7 +892,12 @@ fn read_central_directory(
         )?;
         total_declared_uncompressed = total_declared_uncompressed
             .checked_add(declared_uncompressed_size)
-            .ok_or_else(|| ReaderError::new(ReaderErrorKind::LimitExceeded, "aggregate declared size overflow"))?;
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::LimitExceeded,
+                    "aggregate declared size overflow",
+                )
+            })?;
         if total_declared_uncompressed > limits.max_total_declared_uncompressed_bytes {
             return Err(ReaderError::new(
                 ReaderErrorKind::LimitExceeded,
@@ -918,7 +978,8 @@ fn read_central_directory(
             );
         }
         if encrypted {
-            limitations.push("encrypted member is metadata-only; decryption is disabled".to_owned());
+            limitations
+                .push("encrypted member is metadata-only; decryption is disabled".to_owned());
         }
         if path_disposition != PathDisposition::Relative {
             limitations.push(format!("member path disposition is {path_disposition:?}"));
@@ -1002,7 +1063,11 @@ fn read_central_directory(
         }
     }
 
-    Ok((entries, duplicate_raw_names_present, total_declared_uncompressed))
+    Ok((
+        entries,
+        duplicate_raw_names_present,
+        total_declared_uncompressed,
+    ))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1038,7 +1103,10 @@ fn parse_zip64_extra(
         let field_len = read_u16(&extra[cursor + 2..cursor + 4]) as usize;
         cursor += 4;
         let field_end = cursor.checked_add(field_len).ok_or_else(|| {
-            ReaderError::new(ReaderErrorKind::InvalidArchive, "ZIP extra-field length overflow")
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "ZIP extra-field length overflow",
+            )
         })?;
         if field_end > extra.len() {
             return Err(ReaderError::new(
@@ -1086,12 +1154,16 @@ fn verify_local_header(
     expected: LocalHeaderExpectation<'_>,
     limits: &ReaderLimits,
 ) -> Result<LocalEntryFacts, ReaderError> {
-    let local_offset = expected.archive_start.checked_add(expected.relative_local_offset).ok_or_else(|| {
-        ReaderError::new(ReaderErrorKind::InvalidArchive, "local header offset overflow")
-    })?;
-    if local_offset.saturating_add(LOCAL_HEADER_FIXED_BYTES)
-        > expected.central_directory_offset
-    {
+    let local_offset = expected
+        .archive_start
+        .checked_add(expected.relative_local_offset)
+        .ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "local header offset overflow",
+            )
+        })?;
+    if local_offset.saturating_add(LOCAL_HEADER_FIXED_BYTES) > expected.central_directory_offset {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
             "local header lies outside the data region",
@@ -1117,7 +1189,8 @@ fn verify_local_header(
     let local_name_len = read_u16(&header[26..28]) as u64;
     let local_extra_len = read_u16(&header[28..30]) as u64;
 
-    if local_flags != expected.expected_flags || local_compression != expected.expected_compression {
+    if local_flags != expected.expected_flags || local_compression != expected.expected_compression
+    {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
             "local and central file headers disagree on flags or compression method",
@@ -1130,10 +1203,18 @@ fn verify_local_header(
         limits.max_extra_field_bytes,
     )?;
 
-    let local_name_len_usize = usize::try_from(local_name_len)
-        .map_err(|_| ReaderError::new(ReaderErrorKind::LimitExceeded, "local member name is too large"))?;
-    let local_extra_len_usize = usize::try_from(local_extra_len)
-        .map_err(|_| ReaderError::new(ReaderErrorKind::LimitExceeded, "local extra field is too large"))?;
+    let local_name_len_usize = usize::try_from(local_name_len).map_err(|_| {
+        ReaderError::new(
+            ReaderErrorKind::LimitExceeded,
+            "local member name is too large",
+        )
+    })?;
+    let local_extra_len_usize = usize::try_from(local_extra_len).map_err(|_| {
+        ReaderError::new(
+            ReaderErrorKind::LimitExceeded,
+            "local extra field is too large",
+        )
+    })?;
     let mut local_name = vec![0u8; local_name_len_usize];
     let mut local_extra = vec![0u8; local_extra_len_usize];
     file.read_exact(&mut local_name)
@@ -1156,12 +1237,16 @@ fn verify_local_header(
             false,
         )?;
         let local_uncompressed = if local_uncompressed32 == u32::MAX {
-            local_zip64.uncompressed.ok_or_else(|| missing_zip64_value("local uncompressed size"))?
+            local_zip64
+                .uncompressed
+                .ok_or_else(|| missing_zip64_value("local uncompressed size"))?
         } else {
             local_uncompressed32 as u64
         };
         let local_compressed = if local_compressed32 == u32::MAX {
-            local_zip64.compressed.ok_or_else(|| missing_zip64_value("local compressed size"))?
+            local_zip64
+                .compressed
+                .ok_or_else(|| missing_zip64_value("local compressed size"))?
         } else {
             local_compressed32 as u64
         };
@@ -1180,10 +1265,20 @@ fn verify_local_header(
         .checked_add(LOCAL_HEADER_FIXED_BYTES)
         .and_then(|value| value.checked_add(local_name_len))
         .and_then(|value| value.checked_add(local_extra_len))
-        .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "member data offset overflow"))?;
+        .ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "member data offset overflow",
+            )
+        })?;
     let compressed_data_end = data_offset
         .checked_add(expected.expected_compressed_size)
-        .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "compressed member end overflow"))?;
+        .ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "compressed member end overflow",
+            )
+        })?;
     if compressed_data_end > expected.central_directory_offset {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
@@ -1329,7 +1424,9 @@ fn decode_cp437(bytes: &[u8]) -> String {
             if *byte < 0x80 {
                 char::from(*byte)
             } else {
-                HIGH.chars().nth((*byte - 0x80) as usize).unwrap_or('\u{FFFD}')
+                HIGH.chars()
+                    .nth((*byte - 0x80) as usize)
+                    .unwrap_or('\u{FFFD}')
             }
         })
         .collect()
@@ -1343,9 +1440,7 @@ fn classify_path(path: &str) -> PathDisposition {
         return PathDisposition::ContainsNul;
     }
     let bytes = path.as_bytes();
-    let windows_drive = bytes.len() >= 2
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':';
+    let windows_drive = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
     if path.starts_with('/') || path.starts_with('\\') || windows_drive {
         return PathDisposition::Absolute;
     }
@@ -1374,7 +1469,10 @@ fn missing_zip64_value(name: &str) -> ReaderError {
 
 fn take_u32(bytes: &[u8], cursor: &mut usize) -> Result<u32, ReaderError> {
     let end = cursor.checked_add(4).ok_or_else(|| {
-        ReaderError::new(ReaderErrorKind::InvalidArchive, "ZIP64 extra-field cursor overflow")
+        ReaderError::new(
+            ReaderErrorKind::InvalidArchive,
+            "ZIP64 extra-field cursor overflow",
+        )
     })?;
     if end > bytes.len() {
         return Err(ReaderError::new(
@@ -1389,7 +1487,10 @@ fn take_u32(bytes: &[u8], cursor: &mut usize) -> Result<u32, ReaderError> {
 
 fn take_u64(bytes: &[u8], cursor: &mut usize) -> Result<u64, ReaderError> {
     let end = cursor.checked_add(8).ok_or_else(|| {
-        ReaderError::new(ReaderErrorKind::InvalidArchive, "ZIP64 extra-field cursor overflow")
+        ReaderError::new(
+            ReaderErrorKind::InvalidArchive,
+            "ZIP64 extra-field cursor overflow",
+        )
     })?;
     if end > bytes.len() {
         return Err(ReaderError::new(
@@ -1465,11 +1566,19 @@ mod tests {
             push_u32(&mut bytes, if uses_descriptor { 0 } else { checksum });
             push_u32(
                 &mut bytes,
-                if uses_descriptor { 0 } else { entry.data.len() as u32 },
+                if uses_descriptor {
+                    0
+                } else {
+                    entry.data.len() as u32
+                },
             );
             push_u32(
                 &mut bytes,
-                if uses_descriptor { 0 } else { entry.data.len() as u32 },
+                if uses_descriptor {
+                    0
+                } else {
+                    entry.data.len() as u32
+                },
             );
             push_u16(&mut bytes, entry.name.len() as u16);
             push_u16(&mut bytes, 0);
@@ -1564,10 +1673,8 @@ mod tests {
 
     fn write_temp(bytes: &[u8]) -> PathBuf {
         let id = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "symthaea-rea-zip-{}-{id}.zip",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("symthaea-rea-zip-{}-{id}.zip", std::process::id()));
         let mut file = File::create(&path).unwrap();
         file.write_all(bytes).unwrap();
         file.sync_all().unwrap();
@@ -1672,7 +1779,12 @@ mod tests {
         assert_eq!(entry.declared_uncompressed_size, 7);
         assert!(entry.data_descriptor_end.is_some());
         assert_eq!(entry.data_descriptor_has_signature, Some(true));
-        assert!(entry.limitations.iter().any(|item| item.contains("payload CRC remains unverified")));
+        assert!(
+            entry
+                .limitations
+                .iter()
+                .any(|item| item.contains("payload CRC remains unverified"))
+        );
         fs::remove_file(path).unwrap();
 
         let path = write_temp(&build_zip(
@@ -1687,12 +1799,12 @@ mod tests {
         ));
         let mut bytes = fs::read(&path).unwrap();
         fs::remove_file(&path).unwrap();
-        let descriptor_start = LOCAL_HEADER_FIXED_BYTES as usize + b"descriptor.bin".len() + b"payload".len();
+        let descriptor_start =
+            LOCAL_HEADER_FIXED_BYTES as usize + b"descriptor.bin".len() + b"payload".len();
         bytes.drain(descriptor_start..descriptor_start + 4);
         let eocd = bytes.len() - EOCD_FIXED_BYTES;
         let old_directory_offset = read_u32(&bytes[eocd + 16..eocd + 20]);
-        bytes[eocd + 16..eocd + 20]
-            .copy_from_slice(&(old_directory_offset - 4).to_le_bytes());
+        bytes[eocd + 16..eocd + 20].copy_from_slice(&(old_directory_offset - 4).to_le_bytes());
         let path = write_temp(&bytes);
         let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
         assert_eq!(
@@ -1798,7 +1910,10 @@ mod tests {
         let inventory = reader.inventory();
         assert_eq!(inventory.entries.len(), 1);
         assert_eq!(inventory.entries[0].occurrence_index, 0);
-        assert_eq!(inventory.entries[0].decoded_name.as_deref(), Some("classes.dex"));
+        assert_eq!(
+            inventory.entries[0].decoded_name.as_deref(),
+            Some("classes.dex")
+        );
         assert_eq!(inventory.entries[0].kind, EntryKind::File);
         assert_eq!(inventory.entries[0].declared_uncompressed_size, 6);
         assert_eq!(inventory.entries[0].declared_crc32, crc32(b"sample"));
@@ -1836,8 +1951,16 @@ mod tests {
             inventory.entries[0].occurrence_index,
             inventory.entries[1].occurrence_index
         );
-        assert_eq!(inventory.entries[0].decoded_name, inventory.entries[1].decoded_name);
-        assert!(inventory.entries.iter().all(|entry| entry.limitations.iter().any(|x| x.contains("duplicate raw member name"))));
+        assert_eq!(
+            inventory.entries[0].decoded_name,
+            inventory.entries[1].decoded_name
+        );
+        assert!(inventory.entries.iter().all(|entry| {
+            entry
+                .limitations
+                .iter()
+                .any(|x| x.contains("duplicate raw member name"))
+        }));
         fs::remove_file(path).unwrap();
     }
 
@@ -1847,7 +1970,8 @@ mod tests {
         bytes.extend_from_slice(&single_entry(b"Payload/app.bin", b"body"));
         let comment = b"archive comment";
         let comment_start = bytes.len() - 2;
-        bytes[comment_start..comment_start + 2].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        bytes[comment_start..comment_start + 2]
+            .copy_from_slice(&(comment.len() as u16).to_le_bytes());
         bytes.extend_from_slice(comment);
         // The fixture helper above already wrote an empty comment field. Add the
         // real comment and update the EOCD comment length after appending.
@@ -2003,7 +2127,10 @@ mod tests {
 
     #[test]
     fn decodes_cp437_fallback_names_without_utf8_flag() {
-        assert_eq!(decode_member_name(b"caf\x82", 0, &[]).as_deref(), Some("café"));
+        assert_eq!(
+            decode_member_name(b"caf\x82", 0, &[]).as_deref(),
+            Some("café")
+        );
         assert_eq!(decode_cp437(&[0x80, 0x82, 0x9c]), "Çé£");
     }
 
