@@ -18,6 +18,8 @@ use std::fmt;
 pub struct CalibrationTrajectory {
     pub trajectory_id: String,
     pub source_volume_id: String,
+    /// Highest shared animal/session/archive grouping that must be independent across units.
+    pub independence_cluster_id: String,
     pub evidence_sha256: String,
     /// Maximum endpoint drift relative to its rolling-origin anchor in the observed window,
     /// already divided by the query's pre-registered materiality threshold.
@@ -47,6 +49,7 @@ pub struct QueryStopCalibrationInput {
     /// Miscoverage target in (0,1), fixed before looking at calibration scores.
     pub alpha: f64,
     pub target_source_volume_id: String,
+    pub target_independence_cluster_id: String,
     /// Supplied by an independent group-disjoint split auditor; adapters must verify the receipt.
     pub target_is_disjoint_from_calibration: bool,
     /// Observed historical max-drift ratio for the target rolling origin.
@@ -105,7 +108,9 @@ pub enum StopCalibrationError {
     InvalidRatio { kind: &'static str, value: String },
     DuplicateTrajectoryId(String),
     DuplicateSourceVolume(String),
+    DuplicateIndependenceCluster(String),
     TargetVolumeAppearsInCalibration(String),
+    TargetClusterAppearsInCalibration(String),
     EmptySourceVolume(String),
     RankOverflow,
 }
@@ -133,8 +138,14 @@ impl fmt::Display for StopCalibrationError {
             Self::DuplicateSourceVolume(value) => {
                 write!(f, "source volume occurs more than once in calibration: {value}")
             }
+            Self::DuplicateIndependenceCluster(value) => {
+                write!(f, "independence cluster occurs more than once in calibration: {value}")
+            }
             Self::TargetVolumeAppearsInCalibration(value) => {
                 write!(f, "target source volume also appears in calibration: {value}")
+            }
+            Self::TargetClusterAppearsInCalibration(value) => {
+                write!(f, "target independence cluster also appears in calibration: {value}")
             }
             Self::EmptySourceVolume(value) => {
                 write!(f, "trajectory {value} has an empty source volume ID")
@@ -261,6 +272,7 @@ fn validate_input(input: &QueryStopCalibrationInput) -> Result<(), StopCalibrati
         ("unit", &input.unit_id),
         ("calibration stratum", &input.calibration_stratum_id),
         ("target source volume", &input.target_source_volume_id),
+        ("target independence cluster", &input.target_independence_cluster_id),
     ] {
         validate_id(kind, value)?;
     }
@@ -289,8 +301,10 @@ fn validate_input(input: &QueryStopCalibrationInput) -> Result<(), StopCalibrati
 
     let mut trajectory_ids = BTreeSet::new();
     let mut source_volumes = BTreeSet::new();
+    let mut independence_clusters = BTreeSet::new();
     for trajectory in &input.calibration_trajectories {
         validate_id("trajectory", &trajectory.trajectory_id)?;
+        validate_id("independence cluster", &trajectory.independence_cluster_id)?;
         if trajectory.source_volume_id.trim().is_empty()
             || trajectory.source_volume_id.trim() != trajectory.source_volume_id
         {
@@ -318,9 +332,19 @@ fn validate_input(input: &QueryStopCalibrationInput) -> Result<(), StopCalibrati
                 trajectory.source_volume_id.clone(),
             ));
         }
+        if !independence_clusters.insert(trajectory.independence_cluster_id.clone()) {
+            return Err(StopCalibrationError::DuplicateIndependenceCluster(
+                trajectory.independence_cluster_id.clone(),
+            ));
+        }
         if trajectory.source_volume_id == input.target_source_volume_id {
             return Err(StopCalibrationError::TargetVolumeAppearsInCalibration(
                 trajectory.source_volume_id.clone(),
+            ));
+        }
+        if trajectory.independence_cluster_id == input.target_independence_cluster_id {
+            return Err(StopCalibrationError::TargetClusterAppearsInCalibration(
+                trajectory.independence_cluster_id.clone(),
             ));
         }
     }
@@ -373,6 +397,7 @@ mod tests {
         CalibrationTrajectory {
             trajectory_id: format!("trajectory-{index}"),
             source_volume_id: format!("volume-{index}"),
+            independence_cluster_id: format!("cluster-{index}"),
             evidence_sha256: SHA_C.to_owned(),
             observed_max_drift_ratio: observed,
             future_max_drift_ratio: future,
@@ -394,6 +419,7 @@ mod tests {
             future_horizon_edits: 100,
             alpha,
             target_source_volume_id: "target-volume".to_owned(),
+            target_independence_cluster_id: "target-cluster".to_owned(),
             target_is_disjoint_from_calibration: true,
             target_observed_max_drift_ratio: 0.20,
             target_current_uncertainty_width_ratio: 0.30,
@@ -484,6 +510,32 @@ mod tests {
             calibrate_query_stop(&value),
             Err(StopCalibrationError::DuplicateSourceVolume(
                 "volume-0".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn distinct_volumes_from_one_independence_cluster_do_not_count_as_independent() {
+        let mut value = input(19, 0.05);
+        value.calibration_trajectories[1].independence_cluster_id =
+            value.calibration_trajectories[0].independence_cluster_id.clone();
+        assert_eq!(
+            calibrate_query_stop(&value),
+            Err(StopCalibrationError::DuplicateIndependenceCluster(
+                "cluster-0".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn target_independence_cluster_must_be_disjoint_from_calibration() {
+        let mut value = input(19, 0.05);
+        value.calibration_trajectories[0].independence_cluster_id =
+            "target-cluster".to_owned();
+        assert_eq!(
+            calibrate_query_stop(&value),
+            Err(StopCalibrationError::TargetClusterAppearsInCalibration(
+                "target-cluster".to_owned()
             ))
         );
     }
