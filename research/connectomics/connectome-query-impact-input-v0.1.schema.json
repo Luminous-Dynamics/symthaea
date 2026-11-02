@@ -42,16 +42,7 @@
         "upper": {
           "type": "number"
         }
-      },
-      "allOf": [
-        {
-          "properties": {
-            "upper": {
-              "minimum": 0
-            }
-          }
-        }
-      ]
+      }
     },
     "evaluation": {
       "type": "object",
