@@ -26,6 +26,7 @@ const REPORT_VERSION: &str = "0.1.0";
 const MAX_PATH_SUPPORT: usize = 100_000;
 const MAX_EXACT_F64_INTEGER: u64 = 9_007_199_254_740_992;
 const PROBABILITY_SUM_TOLERANCE: f64 = 1e-10;
+const NOMINAL_RECEIPT_TOLERANCE: f64 = 1e-8;
 const LN_2: f64 = std::f64::consts::LN_2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +69,12 @@ pub struct FiniteTvPathSample {
     pub observed_path_counts: Vec<u64>,
     /// Frozen nominal probabilities over exactly the same ordered support.
     pub nominal_path_probabilities: Vec<f64>,
+    /// Per-category conditional rejection probabilities for this policy/model.
+    pub path_rejection_probabilities: Vec<f64>,
+    /// Per-category evaluator costs for this policy/model.
+    pub path_evaluator_costs: Vec<f64>,
+    /// Per-category decision utilities for this policy/model.
+    pub path_decision_utilities: Vec<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -352,6 +359,9 @@ fn validate_policy_samples(
         if support_size == 0
             || support_size > MAX_PATH_SUPPORT
             || sample.nominal_path_probabilities.len() != support_size
+            || sample.path_rejection_probabilities.len() != support_size
+            || sample.path_evaluator_costs.len() != support_size
+            || sample.path_decision_utilities.len() != support_size
         {
             return Err(FiniteTvCalibrationError::new(
                 format!("{row_path}.path_support"),
@@ -394,8 +404,39 @@ fn validate_policy_samples(
                 "nominal path probabilities must sum to one within tolerance",
             ));
         }
+        for (category, rejection_probability) in sample.path_rejection_probabilities.iter().enumerate() {
+            if !rejection_probability.is_finite() || !(0.0..=1.0).contains(rejection_probability) {
+                return Err(FiniteTvCalibrationError::new(
+                    format!("{row_path}.path_rejection_probabilities[{category}]"),
+                    "path rejection probability must be finite and lie in [0, 1]",
+                ));
+            }
+        }
+        for (category, cost) in sample.path_evaluator_costs.iter().enumerate() {
+            if !cost.is_finite() || *cost < 0.0 {
+                return Err(FiniteTvCalibrationError::new(
+                    format!("{row_path}.path_evaluator_costs[{category}]"),
+                    "path evaluator cost must be finite and nonnegative",
+                ));
+            }
+        }
+        for (category, utility) in sample.path_decision_utilities.iter().enumerate() {
+            if !utility.is_finite() {
+                return Err(FiniteTvCalibrationError::new(
+                    format!("{row_path}.path_decision_utilities[{category}]"),
+                    "path decision utility must be finite",
+                ));
+            }
+        }
     }
     Ok(())
+}
+
+fn nominal_path_expectation(sample: &FiniteTvPathSample, outcomes: &[f64]) -> f64 {
+    sample.nominal_path_probabilities.iter()
+        .zip(outcomes)
+        .map(|(probability, outcome)| probability * outcome)
+        .sum()
 }
 
 fn checked_sample_size(counts: &[u64], path: &str) -> Result<u64, FiniteTvCalibrationError> {
@@ -464,6 +505,29 @@ fn validate_request_against_plan(
             &expected_policy_ids,
             &format!("request.null_models[{model_index}].policy_samples"),
         )?;
+        for policy in &plan.policies {
+            let receipt = policy.null_models.iter()
+                .find(|row| row.model_id == model.model_id)
+                .ok_or_else(|| FiniteTvCalibrationError::new(
+                    "nominal_plan.null_models",
+                    "nominal null receipt disappeared after validation",
+                ))?;
+            let sample = model.policy_samples.iter()
+                .find(|row| row.policy_id == policy.policy_id)
+                .ok_or_else(|| FiniteTvCalibrationError::new(
+                    "request.null_models",
+                    "validated null calibration row disappeared",
+                ))?;
+            let reconstructed = nominal_path_expectation(sample, &sample.path_rejection_probabilities);
+            if !reconstructed.is_finite()
+                || (reconstructed - receipt.null_size).abs() > NOMINAL_RECEIPT_TOLERANCE
+            {
+                return Err(FiniteTvCalibrationError::new(
+                    format!("request.null_models[{model_index}].policy_samples.{}", policy.policy_id),
+                    "path-space rejection outcomes do not reconstruct the frozen nominal null-size receipt",
+                ));
+            }
+        }
     }
     for (model_index, model) in request.alternatives.iter().enumerate() {
         validate_policy_coverage(
@@ -492,6 +556,39 @@ fn validate_request_against_plan(
                 return Err(FiniteTvCalibrationError::new(
                     format!("request.alternatives[{model_index}].evaluator_cost_upper_bound"),
                     "cost support bound is below a nominal policy receipt",
+                ));
+            }
+            let sample = model.policy_samples.iter()
+                .find(|row| row.policy_id == policy.policy_id)
+                .ok_or_else(|| FiniteTvCalibrationError::new(
+                    "request.alternatives",
+                    "validated alternative calibration row disappeared",
+                ))?;
+            if sample.path_evaluator_costs.iter()
+                .any(|cost| *cost > model.evaluator_cost_upper_bound + PROBABILITY_SUM_TOLERANCE)
+                || sample.path_decision_utilities.iter().any(|utility| {
+                    *utility < model.utility_lower_bound - PROBABILITY_SUM_TOLERANCE
+                        || *utility > model.utility_upper_bound + PROBABILITY_SUM_TOLERANCE
+                })
+            {
+                return Err(FiniteTvCalibrationError::new(
+                    format!("request.alternatives[{model_index}].policy_samples.{}", policy.policy_id),
+                    "per-path cost or utility lies outside the declared support bounds",
+                ));
+            }
+            let reconstructed_power = nominal_path_expectation(sample, &sample.path_rejection_probabilities);
+            let reconstructed_cost = nominal_path_expectation(sample, &sample.path_evaluator_costs);
+            let reconstructed_utility = nominal_path_expectation(sample, &sample.path_decision_utilities);
+            if !reconstructed_power.is_finite()
+                || !reconstructed_cost.is_finite()
+                || !reconstructed_utility.is_finite()
+                || (reconstructed_power - receipt.rejection_power).abs() > NOMINAL_RECEIPT_TOLERANCE
+                || (reconstructed_cost - receipt.expected_evaluator_cost).abs() > NOMINAL_RECEIPT_TOLERANCE
+                || (reconstructed_utility - receipt.decision_utility).abs() > NOMINAL_RECEIPT_TOLERANCE
+            {
+                return Err(FiniteTvCalibrationError::new(
+                    format!("request.alternatives[{model_index}].policy_samples.{}", policy.policy_id),
+                    "path-space rejection, cost and utility outcomes do not reconstruct the frozen nominal alternative receipt",
                 ));
             }
         }
@@ -782,6 +879,9 @@ mod tests {
             calibration_data_sha256: data_hash.into(),
             observed_path_counts: vec![5_000, 5_000],
             nominal_path_probabilities: vec![0.5, 0.5],
+            path_rejection_probabilities: vec![0.0, 0.0],
+            path_evaluator_costs: vec![0.0, 0.0],
+            path_decision_utilities: vec![0.0, 0.0],
         }
     }
 
@@ -830,6 +930,9 @@ mod tests {
             calibration_data_sha256: DATA_HASH_A.into(),
             observed_path_counts: vec![75, 25],
             nominal_path_probabilities: vec![0.5, 0.5],
+            path_rejection_probabilities: vec![0.5, 0.5],
+            path_evaluator_costs: vec![0.0, 0.0],
+            path_decision_utilities: vec![0.0, 0.0],
         };
         let component = calibrate_component("null", &row, 0.01).unwrap();
         let expected_slack = ((2.0 * LN_2 + 100.0_f64.ln()) / 200.0).sqrt();
@@ -846,6 +949,9 @@ mod tests {
             calibration_data_sha256: DATA_HASH_A.into(),
             observed_path_counts: vec![100],
             nominal_path_probabilities: vec![1.0],
+            path_rejection_probabilities: vec![0.5],
+            path_evaluator_costs: vec![0.0],
+            path_decision_utilities: vec![0.0],
         };
         let component = calibrate_component("null", &row, 0.01).unwrap();
         assert_eq!(component.empirical_tv_distance_to_nominal, 0.0);
