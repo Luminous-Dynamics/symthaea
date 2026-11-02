@@ -302,3 +302,12 @@ An independent NumPy formula-level pilot (seed 20261102, 20,000 IID multinomial 
 - F02: 0.13189 / 0.13186 / [0.12046, 0.14326].
 
 These are formula-level simulations, not Rust tests, a proof, a comprehensive coverage study, or an end-to-end Type-I result. The comparison has different guarantee scopes: TV protects arbitrary bounded path functionals, whereas DFCE protects only the four declared functions. Preserve that distinction in all reports.
+
+
+## 14. Rectangularity comparison: no universal conservatism ordering
+
+Do not assume that s-rectangular ambiguity is always less conservative than (s,a)-rectangular ambiguity. The geometry differs—(s,a)-rectangular sets factorize across state-action rows, while s-rectangular sets factorize across states and may couple action-specific rows within each state—but robust-value comparisons also depend on the radii, distance, normalization and shape of the ambiguity sets.
+
+Ramani & Ghate, *A Family of s-Rectangular Robust MDPs: Relative Conservativeness, Asymptotic Analyses, and Finite-Sample Properties*, SIAM Journal on Optimization, DOI https://doi.org/10.1137/23M1559920, show that for their family an s-rectangular model can be compared with an (s,a)-rectangular model in both directions by changing radii; under lower-semicontinuous convex distances, identical robust optimal values can be obtained under their stated conditions.
+
+Therefore compare the geometries at matched statistical coverage and matched calibration evidence, not by assigning the same arbitrary scalar radius. Report ambiguity-set inclusion when provable, the induced robust-value gap, and the calibration/solver cost. The objective is to measure geometry–calibration–computation trade-offs, not to assume one class universally dominates another.
