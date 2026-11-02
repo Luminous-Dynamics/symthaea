@@ -723,8 +723,7 @@ pub fn verify_checkpoint_chain_with_witness_set(
 ) -> Result<VerifiedCheckpointChain, String> {
     let trust_bytes = serde_json::to_vec(&witness_set.trust_store)
         .map_err(|error| format!("cannot serialize verified witness set for chain verification: {error}"))?;
-    verify_checkpoint_chain(&trust_bytes, &trust_bytes, &sha256_prefixed(&trust_bytes))
-        .and_then(|_| verify_checkpoint_chain(envelopes, &trust_bytes, &sha256_prefixed(&trust_bytes)))
+    verify_checkpoint_chain(envelopes, &trust_bytes, &sha256_prefixed(&trust_bytes))
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
