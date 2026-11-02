@@ -95,19 +95,33 @@ pub struct Scope {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_source_generation: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_source_predecessor_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_log_checkpoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_policy_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_source_cursor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_source_predecessor_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_log_checkpoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restored_incarnation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restored_authority_revision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restored_state_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub witness_sequence_seen: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_policy_digest: Option<String>,
 }
 
