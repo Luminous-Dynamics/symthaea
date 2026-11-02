@@ -358,7 +358,7 @@ mod tests {
         ])
         .unwrap();
         assert!(clean.average_precision > noisy.average_precision);
-        assert!((noisy.average_precision - (1.0 / 3.0 + 1.0 / 2.0) / 2.0).abs() < 1e-12);
+        assert!((noisy.average_precision - 0.5).abs() < 1e-12);
     }
 
     #[test]
