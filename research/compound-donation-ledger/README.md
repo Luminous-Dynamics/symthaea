@@ -61,31 +61,35 @@ completeness.
 
 ## Replay and trust boundary
 
-verify_receipt independently reconstructs all derived reserve events from the
-policy and evidence-update events, checks that the complete supplied audit
-log equals the reconstructed log, and optionally compares the exact terminal
-snapshot. It detects edits, omitted/duplicated reserve records, invalid
-credits, backward routing, overdraws, and inconsistent final state.
+The writer's `verify_receipt` method replays through the same reference
+transition engine; it is self-replay, not independent verification. The
+separate `verifier/` crate uses its own BTreeMap state model and linear prefix
+scan. It does not call the writer's ledger or transition helpers; it does
+reuse the public event types as the receipt wire schema. Reservation receipts
+and snapshots carry the precommitted destination ID, which the independent
+verifier checks against the candidate policy.
 
-The next validation tranche must compile and run both crates, then exercise
-the separate verifier against independently generated and tampered receipts.
-The optimized writer can later use an augmented prefix-sum tree while the
-verifier retains a linear scan. Neither crate is a digital signature, Merkle
-proof, source attestation, or proof that the evidence itself is statistically
-valid. Those
-layers require separate authenticated envelopes and independently verified
-global-filtration evidence inputs.
+Both crates are authored but not compiled or run in this environment. The
+optimized writer can later use an augmented prefix-sum tree while the verifier
+retains a linear scan. Neither crate is a digital signature, Merkle proof,
+source attestation, or proof that the evidence itself is statistically valid.
+Those layers require separate authenticated envelopes and independently
+verified global-filtration evidence inputs.
 
 ## Run
 
-From this directory:
+From this directory, run the writer/reference crate and the independent
+verifier separately:
 
 ~~~sh
 cargo test --offline
+cargo test --manifest-path verifier/Cargo.toml --offline
 ~~~
 
-No external crates are required. The crate is not yet added to the workspace,
-and no repository CI result is claimed by its existence.
+The writer/reference crate has no external dependencies. The verifier depends
+only on the local reference crate. The main Symthaea workspace explicitly
+excludes this research directory so the standalone crates can be built without
+joining the production workspace. No repository CI result is claimed.
 
 ## Exploratory simulation harness
 
