@@ -30,9 +30,15 @@ pub struct HeldOutTaskScore {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TaskTransferMetrics {
     pub following_gain: f64,
-    pub post_dropout_gain: f64,
+    pub half_exposure_gain: f64,
+    /// Agent score in the half-exposure condition divided by expert score.
+    /// Values above 1 indicate performance beyond the expert's reference score.
+    pub half_exposure_normalized_score: f64,
     pub cultural_transmission: f64,
-    pub retained_gain_fraction: Option<f64>,
+    /// Fraction of the full-expert gain attained in the half-exposure condition.
+    /// This includes the first half when the expert is present; it is not a
+    /// pure post-dropout-only reward measure.
+    pub half_exposure_gain_fraction: Option<f64>,
     pub action_fidelity: Option<f64>,
 }
 
@@ -116,20 +122,22 @@ pub fn evaluate_task(task: &HeldOutTaskScore) -> Result<TaskTransferMetrics, Tra
 
     let following_gain =
         (task.agent_with_expert_full - task.agent_solo) / task.expert_score;
-    let post_dropout_gain =
+    let half_exposure_gain =
         (task.agent_with_expert_half - task.agent_solo) / task.expert_score;
-    let cultural_transmission = 0.5 * (following_gain + post_dropout_gain);
-    let retained_gain_fraction = if following_gain > 0.0 {
-        Some(post_dropout_gain / following_gain)
+    let half_exposure_normalized_score = task.agent_with_expert_half / task.expert_score;
+    let cultural_transmission = 0.5 * (following_gain + half_exposure_gain);
+    let half_exposure_gain_fraction = if following_gain > 0.0 {
+        Some(half_exposure_gain / following_gain)
     } else {
         None
     };
 
     Ok(TaskTransferMetrics {
         following_gain,
-        post_dropout_gain,
+        half_exposure_gain,
+        half_exposure_normalized_score,
         cultural_transmission,
-        retained_gain_fraction,
+        half_exposure_gain_fraction,
         action_fidelity: task.action_fidelity,
     })
 }
@@ -138,9 +146,10 @@ pub fn evaluate_task(task: &HeldOutTaskScore) -> Result<TaskTransferMetrics, Tra
 pub struct TransferSummary {
     pub task_count: usize,
     pub mean_following_gain: f64,
-    pub mean_post_dropout_gain: f64,
+    pub mean_half_exposure_gain: f64,
+    pub mean_half_exposure_normalized_score: f64,
     pub mean_cultural_transmission: f64,
-    pub mean_retained_gain_fraction: Option<f64>,
+    pub mean_half_exposure_gain_fraction: Option<f64>,
     pub mean_action_fidelity: Option<f64>,
     pub cultural_transmission_sample_sd: Option<f64>,
     pub cultural_transmission_ci95_half_width: Option<f64>,
@@ -185,7 +194,8 @@ pub fn evaluate_held_out(
     let mut seen_evaluation = BTreeSet::new();
     let mut per_task = Vec::with_capacity(evaluation_tasks.len());
     let mut following = Vec::with_capacity(evaluation_tasks.len());
-    let mut post_dropout = Vec::with_capacity(evaluation_tasks.len());
+    let mut half_exposure = Vec::with_capacity(evaluation_tasks.len());
+    let mut half_exposure_normalized = Vec::with_capacity(evaluation_tasks.len());
     let mut transmission = Vec::with_capacity(evaluation_tasks.len());
     let mut retention = Vec::new();
     let mut fidelity = Vec::new();
@@ -210,9 +220,10 @@ pub fn evaluate_held_out(
 
         let metrics = evaluate_task(task)?;
         following.push(metrics.following_gain);
-        post_dropout.push(metrics.post_dropout_gain);
+        half_exposure.push(metrics.half_exposure_gain);
+        half_exposure_normalized.push(metrics.half_exposure_normalized_score);
         transmission.push(metrics.cultural_transmission);
-        if let Some(value) = metrics.retained_gain_fraction {
+        if let Some(value) = metrics.half_exposure_gain_fraction {
             retention.push(value);
         }
         if let Some(value) = metrics.action_fidelity {
@@ -245,9 +256,10 @@ pub fn evaluate_held_out(
         summary: TransferSummary {
             task_count: evaluation_tasks.len(),
             mean_following_gain: mean(&following).expect("nonempty"),
-            mean_post_dropout_gain: mean(&post_dropout).expect("nonempty"),
+            mean_half_exposure_gain: mean(&half_exposure).expect("nonempty"),
+            mean_half_exposure_normalized_score: mean(&half_exposure_normalized).expect("nonempty"),
             mean_cultural_transmission: mean_transmission,
-            mean_retained_gain_fraction: mean(&retention),
+            mean_half_exposure_gain_fraction: mean(&retention),
             mean_action_fidelity: mean(&fidelity),
             cultural_transmission_sample_sd: sample_sd,
             cultural_transmission_ci95_half_width: ci95,
@@ -276,24 +288,28 @@ mod tests {
         let m = evaluate_task(&task("t1", "family-a", 100.0, 20.0, 20.0, 20.0)).unwrap();
         assert_eq!(m.cultural_transmission, 0.0);
         assert_eq!(m.following_gain, 0.0);
-        assert_eq!(m.post_dropout_gain, 0.0);
-        assert_eq!(m.retained_gain_fraction, None);
+        assert_eq!(m.half_exposure_gain, 0.0);
+        assert_eq!(m.half_exposure_gain_fraction, None);
     }
 
     #[test]
-    fn full_expert_dependency_without_memory_has_half_score() {
-        let m = evaluate_task(&task("t2", "family-a", 100.0, 100.0, 20.0, 20.0)).unwrap();
-        assert_eq!(m.following_gain, 0.8);
-        assert_eq!(m.post_dropout_gain, 0.0);
-        assert_eq!(m.cultural_transmission, 0.4);
-        assert_eq!(m.retained_gain_fraction, Some(0.0));
+    fn expert_following_without_retention_scores_three_quarters() {
+        // The learner matches the expert while present, but earns only the
+        // first-half expert reward in the half-exposure condition.
+        let m = evaluate_task(&task("t2", "family-a", 100.0, 100.0, 50.0, 0.0)).unwrap();
+        assert_eq!(m.following_gain, 1.0);
+        assert_eq!(m.half_exposure_gain, 0.5);
+        assert_eq!(m.half_exposure_normalized_score, 0.5);
+        assert_eq!(m.cultural_transmission, 0.75);
+        assert_eq!(m.half_exposure_gain_fraction, Some(0.5));
     }
 
     #[test]
     fn full_transmission_and_retention_reaches_one() {
         let m = evaluate_task(&task("t3", "family-a", 100.0, 100.0, 100.0, 0.0)).unwrap();
         assert_eq!(m.cultural_transmission, 1.0);
-        assert_eq!(m.retained_gain_fraction, Some(1.0));
+        assert_eq!(m.half_exposure_normalized_score, 1.0);
+        assert_eq!(m.half_exposure_gain_fraction, Some(1.0));
     }
 
     #[test]
