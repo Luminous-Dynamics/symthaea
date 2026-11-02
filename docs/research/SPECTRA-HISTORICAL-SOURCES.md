@@ -137,6 +137,26 @@ A searchable passage describes an early copper-screen cage, a receiver/sender se
 
 **Archive reference:** https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2 (printed p.42 in the hosted transcription; check the original CIA scan because the site warns that transcription can contain errors).
 
+## PH-012 — University of Calcutta, Rajabazar Campus Library: verified journal holding
+
+**Catalogue:** University of Calcutta, Rajabazar Journal Library list, official library PDF:
+https://www.caluniv.ac.in/CU_Old_Journal/Rajabazar%20Journal%20Library.pdf
+
+**Classification:** P1 for the catalogue's own statement of its holdings; not proof that a particular article is present or available for scanning.
+
+**Exact catalogue entry:** Printed page 1142 (PDF zero-based page 130) lists:
+
+- Title: Darshana: an International Quarterly of Philosophy, Psychology, Psychical Research, Religion, Mysticism and Sociology
+- Frequency: Quarterly
+- Place: Moradabad
+- Holdings: Volume 1 (1961) through volume 9, and volume 11 (1971).
+
+The catalogue entry is visible in the official PDF page image and extracted text. This provides a concrete institution to contact for the 1961 first volume.
+
+**Action:** Ask the Rajabazar Campus Library to verify whether Volume 1 (1961) is physically present, whether the April 1961 issue can be identified, and whether pages 30–43 of "Experiments with Faraday Cage Apparatus" can be inspected or reproduced under its access/copyright policy. Request the title page, contents page, article, figures and references together so the issue/author/date can be authenticated.
+
+**Caution:** The catalogue only claims a volume-level holding, not a specific issue/article. The volume may have gaps, missing leaves or incomplete binding. Do not report the article recovered until the copy itself is inspected.
+
 ## PH-008 — "Signal Detection in the Faraday Cage" (562-page work listed as "in press")
 
 The same Puharich-authored background paper lists:
