@@ -285,30 +285,28 @@ def generate(output_path: Path) -> dict[str, Any]:
         mip_tie_cut_sha256s = [sha for sha, _ in mip_tie_cuts]
         mip_tie_cut_removed_edges = [payload[0] for _, payload in mip_tie_cuts]
         mip_tie_lex_key_hexes = [payload[1] for _, payload in mip_tie_cuts]
-        default_resolved_ties = list(fixed_state_sia.ties)
-        default_resolved_cut_shas = sorted(
-            sha for sha, _ in (_mip_cut_identity(tied_sia) for tied_sia in default_resolved_ties)
-            if sha is not None
-        )
-        default_resolved_lex_keys = [
-            tied_sia.partition.lex_key().hex() for tied_sia in default_resolved_ties
-        ]
-        minimum_numeric_tie_lex_key_hex = min(mip_tie_lex_key_hexes)
-        lex_resolution_matches_numeric_ties = (
-            default_resolved_lex_keys == [minimum_numeric_tie_lex_key_hex]
-        )
-        numeric_tie_contains_default_representative = (
-            _mip_cut_identity(default_resolved_ties[0])[0] in mip_tie_cut_sha256s
-            if default_resolved_ties
-            else False
-        )
-        mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(sia)
+        # SystemIrreducibilityAnalysis.ties is reused by the outer
+        # cause/effect state-selection layer. The selected partition itself
+        # lives on .partition; retain state-pair tie metadata separately.
+        state_pair_ties = list(fixed_state_sia.ties)
+        mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(fixed_state_sia)
+        landscape_cut_sha256, _ = _mip_cut_identity(sia)
+        if mip_cut_sha256 != landscape_cut_sha256:
+            raise RuntimeError(
+                "fixed-state SIA MIP differs from the landscape-selected MIP"
+            )
         if mip_cut_sha256 not in mip_tie_cut_sha256s:
             raise RuntimeError(
-                "landscape SIA representative is missing from pre-lex numerical MIP tie set"
+                "selected PyPhi MIP is missing from pre-lex numerical MIP tie set"
             )
-        if len(default_resolved_cut_shas) != 1 or default_resolved_cut_shas[0] != mip_cut_sha256:
-            raise RuntimeError("PyPhi PARTITION_LEX did not resolve to the landscape SIA representative")
+        mip_default_resolved_lex_key_hex = fixed_state_sia.partition.lex_key().hex()
+        minimum_numeric_tie_lex_key_hex = min(mip_tie_lex_key_hexes)
+        lex_resolution_matches_numeric_ties = (
+            mip_default_resolved_lex_key_hex == minimum_numeric_tie_lex_key_hex
+        )
+        numeric_tie_contains_default_representative = (
+            mip_cut_sha256 in mip_tie_cut_sha256s
+        )
         point = {
             **expected,
             "mip_cut_sha256": mip_cut_sha256,
@@ -317,9 +315,10 @@ def generate(output_path: Path) -> dict[str, Any]:
             "mip_tie_cut_sha256s": mip_tie_cut_sha256s,
             "mip_tie_cut_removed_edges": mip_tie_cut_removed_edges,
             "mip_tie_lex_key_hexes": mip_tie_lex_key_hexes,
-            "mip_default_resolved_tie_count": len(default_resolved_cut_shas),
-            "mip_default_resolved_lex_key_hex": default_resolved_lex_keys[0],
-            "mip_default_resolved_cut_sha256s": default_resolved_cut_shas,
+            "mip_default_resolved_tie_count": 1,
+            "mip_default_resolved_lex_key_hex": mip_default_resolved_lex_key_hex,
+            "mip_default_resolved_cut_sha256s": [mip_cut_sha256],
+            "state_pair_tie_count": len(state_pair_ties),
             "minimum_numeric_tie_lex_key_hex": minimum_numeric_tie_lex_key_hex,
             "lex_resolution_matches_numeric_ties": lex_resolution_matches_numeric_ties,
             "numeric_tie_contains_default_representative": numeric_tie_contains_default_representative,
