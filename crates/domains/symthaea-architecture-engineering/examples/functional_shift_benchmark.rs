@@ -1,4 +1,4 @@
-use std::{env, error::Error, process};
+use std::{env, error::Error, io, process};
 
 use symthaea_architecture_engineering::functional_shift_benchmark::{
     run_functional_shift_benchmark, FunctionalShiftBenchmarkRequest, FunctionalShiftScenario,
@@ -21,15 +21,24 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut args = env::args().skip(1);
     while let Some(argument) = args.next() {
-        let value = args
-            .next()
-            .ok_or_else(|| format!("missing value after {argument}"))?;
+        let value = args.next().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("missing value after {argument}"),
+            )
+        })?;
         match argument.as_str() {
             "--scenario" => {
                 scenario = match value.as_str() {
                     "orthogonal" => FunctionalShiftScenario::OrthogonalToDeclaredFunctionals,
                     "aligned" => FunctionalShiftScenario::DecisionAligned,
-                    _ => return Err(format!("unknown scenario {value:?}; use orthogonal or aligned").into()),
+                    _ => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!("unknown scenario {value:?}; use orthogonal or aligned"),
+                        )
+                        .into());
+                    }
                 };
             }
             "--seed" => seed = value.parse()?,
@@ -37,7 +46,13 @@ fn run() -> Result<(), Box<dyn Error>> {
             "--samples" => samples_per_replication = value.parse()?,
             "--functional-delta" => functional_delta = value.parse()?,
             "--tv-delta" => tv_delta = value.parse()?,
-            _ => return Err(format!("unknown argument {argument:?}").into()),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("unknown argument {argument:?}"),
+                )
+                .into());
+            }
         }
     }
 
