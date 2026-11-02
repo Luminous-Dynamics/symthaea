@@ -1,0 +1,100 @@
+{
+  "scope": "Synthetic recipient-utility benchmark only; not e-process validity, null hypotheses, FDR/SupFDR, or statistical power.",
+  "seed": 20261102,
+  "recipient_offsets": 32,
+  "rounds": 100,
+  "utility_range": "[0,1]",
+  "feedback_timing": "q_t uses utility history through t-1; U_t is revealed after choosing q_t.",
+  "hedge_parameters": {
+    "eta": 0.528886192784,
+    "fixed_share_alpha": 0.05
+  },
+  "priors": {
+    "telescoping": "rho_d=1/[d(d+1)]; outside-horizon mass beyond K offsets is 1/(K+1)",
+    "geometric": "rho_d=2^-d; outside-horizon mass beyond K offsets is 2^-K",
+    "uniform": "1/K over current finite horizon; deliberately non-projective diagnostic"
+  },
+  "no_go_witness": {
+    "reserve": "1/5",
+    "short_horizon_routes": {"recipient_2": "1", "recipient_3": "0"},
+    "extended_horizon_routes": {"recipient_2": "0", "recipient_3": "1"},
+    "donor_total_outflow_equal": true,
+    "recipient_2_old_prefix_state_changes": true,
+    "pathwise_donor_budget_preserved": true,
+    "strong_projectivity_fails": true
+  },
+  "exact_fraction_accounting_screen": {
+    "traces": 1000,
+    "donors": 8,
+    "rounds": 25,
+    "assertions": 1725000,
+    "result": "all passed in local execution of the same Fraction accounting logic",
+    "qualification": "Not a Rust test and not an e-process/FDR validity experiment."
+  },
+  "metrics": {
+    "mean_utility_per_unit": "mean U-reward per unit of reserve allocated",
+    "static_regret": "best fixed recipient total reward minus policy reward, divided by rounds; negative values are possible for a policy that switches recipients",
+    "gap_to_per_round_oracle": "unattainable per-round best recipient reward minus policy reward",
+    "effective_recipient_count": "exp(Shannon entropy of average recipient allocation shares)",
+    "top1_allocation_share": "largest average recipient allocation share"
+  },
+  "results": {
+    "nearest_recipient": {
+      "nearest_fixed": {"mean_utility": 1.000000, "static_regret": 0.000000, "oracle_gap": 0.000000, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.699578, "static_regret": 0.300422, "oracle_gap": 0.300422, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.779139, "static_regret": 0.220861, "oracle_gap": 0.220861, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.110239, "static_regret": 0.889761, "oracle_gap": 0.889761, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.985335, "static_regret": 0.014665, "oracle_gap": 0.014665, "effective_recipients": 1.212904, "top1_share": 0.968436},
+      "fixed_share_hedge": {"mean_utility": 0.938632, "static_regret": 0.061368, "oracle_gap": 0.061368, "effective_recipients": 1.828995, "top1_share": 0.876823}
+    },
+    "mid_distance_peak": {
+      "nearest_fixed": {"mean_utility": 0.096972, "static_regret": 0.903028, "oracle_gap": 0.903028, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.171040, "static_regret": 0.828960, "oracle_gap": 0.828960, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.153607, "static_regret": 0.846393, "oracle_gap": 0.846393, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.181546, "static_regret": 0.818454, "oracle_gap": 0.818454, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.914981, "static_regret": 0.085019, "oracle_gap": 0.085019, "effective_recipients": 1.931378, "top1_share": 0.873242},
+      "fixed_share_hedge": {"mean_utility": 0.807173, "static_regret": 0.192827, "oracle_gap": 0.192827, "effective_recipients": 3.038083, "top1_share": 0.743202}
+    },
+    "far_distance_peak": {
+      "nearest_fixed": {"mean_utility": 0.010052, "static_regret": 0.989948, "oracle_gap": 0.989948, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.030798, "static_regret": 0.969202, "oracle_gap": 0.969202, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.012910, "static_regret": 0.987090, "oracle_gap": 0.987090, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.283625, "static_regret": 0.716375, "oracle_gap": 0.716375, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.874202, "static_regret": 0.125798, "oracle_gap": 0.125798, "effective_recipients": 2.526962, "top1_share": 0.816532},
+      "fixed_share_hedge": {"mean_utility": 0.761489, "static_regret": 0.238511, "oracle_gap": 0.238511, "effective_recipients": 3.630633, "top1_share": 0.707252}
+    },
+    "switching_four_regimes": {
+      "nearest_fixed": {"mean_utility": 0.177961, "static_regret": 0.091905, "oracle_gap": 0.822039, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.180744, "static_regret": 0.089121, "oracle_gap": 0.819256, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.197036, "static_regret": 0.072829, "oracle_gap": 0.802964, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.142147, "static_regret": 0.127719, "oracle_gap": 0.857853, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.231840, "static_regret": 0.038025, "oracle_gap": 0.768160, "effective_recipients": 1.919572, "top1_share": 0.841347},
+      "fixed_share_hedge": {"mean_utility": 0.459362, "static_regret": -0.189497, "oracle_gap": 0.540638, "effective_recipients": 8.420778, "top1_share": 0.236567}
+    },
+    "sparse_opportunities": {
+      "nearest_fixed": {"mean_utility": 0.102938, "static_regret": 0.797062, "oracle_gap": 0.797062, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.144420, "static_regret": 0.755580, "oracle_gap": 0.755580, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.151386, "static_regret": 0.748614, "oracle_gap": 0.748614, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.175529, "static_regret": 0.724471, "oracle_gap": 0.724471, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.842287, "static_regret": 0.057713, "oracle_gap": 0.057713, "effective_recipients": 2.238101, "top1_share": 0.803691},
+      "fixed_share_hedge": {"mean_utility": 0.740069, "static_regret": 0.159931, "oracle_gap": 0.159931, "effective_recipients": 3.348900, "top1_share": 0.693249}
+    },
+    "diffuse_random": {
+      "nearest_fixed": {"mean_utility": 0.459878, "static_regret": 0.107969, "oracle_gap": 0.508453, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.460406, "static_regret": 0.107441, "oracle_gap": 0.507924, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.473027, "static_regret": 0.094820, "oracle_gap": 0.495303, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.501347, "static_regret": 0.066500, "oracle_gap": 0.466983, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.483544, "static_regret": 0.084303, "oracle_gap": 0.484787, "effective_recipients": 9.075649, "top1_share": 0.367018},
+      "fixed_share_hedge": {"mean_utility": 0.474273, "static_regret": 0.093574, "oracle_gap": 0.494057, "effective_recipients": 8.055440, "top1_share": 0.407677}
+    },
+    "smooth_regime_shift": {
+      "nearest_fixed": {"mean_utility": 0.347074, "static_regret": 0.002878, "oracle_gap": 0.596392, "effective_recipients": 1.000000, "top1_share": 1.000000},
+      "telescoping_fixed": {"mean_utility": 0.329449, "static_regret": 0.020504, "oracle_gap": 0.614017, "effective_recipients": 6.551638, "top1_share": 0.500000},
+      "geometric_fixed": {"mean_utility": 0.341939, "static_regret": 0.008013, "oracle_gap": 0.601527, "effective_recipients": 4.000000, "top1_share": 0.500000},
+      "uniform_finite_horizon": {"mean_utility": 0.331710, "static_regret": 0.018242, "oracle_gap": 0.611755, "effective_recipients": 32.000000, "top1_share": 0.031250},
+      "prior_weighted_hedge": {"mean_utility": 0.337895, "static_regret": 0.012057, "oracle_gap": 0.605571, "effective_recipients": 4.407284, "top1_share": 0.565057},
+      "fixed_share_hedge": {"mean_utility": 0.442427, "static_regret": -0.092475, "oracle_gap": 0.501039, "effective_recipients": 12.678037, "top1_share": 0.394143}
+    }
+  },
+  "claim_boundary": "The adaptive utility signal is synthetic. This benchmark is not an online-FDR experiment and cannot support a power or SOTA claim."
+}
