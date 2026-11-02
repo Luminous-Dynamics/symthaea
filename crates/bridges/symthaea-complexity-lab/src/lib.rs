@@ -6,6 +6,7 @@
 //! speedup. Values use checked i128 arithmetic; overflow is an explicit error.
 
 pub mod design;
+pub mod matrix;
 
 use std::error::Error;
 use std::fmt;
