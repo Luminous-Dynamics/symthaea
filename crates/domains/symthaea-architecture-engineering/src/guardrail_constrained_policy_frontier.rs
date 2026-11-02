@@ -13,12 +13,13 @@
 use super::noncompensatory_guardrails::{
     analyze_noncompensatory_guardrails, verify_noncompensatory_guardrail_report,
     GuardrailDirection, GuardrailEvidenceAvailability, GuardrailPolicyWeight,
-    GuardrailRequirement, GuardrailRequirementResult, NoncompensatoryGuardrailReport,
+    GuardrailRequirement, NoncompensatoryGuardrailReport,
     NoncompensatoryGuardrailRequest, GuardrailOverallDecision,
 };
 use super::policy_frontier_lp::{
     analyze_policy_frontier_with_constraints, FrontierAdditionalLinearConstraint,
-    FrontierPolicyWeight, PolicyFrontierError, PolicyFrontierPlan, PolicyFrontierReport,
+    FrontierAlternativeMetrics, FrontierNullSize, FrontierPolicyWeight, PolicyFrontierError,
+    PolicyFrontierPlan, PolicyFrontierReport,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -473,11 +474,22 @@ pub fn analyze_guardrail_constrained_frontier(
         &independent_guardrail_report,
         &optimizer_report.policy_weights,
     )?;
-    let active_constraint_ids = guardrail_results
+    let mut active_constraint_ids = eligibility
+        .iter()
+        .filter(|row| !row.eligible)
+        .map(|row| format!("EXCLUDE_POLICY:{}", row.policy_id))
+        .collect::<Vec<_>>();
+    active_constraint_ids.extend(guardrail_results
         .iter()
         .filter(|row| row.active_at_tolerance)
-        .map(|row| format!("GUARDRAIL:{}", row.requirement.requirement_id))
-        .collect::<Vec<_>>();
+        .map(|row| {
+            let direction = match row.requirement.direction {
+                GuardrailDirection::UpperBound => "UPPER",
+                GuardrailDirection::LowerBound => "LOWER",
+            };
+            format!("GUARDRAIL:{direction}:{}", row.requirement.requirement_id)
+        }));
+    active_constraint_ids.sort();
 
     finish_report(GuardrailConstrainedFrontierReport {
         schema: REPORT_SCHEMA.into(),
@@ -772,7 +784,7 @@ fn digest<T: Serialize>(value: &T) -> Result<String, GuardrailFrontierError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domains::symthaea_architecture_engineering::noncompensatory_guardrails::{
+    use crate::noncompensatory_guardrails::{
         CalibrationTargetRelation, GuardrailEvidenceAvailability, GuardrailScope,
         GuardrailPolicyBound,
     };
