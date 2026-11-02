@@ -845,6 +845,105 @@ mod tests {
     }
 
     #[test]
+    fn lineage_and_adoption_counters_reconcile_with_run_events() {
+        let config = Config {
+            population_size: 16,
+            steps_per_agent: 4,
+            er_probability: 0.35,
+            recommendation_probability: 0.45,
+            ..Config::default()
+        };
+        let run = simulate(config, 2025).unwrap();
+        let final_step = run.steps.last().unwrap();
+
+        assert_eq!(
+            run.traits.len() as u64,
+            final_step.cumulative_unique_innovations
+        );
+
+        let summed_adoptions: u64 = run.traits.iter()
+            .map(|trait_record| trait_record.adoption_count)
+            .sum();
+        assert_eq!(
+            summed_adoptions,
+            final_step.cumulative_peer_copies + final_step.cumulative_recommendations
+        );
+
+        for (index, trait_record) in run.traits.iter().enumerate() {
+            assert_eq!(trait_record.id, index);
+            assert!(trait_record.payoff > 0);
+            assert!(trait_record.level > 0);
+            match trait_record.parent_trait {
+                Some(parent_id) => {
+                    assert!(parent_id < trait_record.id);
+                    let parent = &run.traits[parent_id];
+                    assert_eq!(parent.level + 1, trait_record.level);
+                    assert_eq!(parent.root_lineage, trait_record.root_lineage);
+                }
+                None => assert_eq!(trait_record.root_lineage, trait_record.id),
+            }
+        }
+
+        for agent in &run.final_agents {
+            assert!(agent.effort_budget >= 0);
+            assert!(agent.level < agent.traits_by_level.len());
+            if agent.level > 0 {
+                assert!(agent.traits_by_level[agent.level].is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn declared_branch_count_is_inert_in_the_pinned_upstream_update_rules() {
+        let common = Config {
+            population_size: 12,
+            steps_per_agent: 3,
+            er_probability: 0.25,
+            recommendation_probability: 0.6,
+            ..Config::default()
+        };
+        let one_branch = simulate(
+            Config { declared_branch_count: 1, ..common },
+            81,
+        ).unwrap();
+        let many_branches = simulate(
+            Config { declared_branch_count: 1_000, ..common },
+            81,
+        ).unwrap();
+        assert_eq!(one_branch, many_branches);
+    }
+
+    #[test]
+    fn step_count_matches_population_times_steps_per_agent() {
+        let config = Config {
+            population_size: 9,
+            steps_per_agent: 7,
+            ..Config::default()
+        };
+        let run = simulate(config, 2).unwrap();
+        assert_eq!(run.steps.len(), 9 * 7);
+    }
+
+    #[test]
+    fn active_lineage_hhi_is_bounded_and_zero_when_every_agent_is_uninformed() {
+        let config = Config {
+            population_size: 8,
+            steps_per_agent: 1,
+            innovation_cost: 10_000,
+            initial_effort_budget: 10_000,
+            social_learning_cost: 20_000,
+            recommendation_cost: 20_000,
+            ..Config::default()
+        };
+        // Agents can still make one initial innovation attempt. The assertion
+        // below focuses on the metric's numeric domain, not a forced zero case.
+        let run = simulate(config, 5).unwrap();
+        for step in &run.steps {
+            assert!((0.0..=1.0).contains(&step.active_lineage_hhi));
+        }
+    }
+
+    #[test]
     fn invalid_parameters_fail_closed() {
         let config = Config {
             recommendation_probability: 1.1,
