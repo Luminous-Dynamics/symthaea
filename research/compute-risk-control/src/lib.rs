@@ -734,7 +734,7 @@ mod tests {
 
     #[test]
     fn upper_threshold_counts_wrong_emission_only() {
-        let c=candidate("upper",900_000,100_000,500,300_000);
+        let c=candidate("upper",900_000,0,1_000,1_000_000);
         let t=trace(&[false,false,true,true,true,true,true,true], &[200_000,920_000,930_000,940_000,950_000,960_000,970_000,980_000]);
         let loss=evaluate_candidate_on_trace(&c,&t).unwrap();
         assert_eq!(loss.stop_cause,StopCause::UpperThreshold);
@@ -745,7 +745,7 @@ mod tests {
 
     #[test]
     fn upper_threshold_correct_answer_has_zero_wrong_answer_loss() {
-        let c=candidate("upper",800_000,100_000,300,500_000);
+        let c=candidate("upper",800_000,0,1_000,1_000_000);
         let t=trace(&[false,true,true,true,true,true,true,true], &[100_000,850_000,900_000,930_000,950_000,960_000,970_000,980_000]);
         let loss=evaluate_candidate_on_trace(&c,&t).unwrap();
         assert_eq!(loss.stop_cause,StopCause::UpperThreshold);
@@ -764,7 +764,7 @@ mod tests {
 
     #[test]
     fn full_budget_fallback_has_no_early_stop_loss() {
-        let c=candidate("late",1_000_000,0,0,500_000);
+        let c=candidate("late",1_000_000,0,1_000,1_000_000);
         let t=trace(&[false,false,false,false,false,false,false,false], &[100_000,200_000,300_000,400_000,500_000,600_000,700_000,800_000]);
         let loss=evaluate_candidate_on_trace(&c,&t).unwrap();
         assert_eq!(loss.stop_cause,StopCause::FullBudget);
@@ -873,7 +873,7 @@ mod tests {
 
     #[test]
     fn full_budget_wrong_answer_remains_visible_as_output_error() {
-        let c=candidate("full",1_000_000,0,0,0);
+        let c=candidate("full",1_000_000,0,1_000,1_000_000);
         let t=trace(&[true,true,true,true,true,true,true,false], &[100_000,200_000,300_000,400_000,500_000,600_000,700_000,800_000]);
         let loss=evaluate_candidate_on_trace(&c,&t).unwrap();
         assert_eq!(loss.stop_cause,StopCause::FullBudget);
