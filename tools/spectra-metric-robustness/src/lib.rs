@@ -344,7 +344,7 @@ pub fn simulate(
                 };
 
                 let is_missing = if world == StressWorld::OutcomeDependentMissingness {
-                    let probability = if is_signal && response { 0.65 } else { 0.05 };
+                    let probability = if is_signal && response { 0.95 } else { 0.05 };
                     missing_rng.uniform() < probability
                 } else {
                     false
@@ -857,6 +857,7 @@ mod tests {
         let result = report(StressWorld::OutcomeDependentMissingness, 0x5EED_2026);
         assert!(result.missing_trials > 0);
         assert!(result.flags.contains(&DiagnosticFlag::DifferentialMissingness));
+        assert_eq!(result.disposition, MetricDisposition::NotEvaluable);
     }
 
     #[test]
