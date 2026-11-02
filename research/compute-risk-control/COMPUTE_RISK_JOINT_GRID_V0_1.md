@@ -97,13 +97,71 @@ At the declared 23% upper/lower budgets and 35% output-error budget, only the fu
 
 A separate Monte Carlo sanity check of the correction used `N=256`, `G=4`, 12 Bernoulli risk streams with true mean 0.5, delta=10%, and 20,000 independently generated calibration families. With the documented outward-rounded correction of 96,700 PPM, all 12 population means were simultaneously below their UCBs in 98.755% of families (95% Wilson interval 98.592%–98.900%). This is a synthetic check of the arithmetic under a simple iid design; it does not validate the stratified fixture, the LLM confidence signal, or a real deployment.
 
-## 7. Industry comparisons and benchmark targets
+## 7. SOTA and industry comparison: protocol-matched, not one-number leaderboard
 
-Required comparator arms: fixed full-budget reasoning; fixed 25/50/75% token budgets; confidence-only upper-threshold stopping; paper-faithful Conformal Thinking two-step method after a complete licensed reproduction or independent theorem-to-code reconstruction; the Symthaea joint-grid method; and an exact finite-horizon oracle (upper bound only, not deployable).
+The current field has several strong but non-equivalent approaches. Their reported savings are not directly comparable because they vary by model, task, compute regime, budget metric and evaluation protocol. Symthaea should reproduce the methods on common tasks and report the full inference-system cost profile before making a superiority claim.
 
-Report upper/lower/output risk separately, task success, mean/p50/p90/p95/p99 tokens, latency, verifier/tool calls, task-family metrics, and regret to the exact oracle. Never hide weak solvability or overconfidence regimes inside aggregates.
+### Comparator matrix
 
-Prospective acceptance targets (not achieved): at least 20% lower median tokens at matched task success; no more than 1 percentage point accuracy regression; all three simultaneous UCBs under preregistered operational budgets on a genuine iid held-out sample; zero hard token/time/memory overrun; and no task-family tail hidden by aggregate metrics.
+| Method / reference | Reported contribution | How Symthaea should compare |
+|---|---|---|
+| Conformal Thinking, ICML 2026 | Calibrates an upper false-positive threshold and a lower farsighted premature-exit threshold against held-out risk targets. | Paper-matched two-step baseline; report both exit risks and actual emitted-answer error. Our joint 3G method is a distinct variant, not the paper's method. |
+| Adaptive Thinking / Sonata, ICLR 2026 | Uses predicted self-consistency from prefill hidden states to route compute; the authors report 20–80% fewer thinking tokens at similar accuracy, or up to 5% accuracy improvement at similar token cost on their evaluated models/tasks. | Add a self-consistency/latent-signal baseline; test calibration transfer, inference overhead, hidden-state availability and whether verifier agreement is correlated. |
+| Learning When to Think (2026 preprint) | Learns NoThink/Short/Long modes inside GRPO; reports MATH500 accuracy 0.782 vs 0.796 for the base while lowering mean response length from 4,796 to 2,811 tokens (41%); reports larger GSM8K savings in its setup. | Multi-mode learned-router baseline; test our three risk channels on exactly the same checkpoints/tasks and include training cost/amortization. |
+| AdaCompute-LLM (2026 preprint) | Solve-then-learn constrained allocation with a Lagrangian oracle; reports up to 12.8% relative accuracy improvement on MATH under matched compute budgets and over 91% imitation accuracy. | Constrained-policy allocation baseline; distinguish average budget feasibility and per-task risk certification. |
+| Selective verification over categorical structure (2026 preprint) | Ranks intermediate states and allocates verifier calls selectively; reports 44% fewer verifier calls on MATH than named sampling/search baselines in its experiment. | Verification-cost lane; account for verifier-call cost, correlation, and actual error detection—not just reasoning tokens. |
+| When More Thinking Hurts, Findings of ACL 2026 | Finds diminishing marginal returns and overthinking, including reasoning runs that abandon previously correct answers. | Stress tests for correct-answer regression and emitted-answer error; measure the entire checkpoint trajectory, not just final accuracy. |
+| Thinking Hard, Not Smart (2026 preprint) | Shows models can allocate a shared budget poorly across multiple tasks, front-loading compute by presentation order rather than value/difficulty. | Add a batch/portfolio budget benchmark; per-question stopping does not establish global resource-allocation quality. |
+| Test-Time Scaling in Reasoning LLMs (2026 evaluation/reproducibility preprint) | Separates single-trajectory sequential scaling, leaf-level sampling/terminal reduction, and prefix-level search; emphasizes full-system cost accounting and replay. | Report depth, breadth and search as separate regimes; preserve exact replay artifacts and distinguish candidate-bank diagnostics from end-to-end system results. |
+
+### Required benchmark lanes
+
+**Lane A — Sequential depth:** one reasoning trajectory with upper/lower stopping and full-budget fallback. This is the current crate's scope.
+
+**Lane B — Leaf-level breadth:** multiple independently sampled complete candidates, then voting or verifier-based terminal reduction. Measure generated candidates, duplicate work, aggregation error and all verifier cost.
+
+**Lane C — Prefix-level search:** branching over unfinished reasoning prefixes. Measure tree width/depth, expansion cost, duplicate prefixes, verifier calls, and the cost of discarded branches.
+
+**Lane D — Verifier allocation:** spend limited verification calls on intermediate states. Include uniform verification, confidence-ranked, residual/progress-ranked, self-consistency, independent-verifier and exact synthetic oracle arms. Correlated verifiers must not be counted as independent evidence.
+
+**Lane E — Shared batch budget:** allocate a fixed total token/compute budget across multiple tasks with different difficulty and value. Randomize task presentation order, test order sensitivity, and compare against a finite-horizon allocation oracle. Report score/regret per batch; a per-query risk guarantee does not establish a global portfolio guarantee.
+
+### Matched-cost reporting contract
+
+Do not collapse all inference into “tokens.” For every task and batch, report:
+
+- input/prompt tokens, output/reasoning tokens, verifier tokens and tool tokens separately;
+- model forward passes, sampled candidates, expanded prefixes and verifier calls;
+- wall-clock latency p50/p90/p95/p99, throughput and queue wait;
+- measured GPU/CPU time, peak memory and energy when instrumentation is available;
+- hard budget utilization, budget overrun count, and complete cost of the inference system;
+- task correctness, three risk channels, subgroup/task-family risk, calibration error and regret to the exact oracle.
+
+For the same reported result, retain the model/checkpoint, prompt, decoding parameters, reasoning regime, verifier identity, candidate grid, calibration split, held-out task IDs, tokenization and resource-accounting method. “Exact replay” and “same distributional behavior” are different reproducibility claims.
+
+### Prospective targets to beat strong baselines
+
+These are targets, not results:
+
+1. At equal end-to-end cost, improve task success by at least 1 percentage point over the best paper-matched adaptive baseline **or** retain accuracy within 1 point while lowering total cost by at least 30%.
+2. Keep all three risk UCBs within preregistered budgets on genuinely independent held-out task units; separately report task-family and difficulty strata. No subgroup may be silently hidden by the mean.
+3. Reduce verifier calls by at least 30% versus uniform verification at matched emitted-answer error, with correlated-verifier ancestry preserved.
+4. On shared-batch tasks, reduce regret to the exact budget-allocation oracle by at least 25% versus sequential first-come/first-served allocation, with randomized order and value/difficulty perturbations.
+5. Keep hard compute overruns at zero and report p95/p99 latency; average token savings cannot excuse pathological tail latency.
+6. Maintain a full-budget baseline and explicit abstention/fallback. If no policy meets all risk limits, return no feasible candidate rather than weaken the declared risk target.
+
+### Research references and source audit
+
+- Conformal Thinking (ICML 2026): https://proceedings.mlr.press/v306/wang26hd.html
+- Adaptive Thinking / Sonata (ICLR 2026, Apple ML Research): https://machinelearning.apple.com/research/adaptive-thinking
+- Learning When to Think (2026 preprint): https://arxiv.org/abs/2608.20256
+- Adaptive Test-Time Compute Allocation via Constrained Policy Optimization (2026 preprint): https://arxiv.org/abs/2604.14853
+- Adaptive Test-Time Compute Allocation via Learned Heuristics over Categorical Structure (2026 preprint): https://arxiv.org/abs/2602.03975
+- When More Thinking Hurts (Findings of ACL 2026): https://aclanthology.org/2026.findings-acl.1199/
+- Thinking Hard, Not Smart (2026 preprint): https://arxiv.org/abs/2608.07968
+- Test-Time Scaling in Reasoning LLMs: Inference Regimes, Evaluation, and Reproducibility (2026 preprint): https://arxiv.org/abs/2608.04001
+
+The numerical results in this comparison are claims reported by the respective authors in their own experimental protocols, not matched head-to-head measurements. The only current Symthaea result is the deterministic stratified synthetic diagnostic in Section 6, which demonstrates no compute saving at the declared answer-quality requirement.
 
 ## 8. Integration
 
