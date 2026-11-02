@@ -22,6 +22,19 @@ pub struct PrinterConstraints {
     pub max_layer_height: f32,      // mm
 }
 
+/// Result of comparing resolved geometry with an explicit printer profile.
+///
+/// This is a build-volume precheck only; it does not establish process
+/// qualification, material suitability, structural adequacy, or machine safety.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintFitStatus {
+    NotEvaluatedNoProfile,
+    InvalidConstraintProfile,
+    InvalidGeometryBounds,
+    FitsDeclaredBuildVolume,
+    ExceedsDeclaredBuildVolume,
+}
+
 /// A geometric thought: the bridge between HDC intent and physical geometry
 #[derive(Debug, Clone, Serialize)]
 pub struct GeometricThought {
@@ -76,18 +89,64 @@ impl GeometricThought {
         resolve_to_mesh(&self.operation_tree)
     }
 
-    /// Check if mesh fits within printer constraints
-    pub fn fits_constraints(&self) -> bool {
-        if let Some(ref constraints) = self.printer_constraints {
-            let mesh = self.resolve();
-            let (min, max) = mesh_aabb(&mesh);
-            let size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
-            size[0] <= constraints.max_build_volume[0]
-                && size[1] <= constraints.max_build_volume[1]
-                && size[2] <= constraints.max_build_volume[2]
-        } else {
-            true // No constraints = always fits
+    /// Evaluate the declared build-volume constraint profile without promoting unknowns.
+    pub fn evaluate_constraints(&self) -> ConstraintFitStatus {
+        let Some(constraints) = self.printer_constraints.as_ref() else {
+            return ConstraintFitStatus::NotEvaluatedNoProfile;
+        };
+
+        if constraints
+            .max_build_volume
+            .iter()
+            .any(|limit| !limit.is_finite() || *limit <= 0.0)
+            || !constraints.min_layer_height.is_finite()
+            || constraints.min_layer_height <= 0.0
+            || !constraints.max_layer_height.is_finite()
+            || constraints.max_layer_height <= 0.0
+            || constraints.min_layer_height > constraints.max_layer_height
+        {
+            return ConstraintFitStatus::InvalidConstraintProfile;
         }
+
+        let mesh = self.resolve();
+        if mesh.vertices.is_empty()
+            || mesh.indices.is_empty()
+            || mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.iter().any(|coordinate| !coordinate.is_finite()))
+            || mesh
+                .indices
+                .iter()
+                .flatten()
+                .any(|index| *index as usize >= mesh.vertices.len())
+        {
+            return ConstraintFitStatus::InvalidGeometryBounds;
+        }
+
+        let (min, max) = mesh_aabb(&mesh);
+        let size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+        if size.iter().any(|extent| !extent.is_finite() || *extent <= 0.0) {
+            return ConstraintFitStatus::InvalidGeometryBounds;
+        }
+
+        if size
+            .iter()
+            .zip(constraints.max_build_volume)
+            .any(|(extent, limit)| *extent > limit)
+        {
+            ConstraintFitStatus::ExceedsDeclaredBuildVolume
+        } else {
+            ConstraintFitStatus::FitsDeclaredBuildVolume
+        }
+    }
+
+    /// Fail-closed boolean projection for legacy/demo callers.
+    ///
+    /// A false result includes missing profiles and invalid geometry; use
+    /// evaluate_constraints when the distinction matters.
+    pub fn fits_constraints(&self) -> bool {
+        self.evaluate_constraints() == ConstraintFitStatus::FitsDeclaredBuildVolume
     }
 
     /// Autonomously derive symbolic SMT safety invariants from the CSG tree.
@@ -322,7 +381,51 @@ mod tests {
     #[test]
     fn test_no_constraints() {
         let thought = GeometricThought::from_csg(CSGNode::cube());
-        assert!(thought.fits_constraints()); // No constraints = always fits
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::NotEvaluatedNoProfile
+        );
+        assert!(!thought.fits_constraints());
+    }
+
+    #[test]
+    fn invalid_printer_profile_is_not_treated_as_a_valid_build_volume() {
+        let mut thought = GeometricThought::from_csg(CSGNode::cube());
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, f32::NAN, 100.0],
+            min_layer_height: 0.1,
+            max_layer_height: 0.3,
+        });
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidConstraintProfile
+        );
+
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, 100.0, 100.0],
+            min_layer_height: 0.4,
+            max_layer_height: 0.3,
+        });
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidConstraintProfile
+        );
+    }
+
+    #[test]
+    fn non_finite_geometry_cannot_pass_build_volume_precheck() {
+        let mut thought =
+            GeometricThought::from_csg(CSGNode::cube().scale(f32::NAN, 1.0, 1.0));
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, 100.0, 100.0],
+            min_layer_height: 0.1,
+            max_layer_height: 0.3,
+        });
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidGeometryBounds
+        );
+        assert!(!thought.fits_constraints());
     }
 
     #[test]
