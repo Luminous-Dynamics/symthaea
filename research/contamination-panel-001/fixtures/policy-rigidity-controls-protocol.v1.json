@@ -1,0 +1,138 @@
+{
+  "schema": "symthaea.policy_rigidity_controls_protocol.v1",
+  "protocol_id": "SCI-POLICY-RIGIDITY-CONTROLS-001",
+  "version": "1.0.0",
+  "status": "research_protocol_not_qualified",
+  "core_question": "Does response-conditioned entropy-path invariance identify item-specific training exposure beyond global RL-induced policy rigidity and intrinsic task determinism?",
+  "model_scope": "One exact model checkpoint, tokenizer, prompt harness and runtime environment per request.",
+  "group_key": [
+    "task_family",
+    "difficulty_band",
+    "path_multiplicity"
+  ],
+  "required_path_multiplicity": [
+    "single_or_few_valid_paths",
+    "multiple_valid_paths",
+    "indeterminate"
+  ],
+  "mandatory_control_cells": [
+    {
+      "exposure": "known_clean",
+      "path_multiplicity": "multiple_valid_paths",
+      "purpose": "clean/flexible control"
+    },
+    {
+      "exposure": "known_clean",
+      "path_multiplicity": "single_or_few_valid_paths",
+      "purpose": "clean/rigid hard negative"
+    },
+    {
+      "exposure": "known_exposed",
+      "path_multiplicity": "multiple_valid_paths",
+      "purpose": "exposed/flexible hard positive"
+    },
+    {
+      "exposure": "known_exposed",
+      "path_multiplicity": "single_or_few_valid_paths",
+      "purpose": "exposed/rigid positive"
+    }
+  ],
+  "probe_envelope": [
+    {
+      "intervention": "response_conditioned_self_critique",
+      "score": "baseline versus critique entropy-path similarity",
+      "required": true
+    },
+    {
+      "intervention": "prompt_only_unfamiliar_method",
+      "score": "baseline versus task-only unfamiliar-method entropy-path similarity",
+      "required": true
+    },
+    {
+      "intervention": "semantic_preserving_paraphrase",
+      "score": "baseline versus meaning-preserving paraphrase entropy-path similarity",
+      "required": true
+    },
+    {
+      "intervention": "constraint_preserving_reparameterization",
+      "score": "baseline versus equivalent transformed task entropy-path similarity",
+      "required": true
+    },
+    {
+      "intervention": "alternate_valid_method",
+      "score": "baseline versus valid alternate-method entropy-path similarity",
+      "required_for": "multiple_valid_paths"
+    }
+  ],
+  "score_decomposition": {
+    "global_policy_entropy": "baseline_mean_entropy_nats; lower-tail rank against clean controls denotes unexpectedly low entropy for the matched stratum.",
+    "global_task_path_rigidity": "mean(prompt_only, semantic_paraphrase, constraint_reparameterization, alternate_valid_method when applicable); higher means the task/policy remains rigid under non-response-conditioned interventions.",
+    "response_conditioned_excess": "response_conditioned_self_critique_similarity - global_task_path_rigidity; higher means the response-conditioned intervention preserves the entropy path more than the alternative intervention envelope."
+  },
+  "calibration": {
+    "clean_control_only": true,
+    "exact_group_match": [
+      "model_checkpoint_sha256",
+      "tokenizer_sha256",
+      "prompt_harness_sha256",
+      "runtime_environment_sha256",
+      "task_family",
+      "difficulty_band",
+      "path_multiplicity"
+    ],
+    "clean_control_min_per_group": 2,
+    "clean_control_required_exposure_label": "known_clean",
+    "upper_tail_p": "(1 + count(clean_control_score >= candidate_score)) / (n_clean + 1)",
+    "entropy_lower_tail_p": "(1 + count(clean_control_baseline_entropy <= candidate_entropy)) / (n_clean + 1)",
+    "ties": "Conservative; all equal values count as extreme.",
+    "alpha_resolution": "For 1% resolution, each matched clean-control group needs at least 99 independent units; this is only p-value resolution, not FPR precision.",
+    "multiple_testing": "Benjamini-Yekutieli within each task_family × difficulty_band × path_multiplicity group, conditional on valid super-uniform clean-control ranks."
+  },
+  "independence_and_provenance": {
+    "unit": "Independent source/task cluster, not individual generations or repeated prompt variants.",
+    "split_overlap": "Calibration and evaluation unit IDs and source_cluster_sha256 digests must be globally disjoint.",
+    "evidence_fields": [
+      "model checkpoint",
+      "tokenizer",
+      "prompt harness",
+      "runtime environment",
+      "probe registry",
+      "per-item probe receipt",
+      "task recipe",
+      "source cluster",
+      "path-multiplicity adjudication",
+      "reviewer panel"
+    ],
+    "path_adjudication": "At least three reviewers and at least 900/1000 agreement for accepted single/few-path or multiple-valid-path labels; indeterminate labels remain abstentions.",
+    "exposure_truth": "Known exposure labels come from sealed training manifests and randomized intervention receipts, never from detector scores."
+  },
+  "target_metrics": [
+    "global entropy low-tail p-values",
+    "global task/path rigidity upper-tail p-values",
+    "response-conditioned excess upper-tail p-values",
+    "BY-adjusted response-conditioned excess p-values",
+    "FPR/TPR and exact uncertainty by hard-control cell",
+    "coverage, abstention, AUPRC, TPR at fixed 1/5/10% FPR",
+    "independent model-pair uncertainty",
+    "probe generation count, tokens, logprob width, latency and GPU memory"
+  ],
+  "qualification_targets": {
+    "missing_probe_features_silently_imputed": 0,
+    "cross_split_source_cluster_overlap": 0,
+    "duplicate_unit_ids": 0,
+    "unadjudicated_path_multiplicity_silently_scored": 0,
+    "clean_but_rigid_hard_negative_cell_required": true,
+    "exposed_but_flexible_hard_positive_cell_required": true,
+    "at_least_99_clean_calibration_units_per_group_for_1pct_rank_resolution": true,
+    "at_least_300_clean_locked_evaluation_units_per_group_as_zero_fp_1pct_fpr_precision_floor": true
+  },
+  "claim_ceiling": [
+    "Low baseline entropy is not proof of item-specific contamination.",
+    "High task/path rigidity is not proof of training membership.",
+    "Response-conditioned excess is a diagnostic contrast, not a causal membership test.",
+    "Conformal-style p-values depend on clean-control exchangeability within the exact matched group.",
+    "BY controls FDR only if the underlying null p-values are super-uniform.",
+    "Model-pair training interventions remain the causal uncertainty units; items and generations are nested.",
+    "The report cannot authenticate reviewers, model custody or true training inclusion."
+  ]
+}

@@ -13,6 +13,7 @@ use contamination_panel_bench::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
         randomize_intervention,
     },
+    policy_rigidity_controls::{PolicyRigidityControlsRequestV1, analyze_policy_rigidity_controls},
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
@@ -388,6 +389,32 @@ fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn analyze_policy_rigidity_controls_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-policy-rigidity-controls <policy-rigidity-controls-request.json> <policy-rigidity-controls-report.json>"
+                .into(),
+        );
+    }
+    const MAX_POLICY_RIGIDITY_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_POLICY_RIGIDITY_REQUEST_BYTES)?;
+    let request: PolicyRigidityControlsRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = analyze_policy_rigidity_controls(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "groups={} evaluation_units={} flagged={} no_flag={} abstained={} method={} confirmatory_eligible={}",
+        report.group_summaries.len(),
+        report.evaluation_unit_count,
+        report.flagged_count,
+        report.no_flag_count,
+        report.abstained_count,
+        report.multiple_testing_method,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.first().map(String::as_str) {
@@ -401,9 +428,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
+        Some("analyze-policy-rigidity-controls") => analyze_policy_rigidity_controls_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-policy-rigidity-controls | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
