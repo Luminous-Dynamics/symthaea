@@ -167,6 +167,29 @@ running maxima are not exhaustive. The staircase family is a discrete,
 auditable design space within that broader class; the formula itself follows
 from Ville's inequality and is not claimed as a novel theorem.
 
+A threshold-grid example explains why this is worth testing. With family size
+m=1,000, target alpha=0.05, the weighted e-BH rank-r boundary is
+h_r=m/(alpha r). For r in {1,10,100,1,000}, h_r is respectively
+{20,000, 2,000, 200, 20}. A four-point equal-prior staircase can assign
+mass pi=1/4 to each of those target e-values, placing its raw crossing
+threshold at K_r=h_r/pi=4h_r. The square-root adjuster A(x)=sqrt(x)-1
+reaches the same adjusted boundary h_r only at S=(h_r+1)^2.
+
+| Rejection rank r | Required adjusted value h_r | Square-root raw supremum | Four-point staircase raw supremum |
+|---:|---:|---:|---:|
+| 1 | 20,000 | 400,040,001 | 80,000 |
+| 10 | 2,000 | 4,004,001 | 8,000 |
+| 100 | 200 | 40,401 | 800 |
+| 1,000 | 20 | 441 | 80 |
+
+This is a comparison of threshold geometry, not a power experiment or a claim
+of dominance. The staircase prior allocates its entire mass to these four
+rank thresholds and may be worse when the true discovery rank or family size
+falls outside the grid. It motivates held-out threshold-prior optimization
+and explicit out-of-grid stress tests. The calibrator's validity is retained
+because the total prior mass is one; the power benefit, if any, must be
+measured on matched independent confirmatory streams.
+
 ## 6. Prior art and software baselines
 
 The benchmark must keep guarantee classes separate.
