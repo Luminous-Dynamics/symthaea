@@ -964,6 +964,16 @@ mod tests {
             Err(LedgerError::InvalidReserveRate)
         );
         assert_eq!(
+            DonationLedger::new(vec![CandidateSpec {
+                id: 99,
+                weight: WEIGHT_SCALE,
+                reserve_rate_numerator: 1,
+                reserve_rate_denominator: 1,
+                destination_id: None,
+            }]),
+            Err(LedgerError::InvalidRecipient)
+        );
+        assert_eq!(
             DonationLedger::new(vec![
                 spec(1, WEIGHT_SCALE, 1, 1),
                 spec(2, 1, 1, 1),
