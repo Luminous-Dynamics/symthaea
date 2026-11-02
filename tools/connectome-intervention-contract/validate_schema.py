@@ -194,6 +194,10 @@ def main() -> None:
     cpg_failed["simulation"]["solver_status"] = "max_steps_reached"
     rejected(cpg_validator, cpg_failed, "CPG complete receipt with failed solver")
 
+    cpg_throw_disabled = copy.deepcopy(cpg_complete)
+    cpg_throw_disabled["solver"]["throw_on_failure"] = False
+    rejected(cpg_validator, cpg_throw_disabled, "CPG complete receipt with solver throw-on-failure disabled")
+
     cpg_noise_noop = copy.deepcopy(cpg_example)
     cpg_noise_noop["perturbation"]["input_noise"]["requested_stddev"] = 0.1
     rejected(cpg_validator, cpg_noise_noop, "CPG requested non-zero noise marked unapplied")
@@ -206,7 +210,7 @@ def main() -> None:
 
     print(
         "OK: both Draft 2020-12 schemas are valid; both incomplete examples and a "
-        "synthetic complete CPG fixture validate; nine adversarial mutations reject."
+        "synthetic complete CPG fixture validate; eleven adversarial mutations reject."
     )
 
 
