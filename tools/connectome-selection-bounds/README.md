@@ -183,3 +183,31 @@ Synthetic known answers:
 
 These are finite-cohort identification bounds conditional on the supplied detector operating ranges. They are not sampling confidence intervals, do not solve MNAR trace availability beyond the declared range, and do not identify a causal effect or direct monosynaptic connection. Detector calibration must represent the relevant animal/session populations; trial-level Wilson intervals are not a substitute for cluster-aware calibration.
 
+
+## Structural hypothesis response sets
+
+The crate also propagates response bounds over alternative, provenance-pinned structural interpretations. This prevents an unresolved split/merge decision from being silently collapsed into one hard neuron identity before functional analysis.
+
+The API is:
+
+```rust
+evaluate_structural_hypothesis_response_set(
+    &[StructuralHypothesisInput]
+) -> Result<StructuralResponseIdentifiedSet, EvalError>
+```
+
+Each input contains a stable hypothesis ID, source and target entity IDs, a SHA-256 evidence-manifest digest, an upstream admissibility flag, and already-qualified source/target prevalence intervals. The caller must freeze and justify the admissibility rule; this function does not inspect raw segmentation, validate graph topology, or determine which structural alternative is true.
+
+For every admissible hypothesis, the library computes its Fréchet joint-response interval and target-given-source interval. It then returns a **canonical union of intervals**, not a weighted mean and not a convex hull. This distinction matters: two alternative connectomes can imply disjoint feasible response ranges. Filling the gap between them would claim values supported by no supplied hypothesis.
+
+If any admissible structural hypothesis allows the source prevalence to be zero, the global target-given-source set is returned as not estimable. The implementation does not discard that alternative just because a conditional denominator is unavailable.
+
+The report preserves the hypothesis IDs, entity mappings, evidence digests, marginal intervals, per-hypothesis outputs, excluded hypothesis IDs, and the explicit flag that no probability weights were applied. It validates all alternatives (including excluded records) and rejects duplicate IDs, malformed digests, invalid intervals and an empty admissible set.
+
+Synthetic known answer:
+- Hypothesis A has source/target marginals 0.1/0.1 and implies a joint interval [0,0.1].
+- Hypothesis B has source/target marginals 0.9/0.9 and implies [0.8,0.9].
+- Their union remains [[0,0.1],[0.8,0.9]]. The interval [0.1,0.8] is not filled in.
+- A third recorded but excluded hypothesis remains in the provenance report and is not included in the identified set.
+
+This is an identified set conditional on the supplied hypotheses and marginal intervals, not a posterior probability, a confidence interval, a complete enumeration of all possible connectomes, a causal effect, or proof of a direct synapse. The supplied hypotheses must be sufficiently complete for any broader scientific claim.
