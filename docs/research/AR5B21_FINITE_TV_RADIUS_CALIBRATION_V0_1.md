@@ -103,6 +103,9 @@ The request binds:
 - a path-support SHA-256 for each row, including category ordering;
 - a calibration-data SHA-256 for each row;
 - observed categorical counts and nominal category probabilities;
+- per-path rejection probabilities, evaluator costs and decision utilities on that identical ordered support.
+
+Before calculating any radius, the calibrator recomputes the nominal expectations from the declared path law and outcome functions. Null rejection expectations must match the frozen null-size receipts. Alternative rejection, cost and utility expectations must match the frozen power/cost/utility receipts. Per-path costs and utilities must lie inside the declared support bounds. This prevents an envelope from being computed against one path distribution while the optimizer consumes unrelated nominal decision metrics.
 - null and alternative simultaneous failure budgets;
 - IID complete-path and confirmatory-independence declarations;
 - alternative utility and cost support bounds.
@@ -119,7 +122,7 @@ The calibrator:
 9. emits a report with every row's support size, sample size, empirical TV, allocated delta, slack, radius and source digest;
 10. verifies reports by deterministic full reconstruction.
 
-The module has eight authored tests:
+The module has nine authored tests:
 - hand-calculated empirical-TV and concentration arithmetic;
 - singleton-support zero-radius control;
 - simultaneous delta allocation and maximum-over-policy aggregation;
@@ -127,6 +130,7 @@ The module has eight authored tests:
 - stale plan digest and missing-policy rejection;
 - non-IID, dependent calibration and support mismatch rejection;
 - invalid counts, probability simplex and support bounds;
+- path-outcome/nominal-receipt semantic mismatch rejection;
 - canonical input ordering and report tampering.
 
 No Rust test has run. No compile, format, Clippy, CI or benchmark pass is claimed.
@@ -196,7 +200,7 @@ Other extensions, each requiring its own theorem and validation:
 
 ## 9. Claim boundary
 
-The calibration certificate is valid only under the declared finite support, known category ordering, IID complete-path sampling, frozen nominal probabilities, and independent calibration/confirmatory streams. The implementation cannot prove those premises from metadata or hashes.
+The calibration certificate is valid only under the declared finite support, known category ordering, IID complete-path sampling, frozen nominal probabilities, and independent calibration/confirmatory streams. The implementation cannot prove IID sampling, independence, or artifact provenance from metadata or hashes. It does, however, require that the path-level rejection/cost/utility functions and nominal path distribution reconstruct every nominal plan receipt within a declared numerical tolerance.
 
 It does not establish validity for arbitrary continuous, unbounded, dependent, clustered or nonstationary trajectories. Large-support conservatism is expected. No SOTA claim or real-experiment performance claim is made.
 
