@@ -1,0 +1,136 @@
+{
+  "benchmark": "two_phase_exact_minimum_credit_valid_process_pilot",
+  "scope": "Exploratory paired pilot only. It does not prove statistical validity, confirm FDR/SupFDR control, demonstrate power superiority, or benchmark Rust.",
+  "execution_note": "A local Python reimplementation of the exact-rational simulator logic was executed in the analysis environment. The committed standalone runner and its unit tests were authored separately and have not yet been run from a connected checkout. The pilot used the same LR factors, A2 fixed-grid adjuster, reserve formula, e-BH formula, source-bank rules, scenarios and seed schedules.",
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5"
+  },
+  "parameters": {
+    "hypotheses": 24,
+    "looks": 50,
+    "alpha": "1/10",
+    "weights": "gamma_i=1/[(i+1)(i+2)]",
+    "weight_mass": "24/25",
+    "null_lr_factors": "7/5 on success and 3/5 on failure; p0=1/2 so conditional expectation is exactly one",
+    "adjuster": "A(x)=sqrt(x)-1 rounded downward to a 1e-6 fixed-point grid",
+    "dependence_modes": ["independent", "shared-uniform", "balanced-negative"],
+    "methods": ["no_donation", "fixed_next", "two_phase_min_credit"],
+    "two_phase_policy": "one fundable recipient per pre-observation checkpoint; smallest exact e-BH credit deficit; oldest source-first consumption; no partial spending",
+    "reporting": "after predictable activation, before/after assignment checkpoint, and after atomic look commit"
+  },
+  "streams_per_cell": {
+    "all_null": 50,
+    "immediate_bridge": 50,
+    "late_bridge": 50,
+    "far_cluster": 20,
+    "no_useful": 20,
+    "switching": 20
+  },
+  "seed_schedules": {
+    "50_stream_cells": "20261125 + scenario_index*100000 + dependence_index*10000 + replicate",
+    "20_stream_cells": "10125 + scenario_index*100000 + dependence_index*10000 + replicate"
+  },
+  "uncertainty": {
+    "one_sided_95pct_Hoeffding_halfwidth": {
+      "n_50": 0.17308,
+      "n_20": 0.27366
+    },
+    "simultaneous_correction": "none",
+    "paired_power_confidence_intervals": "not computed"
+  },
+  "results": {
+    "all_null_50_streams": {
+      "independent": {
+        "supfdr": {"none": 0, "fixed_next": 0, "two_phase_min_credit": 0},
+        "p_any_false": {"none": 0, "fixed_next": 0, "two_phase_min_credit": 0},
+        "two_phase_mean_reserve": 0.03705,
+        "two_phase_mean_credited": 0,
+        "two_phase_mean_unassigned": 0.03705
+      },
+      "shared_uniform": {
+        "supfdr": {"none": 0, "fixed_next": 0, "two_phase_min_credit": 0},
+        "p_any_false": {"none": 0, "fixed_next": 0, "two_phase_min_credit": 0},
+        "two_phase_mean_reserve": 0.03500,
+        "two_phase_mean_credited": 0,
+        "two_phase_mean_unassigned": 0.03500
+      },
+      "balanced_negative": {
+        "supfdr": {"none": 0, "fixed_next": 0, "two_phase_min_credit": 0},
+        "p_any_false": {"none": 0, "fixed_next": 0, "two_phase_min_credit": 0},
+        "two_phase_mean_reserve": 0.05183,
+        "two_phase_mean_credited": 0,
+        "two_phase_mean_unassigned": 0.05183
+      },
+      "interpretation": "No false discoveries were observed in 50 streams per dependence mode. For the all-null Bernoulli event, zero events in 50 streams gives a one-sided exact 95% upper bound of approximately 5.82%; this is not a confirmatory calibration result."
+    },
+    "immediate_bridge_50_streams": {
+      "independent": {
+        "terminal_power": {"none": 0.42933, "fixed_next": 0.44267, "two_phase_min_credit": 0.44267},
+        "two_phase_mean_assignments": 2.08,
+        "two_phase_mean_reserve": 0.73602,
+        "two_phase_mean_credited": 0.51195,
+        "two_phase_mean_unassigned": 0.22407
+      },
+      "shared_uniform": {
+        "terminal_power": {"none": 0.38533, "fixed_next": 0.39600, "two_phase_min_credit": 0.39467},
+        "two_phase_mean_assignments": 2.38,
+        "two_phase_mean_reserve": 0.72272,
+        "two_phase_mean_credited": 0.29558,
+        "two_phase_mean_unassigned": 0.42714
+      },
+      "balanced_negative": {
+        "terminal_power": {"none": 0.38267, "fixed_next": 0.42400, "two_phase_min_credit": 0.41200},
+        "two_phase_mean_assignments": 2.06,
+        "two_phase_mean_reserve": 0.73122,
+        "two_phase_mean_credited": 0.48602,
+        "two_phase_mean_unassigned": 0.24520
+      }
+    },
+    "late_bridge_50_streams": {
+      "independent": {
+        "terminal_power": {"none": 0.52000, "fixed_next": 0.53000, "two_phase_min_credit": 0.54143},
+        "two_phase_mean_assignments": 2.90,
+        "two_phase_mean_reserve": 0.84677,
+        "two_phase_mean_credited": 0.71634,
+        "two_phase_mean_unassigned": 0.13042
+      },
+      "shared_uniform": {
+        "terminal_power": {"none": 0.51857, "fixed_next": 0.51857, "two_phase_min_credit": 0.53429},
+        "two_phase_mean_assignments": 4.24,
+        "two_phase_mean_reserve": 0.86081,
+        "two_phase_mean_credited": 0.59757,
+        "two_phase_mean_unassigned": 0.26324
+      },
+      "balanced_negative": {
+        "terminal_power": {"none": 0.49857, "fixed_next": 0.50571, "two_phase_min_credit": 0.51714},
+        "two_phase_mean_assignments": 2.76,
+        "two_phase_mean_reserve": 0.84821,
+        "two_phase_mean_credited": 0.67519,
+        "two_phase_mean_unassigned": 0.17302
+      }
+    },
+    "far_cluster_20_streams": {
+      "independent": {"terminal_power": {"none": 0.13333, "fixed_next": 0.13333, "two_phase_min_credit": 0.13333}, "two_phase_assignments": 0, "two_phase_unassigned": 0.5},
+      "shared_uniform": {"terminal_power": {"none": 0.14167, "fixed_next": 0.14167, "two_phase_min_credit": 0.14167}, "two_phase_assignments": 0, "two_phase_unassigned": 0.5},
+      "balanced_negative": {"terminal_power": {"none": 0.15000, "fixed_next": 0.15000, "two_phase_min_credit": 0.15000}, "two_phase_assignments": 0, "two_phase_unassigned": 0.5}
+    },
+    "no_useful_20_streams": {
+      "independent": {"terminal_power": {"none": 0.95, "fixed_next": 0.95, "two_phase_min_credit": 0.95}, "two_phase_assignments": 0, "two_phase_unassigned": 0.5},
+      "shared_uniform": {"terminal_power": {"none": 0.95, "fixed_next": 0.95, "two_phase_min_credit": 0.95}, "two_phase_assignments": 0, "two_phase_unassigned": 0.5},
+      "balanced_negative": {"terminal_power": {"none": 0.90, "fixed_next": 0.90, "two_phase_min_credit": 0.90}, "two_phase_assignments": 0, "two_phase_unassigned": 0.5}
+    },
+    "switching_20_streams": {
+      "independent": {"terminal_power": {"none": 0.04412, "fixed_next": 0.04412, "two_phase_min_credit": 0.04412}, "two_phase_assignments": 0, "two_phase_unassigned": 0.54},
+      "shared_uniform": {"terminal_power": {"none": 0.05294, "fixed_next": 0.05294, "two_phase_min_credit": 0.05294}, "two_phase_assignments": 0, "two_phase_unassigned": 0.54068},
+      "balanced_negative": {"terminal_power": {"none": 0.05588, "fixed_next": 0.05588, "two_phase_min_credit": 0.05588}, "two_phase_assignments": 0, "two_phase_unassigned": 0.55275}
+    }
+  },
+  "observations": [
+    "In this small pilot, exact-threshold two-phase allocation outperformed both no-donation and immediate fixed-next on the late-borderline scenario in all three dependence constructions.",
+    "In the immediate-bridge scenario, it matched fixed-next under independence but was slightly behind fixed-next in the shared and balanced-negative cells.",
+    "In far-recipient, no-useful-recipient and switching controls, no exact assignment was fundable, so the bank remained unassigned rather than being partially spent.",
+    "All observed SupFDR values were zero in these pilot cells; the sample size is far too small to claim calibration."
+  ],
+  "claim_boundary": "Exploratory Monte Carlo only. No theorem proof, confirmatory error-rate bound, statistical superiority, production Rust execution, or SOTA result."
+}
