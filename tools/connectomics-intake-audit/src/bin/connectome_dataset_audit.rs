@@ -739,7 +739,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
             &row.source_archive,
             &row.source_archive_sample_hash,
         );
-        source_identity_digests.insert(identity_digest);
+        source_identity_digests.insert(identity_digest.clone());
         if let Some(previous) = legacy_identities.get(&row.combined_sample_hash) {
             if previous != &source_identity {
                 legacy_md5_identity_collision_count += 1;
