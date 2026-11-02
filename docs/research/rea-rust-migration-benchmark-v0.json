@@ -961,6 +961,72 @@
       ],
       "target": "at_least_20_percent_reduction_in_90th_percentile_realized_decision_regret_vs_point_EIG_on_preregistered_shift_suite_without_more_than_10_percent_median_resource_cost_increase",
       "claim_ceiling": "Utility, priors, likelihoods and scenario coverage remain caller-supplied. This is decision support, not proof that stakeholder utility is complete or that true conditions lie in the scenario set."
+    },
+    {
+      "id": "decision_value_and_minimax_regret",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10109",
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10171",
+      "algorithms": [
+        "point_EIG",
+        "scenario_robust_EIG_expected_worst_CVaR",
+        "expected_EVSI",
+        "worst_case_EVSI",
+        "lower_tail_CVaR_EVSI",
+        "EVSI_minus_worst_case_shared_policy_regret",
+        "exact_finite_scenario_minimax_regret",
+        "random_authorized_experiment",
+        "cost_only_authorized_experiment"
+      ],
+      "case_families": [
+        "information_gain_without_decision_change",
+        "lower_EIG_probe_with_high_decision_value",
+        "asymmetric_catastrophic_remediation_loss",
+        "scenario_weight_shift",
+        "likelihood_misspecification",
+        "omitted_latent_condition",
+        "opposed_scenario_optimal_actions",
+        "near_tied_terminal_decisions",
+        "zero_EVSI_positive_EIG",
+        "unauthorized_or_irreversible_probe",
+        "minimax_policy_search_space_overflow"
+      ],
+      "primary_metrics": [
+        "expected_EVSI_prediction_error",
+        "worst_case_EVSI",
+        "lower_tail_CVaR_EVSI",
+        "worst_case_expected_regret",
+        "realized_regret_under_held_out_ground_truth",
+        "wrong_terminal_decision_rate",
+        "shared_policy_decision_stability",
+        "abstention_precision_and_recall",
+        "investigation_cost_and_time",
+        "target_impact",
+        "exact_policy_search_evaluations",
+        "search_budget_abstention_rate"
+      ],
+      "targets": {
+        "p90_realized_regret_reduction_vs_point_EIG": 0.2,
+        "wrong_action_rate": "reduce without increasing target impact or investigation cost by more than 10%",
+        "unauthorized_action_selections": 0,
+        "policy_budget_overflow": "100_percent explicit rejection or abstention; no silent fallback"
+      },
+      "controls": [
+        "utility_matrices_are_frozen_and_versioned_before_runs",
+        "scenario_priors_and_weights_are_versioned_and_not_agent_generated",
+        "ground_truth_scenarios_are_held_out_from_the_decision_planner",
+        "all_policies_use_the_same_proposal_and_resource_gate",
+        "finite_scenario_minimax_is_not_reported_as_an_arbitrary_adversarial_guarantee",
+        "exact_policy_search_cap_and_evaluation_count_are_reported"
+      ],
+      "reporting": {
+        "separate_EVSI_from_entropy_reduction": true,
+        "report_regret_distribution_p50_p90_p95": true,
+        "report_scenario_specific_decisions": true,
+        "report_tie_break_and_policy_space": true,
+        "no_single_composite_score": true
+      },
+      "claim_ceiling": "The minimax guarantee applies only to the supplied finite scenario set, terminal decisions and utilities; it does not cover unknown scenarios or validate caller-supplied value judgments."
     }
   ],
   "promotion_policy": {
@@ -1000,7 +1066,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/pull/9910",
     "https://github.com/Luminous-Dynamics/symthaea/pull/10058",
     "https://github.com/Luminous-Dynamics/symthaea/pull/10074",
-    "https://github.com/Luminous-Dynamics/symthaea/pull/9965"
+    "https://github.com/Luminous-Dynamics/symthaea/pull/9965",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/10171"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
