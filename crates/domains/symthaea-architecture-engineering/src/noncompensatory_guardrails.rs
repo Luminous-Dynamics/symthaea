@@ -137,8 +137,12 @@ pub struct NoncompensatoryGuardrailRequest {
     pub guardrail_roster_sha256: String,
     pub calibration_target_design_sha256: String,
     pub confirmatory_target_design_sha256: String,
+    /// Defines the independent experimental/cluster unit represented by each policy bound.
+    pub sampling_unit_contract_sha256: String,
     pub target_relation: CalibrationTargetRelation,
     pub calibration_independent_of_confirmatory_stream: bool,
+    pub independent_sampling_units_declared: bool,
+    pub no_cross_unit_interference_declared: bool,
     /// V1 only handles expected guardrail functionals linear under the declared policy mixture.
     pub mixture_estimand_linear: bool,
     /// One simultaneous confidence failure probability for every policy × requirement bound.
@@ -160,8 +164,11 @@ impl NoncompensatoryGuardrailRequest {
         guardrail_roster_sha256: impl Into<String>,
         calibration_target_design_sha256: impl Into<String>,
         confirmatory_target_design_sha256: impl Into<String>,
+        sampling_unit_contract_sha256: impl Into<String>,
         target_relation: CalibrationTargetRelation,
         calibration_independent_of_confirmatory_stream: bool,
+        independent_sampling_units_declared: bool,
+        no_cross_unit_interference_declared: bool,
         mixture_estimand_linear: bool,
         simultaneous_guardrail_failure_probability: f64,
         simultaneous_coverage_receipt_sha256: impl Into<String>,
@@ -179,8 +186,11 @@ impl NoncompensatoryGuardrailRequest {
             guardrail_roster_sha256: guardrail_roster_sha256.into(),
             calibration_target_design_sha256: calibration_target_design_sha256.into(),
             confirmatory_target_design_sha256: confirmatory_target_design_sha256.into(),
+            sampling_unit_contract_sha256: sampling_unit_contract_sha256.into(),
             target_relation,
             calibration_independent_of_confirmatory_stream,
+            independent_sampling_units_declared,
+            no_cross_unit_interference_declared,
             mixture_estimand_linear,
             simultaneous_guardrail_failure_probability,
             simultaneous_coverage_receipt_sha256: simultaneous_coverage_receipt_sha256.into(),
@@ -224,6 +234,10 @@ impl NoncompensatoryGuardrailRequest {
             &self.confirmatory_target_design_sha256,
             "request.confirmatory_target_design_sha256",
         )?;
+        validate_hash(
+            &self.sampling_unit_contract_sha256,
+            "request.sampling_unit_contract_sha256",
+        )?;
         if self.target_relation != CalibrationTargetRelation::SameTargetLawByDesign {
             return Err(GuardrailError::new(
                 "request.target_relation",
@@ -240,6 +254,18 @@ impl NoncompensatoryGuardrailRequest {
             return Err(GuardrailError::new(
                 "request.calibration_independent_of_confirmatory_stream",
                 "guardrail confidence calibration must be independent of confirmation",
+            ));
+        }
+        if !self.independent_sampling_units_declared {
+            return Err(GuardrailError::new(
+                "request.independent_sampling_units_declared",
+                "V1 requires independent sampling units as defined by the bound sampling-unit contract",
+            ));
+        }
+        if !self.no_cross_unit_interference_declared {
+            return Err(GuardrailError::new(
+                "request.no_cross_unit_interference_declared",
+                "V1 does not qualify unmodeled cross-unit interference",
             ));
         }
         if !self.mixture_estimand_linear {
@@ -487,6 +513,7 @@ pub struct NoncompensatoryGuardrailReport {
     pub guardrail_roster_sha256: String,
     pub calibration_target_design_sha256: String,
     pub confirmatory_target_design_sha256: String,
+    pub sampling_unit_contract_sha256: String,
     pub simultaneous_guardrail_failure_probability: f64,
     pub simultaneous_coverage_receipt_sha256: String,
     pub overall_decision: GuardrailOverallDecision,
@@ -503,6 +530,7 @@ struct ReportPayload<'a> {
     guardrail_roster_sha256: &'a str,
     calibration_target_design_sha256: &'a str,
     confirmatory_target_design_sha256: &'a str,
+    sampling_unit_contract_sha256: &'a str,
     simultaneous_guardrail_failure_probability: f64,
     simultaneous_coverage_receipt_sha256: &'a str,
     overall_decision: GuardrailOverallDecision,
@@ -685,6 +713,7 @@ pub fn analyze_noncompensatory_guardrails(
         guardrail_roster_sha256: &request.guardrail_roster_sha256,
         calibration_target_design_sha256: &request.calibration_target_design_sha256,
         confirmatory_target_design_sha256: &request.confirmatory_target_design_sha256,
+        sampling_unit_contract_sha256: &request.sampling_unit_contract_sha256,
         simultaneous_guardrail_failure_probability: request
             .simultaneous_guardrail_failure_probability,
         simultaneous_coverage_receipt_sha256: &request.simultaneous_coverage_receipt_sha256,
@@ -700,6 +729,7 @@ pub fn analyze_noncompensatory_guardrails(
         guardrail_roster_sha256: request.guardrail_roster_sha256,
         calibration_target_design_sha256: request.calibration_target_design_sha256,
         confirmatory_target_design_sha256: request.confirmatory_target_design_sha256,
+        sampling_unit_contract_sha256: request.sampling_unit_contract_sha256,
         simultaneous_guardrail_failure_probability: request
             .simultaneous_guardrail_failure_probability,
         simultaneous_coverage_receipt_sha256: request.simultaneous_coverage_receipt_sha256,
@@ -740,6 +770,7 @@ mod tests {
     const HASH_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const HASH_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const HASH_E: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const HASH_F: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
     fn requirements() -> Vec<GuardrailRequirement> {
         vec![
@@ -826,7 +857,9 @@ mod tests {
             roster_sha,
             HASH_A,
             HASH_A,
+            HASH_F,
             CalibrationTargetRelation::SameTargetLawByDesign,
+            true,
             true,
             true,
             0.01,
