@@ -33,6 +33,21 @@ Run:
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin networked-mediation-sweep > networked-mediation-sweep.csv
 ```
 
+## Iterated content drift and cultural attractors
+
+The separate `src/iterated_transmission.rs` module models repeated transmission of four normalized content attributes: toxicity, positivity, difficulty and length. A channel step applies a declared attribute-specific bias toward a configurable attractor plus noise, scaled by an open-endedness parameter. The evaluator reports signed/absolute drift by attribute, final distance to each attractor, initial/final pairwise distance and a convergence index.
+
+The `telephone-attractor-sweep` binary tests 4 chain lengths × 4 open-endedness values (16 conditions), 128 replicate seed sets per condition, and four distinct initial signals. Attractor targets, bias strengths and noise are synthetic controls—not measured parameters of a particular LLM.
+
+This is a metric/experiment-design fixture, not an implementation of text generation or a reproduction of Perez et al. (ICLR 2025). Real-model comparisons require pinned provider/model/prompt identities, preserved text chains, calibrated attribute scorers and independent human review.
+
+Protocol: [ITERATED_TRANSMISSION_ATTRACTOR_PROTOCOL_V0_1.md](ITERATED_TRANSMISSION_ATTRACTOR_PROTOCOL_V0_1.md).
+
+Run:
+```sh
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin telephone-attractor-sweep > telephone-attractor-sweep.csv
+```
+
 ## Zero-shot rule transfer
 
 The Reward Network engine exposes `evaluate_zero_shot_transfer`, which applies one frozen policy to multiple named graph profiles and reports policy reward, full-information oracle reward, regret, oracle fraction and invalid moves. Tests compare the same loss-seeking and immediate-greedy rules across two distinct synthetic profiles: the abstract 10-move incentive fixture and a historical-shape 8-transition fixture. The result is a *rule-transfer sanity check*, not evidence that Symthaea's learned representations or human cultural skills transfer across real graph families. Final v2.0 transfer tests must use held-out Zenodo networks grouped by topology/reward-family, not the synthetic fixtures.
