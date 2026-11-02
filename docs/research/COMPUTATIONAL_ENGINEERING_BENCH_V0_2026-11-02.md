@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-02  
 **Status:** Design-only task contract and catalog; no benchmark run or performance claim exists.  
-**Machine-readable artifacts:** `benchmarks/ceb/task.schema.json`, `benchmarks/ceb/catalog.v0.json`
+**Machine-readable artifacts:** `benchmarks/ceb/task.schema.json`, `benchmarks/ceb/catalog.v0.json`, `benchmarks/ceb/run-receipt.schema.json`, `benchmarks/ceb/dsse-envelope.schema.json`
 
 ## 1. Purpose
 
@@ -21,7 +21,7 @@ Therefore:
 - They are not executable benchmark tasks yet.
 - They must not enter a pass-rate denominator or leaderboard.
 - No agent, including Symthaea, has a CEB score.
-- A valid JSON record or passing schema validator is not evidence of engineering performance.
+- A valid JSON record or passing schema validator is not evidence of engineering performance. The design-only receipt example is not a real run and must not be scored.
 - A task becomes `fixture_ready` only after its source snapshot, isolated environment, budgets and independent grader are pinned and validated.
 - A task becomes `qualified` only after the grader, reference patch, empty-patch negative control, split custody and isolation controls all pass.
 
@@ -60,7 +60,7 @@ Every task must pass all of the following before it can be used for a result:
 7. **Scope review:** the task instructions and grader measure the same behavior; unrelated pass-to-pass regression tests remain active.
 8. **Verifier red-team:** attack the reward channel, grader files, test discovery, answer/oracle paths, caches, environment inheritance, network boundaries, symlinks, report serialization and benchmark-version pinning. Include both false-accept and false-reject controls. A valid reference patch must never be rejected solely because it uses an alternate permitted implementation.
 
-The grader should emit per-check results and a signed/digest-bound evidence receipt. A score is not accepted merely because the agent says its own tests passed.
+The grader should emit per-check results in an in-toto Statement v1, wrapped by a DSSE-signed envelope. The statement binds task, source, candidate patch, environment, grader, checks and resource usage; the envelope authenticates the serialized statement against an independently provisioned trust root. A single grade receipt is not an acceptance: primary and pristine-regrade receipts must bind identical task/source/patch/grader/model/harness inputs, distinct execution identities and independent evidence, with both grades passing. A score is not accepted merely because the agent says its own tests passed. See `docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md` and issue #10167.
 
 ## 5. Scoring model
 
@@ -121,7 +121,7 @@ The eight initial records in `catalog.v0.json` cover:
 | CEB-SYS-001 | Systems design | Requirement-to-evidence traceability | Trace completeness, risk and review rubric |
 | CEB-VER-001 | Benchmark integrity | Audit and harden an adversarial benchmark verifier | Positive/negative controls, exploit resistance and independently reviewed task-level verdicts |
 
-All nine are `design_only`. The first qualification batch should contain 2–3 independently implemented fixture tasks per lane, not one cherry-picked demonstration.
+All nine are `design_only`. The receipt and DSSE schemas define evidence shape only; no signing keys, trusted runner identity, executable verifier or accepted receipt has been provisioned. The first qualification batch should contain 2–3 independently implemented fixture tasks per lane, not one cherry-picked demonstration.
 
 ## 8. Recommended first qualification batch
 
