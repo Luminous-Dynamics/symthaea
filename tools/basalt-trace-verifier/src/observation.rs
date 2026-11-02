@@ -1162,7 +1162,7 @@ pub fn verify_backend_observation(
         Ok(value) => value,
         Err(error) => {
             return invalid_observation_report(InvalidObservationContext {
-            trace_id: trace_id,
+            trace_id,
             reference_sha256: expected_reference_trace_sha256.to_string(),
             raw_event_sha256: raw_sha256,
             operations: 0,
@@ -1178,7 +1178,7 @@ pub fn verify_backend_observation(
 
     if let Err(errors) = validate_json_required_presence(observation_bytes) {
         return invalid_observation_report(InvalidObservationContext {
-            trace_id: trace_id,
+            trace_id,
             reference_sha256: parsed.reference_trace_sha256.clone(),
             raw_event_sha256: raw_sha256,
             operations: parsed.observed_operations.len(),
@@ -1192,7 +1192,7 @@ pub fn verify_backend_observation(
     let actual_reference_trace_sha256 = sha256_prefixed_bytes(reference_trace_bytes);
     if actual_reference_trace_sha256 != expected_reference_trace_sha256 {
         return invalid_observation_report(InvalidObservationContext {
-            trace_id: trace_id,
+            trace_id,
             reference_sha256: parsed.reference_trace_sha256.clone(),
             raw_event_sha256: raw_sha256,
             operations: parsed.observed_operations.len(),
@@ -1209,7 +1209,7 @@ pub fn verify_backend_observation(
         Ok(value) => value,
         Err(error) => {
             return invalid_observation_report(InvalidObservationContext {
-            trace_id: trace_id,
+            trace_id,
             reference_sha256: parsed.reference_trace_sha256.clone(),
             raw_event_sha256: raw_sha256,
             operations: parsed.observed_operations.len(),
@@ -1223,7 +1223,7 @@ pub fn verify_backend_observation(
     let reference_report = verify_reference(&reference_trace, reference_trace_bytes);
     if reference_report.status != "pass" {
         return invalid_observation_report(InvalidObservationContext {
-            trace_id: trace_id,
+            trace_id,
             reference_sha256: parsed.reference_trace_sha256.clone(),
             raw_event_sha256: raw_sha256,
             operations: parsed.observed_operations.len(),
@@ -1244,7 +1244,7 @@ pub fn verify_backend_observation(
         Ok(value) => value,
         Err(errors) => {
             return invalid_observation_report(InvalidObservationContext {
-            trace_id: trace_id,
+            trace_id,
             reference_sha256: parsed.reference_trace_sha256.clone(),
             raw_event_sha256: raw_sha256,
             operations: parsed.observed_operations.len(),
