@@ -398,7 +398,7 @@ mod tests{
     }
     #[test]fn finite_fixture_exposes_reward_risk_tradeoff_and_nonmonotone_action_loss(){
         let f=load_builtin_fixture().unwrap();let xs=evaluate_beta_grid(&f).unwrap();
-        assert_eq!(xs.len(),7);
+        assert_eq!(xs.len(),8);
         assert!(xs[0].evaluator_risk_within_budget);
         assert!(xs[1].evaluator_risk_within_budget);
         assert!(!xs[2].evaluator_risk_within_budget);
@@ -407,6 +407,8 @@ mod tests{
         assert!(xs[0].evaluator.expected_reward_milli.numerator>0);
         assert!(xs[0].evaluator.expected_loss_ppm.cmp_checked(Fraction::new(0,1).unwrap()).unwrap()==Ordering::Greater);
         assert_ne!(xs[0].evaluator.expected_loss_ppm,xs[4].evaluator.expected_loss_ppm);
+        assert!(xs[6].evaluator.expected_loss_ppm.cmp_checked(xs[5].evaluator.expected_loss_ppm).unwrap()==Ordering::Greater);
+        assert!(xs[7].evaluator.expected_loss_ppm.cmp_checked(xs[6].evaluator.expected_loss_ppm).unwrap()==Ordering::Less);
     }
     #[test]fn weighted_diagnostic_uses_exact_finite_support_supremum(){
         let f=load_builtin_fixture().unwrap();
