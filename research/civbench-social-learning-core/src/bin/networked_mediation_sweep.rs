@@ -8,12 +8,16 @@
 //! synthetic mechanism sensitivity study, not a fit to human data.
 
 use civbench_social_learning_core::networked_mediation::{
-    simulate_networked_mediation, NetworkedMediationConfig,
+    simulate_networked_mediation, NetworkedMediationConfig, RecommenderObjective,
 };
 
 const REPLICATES: u64 = 256;
 const SHORTCUT_PROBABILITIES: [f64; 4] = [0.0, 0.02, 0.10, 0.50];
 const MEDIATION_FRACTIONS: [f64; 5] = [0.0, 0.25, 0.50, 0.75, 1.0];
+const RECOMMENDER_OBJECTIVES: [(&str, RecommenderObjective, f64); 2] = [
+    ("performance_only", RecommenderObjective::PerformanceOnly, 0.0),
+    ("performance_plus_lineage_diversity", RecommenderObjective::PerformanceDiversity { novelty_weight: 0.5 }, 0.5),
+];
 
 #[derive(Default)]
 struct OnlineStats {
@@ -49,11 +53,12 @@ fn fmt(value: Option<f64>) -> String {
 
 fn main() {
     println!(
-        "shortcut_probability,mediation_fraction,generation,replicates,actual_network_density,mean_quality,mean_quality_ci95,max_quality,knowledge_coverage,seed_lineage_prevalence,unique_nonzero_lineages,effective_lineage_diversity,lineage_hhi,individual_innovations,observations,successful_acquisitions,peer_adoptions,mediated_adoptions,peer_acquisitions,mediated_acquisitions"
+        "shortcut_probability,mediation_fraction,recommender_objective,novelty_weight,generation,replicates,actual_network_density,mean_quality,mean_quality_ci95,max_quality,knowledge_coverage,seed_lineage_prevalence,unique_nonzero_lineages,effective_lineage_diversity,lineage_hhi,individual_innovations,observations,successful_acquisitions,peer_adoptions,mediated_adoptions,peer_acquisitions,mediated_acquisitions"
     );
 
     for shortcut_probability in SHORTCUT_PROBABILITIES {
         for mediation_fraction in MEDIATION_FRACTIONS {
+            for (objective_name, recommender_objective, novelty_weight) in RECOMMENDER_OBJECTIVES {
             let mut density = OnlineStats::default();
             let mut mean_quality: Vec<OnlineStats> = (0..8).map(|_| OnlineStats::default()).collect();
             let mut max_quality: Vec<OnlineStats> = (0..8).map(|_| OnlineStats::default()).collect();
@@ -74,6 +79,7 @@ fn main() {
                 let config = NetworkedMediationConfig {
                     shortcut_probability,
                     mediation_fraction,
+                    recommender_objective,
                     ..NetworkedMediationConfig::default()
                 };
                 let run = simulate_networked_mediation(config, seed)
@@ -101,9 +107,11 @@ fn main() {
 
             for generation in 0..8 {
                 println!(
-                    "{:.6},{:.6},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                    "{:.6},{:.6},{},{:.6},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                     shortcut_probability,
                     mediation_fraction,
+                    objective_name,
+                    novelty_weight,
                     generation,
                     REPLICATES,
                     fmt(density.mean()),
@@ -123,6 +131,7 @@ fn main() {
                     fmt(peer_acquisitions[generation].mean()),
                     fmt(mediated_acquisitions[generation].mean()),
                 );
+            }
             }
         }
     }
