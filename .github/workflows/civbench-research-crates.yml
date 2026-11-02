@@ -7,6 +7,7 @@ on:
       - "research/**/Cargo.lock"
       - "research/**/src/**"
       - ".github/workflows/civbench-research-crates.yml"
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py"
   push:
     paths:
       - "research/**/Cargo.toml"
