@@ -12,8 +12,6 @@ The signal-detection module preserves the four event-detection outcomes:
 - false alarms: event absent, response present;
 - correct rejections: event absent, response absent.
 
-Example:
-
 ```rust
 use symthaea_statistics::SignalDetectionCounts;
 
@@ -25,8 +23,6 @@ let counts = SignalDetectionCounts {
 };
 
 let metrics = counts.metrics().expect("both event classes are represented");
-assert_eq!(metrics.signal_trials, 50);
-assert_eq!(metrics.noise_trials, 50);
 println!("hit rate = {}", metrics.hit_rate);
 println!("false-alarm rate = {}", metrics.false_alarm_rate);
 println!("d-prime = {}", metrics.d_prime);
@@ -47,6 +43,35 @@ of an electromagnetic field or other physical mechanism.
 A result is not evaluable when there are no event-present trials, no
 event-absent trials, or count totals overflow. The API does not silently
 invent a missing denominator.
+
+## ROC curves
+
+The ROC module accepts scored observations with an explicit ground-truth
+signal label. It sorts scores once, groups equal scores before updating the
+curve, and computes trapezoidal AUC in O(n log n) time. Larger scores mean
+stronger evidence for the signal class.
+
+```rust
+use symthaea_statistics::{RocObservation, try_roc_curve};
+
+let observations = [
+    RocObservation { score: 0.9, is_signal: true },
+    RocObservation { score: 0.8, is_signal: false },
+    RocObservation { score: 0.7, is_signal: true },
+    RocObservation { score: 0.6, is_signal: false },
+];
+
+let curve = try_roc_curve(&observations)?;
+assert!((curve.auc - 0.75).abs() < 1e-12);
+
+# Ok::<(), symthaea_statistics::RocError>(())
+```
+
+Tied scores enter at one threshold and receive half-credit in AUC via the
+trapezoidal definition. Empty input, non-finite scores and single-class data
+return explicit errors instead of a fabricated diagonal curve. AUC measures
+ranking discrimination; it does not measure probability calibration or
+choose an operating threshold.
 
 ## Existing statistical layers
 
