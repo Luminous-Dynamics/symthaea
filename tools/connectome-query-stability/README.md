@@ -10,7 +10,7 @@ This crate checks a deliberately limited claim:
 
 > Did every declared query metric remain within its absolute tolerance across the complete supplied checkpoint window and every supplied admissible scenario?
 
-It does not forecast future changes. The report hard-codes:
+It does not forecast future changes. The report carries the first/latest graph snapshot SHA-256, latest edit-history manifest, graph-builder configuration and structural-uncertainty manifest so downstream receipts can bind the result to the exact audited graph state. It hard-codes:
 - `future_stability_certified = false`
 - `universal_connectome_completeness_claimed = false`
 
