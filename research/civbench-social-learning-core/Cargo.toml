@@ -47,4 +47,8 @@ path = "src/bin/czaplicka_2025_sweep.rs"
 name = "czaplicka-2025-parity"
 path = "src/bin/czaplicka_2025_parity.rs"
 
+[[bin]]
+name = "reward-network-abm-reference-sweep"
+path = "src/bin/reward_network_abm_reference_sweep.rs"
+
 [dependencies]
