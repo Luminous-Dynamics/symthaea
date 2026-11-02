@@ -607,6 +607,9 @@ impl DelayedAciBank {
             {
                 return Err(invalid("queued prediction identity/phase does not match due target"));
             }
+            if self.phase_alpha_ppm[phase_index] != pending.alpha_used_ppm {
+                return Err(invalid("phase alpha state differs from alpha stored with due prediction"));
+            }
             let error_ppm = if observed_miss { SCALE_PPM } else { 0 };
             let delta = div_round_away_from_zero(
                 i128::from(self.gamma_ppm) * i128::from(self.target_alpha_ppm - error_ppm),
