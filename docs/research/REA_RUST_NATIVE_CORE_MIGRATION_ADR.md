@@ -506,3 +506,13 @@ The first target is not to claim the best decompiler. It is to show that evidenc
 - explicit coverage, refusals, timeouts and unsupported cases in all denominators.
 
 These are proposed gates, not measured results and not universal industry standards. The benchmark manifest includes separate families for the SRE-Bench external track and OWASP public mobile challenges.
+
+#### Published SRE-Bench public-facing leaderboard snapshot
+
+At the October 2026 snapshot, the public-facing results table reports GPT-6-Astra at 5.55 tasks passed per graded binary, with 149 fully solved of 181 graded (82.3%) and 7 zero-credit (3.9%). The same table reports GPT-5.6-Sol at 3.69 tasks per graded binary, with 80 fully solved of 254 graded (31.5%). These are different graded-instance counts, so quoting solved percentages alone hides differences in coverage and refusal. The benchmark page explicitly states that GPT-6-Astra was graded on 181 of 262 instances because of cyber-safety refusals.
+
+For our own reporting, keep the official SRE-Bench score unchanged, but add two non-substituting coverage measures:
+- **eligible coverage** = attempted / eligible tasks;
+- **coverage-adjusted task yield** = passed tasks / all eligible tasks.
+
+Also publish refused, abstained, unsupported, timeout and tool-failure counts separately. Do not relabel the coverage-adjusted measure as the official SRE-Bench score. This is the guard against a system appearing stronger merely because it declines more difficult tasks.
