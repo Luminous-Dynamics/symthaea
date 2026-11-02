@@ -50,7 +50,8 @@
         "security_engineering",
         "performance_engineering",
         "systems_design",
-        "reliability_engineering"
+        "reliability_engineering",
+        "benchmark_integrity"
       ]
     },
     "title": {
