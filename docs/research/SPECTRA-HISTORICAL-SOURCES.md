@@ -254,6 +254,31 @@ This document is also useful because it explicitly distinguishes (in its own ter
 Hosted transcription: https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2
 The host warns that the transcription is machine-generated and may contain errors; use document ID CIA-RDP96-00787R000100190001-2 to retrieve/check the official CIA scan.
 
+## PH-016 — *Beyond Telepathy* (Doubleday, 1962), Appendix A
+
+**Document:** Andrija Puharich, *Beyond Telepathy*, Doubleday, Garden City, NY, 1962, 312 pages. Original edition record: Google Books (digitized from University of California, 2017) and Open Library / WorldCat.
+
+- Google Books 1962 edition: https://books.google.com/books/about/Beyond_Telepathy.html?id=q68SUck-Q44C
+- Open Library 1962 edition record: https://openlibrary.org/books/OL5823263M/Beyond_telepathy.
+- Related Internet Archive scan (1973 Anchor Press edition, original ©1962), access-restricted/borrow: https://archive.org/details/beyondtelepathy00puha
+
+**Classification:** P1 for Puharich's own published account once the appendix text is inspected. At present, the existence and subject of the appendix are supported by a contemporaneous book review, not yet by direct inspection of the appendix.
+
+**Contemporaneous locator:** *Kirkus Reviews*, issue 1 April 1962, review of *Beyond Telepathy* (release date 27 April 1962), says the book contains an appendix described as a complete account of tests made on Eileen Garrett in a copper Faraday enclosure to investigate ESP/electromagnetism:
+https://www.kirkusreviews.com/book-reviews/a/-146/beyond-telepathy/
+
+**Why it matters:** This is likely the most important published first-person account of the Garrett/Faraday work. It may contain protocol descriptions, condition comparisons, scores, apparatus details, physiological observations, or references to the underlying journals. It should be prioritized above reconstructing the Garrett protocol from later memoir text alone.
+
+**Access status checked:** Google Books identifies the 1962 Doubleday edition as snippet view, no eBook. Internet Archive has a 1973 Anchor Press scan with original copyright 1962, but its item page currently marks it access-restricted and offers borrow/reading rather than unrestricted download. Do not describe the text as fully recovered.
+
+**Required extraction when access is obtained:**
+1. Record the exact appendix title, page range, and edition.
+2. Capture the table of contents, apparatus description/drawings, exact experimental task, target and randomization method, role separation, feedback/scoring procedure, all condition labels/order, trial counts, failed/missing runs and stated statistical analysis.
+3. Extract exact scores with page/image citations and preserve the author's original terminology.
+4. Compare its account to PH-015 (1969 court opinion), PH-001 (1972 SRI proposal), PH-006/009 (later memoir), PH-007 (1961 Darshana article), and PH-008 (562-page manuscript).
+5. Mark where Puharich's published account is incomplete, inconsistent or differs from the later sources; do not silently harmonize discrepancies.
+6. Seek the underlying journals/raw trial logs separately. A first-person published account is not the same as a complete raw dataset or independent replication.
+
 ## PH-013 — Eileen J. Garrett Parapsychology Foundation Collection at UMBC
 
 **Repository:** Albin O. Kuhn Library and Gallery Special Collections, University of Maryland, Baltimore County (UMBC).
