@@ -20,7 +20,8 @@ pub const PUBLISHED_MOVE_BUDGET: usize = 10;
 pub const LEGACY_GITHUB_NODE_COUNT: usize = 10;
 pub const LEGACY_GITHUB_EDGE_COUNT: usize = 20;
 pub const LEGACY_GITHUB_MOVE_BUDGET: usize = 8;
-pub const LEGACY_GITHUB_MAX_NODE_LEVEL: u8 = 5;
+pub const LEGACY_GITHUB_OBSERVED_MAX_NODE_LEVEL: u8 = 4;
+pub const LEGACY_GITHUB_VALIDATOR_MAX_NODE_LEVEL: u8 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RewardEdge {
@@ -447,7 +448,7 @@ mod tests {
     fn legacy_github_profile_fixture_is_valid_but_remains_synthetic() {
         let network = synthetic_legacy_profile_network();
         assert!(network.validate_shape(LEGACY_GITHUB_NODE_COUNT, LEGACY_GITHUB_EDGE_COUNT).is_ok());
-        assert!(network.validate_level_range(LEGACY_GITHUB_MAX_NODE_LEVEL - 1).is_ok());
+        assert!(network.validate_level_range(LEGACY_GITHUB_OBSERVED_MAX_NODE_LEVEL).is_ok());
         assert!(network.validate_terminal_strategy(4, 3).is_ok());
     }
 
