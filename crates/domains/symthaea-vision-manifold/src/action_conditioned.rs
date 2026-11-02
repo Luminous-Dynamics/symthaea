@@ -646,13 +646,48 @@ mod tests {
 
     #[test]
     fn request_rejects_bad_identity_timing_actions_and_draws() {
-        let mut request = request();
-        assert!(request.validate().is_ok());
-        request.horizon_seconds = f64::NAN;
-        assert!(request.validate().is_err());
-        request = request();
-        request.target_time_seconds = 1.75;
-        assert!(request.validate().is_err());
+        let mut bad_horizon = request();
+        assert!(bad_horizon.validate().is_ok());
+        bad_horizon.horizon_seconds = f64::NAN;
+        assert!(bad_horizon.validate().is_err());
+
+        let mut bad_target = request();
+        bad_target.target_time_seconds = 1.75;
+        assert!(bad_target.validate().is_err());
+
+        let mut bad_manifest = request();
+        bad_manifest.action_manifest_sha256 = "not-a-digest";
+        assert!(bad_manifest.validate().is_err());
+
+        let mut bad_action = request();
+        bad_action.actions[1].canonical_descriptor.clear();
+        assert!(bad_action.validate().is_err());
+    }
+
+    struct FixedPredictor;
+
+    impl ActionConditionedVisualPredictor for FixedPredictor {
+        fn predict_joint_action_set(
+            &self,
+            _request: &ActionForecastRequest<'_>,
+        ) -> Result<ActionForecastBank, String> {
+            Ok(bank())
+        }
+    }
+
+    #[test]
+    fn predictor_adapter_validates_returned_bank_against_immutable_request() {
+        let request = request();
+        let prediction = FixedPredictor.predict_validated(&request).unwrap();
+        prediction.validate_for_request(&request).unwrap();
+
+        let mut tampered = prediction;
+        tampered.persistence_belief[0] = 0.5;
+        assert!(tampered.validate_for_request(&request).is_err());
+
+        let mut tampered = bank();
+        tampered.action_manifest_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
+        assert!(tampered.validate_for_request(&request).is_err());
     }
 
     #[test]
