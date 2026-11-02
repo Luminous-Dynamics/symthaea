@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)]
 
 //! Reward Network task mechanics and transparent reference policies.
+//! V0 models directed transitions with stable edge-index tie-breaking; verify
+//! those semantics against the original archive before experimental replay.
 //! Tests use a synthetic graph, not an original experimental network.
 
 use core::fmt;
