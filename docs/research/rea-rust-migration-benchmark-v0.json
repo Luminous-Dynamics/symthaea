@@ -882,6 +882,85 @@
         }
       ],
       "reporting_invariant": "Every result publishes coverage/denominator, refusals, unsupported, timeouts, abstentions and graded-subset scores. Never count ungraded/refused cases as solved or silently drop them."
+    },
+    {
+      "id": "agentre_bench_v3_1_external",
+      "status": "external_baseline_not_yet_executed",
+      "source": "https://www.agentre-bench.ai/",
+      "version": "3.1",
+      "release_window": "2026-10",
+      "platform_cohort": "Windows_PE",
+      "published_design": {
+        "programs": 10,
+        "symbol_conditions": [
+          "with_symbols",
+          "without_symbols"
+        ],
+        "artifacts": 20,
+        "models": 5,
+        "attempts_per_artifact": 5,
+        "episodes": 500,
+        "tool_call_budget": 25
+      },
+      "metrics": [
+        "deterministic_claim_accuracy",
+        "unsupported_claim_penalty",
+        "evidence_traceability",
+        "tool_call_count",
+        "coverage",
+        "failure_and_abstention_rate",
+        "time_and_cost",
+        "repeated_attempt_confidence_interval"
+      ],
+      "reporting": {
+        "keep_separate_from_SRE_Bench": true,
+        "fixed_budget_condition": true,
+        "report_attempt_denominators": true,
+        "missing_and_invalid_answers_retained": true
+      },
+      "claim_ceiling": "Published benchmark results are external baselines; Symthaea has not participated or reproduced them. Do not compare scores directly with SRE-Bench or other incompatible protocols."
+    },
+    {
+      "id": "robust_decision_aware_evsi_and_regret",
+      "status": "planned_follow_on",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10109",
+      "references": [
+        "https://proceedings.mlr.press/v337/harikumar26a.html"
+      ],
+      "baseline_arms": [
+        "point_EIG",
+        "scenario_robust_EIG",
+        "expected_EVSI",
+        "worst_case_EVSI",
+        "lower_tail_CVaR_EVSI",
+        "minimax_regret",
+        "random_eligible_probe",
+        "cost_only_heuristic"
+      ],
+      "metrics": [
+        "expected_value_of_sample_information",
+        "worst_case_decision_utility",
+        "lower_tail_CVaR_decision_utility",
+        "scenario_conditioned_posterior_action",
+        "shared_policy_decision_regret",
+        "decision_stability_across_scenarios",
+        "wrong_action_rate",
+        "decision_scope_abstention_rate",
+        "investigation_cost_energy_target_impact"
+      ],
+      "controls": [
+        "likelihood_misspecification",
+        "omitted_latent_variables",
+        "decision_utility_misspecification",
+        "asymmetric_loss",
+        "scenario_weight_perturbation",
+        "outcome_changes_entropy_but_not_action",
+        "low_EIG_probe_prevents_high_impact_wrong_action",
+        "ambiguous_tied_decisions",
+        "adversarially_optimistic_scenario"
+      ],
+      "target": "at_least_20_percent_reduction_in_90th_percentile_realized_decision_regret_vs_point_EIG_on_preregistered_shift_suite_without_more_than_10_percent_median_resource_cost_increase",
+      "claim_ceiling": "Utility, priors, likelihoods and scenario coverage remain caller-supplied. This is decision support, not proof that stakeholder utility is complete or that true conditions lie in the scenario set."
     }
   ],
   "promotion_policy": {
@@ -930,5 +1009,22 @@
     "native_mobile_analyzer_qualified": false,
     "performance_improvement_measured": false,
     "industry_superiority_claim_allowed": false
-  }
+  },
+  "external_baseline_notes": [
+    {
+      "name": "AgentRE-Bench v3.1",
+      "url": "https://www.agentre-bench.ai/",
+      "protocol": "20 Windows PE artifacts, 500 episodes, five models x five attempts, 25 tool calls per episode, versioned ground truth and unsupported-claim penalties",
+      "non_comparable_to": [
+        "SRE-Bench",
+        "Decompile-Bench"
+      ],
+      "status": "research target only; no Luminous result"
+    },
+    {
+      "name": "UAI 2026 Robust Bayesian Decision Making under Adversarial Uncertainty",
+      "url": "https://proceedings.mlr.press/v337/harikumar26a.html",
+      "implication": "separate robust information gain from downstream decision utility and regret"
+    }
+  ]
 }
