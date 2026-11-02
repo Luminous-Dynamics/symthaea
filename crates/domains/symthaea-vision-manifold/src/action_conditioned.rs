@@ -378,6 +378,7 @@ pub enum ForecastObservationResult {
 struct PendingForecast {
     history_sha256: String,
     action_manifest_sha256: String,
+    joint_draw_manifest_sha256: String,
     model_sha256: String,
     source_frame_sequence: u64,
     issued_at_seconds: f64,
@@ -389,6 +390,14 @@ struct PendingForecast {
     branch_id: String,
     predicted_belief: Vec<f32>,
     persistence_belief: Vec<f32>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnobservedForecastExpiry {
+    pub action_id: u64,
+    pub joint_draw_id: u64,
+    pub branch_id: String,
+    pub reason: ForecastExpiryReason,
 }
 
 /// Bounded exact-target scorer for action-conditioned future visual beliefs.
@@ -542,14 +551,6 @@ impl ActionConditionedForecastEvaluator {
         self.matured_count = self.matured_count.saturating_add(1);
         Ok(ForecastObservationResult::Scored(score))
     }
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UnobservedForecastExpiry {
-    pub action_id: u64,
-    pub joint_draw_id: u64,
-    pub branch_id: String,
-    pub reason: ForecastExpiryReason,
-}
 
     pub fn pending_count(&self) -> usize {
         self.pending.len()
