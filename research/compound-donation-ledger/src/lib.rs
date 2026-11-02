@@ -617,7 +617,7 @@ pub struct OvershootRefundReceipt {
 pub struct ProcessOvershootRefund {
     alpha_numerator: u64,
     denominator: u128,
-    refund_cap_numerator: u128,
+    refund_cap_numerator: Option<u128>,
     last_round: Option<u64>,
     last_evidence_value: u128,
     cumulative_refund_numerator: u128,
@@ -660,11 +660,27 @@ impl ProcessOvershootRefund {
         Ok(Self {
             alpha_numerator,
             denominator,
-            refund_cap_numerator,
+            refund_cap_numerator: Some(refund_cap_numerator),
             last_round: None,
             last_evidence_value: initial_evidence_value,
             cumulative_refund_numerator: 0,
         })
+    }
+
+    /// Creates the full, uncapped SCORE overshoot account:
+    /// O_t = (alpha * V_t - 1)_+.
+    ///
+    /// The corresponding effective cost is exactly min(alpha * V_t, 1).
+    /// Expected cumulative refund under the null is at most alpha because
+    /// O_t <= alpha * V_t and E[V_infinity] <= 1. This mode is kept separate
+    /// from the bounded-credit constructor to make the policy explicit.
+    pub fn new_full_overshoot(
+        alpha_numerator: u64,
+        alpha_denominator: u64,
+    ) -> Result<Self, LedgerError> {
+        let mut account = Self::new(alpha_numerator, alpha_denominator)?;
+        account.refund_cap_numerator = None;
+        Ok(account)
     }
 
     /// Atomically records a nondecreasing process value and releases only the
@@ -696,7 +712,9 @@ impl ProcessOvershootRefund {
             .checked_mul(new_evidence_value)
             .ok_or(LedgerError::ArithmeticOverflow)?;
         let raw_overshoot = alpha_scaled_evidence.saturating_sub(self.denominator);
-        let next_refund = raw_overshoot.min(self.refund_cap_numerator);
+        let next_refund = self
+            .refund_cap_numerator
+            .map_or(raw_overshoot, |cap| raw_overshoot.min(cap));
         if next_refund < self.cumulative_refund_numerator {
             return Err(LedgerError::InvariantViolation);
         }
@@ -729,8 +747,12 @@ impl ProcessOvershootRefund {
         self.cumulative_refund_numerator
     }
 
-    pub fn refund_cap_numerator(&self) -> u128 {
+    pub fn refund_cap_numerator(&self) -> Option<u128> {
         self.refund_cap_numerator
+    }
+
+    pub fn is_full_overshoot(&self) -> bool {
+        self.refund_cap_numerator.is_none()
     }
 
     pub fn denominator(&self) -> u128 {
@@ -1577,7 +1599,7 @@ mod tests {
         );
         assert_eq!(
             capped.cumulative_refund_numerator,
-            account.refund_cap_numerator()
+            account.refund_cap_numerator().unwrap()
         );
         assert_eq!(
             capped.effective_cost_numerator,
@@ -1668,6 +1690,62 @@ mod tests {
         assert!(crossed.rejected);
         assert_eq!(crossed.cumulative_refund_numerator, EVIDENCE_ONE);
         assert_eq!(crossed.effective_cost_numerator, crossed.denominator);
+    }
+
+
+    #[test]
+    fn full_process_overshoot_refund_matches_score_identity() {
+        let mut account = ProcessOvershootRefund::new_full_overshoot(1, 20).unwrap();
+        assert!(account.is_full_overshoot());
+        assert_eq!(account.refund_cap_numerator(), None);
+
+        let below = account.record(1, 19 * EVIDENCE_ONE).unwrap();
+        assert_eq!(below.refund_increment_numerator, 0);
+        assert_eq!(below.effective_cost_numerator, 19 * EVIDENCE_ONE);
+
+        let at = account.record(2, 20 * EVIDENCE_ONE).unwrap();
+        assert_eq!(at.refund_increment_numerator, 0);
+        assert_eq!(at.effective_cost_numerator, 20 * EVIDENCE_ONE);
+
+        let overshoot = account.record(3, 100 * EVIDENCE_ONE).unwrap();
+        assert_eq!(
+            overshoot.cumulative_refund_numerator,
+            80 * EVIDENCE_ONE
+        );
+        assert_eq!(
+            overshoot.refund_increment_numerator,
+            80 * EVIDENCE_ONE
+        );
+        assert_eq!(
+            overshoot.effective_cost_numerator,
+            overshoot.denominator
+        );
+
+        let later = account.record(4, 200 * EVIDENCE_ONE).unwrap();
+        assert_eq!(later.refund_increment_numerator, 100 * EVIDENCE_ONE);
+        assert_eq!(later.cumulative_refund_numerator, 180 * EVIDENCE_ONE);
+        assert_eq!(later.effective_cost_numerator, later.denominator);
+    }
+
+    #[test]
+    fn full_and_capped_refund_have_same_cost_but_different_refund_credit_after_cap() {
+        let mut capped = ProcessOvershootRefund::new(1, 20).unwrap();
+        let mut full = ProcessOvershootRefund::new_full_overshoot(1, 20).unwrap();
+
+        let capped_receipt = capped.record(1, 100 * EVIDENCE_ONE).unwrap();
+        let full_receipt = full.record(1, 100 * EVIDENCE_ONE).unwrap();
+        assert_eq!(
+            capped_receipt.effective_cost_numerator,
+            full_receipt.effective_cost_numerator
+        );
+        assert_eq!(
+            capped_receipt.cumulative_refund_numerator,
+            EVIDENCE_ONE
+        );
+        assert_eq!(
+            full_receipt.cumulative_refund_numerator,
+            80 * EVIDENCE_ONE
+        );
     }
 
     #[test]
