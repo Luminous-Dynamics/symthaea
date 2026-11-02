@@ -45,6 +45,7 @@ pub mod audio_analyzer;
 #[cfg(feature = "theory")]
 pub mod blinded_study;
 pub mod choreography;
+pub mod creative_ecology;
 #[cfg(feature = "clap-fad")]
 pub mod clap_embed;
 #[cfg(feature = "clap-fad")]
