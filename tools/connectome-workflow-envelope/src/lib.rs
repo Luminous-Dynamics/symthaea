@@ -122,6 +122,7 @@ pub struct ViewDecisionReceipt {
     pub policy_sha256: String,
     pub scenario_set_sha256: String,
     pub loss_matrix_sha256: String,
+    pub acquisition_cost_profile_sha256: String,
     pub loss_unit_id: String,
     pub outcome: ViewDecisionOutcome,
 }
@@ -717,6 +718,7 @@ fn validate_view_receipt(
     validate_sha("view policy", &receipt.policy_sha256)?;
     validate_sha("view scenario set", &receipt.scenario_set_sha256)?;
     validate_sha("view decision loss matrix", &receipt.loss_matrix_sha256)?;
+    validate_sha("view acquisition cost profile", &receipt.acquisition_cost_profile_sha256)?;
     validate_id("view loss unit", &receipt.loss_unit_id)?;
     if receipt.operation_id != operation.operation_id {
         return Err(EnvelopeError::OperationMismatch {
@@ -1014,6 +1016,7 @@ mod tests {
             policy_sha256: SHA_B.to_owned(),
             scenario_set_sha256: SHA_C.to_owned(),
             loss_matrix_sha256: SHA_D.to_owned(),
+            acquisition_cost_profile_sha256: SHA_A.to_owned(),
             loss_unit_id: "risk-units".to_owned(),
             outcome: ViewDecisionOutcome::Acquired {
                 view_id: "view-xy".to_owned(),
@@ -1130,6 +1133,21 @@ mod tests {
         assert_eq!(report.status, WorkflowStatus::ViewDecisionPending);
         assert!(report.completed_stages.contains(&"SPLIT_AUDIT"));
         assert!(report.completed_stages.contains(&"PREDICTION"));
+    }
+
+    #[test]
+    fn split_audit_must_reference_the_same_operation_sample_task_and_split() {
+        let mut value = envelope();
+        let mut receipt = split_receipt(SplitAuditOutcome::GroupDisjoint);
+        receipt.sample_hash = "ffffffffffffffffffffffffffffffff".to_owned();
+        value.split_audit = Some(receipt);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::OperationMismatch {
+                stage: "split audit",
+                field: "sample_hash"
+            })
+        );
     }
 
     #[test]
@@ -1292,6 +1310,33 @@ mod tests {
         assert_eq!(
             audit_workflow(&value),
             Err(EnvelopeError::QuerySnapshotMismatch)
+        );
+    }
+
+    #[test]
+    fn query_first_snapshot_must_match_the_base_graph_snapshot() {
+        let mut value = through_edit();
+        let mut query = query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        );
+        query.first_graph_snapshot_sha256 = SHA_A.to_owned();
+        value.query_stability = Some(query);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QueryFirstSnapshotMismatch)
+        );
+    }
+
+    #[test]
+    fn committed_edit_must_change_the_graph_snapshot() {
+        let mut value = through_review();
+        let mut edit = edit_receipt();
+        edit.resulting_snapshot_sha256 = Some(SHA_D.to_owned());
+        value.edit_transaction = Some(edit);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::EditNoopSnapshot)
         );
     }
 
