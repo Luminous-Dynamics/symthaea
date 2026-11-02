@@ -38,5 +38,21 @@
     "The real global filtration and source completeness are declared, not independently established.",
     "Unsigned SHA-256 chains are not source authentication."
   ],
-  "claim_ceiling": "This is a Python reference replay result. No Rust build, production throughput, SupFDR proof, source-authentication result, or power improvement is claimed."
+  "claim_ceiling": "This is a Python reference replay result. No Rust build, production throughput, SupFDR proof, source-authentication result, or power improvement is claimed.",
+  "unit_tests": {
+    "suite": "benchmarks/test_proof_carrying_evidence.py",
+    "tests": 8,
+    "local_result": "passed",
+    "execution_note": "Executed locally against a local copy of the committed standalone runner; this is not GitHub Actions or Rust validation.",
+    "covered": [
+      "registered Bernoulli LR factors and conditional mean one",
+      "exact A2 fixed-point floor square inequalities",
+      "independent replay in independent/shared-uniform/balanced-negative modes",
+      "incomplete and out-of-order batch rejection",
+      "process-spec precommitment tamper",
+      "factor claim tamper",
+      "seven negative controls",
+      "hash-chain observation mutation"
+    ]
+  }
 }
