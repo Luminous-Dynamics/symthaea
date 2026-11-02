@@ -17,7 +17,8 @@
     "methods",
     "metrics",
     "qualification_targets",
-    "references"
+    "references",
+    "seed_ids"
   ],
   "properties": {
     "schema": {
@@ -129,7 +130,8 @@
           "regime_segments",
           "label_revisions",
           "source_outages",
-          "notes"
+          "notes",
+          "required_source_ids"
         ],
         "properties": {
           "id": {
@@ -318,6 +320,15 @@
           "notes": {
             "type": "string",
             "minLength": 1
+          },
+          "required_source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         }
       }
@@ -460,6 +471,15 @@
             "format": "uri"
           }
         }
+      }
+    },
+    "seed_ids": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
       }
     }
   }
