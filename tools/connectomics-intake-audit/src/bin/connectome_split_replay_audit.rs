@@ -221,10 +221,8 @@ fn python_int_key(value: &Value) -> Option<String> {
             if let Ok(value) = trimmed.parse::<u128>() {
                 return Some(value.to_string());
             }
-            let float = trimmed.parse::<f64>().ok()?;
-            if float.is_finite() && float.fract() == 0.0 && float >= i128::MIN as f64 && float < i128::MAX as f64 {
-                return Some(format!("{:.0}", float));
-            }
+            // Python int("12.0") raises ValueError; only JSON numeric floats
+            // are accepted through the Value::Number branch below.
             None
         }
         Value::Number(value) => {
@@ -890,6 +888,15 @@ mod tests {
         );
         let report = audit(altered.as_bytes(), sha256(altered.as_bytes()), &root, "a".repeat(40));
         assert_eq!(report.status, "PASS", "{:?}", report.errors);
+    }
+
+    #[test]
+    fn integer_string_conversion_matches_python_int_string_semantics() {
+        assert_eq!(python_int_key(&json!("  +12 ")), Some("12".to_owned()));
+        assert_eq!(python_int_key(&json!("-12")), Some("-12".to_owned()));
+        assert_eq!(python_int_key(&json!("12.0")), None);
+        assert_eq!(python_int_key(&json!("1e3")), None);
+        assert_eq!(python_int_key(&json!(12.0)), Some("12".to_owned()));
     }
 
 }
