@@ -1365,3 +1365,4 @@ pub mod causal_analysis;
 pub mod exposure_transfer;
 pub mod measurement_distribution;
 pub mod training_receipt;
+pub mod detector_concealment;
