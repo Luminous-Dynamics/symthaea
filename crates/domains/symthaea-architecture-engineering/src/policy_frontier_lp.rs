@@ -436,17 +436,23 @@ struct FrontierCandidate {
     entropy: f64,
 }
 
+/// A single policy coefficient, keyed by stable policy identity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierPolicyCoefficient {
+    pub policy_id: String,
+    pub coefficient: f64,
+}
+
 /// An additional hard linear inequality over the randomized policy weights.
 ///
-/// The represented relation is sum_i coefficients[i] * q_i <= upper_bound.
-/// Coefficients are bound to the canonical policy order of the supplied plan.
-/// These constraints are included in active-basis enumeration, not applied as
-/// a post-hoc penalty.
+/// The represented relation is sum_i coefficient_i * q_i <= upper_bound.
+/// Coefficients are keyed by policy ID, never by an implicit positional order.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FrontierAdditionalLinearConstraint {
     pub constraint_id: String,
-    pub coefficients: Vec<f64>,
+    pub policy_coefficients: Vec<FrontierPolicyCoefficient>,
     pub upper_bound: f64,
 }
 
