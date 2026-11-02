@@ -161,3 +161,23 @@ Detector-count calibration contracts:
 This result is returned only when the source lower bound is strictly positive. If the source prevalence interval includes zero, the function returns `None` because the conditioning denominator is not guaranteed to exist. It is an associational probability bound, not a causal propagation effect or proof of a direct synapse.
 
 For point marginals source=0.8 and target=0.6, the conditional target-response probability is bounded by [0.5,0.75]. With intervals source=[0.7,0.8] and target=[0.6,0.9], it is [3/7,1]. These are sharp over all compatible source/target couplings.
+
+## Full-cohort missing-detector integration
+
+The point-valued latent_prevalence_bounds(q, operating) remains available when q is observed for every planned unit. When source or target detector states are unknown, do not calculate q only over complete cases and silently transport that rate to the planned cohort. Use the added composition:
+
+1. observed_positive_fraction_bounds(counts, planned_units) forms the full-cohort detector-positive interval:
+   [detected / planned, (detected + unknown) / planned].
+   Here unknown is the sum of unobserved, classifier-invalid and registration-failed units. All five status counts must sum exactly to the planned denominator; an empty or inconsistent cohort fails closed.
+2. latent_prevalence_bounds_from_observed_fraction_interval(q_bounds, operating) inverts the full observed-rate interval against the channel's externally calibrated sensitivity/specificity ranges.
+3. evaluate_joint_response_bounds(...) performs those steps independently for source and target, then applies the Fréchet bounds to their latent marginal intervals. It also returns target-given-source bounds when source prevalence is bounded strictly above zero.
+
+The integrated report retains the planned denominator, both raw response-status count tables, both observed-positive intervals, both latent marginal intervals, the joint interval and the conditional interval (or None). Unknown states are not converted to negative detections, and complete-case denominators are not substituted for the planned cohort.
+
+Synthetic known answers:
+- With 10 planned units, source 8/10 and target 6/10, and perfect detector ranges, the marginal prevalences are 0.8 and 0.6; the sharp joint interval is [0.4,0.6] and target-given-source is [0.5,0.75].
+- With source counts 6 detected / 2 negative / 2 unknown and target counts 3 detected / 5 negative / 2 unknown, the observed intervals are [0.6,0.8] and [0.3,0.5]; under perfect detectors the joint interval is [0,0.5].
+- With all detector statuses unknown, each marginal remains [0,1], the joint remains [0,1], and target-given-source is not estimable.
+
+These are finite-cohort identification bounds conditional on the supplied detector operating ranges. They are not sampling confidence intervals, do not solve MNAR trace availability beyond the declared range, and do not identify a causal effect or direct monosynaptic connection. Detector calibration must represent the relevant animal/session populations; trial-level Wilson intervals are not a substitute for cluster-aware calibration.
+
