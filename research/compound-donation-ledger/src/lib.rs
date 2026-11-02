@@ -585,6 +585,95 @@ impl StaircaseAdjuster {
         Ok(Self { points })
     }
 
+    /// Builds an equal-prior geometric grid over the e-BH rejection ranks.
+    ///
+    /// The rank grid is 1, 2, 4, ..., plus the family size when it is not a
+    /// power of two. For each grid rank r, let h_r = family_size / (alpha*r)
+    /// be the weighted e-BH boundary. Its raw threshold K is chosen with
+    /// integer ceiling arithmetic so the *actual fixed-point prior mass*
+    /// times K contributes at least ceil(h_r) evidence ticks.
+    ///
+    /// There are Q = O(log family_size) grid points. For every actual
+    /// rejection rank k, some grid rank r satisfies k/2 < r <= k (or r=k
+    /// when k is the final family size), so the raw threshold is at most
+    /// approximately 2Q times the e-BH boundary. The exact rational prior
+    /// uses floor(PRIOR_MASS_SCALE / Q); unused mass is left unspent.
+    pub fn e_bh_rank_geometric(
+        family_size: u64,
+        alpha_numerator: u64,
+        alpha_denominator: u64,
+    ) -> Result<Self, LedgerError> {
+        if family_size == 0
+            || alpha_numerator == 0
+            || alpha_denominator == 0
+            || alpha_numerator >= alpha_denominator
+        {
+            return Err(LedgerError::InvalidThresholdGrid);
+        }
+
+        let mut ranks = Vec::new();
+        let mut rank = 1_u64;
+        loop {
+            if rank > family_size {
+                break;
+            }
+            ranks.push(rank);
+            match rank.checked_mul(2) {
+                Some(next) if next <= family_size => rank = next,
+                _ => break,
+            }
+        }
+        if ranks.last().copied() != Some(family_size) {
+            ranks.push(family_size);
+        }
+
+        let point_count = ranks.len() as u128;
+        let prior_mass = PRIOR_MASS_SCALE / point_count;
+        if prior_mass == 0 {
+            return Err(LedgerError::InvalidThresholdGrid);
+        }
+
+        // Multiple rank targets can map to the same integer raw threshold for
+        // small families or extreme alpha values. Merge their masses exactly.
+        let mut merged = BTreeMap::<u128, u128>::new();
+        for rank in ranks {
+            let h_numerator = (family_size as u128)
+                .checked_mul(alpha_denominator as u128)
+                .and_then(|value| value.checked_mul(EVIDENCE_ONE))
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let h_denominator = (alpha_numerator as u128)
+                .checked_mul(rank as u128)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let h_ticks = h_numerator
+                .checked_add(h_denominator - 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?
+                / h_denominator;
+
+            let raw_numerator = h_ticks
+                .checked_mul(PRIOR_MASS_SCALE)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let raw_threshold = raw_numerator
+                .checked_add(prior_mass - 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?
+                / prior_mass;
+
+            let entry = merged.entry(raw_threshold).or_insert(0);
+            *entry = entry
+                .checked_add(prior_mass)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+        }
+
+        Self::new(
+            merged
+                .into_iter()
+                .map(|(threshold, prior_mass)| ThresholdMass {
+                    threshold,
+                    prior_mass,
+                })
+                .collect(),
+        )
+    }
+
     /// Builds a finite prefix of a horizon-independent dyadic prior.
     ///
     /// The ideal infinite prior is pi_j = 1 / (j * (j + 1)) at K_j = 2^j,
@@ -919,6 +1008,56 @@ mod tests {
         );
         assert_eq!(adjuster.value_at(100 * EVIDENCE_ONE - 1).unwrap(), 2 * EVIDENCE_ONE);
         assert_eq!(adjuster.value_at(EVIDENCE_ONE).unwrap(), 0);
+    }
+
+    #[test]
+    fn e_bh_rank_geometric_covers_every_rank_with_logarithmic_grid() {
+        let m = 100_u64;
+        let alpha_num = 1_u64;
+        let alpha_den = 20_u64;
+        let adjuster = StaircaseAdjuster::e_bh_rank_geometric(m, alpha_num, alpha_den).unwrap();
+        assert_eq!(adjuster.points().len(), 8);
+        let total_mass: u128 = adjuster.points().iter().map(|point| point.prior_mass).sum();
+        assert!(total_mass <= PRIOR_MASS_SCALE);
+
+        for k in 1..=m {
+            let rank = 1_u64 << (63 - (k.leading_zeros() as u64));
+            let h_numerator = (m as u128) * (alpha_den as u128) * EVIDENCE_ONE;
+            let h_denominator = (alpha_num as u128) * (rank as u128);
+            let h_ticks = (h_numerator + h_denominator - 1) / h_denominator;
+            let threshold = adjuster
+                .points()
+                .iter()
+                .find(|point| {
+                    let contribution = point.prior_mass * point.threshold / PRIOR_MASS_SCALE;
+                    contribution >= h_ticks
+                })
+                .map(|point| point.threshold);
+            assert!(threshold.is_some(), "rank {k} had no supporting staircase point");
+
+            let raw = threshold.unwrap();
+            let ideal_boundary = (m as u128) * (alpha_den as u128) * EVIDENCE_ONE
+                / ((alpha_num as u128) * (k as u128));
+            // Since the lower geometric rank is greater than k/2, the
+            // raw-threshold penalty is bounded by about 2Q (plus rounding).
+            assert!(raw <= 17 * ideal_boundary + EVIDENCE_ONE);
+        }
+    }
+
+    #[test]
+    fn e_bh_rank_geometric_rejects_invalid_design_parameters() {
+        assert_eq!(
+            StaircaseAdjuster::e_bh_rank_geometric(0, 1, 20),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
+        assert_eq!(
+            StaircaseAdjuster::e_bh_rank_geometric(100, 0, 20),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
+        assert_eq!(
+            StaircaseAdjuster::e_bh_rank_geometric(100, 1, 1),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
     }
 
     #[test]
