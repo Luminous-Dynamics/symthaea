@@ -431,6 +431,49 @@ mod tests {
         assert!(CheckedCount(u128::MAX).checked_add(&CheckedCount(1)).is_err());
     }
 
+
+    #[test]
+    fn max_count_ties_add_multiplicities_and_products_add_scores() {
+        let a = MaxCountValue::candidate(7, 2);
+        let b = MaxCountValue::candidate(7, 5);
+        let c = MaxCountValue::candidate(4, 100);
+        assert_eq!(a.checked_add(&b).unwrap().optimum(), Some(MaxCountTerm { score: 7, count: 7 }));
+        assert_eq!(a.checked_add(&c).unwrap().optimum(), Some(MaxCountTerm { score: 7, count: 2 }));
+        assert_eq!(
+            a.checked_mul(&b).unwrap().optimum(),
+            Some(MaxCountTerm { score: 14, count: 10 })
+        );
+    }
+
+    #[test]
+    fn pareto_pruning_is_preserved_by_minkowski_addition() {
+        let dominated = ParetoCountValue::point(vec![1, 1], 3);
+        let dominator = ParetoCountValue::point(vec![2, 1], 1);
+        let context = ParetoCountValue::point(vec![4, -2], 1);
+        let pruned = dominated.checked_add(&dominator).unwrap();
+        let left = pruned.checked_mul(&context).unwrap();
+        let right = dominated.checked_mul(&context).unwrap()
+            .checked_add(&dominator.checked_mul(&context).unwrap()).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(
+            left.points().map(|(v,c)|(v.to_vec(),c)).collect::<Vec<_>>(),
+            vec![(vec![6,-1],1)]
+        );
+    }
+
+    #[test]
+    fn elimination_order_changes_width_not_the_exact_answer() {
+        let mut g = ExactFactorGraph::new(vec![2,2,2,2], CheckedCount(0), CheckedCount(1)).unwrap();
+        for (u,v) in [(0,1),(1,2),(2,3)] {
+            g.add_factor(vec![u,v], vec![CheckedCount(1);4]).unwrap();
+        }
+        let (left, left_stats) = g.evaluate(&[0,1,2,3]).unwrap();
+        let (right, right_stats) = g.evaluate(&[1,2,0,3]).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(left, CheckedCount(16));
+        assert!(left_stats.maximum_bucket_variables <= right_stats.maximum_bucket_variables);
+    }
+
     #[test]
     fn unconstrained_variables_count_all_states() {
         let g = ExactFactorGraph::new(vec![2,3,4], CheckedCount(0), CheckedCount(1)).unwrap();
