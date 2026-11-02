@@ -29,7 +29,8 @@
         "calibration_trials",
         "evaluation_trials",
         "candidate_count",
-        "signal_hit_rate_permille"
+        "signal_hit_rate_permille",
+        "campaign_instance_id"
       ],
       "properties": {
         "calibration_trials": {
@@ -43,6 +44,9 @@
         },
         "signal_hit_rate_permille": {
           "const": 400
+        },
+        "campaign_instance_id": {
+          "const": 600000001
         }
       }
     },
