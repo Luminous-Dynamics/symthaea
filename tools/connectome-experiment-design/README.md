@@ -102,6 +102,58 @@ The frozen two-parameter fixture uses an identity prior covariance and unit obse
 
 D-optimal selects the concentrated observation because it most reduces uncertainty volume. A-optimal selects the balanced design because it reduces the sum of marginal parameter variances more. Neither is universally best; the scientific estimand determines which parameter-uncertainty geometry matters.
 
+## Benchmark against current research
+
+The primary recent comparator is Ogino, Sekizawa, Kitazono and Oizumi, *Designing optimal perturbation inputs for system identification in neuroscience*, eLife 15:RP110030 (version of record 13 October 2026): https://doi.org/10.7554/eLife.110030.3
+
+Their linear system-identification analysis relates asymptotic matrix-estimation error to the state covariance through:
+
+```
+E[||A_hat - A||_F^2] ~= (1/T) tr(Sigma_noise) tr(Sigma_state^-1)
+```
+
+The practical implication is to re-excite weakly observed dynamical modes and make state covariance eigenvalues larger and more uniform, not merely maximize total activity. The paper studies impulse, step, sinusoidal and composite-frequency perturbations, along with iterative input/target refinement. Its central linear formulation assumes a known input matrix B; the paper discusses extensions beyond that setting, and notes the gap between ideal control inputs and experimental feasibility.
+
+**This crate does not claim to reproduce or outperform Ogino et al.** It provides generic local Gaussian parameter-information scores over caller-supplied Jacobian/noise matrices. A fair bake-off must implement the paper's state-covariance objective as a separate comparator, reproduce its published simulations/conditions, and include the D-optimal and A-optimal scores as additional, separately labelled baselines.
+
+### Required experiment-design bake-off
+
+Freeze the candidate experiment pool and compare, at equal measurement duration, input energy, number of stimulation channels, observation count and compute budget:
+
+1. passive/no perturbation;
+2. impulse, step and sinusoidal perturbations;
+3. uniform-frequency and composite-frequency inputs;
+4. the published Ogino-style objective/iterative refinement;
+5. random feasible designs;
+6. Fisher D-optimal and A-optimal designs;
+7. finite-hypothesis EIG designs;
+8. utility-aware EVSI designs;
+9. degree/centrality/expert-prior and largest-predicted-response heuristics.
+
+Report more than the objective each selector optimized: held-out parameter error, system-matrix Frobenius error, posterior coverage and sharpness, mode/eigenvalue recovery, model-discrimination accuracy, decision regret, robustness under prior/noise/model mismatch, measurement energy, wall time and failure rate. This avoids awarding a method a win for improving its own internal score while the scientific estimate gets worse.
+
+### External connectome challenge sets
+
+**Drosophila walking circuit.** Pugliese et al., *Connectome simulations identify a central pattern generator for fly walking*, Nature (version of record 28 October 2026): https://doi.org/10.1038/s41586-026-11195-y. The study reports a minimal one-inhibitory/two-excitatory interneuron rhythm-generating circuit across four connectome datasets and all six legs, and experimentally tests a predicted DNb08 descending pathway using optogenetics in behaving flies. Its code and figure reproductions are published at https://github.com/smpuglie/Pugliese_2026; simulation output and Anipose data are deposited at https://doi.org/10.5281/zenodo.22260923.
+
+A reproducible Symthaea challenge should pin the exact source/data versions and separately score: DNg100/DNb08 activation responses, rhythm onset/frequency, left-right and inter-leg coordination, three-cell-core necessity/sufficiency, and held-out connectome reconstruction transfer. Do not merge simulated sufficiency, observed behaviour and experimentally verified pathway outcomes into one label.
+
+**C. elegans signal propagation.** Randi et al., *Neural signal propagation atlas of Caenorhabditis elegans*, Nature 623, 406–414 (2023): https://www.nature.com/articles/s41586-023-06683-4. The atlas measures optogenetically evoked propagation over 23,433 neuron pairs with whole-brain calcium imaging. Use it as a perturbation-response/effective-propagation benchmark, not as a direct anatomical synapse catalogue. Separate measured propagation, connectome-predicted routes and inferred latent/shared-input pathways.
+
+### Promotion rules and aspirational targets
+
+These are proposed research gates, not results or universal field standards:
+
+- **Analytic correctness:** all Gaussian fixtures within 1e-10 relative/absolute tolerance; reject singular, asymmetric, malformed and non-finite inputs.
+- **Parameter recovery:** beat random, passive, impulse/step/sinusoid and the reproduced published control-theoretic selector on held-out parameter error at matched energy/time.
+- **Calibration:** nominal 90%/95% parameter intervals should achieve coverage within preregistered uncertainty bounds, with sharpness reported alongside coverage.
+- **Robustness:** publish score degradation under correlated/heteroscedastic noise, latent inputs, observation-kernel mismatch, prior misspecification and nonlinear dynamics.
+- **Generalization:** repeat across held-out targets, sessions, animals and connectome reconstructions; never random-split correlated timepoints and call it cross-animal evidence.
+- **Efficiency:** publish accuracy/calibration/energy/latency/memory Pareto curves, not a single speed claim.
+- **Decision quality:** report realized EIG, posterior parameter error and EVSI regret separately. An information-rich experiment is not necessarily the experiment with the greatest decision value.
+
+The promotion criterion for "better than the current comparator" is a preregistered improvement in the target scientific estimand with a confidence interval clearing a meaningful margin, under matched feasibility and resource budgets. No SOTA claim follows from the synthetic fixture suite alone.
+
 ### The three objectives
 
 | Objective | Question | Output unit | Main failure mode |
