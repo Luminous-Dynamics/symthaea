@@ -1,8 +1,7 @@
-//! Joint finite-grid calibration of two reasoning-stopping risks.
+//! Joint finite-grid calibration of stopping risks and emitted-answer quality.
 //!
-//! The upper channel measures wrong answers at an upper-threshold exit.
-//! The lower channel measures the fraction of future checkpoints that would
-//! be correct when a lower-threshold rule abandons a task.
+//! The three channels measure upper-threshold wrong answers, lower-threshold
+//! premature abandonment, and error in the answer actually emitted.
 //!
 //! This is a Symthaea joint-grid variant inspired by Conformal Thinking. It
 //! evaluates all candidates and uses one simultaneous Hoeffding correction
@@ -208,7 +207,7 @@ impl ComputeRiskFixture {
         if self.risk_upper_budget_ppm == 0 || self.risk_upper_budget_ppm > PPM as u32
             || self.risk_lower_budget_ppm == 0 || self.risk_lower_budget_ppm > PPM as u32
             || self.risk_output_error_budget_ppm == 0 || self.risk_output_error_budget_ppm > PPM as u32 {
-            return Err(fail("risk_budget", "both operational risk budgets must be in 1..=1,000,000 PPM"));
+            return Err(fail("risk_budget", "all three operational risk budgets must be in 1..=1,000,000 PPM"));
         }
         if self.confidence_delta_ppm == 0 || self.confidence_delta_ppm >= PPM as u32 {
             return Err(fail("confidence_delta_ppm", "must be in (0, 1,000,000) PPM"));
