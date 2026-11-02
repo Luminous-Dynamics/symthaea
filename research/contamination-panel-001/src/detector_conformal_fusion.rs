@@ -485,6 +485,7 @@ pub fn calibrate_detector_panel(
     }
     validate_digest(&request.calibration_protocol_sha256, "calibration_protocol_sha256")?;
     validate_digest(&request.detector_registry_sha256, "detector_registry_sha256")?;
+    validate_detector_specs(&request.detector_specs)?;
     if request.calibration_a.len() < 2
         || request.calibration_a.len() > MAX_CALIBRATION_ROWS
         || request.calibration_b.len() < 2
@@ -538,7 +539,7 @@ pub fn calibrate_detector_panel(
         {
             return Err("evaluation row has invalid unit/group IDs".to_owned());
         }
-        validate_features(&row.features, "evaluation row")?;
+        validate_evaluation_features(&row.features, "evaluation row")?;
         unique_unit_id(&mut all_unit_ids, &row.evaluation_unit_id, "evaluation")?;
         evaluation_rows
             .entry(group_key(&row.task_family, &row.model_regime))
@@ -563,26 +564,29 @@ pub fn calibrate_detector_panel(
             return Err("each group requires at least two independent units in calibration A and B".to_owned());
         }
 
-        let first_features = &rows_a[0].features;
-        let mut detector_ids: Vec<String> =
-            first_features.iter().map(|feature| feature.detector_id.clone()).collect();
-        detector_ids.sort();
+        let mut specs = request.detector_specs.clone();
+        specs.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
+        let detector_ids: Vec<String> =
+            specs.iter().map(|spec| spec.detector_id.clone()).collect();
+        let expected: BTreeSet<&str> = detector_ids.iter().map(String::as_str).collect();
         let mut directions = BTreeMap::new();
+        let mut weights_permille = BTreeMap::new();
         let mut a_scores = BTreeMap::<String, Vec<f64>>::new();
-        for feature in first_features {
-            directions.insert(feature.detector_id.clone(), feature.direction);
-            a_scores.insert(feature.detector_id.clone(), Vec::with_capacity(rows_a.len()));
+        for spec in &specs {
+            directions.insert(spec.detector_id.clone(), spec.direction);
+            weights_permille.insert(spec.detector_id.clone(), spec.weight_permille);
+            a_scores.insert(spec.detector_id.clone(), Vec::with_capacity(rows_a.len()));
         }
 
         for row in rows_a {
-            let ids: BTreeSet<&str> = row.features.iter().map(|feature| feature.detector_id.as_str()).collect();
-            let expected: BTreeSet<&str> = detector_ids.iter().map(String::as_str).collect();
+            let ids: BTreeSet<&str> =
+                row.features.iter().map(|feature| feature.detector_id.as_str()).collect();
             if ids != expected {
-                return Err("calibration-A detector feature sets must match within group".to_owned());
+                return Err("calibration-A detector feature sets must exactly match the pinned registry".to_owned());
             }
             for feature in &row.features {
                 if directions.get(&feature.detector_id) != Some(&feature.direction) {
-                    return Err("calibration-A detector directions must be stable within group".to_owned());
+                    return Err("calibration-A detector directions must match the pinned registry".to_owned());
                 }
                 a_scores
                     .get_mut(&feature.detector_id)
@@ -594,6 +598,7 @@ pub fn calibrate_detector_panel(
         let calibration_a = GroupCalibrationA {
             detector_ids,
             directions,
+            weights_permille,
             scores: a_scores,
         };
 
