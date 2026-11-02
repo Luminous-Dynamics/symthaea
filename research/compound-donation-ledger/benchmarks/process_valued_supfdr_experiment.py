@@ -60,6 +60,18 @@ def make_scenarios(n: int, looks: int) -> list[Scenario]:
     scenarios.append(Scenario("strong_donor_many_weak", p, is_null,
                               arrivals_all.copy()))
 
+    # One borderline recipient plus enough strong alternatives to lower the
+    # self-consistent e-BH threshold: a targeted test of transfer utility.
+    p = np.full((looks, n), 0.5)
+    p[:, 0] = 0.80
+    if n > 1:
+        p[:, 1] = 0.62
+    p[:, 2:min(20, n)] = 0.80
+    is_null = np.ones(n, dtype=bool)
+    is_null[:min(20, n)] = False
+    scenarios.append(Scenario("donation_bridge_target", p, is_null,
+                              arrivals_all.copy()))
+
     p = np.full((looks, n), 0.5)
     p[:, 2:18] = 0.65
     p[:, 0] = 0.80
@@ -260,11 +272,11 @@ def evaluate_method(
 
         x = x_path[:, t, :]
         dx = np.maximum(x - previous_x, 0.0)
+        old_reserve = previous_reserve.copy()
         if method == "raw_supremum_invalid_control":
             z = gamma[None, :] * raw_path[:, t, :]
         else:
             if method != "no_donation":
-                old_reserve = previous_reserve.copy()
                 reserve = np.minimum(
                     np.maximum(gamma[None, :] * x - 1.0, 0.0),
                     gamma[None, :]
@@ -508,7 +520,7 @@ def main() -> None:
     parser.add_argument("--streams", type=int, default=1000)
     parser.add_argument("--hypotheses", type=int, default=32)
     parser.add_argument("--looks", type=int, default=80)
-    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument("--alpha", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=10033)
     parser.add_argument("--dependence", choices=[
         "all", "independent", "shared_uniform", "balanced_negative"
