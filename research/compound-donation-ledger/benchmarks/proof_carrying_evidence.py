@@ -181,10 +181,10 @@ def independent_verify(spec, receipts):
             if y:
                 e_factor = F(p1.numerator * p0.denominator, p1.denominator * p0.numerator)
             else:
-                e_factor = (
-                    F(p0.denominator * p1.denominator - p1.numerator * p0.denominator,
-                      p1.denominator * p0.denominator)
-                    / F(p0.denominator - p0.numerator, p0.denominator)
+                # (1-p1)/(1-p0), expanded from the registered integer pairs.
+                e_factor = F(
+                    (p1.denominator - p1.numerator) * p0.denominator,
+                    p1.denominator * (p0.denominator - p0.numerator),
                 )
             product = state[i]["product"] * e_factor
             supremum = max(state[i]["supremum"], product)
