@@ -283,6 +283,17 @@ impl DecisionFunctionalCalibrationRequest {
             "request.alternative_rows",
         )?;
 
+        if self.evidence_mode == CalibrationEvidenceMode::RandomizedPolicyExecution {
+            validate_randomized_assignment(
+                self.null_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, &row.sampling_unit_ids)),
+                "request.null_rows",
+            )?;
+            validate_randomized_assignment(
+                self.alternative_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, &row.sampling_unit_ids)),
+                "request.alternative_rows",
+            )?;
+        }
+
         for (index, row) in self.null_rows.iter().enumerate() {
             validate_sampling_units(
                 &row.sampling_unit_ids,
@@ -414,6 +425,7 @@ pub struct DecisionFunctionalCalibrationReport {
     pub null_family_coverage_failure_probability: f64,
     pub alternative_family_coverage_failure_probability: f64,
     pub worst_case_unconditional_type_i_upper_bound: f64,
+    pub robustified_plan_sha256: String,
     pub components: Vec<DecisionFunctionalConfidenceComponent>,
     pub frontier: PolicyFrontierReport,
     pub report_sha256: String,
@@ -436,6 +448,7 @@ struct ReportPayload<'a> {
     null_family_coverage_failure_probability: f64,
     alternative_family_coverage_failure_probability: f64,
     worst_case_unconditional_type_i_upper_bound: f64,
+    robustified_plan_sha256: &'a str,
     components: &'a [DecisionFunctionalConfidenceComponent],
     frontier: &'a PolicyFrontierReport,
 }
@@ -519,6 +532,36 @@ fn validate_sampling_units(
     Ok(())
 }
 
+fn validate_randomized_assignment<'a>(
+    rows: impl Iterator<Item = (&'a String, &'a String, f64, &'a [String])>,
+    path: &str,
+) -> Result<(), DecisionFunctionalError> {
+    let mut by_model: BTreeMap<&str, (f64, BTreeSet<&str>)> = BTreeMap::new();
+    for (model_id, _policy_id, probability, unit_ids) in rows {
+        let entry = by_model
+            .entry(model_id.as_str())
+            .or_insert_with(|| (0.0, BTreeSet::new()));
+        entry.0 += probability;
+        for unit_id in unit_ids {
+            if !entry.1.insert(unit_id.as_str()) {
+                return Err(DecisionFunctionalError::new(
+                    format!("{path}.{model_id}.sampling_unit_ids"),
+                    "a sampling unit appears in more than one randomized policy arm for this model",
+                ));
+            }
+        }
+    }
+    for (model_id, (probability_sum, _)) in by_model {
+        if (probability_sum - 1.0).abs() > TOLERANCE {
+            return Err(DecisionFunctionalError::new(
+                format!("{path}.{model_id}.assignment_probability"),
+                "randomized policy-arm assignment probabilities must sum to one per model",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_unique_row_ids<'a>(
     rows: impl Iterator<Item = (&'a String, &'a String)>,
     path: &str,
@@ -568,22 +611,12 @@ fn hoeffding_radius(
     }
     validate_open_probability(failure_probability, "confidence.failure_probability")?;
     let width = upper - lower;
-    let factor = (failure_probability.ln().neg() / (2.0 * sample_size as f64)).sqrt();
+    let factor = ((-failure_probability.ln()) / (2.0 * sample_size as f64)).sqrt();
     let raw = width * factor;
     if !raw.is_finite() || raw >= width {
         Ok(width)
     } else {
         Ok(raw.max(0.0))
-    }
-}
-
-trait NegLog {
-    fn neg(self) -> Self;
-}
-
-impl NegLog for f64 {
-    fn neg(self) -> Self {
-        -self
     }
 }
 
@@ -1004,6 +1037,7 @@ pub fn analyze_decision_functional_frontier(
         alternative_family_coverage_failure_probability: request
             .alternative_family_coverage_failure_probability,
         worst_case_unconditional_type_i_upper_bound: unconditional_type_i,
+        robustified_plan_sha256: &robustified_sha256,
         components: &components,
         frontier: &frontier,
     };
@@ -1028,6 +1062,7 @@ pub fn analyze_decision_functional_frontier(
         alternative_family_coverage_failure_probability: request
             .alternative_family_coverage_failure_probability,
         worst_case_unconditional_type_i_upper_bound: unconditional_type_i,
+        robustified_plan_sha256: robustified_sha256,
         components,
         frontier,
         report_sha256,
@@ -1228,6 +1263,23 @@ mod tests {
         assert!(analyze_decision_functional_frontier(&plan, &request).is_err());
         request.calibration_independent_of_confirmatory_stream = true;
         request.independent_sampling_units_declared = false;
+        assert!(analyze_decision_functional_frontier(&plan, &request).is_err());
+    }
+
+    #[test]
+    fn rejects_randomized_assignment_without_full_arm_support() {
+        let plan = nominal_plan();
+        let mut request = request(&plan);
+        request.null_rows[0].assignment_probability = 0.2;
+        assert!(analyze_decision_functional_frontier(&plan, &request).is_err());
+    }
+
+    #[test]
+    fn rejects_sampling_units_reused_across_randomized_policy_arms() {
+        let plan = nominal_plan();
+        let mut request = request(&plan);
+        request.null_rows[1].sampling_unit_ids[0] =
+            request.null_rows[0].sampling_unit_ids[0].clone();
         assert!(analyze_decision_functional_frontier(&plan, &request).is_err());
     }
 
