@@ -167,6 +167,13 @@ pub struct CoDecDatasetLevelAucRequestV1 {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+pub struct CoDecPercentileIntervalV1 {
+    pub lower_95: f64,
+    pub upper_95: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct CoDecDatasetLevelAucReportV1 {
     pub schema: String,
     pub dataset_observation_count: u64,
@@ -175,6 +182,11 @@ pub struct CoDecDatasetLevelAucReportV1 {
     pub unexposed_dataset_count: u64,
     pub dataset_level_auroc: f64,
     pub dataset_level_auprc: f64,
+    pub dataset_level_auroc_cluster_bootstrap_95: Option<CoDecPercentileIntervalV1>,
+    pub dataset_level_auprc_cluster_bootstrap_95: Option<CoDecPercentileIntervalV1>,
+    pub bootstrap_replicates_requested: u64,
+    pub bootstrap_replicates_valid: u64,
+    pub bootstrap_seed_commitment_sha256: String,
     pub unit_of_analysis: String,
     pub independently_authenticated: bool,
     pub confirmatory_eligible: bool,
@@ -598,6 +610,96 @@ fn dataset_level_metrics(
 
 /// Compute AUROC across independently labelled datasets. The unit of analysis
 /// is each dataset report, never an individual target item.
+const CODEC_DATASET_BOOTSTRAP_REPLICATES: usize = 2_000;
+const CODEC_DATASET_BOOTSTRAP_MIN_VALID: usize = 1_000;
+
+fn percentile_interval(values: &[f64]) -> Result<Option<CoDecPercentileIntervalV1>, String> {
+    if values.len() < CODEC_DATASET_BOOTSTRAP_MIN_VALID {
+        return Ok(None);
+    }
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err("CoDeC bootstrap values must be finite".to_owned());
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let quantile = |probability: f64| -> f64 {
+        let position = probability * (sorted.len() - 1) as f64;
+        let lower = position.floor() as usize;
+        let upper = position.ceil() as usize;
+        if lower == upper {
+            sorted[lower]
+        } else {
+            let weight = position - lower as f64;
+            sorted[lower] * (1.0 - weight) + sorted[upper] * weight
+        }
+    };
+    Ok(Some(CoDecPercentileIntervalV1 {
+        lower_95: quantile(0.025),
+        upper_95: quantile(0.975),
+    }))
+}
+
+fn cluster_bootstrap_dataset_metrics(
+    observations: &[CoDecDatasetLabelledScoreV1],
+) -> Result<(
+    Option<CoDecPercentileIntervalV1>,
+    Option<CoDecPercentileIntervalV1>,
+    u64,
+    String,
+), String> {
+    let mut canonical = observations.to_vec();
+    canonical.sort_by(|left, right| {
+        left.source_family_id
+            .cmp(&right.source_family_id)
+            .then_with(|| left.dataset_id.cmp(&right.dataset_id))
+    });
+    let canonical_bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| format!("cannot serialize CoDeC dataset observations: {error}"))?;
+    let seed_commitment = hash_domain(
+        b"codec-dataset-cluster-bootstrap-seed.v1",
+        &canonical_bytes,
+    );
+
+    let mut families = std::collections::BTreeMap::<
+        String,
+        Vec<CoDecDatasetLabelledScoreV1>,
+    >::new();
+    for observation in &canonical {
+        families
+            .entry(observation.source_family_id.clone())
+            .or_default()
+            .push(observation.clone());
+    }
+    if families.len() < 2 {
+        return Ok((None, None, 0, seed_commitment));
+    }
+    let family_rows: Vec<Vec<CoDecDatasetLabelledScoreV1>> = families.into_values().collect();
+    let mut aurocs = Vec::with_capacity(CODEC_DATASET_BOOTSTRAP_REPLICATES);
+    let mut auprcs = Vec::with_capacity(CODEC_DATASET_BOOTSTRAP_REPLICATES);
+    for replicate in 0..CODEC_DATASET_BOOTSTRAP_REPLICATES {
+        let mut sampled = Vec::new();
+        for draw in 0..family_rows.len() {
+            let payload = format!("{seed_commitment}:{replicate}:{draw}");
+            let random_hex = hash_domain(
+                b"codec-dataset-cluster-bootstrap-draw.v1",
+                payload.as_bytes(),
+            );
+            let random_value = u64::from_str_radix(&random_hex[..16], 16)
+                .map_err(|error| format!("cannot decode deterministic bootstrap draw: {error}"))?;
+            let selected = (random_value % family_rows.len() as u64) as usize;
+            sampled.extend(family_rows[selected].iter().cloned());
+        }
+        if let Ok((auc, ap)) = dataset_level_metrics(&sampled) {
+            aurocs.push(auc);
+            auprcs.push(ap);
+        }
+    }
+    let valid = aurocs.len() as u64;
+    let auc_interval = percentile_interval(&aurocs)?;
+    let auprc_interval = percentile_interval(&auprcs)?;
+    Ok((auc_interval, auprc_interval, valid, seed_commitment))
+}
+
 pub fn codec_dataset_level_auroc(
     request: &CoDecDatasetLevelAucRequestV1,
 ) -> Result<CoDecDatasetLevelAucReportV1, String> {
@@ -634,6 +736,8 @@ pub fn codec_dataset_level_auroc(
         .map(|observation| observation.source_family_id.as_str())
         .collect::<BTreeSet<_>>()
         .len();
+    let (auc_interval, auprc_interval, bootstrap_valid, bootstrap_seed) =
+        cluster_bootstrap_dataset_metrics(observations)?;
     Ok(CoDecDatasetLevelAucReportV1 {
         schema: CODEC_DATASET_AUC_SCHEMA.to_owned(),
         dataset_observation_count: observations.len() as u64,
@@ -642,6 +746,11 @@ pub fn codec_dataset_level_auroc(
         unexposed_dataset_count: negatives as u64,
         dataset_level_auroc: auroc,
         dataset_level_auprc: auprc,
+        dataset_level_auroc_cluster_bootstrap_95: auc_interval,
+        dataset_level_auprc_cluster_bootstrap_95: auprc_interval,
+        bootstrap_replicates_requested: CODEC_DATASET_BOOTSTRAP_REPLICATES as u64,
+        bootstrap_replicates_valid: bootstrap_valid,
+        bootstrap_seed_commitment_sha256: bootstrap_seed,
         unit_of_analysis: "independent_dataset".to_owned(),
         independently_authenticated: false,
         confirmatory_eligible: false,
@@ -829,6 +938,9 @@ mod tests {
         assert_eq!(report.dataset_level_auprc, 1.0);
         assert_eq!(report.source_family_count, 4);
         assert_eq!(report.unit_of_analysis, "independent_dataset");
+        assert!(report.dataset_level_auroc_cluster_bootstrap_95.is_some());
+        assert!(report.dataset_level_auprc_cluster_bootstrap_95.is_some());
+        assert!(report.bootstrap_replicates_valid >= 1_000);
     }
 
     #[test]
