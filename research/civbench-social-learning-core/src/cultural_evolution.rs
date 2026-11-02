@@ -3,17 +3,16 @@
 
 #![forbid(unsafe_code)]
 
-//! Small, parameterized generational cultural-transmission reference model.
+//! Parameterized generational cultural-transmission reference model.
 //!
-//! It captures individual discovery, noisy demonstration performance,
-//! softmax teacher selection, probabilistic social acquisition and strategy
-//! integration. It is inspired by the mechanism sequence in Brinkmann et al.
-//! (2026), but is not a reproduction of their published ABM parameters or
-//! code. Those require the exact supplementary information and Zenodo archive.
+//! This model separates individual discovery, demonstrator selection,
+//! demonstration observation, actual strategy acquisition, and integration.
+//! It is inspired by the mechanism sequence in Brinkmann et al. (2026), but
+//! does not reproduce their published ABM parameters or code.
 
 use core::fmt;
 
-/// Strategy repertoire used by the reference model.
+/// Small strategy repertoire for the reference task.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Strategy {
     None,
@@ -40,28 +39,43 @@ impl Strategy {
     }
 }
 
-/// Role is only used for the initial machine-seeded generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentKind {
     Human,
     Machine,
 }
 
+/// Selection mechanisms are explicit experimental treatments.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TeacherSelectionRule {
+    Uniform,
+    PerformanceSoftmax { temperature: f64 },
+}
+
 /// Complete agent record retained for benchmark auditing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TransmissionAgent {
     pub kind: AgentKind,
+    /// Strategy found through this agent's own individual-learning trials.
     pub individual_strategy: Strategy,
+    /// Acquired from the selected teacher, if the demonstration was observed
+    /// and the teacher possessed a non-empty strategy.
     pub social_strategy: Option<Strategy>,
+    /// Final strategy after comparing individual and social strategies.
     pub integrated_strategy: Strategy,
-    /// Index of the selected teacher in the previous generation.
     pub teacher_index: Option<usize>,
-    pub social_acquisition_succeeded: bool,
-    /// Demonstration score used by subsequent-generation teacher selection.
+    /// What the selected teacher had available to demonstrate; None means
+    /// the teacher had no strategy, not that the learner acquired nothing.
+    pub teacher_strategy: Option<Strategy>,
+    /// True if the learner observed/received the selected demonstration.
+    /// This can be true even if the teacher had no strategy to transmit.
+    pub demonstration_observed: bool,
+    /// Whether selected teacher had the highest demo score among candidates.
+    pub selected_top_teacher: Option<bool>,
+    /// Score offered to future demonstrators.
     pub demonstration_score: f64,
 }
 
-/// A generation is a fixed-size population in the reference experiment.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopulationGeneration {
     pub index: usize,
@@ -76,8 +90,15 @@ pub struct GenerationMetrics {
     pub myopic_count: usize,
     pub uninformed_count: usize,
     pub optimal_prevalence: f64,
-    pub social_acquisitions: usize,
-    pub social_acquisition_rate: Option<f64>,
+    pub individually_discovered_optimal_count: usize,
+    pub demonstration_observations: usize,
+    pub social_knowledge_acquisitions: usize,
+    pub social_optimal_acquisitions: usize,
+    pub selected_top_teacher_count: usize,
+    pub demonstration_observation_rate: Option<f64>,
+    pub social_acquisition_rate_given_observation: Option<f64>,
+    pub optimal_acquisition_rate_given_observation: Option<f64>,
+    pub top_teacher_selection_rate: Option<f64>,
 }
 
 impl PopulationGeneration {
@@ -88,9 +109,20 @@ impl PopulationGeneration {
             .filter(|agent| agent.integrated_strategy == Strategy::Myopic).count();
         let uninformed_count = self.agents.iter()
             .filter(|agent| agent.integrated_strategy == Strategy::None).count();
-        let social_acquisitions = self.agents.iter()
-            .filter(|agent| agent.social_acquisition_succeeded).count();
+        let individually_discovered_optimal_count = self.agents.iter()
+            .filter(|agent| agent.individual_strategy == Strategy::Optimal).count();
+        let demonstration_observations = self.agents.iter()
+            .filter(|agent| agent.demonstration_observed).count();
+        let social_knowledge_acquisitions = self.agents.iter()
+            .filter(|agent| agent.social_strategy.is_some()).count();
+        let social_optimal_acquisitions = self.agents.iter()
+            .filter(|agent| agent.social_strategy == Some(Strategy::Optimal)).count();
+        let selected_top_teacher_count = self.agents.iter()
+            .filter(|agent| agent.selected_top_teacher == Some(true)).count();
+        let teacher_selection_trials = self.agents.iter()
+            .filter(|agent| agent.selected_top_teacher.is_some()).count();
         let total_agents = self.agents.len();
+
         GenerationMetrics {
             generation: self.index,
             total_agents,
@@ -98,42 +130,65 @@ impl PopulationGeneration {
             myopic_count,
             uninformed_count,
             optimal_prevalence: optimal_count as f64 / total_agents as f64,
-            social_acquisitions,
-            social_acquisition_rate: if self.index == 0 {
+            individually_discovered_optimal_count,
+            demonstration_observations,
+            social_knowledge_acquisitions,
+            social_optimal_acquisitions,
+            selected_top_teacher_count,
+            demonstration_observation_rate: if self.index == 0 {
                 None
             } else {
-                Some(social_acquisitions as f64 / total_agents as f64)
+                Some(demonstration_observations as f64 / total_agents as f64)
             },
+            social_acquisition_rate_given_observation: ratio(
+                social_knowledge_acquisitions,
+                demonstration_observations,
+            ),
+            optimal_acquisition_rate_given_observation: ratio(
+                social_optimal_acquisitions,
+                demonstration_observations,
+            ),
+            top_teacher_selection_rate: ratio(
+                selected_top_teacher_count,
+                teacher_selection_trials,
+            ),
         }
+    }
+}
+
+fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
+    if denominator == 0 {
+        None
+    } else {
+        Some(numerator as f64 / denominator as f64)
     }
 }
 
 /// Parameters for a transparent generational transmission experiment.
 ///
-/// Discovery probabilities are per allocated exploration trial. Human and
-/// machine agents may have different trial budgets and exploration biases.
-/// Social acquisition is independent of teacher selection and is measured
-/// separately from the learner's integrated final strategy.
+/// The seed generation and later generations have separate human-learning
+/// budgets so individual discovery opportunity is not implicitly conflated
+/// across generations. These are experimental controls, not assumed universal
+/// properties of human learning.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransmissionConfig {
     pub generations: usize,
     pub population_size: usize,
     pub machine_count_generation_zero: usize,
-    pub human_learning_trials: u32,
+    pub human_learning_trials_generation_zero: u32,
+    pub human_learning_trials_later_generations: u32,
     pub machine_learning_trials: u32,
-    /// Fraction of individual-learning effort allocated to optimal discovery.
     pub human_optimal_exploration_bias: f64,
     pub machine_optimal_exploration_bias: f64,
     pub optimal_discovery_probability_per_trial: f64,
     pub myopic_discovery_probability_per_trial: f64,
-    /// Probability that an attempted social transmission is acquired.
-    pub social_acquisition_probability: f64,
-    /// Number of previous-generation teacher candidates sampled per learner.
+    /// Probability that a learner observes/receives its selected demonstration.
+    pub social_observation_probability: f64,
     pub teacher_candidate_count: usize,
-    /// Softmax temperature over demonstration scores; lower is more selective.
-    pub teacher_selection_temperature: f64,
+    pub teacher_selection: TeacherSelectionRule,
     pub demonstration_count: u32,
-    /// Per-demonstration noise scale; aggregate score noise is epsilon*sqrt(K).
+    /// Standard deviation per demonstration is epsilon; aggregate noise is
+    /// epsilon * sqrt(demonstration_count).
     pub reward_noise_epsilon: f64,
 }
 
@@ -143,15 +198,18 @@ impl Default for TransmissionConfig {
             generations: 5,
             population_size: 8,
             machine_count_generation_zero: 3,
-            human_learning_trials: 6,
+            human_learning_trials_generation_zero: 6,
+            human_learning_trials_later_generations: 2,
             machine_learning_trials: 1_000,
             human_optimal_exploration_bias: 0.1,
             machine_optimal_exploration_bias: 0.9,
             optimal_discovery_probability_per_trial: 0.001,
             myopic_discovery_probability_per_trial: 0.5,
-            social_acquisition_probability: 0.8,
+            social_observation_probability: 0.8,
             teacher_candidate_count: 5,
-            teacher_selection_temperature: 0.25,
+            teacher_selection: TeacherSelectionRule::PerformanceSoftmax {
+                temperature: 0.25,
+            },
             demonstration_count: 10,
             reward_noise_epsilon: 0.1,
         }
@@ -178,10 +236,14 @@ impl fmt::Display for TransmissionError {
         match self {
             Self::ZeroGenerations => write!(f, "generations must be positive"),
             Self::ZeroPopulation => write!(f, "population size must be positive"),
-            Self::TooManyMachines { machines, population } => write!(f, "{machines} machines exceed population size {population}"),
+            Self::TooManyMachines { machines, population } => {
+                write!(f, "{machines} machines exceed population size {population}")
+            }
             Self::ZeroLearningTrials => write!(f, "individual-learning trial budgets must be positive"),
             Self::ZeroTeacherCandidates => write!(f, "teacher candidate count must be positive when generations > 1"),
-            Self::TooManyTeacherCandidates { candidates, population } => write!(f, "{candidates} teacher candidates exceed prior generation size {population}"),
+            Self::TooManyTeacherCandidates { candidates, population } => {
+                write!(f, "{candidates} teacher candidates exceed prior generation size {population}")
+            }
             Self::ZeroDemonstrations => write!(f, "demonstration count must be positive"),
             Self::InvalidProbability { name } => write!(f, "{name} must be finite and within [0, 1]"),
             Self::InvalidBias { name } => write!(f, "{name} must be finite and within [0, 1]"),
@@ -194,19 +256,28 @@ impl std::error::Error for TransmissionError {}
 
 impl TransmissionConfig {
     pub fn validate(self) -> Result<(), TransmissionError> {
-        if self.generations == 0 { return Err(TransmissionError::ZeroGenerations); }
-        if self.population_size == 0 { return Err(TransmissionError::ZeroPopulation); }
+        if self.generations == 0 {
+            return Err(TransmissionError::ZeroGenerations);
+        }
+        if self.population_size == 0 {
+            return Err(TransmissionError::ZeroPopulation);
+        }
         if self.machine_count_generation_zero > self.population_size {
             return Err(TransmissionError::TooManyMachines {
                 machines: self.machine_count_generation_zero,
                 population: self.population_size,
             });
         }
-        if self.human_learning_trials == 0 || self.machine_learning_trials == 0 {
+        if self.human_learning_trials_generation_zero == 0
+            || self.human_learning_trials_later_generations == 0
+            || self.machine_learning_trials == 0
+        {
             return Err(TransmissionError::ZeroLearningTrials);
         }
         if self.generations > 1 {
-            if self.teacher_candidate_count == 0 { return Err(TransmissionError::ZeroTeacherCandidates); }
+            if self.teacher_candidate_count == 0 {
+                return Err(TransmissionError::ZeroTeacherCandidates);
+            }
             if self.teacher_candidate_count > self.population_size {
                 return Err(TransmissionError::TooManyTeacherCandidates {
                     candidates: self.teacher_candidate_count,
@@ -214,11 +285,13 @@ impl TransmissionConfig {
                 });
             }
         }
-        if self.demonstration_count == 0 { return Err(TransmissionError::ZeroDemonstrations); }
+        if self.demonstration_count == 0 {
+            return Err(TransmissionError::ZeroDemonstrations);
+        }
         for (name, value) in [
             ("optimal discovery probability", self.optimal_discovery_probability_per_trial),
             ("myopic discovery probability", self.myopic_discovery_probability_per_trial),
-            ("social acquisition probability", self.social_acquisition_probability),
+            ("social observation probability", self.social_observation_probability),
         ] {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                 return Err(TransmissionError::InvalidProbability { name });
@@ -232,8 +305,10 @@ impl TransmissionConfig {
                 return Err(TransmissionError::InvalidBias { name });
             }
         }
-        if !self.teacher_selection_temperature.is_finite() || self.teacher_selection_temperature <= 0.0 {
-            return Err(TransmissionError::InvalidTemperature);
+        if let TeacherSelectionRule::PerformanceSoftmax { temperature } = self.teacher_selection {
+            if !temperature.is_finite() || temperature <= 0.0 {
+                return Err(TransmissionError::InvalidTemperature);
+            }
         }
         if !self.reward_noise_epsilon.is_finite() || self.reward_noise_epsilon < 0.0 {
             return Err(TransmissionError::InvalidNoiseScale);
@@ -252,26 +327,28 @@ impl TransmissionRun {
         self.generations.iter().map(PopulationGeneration::metrics).collect()
     }
 
-    /// Human generations 1..end all contain at least one optimal strategy.
-    /// This is a model-side persistence descriptor, not the paper's raw-data
-    /// classification implementation.
+    /// At least one optimal strategy appears in every post-seed generation.
+    /// This model-side descriptor is not the paper's raw-data classification.
     pub fn optimal_present_in_every_post_seed_generation(&self) -> bool {
         if self.generations.len() < 2 {
             return false;
         }
         self.generations.iter().skip(1).all(|generation| {
-            generation.agents.iter().any(|agent| agent.integrated_strategy == Strategy::Optimal)
+            generation.agents.iter()
+                .any(|agent| agent.integrated_strategy == Strategy::Optimal)
         })
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DeterministicRng {
     state: u64,
 }
 
 impl DeterministicRng {
-    fn new(seed: u64) -> Self { Self { state: seed } }
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
 
     fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -308,10 +385,10 @@ fn discover_strategy(
 ) -> Strategy {
     let optimal_trials = f64::from(trials) * optimal_bias;
     let myopic_trials = f64::from(trials) * (1.0 - optimal_bias);
-    let optimal_probability =
-        1.0 - (1.0 - config.optimal_discovery_probability_per_trial).powf(optimal_trials);
-    let myopic_probability =
-        1.0 - (1.0 - config.myopic_discovery_probability_per_trial).powf(myopic_trials);
+    let optimal_probability = 1.0
+        - (1.0 - config.optimal_discovery_probability_per_trial).powf(optimal_trials);
+    let myopic_probability = 1.0
+        - (1.0 - config.myopic_discovery_probability_per_trial).powf(myopic_trials);
 
     let found_optimal = rng.bernoulli(optimal_probability);
     let found_myopic = rng.bernoulli(myopic_probability);
@@ -351,25 +428,39 @@ fn sample_teacher_candidates(
 fn select_teacher(
     previous: &[TransmissionAgent],
     candidates: &[usize],
-    temperature: f64,
+    rule: TeacherSelectionRule,
     rng: &mut DeterministicRng,
-) -> usize {
+) -> (usize, bool) {
     let maximum = candidates.iter()
         .map(|&index| previous[index].demonstration_score)
         .fold(f64::NEG_INFINITY, f64::max);
-    let weights: Vec<f64> = candidates.iter()
-        .map(|&index| ((previous[index].demonstration_score - maximum) / temperature).exp())
-        .collect();
-    let total: f64 = weights.iter().sum();
-    if !total.is_finite() || total <= 0.0 {
-        return candidates[0];
-    }
-    let mut draw = rng.uniform() * total;
-    for (&candidate, weight) in candidates.iter().zip(weights) {
-        if draw < weight { return candidate; }
-        draw -= weight;
-    }
-    *candidates.last().expect("teacher candidate list is nonempty")
+    let selected = match rule {
+        TeacherSelectionRule::Uniform => candidates[rng.index(candidates.len())],
+        TeacherSelectionRule::PerformanceSoftmax { temperature } => {
+            let weights: Vec<f64> = candidates.iter()
+                .map(|&index| {
+                    ((previous[index].demonstration_score - maximum) / temperature).exp()
+                })
+                .collect();
+            let total: f64 = weights.iter().sum();
+            if !total.is_finite() || total <= 0.0 {
+                candidates[0]
+            } else {
+                let mut draw = rng.uniform() * total;
+                let mut selected = *candidates.last().expect("candidate list is nonempty");
+                for (&candidate, weight) in candidates.iter().zip(weights) {
+                    if draw < weight {
+                        selected = candidate;
+                        break;
+                    }
+                    draw -= weight;
+                }
+                selected
+            }
+        }
+    };
+    let selected_score = previous[selected].demonstration_score;
+    (selected, selected_score >= maximum)
 }
 
 fn integrate_strategy(individual: Strategy, social: Option<Strategy>) -> Strategy {
@@ -381,10 +472,9 @@ fn integrate_strategy(individual: Strategy, social: Option<Strategy>) -> Strateg
 
 /// Run one parameterized generational experiment.
 ///
-/// The implementation is a transparent reference model inspired by the
-/// article's described mechanism sequence. It does not reproduce the exact
-/// published ABM until its supplementary parameterization, implementation,
-/// and archived outputs are ingested.
+/// The model is deliberately simplified and auditable. It is not a reproduction
+/// of the article's ABM until the supplementary parameterization, implementation
+/// and archived outputs are ingested and independently compared.
 pub fn simulate_transmission(
     config: TransmissionConfig,
     seed: u64,
@@ -393,8 +483,6 @@ pub fn simulate_transmission(
     let mut rng = DeterministicRng::new(seed);
     let mut generations = Vec::with_capacity(config.generations);
 
-    // Seed generation: machines have a larger search budget and a separate
-    // exploration bias; remaining slots are human individual learners.
     let mut initial_agents = Vec::with_capacity(config.population_size);
     for index in 0..config.population_size {
         let kind = if index < config.machine_count_generation_zero {
@@ -403,8 +491,14 @@ pub fn simulate_transmission(
             AgentKind::Human
         };
         let (trials, bias) = match kind {
-            AgentKind::Machine => (config.machine_learning_trials, config.machine_optimal_exploration_bias),
-            AgentKind::Human => (config.human_learning_trials, config.human_optimal_exploration_bias),
+            AgentKind::Machine => (
+                config.machine_learning_trials,
+                config.machine_optimal_exploration_bias,
+            ),
+            AgentKind::Human => (
+                config.human_learning_trials_generation_zero,
+                config.human_optimal_exploration_bias,
+            ),
         };
         let individual_strategy = discover_strategy(trials, bias, config, &mut rng);
         let score = demonstration_score(individual_strategy, config, &mut rng);
@@ -414,32 +508,42 @@ pub fn simulate_transmission(
             social_strategy: None,
             integrated_strategy: individual_strategy,
             teacher_index: None,
-            social_acquisition_succeeded: false,
+            teacher_strategy: None,
+            demonstration_observed: false,
+            selected_top_teacher: None,
             demonstration_score: score,
         });
     }
-    generations.push(PopulationGeneration { index: 0, agents: initial_agents });
+    generations.push(PopulationGeneration {
+        index: 0,
+        agents: initial_agents,
+    });
 
     for generation_index in 1..config.generations {
         let previous = &generations[generation_index - 1].agents;
         let mut agents = Vec::with_capacity(config.population_size);
         for _ in 0..config.population_size {
             let individual_strategy = discover_strategy(
-                config.human_learning_trials,
+                config.human_learning_trials_later_generations,
                 config.human_optimal_exploration_bias,
                 config,
                 &mut rng,
             );
-            let candidates = sample_teacher_candidates(previous, config.teacher_candidate_count, &mut rng);
-            let teacher_index = select_teacher(
+            let candidates = sample_teacher_candidates(
                 previous,
-                &candidates,
-                config.teacher_selection_temperature,
+                config.teacher_candidate_count,
                 &mut rng,
             );
-            let acquired = rng.bernoulli(config.social_acquisition_probability);
-            let social_strategy = if acquired {
-                Some(previous[teacher_index].integrated_strategy)
+            let (teacher_index, selected_top_teacher) = select_teacher(
+                previous,
+                &candidates,
+                config.teacher_selection,
+                &mut rng,
+            );
+            let teacher_strategy = previous[teacher_index].integrated_strategy;
+            let demonstration_observed = rng.bernoulli(config.social_observation_probability);
+            let social_strategy = if demonstration_observed && teacher_strategy != Strategy::None {
+                Some(teacher_strategy)
             } else {
                 None
             };
@@ -451,11 +555,16 @@ pub fn simulate_transmission(
                 social_strategy,
                 integrated_strategy,
                 teacher_index: Some(teacher_index),
-                social_acquisition_succeeded: acquired,
+                teacher_strategy: Some(teacher_strategy),
+                demonstration_observed,
+                selected_top_teacher: Some(selected_top_teacher),
                 demonstration_score: score,
             });
         }
-        generations.push(PopulationGeneration { index: generation_index, agents });
+        generations.push(PopulationGeneration {
+            index: generation_index,
+            agents,
+        });
     }
 
     Ok(TransmissionRun { generations })
@@ -470,15 +579,18 @@ mod tests {
             generations: 4,
             population_size: 8,
             machine_count_generation_zero: 1,
-            human_learning_trials: 1,
+            human_learning_trials_generation_zero: 1,
+            human_learning_trials_later_generations: 1,
             machine_learning_trials: 1,
             human_optimal_exploration_bias: 0.0,
             machine_optimal_exploration_bias: 1.0,
             optimal_discovery_probability_per_trial: 1.0,
             myopic_discovery_probability_per_trial: 0.0,
-            social_acquisition_probability: 1.0,
+            social_observation_probability: 1.0,
             teacher_candidate_count: 8,
-            teacher_selection_temperature: 0.01,
+            teacher_selection: TeacherSelectionRule::PerformanceSoftmax {
+                temperature: 0.01,
+            },
             demonstration_count: 10,
             reward_noise_epsilon: 0.0,
         }
@@ -486,20 +598,57 @@ mod tests {
 
     #[test]
     fn optimal_strategy_dominates_myopic_when_both_are_acquired() {
-        assert_eq!(integrate_strategy(Strategy::Myopic, Some(Strategy::Optimal)), Strategy::Optimal);
-        assert_eq!(integrate_strategy(Strategy::Optimal, Some(Strategy::Myopic)), Strategy::Optimal);
+        assert_eq!(
+            integrate_strategy(Strategy::Myopic, Some(Strategy::Optimal)),
+            Strategy::Optimal
+        );
+        assert_eq!(
+            integrate_strategy(Strategy::Optimal, Some(Strategy::Myopic)),
+            Strategy::Optimal
+        );
     }
 
     #[test]
     fn high_performance_machine_seed_is_acquired_and_retained() {
         let run = simulate_transmission(high_transmission_config(), 7).unwrap();
         assert_eq!(run.generations[0].agents[0].kind, AgentKind::Machine);
-        assert_eq!(run.generations[0].agents[0].integrated_strategy, Strategy::Optimal);
+        assert_eq!(
+            run.generations[0].agents[0].integrated_strategy,
+            Strategy::Optimal
+        );
         for generation in run.generations.iter().skip(1) {
-            assert!(generation.agents.iter().all(|agent| agent.integrated_strategy == Strategy::Optimal));
+            assert!(generation.agents.iter().all(|agent| {
+                agent.integrated_strategy == Strategy::Optimal
+                    && agent.social_strategy == Some(Strategy::Optimal)
+                    && agent.demonstration_observed
+            }));
             assert_eq!(generation.metrics().optimal_prevalence, 1.0);
+            assert_eq!(generation.metrics().social_acquisition_rate_given_observation, Some(1.0));
         }
         assert!(run.optimal_present_in_every_post_seed_generation());
+    }
+
+    #[test]
+    fn observed_empty_teacher_is_not_counted_as_knowledge_acquisition() {
+        let generation = PopulationGeneration {
+            index: 1,
+            agents: vec![TransmissionAgent {
+                kind: AgentKind::Human,
+                individual_strategy: Strategy::None,
+                social_strategy: None,
+                integrated_strategy: Strategy::None,
+                teacher_index: Some(0),
+                teacher_strategy: Some(Strategy::None),
+                demonstration_observed: true,
+                selected_top_teacher: Some(true),
+                demonstration_score: 0.0,
+            }],
+        };
+        let metrics = generation.metrics();
+        assert_eq!(metrics.demonstration_observations, 1);
+        assert_eq!(metrics.social_knowledge_acquisitions, 0);
+        assert_eq!(metrics.social_acquisition_rate_given_observation, Some(0.0));
+        assert_eq!(metrics.top_teacher_selection_rate, Some(1.0));
     }
 
     #[test]
@@ -508,28 +657,76 @@ mod tests {
             generations: 3,
             population_size: 6,
             machine_count_generation_zero: 1,
-            human_learning_trials: 1,
+            human_learning_trials_generation_zero: 1,
+            human_learning_trials_later_generations: 1,
             machine_learning_trials: 1,
             human_optimal_exploration_bias: 1.0,
             machine_optimal_exploration_bias: 1.0,
             optimal_discovery_probability_per_trial: 0.0,
             myopic_discovery_probability_per_trial: 0.0,
-            social_acquisition_probability: 0.0,
+            social_observation_probability: 0.0,
             teacher_candidate_count: 3,
-            teacher_selection_temperature: 0.5,
+            teacher_selection: TeacherSelectionRule::Uniform,
             demonstration_count: 10,
             reward_noise_epsilon: 0.0,
         };
         let run = simulate_transmission(config, 11).unwrap();
         assert!(run.generations.iter().all(|generation| {
-            generation.agents.iter().all(|agent| agent.integrated_strategy == Strategy::None)
+            generation.agents.iter().all(|agent| {
+                agent.integrated_strategy == Strategy::None
+                    && agent.social_strategy.is_none()
+            })
         }));
+        assert_eq!(
+            run.generations[1].metrics().social_acquisition_rate_given_observation,
+            None
+        );
+    }
+
+    #[test]
+    fn performance_softmax_selects_best_teacher_at_low_temperature() {
+        let previous = vec![
+            TransmissionAgent {
+                kind: AgentKind::Human,
+                individual_strategy: Strategy::Myopic,
+                social_strategy: None,
+                integrated_strategy: Strategy::Myopic,
+                teacher_index: None,
+                teacher_strategy: None,
+                demonstration_observed: false,
+                selected_top_teacher: None,
+                demonstration_score: 0.0,
+            },
+            TransmissionAgent {
+                kind: AgentKind::Machine,
+                individual_strategy: Strategy::Optimal,
+                social_strategy: None,
+                integrated_strategy: Strategy::Optimal,
+                teacher_index: None,
+                teacher_strategy: None,
+                demonstration_observed: false,
+                selected_top_teacher: None,
+                demonstration_score: 10.0,
+            },
+        ];
+        let mut rng = DeterministicRng::new(9);
+        let (selected, is_top) = select_teacher(
+            &previous,
+            &[0, 1],
+            TeacherSelectionRule::PerformanceSoftmax { temperature: 0.001 },
+            &mut rng,
+        );
+        assert_eq!(selected, 1);
+        assert!(is_top);
     }
 
     #[test]
     fn fixed_seed_reproduces_the_entire_transmission_run() {
         let config = TransmissionConfig::default();
-        assert_eq!(simulate_transmission(config, 2026).unwrap(), simulate_transmission(config, 2026).unwrap());
+        assert_eq!(
+            simulate_transmission(config, 2026).unwrap(),
+            simulate_transmission(config, 2026).unwrap()
+        );
     }
 
     #[test]
@@ -545,14 +742,20 @@ mod tests {
     #[test]
     fn invalid_probability_and_temperature_are_rejected() {
         let mut config = TransmissionConfig::default();
-        config.social_acquisition_probability = 1.5;
+        config.social_observation_probability = 1.5;
         assert_eq!(
             simulate_transmission(config, 1),
-            Err(TransmissionError::InvalidProbability { name: "social acquisition probability" })
+            Err(TransmissionError::InvalidProbability {
+                name: "social observation probability",
+            })
         );
 
         let mut config = TransmissionConfig::default();
-        config.teacher_selection_temperature = 0.0;
-        assert_eq!(simulate_transmission(config, 1), Err(TransmissionError::InvalidTemperature));
+        config.teacher_selection =
+            TeacherSelectionRule::PerformanceSoftmax { temperature: 0.0 };
+        assert_eq!(
+            simulate_transmission(config, 1),
+            Err(TransmissionError::InvalidTemperature)
+        );
     }
 }
