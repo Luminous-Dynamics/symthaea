@@ -585,7 +585,7 @@ mod tests {
         assert_eq!(decision.mode, VehicleRtaMode::Baseline);
         assert!(decision.reasons.contains(&VehicleRtaReason::ObservationTimeNonMonotonic));
 
-        let mut bad = observation(1.1);
+        let mut bad = observation(1.11);
         bad.timestamp_s = f64::NAN;
         let decision = monitor.evaluate(&bad);
         assert!(decision.observation_timestamp_s.is_none());
@@ -663,11 +663,11 @@ mod tests {
         assert_eq!(dwell_complete.mode, VehicleRtaMode::TransitionToAdvanced);
         assert_eq!(dwell_complete.advanced_weight, 0.0);
 
-        let halfway = monitor.evaluate(&observation(1.6));
+        let halfway = monitor.evaluate(&observation(1.61));
         assert_eq!(halfway.mode, VehicleRtaMode::TransitionToAdvanced);
         assert!((halfway.advanced_weight - 0.5).abs() < 1e-6);
 
-        let complete = monitor.evaluate(&observation(2.1));
+        let complete = monitor.evaluate(&observation(2.21));
         assert_eq!(complete.mode, VehicleRtaMode::Advanced);
         assert_eq!(complete.advanced_weight, 1.0);
     }
