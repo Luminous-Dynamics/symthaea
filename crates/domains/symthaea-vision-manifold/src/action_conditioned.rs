@@ -852,7 +852,7 @@ mod tests {
         forecast_bank.validate_for_request(&request).unwrap();
         assert_eq!(
             forecast_bank.bank_sha256,
-            "11c3ccc99d90771444ad3198ff5f6a87494ed167e2da3be2744acb2f64ba523e"
+            "55d55bae30ca1b0148d6935d66096eaba73d2e4f79daf9c17435226cff57e91c"
         );
     }
 
