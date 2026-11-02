@@ -254,7 +254,9 @@ impl CoupledSeriesRlc {
         let geometric_mean =
             first.inductance_henry.sqrt() * second.inductance_henry.sqrt();
         let mutual_inductance_henry = coupling_coefficient * geometric_mean;
-        if !mutual_inductance_henry.is_finite() {
+        if !mutual_inductance_henry.is_finite()
+            || (coupling_coefficient != 0.0 && mutual_inductance_henry == 0.0)
+        {
             return Err(ModelError::NonRepresentable("mutual_inductance_henry"));
         }
 
@@ -476,7 +478,7 @@ mod tests {
     #[test]
     fn zero_coupling_recovers_independent_resonances() {
         let first = SeriesRlc::new(10.0, 1e-3, 1e-6).expect("first resonator");
-        let second = SeriesRlc::new(20.0, 2e-3, 0.5e-6).expect("second resonator");
+        let second = SeriesRlc::new(20.0, 2e-3, 1e-6).expect("second resonator");
         let coupled =
             CoupledSeriesRlc::new(first, second, 0.0).expect("uncoupled pair");
         let modes = coupled.mode_frequencies_hz().expect("finite modes");
