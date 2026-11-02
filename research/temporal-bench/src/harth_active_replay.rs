@@ -757,8 +757,8 @@ pub fn run_harth_active_replay<P: HarthActiveReplayPolicy>(
             } else {
                 missed_transition_count += 1;
             }
-        } else if let (Some(previous), Some(current)) = (predictions[index - 1], predictions[index]) {
-            if previous != current {
+        } else if let Some(current) = predictions[index] {
+            if predictions[index - 1] != Some(current) && current != truth_current {
                 false_transition_alarm_count += 1;
             }
         }
@@ -884,8 +884,12 @@ pub fn validate_harth_active_replay_receipt(
         || receipt.wake_count > receipt.row_count
         || receipt.wake_intervals_ns.len() as u64 + 1 != receipt.wake_count
         || receipt.wake_intervals_ns.iter().any(|interval| *interval == 0)
+        || receipt.sample_acquisition_count > receipt.wake_count
+        || receipt.back_sample_count > receipt.wake_count
+        || receipt.thigh_sample_count > receipt.wake_count
+        || receipt.both_sample_count > receipt.sample_acquisition_count
     {
-        return Err(HarthActiveReplayError::new("wake_count", "wake and interval denominators are inconsistent"));
+        return Err(HarthActiveReplayError::new("wake_count", "wake and acquisition denominators are inconsistent"));
     }
     let modality_sum = receipt.back_sample_count.checked_add(receipt.thigh_sample_count)
         .ok_or_else(|| HarthActiveReplayError::new("sample_acquisition_count", "modality count overflow"))?;
