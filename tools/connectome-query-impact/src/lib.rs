@@ -1827,6 +1827,7 @@ mod tests {
             }]),
         });
         closed.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+        closed.paired_world_set_coverage.as_mut().unwrap().scenario_id = "b-closed".to_owned();
 
         let report = analyze_candidate(&candidate(vec![supplied, closed])).unwrap();
         let impact = &report.query_impacts[0];
