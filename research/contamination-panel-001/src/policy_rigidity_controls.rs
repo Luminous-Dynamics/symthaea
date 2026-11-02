@@ -12,13 +12,10 @@ use crate::hash_domain;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const POLICY_RIGIDITY_REQUEST_SCHEMA: &str =
-    "symthaea.policy_rigidity_controls_request.v1";
-pub const POLICY_RIGIDITY_REPORT_SCHEMA: &str =
-    "symthaea.policy_rigidity_controls_report.v1";
+pub const POLICY_RIGIDITY_REQUEST_SCHEMA: &str = "symthaea.policy_rigidity_controls_request.v1";
+pub const POLICY_RIGIDITY_REPORT_SCHEMA: &str = "symthaea.policy_rigidity_controls_report.v1";
 pub const PROBE_REGISTRY_SCHEMA: &str = "symthaea.policy_rigidity_probe_registry.v1";
-pub const POLICY_RIGIDITY_FUSION_ID: &str =
-    "matched_clean_control_empirical_ranks_by_v1";
+pub const POLICY_RIGIDITY_FUSION_ID: &str = "matched_clean_control_empirical_ranks_by_v1";
 pub const MIN_CLEAN_CONTROL_UNITS_PER_GROUP: usize = 2;
 pub const MAX_CLEAN_CONTROL_UNITS_PER_GROUP: usize = 100_000;
 pub const MAX_EVALUATION_UNITS: usize = 1_000_000;
@@ -346,15 +343,21 @@ fn validate_scores(
     multiplicity: PathMultiplicityV1,
     label: &str,
 ) -> Result<(), String> {
-    if !scores.baseline_mean_entropy_nats.is_finite()
-        || scores.baseline_mean_entropy_nats < 0.0
-    {
-        return Err(format!("{label} baseline mean entropy must be finite and non-negative"));
+    if !scores.baseline_mean_entropy_nats.is_finite() || scores.baseline_mean_entropy_nats < 0.0 {
+        return Err(format!(
+            "{label} baseline mean entropy must be finite and non-negative"
+        ));
     }
     for (name, value) in [
-        ("response_conditioned_similarity", scores.response_conditioned_similarity),
+        (
+            "response_conditioned_similarity",
+            scores.response_conditioned_similarity,
+        ),
         ("prompt_only_similarity", scores.prompt_only_similarity),
-        ("semantic_paraphrase_similarity", scores.semantic_paraphrase_similarity),
+        (
+            "semantic_paraphrase_similarity",
+            scores.semantic_paraphrase_similarity,
+        ),
         (
             "constraint_reparameterization_similarity",
             scores.constraint_reparameterization_similarity,
@@ -418,17 +421,27 @@ fn decompose(scores: &RigidityProbeScoresV1) -> Result<DecomposedRigidity, Strin
 
 fn upper_tail_p(reference: &[f64], candidate: f64) -> Result<f64, String> {
     if reference.is_empty() || !candidate.is_finite() || reference.iter().any(|v| !v.is_finite()) {
-        return Err("upper-tail empirical rank requires finite nonempty reference scores".to_owned());
+        return Err(
+            "upper-tail empirical rank requires finite nonempty reference scores".to_owned(),
+        );
     }
-    let extreme = reference.iter().filter(|value| **value >= candidate).count() as u64;
+    let extreme = reference
+        .iter()
+        .filter(|value| **value >= candidate)
+        .count() as u64;
     Ok((1 + extreme) as f64 / (reference.len() as f64 + 1.0))
 }
 
 fn lower_tail_p(reference: &[f64], candidate: f64) -> Result<f64, String> {
     if reference.is_empty() || !candidate.is_finite() || reference.iter().any(|v| !v.is_finite()) {
-        return Err("lower-tail empirical rank requires finite nonempty reference scores".to_owned());
+        return Err(
+            "lower-tail empirical rank requires finite nonempty reference scores".to_owned(),
+        );
     }
-    let extreme = reference.iter().filter(|value| **value <= candidate).count() as u64;
+    let extreme = reference
+        .iter()
+        .filter(|value| **value <= candidate)
+        .count() as u64;
     Ok((1 + extreme) as f64 / (reference.len() as f64 + 1.0))
 }
 
@@ -446,9 +459,7 @@ pub fn compute_probe_registry_sha256(specs: &[ProbeSpecV1]) -> Result<String, St
 }
 
 fn validate_probe_registry(specs: &[ProbeSpecV1]) -> Result<(), String> {
-    if specs.len() != ProbeInterventionV1::REQUIRED.len()
-        || specs.len() > MAX_PROBE_SPECS
-    {
+    if specs.len() != ProbeInterventionV1::REQUIRED.len() || specs.len() > MAX_PROBE_SPECS {
         return Err(format!(
             "probe registry must contain exactly {} interventions",
             ProbeInterventionV1::REQUIRED.len()
@@ -462,10 +473,15 @@ fn validate_probe_registry(specs: &[ProbeSpecV1]) -> Result<(), String> {
             || !ids.insert(spec.probe_id.as_str())
             || !interventions.insert(spec.intervention)
         {
-            return Err("probe IDs must uniquely match their canonical intervention IDs".to_owned());
+            return Err(
+                "probe IDs must uniquely match their canonical intervention IDs".to_owned(),
+            );
         }
         require_digest(&spec.prompt_contract_sha256, "probe prompt_contract_sha256")?;
-        require_digest(&spec.generation_contract_sha256, "probe generation_contract_sha256")?;
+        require_digest(
+            &spec.generation_contract_sha256,
+            "probe generation_contract_sha256",
+        )?;
     }
     if ProbeInterventionV1::REQUIRED
         .iter()
@@ -487,13 +503,15 @@ fn validate_record_common(
     scores: &RigidityProbeScoresV1,
     label: &str,
 ) -> Result<(), String> {
-    if !valid_id(unit_id, 128)
-        || !valid_id(task_family, 64)
-        || !valid_id(difficulty_band, 64)
-    {
-        return Err(format!("{label} has invalid unit/family/difficulty identifiers"));
+    if !valid_id(unit_id, 128) || !valid_id(task_family, 64) || !valid_id(difficulty_band, 64) {
+        return Err(format!(
+            "{label} has invalid unit/family/difficulty identifiers"
+        ));
     }
-    require_digest(source_cluster_sha256, &format!("{label} source_cluster_sha256"))?;
+    require_digest(
+        source_cluster_sha256,
+        &format!("{label} source_cluster_sha256"),
+    )?;
     require_digest(
         probe_receipt_manifest_sha256,
         &format!("{label} probe_receipt_manifest_sha256"),
@@ -517,11 +535,7 @@ fn canonical_evaluation_manifest(rows: &[EvaluationControlRecordV1]) -> Result<V
         .map_err(|error| format!("cannot serialize evaluation manifest: {error}"))
 }
 
-fn group_key(
-    family: &str,
-    difficulty: &str,
-    multiplicity: PathMultiplicityV1,
-) -> RigidityGroupKey {
+fn group_key(family: &str, difficulty: &str, multiplicity: PathMultiplicityV1) -> RigidityGroupKey {
     RigidityGroupKey {
         task_family: family.to_owned(),
         difficulty_band: difficulty.to_owned(),
@@ -535,11 +549,18 @@ fn benjamini_yekutieli_adjustment(
     if values.is_empty() {
         return Ok(BTreeMap::new());
     }
-    if values.iter().any(|(_, p)| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+    if values
+        .iter()
+        .any(|(_, p)| !p.is_finite() || !(0.0..=1.0).contains(p))
+    {
         return Err("BY adjustment requires finite p-values in [0,1]".to_owned());
     }
     let mut sorted = values.to_vec();
-    sorted.sort_by(|left, right| left.1.total_cmp(&right.1).then_with(|| left.0.cmp(&right.0)));
+    sorted.sort_by(|left, right| {
+        left.1
+            .total_cmp(&right.1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
     let m = sorted.len();
     let harmonic = (1..=m).map(|rank| 1.0 / rank as f64).sum::<f64>();
     let multiplier = m as f64 * harmonic;
@@ -547,7 +568,9 @@ fn benjamini_yekutieli_adjustment(
     let mut reverse_min = 1.0_f64;
     for index in (0..m).rev() {
         let rank = index + 1;
-        reverse_min = reverse_min.min(sorted[index].1 * multiplier / rank as f64).min(1.0);
+        reverse_min = reverse_min
+            .min(sorted[index].1 * multiplier / rank as f64)
+            .min(1.0);
         result.insert(sorted[index].0.clone(), reverse_min);
     }
     Ok(result)
@@ -562,7 +585,10 @@ fn pattern_from_diagnostics(
     let global_entropy_low = global_entropy_p <= alpha;
     let global_rigidity_high = global_rigidity_p <= alpha;
     let response_specific = response_excess_p <= alpha;
-    match (global_entropy_low || global_rigidity_high, response_specific) {
+    match (
+        global_entropy_low || global_rigidity_high,
+        response_specific,
+    ) {
         (true, true) => RigidityPatternV1::BroadPolicyRigidity,
         (true, false) => RigidityPatternV1::TaskOrPathRigidity,
         (false, true) => RigidityPatternV1::ResponseConditionedSpecificity,
@@ -593,8 +619,14 @@ pub fn analyze_policy_rigidity_controls(
         (&request.model_checkpoint_sha256, "model_checkpoint_sha256"),
         (&request.tokenizer_sha256, "tokenizer_sha256"),
         (&request.prompt_harness_sha256, "prompt_harness_sha256"),
-        (&request.runtime_environment_sha256, "runtime_environment_sha256"),
-        (&request.calibration_protocol_sha256, "calibration_protocol_sha256"),
+        (
+            &request.runtime_environment_sha256,
+            "runtime_environment_sha256",
+        ),
+        (
+            &request.calibration_protocol_sha256,
+            "calibration_protocol_sha256",
+        ),
         (&request.probe_registry_sha256, "probe_registry_sha256"),
     ] {
         require_digest(digest, label)?;
@@ -653,7 +685,8 @@ pub fn analyze_policy_rigidity_controls(
     }
 
     let mut seen_eval_ids = BTreeSet::new();
-    let mut evaluation_groups = BTreeMap::<RigidityGroupKey, Vec<&EvaluationControlRecordV1>>::new();
+    let mut evaluation_groups =
+        BTreeMap::<RigidityGroupKey, Vec<&EvaluationControlRecordV1>>::new();
     for row in &request.evaluation {
         validate_record_common(
             &row.evaluation_unit_id,
@@ -669,10 +702,15 @@ pub fn analyze_policy_rigidity_controls(
         if !seen_eval_ids.insert(row.evaluation_unit_id.as_str())
             || all_unit_ids.contains(row.evaluation_unit_id.as_str())
         {
-            return Err("evaluation unit IDs must be unique and disjoint from clean controls".to_owned());
+            return Err(
+                "evaluation unit IDs must be unique and disjoint from clean controls".to_owned(),
+            );
         }
         if !all_source_clusters.insert(row.source_cluster_sha256.as_str()) {
-            return Err("source-cluster digests must be unique across clean and evaluation splits".to_owned());
+            return Err(
+                "source-cluster digests must be unique across clean and evaluation splits"
+                    .to_owned(),
+            );
         }
         evaluation_groups
             .entry(group_key(
@@ -713,7 +751,9 @@ pub fn analyze_policy_rigidity_controls(
                     by_adjusted_excess_p: None,
                     by_family_size: None,
                     minimum_clean_rank_p_value: None,
-                    decision: if row.path_multiplicity.classification == PathMultiplicityV1::Indeterminate {
+                    decision: if row.path_multiplicity.classification
+                        == PathMultiplicityV1::Indeterminate
+                    {
                         RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
                     } else {
                         RigidityDecisionV1::AbstainUnsupportedCleanControlGroup
@@ -731,11 +771,20 @@ pub fn analyze_policy_rigidity_controls(
                 flagged_response_conditioned_excess_count: 0,
                 no_flag_count: 0,
                 abstained_count: rows.len() as u64,
-                known_clean_count: rows.iter().filter(|r| r.exposure_label == Some(ExposureLabelV1::KnownClean)).count() as u64,
-                known_exposed_count: rows.iter().filter(|r| r.exposure_label == Some(ExposureLabelV1::KnownExposed)).count() as u64,
+                known_clean_count: rows
+                    .iter()
+                    .filter(|r| r.exposure_label == Some(ExposureLabelV1::KnownClean))
+                    .count() as u64,
+                known_exposed_count: rows
+                    .iter()
+                    .filter(|r| r.exposure_label == Some(ExposureLabelV1::KnownExposed))
+                    .count() as u64,
                 false_positive_count: 0,
                 true_positive_count: 0,
-                false_negative_count: rows.iter().filter(|r| r.exposure_label == Some(ExposureLabelV1::KnownExposed)).count() as u64,
+                false_negative_count: rows
+                    .iter()
+                    .filter(|r| r.exposure_label == Some(ExposureLabelV1::KnownExposed))
+                    .count() as u64,
                 empirical_fpr_permille: None,
                 empirical_tpr_permille: None,
                 decision_coverage_permille: 0.0,
@@ -747,9 +796,14 @@ pub fn analyze_policy_rigidity_controls(
         if clean.len() < MIN_CLEAN_CONTROL_UNITS_PER_GROUP {
             return Err("each matched clean-control group requires at least two units".to_owned());
         }
-        let baseline_reference: Vec<f64> = clean.iter().map(|v| v.baseline_mean_entropy_nats).collect();
-        let global_reference: Vec<f64> = clean.iter().map(|v| v.global_path_rigidity_score).collect();
-        let excess_reference: Vec<f64> = clean.iter().map(|v| v.response_conditioned_excess).collect();
+        let baseline_reference: Vec<f64> =
+            clean.iter().map(|v| v.baseline_mean_entropy_nats).collect();
+        let global_reference: Vec<f64> =
+            clean.iter().map(|v| v.global_path_rigidity_score).collect();
+        let excess_reference: Vec<f64> = clean
+            .iter()
+            .map(|v| v.response_conditioned_excess)
+            .collect();
         let min_p = 1.0 / (clean.len() as f64 + 1.0);
         let alpha_resolvable =
             u128::from(request.target_alpha_permille) * (clean.len() as u128 + 1) >= 1_000;
@@ -762,17 +816,19 @@ pub fn analyze_policy_rigidity_controls(
 
         for row in rows {
             let decomposed = decompose(&row.scores)?;
-            let entropy_p = lower_tail_p(&baseline_reference, decomposed.baseline_mean_entropy_nats)?;
+            let entropy_p =
+                lower_tail_p(&baseline_reference, decomposed.baseline_mean_entropy_nats)?;
             let global_p = upper_tail_p(&global_reference, decomposed.global_path_rigidity_score)?;
             let excess_p = upper_tail_p(&excess_reference, decomposed.response_conditioned_excess)?;
             let pattern = pattern_from_diagnostics(entropy_p, global_p, excess_p, alpha);
-            let decision = if row.path_multiplicity.classification == PathMultiplicityV1::Indeterminate {
-                RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
-            } else if !alpha_resolvable {
-                RigidityDecisionV1::AbstainInsufficientCalibrationResolution
-            } else {
-                RigidityDecisionV1::NoResponseConditionedExcessFlag
-            };
+            let decision =
+                if row.path_multiplicity.classification == PathMultiplicityV1::Indeterminate {
+                    RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
+                } else if !alpha_resolvable {
+                    RigidityDecisionV1::AbstainInsufficientCalibrationResolution
+                } else {
+                    RigidityDecisionV1::NoResponseConditionedExcessFlag
+                };
             match row.exposure_label {
                 Some(ExposureLabelV1::KnownClean) => clean_labelled += 1,
                 Some(ExposureLabelV1::KnownExposed) => exposed_labelled += 1,
@@ -794,7 +850,8 @@ pub fn analyze_policy_rigidity_controls(
                 by_family_size: None,
                 minimum_clean_rank_p_value: Some(min_p),
                 decision,
-                pattern: if decision == RigidityDecisionV1::AbstainInsufficientCalibrationResolution {
+                pattern: if decision == RigidityDecisionV1::AbstainInsufficientCalibrationResolution
+                {
                     RigidityPatternV1::InsufficientEvidence
                 } else {
                     pattern
@@ -806,7 +863,10 @@ pub fn analyze_policy_rigidity_controls(
         let eligible_pairs: Vec<(String, f64)> = score_rows[start..]
             .iter()
             .filter(|row| row.decision == RigidityDecisionV1::NoResponseConditionedExcessFlag)
-            .filter_map(|row| row.response_conditioned_excess_upper_tail_p.map(|p| (row.evaluation_unit_id.clone(), p)))
+            .filter_map(|row| {
+                row.response_conditioned_excess_upper_tail_p
+                    .map(|p| (row.evaluation_unit_id.clone(), p))
+            })
             .collect();
         let by_adjusted = benjamini_yekutieli_adjustment(&eligible_pairs)?;
         let family_size = eligible_pairs.len() as u64;
@@ -832,18 +892,26 @@ pub fn analyze_policy_rigidity_controls(
             .count() as u64;
         let abstained = score_rows[start..]
             .iter()
-            .filter(|row| matches!(
-                row.decision,
-                RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
-                    | RigidityDecisionV1::AbstainInsufficientCalibrationResolution
-            ))
+            .filter(|row| {
+                matches!(
+                    row.decision,
+                    RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
+                        | RigidityDecisionV1::AbstainInsufficientCalibrationResolution
+                )
+            })
             .count() as u64;
         for row in &score_rows[start..] {
             match row.exposure_label {
                 Some(ExposureLabelV1::KnownClean)
-                    if row.decision == RigidityDecisionV1::FlagResponseConditionedExcess => fp += 1,
+                    if row.decision == RigidityDecisionV1::FlagResponseConditionedExcess =>
+                {
+                    fp += 1
+                }
                 Some(ExposureLabelV1::KnownExposed)
-                    if row.decision != RigidityDecisionV1::FlagResponseConditionedExcess => fn_count += 1,
+                    if row.decision != RigidityDecisionV1::FlagResponseConditionedExcess =>
+                {
+                    fn_count += 1
+                }
                 _ => {}
             }
             if row.exposure_label == Some(ExposureLabelV1::KnownExposed)
@@ -854,10 +922,10 @@ pub fn analyze_policy_rigidity_controls(
         }
         let clean_denominator = clean_labelled;
         let exposed_denominator = exposed_labelled;
-        let empirical_fpr_permille = (clean_denominator > 0)
-            .then_some(fp as f64 * 1_000.0 / clean_denominator as f64);
-        let empirical_tpr_permille = (exposed_denominator > 0)
-            .then_some(tp as f64 * 1_000.0 / exposed_denominator as f64);
+        let empirical_fpr_permille =
+            (clean_denominator > 0).then_some(fp as f64 * 1_000.0 / clean_denominator as f64);
+        let empirical_tpr_permille =
+            (exposed_denominator > 0).then_some(tp as f64 * 1_000.0 / exposed_denominator as f64);
 
         group_summaries.push(RigidityGroupSummaryV1 {
             task_family: key.task_family.clone(),
@@ -995,7 +1063,11 @@ mod tests {
             adjudication_report_sha256: digest(40),
             reviewer_panel_sha256: digest(41),
             reviewer_count: 3,
-            agreement_permille: if classification == PathMultiplicityV1::Indeterminate { 700 } else { 1_000 },
+            agreement_permille: if classification == PathMultiplicityV1::Indeterminate {
+                700
+            } else {
+                1_000
+            },
         }
     }
 
@@ -1028,13 +1100,7 @@ mod tests {
             task_recipe_sha256: digest(43),
             exposure_label: ExposureLabelV1::KnownClean,
             scores: if path == PathMultiplicityV1::MultipleValidPaths {
-                score_bundle(
-                    global + excess,
-                    global,
-                    global,
-                    global,
-                    Some(global),
-                )
+                score_bundle(global + excess, global, global, global, Some(global))
             } else {
                 score_bundle(global + excess, global, global, global, None)
             },
@@ -1090,8 +1156,18 @@ mod tests {
                 clean_record("m3", PathMultiplicityV1::MultipleValidPaths, 0.1),
             ],
             evaluation: vec![
-                eval_record("e1", PathMultiplicityV1::SingleOrFewValidPaths, ExposureLabelV1::KnownClean, 0.9),
-                eval_record("e2", PathMultiplicityV1::MultipleValidPaths, ExposureLabelV1::KnownExposed, 0.9),
+                eval_record(
+                    "e1",
+                    PathMultiplicityV1::SingleOrFewValidPaths,
+                    ExposureLabelV1::KnownClean,
+                    0.9,
+                ),
+                eval_record(
+                    "e2",
+                    PathMultiplicityV1::MultipleValidPaths,
+                    ExposureLabelV1::KnownExposed,
+                    0.9,
+                ),
             ],
         }
     }
@@ -1109,20 +1185,29 @@ mod tests {
         let request = request();
         let report = analyze_policy_rigidity_controls(&request).unwrap();
         assert_eq!(report.group_summaries.len(), 2);
-        assert!(report.score_rows.iter().all(|row| row.global_entropy_lower_tail_p.is_some()));
+        assert!(
+            report
+                .score_rows
+                .iter()
+                .all(|row| row.global_entropy_lower_tail_p.is_some())
+        );
     }
 
     #[test]
     fn multiple_path_tasks_require_alternate_valid_method_probe() {
         let mut request = request();
-        request.evaluation[1].scores.alternate_valid_method_similarity = None;
+        request.evaluation[1]
+            .scores
+            .alternate_valid_method_similarity = None;
         assert!(analyze_policy_rigidity_controls(&request).is_err());
     }
 
     #[test]
     fn single_path_tasks_reject_inapplicable_alternate_method_probe() {
         let mut request = request();
-        request.evaluation[0].scores.alternate_valid_method_similarity = Some(0.5);
+        request.evaluation[0]
+            .scores
+            .alternate_valid_method_similarity = Some(0.5);
         assert!(analyze_policy_rigidity_controls(&request).is_err());
     }
 
@@ -1130,10 +1215,19 @@ mod tests {
     fn indeterminate_path_multiplicity_abstains() {
         let mut request = request();
         request.evaluation[0].path_multiplicity = adjudication(PathMultiplicityV1::Indeterminate);
-        request.evaluation[0].scores.alternate_valid_method_similarity = None;
+        request.evaluation[0]
+            .scores
+            .alternate_valid_method_similarity = None;
         let report = analyze_policy_rigidity_controls(&request).unwrap();
-        let row = report.score_rows.iter().find(|row| row.evaluation_unit_id == "e1").unwrap();
-        assert_eq!(row.decision, RigidityDecisionV1::AbstainIndeterminatePathMultiplicity);
+        let row = report
+            .score_rows
+            .iter()
+            .find(|row| row.evaluation_unit_id == "e1")
+            .unwrap();
+        assert_eq!(
+            row.decision,
+            RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
+        );
     }
 
     #[test]
@@ -1146,7 +1240,8 @@ mod tests {
     #[test]
     fn source_cluster_overlap_across_splits_is_rejected() {
         let mut request = request();
-        request.evaluation[0].source_cluster_sha256 = request.clean_controls[0].source_cluster_sha256.clone();
+        request.evaluation[0].source_cluster_sha256 =
+            request.clean_controls[0].source_cluster_sha256.clone();
         assert!(analyze_policy_rigidity_controls(&request).is_err());
     }
 
@@ -1188,7 +1283,8 @@ mod tests {
     fn full_request_fixture_round_trips_and_scores() {
         let request: PolicyRigidityControlsRequestV1 = serde_json::from_str(include_str!(
             "../fixtures/policy-rigidity-controls-request.hand.v1.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let report = analyze_policy_rigidity_controls(&request).unwrap();
         assert_eq!(report.evaluation_unit_count, 2);
         assert_eq!(report.group_summaries.len(), 2);
