@@ -348,11 +348,13 @@ pub fn evaluate_beta_grid(f:&PolicyFixture)->Result<Vec<BetaEvaluation>,PolicyEr
         let diag=weighted_risk_diagnostic(&policy,&f.calibration_mixture_policy,&f.calibration_samples,f.worst_case_loss_ppm)?;
         let risk_fraction=eval.expected_loss_ppm.div(Fraction::new(PPM,1)?)?;
         let budget=Fraction::new(u128::from(f.risk_budget_ppm),PPM)?;
+        let calibration_diagnostic_within_budget =
+            diag.weighted_empirical_risk_with_worst_case_test.cmp_checked(budget)? != Ordering::Greater;
         results.push(BetaEvaluation{
             beta:*beta,clipped_policy:policy,evaluator:eval,
             weighted_calibration:diag,
             evaluator_risk_within_budget:risk_fraction.cmp_checked(budget)?!=Ordering::Greater,
-            calibration_diagnostic_within_budget:diag.weighted_empirical_risk_with_worst_case_test.cmp_checked(budget)?!=Ordering::Greater
+            calibration_diagnostic_within_budget
         });
     }
     Ok(results)
@@ -396,7 +398,10 @@ mod tests{
     }
     #[test]fn finite_fixture_exposes_reward_risk_tradeoff_and_nonmonotone_action_loss(){
         let f=load_builtin_fixture().unwrap();let xs=evaluate_beta_grid(&f).unwrap();
-        assert_eq!(xs.len(),5);
+        assert_eq!(xs.len(),7);
+        assert!(xs[0].evaluator_risk_within_budget);
+        assert!(xs[1].evaluator_risk_within_budget);
+        assert!(!xs[2].evaluator_risk_within_budget);
         assert_eq!(f.action_support[2].loss_ppm,900000);
         assert_eq!(f.action_support[3].loss_ppm,20000);
         assert!(xs[0].evaluator.expected_reward_milli.numerator>0);
