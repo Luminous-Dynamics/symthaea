@@ -1,0 +1,840 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/detector-fragility-report-v1.json",
+  "title": "Detector fragility report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "study_sha256",
+    "target_fpr_permille",
+    "independent_model_pair_replicate_count",
+    "pair_reports",
+    "aggregate_interventions",
+    "intervals_multiplicity_adjusted",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.detector_fragility_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_fpr_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "independent_model_pair_replicate_count": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 1000
+    },
+    "pair_reports": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "replicate_id",
+          "checkpoint_reports",
+          "intervention_comparisons"
+        ],
+        "properties": {
+          "replicate_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "checkpoint_reports": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "stage",
+                "checkpoint_sha256",
+                "parent_checkpoint_sha256",
+                "training_receipt_sha256",
+                "training_config_sha256",
+                "objective_config_sha256",
+                "training_data_manifest_sha256",
+                "optimizer_steps",
+                "performance",
+                "detectors"
+              ],
+              "properties": {
+                "stage": {
+                  "type": "string",
+                  "enum": [
+                    "sft_clean",
+                    "sft_contaminated",
+                    "sft_clean_then_grpo_clean",
+                    "sft_contaminated_then_grpo_clean",
+                    "sft_clean_then_raft",
+                    "sft_contaminated_then_raft",
+                    "sft_clean_then_raft_plus_plus",
+                    "sft_contaminated_then_raft_plus_plus",
+                    "advanced_lrm_clean",
+                    "advanced_lrm_cot_contaminated"
+                  ]
+                },
+                "checkpoint_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "parent_checkpoint_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "training_receipt_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "training_config_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "objective_config_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "training_data_manifest_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "optimizer_steps": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "performance": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "member_accuracy_permille",
+                    "nonmember_accuracy_permille",
+                    "member_test_count",
+                    "nonmember_test_count"
+                  ],
+                  "properties": {
+                    "member_accuracy_permille": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000
+                    },
+                    "nonmember_accuracy_permille": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000
+                    },
+                    "member_test_count": {
+                      "type": "integer",
+                      "minimum": 100
+                    },
+                    "nonmember_test_count": {
+                      "type": "integer",
+                      "minimum": 300
+                    }
+                  }
+                },
+                "detectors": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "detector_id",
+                      "detector_spec_sha256",
+                      "direction",
+                      "auroc",
+                      "auprc",
+                      "calibration_threshold_oriented",
+                      "calibration_negative_count",
+                      "calibration_false_positive_count",
+                      "test_positive_count",
+                      "test_negative_count",
+                      "test_true_positive_count",
+                      "test_false_positive_count",
+                      "test_tpr_permille",
+                      "test_fpr_permille",
+                      "test_tpr_wilson_95",
+                      "test_fpr_wilson_95"
+                    ],
+                    "properties": {
+                      "detector_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9._:-]+$"
+                      },
+                      "detector_spec_sha256": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "direction": {
+                        "type": "string",
+                        "enum": [
+                          "higher_is_member",
+                          "lower_is_member"
+                        ]
+                      },
+                      "auroc": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "auprc": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "calibration_threshold_oriented": {
+                        "type": "number"
+                      },
+                      "calibration_negative_count": {
+                        "type": "integer",
+                        "minimum": 300
+                      },
+                      "calibration_false_positive_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "test_positive_count": {
+                        "type": "integer",
+                        "minimum": 100
+                      },
+                      "test_negative_count": {
+                        "type": "integer",
+                        "minimum": 300
+                      },
+                      "test_true_positive_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "test_false_positive_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "test_tpr_permille": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "test_fpr_permille": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "test_tpr_wilson_95": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "lower_95",
+                          "upper_95"
+                        ],
+                        "properties": {
+                          "lower_95": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "upper_95": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        }
+                      },
+                      "test_fpr_wilson_95": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "lower_95",
+                          "upper_95"
+                        ],
+                        "properties": {
+                          "lower_95": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "upper_95": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "intervention_comparisons": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "intervention",
+                "before_contaminated_stage",
+                "before_clean_control_stage",
+                "after_contaminated_stage",
+                "after_clean_control_stage",
+                "member_performance_inflation_before_permille",
+                "member_performance_inflation_after_permille",
+                "member_inflation_retention_permille",
+                "nonmember_generalization_delta_before_permille",
+                "nonmember_generalization_delta_after_permille",
+                "detectors"
+              ],
+              "properties": {
+                "intervention": {
+                  "type": "string",
+                  "enum": [
+                    "sft_then_clean_grpo",
+                    "sft_then_raft",
+                    "sft_then_raft_plus_plus",
+                    "advanced_lrm_cot_sft"
+                  ]
+                },
+                "before_contaminated_stage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "sft_clean",
+                        "sft_contaminated",
+                        "sft_clean_then_grpo_clean",
+                        "sft_contaminated_then_grpo_clean",
+                        "sft_clean_then_raft",
+                        "sft_contaminated_then_raft",
+                        "sft_clean_then_raft_plus_plus",
+                        "sft_contaminated_then_raft_plus_plus",
+                        "advanced_lrm_clean",
+                        "advanced_lrm_cot_contaminated"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "before_clean_control_stage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "sft_clean",
+                        "sft_contaminated",
+                        "sft_clean_then_grpo_clean",
+                        "sft_contaminated_then_grpo_clean",
+                        "sft_clean_then_raft",
+                        "sft_contaminated_then_raft",
+                        "sft_clean_then_raft_plus_plus",
+                        "sft_contaminated_then_raft_plus_plus",
+                        "advanced_lrm_clean",
+                        "advanced_lrm_cot_contaminated"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "after_contaminated_stage": {
+                  "type": "string",
+                  "enum": [
+                    "sft_clean",
+                    "sft_contaminated",
+                    "sft_clean_then_grpo_clean",
+                    "sft_contaminated_then_grpo_clean",
+                    "sft_clean_then_raft",
+                    "sft_contaminated_then_raft",
+                    "sft_clean_then_raft_plus_plus",
+                    "sft_contaminated_then_raft_plus_plus",
+                    "advanced_lrm_clean",
+                    "advanced_lrm_cot_contaminated"
+                  ]
+                },
+                "after_clean_control_stage": {
+                  "type": "string",
+                  "enum": [
+                    "sft_clean",
+                    "sft_contaminated",
+                    "sft_clean_then_grpo_clean",
+                    "sft_contaminated_then_grpo_clean",
+                    "sft_clean_then_raft",
+                    "sft_contaminated_then_raft",
+                    "sft_clean_then_raft_plus_plus",
+                    "sft_contaminated_then_raft_plus_plus",
+                    "advanced_lrm_clean",
+                    "advanced_lrm_cot_contaminated"
+                  ]
+                },
+                "member_performance_inflation_before_permille": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "member_performance_inflation_after_permille": {
+                  "type": "number"
+                },
+                "member_inflation_retention_permille": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "nonmember_generalization_delta_before_permille": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "nonmember_generalization_delta_after_permille": {
+                  "type": "number"
+                },
+                "detectors": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "detector_id",
+                      "auroc_before",
+                      "auroc_after",
+                      "auroc_delta",
+                      "signal_retention_permille",
+                      "tpr_before_permille",
+                      "tpr_after_permille",
+                      "fpr_before_permille",
+                      "fpr_after_permille",
+                      "concealment_gap_permille"
+                    ],
+                    "properties": {
+                      "detector_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9._:-]+$"
+                      },
+                      "auroc_before": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "auroc_after": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "auroc_delta": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "signal_retention_permille": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "tpr_before_permille": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "tpr_after_permille": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "fpr_before_permille": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "fpr_after_permille": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "concealment_gap_permille": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "aggregate_interventions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intervention",
+          "independent_model_pair_count",
+          "member_performance_inflation_before_permille",
+          "member_performance_inflation_after_permille",
+          "member_inflation_retention_permille",
+          "nonmember_generalization_delta_after_permille",
+          "detectors"
+        ],
+        "properties": {
+          "intervention": {
+            "type": "string",
+            "enum": [
+              "sft_then_clean_grpo",
+              "sft_then_raft",
+              "sft_then_raft_plus_plus",
+              "advanced_lrm_cot_sft"
+            ]
+          },
+          "independent_model_pair_count": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "member_performance_inflation_before_permille": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mean",
+                  "standard_deviation_across_replicates",
+                  "standard_error",
+                  "confidence_level_permille",
+                  "lower_95",
+                  "upper_95"
+                ],
+                "properties": {
+                  "mean": {
+                    "type": "number"
+                  },
+                  "standard_deviation_across_replicates": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "standard_error": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "confidence_level_permille": {
+                    "const": 950
+                  },
+                  "lower_95": {
+                    "type": "number"
+                  },
+                  "upper_95": {
+                    "type": "number"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "member_performance_inflation_after_permille": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mean",
+              "standard_deviation_across_replicates",
+              "standard_error",
+              "confidence_level_permille",
+              "lower_95",
+              "upper_95"
+            ],
+            "properties": {
+              "mean": {
+                "type": "number"
+              },
+              "standard_deviation_across_replicates": {
+                "type": "number",
+                "minimum": 0
+              },
+              "standard_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "confidence_level_permille": {
+                "const": 950
+              },
+              "lower_95": {
+                "type": "number"
+              },
+              "upper_95": {
+                "type": "number"
+              }
+            }
+          },
+          "member_inflation_retention_permille": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mean",
+                  "standard_deviation_across_replicates",
+                  "standard_error",
+                  "confidence_level_permille",
+                  "lower_95",
+                  "upper_95"
+                ],
+                "properties": {
+                  "mean": {
+                    "type": "number"
+                  },
+                  "standard_deviation_across_replicates": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "standard_error": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "confidence_level_permille": {
+                    "const": 950
+                  },
+                  "lower_95": {
+                    "type": "number"
+                  },
+                  "upper_95": {
+                    "type": "number"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nonmember_generalization_delta_after_permille": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mean",
+              "standard_deviation_across_replicates",
+              "standard_error",
+              "confidence_level_permille",
+              "lower_95",
+              "upper_95"
+            ],
+            "properties": {
+              "mean": {
+                "type": "number"
+              },
+              "standard_deviation_across_replicates": {
+                "type": "number",
+                "minimum": 0
+              },
+              "standard_error": {
+                "type": "number",
+                "minimum": 0
+              },
+              "confidence_level_permille": {
+                "const": 950
+              },
+              "lower_95": {
+                "type": "number"
+              },
+              "upper_95": {
+                "type": "number"
+              }
+            }
+          },
+          "detectors": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "detector_id",
+                "signal_retention_permille",
+                "concealment_gap_permille"
+              ],
+              "properties": {
+                "detector_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "signal_retention_permille": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "mean",
+                        "standard_deviation_across_replicates",
+                        "standard_error",
+                        "confidence_level_permille",
+                        "lower_95",
+                        "upper_95"
+                      ],
+                      "properties": {
+                        "mean": {
+                          "type": "number"
+                        },
+                        "standard_deviation_across_replicates": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "standard_error": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "confidence_level_permille": {
+                          "const": 950
+                        },
+                        "lower_95": {
+                          "type": "number"
+                        },
+                        "upper_95": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "concealment_gap_permille": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "mean",
+                        "standard_deviation_across_replicates",
+                        "standard_error",
+                        "confidence_level_permille",
+                        "lower_95",
+                        "upper_95"
+                      ],
+                      "properties": {
+                        "mean": {
+                          "type": "number"
+                        },
+                        "standard_deviation_across_replicates": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "standard_error": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "confidence_level_permille": {
+                          "const": 950
+                        },
+                        "lower_95": {
+                          "type": "number"
+                        },
+                        "upper_95": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "intervals_multiplicity_adjusted": {
+      "const": false
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "const": "exploratory_detector_fragility"
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {}
+}

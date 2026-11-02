@@ -1,0 +1,188 @@
+{
+  "schema": "symthaea.detector_fragility_protocol.v1",
+  "protocol_id": "SCI-DETECTOR-FRAGILITY-001",
+  "version": "1.0.0",
+  "status": "research_protocol_not_qualified",
+  "purpose": "Measure whether contamination detector separability is concealed by later optimization while benchmark performance inflation remains.",
+  "literature_anchor": {
+    "title": "On the Fragility of Benchmark Contamination Detection in Reasoning Models",
+    "venue": "ICLR 2026",
+    "url": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a3860475ddbfb8c644c43f0dcd266b66-Abstract-Conference.html",
+    "paper_pdf": "https://proceedings.iclr.cc/paper_files/paper/2026/file/a3860475ddbfb8c644c43f0dcd266b66-Paper-Conference.pdf",
+    "reported_findings": [
+      "Several reference-free detectors identify SFT contamination before RL; the paper reports mean AUROC around 73.42% across six benchmarks, and LiRA around 89.13% where its reference assumptions hold.",
+      "After clean GRPO, detector AUROC systematically decreases; up to 156 additional GRPO steps are reported.",
+      "The contaminated model retains approximately 7.14 percentage points of average pass@1 inflation across six benchmarks after clean GRPO.",
+      "A final CoT SFT contamination stage on advanced LRMs leaves several reasoning and coding detector results near chance.",
+      "The paper evaluates LiveCodeBench v2 and MMLU-Pro beyond mathematics."
+    ],
+    "interpretation": "Paper-reported results are replication targets, not universal laws or Symthaea results."
+  },
+  "stage_matrix": [
+    {
+      "stage": "sft_clean",
+      "parent": "frozen_base",
+      "objective_pair": "sft",
+      "role": "clean counterfactual"
+    },
+    {
+      "stage": "sft_contaminated",
+      "parent": "frozen_base",
+      "objective_pair": "sft",
+      "role": "SFT contamination before RL"
+    },
+    {
+      "stage": "sft_clean_then_grpo_clean",
+      "parent": "sft_clean",
+      "objective_pair": "grpo",
+      "role": "matched clean GRPO control"
+    },
+    {
+      "stage": "sft_contaminated_then_grpo_clean",
+      "parent": "sft_contaminated",
+      "objective_pair": "grpo",
+      "role": "clean GRPO concealment arm"
+    },
+    {
+      "stage": "sft_clean_then_raft",
+      "parent": "sft_clean",
+      "objective_pair": "raft",
+      "role": "rejection-sampling control"
+    },
+    {
+      "stage": "sft_contaminated_then_raft",
+      "parent": "sft_contaminated",
+      "objective_pair": "raft",
+      "role": "contaminated RAFT arm"
+    },
+    {
+      "stage": "sft_clean_then_raft_plus_plus",
+      "parent": "sft_clean",
+      "objective_pair": "raft_plus_plus",
+      "role": "importance-sampling/clipping control"
+    },
+    {
+      "stage": "sft_contaminated_then_raft_plus_plus",
+      "parent": "sft_contaminated",
+      "objective_pair": "raft_plus_plus",
+      "role": "contaminated RAFT++ arm"
+    },
+    {
+      "stage": "advanced_lrm_clean",
+      "parent": "advanced_lrm_base",
+      "objective_pair": "final_sft",
+      "role": "matched advanced-LRM clean control"
+    },
+    {
+      "stage": "advanced_lrm_cot_contaminated",
+      "parent": "advanced_lrm_base",
+      "objective_pair": "final_sft",
+      "role": "post-LRM CoT SFT contamination"
+    }
+  ],
+  "comparison_matrix": [
+    {
+      "id": "sft_then_clean_grpo",
+      "before_contaminated": "sft_contaminated",
+      "before_clean": "sft_clean",
+      "after_contaminated": "sft_contaminated_then_grpo_clean",
+      "after_clean": "sft_clean_then_grpo_clean"
+    },
+    {
+      "id": "sft_then_raft",
+      "before_contaminated": "sft_contaminated",
+      "before_clean": "sft_clean",
+      "after_contaminated": "sft_contaminated_then_raft",
+      "after_clean": "sft_clean_then_raft"
+    },
+    {
+      "id": "sft_then_raft_plus_plus",
+      "before_contaminated": "sft_contaminated",
+      "before_clean": "sft_clean",
+      "after_contaminated": "sft_contaminated_then_raft_plus_plus",
+      "after_clean": "sft_clean_then_raft_plus_plus"
+    },
+    {
+      "id": "advanced_lrm_cot_sft",
+      "before_contaminated": null,
+      "before_clean": null,
+      "after_contaminated": "advanced_lrm_cot_contaminated",
+      "after_clean": "advanced_lrm_clean"
+    }
+  ],
+  "matching_invariants": {
+    "same_frozen_base_checkpoint_per_model_pair": true,
+    "same_candidate_ids_across_all_10_stages": true,
+    "same_calibration_test_split_and_randomized_member_labels": true,
+    "same_detector_specs_and_score_directions_across_all_stages": true,
+    "same_optimizer_step_budget_within_each_clean_contaminated_arm_pair": true,
+    "same_objective_config_within_each_clean_contaminated_arm_pair": true,
+    "checkpoint_parent_hashes_must_match_registered_stage_lineage": true,
+    "training_receipt_and_data_manifest_hashes_required": true
+  },
+  "statistical_design": {
+    "uncertainty_unit": "independent matched model-pair training replicate",
+    "minimum_model_pair_replicates": 20,
+    "minimum_calibration_nonmember_examples": 300,
+    "minimum_test_nonmember_examples": 300,
+    "minimum_test_member_examples": 100,
+    "target_fpr_permille": [
+      10,
+      50,
+      100
+    ],
+    "calibration_threshold": "For each detector and checkpoint, choose the conservative score threshold from calibration non-members at the preregistered target FPR; evaluate TPR/FPR only on the held-out test split.",
+    "threshold_ties": "Strict score > threshold; tied items at threshold are not flagged, making the empirical calibration false-positive count no greater than the allowed integer budget.",
+    "confidence_intervals": "Wilson 95% intervals for held-out TPR/FPR; Student-t 95% intervals across independent model-pair replicates for aggregate retention and inflation measures.",
+    "multiplicity": "Not adjusted in v1; all method × stage × domain comparisons must be treated as exploratory unless a separate preregistered multiplicity plan is supplied.",
+    "power": "Final replicate and item counts are selected by preregistered power simulation using pair-level variance, detector heterogeneity and domain interactions."
+  },
+  "measures": {
+    "auroc": "Rank-based, tie-corrected AUROC on held-out test examples.",
+    "auprc": "Average precision by grouped score thresholds on held-out test examples.",
+    "fixed_fpr": "TPR and FPR at the calibration-selected threshold; Wilson intervals are reported.",
+    "detector_signal_retention": "1000 * (AUC_after - 0.5) / (AUC_before - 0.5), only defined when pre-intervention AUC > 0.5.",
+    "member_performance_inflation": "Treatment checkpoint member accuracy minus its matched clean-control checkpoint member accuracy, on the same held-out member-labeled items.",
+    "member_inflation_retention": "1000 * member_inflation_after / member_inflation_before, only defined when before inflation is positive.",
+    "nonmember_generalization_delta": "Treatment checkpoint non-member accuracy minus matched clean-control non-member accuracy.",
+    "concealment_gap": "member_inflation_retention - detector_signal_retention; report the two components separately and never rank by gap alone."
+  },
+  "detector_panel": [
+    "FTD",
+    "DVD",
+    "Min-K%++",
+    "likelihood/loss/Max-K% and reference-based LiRA where assumptions are satisfied",
+    "LaRA paper-faithful SLaRA",
+    "Self-Critique paper-faithful top-K and separately full-vocabulary modes",
+    "CoDeC",
+    "lexical, syntactic, embedding and benchmark-audit controls"
+  ],
+  "domains": [
+    "mathematics",
+    "science",
+    "coding",
+    "general_qa",
+    "logic",
+    "tool_use",
+    "multimodal"
+  ],
+  "qualification_targets": {
+    "every_pair_has_all_10_stages": true,
+    "every_pair_has_all_4_intervention_comparisons": true,
+    "checkpoint_lineage_mismatches": 0,
+    "detector_spec_mismatches": 0,
+    "candidate_split_or_label_mismatches": 0,
+    "missing_detector_scores": 0,
+    "thresholds_selected_without_calibration_split": 0,
+    "test_set_threshold_tuning": 0,
+    "claim_rule": "A detector is robust only to the intervention families and domains actually tested. AUC or TPR improvement before concealment does not imply lifecycle robustness."
+  },
+  "claim_ceiling": [
+    "Model pair receipts and digests are declared consistency evidence until an independent signer/trust-root and execution-custody verifier is present.",
+    "The benchmark can show reduced detectability after an intervention; it cannot infer developer intent.",
+    "Preserved task performance is not proof of membership or generalization unless the intervention and item labels are authenticated.",
+    "No multiplicity-adjusted confirmatory claims are emitted in v1.",
+    "Wilson intervals are not exact Clopper-Pearson intervals.",
+    "No universal detector claim or SOTA superiority is established by synthetic fixtures."
+  ]
+}
