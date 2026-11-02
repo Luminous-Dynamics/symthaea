@@ -416,6 +416,8 @@ pub fn generate_campaign_v1(
         evaluation_target_indices.push(target_index);
     }
 
+    let expected_protocol_valid = world != SyntheticWorldV1::AdversarialMutation;
+
     Ok(GeneratedCampaignV1 {
         public: PublicCampaignV1 {
             schema: CORPUS_SCHEMA_V0_1.to_owned(),
@@ -432,7 +434,7 @@ pub fn generate_campaign_v1(
             injected_leakage_modality: leakage,
             evaluation_target_indices,
             evaluation_target_ids,
-            expected_protocol_valid: world != SyntheticWorldV1::AdversarialMutation,
+            expected_protocol_valid,
             claim_ceiling: "synthetic_only".to_owned(),
         },
     })
