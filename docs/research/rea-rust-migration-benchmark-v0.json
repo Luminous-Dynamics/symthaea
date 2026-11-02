@@ -34,7 +34,9 @@
     "rust_role": "native_symthaea_contract_core_cli_mcp_and_selective_analyzers",
     "external_provider_replacement": false,
     "first_milestone": "rea_evidence_semantic_identity_and_schema_parity",
-    "promotion_mode": "shadow_then_exact_scope_gate"
+    "promotion_mode": "shadow_then_exact_scope_gate",
+    "internal_integration": "direct_typed_rust_api",
+    "mcp_role": "thin_external_interoperability_adapter"
   },
   "invariants": [
     "Raw Evidence file digest and semantic Evidence ID are separate identities.",
@@ -45,7 +47,8 @@
     "Native Rust results are non-authorizing during shadow execution.",
     "Unknown tool effects are denied in read-only mobile profiles.",
     "A provider wrapper is not an implementation of the provider's internal engine.",
-    "No operation is promoted without a frozen golden corpus, negative controls and independent review."
+    "No operation is promoted without a frozen golden corpus, negative controls and independent review.",
+    "Symthaea in-process consumers use the direct Rust API; MCP is not required for local native execution."
   ],
   "migration_stages": [
     {
@@ -239,6 +242,18 @@
         "same_tool_versions",
         "confidence_intervals"
       ]
+    },
+    {
+      "id": "adapter_equivalence",
+      "status": "planned",
+      "metrics": [
+        "direct_api_vs_cli_vs_mcp_semantic_output",
+        "evidence_id_parity",
+        "authority_effect_parity",
+        "error_and_coverage_parity"
+      ],
+      "target": "100_percent_semantic_parity_across_all_adapters_for_the_same_native_operation",
+      "note": "Transport framing may differ; normalized semantic Evidence and effect behavior must not."
     }
   ],
   "promotion_policy": {
