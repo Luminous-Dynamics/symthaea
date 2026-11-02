@@ -1042,7 +1042,7 @@ mod tests {
     #[test]
     fn late_observation_expires_instead_of_scoring_the_wrong_frame() {
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&bank()).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
         let actual = [0.0, 1.0, 0.0];
         assert_eq!(
             evaluator.observe_branch(&observation("b17-100", 17, 100, 45, 1.6, &actual)).unwrap(),
@@ -1055,7 +1055,7 @@ mod tests {
     #[test]
     fn branch_identity_mismatch_never_consumes_pending_forecast() {
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&bank()).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
         let actual = [0.0, 1.0, 0.0];
         let wrong = BranchVisualObservation {
             history_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -1073,7 +1073,7 @@ mod tests {
         assert_eq!(full.pending_count(), 0);
 
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&forecast_bank).unwrap();
+        evaluator.issue_for_request(&request(), &forecast_bank).unwrap();
         assert!(evaluator.issue_for_request(&request(), &forecast_bank).is_err());
         assert_eq!(evaluator.pending_count(), 4);
     }
@@ -1081,7 +1081,7 @@ mod tests {
     #[test]
     fn timestamp_before_target_and_invalid_vectors_are_rejected_without_consumption() {
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&bank()).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
         let actual = [0.0, 1.0, 0.0];
         assert!(evaluator
             .observe_branch(&observation("b17-100", 17, 100, 45, 1.4, &actual))
@@ -1096,7 +1096,7 @@ mod tests {
     #[test]
     fn episode_close_expires_unobserved_target_branches_explicitly() {
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&bank()).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
         let expired = evaluator.finish_history(HISTORY).unwrap();
         assert_eq!(expired.len(), 4);
         assert!(expired.iter().all(|item| {
@@ -1113,7 +1113,7 @@ mod tests {
     #[test]
     fn wrong_joint_draw_manifest_does_not_consume_branch_forecast() {
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&bank()).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
         let actual = [0.0, 1.0, 0.0];
         let wrong = BranchVisualObservation {
             joint_draw_manifest_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -1129,7 +1129,7 @@ mod tests {
         forecast_bank.samples[0].predicted_belief = forecast_bank.persistence_belief.clone();
         forecast_bank.bank_sha256 = compute_action_forecast_bank_sha256(&forecast_bank);
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.0).unwrap();
-        evaluator.issue(&forecast_bank).unwrap();
+        evaluator.issue_for_request(&request(), &forecast_bank).unwrap();
         let actual = [1.0, 0.0, 0.0];
         let result = evaluator
             .observe_branch(&observation("b17-100", 17, 100, 45, 1.5, &actual))
