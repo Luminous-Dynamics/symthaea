@@ -293,6 +293,9 @@ compile_error!(
 /// Native Rust REA Evidence compatibility API (opt-in; direct in-process calls).
 #[cfg(feature = "rea-compat")]
 pub mod rea_compat;
+/// Native Rust REA EvidenceBundle compatibility API.
+#[cfg(feature = "rea-compat")]
+pub mod rea_bundle_compat;
 
 // Unified error types for cross-subsystem error handling.
 pub mod errors;
