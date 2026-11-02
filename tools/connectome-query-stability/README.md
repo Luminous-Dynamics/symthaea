@@ -58,6 +58,15 @@ This is intentionally conservative. If structural alternatives disagree widely, 
 - It does not independently verify artifact bytes against the SHA fields; ingestion must do that.
 - It requires graph-builder configuration to remain fixed across the sequence; changing it requires a new query-stability run.
 
+## Reproducible input schema and known-answer fixture
+
+- Input schema: `research/connectomics/connectome-query-stability-input-v0.1.schema.json`.
+- Synthetic counterexample: `research/connectomics/fixtures/connectome-query-stability-known-answer-v0.1.json`.
+
+The fixture has two linked checkpoints. `global_motif_count` remains in [10.00, 10.01] across both, within tolerance 0.05. `target_path_strength` moves from [0.20, 0.21] to [0.80, 0.81], exceeding tolerance 0.02; the overall query must be `UnstableOverObservedWindow`. All fixture hashes are synthetic sentinels, not real artifact digests.
+
+The schema checks structure and digest formats. The Rust input validator must additionally check the parent chain, monotonic edit counts, same-volume lineage, stable graph-builder configuration, exact metric/unit sets and actual bytes behind the declared hashes.
+
 ## Tests
 
 Run in an environment with Rust:
