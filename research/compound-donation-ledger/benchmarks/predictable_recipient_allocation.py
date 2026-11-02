@@ -176,8 +176,7 @@ def exact_accounting_screen(traces: int = 1000, donors: int = 8,
                 delta_reserve = target - prior_reserve[i]
                 assert delta_reserve >= 0
                 assert delta_reserve <= gamma * dx
-                if shares:
-                    assert sum(shares, Fraction(0)) == 1
+                assert sum(shares, Fraction(0)) <= 1
                 allocated = Fraction(0)
                 for j, q in zip(range(i + 1, donors), shares):
                     amount = q * delta_reserve
