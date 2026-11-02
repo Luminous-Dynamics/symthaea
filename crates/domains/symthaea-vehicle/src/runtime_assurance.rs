@@ -158,7 +158,7 @@ impl VehicleRuntimeAssurance {
         }
         Ok(Self {
             config,
-            mode: VehicleRtaMode::Advanced,
+            mode: VehicleRtaMode::Baseline,
             last_timestamp_s: None,
             safe_since_s: None,
             transition_started_s: None,
@@ -535,13 +535,21 @@ mod tests {
     }
 
     #[test]
-    fn permits_valid_advanced_command() {
+    fn startup_requires_dwell_before_advanced_command() {
         let mut monitor = monitor();
-        let decision = monitor.evaluate(&observation(0.0));
-        assert_eq!(decision.mode, VehicleRtaMode::Advanced);
-        assert_eq!(decision.advanced_weight, 1.0);
-        assert!(decision.reasons.is_empty());
-        assert!(decision.selected_command.is_some());
+        let first = monitor.evaluate(&observation(0.0));
+        assert_eq!(first.mode, VehicleRtaMode::RecoveryDwell);
+        assert_eq!(first.advanced_weight, 0.0);
+        assert!(first.selected_command.is_some());
+
+        let dwell_complete = monitor.evaluate(&observation(1.1));
+        assert_eq!(dwell_complete.mode, VehicleRtaMode::TransitionToAdvanced);
+        assert_eq!(dwell_complete.advanced_weight, 0.0);
+
+        let transition_complete = monitor.evaluate(&observation(2.2));
+        assert_eq!(transition_complete.mode, VehicleRtaMode::Advanced);
+        assert_eq!(transition_complete.advanced_weight, 1.0);
+        assert!(transition_complete.reasons.is_empty());
     }
 
     #[test]
