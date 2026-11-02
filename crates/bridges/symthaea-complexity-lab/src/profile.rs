@@ -20,7 +20,6 @@ pub enum ProfileError {
     ZeroTruncationBound { axis: usize },
     ExponentDimensionMismatch { expected: usize, actual: usize },
     IncompatibleTruncation { left: Vec<u32>, right: Vec<u32> },
-    ExponentOverflow { axis: usize },
     CoefficientOverflow { operation: &'static str },
     InvalidFactorScope { factor: usize, reason: &'static str },
     FactorTableLengthOverflow { factor: usize },
@@ -35,7 +34,6 @@ impl fmt::Display for ProfileError {
             Self::ZeroTruncationBound { axis } => write!(f, "truncation bound on axis {axis} must be positive"),
             Self::ExponentDimensionMismatch { expected, actual } => write!(f, "exponent has {actual} coordinates; expected {expected}"),
             Self::IncompatibleTruncation { left, right } => write!(f, "incompatible profile rings: {left:?} versus {right:?}"),
-            Self::ExponentOverflow { axis } => write!(f, "exponent addition overflow on axis {axis}"),
             Self::CoefficientOverflow { operation } => write!(f, "coefficient overflow during {operation}"),
             Self::InvalidFactorScope { factor, reason } => write!(f, "factor {factor} has invalid scope: {reason}"),
             Self::FactorTableLengthOverflow { factor } => write!(f, "factor {factor} truth-table length overflows usize"),
@@ -113,13 +111,16 @@ impl WeightProfile {
                 let mut exponent = Vec::with_capacity(self.bounds.len());
                 let mut truncated = false;
                 for axis in 0..self.bounds.len() {
-                    let sum = left_e[axis].checked_add(right_e[axis])
-                        .ok_or(ProfileError::ExponentOverflow { axis })?;
-                    if sum >= self.bounds[axis] {
+                    // Both stored exponents are below the bound. Compare
+                    // against the remaining room before adding, so an
+                    // exponent sum beyond u32::MAX is simply truncated (it
+                    // cannot be represented in this quotient ring).
+                    let remaining = self.bounds[axis] - left_e[axis];
+                    if right_e[axis] >= remaining {
                         truncated = true;
                         break;
                     }
-                    exponent.push(sum);
+                    exponent.push(left_e[axis] + right_e[axis]);
                 }
                 if truncated { continue; }
                 let coefficient = left_c.checked_mul(*right_c)
@@ -294,13 +295,17 @@ pub fn enumerate_boolean_weight_profile(
             }
             let value = &factor.values[local_index];
 
+            if value.coefficient == 0 {
+                vanishes = true;
+                break;
+            }
             for axis in 0..profile.bounds.len() {
-                exponent[axis] = exponent[axis].checked_add(value.exponents[axis])
-                    .ok_or(ProfileError::ExponentOverflow { axis })?;
-                if exponent[axis] >= profile.bounds[axis] {
+                let remaining = profile.bounds[axis] - exponent[axis];
+                if value.exponents[axis] >= remaining {
                     vanishes = true;
                     break;
                 }
+                exponent[axis] += value.exponents[axis];
             }
             if vanishes { break; }
 
