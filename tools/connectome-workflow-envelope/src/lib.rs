@@ -281,7 +281,7 @@ pub enum WorkflowStatus {
     QueryProjectedStableWithinHorizon,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowAudit {
     pub envelope_id: String,
     pub status: WorkflowStatus,
