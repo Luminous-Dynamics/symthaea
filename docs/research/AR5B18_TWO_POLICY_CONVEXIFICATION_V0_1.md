@@ -1,6 +1,6 @@
 # AR-5B18: Exact Two-Policy Randomization and Robust-Utility Convexification v0.1
 
-**Status:** finite reference draft; six tests authored but not compiled or executed.  
+**Status:** finite reference draft; seven tests authored but not compiled or executed.  
 **Stack:** #9429 → #9718 → #9719 → #9721 → #9754 → #9782 → #9785 → #9787 → #9807 → #9814 → #9823 → #9825 → #9854 → #9856 → #9860 → #9895 → this branch.  
 **Tracking:** #9896.
 
