@@ -1,5 +1,7 @@
 # CivBench Social Learning Core
 
+See [CIVBENCH_RESEARCH_ROADMAP_V0_1.md](CIVBENCH_RESEARCH_ROADMAP_V0_1.md) for the benchmark portfolio, industry comparison, proposed targets, reproduction gates, and the staged path for making defensible superiority claims.
+
 A dependency-free, deterministic Rust reference model for testing whether richer cognitive/social-learning mechanisms add value beyond simple diffusion rules.
 
 This is a benchmark baseline, not a human-behaviour simulator and not a theory of culture. It contains two distinct task slices: a binary-proposition diffusion model, and a Reward Network III task environment with explicit reward edges and local-observation policies.
