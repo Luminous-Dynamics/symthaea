@@ -464,6 +464,198 @@ fn outer_conformal_p_value(
     Ok((numerator, denominator, numerator as f64 / denominator as f64))
 }
 
+fn benjamini_yekutieli_adjusted_p_values(
+    values: &[(String, f64)],
+) -> Result<BTreeMap<String, f64>, String> {
+    if values.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    if values.iter().any(|(_, p)| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+        return Err("BY adjustment requires finite p-values in [0, 1]".to_owned());
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|left, right| {
+        left.1.total_cmp(&right.1).then_with(|| left.0.cmp(&right.0))
+    });
+    let m = sorted.len();
+    let harmonic = (1..=m).map(|rank| 1.0 / rank as f64).sum::<f64>();
+    let multiplier = m as f64 * harmonic;
+    let mut adjusted = BTreeMap::new();
+    let mut reverse_min = 1.0_f64;
+    for index in (0..m).rev() {
+        let rank = index + 1;
+        let candidate = sorted[index].1 * multiplier / rank as f64;
+        reverse_min = reverse_min.min(candidate).min(1.0);
+        adjusted.insert(sorted[index].0.clone(), reverse_min);
+    }
+    Ok(adjusted)
+}
+
+fn average_ranks(values: &[f64]) -> Vec<f64> {
+    let mut order: Vec<usize> = (0..values.len()).collect();
+    order.sort_by(|left, right| values[*left].total_cmp(&values[*right]));
+    let mut ranks = vec![0.0; values.len()];
+    let mut start = 0;
+    while start < order.len() {
+        let mut end = start + 1;
+        while end < order.len()
+            && values[order[end]].total_cmp(&values[order[start]]).is_eq()
+        {
+            end += 1;
+        }
+        let average_rank = ((start + 1) as f64 + end as f64) / 2.0;
+        for index in &order[start..end] {
+            ranks[*index] = average_rank;
+        }
+        start = end;
+    }
+    ranks
+}
+
+fn spearman_rank_correlation(left: &[f64], right: &[f64]) -> Option<f64> {
+    if left.len() != right.len() || left.len() < 3
+        || left.iter().chain(right).any(|value| !value.is_finite())
+    {
+        return None;
+    }
+    let left_ranks = average_ranks(left);
+    let right_ranks = average_ranks(right);
+    let left_mean = left_ranks.iter().sum::<f64>() / left_ranks.len() as f64;
+    let right_mean = right_ranks.iter().sum::<f64>() / right_ranks.len() as f64;
+    let covariance = left_ranks
+        .iter()
+        .zip(&right_ranks)
+        .map(|(a, b)| (a - left_mean) * (b - right_mean))
+        .sum::<f64>();
+    let left_variance = left_ranks
+        .iter()
+        .map(|value| (value - left_mean).powi(2))
+        .sum::<f64>();
+    let right_variance = right_ranks
+        .iter()
+        .map(|value| (value - right_mean).powi(2))
+        .sum::<f64>();
+    let denominator = (left_variance * right_variance).sqrt();
+    if denominator <= f64::EPSILON {
+        None
+    } else {
+        Some((covariance / denominator).clamp(-1.0, 1.0))
+    }
+}
+
+fn pairwise_detector_spearman(
+    rows: &[&EvaluationFeatureRowV1],
+    calibration: &GroupCalibrationA,
+) -> Vec<DetectorDisagreementV1> {
+    let mut output = Vec::new();
+    for left_index in 0..calibration.detector_ids.len() {
+        for right_index in (left_index + 1)..calibration.detector_ids.len() {
+            let left_id = &calibration.detector_ids[left_index];
+            let right_id = &calibration.detector_ids[right_index];
+            let mut left_scores = Vec::new();
+            let mut right_scores = Vec::new();
+            for row in rows {
+                let left = row.features.iter().find(|feature| {
+                    feature.detector_id == *left_id
+                        && calibration.directions.get(left_id) == Some(&feature.direction)
+                });
+                let right = row.features.iter().find(|feature| {
+                    feature.detector_id == *right_id
+                        && calibration.directions.get(right_id) == Some(&feature.direction)
+                });
+                if let (Some(left), Some(right)) = (left, right) {
+                    left_scores.push(left.score);
+                    right_scores.push(right.score);
+                }
+            }
+            output.push(DetectorDisagreementV1 {
+                left_detector_id: left_id.clone(),
+                right_detector_id: right_id.clone(),
+                paired_unit_count: left_scores.len() as u64,
+                spearman_rank_correlation: spearman_rank_correlation(
+                    &left_scores,
+                    &right_scores,
+                ),
+            });
+        }
+    }
+    output
+}
+
+fn apply_by_adjustment(
+    score_rows: &mut [SelectiveFusionScoreV1],
+    group_summaries: &mut [ConformalGroupSummaryV1],
+    alpha_permille: u16,
+) -> Result<(), String> {
+    for summary in group_summaries.iter_mut() {
+        let family_values: Vec<(String, f64)> = score_rows
+            .iter()
+            .filter(|row| row.task_family == summary.task_family
+                && row.model_regime == summary.model_regime)
+            .filter_map(|row| {
+                if row.decision == SelectiveDecisionV1::NoContaminationFlag {
+                    row.final_p_value
+                        .map(|p| (row.evaluation_unit_id.clone(), p))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let family_size = family_values.len() as u64;
+        let adjusted = benjamini_yekutieli_adjusted_p_values(&family_values)?;
+        for row in score_rows.iter_mut().filter(|row| {
+            row.task_family == summary.task_family && row.model_regime == summary.model_regime
+        }) {
+            if let Some(value) = adjusted.get(&row.evaluation_unit_id).copied() {
+                row.by_adjusted_p_value = Some(value);
+                row.by_family_size = Some(family_size);
+                row.decision = if value * 1_000.0 <= f64::from(alpha_permille) {
+                    SelectiveDecisionV1::FlagContaminated
+                } else {
+                    SelectiveDecisionV1::NoContaminationFlag
+                };
+            }
+        }
+
+        let rows: Vec<&SelectiveFusionScoreV1> = score_rows
+            .iter()
+            .filter(|row| row.task_family == summary.task_family
+                && row.model_regime == summary.model_regime)
+            .collect();
+        let flagged = rows.iter().filter(|row| row.decision == SelectiveDecisionV1::FlagContaminated).count() as u64;
+        let no_flag = rows.iter().filter(|row| row.decision == SelectiveDecisionV1::NoContaminationFlag).count() as u64;
+        let abstained = rows.len() as u64 - flagged - no_flag;
+        let clean = rows.iter().filter(|row| row.ground_truth_contaminated == Some(false)).count() as u64;
+        let contaminated = rows.iter().filter(|row| row.ground_truth_contaminated == Some(true)).count() as u64;
+        let labelled = clean + contaminated;
+        let fp = rows.iter().filter(|row| {
+            row.ground_truth_contaminated == Some(false)
+                && row.decision == SelectiveDecisionV1::FlagContaminated
+        }).count() as u64;
+        let tp = rows.iter().filter(|row| {
+            row.ground_truth_contaminated == Some(true)
+                && row.decision == SelectiveDecisionV1::FlagContaminated
+        }).count() as u64;
+        let fn_count = contaminated - tp;
+        summary.labelled_evaluation_unit_count = labelled;
+        summary.flagged_count = flagged;
+        summary.no_flag_count = no_flag;
+        summary.abstained_count = abstained;
+        summary.clean_labelled_count = clean;
+        summary.contaminated_labelled_count = contaminated;
+        summary.false_positive_count = fp;
+        summary.true_positive_count = tp;
+        summary.false_negative_count = fn_count;
+        summary.empirical_fpr_permille =
+            (clean > 0).then_some(fp as f64 * 1_000.0 / clean as f64);
+        summary.empirical_tpr_permille =
+            (contaminated > 0).then_some(tp as f64 * 1_000.0 / contaminated as f64);
+        summary.decision_coverage_permille =
+            (flagged + no_flag) as f64 * 1_000.0 / rows.len().max(1) as f64;
+    }
+    Ok(())
+}
+
 pub fn calibrate_detector_panel(
     request: &DetectorConformalFusionRequestV1,
 ) -> Result<DetectorConformalFusionReportV1, String> {
