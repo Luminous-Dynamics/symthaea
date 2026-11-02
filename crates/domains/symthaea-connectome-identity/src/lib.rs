@@ -60,6 +60,9 @@ pub enum ReasonCode {
     MissingOrientation,
     EmptyMatrix,
     MatrixNotSquare,
+    MatrixPayloadRowCountMismatch,
+    MatrixPayloadColumnCountMismatch,
+    AnnotationPayloadLengthMismatch,
     RowAxisLengthMismatch,
     ColumnAxisLengthMismatch,
     EmptyRowId,
@@ -106,32 +109,57 @@ impl ValidationFailure {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdentityJoin {
-    pub schema_version: String,
-    pub artifact: ArtifactIdentity,
-    pub orientation: MatrixOrientation,
-    pub canonical_ids: Vec<String>,
-    pub row_to_canonical: Vec<usize>,
-    pub column_to_canonical: Vec<usize>,
-    pub annotation_to_canonical: Vec<usize>,
-    pub canonical_to_row: Vec<usize>,
-    pub canonical_to_column: Vec<usize>,
-    pub canonical_to_annotation: Vec<usize>,
+    schema_version: String,
+    artifact: ArtifactIdentity,
+    orientation: MatrixOrientation,
+    canonical_ids: Vec<String>,
+    row_to_canonical: Vec<usize>,
+    column_to_canonical: Vec<usize>,
+    annotation_to_canonical: Vec<usize>,
+    canonical_to_row: Vec<usize>,
+    canonical_to_column: Vec<usize>,
+    canonical_to_annotation: Vec<usize>,
     /// Invariant under source-axis/table permutations with identical identities.
-    pub canonical_identity_sha256: String,
+    canonical_identity_sha256: String,
     /// Binds the exact original order of rows, columns and annotation records.
-    pub source_binding_sha256: String,
+    source_binding_sha256: String,
+}
+
+impl IdentityJoin {
+    pub fn schema_version(&self) -> &str { &self.schema_version }
+    pub fn artifact(&self) -> &ArtifactIdentity { &self.artifact }
+    pub fn orientation(&self) -> MatrixOrientation { self.orientation }
+    pub fn canonical_ids(&self) -> &[String] { &self.canonical_ids }
+    pub fn row_to_canonical(&self) -> &[usize] { &self.row_to_canonical }
+    pub fn column_to_canonical(&self) -> &[usize] { &self.column_to_canonical }
+    pub fn annotation_to_canonical(&self) -> &[usize] { &self.annotation_to_canonical }
+    pub fn canonical_to_row(&self) -> &[usize] { &self.canonical_to_row }
+    pub fn canonical_to_column(&self) -> &[usize] { &self.canonical_to_column }
+    pub fn canonical_to_annotation(&self) -> &[usize] { &self.canonical_to_annotation }
+    pub fn canonical_identity_sha256(&self) -> &str { &self.canonical_identity_sha256 }
+    pub fn source_binding_sha256(&self) -> &str { &self.source_binding_sha256 }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedTargets {
-    pub ids: Vec<String>,
-    pub canonical_indices: Vec<usize>,
+    ids: Vec<String>,
+    canonical_indices: Vec<usize>,
+}
+
+impl ResolvedTargets {
+    pub fn ids(&self) -> &[String] { &self.ids }
+    pub fn canonical_indices(&self) -> &[usize] { &self.canonical_indices }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedSelection {
-    pub keep: Option<ResolvedTargets>,
-    pub remove: ResolvedTargets,
+    keep: Option<ResolvedTargets>,
+    remove: ResolvedTargets,
+}
+
+impl ResolvedSelection {
+    pub fn keep(&self) -> Option<&ResolvedTargets> { self.keep.as_ref() }
+    pub fn remove(&self) -> &ResolvedTargets { &self.remove }
 }
 
 fn valid_identifier(value: &str) -> bool {
@@ -386,6 +414,56 @@ pub fn validate_identity_join(
     })
 }
 
+/// Reorders the supplied source matrix into the join's canonical neuron order.
+///
+/// The matrix slice must use the same row/column order declared in the original
+/// `MatrixAxisInput`. The join's immutable source-binding digest records that order.
+pub fn canonicalize_matrix<T: Clone>(
+    matrix: &[Vec<T>],
+    join: &IdentityJoin,
+) -> Result<Vec<Vec<T>>, ValidationFailure> {
+    let count = join.canonical_ids.len();
+    let mut reasons = Vec::new();
+    if matrix.len() != count {
+        reasons.push(ReasonCode::MatrixPayloadRowCountMismatch);
+    }
+    if matrix.iter().any(|row| row.len() != count) {
+        reasons.push(ReasonCode::MatrixPayloadColumnCountMismatch);
+    }
+    if !reasons.is_empty() {
+        return Err(ValidationFailure::from_reasons(reasons));
+    }
+
+    let mut canonical = Vec::with_capacity(count);
+    for canonical_row in 0..count {
+        let source_row = join.canonical_to_row[canonical_row];
+        let mut row = Vec::with_capacity(count);
+        for canonical_column in 0..count {
+            let source_column = join.canonical_to_column[canonical_column];
+            row.push(matrix[source_row][source_column].clone());
+        }
+        canonical.push(row);
+    }
+    Ok(canonical)
+}
+
+/// Reorders annotation or per-neuron parameter values into canonical neuron order.
+pub fn canonicalize_annotation_values<T: Clone>(
+    values: &[T],
+    join: &IdentityJoin,
+) -> Result<Vec<T>, ValidationFailure> {
+    if values.len() != join.canonical_ids.len() {
+        return Err(ValidationFailure::from_reasons(vec![
+            ReasonCode::AnnotationPayloadLengthMismatch,
+        ]));
+    }
+    Ok(join
+        .canonical_to_annotation
+        .iter()
+        .map(|source_index| values[*source_index].clone())
+        .collect())
+}
+
 /// Resolves stable neuron IDs into canonical indices; unknown/duplicate IDs reject.
 pub fn resolve_targets(
     join: &IdentityJoin,
@@ -484,10 +562,10 @@ mod tests {
     #[test]
     fn exact_axis_and_annotation_order_is_admitted() {
         let join = validate_identity_join(&input()).expect("exact identity join");
-        assert_eq!(join.canonical_ids, vec!["100", "200", "300"]);
-        assert_eq!(join.row_to_canonical, vec![0, 1, 2]);
-        assert_eq!(join.column_to_canonical, vec![0, 1, 2]);
-        assert_eq!(join.annotation_to_canonical, vec![0, 1, 2]);
+        assert_eq!(join.canonical_ids(), vec!["100", "200", "300"]);
+        assert_eq!(join.row_to_canonical(), vec![0, 1, 2]);
+        assert_eq!(join.column_to_canonical(), vec![0, 1, 2]);
+        assert_eq!(join.annotation_to_canonical(), vec![0, 1, 2]);
     }
 
     #[test]
@@ -510,8 +588,8 @@ mod tests {
         source.column_ids = vec!["300".to_string(), "100".to_string(), "200".to_string()];
         source.annotation_ids = vec!["200".to_string(), "100".to_string(), "300".to_string()];
         let second = validate_identity_join(&source).expect("permuted join");
-        assert_eq!(first.canonical_identity_sha256, second.canonical_identity_sha256);
-        assert_ne!(first.source_binding_sha256, second.source_binding_sha256);
+        assert_eq!(first.canonical_identity_sha256(), second.canonical_identity_sha256);
+        assert_ne!(first.source_binding_sha256(), second.source_binding_sha256());
     }
 
     #[test]
@@ -521,7 +599,7 @@ mod tests {
         source.column_ids[0] = "00100".to_string();
         source.annotation_ids[0] = "00100".to_string();
         let join = validate_identity_join(&source).expect("leading-zero identity is valid");
-        assert!(join.canonical_ids.contains(&"00100".to_string()));
+        assert!(join.canonical_ids().contains(&"00100".to_string()));
         assert!(!join.canonical_ids.contains(&"100".to_string()));
     }
 
@@ -619,8 +697,8 @@ mod tests {
             &["300".to_string(), "100".to_string()],
         )
         .expect("stable target resolution");
-        assert_eq!(resolved.ids, vec!["100", "300"]);
-        assert_eq!(resolved.canonical_indices, vec![0, 2]);
+        assert_eq!(resolved.ids(), vec!["100", "300"]);
+        assert_eq!(resolved.canonical_indices(), vec![0, 2]);
     }
 
     #[test]
@@ -710,7 +788,7 @@ mod tests {
         let keep = vec!["300".to_string(), "100".to_string()];
         let remove = vec!["200".to_string()];
         let result = resolve_selection(&join, Some(&keep), &remove).expect("disjoint selection");
-        assert_eq!(result.keep.expect("keep set").canonical_indices, vec![0, 2]);
+        assert_eq!(result.keep().expect("keep set").canonical_indices(), vec![0, 2]);
         assert_eq!(result.remove.canonical_indices, vec![1]);
     }
 
