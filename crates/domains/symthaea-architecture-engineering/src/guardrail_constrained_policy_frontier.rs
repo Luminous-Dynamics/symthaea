@@ -691,6 +691,18 @@ pub fn verify_guardrail_constrained_frontier_report(
     let entropy = weights.iter().filter(|weight| **weight > 0.0)
         .map(|weight| -weight * weight.ln())
         .sum::<f64>();
+    let null_rows_match = report.optimizer_report.null_model_sizes.len() == expected_null_sizes.len()
+        && report.optimizer_report.null_model_sizes.iter().zip(&expected_null_sizes).all(|(actual, expected)| {
+            actual.model_id == expected.model_id
+                && (actual.null_size - expected.null_size).abs() <= 1e-7
+        });
+    let alternative_rows_match = report.optimizer_report.alternatives.len() == expected_alternatives.len()
+        && report.optimizer_report.alternatives.iter().zip(&expected_alternatives).all(|(actual, expected)| {
+            actual.model_id == expected.model_id
+                && (actual.rejection_power - expected.rejection_power).abs() <= 1e-7
+                && (actual.expected_evaluator_cost - expected.expected_evaluator_cost).abs() <= 1e-7
+                && (actual.decision_utility - expected.decision_utility).abs() <= 1e-7
+        });
     if (report.optimizer_report.worst_case_null_size - worst_null_size).abs() > 1e-7
         || (report.optimizer_report.worst_case_rejection_power - worst_power).abs() > 1e-7
         || (report.optimizer_report.worst_case_decision_utility - worst_utility).abs() > 1e-7
@@ -699,8 +711,8 @@ pub fn verify_guardrail_constrained_frontier_report(
         || (report.optimizer_report.remaining_alpha_budget
             - (plan.significance_level - worst_null_size)).abs() > 1e-7
         || report.optimizer_report.support_size != report.selected_policy_weights.len()
-        || report.optimizer_report.null_model_sizes != expected_null_sizes
-        || report.optimizer_report.alternatives != expected_alternatives
+        || !null_rows_match
+        || !alternative_rows_match
     {
         return Err(GuardrailFrontierError::new(
             "report.optimizer_report",
