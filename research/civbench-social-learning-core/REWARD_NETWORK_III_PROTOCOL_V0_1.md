@@ -76,6 +76,13 @@ CivBench should compare at least three axes:
 
 The 2024 PNAS control-condition study above is a further warning: social transmission is not automatically superior to individual learning. Comparisons must equalize accumulated learning opportunity and measure acquisition cost, fatigue and redundancy.
 
+
+### Multi-seed sensitivity experiment
+
+The `cultural-transmission-sweep` binary in this crate runs 256 deterministic seeds for each of seven preregistered reference-model conditions: no social transmission; uniform teacher choice with 0%, 5% or 20% corruption; and performance-softmax teacher choice with the same corruption levels. It emits per-generation optimal-strategy prevalence, demonstration observation, acquisition conditional on observation, optimal acquisition, integration conditional on acquisition, and selection of the top-scoring candidate. The prevalence interval is a normal-approximation 95% confidence half-width over simulation replicates; it is not a confidence interval for human population effects.
+
+This experiment should be used to verify expected directions and interactions in the simplified mechanism model. It cannot establish human cultural universality, paper replication, or superiority over the archived DQN.
+
 ## Simplified executable generational model in this crate
 
 `src/cultural_evolution.rs` is an independent reference ABM, not the paper's original agent-based model. It deliberately exposes separate state transitions:
