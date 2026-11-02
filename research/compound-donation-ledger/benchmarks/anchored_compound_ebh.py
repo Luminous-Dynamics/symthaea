@@ -45,6 +45,36 @@ def anchor_slack(global_mass: Rational) -> Fraction:
     return Fraction(1) - mass
 
 
+
+def finite_envelope_weight_prefix(
+    count: int, global_mass: Rational = 1
+) -> tuple[Fraction, ...]:
+    """Weights for a precommitted finite candidate envelope.
+
+    Uses the first count entries of gamma_i=global_mass/[i(i+1)].
+    Unlike projective_weight_prefix, global_mass may equal one because the
+    maximum family size is fixed before the experiment begins.
+    """
+    mass = as_fraction(global_mass)
+    if count < 0:
+        raise ValueError("count must be nonnegative")
+    if not 0 < mass <= 1:
+        raise ValueError("finite-envelope global mass must lie in (0,1]")
+    return tuple(mass / (i * (i + 1)) for i in range(1, count + 1))
+
+
+def finite_envelope_slack(
+    count: int, global_mass: Rational = 1
+) -> Fraction:
+    """Unused weight mass after a fixed, precommitted finite envelope."""
+    weights = finite_envelope_weight_prefix(count, global_mass)
+    used = sum(weights, Fraction(0))
+    slack = Fraction(1) - used
+    if slack < 0:
+        raise AssertionError("finite-envelope weight mass exceeds one")
+    return slack
+
+
 def weighted_compound_ebh(
     scores: Sequence[Rational], alpha: Rational
 ) -> tuple[int, ...]:
