@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/detector-fragility-study-v1.json",
+  "title": "Detector fragility study v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "target_fpr_permille",
+    "minimum_calibration_negatives",
+    "minimum_test_negatives",
+    "minimum_test_members",
+    "model_pair_replicates"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.detector_fragility_study.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "target_fpr_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "minimum_calibration_negatives": {
+      "type": "integer",
+      "minimum": 300
+    },
+    "minimum_test_negatives": {
+      "type": "integer",
+      "minimum": 300
+    },
+    "minimum_test_members": {
+      "type": "integer",
+      "minimum": 100
+    },
+    "model_pair_replicates": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/model_pair"
+      }
+    }
+  },
+  "$defs": {
+    "detector_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "detector_id",
+        "detector_spec_sha256",
+        "direction",
+        "raw_score"
+      ],
+      "properties": {
+        "detector_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "detector_spec_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "higher_is_member",
+            "lower_is_member"
+          ]
+        },
+        "raw_score": {
+          "type": "number"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "split",
+        "intended_member",
+        "correct",
+        "detector_scores"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "split": {
+          "type": "string",
+          "enum": [
+            "calibration",
+            "test"
+          ]
+        },
+        "intended_member": {
+          "type": "boolean"
+        },
+        "correct": {
+          "type": "boolean"
+        },
+        "detector_scores": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/detector_score"
+          }
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "checkpoint_sha256",
+        "parent_checkpoint_sha256",
+        "training_receipt_sha256",
+        "training_config_sha256",
+        "objective_config_sha256",
+        "training_data_manifest_sha256",
+        "optimizer_steps",
+        "observations"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "sft_clean",
+            "sft_contaminated",
+            "sft_clean_then_grpo_clean",
+            "sft_contaminated_then_grpo_clean",
+            "sft_clean_then_raft",
+            "sft_contaminated_then_raft",
+            "sft_clean_then_raft_plus_plus",
+            "sft_contaminated_then_raft_plus_plus",
+            "advanced_lrm_clean",
+            "advanced_lrm_cot_contaminated"
+          ]
+        },
+        "checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "parent_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "objective_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_data_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "optimizer_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 700,
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
+        }
+      }
+    },
+    "model_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replicate_id",
+        "base_checkpoint_sha256",
+        "advanced_lrm_base_checkpoint_sha256",
+        "randomization_manifest_sha256",
+        "checkpoints"
+      ],
+      "properties": {
+        "replicate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "base_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "advanced_lrm_base_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "randomization_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "checkpoints": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/checkpoint"
+          }
+        }
+      }
+    }
+  }
+}
