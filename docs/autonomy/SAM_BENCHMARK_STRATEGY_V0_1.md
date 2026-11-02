@@ -124,6 +124,24 @@ The first benchmark comparison must pair controllers on identical candidate IDs 
 
 ## 6. Current technical reference points
 
+### Scenario-generation research baselines
+
+Two 2026 studies should be included in the discovery-method comparison:
+
+- Trinh et al., *A Novel Simulation Framework for Adaptive Stress Testing of Autonomous Driving Systems*, IEEE Transactions on Reliability (2026), DOI [10.1109/TR.2026.3701756](https://doi.org/10.1109/TR.2026.3701756). Its abstract describes an MDP / reinforcement-learning adaptive stress-testing method extending beyond single-lane longitudinal cases to longitudinal and lateral behavior, multilane traffic, pedestrians and signalized intersections. The authors report improved corner-case discovery over a prior AST scheme. We have the abstract and bibliographic metadata, not a verified numerical result table; do not invent a numeric target from the abstract.
+- Wen et al., *Adaptive stress testing of autonomous vehicle-pedestrian interactions: A large language model (LLM) distillation approach*, Transportation Research Part C (vol. 194, scheduled Jan 2027; early online 14 Sep 2026), DOI [10.1016/j.trc.2026.106000](https://doi.org/10.1016/j.trc.2026.106000). The published abstract describes LLM-generated safety-critical pedestrian trajectories, behavior-cloning initialization and online DRL refinement. The authors report improved failure exposure and trajectory diversity, with orders-of-magnitude lower inference time than a standalone LLM. Publicly accessible metadata does not establish a directly comparable numeric result; obtain the full method and reproduce its baselines before claiming parity or improvement.
+
+These papers turn AST into a required future baseline, not a replacement for seeded random and stratified search. Compare all methods on:
+- the same frozen ego controller and simulator build;
+- identical candidate-execution budgets and declared wall-clock/compute ceilings;
+- the same action/observation contract and disturbance support;
+- discovery yield, unique counterexample families, trajectory diversity, time-to-first-counterexample, minimization ratio, replay success and compute cost;
+- an independent holdout generator not used by any search policy.
+
+An adversarial generator optimizes exposure, not prevalence. If its policy is trained online, freeze the resulting generator before holdout evaluation. Preserve policy weights, reward, optimizer seed, training budget and scenario lineage.
+
+A further critical distinction is **avoidable versus unavoidable contact**. A collision in a rollout is an observed outcome under one trajectory, not proof that the controller could have prevented it. Candidate classification should compose an independent action-conditioned viability / reachability analysis; results must be `avoidable-under-model`, `unavoidable-under-model` or `indeterminate`, with model/actuator assumptions and uncertainty retained. Never infer avoidability from the tested controller's own confidence or from the adversarial search reward.
+
 NVIDIA's August 4, 2026 technical release reports the following vendor-evaluated results for Alpamayo 2 Super:
 - 6.4-second minADE6 of 0.911 m on 1,434 challenging samples from its Physical AI AV Dataset;
 - a 0.433 score on the Physical AI AV Reasoning Benchmark;
@@ -168,6 +186,7 @@ Primary references:
 - ISO 21448:2022 (SOTIF) remains the published first edition shown by ISO's catalogue; verify status at each safety-case update.
 - ISO 26262:2018 remains the published series listed in ISO's catalogue, with parts entering revision work in 2026. Track DIS/CD revisions, but do not treat a draft as a published requirement.
 - NIST's 2026 TEVV-Athlon framework is useful for structuring measurement concepts, methods, tools, observations and outcomes. NIST AI 800-3 (February 2026) gives a complementary distinction between benchmark-conditional accuracy and generalized performance over an item superpopulation. Apply that lesson to scenario-family sampling: benchmark success is not automatically ODD-generalized performance.
+- ASAM OpenSCENARIO DSL 2.2.0 (released 19 March 2026) and OpenSCENARIO XML 1.4.0 (released 19 May 2026) are the current scenario-description releases. Use the DSL as a logical/parametric authoring and composition target and XML where a concrete simulator interchange format is supported. Preserve semantic loss and unsupported features explicitly; do not claim round-trip equivalence unless verified.
 
 Primary references:
 - https://saemobilus.sae.org/standards/j3016_202609
@@ -175,6 +194,8 @@ Primary references:
 - https://www.iso.org/standard/68383.html
 - https://www.nist.gov/artificial-intelligence/ai-research/tevv-athlon-framework-evaluating-ai-systems
 - https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.800-3.pdf
+- https://www.asam.net/standards/detail/openscenario-dsl/
+- https://www.asam.net/standards/detail/openscenario-xml/
 
 For any future South African physical testing, complete a current legal and authority review before selecting a site or vehicle. A Department of Transport 2024/25–2026/27 planning document discusses development of an autonomous-vehicle legislative framework; that policy statement is not itself test authorization or a definitive 2026 legal-status opinion. Do not infer public-road testing permission from it.
 
