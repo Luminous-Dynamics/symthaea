@@ -20,6 +20,31 @@ def as_fraction(value: Rational) -> Fraction:
     return value if isinstance(value, Fraction) else Fraction(value)
 
 
+
+def projective_weight_prefix(
+    count: int, global_mass: Rational
+) -> tuple[Fraction, ...]:
+    """First count weights of the globally precommitted telescoping sequence.
+
+    gamma_i = global_mass / [i(i+1)] for i >= 1. Its infinite sum is
+    global_mass, independent of the currently materialized horizon.
+    """
+    mass = as_fraction(global_mass)
+    if count < 0:
+        raise ValueError("count must be nonnegative")
+    if not 0 < mass < 1:
+        raise ValueError("global candidate-weight mass must lie in (0,1)")
+    return tuple(mass / (i * (i + 1)) for i in range(1, count + 1))
+
+
+def anchor_slack(global_mass: Rational) -> Fraction:
+    """Unused part of a fixed global candidate-weight budget."""
+    mass = as_fraction(global_mass)
+    if not 0 < mass < 1:
+        raise ValueError("global candidate-weight mass must lie in (0,1)")
+    return Fraction(1) - mass
+
+
 def weighted_compound_ebh(
     scores: Sequence[Rational], alpha: Rational
 ) -> tuple[int, ...]:
