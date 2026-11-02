@@ -41,7 +41,6 @@ pub struct TrialV1 {
     pub operator_id: String,
     pub target_custodian_id: String,
     pub evaluator_id: String,
-    pub target_id: String,
     pub candidate_ids: Vec<String>,
     pub protocol_sha256: String,
     pub target_pool_sha256: String,
@@ -52,6 +51,14 @@ pub struct TrialV1 {
     pub response_sealed_at: BoundedTimeV1,
     pub target_revealed_at: BoundedTimeV1,
     pub judge_rankings: Vec<JudgeRankingV1>,
+}
+
+/// Evaluator-only truth. This type must never be passed to a participant-facing
+/// policy, telemetry attacker, or blinded judge.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluatorTruthV1 {
+    pub target_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -97,6 +104,7 @@ pub struct FixtureScenarioV1 {
     pub expected_acceptance: bool,
     pub expected_score: Option<ExpectedScoreV1>,
     pub trial: TrialV1,
+    pub evaluator_truth: EvaluatorTruthV1,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -214,7 +222,7 @@ fn validate_times(trial: &TrialV1, errors: &mut Vec<ValidationErrorV1>) {
 /// The function trusts neither a shield label nor a digest-shaped string as
 /// proof of physical shielding or custody. It checks only the typed structure
 /// and recorded chronology supplied to it.
-pub fn evaluate_trial_v1(trial: &TrialV1) -> Result<TrialScoreV1, Vec<ValidationErrorV1>> {
+pub fn evaluate_trial_v1(trial: &TrialV1, truth: &EvaluatorTruthV1) -> Result<TrialScoreV1, Vec<ValidationErrorV1>> {
     let mut errors = Vec::new();
 
     for (name, value) in [
@@ -223,8 +231,7 @@ pub fn evaluate_trial_v1(trial: &TrialV1) -> Result<TrialScoreV1, Vec<Validation
         ("operator_id", trial.operator_id.as_str()),
         ("target_custodian_id", trial.target_custodian_id.as_str()),
         ("evaluator_id", trial.evaluator_id.as_str()),
-        ("target_id", trial.target_id.as_str()),
-    ] {
+        ] {
         if !valid_id(value) {
             errors.push(ValidationErrorV1::InvalidIdentifier(name));
         }
@@ -256,6 +263,10 @@ pub fn evaluate_trial_v1(trial: &TrialV1) -> Result<TrialScoreV1, Vec<Validation
         }
     }
 
+    if !valid_id(&truth.target_id) {
+        errors.push(ValidationErrorV1::InvalidIdentifier("evaluator_truth.target_id"));
+    }
+
     let candidate_count = trial.candidate_ids.len();
     if candidate_count < 2 {
         errors.push(ValidationErrorV1::TooFewCandidates);
@@ -274,7 +285,7 @@ pub fn evaluate_trial_v1(trial: &TrialV1) -> Result<TrialScoreV1, Vec<Validation
         }
     }
 
-    if trial.candidate_ids.iter().filter(|id| *id == &trial.target_id).count() != 1 {
+    if trial.candidate_ids.iter().filter(|id| *id == &truth.target_id).count() != 1 {
         errors.push(ValidationErrorV1::TargetNotPresentExactlyOnce);
     }
 
@@ -319,7 +330,7 @@ pub fn evaluate_trial_v1(trial: &TrialV1) -> Result<TrialScoreV1, Vec<Validation
         if let Some(position) = ranking
             .ranked_candidate_ids
             .iter()
-            .position(|candidate| candidate == &trial.target_id)
+            .position(|candidate| candidate == &truth.target_id)
         {
             target_rank_sum += (position + 1) as u64;
         } else {
@@ -384,7 +395,7 @@ pub fn verify_fixture_suite_json_v1(json: &str) -> Result<FixtureVerificationV1,
             ));
         }
 
-        match evaluate_trial_v1(&scenario.trial) {
+        match evaluate_trial_v1(&scenario.trial, &scenario.evaluator_truth) {
             Ok(score) => {
                 if !scenario.expected_acceptance || scenario.expected_score != Some(score.into()) {
                     return Err(FixtureErrorV1::ScenarioExpectationMismatch(
@@ -450,8 +461,8 @@ mod tests {
             .find(|scenario| scenario.world == SyntheticWorldV1::KnownLeakageInjected)
             .expect("leakage scenario");
 
-        let signal_score = evaluate_trial_v1(&signal.trial).expect("valid signal fixture");
-        let leakage_score = evaluate_trial_v1(&leakage.trial).expect("valid leakage fixture");
+        let signal_score = evaluate_trial_v1(&signal.trial, &signal.evaluator_truth).expect("valid signal fixture");
+        let leakage_score = evaluate_trial_v1(&leakage.trial, &leakage.evaluator_truth).expect("valid leakage fixture");
 
         assert_eq!(signal_score, leakage_score);
         assert_eq!(signal_score.twice_chance_minus_observed_rank_sum, 12);
@@ -462,14 +473,14 @@ mod tests {
     fn malformed_digest_fails_closed() {
         let mut suite: FixtureSuiteV1 = serde_json::from_str(FIXTURE).expect("valid fixture json");
         suite.scenarios[0].trial.response_sha256 = "not-a-digest".to_owned();
-        assert!(evaluate_trial_v1(&suite.scenarios[0].trial).is_err());
+        assert!(evaluate_trial_v1(&suite.scenarios[0].trial, &suite.scenarios[0].evaluator_truth).is_err());
     }
 
     #[test]
     fn different_clock_domains_cannot_prove_order() {
         let mut suite: FixtureSuiteV1 = serde_json::from_str(FIXTURE).expect("valid fixture json");
         suite.scenarios[0].trial.target_revealed_at.clock_domain_id = "unrelated-clock".to_owned();
-        let errors = evaluate_trial_v1(&suite.scenarios[0].trial).expect_err("clock mismatch");
+        let errors = evaluate_trial_v1(&suite.scenarios[0].trial, &suite.scenarios[0].evaluator_truth).expect_err("clock mismatch");
         assert!(errors.contains(&ValidationErrorV1::ClockDomainMismatch));
     }
 
@@ -478,7 +489,7 @@ mod tests {
         let mut suite: FixtureSuiteV1 = serde_json::from_str(FIXTURE).expect("valid fixture json");
         suite.scenarios[0].trial.operator_id =
             suite.scenarios[0].trial.target_custodian_id.clone();
-        let errors = evaluate_trial_v1(&suite.scenarios[0].trial).expect_err("role collision");
+        let errors = evaluate_trial_v1(&suite.scenarios[0].trial, &suite.scenarios[0].evaluator_truth).expect_err("role collision");
         assert!(errors.contains(&ValidationErrorV1::RoleCollision));
     }
 
@@ -488,7 +499,7 @@ mod tests {
         suite.scenarios[0].trial.judge_rankings[0]
             .ranked_candidate_ids
             .pop();
-        let errors = evaluate_trial_v1(&suite.scenarios[0].trial).expect_err("incomplete ranking");
+        let errors = evaluate_trial_v1(&suite.scenarios[0].trial, &suite.scenarios[0].evaluator_truth).expect_err("incomplete ranking");
         assert!(errors.contains(&ValidationErrorV1::InvalidRanking));
     }
 
@@ -497,8 +508,19 @@ mod tests {
         let mut suite: FixtureSuiteV1 = serde_json::from_str(FIXTURE).expect("valid fixture json");
         suite.scenarios[0].trial.target_revealed_at.earliest_ns =
             suite.scenarios[0].trial.response_sealed_at.latest_ns;
-        let errors = evaluate_trial_v1(&suite.scenarios[0].trial).expect_err("overlapping chronology");
+        let errors = evaluate_trial_v1(&suite.scenarios[0].trial, &suite.scenarios[0].evaluator_truth).expect_err("overlapping chronology");
         assert!(errors.contains(&ValidationErrorV1::ChronologyUnproven));
+    }
+
+
+    #[test]
+    fn participant_facing_trial_has_no_target_label_field() {
+        let suite: FixtureSuiteV1 = serde_json::from_str(FIXTURE).expect("valid fixture json");
+        let scenario = &suite.scenarios[0];
+        let public_trial = serde_json::to_value(&scenario.trial).expect("serialize public trial");
+        assert!(public_trial.get("target_id").is_none());
+        assert!(scenario.trial.candidate_ids.iter().all(|id| id.starts_with("candidate-")));
+        assert!(scenario.evaluator_truth.target_id.starts_with("candidate-"));
     }
 
     #[test]
