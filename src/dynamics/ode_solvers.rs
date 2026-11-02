@@ -1580,6 +1580,95 @@ mod tests {
     }
 
     #[test]
+    fn checked_dopri_rejects_non_finite_initial_state() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[f64::NAN],
+                (0.0, 0.1),
+                OdeSolveLimits::default(),
+            )
+            .expect_err("non-finite initial state must reject");
+        assert_eq!(failure.kind, OdeSolveFailureKind::NonFiniteInitialState);
+        assert!(failure.partial_result.is_none());
+    }
+
+    #[test]
+    fn checked_dopri_rejects_system_dimension_mismatch() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 2);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[1.0, 1.0],
+                (0.0, 0.1),
+                OdeSolveLimits::default(),
+            )
+            .expect_err("system dimension must match engine dimension");
+        assert_eq!(failure.kind, OdeSolveFailureKind::SystemDimensionMismatch);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_invalid_limits() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &QuadraticGrowth,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits {
+                    max_attempts: 0,
+                    max_accepted_steps: 10,
+                    max_state_values: 100,
+                },
+            )
+            .expect_err("zero attempt budget must reject");
+        assert_eq!(failure.kind, OdeSolveFailureKind::InvalidLimits);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_trajectory_budget_exhaustion() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &ExponentialDecay,
+                &[1.0],
+                (0.0, 0.1),
+                OdeSolveLimits {
+                    max_attempts: 10,
+                    max_accepted_steps: 10,
+                    max_state_values: 1,
+                },
+            )
+            .expect_err("trajectory scalar budget must reject before push");
+        assert_eq!(failure.kind, OdeSolveFailureKind::TrajectoryBudgetExceeded);
+        let partial = failure.partial_result.expect("initial state retained");
+        assert_eq!(partial.times, vec![0.0]);
+    }
+
+    #[test]
+    fn checked_dopri_rejects_accepted_step_budget_exhaustion() {
+        let engine = OdeSolverEngine::new(dopri_config(0.01, 1e-8, 0.1, 1e-6), 1);
+        let failure = engine
+            .try_solve_dormand_prince(
+                &ExponentialDecay,
+                &[1.0],
+                (0.0, 0.2),
+                OdeSolveLimits {
+                    max_attempts: 20,
+                    max_accepted_steps: 1,
+                    max_state_values: 100,
+                },
+            )
+            .expect_err("accepted-step budget must stop later steps");
+        assert_eq!(
+            failure.kind,
+            OdeSolveFailureKind::MaximumAcceptedStepsExceeded
+        );
+        assert_eq!(failure.partial_result.expect("accepted prefix").step_sizes.len(), 1);
+    }
+
+    #[test]
     fn test_rk4_exponential_decay() {
         let config = OdeConfig {
             solver: OdeSolver::RK4,
