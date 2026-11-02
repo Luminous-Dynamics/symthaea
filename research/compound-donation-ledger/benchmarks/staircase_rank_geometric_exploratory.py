@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+from fractions import Fraction
 from typing import Any
 
 import numpy as np
@@ -55,7 +56,8 @@ def e_bh_rejections(values: np.ndarray, alpha: float) -> np.ndarray:
     return values >= threshold[:, None]
 
 
-def rank_geometric_points(family_size: int, alpha: float) -> list[tuple[int, float]]:
+def rank_geometric_points(family_size: int, alpha: float) -> list[tuple[float, float]]:
+    """Mirror the Rust builder's exact fixed-point ceiling arithmetic."""
     ranks: list[int] = []
     rank = 1
     while rank <= family_size:
@@ -63,11 +65,24 @@ def rank_geometric_points(family_size: int, alpha: float) -> list[tuple[int, flo
         rank *= 2
     if ranks[-1] != family_size:
         ranks.append(family_size)
+
     point_count = len(ranks)
-    mass = 1.0 / point_count
+    prior_mass_scale = 10**9
+    evidence_scale = 10**6
+    mass_ticks = prior_mass_scale // point_count
+    alpha_fraction = Fraction(str(alpha))
+    a, b = alpha_fraction.numerator, alpha_fraction.denominator
+    merged: dict[int, int] = {}
+    for rank in ranks:
+        h_num = family_size * b * evidence_scale
+        h_den = a * rank
+        h_ticks = (h_num + h_den - 1) // h_den
+        raw_num = h_ticks * prior_mass_scale
+        raw_ticks = (raw_num + mass_ticks - 1) // mass_ticks
+        merged[raw_ticks] = merged.get(raw_ticks, 0) + mass_ticks
     return [
-        (math.ceil(point_count * family_size / (alpha * rank)), mass)
-        for rank in ranks
+        (threshold_ticks / evidence_scale, mass / prior_mass_scale)
+        for threshold_ticks, mass in sorted(merged.items())
     ]
 
 
@@ -221,7 +236,7 @@ def main() -> None:
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--p0", type=float, default=0.5)
     parser.add_argument("--p1", type=float, default=0.75)
-    parser.add_argument("--seed", type=int, default=20261102)
+    parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--dependence",
         choices=("independent", "balanced_negative_null"),
@@ -237,12 +252,10 @@ def main() -> None:
 
     output = []
     for fraction in args.alternative_fractions:
-        seed = (
-            args.seed
-            + int(args.p1 * 1000)
-            + int(fraction * 10000)
-            + (1_000_000 if args.dependence == "balanced_negative_null" else 0)
+        base_seed = args.seed if args.seed is not None else (
+            992301 if args.dependence == "balanced_negative_null" else 20261102
         )
+        seed = base_seed + int(args.p1 * 1000) + int(fraction * 10000)
         output.append(
             run_cell(
                 family_size=args.family_size,
