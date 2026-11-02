@@ -142,3 +142,27 @@ These tests are authored, not run. No Rust compile, format, Clippy, unit-test, C
 1. Martinez-Taboada & Ramdas (2026), *Empirical Bernstein in Smooth Banach Spaces*, Annals of Applied Probability 36(3), 2199–2236. https://doi.org/10.1214/25-AAP2277
 2. Martinez-Taboada & Ramdas (ICML 2026), *Sharp Empirical Bernstein Inequalities for the Variance of Bounded Random Variables*, PMLR 306. https://proceedings.mlr.press/v306/martinez-taboada26a.html
 3. Fontem & Ji (2026), *Distributionally robust optimization with generalized total variation ambiguity sets*, EJOR 328(3), 894–911. https://doi.org/10.1016/j.ejor.2025.09.024
+
+
+## 9. Next comparator: joint vector empirical-Bernstein confidence
+
+Keep V1 scalar Hoeffding as the auditable reference. The next method should produce a joint confidence set for the bounded vector of decision/guardrail functionals observed on the same independent sampling unit within one policy/model arm.
+
+Two 2026 Martinez-Taboada & Ramdas results are relevant but distinct:
+
+- *Empirical Bernstein in Smooth Banach Spaces*, Annals of Applied Probability 36(3), 2199–2236 (June 2026), derives vector-valued empirical-Bernstein confidence sets for bounded random vectors in 2-smooth separable Banach spaces, including finite-dimensional Euclidean spaces and separable Hilbert spaces, for both fixed-sample and stopping-time settings. This is the direct joint-mean confidence-set comparator. DOI: https://doi.org/10.1214/25-AAP2277
+- *Sharp Empirical Bernstein Inequalities for the Variance of Bounded Random Variables*, ICML 2026 / PMLR 306, derives variance confidence bounds under constant conditional mean and variance, with batch and stopping-time forms and a Hilbert-space extension. This is a variance-estimation primitive, not automatically a drop-in mean confidence set and not a general arbitrary-dependence guarantee. https://proceedings.mlr.press/v306/martinez-taboada26a.html
+
+A future joint confidence region should expose its support function to the downstream linear policy/guardrail constraints rather than immediately reducing it to marginal intervals. For an established Euclidean ellipsoid centered at `mu_hat`, with shape matrix `Sigma` and radius `r`, the support in direction `c` is:
+
+`c · mu_hat + r * sqrt(cᵀ Sigma c)`.
+
+This is only the optimization adapter; the ellipsoid, shape estimator and radius must be derived from a valid finite-sample theorem.
+
+The dependence contract is strict:
+- exploit coordinate dependence only among functionals jointly observed on the same independent unit within one policy/model arm;
+- do not invent cross-policy covariance or unobserved potential-outcome coupling;
+- freeze the Banach norm, metric family, confidence-set construction and adaptive-selection correction;
+- compare against Bonferroni scalar Hoeffding at matched simultaneous coverage.
+
+Required fixtures include low variance, high variance, correlated, anti-correlated, rank-deficient, rare-event, and near-boundary vectors. Compare width and downstream regret, guardrail false-safe rate, sample size, solver time and verifier time. Exact small-dimensional confidence-set support calculations should be independently checked.
