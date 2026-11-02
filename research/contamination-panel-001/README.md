@@ -796,7 +796,7 @@ The module src/codec.rs provides:
 - declared model, tokenizer, chat template, dataset manifest, context policy, inference backend and receipt digests;
 - explicit unauthenticated/non-confirmatory claim boundary.
 
-The item-level Wilson interval is descriptive and assumes independent targets; common contexts/source clusters can violate that assumption. Dataset-level AUC uses datasets as the unit, but v1 does not yet perform a source-family cluster bootstrap. Source-family IDs are retained so a cluster-aware inference extension can be added without pretending every dataset is independent.
+The item-level Wilson interval is descriptive and assumes independent targets; common contexts/source clusters can violate that assumption. Dataset-level AUROC/AUPRC are point estimates over datasets, with deterministic source-family cluster-bootstrap 95% percentile intervals (2,000 requested draws). Each draw samples whole source families with replacement. If fewer than 1,000 draws contain both exposed and unexposed datasets, intervals are withheld. The family IDs and bootstrap seed commitment are included in the report. This is still a descriptive cluster bootstrap, not a full model-by-domain hierarchical uncertainty model.
 
 ### CLI
 
