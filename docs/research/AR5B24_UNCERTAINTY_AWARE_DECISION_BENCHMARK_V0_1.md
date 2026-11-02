@@ -410,3 +410,16 @@ Do not set a target to reproduce Spotify's 64% learning rate. Compare methods at
 References:
 - Spotify Engineering (September 2025), *Beyond Winning: Spotify's Experiments with Learning Framework*. https://engineering.atspotify.com/2025/9/spotifys-experiments-with-learning-framework
 - Spotify Engineering (May 2026), *Better Experiments with LLM Evals — A funnel, not a fork*. https://engineering.atspotify.com/2026/5/better-experiments-with-llm-evals-a-funnel-not-a-fork
+
+
+## 20. Implementation work opened after protocol v0.1
+
+The following follow-on artifacts separate the mathematical/engineering concerns into independently reviewable work:
+
+- [PR #9999 — bounded-IID decision-functional confidence](https://github.com/Luminous-Dynamics/symthaea/pull/9999): scalar Hoeffding DFCE reference, same-target-law-only V1, sampling-unit and randomized-arm contracts. Draft; tests authored, not executed.
+- [PR #10005 — noncompensatory guardrail verifier](https://github.com/Luminous-Dynamics/symthaea/pull/10005): fixed-mixture PASS/BLOCKED/INDETERMINATE gate with global/local requirements and row-level provenance. Draft; tests authored, not executed. This is a verifier, not yet the guardrail-constrained optimizer.
+- [Issue #10006 — guardrail-constrained frontier LP](https://github.com/Luminous-Dynamics/symthaea/issues/10006): integrate hard guardrail inequalities directly into the exact policy-frontier optimization.
+- [Issue #10008 — calibration-to-confirmation transport certificates](https://github.com/Luminous-Dynamics/symthaea/issues/10008): finite-sample calibration/target transport and composition of transport failure into the null-side error budget.
+- [Issue #10009 — vector empirical-Bernstein confidence sets](https://github.com/Luminous-Dynamics/symthaea/issues/10009): theorem-faithful joint confidence regions and directional support functions.
+
+These are draft research artifacts. No Rust compile/test, CI pass, performance result or SOTA superiority is claimed for the new implementations. The benchmark waves must qualify them at exact heads and with independent solvers/verifiers before promotion.
