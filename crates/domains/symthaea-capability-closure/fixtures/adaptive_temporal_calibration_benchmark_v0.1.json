@@ -28,6 +28,8 @@
   "window_lengths": {
     "feedback_count_steps": [
       64,
+      100,
+      250,
       256,
       1024,
       4096
@@ -665,7 +667,8 @@
       "integrated_coverage_deficit",
       "post_change_recovery_steps",
       "recovery_interval_width",
-      "recovery_interval_score"
+      "recovery_interval_score",
+      "worst_case_local_coverage_error_LCE_k_over_all_contiguous_windows"
     ],
     "feedback": [
       "event_to_feedback_latency",
@@ -677,7 +680,11 @@
       "historical_receipt_mutation_count",
       "delay_to_memory_ratio_r",
       "residual_memory_timescale_estimate",
-      "memory_estimation_error"
+      "memory_estimation_error",
+      "signed_residual_autocorrelation_memory",
+      "absolute_residual_autocorrelation_memory",
+      "squared_residual_autocorrelation_memory",
+      "markov_switching_transition_eigenvalue_memory"
     ],
     "systems": [
       "calibration_update_latency_p50_p95_p99",
