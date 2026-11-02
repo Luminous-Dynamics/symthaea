@@ -71,6 +71,7 @@ pub trait VehiclePhysicsSimulator {
 ///   Fx = throttle * max_engine_force - brake * max_brake_force
 ///   Fdrag = 0.5 * CdA * ρ * V²
 ///   Frolling = Cr * m * g
+#[derive(Clone)]
 pub struct BicycleModelSimulator {
     state: VehicleState,
     params: ChassisParams,
@@ -135,6 +136,27 @@ impl BicycleModelSimulator {
     /// Get reference to chassis parameters.
     pub fn params(&self) -> &ChassisParams {
         &self.params
+    }
+
+    /// Content identity for the named bicycle-model profile and current friction state.
+    ///
+    /// This binds serialized chassis parameters plus the simulator's friction
+    /// multipliers. It is not a binary attestation or physical-model validation.
+    pub fn dynamics_profile_digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.vehicle.bicycle-model.v1");
+        if let Ok(params) = serde_json::to_vec(&self.params) {
+            hasher.update(&params);
+        }
+        for value in [
+            self.friction_scale,
+            self.front_friction_scale,
+            self.rear_friction_scale,
+            self.initial_speed,
+        ] {
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
+        hasher.finalize().to_hex().to_string()
     }
 
     /// Set the vehicle's world-frame position and heading directly.
