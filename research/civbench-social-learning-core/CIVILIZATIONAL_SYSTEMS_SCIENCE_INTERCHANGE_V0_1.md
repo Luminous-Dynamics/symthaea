@@ -41,6 +41,15 @@ Each arrow requires a separate, pre-registered evidence and verification gate. A
 
 ## 3. Canonical claim envelope
 
+The first machine-readable draft is now provided in:
+
+- `civilizational-claim-v0.1.schema.json` — immutable claim/source/time/space/missingness/rights envelope.
+- `civilizational-model-run-v0.1.schema.json` — reproducibility receipt for model, forecast, hindcast, scenario and synthetic benchmark runs.
+
+These schemas are cross-project data contracts, not runtime security or scientific-verification implementations. Each project should map the same semantics to its native types and add strict validators. Mycelix retains identity, provenance, rights, disputes and revocation; Symtropy binds model/parameter/solver/seed/data receipts; Sol-Atlas binds spatial-temporal geometry, units, layer source and uncertainty; Symthaea binds cognitive inference and skill/evaluation lineage.
+
+## 3a. Canonical claim envelope
+
 A claim is an immutable, addressable assertion linked to evidence, scope and interpretation. The following is the conceptual minimum; projects may serialize it in Rust structs, JSON, Holochain entries or columnar data, provided semantics remain equivalent.
 
 ```text
