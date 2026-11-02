@@ -47,6 +47,7 @@ pub enum AuditEvent {
         round: u64,
         token_id: u64,
         donor_id: u64,
+        destination_id: u64,
         amount: u128,
     },
     Credited {
@@ -73,6 +74,7 @@ pub struct CandidateSnapshot {
 pub struct TokenSnapshot {
     pub token_id: u64,
     pub donor_id: u64,
+    pub destination_id: u64,
     pub created_round: u64,
     pub original_amount: u128,
     pub remaining_amount: u128,
@@ -126,6 +128,7 @@ struct CandidateState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct TokenState {
     donor_id: u64,
+    destination_id: u64,
     created_round: u64,
     original_amount: u128,
     remaining_amount: u128,
@@ -198,7 +201,20 @@ impl DonationLedger {
         })
     }
 
+    /// Applies one event atomically: failed transitions never partially mutate the ledger.
+    ///
+    /// This reference implementation clones the state before applying the event,
+    /// then validates the full invariants before committing. It prioritizes a
+    /// trustworthy oracle over update speed; the separate verifier is linear too.
     pub fn apply(&mut self, event: InputEvent) -> Result<(), LedgerError> {
+        let mut staged = self.clone();
+        staged.apply_in_place(event)?;
+        staged.validate_invariants()?;
+        *self = staged;
+        Ok(())
+    }
+
+    fn apply_in_place(&mut self, event: InputEvent) -> Result<(), LedgerError> {
         let round = event.round();
         if self.last_round.is_some_and(|last| round < last) {
             return Err(LedgerError::RoundDecreased);
@@ -223,7 +239,7 @@ impl DonationLedger {
         }
 
         self.last_round = Some(round);
-        self.validate_invariants()
+        Ok(())
     }
 
     fn apply_evidence_update(
@@ -282,6 +298,11 @@ impl DonationLedger {
             return Err(LedgerError::InvariantViolation);
         }
 
+        let destination_id = if reserve > 0 {
+            Some(spec.destination_id.ok_or(LedgerError::InvalidRecipient)?)
+        } else {
+            None
+        };
         let token_id = if reserve > 0 {
             Some(self.next_token_id)
         } else {
@@ -312,6 +333,7 @@ impl DonationLedger {
                 token_id,
                 TokenState {
                     donor_id: candidate_id,
+                    destination_id: destination_id.ok_or(LedgerError::InvalidRecipient)?,
                     created_round: round,
                     original_amount: reserve,
                     remaining_amount: reserve,
@@ -322,6 +344,7 @@ impl DonationLedger {
                 round,
                 token_id,
                 donor_id: candidate_id,
+                destination_id: destination_id.ok_or(LedgerError::InvalidRecipient)?,
                 amount: reserve,
             });
         }
@@ -353,8 +376,7 @@ impl DonationLedger {
         if recipient_id <= token.donor_id {
             return Err(LedgerError::InvalidTransferDirection);
         }
-        let donor_position = self.position(token.donor_id)?;
-        if self.specs[donor_position].destination_id != Some(recipient_id) {
+        if token.destination_id != recipient_id {
             return Err(LedgerError::InvalidRecipient);
         }
         if round < token.created_round || amount > token.remaining_amount {
@@ -441,6 +463,7 @@ impl DonationLedger {
             .map(|(token_id, token)| TokenSnapshot {
                 token_id: *token_id,
                 donor_id: token.donor_id,
+                destination_id: token.destination_id,
                 created_round: token.created_round,
                 original_amount: token.original_amount,
                 remaining_amount: token.remaining_amount,
@@ -480,6 +503,10 @@ impl DonationLedger {
             if prefix_incoming > prefix_outgoing {
                 return Err(LedgerError::InvariantViolation);
             }
+        }
+
+        if prefix_incoming != self.total_incoming || prefix_outgoing != self.total_outgoing {
+            return Err(LedgerError::InvariantViolation);
         }
 
         let mut token_remaining = 0_u128;
@@ -1037,6 +1064,31 @@ mod tests {
             amount: 1,
         }).unwrap();
         ledger.validate_invariants().unwrap();
+    }
+
+    #[test]
+    fn failed_event_is_atomic_and_preserves_receipt() {
+        let mut ledger = DonationLedger::new(basic_specs()).unwrap();
+        ledger.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: EVIDENCE_ONE,
+        }).unwrap();
+        let before_snapshot = ledger.snapshot().unwrap();
+        let before_log = ledger.audit_log().to_vec();
+
+        assert_eq!(
+            ledger.apply(InputEvent::Credit {
+                round: 2,
+                token_id: 1,
+                recipient_id: 30,
+                amount: 1,
+            }),
+            Err(LedgerError::InvalidRecipient)
+        );
+        assert_eq!(ledger.snapshot().unwrap(), before_snapshot);
+        assert_eq!(ledger.audit_log(), before_log.as_slice());
     }
 
     #[test]
