@@ -245,11 +245,13 @@ The test file benchmarks/test_anchored_compound_ebh.py covers:
 - fail-closed input validation.
 
 The local exact-rational research checks completed:
-- 1,333,320 all-subset closure-equivalence comparisons;
-- 31,080 exhaustive small-vector solver comparisons against brute force;
-- all strict-addition and baseline-retention witnesses passed.
+- 133,320 all-subset closure-equivalence comparisons using the committed test grid;
+- 9,360 exhaustive small-vector solver comparisons against brute force using the committed test grid;
+- 144 randomized solver/brute-force comparisons across n=1..8;
+- 112,320 zero-score padding comparisons, all preserving the old decision prefix;
+- strict-addition, baseline-retention and future-high-score extension witnesses passed.
 
-These were executed as local exact-rational reference checks, not as Rust tests or GitHub Actions. The committed test suite is authored for independent reproduction.
+These were executed as local exact-rational reference checks in a separate Python reimplementation of the committed algorithms, not as the committed unittest file, Rust tests or GitHub Actions. The test suite is authored for independent reproduction.
 
 ## 8. Projectivity and limitations
 
