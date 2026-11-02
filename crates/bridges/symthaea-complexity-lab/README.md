@@ -50,6 +50,44 @@ and the transform takes \(O(n(d+1)^{n+1})\) arithmetic operations. It is
 **not** a subexponential counting algorithm and does not implement the
 OpenAI construction.
 
+
+## Weighted and multiobjective profile reference
+
+The `profile` module adds a sparse multivariate integer profile over a
+bounded truncated polynomial ring:
+
+```
+Z[W0, ..., Ws-1] / (W0^N0, ..., Ws-1^Ns-1)
+```
+
+It provides checked coefficient addition/multiplication, scalar scaling,
+monomial shifts, exact coefficient queries, maximum-coordinate extraction
+and Pareto-support extraction. It includes bounded Boolean factor evaluators
+capped at 24 variables; the polynomial-valued form accepts sparse polynomial
+cells, not just one monomial per local assignment. These are brute-force
+oracles, not the shared-measurement subexponential algorithm.
+
+The current profile backend uses checked i128 coefficients. It is exact only
+when every intermediate fits; overflow is an explicit error. It is not the
+full Q-algebra API or an arbitrary-precision implementation. Signed
+coefficients are supported because interpolation can create cancellation.
+Negative objective values must be shifted into nonnegative exponents with
+declared lower bounds and shifted back at the output.
+
+Small unit fixtures include:
+- the triangle Max-Cut profile `2 + 6 W^2`;
+- a two-objective factor system with Pareto maxima `(1,0)` and `(0,1)`;
+- polynomial-valued local factors summing to `(2 + X)(2 + Y)`;
+- truncation, cancellation, ring mismatch and overflow cases.
+
+Run the crate tests with:
+
+    cargo test -p symthaea-complexity-lab
+
+Research parent: ETH-001 #10049. Weighted-profile implementation and
+multiobjective self-reduction: ETH-012 #10156. Exact algebra representation
+and bit-complexity qualification remains ETH-006 #10096.
+
 ## Run
 
 From the repository root:
