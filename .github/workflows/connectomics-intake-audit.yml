@@ -54,6 +54,8 @@ on:
       - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_CONFIRMATORY.example.jsonl"
       - "docs/neuroscience/CONNECTOME_DOMAIN_SPLIT_MANIFEST.schema.json"
+      - "docs/neuroscience/CONNECTOME_EXACT_SPLIT_REPLAY_AUDIT_V0.1.md"
+      - "docs/neuroscience/CONNECTOME_SPLIT_REPLAY_AUDIT_REPORT.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SPLIT.example.json"
       - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
