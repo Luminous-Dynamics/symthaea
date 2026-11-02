@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-query-stability-input-v0.1.schema.json",
+  "title": "Connectome query stability audit input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "query_id",
+    "query_definition_sha256",
+    "analysis_code_sha256",
+    "uncertainty_set_sha256",
+    "source_volume_id",
+    "metric_tolerances",
+    "checkpoints"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "query_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "analysis_code_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "uncertainty_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_volume_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metric_tolerances": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "absolute_tolerance",
+          "unit_id"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "absolute_tolerance": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "checkpoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkpoint_id",
+          "source_volume_id",
+          "cumulative_edit_count",
+          "graph_snapshot_sha256",
+          "parent_graph_snapshot_sha256",
+          "edit_history_manifest_sha256",
+          "graph_builder_config_sha256",
+          "structural_uncertainty_manifest_sha256",
+          "scenario_results"
+        ],
+        "properties": {
+          "checkpoint_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_volume_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cumulative_edit_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "graph_snapshot_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "parent_graph_snapshot_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "edit_history_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "graph_builder_config_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "structural_uncertainty_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "scenario_results": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scenario_id",
+                "metric_intervals"
+              ],
+              "properties": {
+                "scenario_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "metric_intervals": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "metric_id",
+                      "unit_id",
+                      "bounds"
+                    ],
+                    "properties": {
+                      "metric_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "unit_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "bounds": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "lower",
+                          "upper"
+                        ],
+                        "properties": {
+                          "lower": {
+                            "type": "number"
+                          },
+                          "upper": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
