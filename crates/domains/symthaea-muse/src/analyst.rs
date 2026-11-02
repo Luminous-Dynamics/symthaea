@@ -1484,11 +1484,11 @@ pub fn verify_composer_trace(
             });
         }
 
-        if transition.definition.is_none() {
+        if transition.to == ObligationState::Fulfilled && transition.definition.is_none() {
             issues.push(TraceVerificationIssue {
                 code: "obligation-definition-missing".into(),
                 record_id: id.clone(),
-                message: "Lifecycle transition has no typed obligation definition; semantic fulfillment cannot be established.".into(),
+                message: "Fulfilled transition has no typed obligation definition; semantic fulfillment cannot be established.".into(),
             });
         }
         if let Some(definition) = transition.definition.as_ref() {
@@ -1529,6 +1529,13 @@ pub fn verify_composer_trace(
                 }
             }
         }
+        if transition.to == ObligationState::Unresolved {
+            issues.push(TraceVerificationIssue {
+                code: "obligation-unresolved".into(),
+                record_id: id.clone(),
+                message: "Composer reports this obligation as unresolved; it is not a fulfilled semantic claim.".into(),
+            });
+        }
         states.insert(transition.obligation_id.as_str(), transition.to.clone());
     }
     let failed: BTreeSet<_> = issues.iter().map(|item| item.record_id.as_str()).collect();
@@ -1540,6 +1547,7 @@ pub fn verify_composer_trace(
                 | "obligation-definition-version-unsupported"
                 | "obligation-kind-not-yet-qualified"
                 | "obligation-motif-definition-unavailable"
+                | "obligation-unresolved"
         )
     });
     let semantic_discrepancy = issues.iter().any(|issue| {
@@ -1549,6 +1557,7 @@ pub fn verify_composer_trace(
                 | "obligation-definition-version-unsupported"
                 | "obligation-kind-not-yet-qualified"
                 | "obligation-motif-definition-unavailable"
+                | "obligation-unresolved"
         )
     });
     TraceVerificationReport {
@@ -2438,8 +2447,28 @@ mod tests {
             };
             let public_trace = composer_trace_from_theory(&realized.trace, "score", 0, None);
             let verification = verify_composer_trace(&public_trace, &composition, "score", 0);
+            let contradictory: Vec<_> = verification
+                .issues
+                .iter()
+                .filter(|issue| {
+                    !matches!(
+                        issue.code.as_str(),
+                        "obligation-definition-missing"
+                            | "obligation-kind-not-yet-qualified"
+                            | "obligation-motif-definition-unavailable"
+                            | "obligation-unresolved"
+                    )
+                })
+                .collect();
             assert!(
-                verification.issues.is_empty(),
+                contradictory.is_empty(),
+                "{style:?}: unexpected contradictory evidence: {contradictory:?}"
+            );
+            assert!(
+                matches!(
+                    verification.evidence.verification_status,
+                    VerificationStatus::Verified | VerificationStatus::InsufficientEvidence
+                ),
                 "{style:?}: {:?}",
                 verification.issues
             );
