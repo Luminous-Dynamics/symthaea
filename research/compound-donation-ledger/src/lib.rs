@@ -616,7 +616,6 @@ pub struct OvershootRefundReceipt {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProcessOvershootRefund {
     alpha_numerator: u64,
-    alpha_denominator: u64,
     denominator: u128,
     refund_cap_numerator: u128,
     last_round: Option<u64>,
@@ -660,7 +659,6 @@ impl ProcessOvershootRefund {
 
         Ok(Self {
             alpha_numerator,
-            alpha_denominator,
             denominator,
             refund_cap_numerator,
             last_round: None,
