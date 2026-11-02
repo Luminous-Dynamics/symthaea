@@ -524,7 +524,6 @@ fn verify_metrics_and_scores<'a>(
             }
             let state = item.get("score_state").and_then(Value::as_str).unwrap_or("");
             let score = item.get("score").and_then(Value::as_f64);
-            paired_keys.insert((candidate.to_owned(), baseline.to_owned(), metric.to_owned(), stratum.to_owned()));
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
             let key = (model.to_owned(), metric.to_owned(), stratum.to_owned());
@@ -604,6 +603,7 @@ fn verify_paired(
             let baseline = item.get("baseline_model_id").and_then(Value::as_str).unwrap_or("");
             let metric = item.get("metric_id").and_then(Value::as_str).unwrap_or("");
             let stratum = item.get("stratum").and_then(Value::as_str).unwrap_or("");
+            paired_keys.insert((candidate.to_owned(), baseline.to_owned(), metric.to_owned(), stratum.to_owned()));
             if models.get(candidate).and_then(|m| m.get("role")).and_then(Value::as_str) != Some("candidate") {
                 errors.push(format!("paired_comparisons[{index}]: candidate model ref/role invalid"));
             }
