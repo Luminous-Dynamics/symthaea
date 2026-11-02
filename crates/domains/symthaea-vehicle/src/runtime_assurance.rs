@@ -669,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn requires_clean_dwell_and_bumpless_transition_before_reentry() {
+    fn requires_clean_dwell_and_bounded_transition_before_reentry() {
         let mut monitor = monitor();
         let mut fault = observation(0.0);
         fault.estimator_healthy = false;
