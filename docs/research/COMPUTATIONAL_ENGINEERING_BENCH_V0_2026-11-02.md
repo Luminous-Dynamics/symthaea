@@ -8,13 +8,13 @@
 
 CEB measures whether an agent can perform complete computational engineering work: understand a system, diagnose a problem, plan a bounded change, implement it, verify it independently, and produce reproducible evidence.
 
-It is deliberately broader than source-code completion. Its lanes include algorithms, Rust engineering, Nix/build reproducibility, Linux operations, distributed systems, database engineering, cybersecurity, performance, system design, reliability and benchmark-verifier integrity.
+It is deliberately broader than source-code completion. Its lanes include algorithms, Rust engineering, repository intelligence, Nix/build reproducibility, Linux operations, distributed systems, database engineering, cybersecurity, performance, system design, reliability and benchmark-verifier integrity.
 
 CEB is a Symthaea-native evaluation and should complement—not replace—external benchmarks such as SWE-bench Pro V2 and Terminal-Bench 4.0.
 
 ## 2. Current status and claim ceiling
 
-The initial catalog contains nine **design-only** task records. They have no runnable fixtures, pinned images/toolchains, reference patches, independent graders, hidden test assets or qualification results.
+The initial catalog contains ten **design-only** task records. They have no runnable fixtures, pinned images/toolchains, reference patches, independent graders, hidden test assets or qualification results.
 
 Therefore:
 
@@ -25,7 +25,7 @@ Therefore:
 - A task becomes `fixture_ready` only after its source snapshot, isolated environment, budgets and independent grader are pinned and validated.
 - A task becomes `qualified` only after the grader, reference patch, empty-patch negative control, split custody and isolation controls all pass.
 
-The schema intentionally makes the execution state explicit so planning artifacts cannot be mistaken for benchmark evidence.
+The schema intentionally makes the execution state explicit so planning artifacts cannot be mistaken for benchmark evidence. The design-only receipt sample is intentionally unresolved and simulated; it is a schema fixture, not a benchmark result.
 
 ## 3. Task contract
 
@@ -119,9 +119,10 @@ The eight initial records in `catalog.v0.json` cover:
 | CEB-SEC-001 | Security | Shell/path injection hardening | Adversarial path and shell-metacharacter controls |
 | CEB-PERF-001 | Performance | Measured hot-path optimization | Before/after profiles and semantic equivalence |
 | CEB-SYS-001 | Systems design | Requirement-to-evidence traceability | Trace completeness, risk and review rubric |
+| CEB-REPO-001 | Repository intelligence | Construct a typed repository twin and predict change impact | Node/edge gold labels, change-impact precision/recall and incremental invalidation |
 | CEB-VER-001 | Benchmark integrity | Audit and harden an adversarial benchmark verifier | Positive/negative controls, exploit resistance and independently reviewed task-level verdicts |
 
-All nine are `design_only`. The receipt and DSSE schemas define evidence shape only; no signing keys, trusted runner identity, executable verifier or accepted receipt has been provisioned. The first qualification batch should contain 2–3 independently implemented fixture tasks per lane, not one cherry-picked demonstration.
+All ten are `design_only`. The receipt and DSSE schemas define evidence shape only; no signing keys, trusted runner identity, executable verifier or accepted receipt has been provisioned. The first qualification batch should contain 2–3 independently implemented fixture tasks per lane, not one cherry-picked demonstration.
 
 ## 8. Recommended first qualification batch
 
@@ -160,7 +161,15 @@ Use synthetic or permissively licensed fixtures initially, with fresh names, hid
 7. Execute repeated runs only after qualification; publish raw per-task evidence and aggregate uncertainty.
 8. Add lanes only when their fixtures and graders meet the same standard.
 
-## 11. External benchmark integrity finding
+## 11. Repository-twin evaluation lane
+
+CEB-REPO-001 measures the computational repository twin separately from code-generation success. Its first fixture should be a 5–8 crate synthetic Rust workspace with modules, re-exports, public/private symbols, generics, traits, trait impls, cross-crate calls, Cargo features, target-specific dependencies and tests. It is static-only: the agent parses source/manifests but does not execute repository build scripts, tests or binaries.
+
+Gold labels must keep syntax-derived facts distinct from compiler/rust-analyzer-resolved facts. Apply a deterministic edit sequence (rename, move/re-export, trait-impl change, feature gate change, function deletion and test mutation). After each edit, compare incremental invalidation with a full graph rebuild. Score node/edge precision and recall per relation type, change-impact precision/recall for symbols/tests/features/targets, stale-fact rate and provenance coverage.
+
+Proposed targets (not current results): syntax entity P/R ≥0.95; supported compiler-resolved relation P/R ≥0.90; change-impact recall ≥0.95 with precision ≥0.80; zero stale facts after completed invalidation; zero cases where syntax-only facts are labelled compiler-resolved. The gold-label and fixture work is tracked in [issue #10173](https://github.com/Luminous-Dynamics/symthaea/issues/10173).
+
+## 12. External benchmark integrity finding
 
 Terminal-Bench 4.0.0 remains useful as a version-pinned external comparison, but it must not be treated as an unquestioned ground-truth score. Epoch AI's review dated 2026-09-04 labels the release **Flawed** and reports publicly noted scoring defects in 30 of 66 tasks (45.5%), including a directly writable pass signal, answer leakage and false negatives. Terminal-Bench's maintainers say 4.0.0 removed eight tasks and fixed 19, and list verifier improvements such as tamper-resistant graders among the goals for 4.1. These sources describe distinct snapshots and review scopes; retain the exact release, task IDs, grader commit and exclusions with every result.
 
@@ -175,7 +184,7 @@ Accordingly:
 
 The official Terminal-Bench 4.0 page accessed 2026-11-02 currently renders no populated score rows, although it describes 95% confidence-interval whiskers. A separate Vals AI Mini-SWE-agent evaluation, updated 2026-10-29, reports Opus 5.5 at 65.15%, Sonnet 5.5 at 64.14%, Kimi K3.1 Pro at 63.64%, Gemini 4 Carbon at 63.13%, and GPT-6 Astra at 59.60%. Vals reports three full benchmark runs (avg@3), pass@1 per task, Mini-SWE-agent for all models, and an eight-hour task limit per task; these results are not official maintainer-board scores. Do not pool the two sources or interpret different harnesses as matched comparisons. The Epoch AI defect audit applies to the benchmark release itself, not to a claim that every run exploited a flaw.
 
-## 12. External references
+## 13. External references
 
 - [SWE-bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2): refreshed public task split, two-sided gates and pristine-image regrading.
 - [SWE-rebench V2 collection](https://huggingface.co/collections/nebius/swe-rebench-v2): continuously updated task collection; pin the exact dataset revision and leaderboard time window.
@@ -187,6 +196,11 @@ The official Terminal-Bench 4.0 page accessed 2026-11-02 currently renders no po
 **Claim ceiling:** CEB V0 currently defines a task schema and design catalog only. It does not establish Symthaea performance, superiority to commercial agents, security qualification or SOTA.
 
 
-## 13. Existing audit implementation caveat
+## 14. Existing audit implementation caveat
 
 Two repository-repair audit design documents currently describe Rust binaries under `tools/rust-repair-benchmark-harness/`. A source check on `main` dated 2026-11-02 did not find that manifest or corresponding binary sources; repository code search found only the documentation references. Do not treat those auditors as reusable executable infrastructure until the source is restored and exact-head tests pass. This discrepancy is tracked in [issue #10138](https://github.com/Luminous-Dynamics/symthaea/issues/10138). The benchmark-integrity lane must not inherit unverified implementation claims from design prose.
+
+
+## 15. Receipt-verifier implementation
+
+CEB task and run statements are now machine-readable in an in-toto Statement v1 + DSSE envelope. `.github/workflows/ceb-contract-validation-v0.yml` validates the Draft 2020-12 schemas, catalog and cross-field receipt invariants with pinned `jsonschema` and negative controls. The workflow has been authored but not run in this conversation. Cryptographic signature verification, trust-root policy and primary/regrade-pair adjudication remain implementation work under [issue #10167](https://github.com/Luminous-Dynamics/symthaea/issues/10167). A schema-valid statement is not proof of an authentic execution.
