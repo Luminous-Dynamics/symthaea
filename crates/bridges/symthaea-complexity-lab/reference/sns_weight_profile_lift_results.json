@@ -1,0 +1,14 @@
+{
+  "ring": "Z[X,Y]/(X^3,Y^3)",
+  "arithmetic": "Python standard library; arbitrary-precision integer coefficients; exact sparse polynomial convolution",
+  "valid_networks": 6,
+  "valid_equalities": 6,
+  "exact_coefficientwise_division_by_two": 6,
+  "negative_controls": {
+    "wrong_top_index_or_sign_rejected": true,
+    "wrong_bottom_index_or_sign_rejected": true
+  },
+  "passed": 8,
+  "total": 8,
+  "claim_boundary": "Finite exact K4 ring-valued checks only; not a generic proof, asymptotic bound, or practical solver benchmark."
+}
