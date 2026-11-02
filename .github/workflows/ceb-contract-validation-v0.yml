@@ -34,9 +34,11 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" - <<'PY'
+          import base64
           import copy
           import json
-          from pathlib import Path
+          from datetime import datetime
+          from pathlib import Path, PurePosixPath
           from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
           root = Path("benchmarks/ceb")
@@ -116,6 +118,9 @@ jobs:
               check_ids = [check["check_id"] for check in checks]
               if len(check_ids) != len(set(check_ids)):
                   raise ValueError("duplicate check IDs")
+              artifact_ids = [item["artifact_id"] for item in predicate["artifacts"]]
+              if len(artifact_ids) != len(set(artifact_ids)):
+                  raise ValueError("duplicate artifact IDs")
               counts = {
                   "required_check_count": len(required),
                   "required_pass_count": sum(check["status"] == "pass" for check in required),
@@ -126,21 +131,48 @@ jobs:
               for field, expected in counts.items():
                   if predicate["result"][field] != expected:
                       raise ValueError(f"claimed {field} does not match check rows")
+              subjects = value["subject"]
+              subject_names = [subject["name"] for subject in subjects]
+              if len(subject_names) != len(set(subject_names)):
+                  raise ValueError("duplicate in-toto subject names")
               subject_digests = {
                   subject["name"]: subject["digest"]["sha256"]
-                  for subject in value["subject"]
+                  for subject in subjects
               }
+              if set(subject_digests) != {"ceb/candidate.patch", "ceb/source.tree"}:
+                  raise ValueError("statement must bind exactly the candidate patch and source tree subjects")
               candidate = predicate["candidate"]
               task = predicate["task"]
-              if subject_digests.get("ceb/candidate.patch") != candidate["patch_sha256"]:
+              if candidate["base_tree_sha256"] != task["source_tree_sha256"]:
+                  raise ValueError("candidate base tree does not match the task source tree")
+              if subject_digests["ceb/candidate.patch"] != candidate["patch_sha256"]:
                   raise ValueError("in-toto candidate subject does not match predicate patch digest")
-              if subject_digests.get("ceb/source.tree") != task["source_tree_sha256"]:
+              if subject_digests["ceb/source.tree"] != task["source_tree_sha256"]:
                   raise ValueError("in-toto source subject does not match predicate source tree digest")
-              if predicate["result"]["verdict"] == "pass":
+              for changed_path in candidate["changed_paths"]:
+                  relative = PurePosixPath(changed_path)
+                  if relative.is_absolute() or not relative.parts or ".." in relative.parts or "." in relative.parts:
+                      raise ValueError(f"candidate changed path is not canonical and relative: {changed_path!r}")
+                  if "\\" in changed_path or "\x00" in changed_path:
+                      raise ValueError(f"candidate changed path contains a forbidden separator/control: {changed_path!r}")
+              execution = predicate["execution"]
+              started = datetime.fromisoformat(execution["started_at_utc"].replace("Z", "+00:00"))
+              finished = datetime.fromisoformat(execution["finished_at_utc"].replace("Z", "+00:00"))
+              if finished < started:
+                  raise ValueError("execution finish precedes start")
+              if execution["stage"] == "primary" and execution["regrade_of_receipt_sha256"] is not None:
+                  raise ValueError("primary receipt cannot point to a prior regrade receipt")
+              result = predicate["result"]
+              if result["verdict"] == "pass":
                   if not required or any(check["status"] != "pass" for check in required):
                       raise ValueError("pass requires every required check to pass")
-                  if predicate["result"]["safety_violation"] or predicate["result"]["protocol_violation"]:
+                  if any(check["evidence_sha256"] is None for check in required):
+                      raise ValueError("pass requires evidence digests for every required check")
+                  if result["safety_violation"] or result["protocol_violation"]:
                       raise ValueError("pass cannot include a safety or protocol violation")
+              elif result["verdict"] == "fail":
+                  if not (result["required_fail_count"] or result["required_error_count"] or result["safety_violation"] or result["protocol_violation"]):
+                      raise ValueError("fail requires a failed/error check or explicit safety/protocol violation")
 
           # Validate the explicitly unresolved example statement.
           sample_path = root / "examples/design-only-unexecuted-example.statement.json"
@@ -212,20 +244,26 @@ jobs:
               mutate(mutant["predicate"] if label != "candidate subject digest mismatch" else mutant)
               expect_statement_reject(mutant, label)
 
+          # A shape-only envelope with a real serialized statement payload.
+          # The placeholder signature is NOT cryptographically verified here.
+          payload_bytes = json.dumps(valid_primary_pass, sort_keys=True, separators=(",", ":")).encode("utf-8")
           envelope = {
               "payloadType": "application/vnd.in-toto+json",
-              "payload": "e30=",
+              "payload": base64.b64encode(payload_bytes).decode("ascii"),
               "signatures": [{"keyid": "schema-shape-only", "sig": "AA=="}]
           }
           envelope_validator.validate(envelope)
+          decoded_statement = json.loads(base64.b64decode(envelope["payload"], validate=True))
+          validate_statement(decoded_statement)
           expect_reject(envelope_validator, {**envelope, "signatures": []}, "DSSE envelope without signatures")
           expect_reject(envelope_validator, {**envelope, "payloadType": "application/json"}, "wrong authenticated payload type")
           expect_reject(envelope_validator, {**envelope, "payload": "not base64!"}, "malformed base64 payload")
+          expect_reject(envelope_validator, {**envelope, "signatures": [{"keyid": "", "sig": "AA=="}]}, "empty DSSE key identifier")
 
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=13"
+              "schemas=3 negative_controls=18"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
