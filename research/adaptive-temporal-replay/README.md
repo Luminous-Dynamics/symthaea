@@ -12,7 +12,7 @@ Standalone Rust research crate for executing the v0.1 adaptive temporal calibrat
 - Append-only bitemporal label ledger with as-known queries and replay verification.
 - Scalar ACI baseline applied only when feedback is delivered.
 - Fixed-horizon tau-delayed ACI phase bank with alpha-used binding, ordered feedback queue, replay receipts and explicit all-real/empty interval regimes. See TAU_DELAYED_ACI_V0_1.md.
-- Worst-case local coverage error LCE_k over all contiguous windows of fixed length.
+- Worst-case local coverage error LCE_k over all contiguous windows of fixed length, computed with an O(T) rolling count.
 - Finite-sample split-conformal order statistic with an explicit unbounded result when the calibration sample is insufficient.
 
 ## Commands
