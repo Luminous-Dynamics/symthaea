@@ -324,10 +324,20 @@ Report separately:
   serialized receipt size, allocation count and throughput;
 - null-budget utilization and conservatism introduced by calibration.
 
-Use at least 50,000 frozen streams per confirmatory statistical cell; target
-200,000 or more for low-tail diagnostics. Preregister seeds and generators
-before looking at confirmatory results. Monte Carlo intervals are calibration
-diagnostics, not substitutes for a theorem.
+Use at least 50,000 frozen independent streams per confirmatory statistical
+cell; target 200,000 or more for low-tail diagnostics. Preregister seeds and
+generators before looking at confirmatory results.
+
+Interval types must match the estimand. Fixed-time FDR, stopped-FDR and
+SupFDR are means of per-stream FDP-valued variables in [0,1]; use a preregistered
+bounded-mean interval (e.g. empirical Bernstein/Hoeffding) or an independent-
+stream bootstrap. Wilson/Clopper-Pearson intervals apply to Bernoulli
+estimands such as probability of any false discovery and FDX exceedance.
+Do not require a finite-sample upper interval strictly below alpha when the
+theorem allows equality at alpha. Predeclare a Monte Carlo tolerance epsilon,
+compare a one-sided upper bound with alpha+epsilon, and include conservative
+interior levels to check implementation slack. Monte Carlo intervals diagnose
+implementation/calibration; they do not substitute for a theorem.
 
 ### Systems targets
 
