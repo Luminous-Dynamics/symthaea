@@ -18,7 +18,8 @@ The crate implements two bounded pieces:
    A_pi(x) = sum_j pi_j K_j 1{x >= K_j} using integer arithmetic and a
    precommitted prior-mass budget. It also supplies a finite prefix of the
    universal dyadic prior pi_j = 1/(j(j+1)), K_j = 2^j, and an
-   e-BH rank-geometric constructor for a fixed family size and alpha.
+   e-BH rank-geometric constructor for a fixed family-size envelope and
+   rational alpha, including candidate-specific rational weights.
 
 The ledger receives already-calibrated, nondecreasing evidence values. It does
 not compute likelihood ratios, test martingales, e-processes, null models,
