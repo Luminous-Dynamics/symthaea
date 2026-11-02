@@ -853,7 +853,7 @@ mod tests {
         let verifier = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
         let receipt = verify_manifest(&path, verifier).expect("verified finite universe");
         assert_eq!(receipt["disposition"], "VERIFIED");
-        assert_eq!(receipt["coverage"]["closure_verified"], true);
+        assert!(receipt["coverage"]["closure_verified"].as_bool().expect("closure flag"));
         assert_eq!(receipt["expected_world_count"], 4);
         assert_eq!(receipt["evaluated_world_count"], 4);
         assert_eq!(receipt["coverage"]["expected_world_ids"].as_array().expect("IDs").len(), 4);
