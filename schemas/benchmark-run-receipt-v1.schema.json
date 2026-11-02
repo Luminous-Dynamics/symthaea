@@ -568,7 +568,9 @@
           "graded",
           "grade",
           "reason_code",
-          "resources"
+          "resources",
+          "grader_result_sha256",
+          "evidence_ids"
         ],
         "properties": {
           "task_id": {
@@ -674,7 +676,8 @@
           "task_id",
           "input_sha256",
           "reason_code",
-          "predeclared"
+          "predeclared",
+          "approval_reference"
         ],
         "properties": {
           "task_id": {
