@@ -26,8 +26,9 @@ The action contains:
 - an alarm decision for the current step;
 - optional LowPower or HighFidelity sample acquisition at the current step;
 - next wake interval, bounded to 1–1,024 steps;
-- a frozen application decision deadline in the evaluator scenario, never exposed as hidden event truth;
 - candidate-declared compute-cycle, transmit-byte and memory-write counters.
+
+The evaluator freezes an application decision deadline in the scenario. It is not passed to the candidate policy; the result distinguishes on-time from late detections.
 
 The candidate-facing types contain no scenario seed, hidden event schedule, current hidden label, shift schedule, event count, or evaluator metrics. The scenario is supplied only to the simulator entry point and is not passed to policy code.
 
@@ -86,7 +87,7 @@ Required policy families for the first confirmatory run:
 7. a matched random or budget-matched sensing control;
 8. an evaluator-only oracle ceiling, never passed to candidate code.
 
-Report each scenario and subgroup separately. Do not collapse quality, latency, samples, energy, memory and communication into one score unless an application-specific utility function was preregistered. A recommended primary Pareto view is event recall / alarm precision / p95 detection delay against sensor samples, wakes, complete-event energy and resource vector.
+Report each scenario and subgroup separately. Do not collapse quality, latency, samples, energy, memory and communication into one score unless an application-specific utility function was preregistered. A recommended synthetic Pareto view is on-time event recall / alarm precision / p95 detection delay against sensor samples, wakes, and modeled sensor-plus-wake energy. A physical System-track Pareto view must instead use the independently measured complete application-event energy receipt.
 
 ## Claim and security ceilings
 
