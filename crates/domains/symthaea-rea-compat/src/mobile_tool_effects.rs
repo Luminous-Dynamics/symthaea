@@ -126,7 +126,7 @@ impl MobileTool {
 /// Canonical upstream ToolEffects shape. Every field is explicit; missing
 /// catalog entries never receive an implicit all-false default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ToolEffects {
     pub mutates_target: bool,
     pub mutates_session: bool,
@@ -427,13 +427,14 @@ pub struct EffectCeiling {
 
 impl EffectCeiling {
     /// Explicit observation lane: it may invoke the chosen host adb/JADX
-    /// providers, use the selected connection, write caller-authorized host
-    /// output, and append REA evidence/session state, but it may not change
-    /// the device/target, drive UI, discard data or execute foreign code.
+    /// providers, use the selected connection and append REA evidence/session
+    /// state. Host filesystem writes remain denied until a separate caller-bound
+    /// output-sink capability is implemented; device mutation, UI driving, data
+    /// discard and foreign-code execution are also denied.
     pub const MOBILE_DEVICE_READ_ONLY: Self = Self {
         allow_mutates_target: false,
         allow_mutates_session: true,
-        allow_writes_filesystem: true,
+        allow_writes_filesystem: false,
         allow_launches_process: true,
         allow_accesses_network: true,
         allow_changes_ui_state: false,
@@ -921,10 +922,6 @@ mod tests {
             "inspect_adb_device",
             "list_adb_packages",
             "read_adb_logcat",
-            "inspect_android_package",
-            "inspect_android_class",
-            "pull_adb_package",
-            "pull_adb_file",
         ] {
             let grant = authorize_mobile_device_observation(tool).unwrap();
             assert_eq!(grant.tool.as_str(), tool);
@@ -949,6 +946,40 @@ mod tests {
                 }
             ));
         }
+    }
+
+    #[test]
+    fn local_artifact_writes_are_denied_until_a_caller_bound_sink_exists() {
+        for tool in [
+            "inspect_android_jni_bindings",
+            "trace_android_references",
+            "inspect_android_package",
+            "search_android_classes",
+            "inspect_android_class",
+            "inspect_android_method",
+            "pull_adb_package",
+            "pull_adb_file",
+            "capture_adb_screen",
+            "collect_adb_bugreport",
+        ] {
+            assert!(matches!(
+                authorize_mobile_device_observation(tool),
+                Err(ToolAuthorizationError::EffectExceedsCeiling {
+                    effect: EffectFlag::WritesFilesystem,
+                    ..
+                })
+            ), "{tool} must not write outside a bound output sink");
+        }
+    }
+
+    #[test]
+    fn effect_json_uses_upstream_camel_case_field_names() {
+        let entry = mobile_tool_effect_entry(MobileTool::InspectAdbDevice).unwrap();
+        let value = serde_json::to_value(entry.effects).unwrap();
+        assert_eq!(value["mutatesSession"], true);
+        assert_eq!(value["launchesProcess"], true);
+        assert_eq!(value["accessesNetwork"], true);
+        assert_eq!(value["mutates_session"], Value::Null);
     }
 
     #[test]
