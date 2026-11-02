@@ -1014,6 +1014,12 @@ mod tests {
         assert!((crash.mixture_upper_confidence_bound - 0.05).abs() < 1e-8);
         assert!(crash.active_at_tolerance);
         assert_eq!(report.independent_guardrail_report.overall_decision, GuardrailOverallDecision::Pass);
+        assert!((report.frontier_significance_level - 0.05).abs() < 1e-12);
+        assert!((report.simultaneous_guardrail_failure_probability - 0.01).abs() < 1e-12);
+        assert_eq!(
+            report.solver_settings.algorithm_id,
+            "EXHAUSTIVE_ACTIVE_BASIS_PARTIAL_PIVOT_GAUSSIAN_V1"
+        );
         verify_guardrail_constrained_frontier_report(&request, &report).unwrap();
     }
 
@@ -1122,6 +1128,9 @@ mod tests {
         let mut altered = report.clone();
         altered.report_sha256 = HASH_A.into();
         assert!(verify_guardrail_constrained_frontier_report(&request, &altered).is_err());
+        let mut altered_settings = report.clone();
+        altered_settings.solver_settings.max_active_basis_count += 1;
+        assert!(verify_guardrail_constrained_frontier_report(&request, &altered_settings).is_err());
     }
 
     #[test]
