@@ -15,7 +15,7 @@ Brinkmann, L., Eisenmann, T.F., Nussberger, A.-M., Derex, M., Bonati, S., Chirko
 
 The paper reports 1,155 included participants, in 30 populations of five generations and eight positions each. Fifteen populations were Human-Only and fifteen Human-Machine; three Generation-0 positions in each Human-Machine population were machines. 148 of 1,303 completers were excluded under preregistered time/missing-move criteria and replaced.
 
-The task network has 12 nodes and 30 edges. Rewards are in `{-50, 0, 100, 200, 400}`; nodes have hidden levels 0–3. Network-generation constraints ensure any path from a level-0 node to a level-3 node includes at least three negative-reward edges. +400 rewards are available only from level 3; level-0 transitions include +200 rewards. Participants begin at a predetermined node and initially see only its outgoing edges; further edges are revealed as nodes are visited. Each trial has ten moves.
+The paper specifies a ten-move task over reward networks with edge rewards in `{-50, 0, 100, 200, 400}`. It reports that the maximum theoretical trajectory takes three −50 moves followed by seven +400 moves (2,650 points), while ten +200 moves yield the myopic ceiling (2,000 points). The article-level description does not justify hard-coding node count, edge count or level numbering without the v2.0 source archive. Participants begin at a predetermined node and discover outgoing links as they visit nodes. The exact v2.0 traversal, revisit, and step semantics must be imported from the archived interface before reproducing the task.
 
 The reported best score is 2,650 (three -50 moves followed by seven +400 moves). The myopic ceiling is 2,000 (ten +200 moves). The paper generated separate 1,000-network training, validation and experiment sets; the latter was held out. About 9% of generated networks were excluded because the myopic rule outperformed the loss-seeking rule.
 
@@ -24,6 +24,10 @@ Human participants in Generation 0 completed six individual-learning networks; l
 The published DQN used a GRU with two 15-unit ReLU linear layers, 20,000 training episodes, and a 1,000-network training set. Reproduce the paper's actual DQN only from its pinned code, data, weights and configuration; the transparent heuristics in this crate are not the DQN.
 
 Reported outcomes: machine-discovered strategies were preserved across every generation in 9/15 Human-Machine populations; six additional groups had temporary adoption. Fourteen of fifteen Human-Only populations never discovered the strategy. 86.7% selected the highest-scoring demonstrator; 90% of Generation-1 learners in Human-Machine groups selected a machine. These are empirical reference results, not hard-coded expected outputs.
+
+## Source-version reconciliation
+
+A separate audit of the older public GitHub experiment repository is recorded in [LEGACY_GITHUB_SNAPSHOT_AUDIT.md](LEGACY_GITHUB_SNAPSHOT_AUDIT.md). That snapshot contains 841 networks of 10 nodes/20 stored edges, levels 0–4 (the old model validator admits up to 5), and 8-transition heuristic solutions. Its frontend follows directed outgoing edges and caps the task at 8 transitions. It is **not** the paper's final ten-move v2.0 task. The generic Rust engine therefore no longer hard-codes a 12-node/30-edge or level-0–3 published shape; it supports source-specific shape/level profiles and a generic terminal-level/loss-count contract. The remaining v2.0 import must resolve the final schema and semantics.
 
 ## Baseline ladder
 
