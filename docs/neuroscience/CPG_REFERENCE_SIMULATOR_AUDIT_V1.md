@@ -162,3 +162,11 @@ The verifier consumes a separate raw-state file referenced relative to the recei
 The SHA-256 is recomputed from the file bytes. Every value is decoded and checked for finiteness; observed min/max/max-absolute values and the non-finite count must reconcile with the receipt. The capture stage must be `direct_solver_output_before_postprocessing`; a hash of an already-sanitized array is not acceptable.
 
 The raw-state array is authoritative for numerical-integrity checks. Save it before any NaN/Inf replacement, clipping, interpolation, or other post-solver transformation. For large runs, a streaming implementation may scan/hash in chunks, but must produce the same byte-level digest and counts.
+
+## Receipt-file digest placement
+
+The receipt JSON must not contain its own SHA-256: that would be self-referential. The complete receipt binds the source, solver, configuration, environment, log and raw-output manifest digests inside the document. The SHA-256 of the final receipt file bytes is computed after serialization and stored in the external evidence ledger / parent benchmark record. Do not add a `run_receipt_sha256` field inside the receipt itself. The `raw_output_manifest_sha256` identifies the separately materialized raw-output manifest, not the receipt file.
+
+## Solver step accounting
+
+A complete run requires `attempted_steps = accepted_steps + rejected_steps` using the solver's pinned counter semantics. The receipt verifier rejects inconsistent counters and requires `throw_on_failure = true`; raw output finiteness is still independently scanned because a successful status flag alone is insufficient.
