@@ -394,12 +394,17 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
     Ok(())
 }
 
-fn validate_nonnegative_safe_integer(value: &Value, context: &str) -> Result<(), EvidenceError> {
-    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
-    let integer = value.as_u64()
+fn validate_nonnegative_safe_integer(
+    value: &Value,
+    context: &str,
+) -> Result<(), EvidenceError> {
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+    let number = value.as_f64()
         .ok_or_else(|| schema_error(format!("{context} must be a non-negative safe integer")))?;
-    if integer > MAX_SAFE_INTEGER {
-        return Err(schema_error(format!("{context} exceeds the JavaScript safe integer range")));
+    if !number.is_finite() || number < 0.0 || number.fract() != 0.0 || number > MAX_SAFE_INTEGER {
+        return Err(schema_error(format!(
+            "{context} must be a non-negative JavaScript safe integer"
+        )));
     }
     Ok(())
 }
@@ -883,6 +888,11 @@ mod tests {
     #[test]
     fn file_offsets_match_zod_safe_integer_bounds() {
         let mut evidence = golden();
+        evidence["locations"] = json!([{"kind": "file-offset", "offset": 1.0}]);
+        let new_id = compute_evidence_id(&evidence).unwrap();
+        evidence["evidence_id"] = json!(new_id);
+        assert!(verify_evidence_value(&evidence).is_ok());
+
         evidence["locations"] = json!([{"kind": "file-offset", "offset": 9007199254740991}]);
         let new_id = compute_evidence_id(&evidence).unwrap();
         evidence["evidence_id"] = json!(new_id);
