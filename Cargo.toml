@@ -25,6 +25,8 @@ exclude = [
     # This directory contains examples only; it is not a Cargo package.
     # Exclude it from crates/core/* member discovery.
     "crates/core/symthaea",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
