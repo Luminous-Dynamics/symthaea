@@ -125,6 +125,11 @@ pub struct ConditionSummaryV1 {
     pub participant_count: u64,
     /// Mean of participant-level accuracies; participants receive equal weight.
     pub mean_accuracy_permille: f64,
+    /// Binary signal-detection counts, with black (index 1) as the positive class.
+    pub hits: u64,
+    pub misses: u64,
+    pub false_alarms: u64,
+    pub correct_rejections: u64,
     /// Mean period position. A large active/sham difference can reveal order confounding.
     pub mean_period_index: f64,
 }
@@ -153,6 +158,8 @@ pub struct CardReportV1 {
     pub campaign_id: String,
     pub participant_count: u64,
     pub trial_count: u64,
+    /// Binary signal-detection positive class: black card / response index 1.
+    pub signal_positive_index: u8,
     pub condition_summaries: Vec<ConditionSummaryV1>,
     pub participant_contrasts: Vec<ParticipantContrastV1>,
     /// Equal-weight mean of participant contrasts; descriptive only.
@@ -391,7 +398,8 @@ pub fn evaluate_card_campaign_v1(
     let mut trial_ids = BTreeSet::new();
     // participant -> condition -> (correct, n, sum of period positions)
     let mut per_participant = BTreeMap::<String, [ (u64, u64, u64); 4]>::new();
-    let mut condition_totals = [(0_u64, 0_u64, 0_u64); 4];
+    // Tuple: correct, total, period sum, hits, misses, false alarms, correct rejections.
+    let mut condition_totals = [(0_u64, 0_u64, 0_u64, 0_u64, 0_u64, 0_u64, 0_u64); 4];
     let mut active_period_sum = 0_u64;
     let mut sham_period_sum = 0_u64;
     let mut active_period_count = 0_u64;
@@ -430,6 +438,13 @@ pub fn evaluate_card_campaign_v1(
         condition_totals[ci].0 += correct;
         condition_totals[ci].1 += 1;
         condition_totals[ci].2 += row.period_index as u64;
+        match (target, row.response_index) {
+            (1, 1) => condition_totals[ci].3 += 1, // hit
+            (1, 0) => condition_totals[ci].4 += 1, // miss
+            (0, 1) => condition_totals[ci].5 += 1, // false alarm
+            (0, 0) => condition_totals[ci].6 += 1, // correct rejection
+            _ => return Err(CardErrorV1::InvalidResponse),
+        }
         let (condition_counts, periods) = participant_cycles
             .entry(row.participant_id.clone())
             .or_default()
@@ -505,6 +520,10 @@ pub fn evaluate_card_campaign_v1(
             trial_count: condition_totals[ci].1,
             participant_count: participants.len() as u64,
             mean_accuracy_permille: mean_accuracy,
+            hits: condition_totals[ci].3,
+            misses: condition_totals[ci].4,
+            false_alarms: condition_totals[ci].5,
+            correct_rejections: condition_totals[ci].6,
             mean_period_index: mean_period,
         }
     }).collect::<Vec<_>>();
@@ -527,6 +546,7 @@ pub fn evaluate_card_campaign_v1(
         campaign_id: public.campaign_id.clone(),
         participant_count: per_participant.len() as u64,
         trial_count: public.trials.len() as u64,
+        signal_positive_index: 1,
         condition_summaries,
         participant_contrasts,
         mean_enclosure_context_effect_permille: context_sum / context_n as f64,
@@ -683,6 +703,14 @@ mod tests {
             for (index, condition) in report.condition_summaries.iter().enumerate() {
                 assert!((condition.mean_accuracy_permille
                     - expected["condition_mean_accuracy_permille"][index].as_f64().unwrap()).abs() < 1.0e-9);
+                for (field, actual) in [
+                    ("hits", condition.hits),
+                    ("misses", condition.misses),
+                    ("false_alarms", condition.false_alarms),
+                    ("correct_rejections", condition.correct_rejections),
+                ] {
+                    assert_eq!(actual, expected["condition_signal_detection_counts"][index][field].as_u64().unwrap());
+                }
             }
         }
     }
