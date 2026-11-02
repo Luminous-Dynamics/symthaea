@@ -185,6 +185,8 @@
           "source_cluster_id",
           "decision",
           "validation_receipt_sha256",
+          "perturbation_seed_commitment_sha256",
+          "external_egress_receipt_sha256",
           "score",
           "runtime_milliseconds",
           "input_tokens",
@@ -280,6 +282,20 @@
           "external_calls": {
             "type": "integer",
             "minimum": 0
+          },
+          "perturbation_seed_commitment_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "external_egress_receipt_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
