@@ -71,7 +71,9 @@ pub fn div_round_away_from_zero(n: i128, d: i128) -> Result<i128, ReplayError> {
 fn interpolate(start: i64, end: i64, offset: u64, length: u64) -> Result<i64, ReplayError> {
     if length == 0 || offset >= length { return Err(invalid("interpolation offset outside segment")); }
     if length == 1 { return Ok(start); }
-    let numerator = (i128::from(end) - i128::from(start)) * i128::from(offset);
+    let difference = i128::from(end) - i128::from(start);
+    let numerator = difference.checked_mul(i128::from(offset))
+        .ok_or_else(|| invalid("interpolation multiplication overflow"))?;
     let delta = div_round_away_from_zero(numerator, i128::from(length - 1))?;
     i64::try_from(i128::from(start) + delta).map_err(|_| invalid("interpolated value exceeds i64"))
 }
@@ -189,12 +191,25 @@ pub fn load_registry(json: &str) -> Result<(Vec<u64>, Vec<ScenarioSpec>), Replay
     let generator = root.get("generator_contract").ok_or_else(|| invalid("missing generator_contract"))?;
     if generator.get("prng").and_then(|v| v.as_str()) != Some("SplitMix64")
         || generator.get("substream_seed_derivation").and_then(|v| v.as_str())
-            != Some("seed_id XOR FNV1A64(UTF8(scenario_id)) XOR stream_tag_u64") {
-        return Err(invalid("registry PRNG/seed derivation does not match implementation"));
+            != Some("seed_id XOR FNV1A64(UTF8(scenario_id)) XOR stream_tag_u64")
+        || generator.get("distribution_transform").and_then(|v| v.as_str())
+            != Some("u32=next_u32(); signed_ppm=floor(2000000*u32/(2^32-1))-1000000; use z_ppm=signed_ppm for residual innovations")
+        || generator.get("covariate_stream").and_then(|v| v.as_str())
+            != Some("independent SplitMix64 substream with its own committed seed tag; x_ppm uses the identical integer u32-to-signed-PPM mapping; no floating-point conversion")
+        || generator.get("residual_equation").and_then(|v| v.as_str())
+            != Some("ordinary residual = location_milli + round_away(scale_milli*z_ppm/1000000) + round_away(covariate_slope_milli*x_ppm/1000000); on a tail event replace the scale*z term with +/- tail_scale_milli")
+        || generator.get("tail_draw").and_then(|v| v.as_str())
+            != Some("tail occurs when next_u32*1000000 < tail_contamination_ppm*2^32; the separate tail_sign stream selects +/- tail_scale_milli")
+        || generator.get("feedback_delay_draw").and_then(|v| v.as_str())
+            != Some("uniform_integer modes use rejection sampling over the inclusive [minimum_steps,maximum_steps] range") {
+        return Err(invalid("registry PRNG, stream, or integer transform contract differs from implementation"));
     }
     let seeds: Vec<u64> = serde_json::from_value(root.get("seed_ids").cloned().ok_or_else(|| invalid("missing seed_ids"))?)
         .map_err(|e| invalid(format!("seed_ids: {e}")))?;
-    if seeds.len() < 5 { return Err(invalid("registry must pin at least five seeds")); }
+    let mut unique_seeds = BTreeSet::new();
+    if seeds.len() < 5 || seeds.iter().any(|seed| !unique_seeds.insert(*seed)) {
+        return Err(invalid("registry must pin at least five unique seed IDs"));
+    }
     let tags = generator.get("stream_tags").ok_or_else(|| invalid("missing stream_tags"))?;
     let actual = ["residual", "covariate", "tail_decision", "tail_sign", "feedback_delay"]
         .map(|name| tags.get(name).and_then(|v| v.as_u64()).unwrap_or(0));
@@ -217,7 +232,7 @@ pub fn load_builtin_registry() -> Result<(Vec<u64>, Vec<ScenarioSpec>), ReplayEr
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeneratedOutcome {
     pub decision_id: u64, pub target_step: u64,
-    pub covariate_milli: i64, pub residual_milli: i64,
+    pub covariate_ppm: i64, pub residual_milli: i64,
     pub source_available_step: u64, pub feedback_available_step: u64,
 }
 fn source_ready_step(spec: &ScenarioSpec, source_id: u64, step: u64, base_delay: u64) -> Result<u64, ReplayError> {
@@ -271,11 +286,17 @@ pub fn generate_outcomes(spec: &ScenarioSpec, seed_id: u64) -> Result<Vec<Genera
             other => return Err(invalid(format!("unsupported delay mode {other}"))),
         };
         let ordinary_feedback = add_step(step, sampled_delay)?.max(source_available_step);
-        let feedback_available_step = revision_by_target.get(&step)
-            .map(|r| r.initial_available_step).unwrap_or(ordinary_feedback);
+        let feedback_available_step = if let Some(revision) = revision_by_target.get(&step) {
+            if revision.initial_available_step < ordinary_feedback {
+                return Err(invalid("revision schedule backdates initial label before normal/source availability"));
+            }
+            revision.initial_available_step
+        } else {
+            ordinary_feedback
+        };
         if feedback_available_step < step { return Err(invalid("feedback precedes target event")); }
         outcomes.push(GeneratedOutcome {
-            decision_id: step + 1, target_step: step, covariate_milli: x_ppm,
+            decision_id: step + 1, target_step: step, covariate_ppm: x_ppm,
             residual_milli, source_available_step, feedback_available_step,
         });
     }
