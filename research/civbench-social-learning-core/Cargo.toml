@@ -35,4 +35,8 @@ path = "src/bin/telephone_attractor_sweep.rs"
 name = "branching-culture-sweep"
 path = "src/bin/branching_culture_sweep.rs"
 
+[[bin]]
+name = "paper-abm-sweep"
+path = "src/bin/paper_abm_sweep.rs"
+
 [dependencies]
