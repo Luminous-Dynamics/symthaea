@@ -392,7 +392,8 @@
         "post_solver_transformed_value_count",
         "minimum_raw_value",
         "maximum_raw_value",
-        "maximum_absolute_raw_value"
+        "maximum_absolute_raw_value",
+        "raw_state_artifact"
       ],
       "properties": {
         "raw_state_sha256": {
@@ -438,6 +439,52 @@
             "null"
           ],
           "minimum": 0
+        },
+        "raw_state_artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relative_path",
+            "encoding",
+            "byte_length",
+            "sha256",
+            "capture_stage",
+            "layout"
+          ],
+          "properties": {
+            "relative_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "encoding": {
+              "enum": [
+                "f32le",
+                "f64le"
+              ]
+            },
+            "byte_length": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256OrNull"
+            },
+            "capture_stage": {
+              "enum": [
+                "direct_solver_output_before_postprocessing",
+                "not_captured"
+              ]
+            },
+            "layout": {
+              "enum": [
+                "state_major_time_minor",
+                "time_major_state_minor"
+              ]
+            }
+          }
         }
       }
     },
@@ -785,6 +832,24 @@
               },
               "raw_output_manifest_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "raw_state_artifact": {
+                "properties": {
+                  "relative_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "byte_length": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "capture_stage": {
+                    "const": "direct_solver_output_before_postprocessing"
+                  }
+                }
               }
             }
           },
