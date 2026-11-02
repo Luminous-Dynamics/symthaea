@@ -120,7 +120,9 @@ The field already has strong components:
 - **CAVE** demonstrates the importance of versioned annotation state and reproducible edits at scale.
 - **SynAnno** demonstrates that guided workflows can improve expert throughput and reduce cognitive load; a seven-expert evaluation is an operational comparator, not a direct CB2 classifier leaderboard.
 
-The Rust policy crate now contains both a deterministic greedy value-density allocator and an exhaustive exact oracle for at most 20 candidates. The oracle is for regression tests and sampled-batch regret measurement; it is not intended to enumerate the full CB2 test set.\n\nThe differentiation opportunity is to join these ideas into a verifiable operating loop:
+The Rust policy crate now contains both a deterministic greedy value-density allocator and an exhaustive exact oracle for at most 20 candidates. The oracle is for regression tests and sampled-batch regret measurement; it is not intended to enumerate the full CB2 test set.
+
+The differentiation opportunity is to join these ideas into a verifiable operating loop:
 
 1. graph-aware detection and candidate localization;
 2. calibrated uncertainty with structural alternatives preserved;
