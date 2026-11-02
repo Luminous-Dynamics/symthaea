@@ -2003,13 +2003,13 @@ mod tests {
 
     #[test]
     fn decodes_cp437_fallback_names_without_utf8_flag() {
-        assert_eq!(decode_member_name(b"caf\\x82", 0, &[]).as_deref(), Some("café"));
+        assert_eq!(decode_member_name(b"caf\x82", 0, &[]).as_deref(), Some("café"));
         assert_eq!(decode_cp437(&[0x80, 0x82, 0x9c]), "Çé£");
     }
 
     #[test]
     fn accepts_unicode_path_extra_only_when_version_and_raw_name_crc_match() {
-        let raw_name = b"caf\\x82";
+        let raw_name = b"caf\x82";
         let unicode_name = "café";
         let mut extra = Vec::new();
         push_u16(&mut extra, UNICODE_PATH_EXTRA_ID);
