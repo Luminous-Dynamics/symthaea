@@ -1,0 +1,48 @@
+{
+  "scope": "Exact-rational pathwise reserve and projectivity screen only; not e-process validity, FDR/SupFDR, Rust performance, or power evidence.",
+  "seed_schedules": {
+    "threshold_bank": "20261102 + 101*trace",
+    "full_route_cut": "90071 + 313*trace",
+    "prefix_flow": "700001 + 919*trace"
+  },
+  "parameters": {
+    "traces": 100,
+    "global_candidate_universe": 16,
+    "rounds_per_donor": 20,
+    "max_distance": 15,
+    "arithmetic": "fractions.Fraction exact rational arithmetic"
+  },
+  "threshold_sliced_property_screen": {
+    "exact_property_assertions": 810043,
+    "max_positive_tranches_on_any_look": 15,
+    "minimum_unallocated_prior_mass": "1/16",
+    "stress_gammas": ["1/10000", "1/100", "1/10", "1"],
+    "stress_evidence_levels": [1, 2, 10, 100, 1000, 10000, 1000000]
+  },
+  "full_reserve_route_screen": {
+    "exact_split_and_cut_assertions": 92000,
+    "max_exact_cut_projection_error": "0",
+    "tail_identity": "sum_{d=K+1}^infinity 1/(d(d+1)) = 1/(K+1)",
+    "tail_escrow": "total_reserve/(K+1)"
+  },
+  "prefix_flow_screen": {
+    "prefix_and_conservation_assertions": 15200,
+    "donor_weights": "gamma_i=1/[i(i+1)]; finite prefix sum < 1",
+    "activation": "random dormant/active destinations; dormant shares remain escrow"
+  },
+  "threshold_sliced_null_bound": {
+    "identity": "sum_{d>=1} 1/[d^2(d+1)^2] = pi^2/3 - 3",
+    "telescope_sum_lambda_squared_factor": 0.2898681336964528,
+    "geometric_sum_lambda_squared_factor": 0.3333333333333333,
+    "bound": "E[sum_d D_{gamma*rho_d}] <= gamma^2*(pi^2/3-3)",
+    "not_applicable_to": "full-reserve router, which spends the same total D_gamma as the single-recipient policy"
+  },
+  "comparison_gamma_0_2_threshold_sliced": [
+    {"x": 10, "single_D_gamma": 0.2, "telescope_bank": 0.0, "geometric_bank": 0.0, "tel_active_offsets": 0, "geo_active_offsets": 0},
+    {"x": 20, "single_D_gamma": 0.2, "telescope_bank": 0.1, "geometric_bank": 0.1, "tel_active_offsets": 1, "geo_active_offsets": 1},
+    {"x": 50, "single_D_gamma": 0.2, "telescope_bank": 0.13333333333333333, "geometric_bank": 0.175, "tel_active_offsets": 2, "geo_active_offsets": 3},
+    {"x": 100, "single_D_gamma": 0.2, "telescope_bank": 0.15, "geometric_bank": 0.1875, "tel_active_offsets": 3, "geo_active_offsets": 4},
+    {"x": 1000, "single_D_gamma": 0.2, "telescope_bank": 0.18571428571428572, "geometric_bank": 0.1984375, "tel_active_offsets": 13, "geo_active_offsets": 7}
+  ],
+  "claim_boundary": "This screen checks exact accounting identities and finite-prefix cut equivalence. It is not a valid-null simulation, SupFDR benchmark, formal arrival proof, Rust build, or power comparison."
+}
