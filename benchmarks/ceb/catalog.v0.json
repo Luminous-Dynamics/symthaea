@@ -4,7 +4,7 @@
   "release": "v0-design-catalog",
   "status": "design_only",
   "created_at": "2026-11-02",
-  "task_count": 8,
+  "task_count": 9,
   "tasks": [
     {
       "schema_version": 0,
@@ -468,6 +468,68 @@
       "notes": [
         "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
         "Must remain excluded from all performance aggregates until qualification gates are satisfied."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-VER-001",
+      "execution_status": "design_only",
+      "lane": "benchmark_integrity",
+      "title": "Audit and harden an adversarial benchmark verifier",
+      "objective": "Detect and remediate benchmark-verifier weaknesses including reward-channel tampering, answer leakage, evaluator mutation, false-negative scoring, environment asymmetry and version drift while preserving valid task outcomes.",
+      "agent_prompt": "Audit the supplied benchmark task, evaluator design and run protocol as untrusted systems. Identify concrete false-accept and false-reject paths, propose minimal fixes, and specify independent positive and negative controls. Do not alter or weaken the grader to make the candidate pass. Distinguish confirmed exploit paths from hypotheses and preserve all unresolved cases.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled"
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "changes to grader trust boundary",
+          "changes to benchmark scoring policy",
+          "changes to sealed task custody"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "benchmark-verifier-integrity"
+        ],
+        "freshness_policy": "Design-only. Future executable variants must use independently authored verifier attack cases and preserve sealed holdouts."
+      },
+      "notes": [
+        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
+        "No benchmark score is produced by identifying or documenting a hypothetical weakness.",
+        "The grader-integrity lane is separate from the agent task-resolution denominator.",
+        "Do not execute task-controlled code until OS-level isolation is qualified under issue #10064."
       ]
     }
   ]
