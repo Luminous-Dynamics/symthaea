@@ -1044,7 +1044,7 @@ mod tests {
         );
         assert_eq!(selected.status, "anti_rollback_unknown");
         assert_eq!(selected.distinct_member_responses, 0);
-        assert!(selected.counterexamples.len() >= 1);
+        assert!(!selected.counterexamples.is_empty());
         assert!(
             selected
                 .counterexamples
