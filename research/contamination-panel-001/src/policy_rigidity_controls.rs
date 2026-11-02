@@ -378,6 +378,13 @@ fn validate_scores(
                 "{label} single/few-path tasks must not include the alternate-valid-method probe"
             ));
         }
+        (PathMultiplicityV1::Indeterminate, Some(value))
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) =>
+        {
+            return Err(format!(
+                "{label} alternate_valid_method_similarity must be finite and in [0,1]"
+            ));
+        }
         (PathMultiplicityV1::Indeterminate, _) => {}
     }
     Ok(())
