@@ -265,6 +265,153 @@ fn invalid_observation_report(
     }
 }
 
+fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
+    let value: serde_json::Value = serde_json::from_slice(bytes)
+        .map_err(|error| vec![format!("observation JSON value parse failed: {error}")])?;
+    let mut errors = Vec::new();
+    let Some(root) = value.as_object() else {
+        return Err(vec!["observation envelope must be a JSON object".to_string()]);
+    };
+    let required_root = [
+        "suite_id",
+        "version",
+        "trace_id",
+        "reference_trace_sha256",
+        "backend",
+        "raw_event_log_sha256",
+        "runner_clock_windows",
+        "raw_events",
+        "observed_operations",
+        "observed_faults",
+        "witness_observations",
+        "final_observation",
+        "authority",
+        "initial_state",
+    ];
+    for key in required_root {
+        if !root.contains_key(key) {
+            errors.push(format!("observation envelope is missing required field {key}"));
+        }
+    }
+
+    if let Some(operations) = root.get("observed_operations").and_then(|value| value.as_array()) {
+        for (index, operation) in operations.iter().enumerate() {
+            let Some(object) = operation.as_object() else {
+                errors.push(format!("observed_operations[{index}] must be an object"));
+                continue;
+            };
+            for key in [
+                "op_id",
+                "kind",
+                "request",
+                "happens_after",
+                "runner_id",
+                "client_id",
+                "client_sequence",
+                "invoked_at_ns",
+                "completed_at_ns",
+                "outcome",
+                "receipt_id",
+                "receipt_acceptance_revision",
+                "current_authority_revision",
+                "observed_store_revision",
+            ] {
+                if !object.contains_key(key) {
+                    errors.push(format!(
+                        "observed_operations[{index}] is missing required field {key}"
+                    ));
+                }
+            }
+            if object.get("kind").and_then(|value| value.as_str()) == Some("advance")
+                && !object.contains_key("scope")
+            {
+                errors.push(format!(
+                    "observed_operations[{index}] advance operation is missing required scope"
+                ));
+            }
+            for key in [
+                "retry_group_id",
+                "transaction_attempt",
+                "read_snapshot_sha256",
+                "decision_input_sha256",
+                "scope",
+            ] {
+                if object.get(key).is_some_and(serde_json::Value::is_null) {
+                    errors.push(format!(
+                        "observed_operations[{index}].{key} is optional but must not be null when present"
+                    ));
+                }
+            }
+            if let Some(request) = object.get("request").and_then(|value| value.as_object()) {
+                for (key, field) in request {
+                    if field.is_null() {
+                        errors.push(format!(
+                            "observed_operations[{index}].request.{key} must be omitted rather than null"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(events) = root.get("raw_events").and_then(|value| value.as_array()) {
+        for (index, event) in events.iter().enumerate() {
+            let Some(object) = event.as_object() else {
+                errors.push(format!("raw_events[{index}] must be an object"));
+                continue;
+            };
+            for key in [
+                "event_id",
+                "runner_id",
+                "operation_id",
+                "runner_sequence",
+                "monotonic_ns",
+                "phase",
+                "transaction_id",
+            ] {
+                if !object.contains_key(key) {
+                    errors.push(format!("raw_events[{index}] is missing required field {key}"));
+                }
+            }
+            for key in ["payload_sha256", "sqlstate", "fault_id"] {
+                if object.get(key).is_some_and(serde_json::Value::is_null) {
+                    errors.push(format!(
+                        "raw_events[{index}].{key} must be omitted rather than null"
+                    ));
+                }
+            }
+            if object.get("phase").and_then(|value| value.as_str()) == Some("fault") {
+                if !object.get("fault_id").is_some_and(|value| value.as_str().is_some()) {
+                    errors.push(format!("raw_events[{index}] fault phase requires a string fault_id"));
+                }
+            } else if object.contains_key("fault_id") {
+                errors.push(format!(
+                    "raw_events[{index}] non-fault phase must omit fault_id"
+                ));
+            }
+        }
+    }
+
+    if let Some(witnesses) = root.get("witness_observations").and_then(|value| value.as_array()) {
+        for (index, witness) in witnesses.iter().enumerate() {
+            if !witness
+                .as_object()
+                .is_some_and(|object| object.contains_key("predecessor_witness_digest"))
+            {
+                errors.push(format!(
+                    "witness_observations[{index}] is missing required nullable predecessor_witness_digest"
+                ));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
 fn validate_observation_envelope(
     observation: &ObservationEnvelope,
     expected_reference_trace_sha256: &str,
@@ -981,6 +1128,19 @@ pub fn verify_backend_observation(
     };
     trace_id = parsed.trace_id.clone();
     raw_sha256 = parsed.raw_event_log_sha256.clone();
+
+    if let Err(errors) = validate_json_required_presence(observation_bytes) {
+        return invalid_observation_report(
+            trace_id,
+            parsed.reference_trace_sha256.clone(),
+            raw_sha256,
+            parsed.observed_operations.len(),
+            parsed.raw_events.len(),
+            parsed.runner_clock_windows.len(),
+            parsed.observed_faults.len(),
+            errors,
+        );
+    }
 
     let validation = match validate_observation_envelope(
         &parsed,
