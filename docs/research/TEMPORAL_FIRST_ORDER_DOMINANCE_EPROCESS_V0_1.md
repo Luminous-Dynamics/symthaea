@@ -108,7 +108,7 @@ Therefore the current implementation is a research reference, not a production c
 
 ## 6. Tests authored
 
-Ten Rust tests currently cover:
+Twelve Rust tests currently cover:
 1. complete support-profile coverage and digest mutation;
 2. missing support-profile rejection;
 3. derived family alpha and threshold boundary;
@@ -118,7 +118,9 @@ Ten Rust tests currently cover:
 7. blocked assignment, exposure outside support and duplicate pairs fail closed;
 8. sequential look gaps do not advance evidence;
 9. one-step supermartingale expectation on a non-degenerate IID stochastic-dominance null across all short histories;
-10. non-fair assignment probability rejection.
+10. non-fair assignment probability rejection;
+11. deterministic reconstruction from the generic temporal pair ledger;
+12. rejection when a pair exposure binding is tampered.
 
 These are authored tests, not executed tests.
 
