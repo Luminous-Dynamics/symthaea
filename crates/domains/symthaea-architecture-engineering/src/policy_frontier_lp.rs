@@ -892,6 +892,38 @@ pub fn analyze_policy_frontier_with_constraints(
     })
 }
 
+/// Verify the canonical payload digest of a policy-frontier report without
+/// rerunning the optimizer. This checks report integrity, not LP optimality.
+pub fn verify_policy_frontier_report_digest(
+    report: &PolicyFrontierReport,
+) -> Result<(), PolicyFrontierError> {
+    let payload = ReportPayload {
+        schema: &report.schema,
+        version: &report.version,
+        plan_id: &report.plan_id,
+        plan_sha256: &report.plan_sha256,
+        enumerated_basis_count: report.enumerated_basis_count,
+        feasible_vertex_count: report.feasible_vertex_count,
+        support_size: report.support_size,
+        policy_weights: &report.policy_weights,
+        null_model_sizes: &report.null_model_sizes,
+        alternatives: &report.alternatives,
+        worst_case_null_size: report.worst_case_null_size,
+        worst_case_rejection_power: report.worst_case_rejection_power,
+        worst_case_decision_utility: report.worst_case_decision_utility,
+        maximum_expected_evaluator_cost: report.maximum_expected_evaluator_cost,
+        mixture_entropy_nats: report.mixture_entropy_nats,
+        remaining_alpha_budget: report.remaining_alpha_budget,
+    };
+    if digest(&payload)? != report.report_sha256 {
+        return Err(PolicyFrontierError::new(
+            "report.report_sha256",
+            "policy-frontier report digest does not match its canonical payload",
+        ));
+    }
+    Ok(())
+}
+
 pub fn verify_policy_frontier_report(
     plan: &PolicyFrontierPlan,
     report: &PolicyFrontierReport,
