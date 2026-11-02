@@ -182,11 +182,6 @@
         "split_files": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "train",
-            "val",
-            "test"
-          ],
           "properties": {
             "train": {
               "$ref": "#/$defs/fileDigest"
