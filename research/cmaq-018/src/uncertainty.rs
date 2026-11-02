@@ -102,7 +102,9 @@ pub enum AbstainReason {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RobustActionDecision {
     Certified { action_index: usize },
-    Abstain { reason: AbstainReason },
+    Abstain {
+        reason: AbstainReason,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
