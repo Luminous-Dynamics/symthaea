@@ -173,7 +173,7 @@ Accordingly:
 
 ### Current external score context (2026-11-02)
 
-The official Terminal-Bench 4.0 board currently lists Opus 5.5 with Claude Code at 64.8% ±3.1 and GPT-6 Astra with Codex at 58.2% ±2.8. Vals AI's separate Mini-SWE-agent evaluation, updated 2026-10-29, reports Opus 5.5 at 65.15% and GPT-6 Astra at 59.60%. These are different agent harnesses and scoring contexts; they are not interchangeable. The Epoch AI defect audit applies to the benchmark release itself, not to a claim that every run exploited a flaw.
+The official Terminal-Bench 4.0 page accessed 2026-11-02 currently renders no populated score rows, although it describes 95% confidence-interval whiskers. A separate Vals AI Mini-SWE-agent evaluation, updated 2026-10-29, reports Opus 5.5 at 65.15%, Sonnet 5.5 at 64.14%, Kimi K3.1 Pro at 63.64%, Gemini 4 Carbon at 63.13%, and GPT-6 Astra at 59.60%. Vals reports three full benchmark runs (avg@3), pass@1 per task, Mini-SWE-agent for all models, and an eight-hour task limit per task; these results are not official maintainer-board scores. Do not pool the two sources or interpret different harnesses as matched comparisons. The Epoch AI defect audit applies to the benchmark release itself, not to a claim that every run exploited a flaw.
 
 ## 12. External references
 
@@ -183,7 +183,6 @@ The official Terminal-Bench 4.0 board currently lists Opus 5.5 with Claude Code 
 - [Epoch AI review of Terminal-Bench 4.0.0](https://epoch.ai/benchmarks/terminal-bench/review): reports publicly documented scoring defects in 30/66 tasks and labels this release flawed.
 - [Terminal-Bench 4.0 maintenance notes](https://www.tbench.ai/news/terminal-bench-4-0): documents task removals/fixes and the 4.1 verifier-hardening direction.
 - [Vals AI Terminal-Bench 4.0 results](https://vals.ai/benchmarks/terminal-bench-4): independent Mini-SWE-agent evaluation; keep separate from the official maintainer board.
-- [Vals AI Terminal-Bench 4.0 results](https://vals-ai.com/benchmarks/terminal-bench-4): an independent evaluation with model/harness, cost and duration reporting.
 
 **Claim ceiling:** CEB V0 currently defines a task schema and design catalog only. It does not establish Symthaea performance, superiority to commercial agents, security qualification or SOTA.
 
