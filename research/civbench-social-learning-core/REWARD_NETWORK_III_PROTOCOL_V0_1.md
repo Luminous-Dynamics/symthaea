@@ -29,6 +29,13 @@ Reported outcomes: machine-discovered strategies were preserved across every gen
 
 A separate audit of the older public GitHub experiment repository is recorded in [LEGACY_GITHUB_SNAPSHOT_AUDIT.md](LEGACY_GITHUB_SNAPSHOT_AUDIT.md). That snapshot contains 841 networks of 10 nodes/20 stored edges, levels 0–4 (the old model validator admits up to 5), and 8-transition heuristic solutions. Its frontend follows directed outgoing edges and caps the task at 8 transitions. It is **not** the paper's final ten-move v2.0 task. The generic Rust engine therefore no longer hard-codes a 12-node/30-edge or level-0–3 published shape; it supports source-specific shape/level profiles and a generic terminal-level/loss-count contract. The remaining v2.0 import must resolve the final schema and semantics.
 
+
+## Zero-shot transfer and held-out generalization
+
+The crate now includes `evaluate_zero_shot_transfer`, which applies one frozen, uninterpreted policy to multiple named network profiles and records policy reward, full-information oracle reward, regret, oracle fraction and invalid moves. Unit tests compare loss-seeking and immediate-greedy rules across the abstract ten-move synthetic incentive fixture and a separate synthetic compatibility fixture matching the older GitHub snapshot's eight-transition shape.
+
+This is intentionally labelled **zero-shot rule transfer**, not learned-agent generalization. It establishes only that the reference rule behaves consistently across two constructed graph profiles. The definitive transfer benchmark must partition the Zenodo v2.0 task pool by network identity and generator/topology family, train/select policies on training/validation only, then evaluate on held-out network families with no shared network IDs or near-duplicate graph seeds. Report raw reward, regret to a clearly distinguished full-information oracle, reward fraction, invalid action rate, and performance by family. Also compare the frozen strategy description and teach-back artifact against simple heuristics; no policy should access hidden node levels or future edges.
+
 ## Baseline ladder
 
 Run on identical frozen networks and move budgets:
