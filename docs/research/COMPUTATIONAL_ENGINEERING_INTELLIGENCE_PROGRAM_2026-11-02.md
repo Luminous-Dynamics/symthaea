@@ -410,3 +410,27 @@ That is the standard to build toward: not a coding chatbot with a large memory, 
 - [Vals AI, Terminal-Bench 4.0 independent leaderboard and methodology](https://vals-ai.com/benchmarks/terminal-bench-4), updated 2026-10-29.
 - [Epoch AI Terminal-Bench 2.0 methodology and model-agent scoring](https://epoch.ai/benchmarks/terminal-bench), accessed 2026-11-02.
 - [CRUST-bench](https://crust-bench.github.io/), C-to-Rust translation benchmark.
+
+
+## 12. Benchmark-verifier integrity update (2026-11-02)
+
+**This section supersedes the earlier Terminal-Bench score-target language in §5.1 and §6.** New task-level verifier evidence changes how that benchmark should be used.
+
+Epoch AI's review of Terminal-Bench 4.0.0, dated 2026-09-04, labels that release **Flawed** and reports publicly documented scoring defects in 30 of 66 tasks (45.5%), including direct writes to pass signals, answer leakage and false negatives. The Terminal-Bench maintainers report that v4.0 removed eight tasks and fixed 19, and identify tamper-resistant verifiers among the planned 4.1 improvements. Do not treat the v4.0.0 aggregate as unquestioned ground truth.
+
+The official Terminal-Bench 4.0 maintainer board accessed 2026-11-02 lists Opus 5.5 + Claude Code at 64.8% ±3.1 and GPT-6 Astra + Codex at 58.2% ±2.8. Vals AI's separate Mini-SWE-agent evaluation updated 2026-10-29 reports Opus 5.5 at 65.15% and GPT-6 Astra at 59.60%. These are distinct model-agent/harness configurations and must not be pooled or represented as the same leaderboard.
+
+**Revised programme target:** withdraw the former absolute 70% Terminal-Bench goal as a headline milestone while v4.0.0 has reported verifier defects. Retain its raw scores for historical comparison. Publish a separately adjudicated task-level clean subset with explicit IDs, exclusions and grader revisions. On that audited subset, target at least **+10 percentage points over the exact same model and agent harness**, with five or more repeated runs, 95% confidence intervals, per-domain outcomes and fully accounted cost/latency. The benchmark-integrity workstream must independently measure false accepts, false rejects, attack-family coverage, unresolved tasks and pristine-regrade agreement.
+
+This finding motivates [CEB-VER-001](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-v0-2026-11-02/benchmarks/ceb/catalog.v0.json), the [CEB verifier integrity protocol](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-v0-2026-11-02/docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md), and [issue #10138](https://github.com/Luminous-Dynamics/symthaea/issues/10138). The CEB catalog remains design-only; no execution or score is claimed.
+
+References:
+- [Epoch AI review of Terminal-Bench 4.0.0](https://epoch.ai/benchmarks/terminal-bench/review), 2026-09-04.
+- [Terminal-Bench 4.0 maintenance notes](https://www.tbench.ai/news/terminal-bench-4-0).
+- [Official Terminal-Bench 4.0 board](https://www.tbench.ai/?version=4.0).
+- [Vals AI independent Terminal-Bench 4.0 evaluation](https://vals.ai/benchmarks/terminal-bench), updated 2026-10-29.
+
+## 13. Repository integrity follow-up
+
+A source check on 2026-11-02 found that `docs/research/RUST_REPOSITORY_REPAIR_REGRADING_AUDIT_2026-10-24.md` and `docs/research/RUST_REPOSITORY_REPAIR_ABLATION_AUDIT_2026-10-24.md` prescribe binaries under `tools/rust-repair-benchmark-harness/`, but the Cargo manifest and binary sources were not present on `main`; code search found only the documentation references. These documents must not be treated as executable verifier infrastructure until their implementation is restored or the docs are corrected. See [issue #10138](https://github.com/Luminous-Dynamics/symthaea/issues/10138).
+
