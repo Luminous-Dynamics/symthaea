@@ -82,7 +82,8 @@
               "electrical_increment_effect_permille",
               "active_minus_sham_mean_period_index",
               "design_diagnostic",
-              "condition_mean_accuracy_permille"
+              "condition_mean_accuracy_permille",
+              "condition_signal_detection_counts"
             ],
             "properties": {
               "trial_count": {
@@ -114,6 +115,39 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1000
+                }
+              },
+              "condition_signal_detection_counts": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "hits",
+                    "misses",
+                    "false_alarms",
+                    "correct_rejections"
+                  ],
+                  "properties": {
+                    "hits": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "misses": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "false_alarms": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "correct_rejections": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
                 }
               }
             }
