@@ -132,6 +132,10 @@ jobs:
         shell: bash
         run: /usr/bin/time -v -o target/iit-benchmark-evidence/parameter-landscape-partitions.time.txt target/release/examples/sparse_phi_partition_diagnostic_sweep 2>&1 | tee target/iit-benchmark-evidence/parameter-landscape-partitions.csv
 
+      - name: Probe local CPT uncertainty around IIT selection switches
+        shell: bash
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/local-selection-robustness.time.txt target/release/examples/sparse_phi_local_selection_robustness 2>&1 | tee target/iit-benchmark-evidence/local-selection-robustness.csv
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
 
@@ -156,7 +160,8 @@ jobs:
             min-fill-planner-comparison \
             macro-mapping-families \
             parameter-landscape \
-            parameter-landscape-partitions
+            parameter-landscape-partitions \
+            local-selection-robustness
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
             timing="target/iit-benchmark-evidence/${stem}.time.txt"
@@ -179,6 +184,12 @@ jobs:
           test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape-partitions.csv | cut -d, -f15 | sort -u | wc -l)" -ge 1
           test "$(wc -l < target/iit-benchmark-evidence/parameter-landscape-partitions.csv)" -gt 14
           printf 'PASS parameter-landscape-partitions: complete per-cut sample rows with model, request, cut, score-request and score-receipt identities\\n'
+          awk -F, 'NR > 1 && (NF != 37 || $2 != "IIT_4_0_2023" || $12 != "true" || $37 != "EXACT_LOCAL_PERTURBATION" || length($9) != 64 || length($10) != 64 || length($11) != 64 || length($35) != 64) { exit 1 }' target/iit-benchmark-evidence/local-selection-robustness.csv
+          test "$(wc -l < target/iit-benchmark-evidence/local-selection-robustness.csv)" -eq 217
+          test "$(tail -n +2 target/iit-benchmark-evidence/local-selection-robustness.csv | cut -d, -f9 | sort -u | wc -l)" -eq 216
+          test "$(tail -n +2 target/iit-benchmark-evidence/local-selection-robustness.csv | cut -d, -f7 | sort -u | wc -l)" -eq 6
+          awk -F, 'NR > 1 && ($5 < 0 || $5 > 2 || $6 < 0 || $6 > 3 || $8 < 0 || $8 > 1) { exit 1 }' target/iit-benchmark-evidence/local-selection-robustness.csv
+          printf 'PASS local-selection-robustness: 216 exact local CPT perturbations across 3 switch-region anchors, all complete and content-addressed\\n'
 
       - name: Upload immutable IIT benchmark evidence
         if: always()
