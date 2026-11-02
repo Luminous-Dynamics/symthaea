@@ -26,7 +26,8 @@
     "replicate_unit": "independent_randomized_pair",
     "confidence_sequence": "Hoeffding_alpha_spending_Bonferroni",
     "blocked_or_clustered_design_supported": false,
-    "interference_or_carryover_supported": false
+    "interference_or_carryover_supported": false,
+    "supports_blocked_or_clustered_assignment": false
   },
   "evidence_binding": {
     "pair_ids": true,
@@ -39,10 +40,19 @@
     "outer_evidence_ledger_sha256": true
   },
   "tests": {
-    "rust_test_functions_authored": 14,
+    "rust_test_functions_authored": 15,
     "rust_tests_executed": false,
     "benchmark_executed": false,
     "external_preregistration_timestamp_verified": false,
     "randomization_signatures_verified": false
+  },
+  "pair_validation": {
+    "assignment_scheme_required": "independent_fair_coin",
+    "treatment_probability_ppm": 500000,
+    "treatment_orientation_recorded": true,
+    "episode_duration_required": "positive",
+    "treatment_and_control_exposure_must_not_exceed_episode_duration": true,
+    "benefit_sign_derived_from_arm_measurements": true,
+    "caller_supplied_benefit_label_accepted": false
   }
 }
