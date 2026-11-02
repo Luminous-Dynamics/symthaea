@@ -230,6 +230,23 @@ impl Default for MelothaeaAppraisalV1 {
 }
 
 impl MelothaeaAppraisalV1 {
+    /// Validate a current or deserialized appraisal state before reuse.
+    pub fn validate(&self) -> Result<(), AppraisalError> {
+        self.affect.validate()?;
+        for (name, value) in [
+            ("curiosity", self.curiosity),
+            ("uncertainty", self.uncertainty),
+            ("familiarity", self.familiarity),
+            ("tension", self.tension),
+            ("anticipation", self.anticipation),
+            ("resolution", self.resolution),
+            ("confidence", self.confidence),
+        ] {
+            bounded(name, value, 0.0, 1.0)?;
+        }
+        Ok(())
+    }
+
     /// Update functional appraisal from audio-derived evidence.
     ///
     /// Composer intent is not an input. The anti-circularity boundary is
@@ -239,6 +256,7 @@ impl MelothaeaAppraisalV1 {
         observation: &IndependentPerceptualObservationV1,
         profile: &AppraisalProfileV1,
     ) -> Result<AppraisalTransitionV1, AppraisalError> {
+        self.validate()?;
         observation.validate()?;
         profile.validate()?;
         if self
@@ -514,6 +532,16 @@ mod tests {
         first.update(&heard, &profile).unwrap();
         second.update(&heard, &profile).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn malformed_persisted_state_fails_closed() {
+        let mut state = MelothaeaAppraisalV1::default();
+        state.curiosity = f32::NAN;
+        assert_eq!(
+            state.update(&observation(1), &AppraisalProfileV1::default()),
+            Err(AppraisalError::NonFinite("curiosity"))
+        );
     }
 
     #[test]
