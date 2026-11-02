@@ -66,7 +66,9 @@ The fixture covers:
 - source-volume overlap;
 - source-operation overlap;
 - spatial-cube overlap;
-- the same sample hash crossing splits under two different task routes.
+- the same sample hash crossing splits under two different task routes;
+- inconsistent source-group metadata across two task routes for the same sample;
+- missing required group identity, invalid `em_best` task view and duplicate task operation.
 
 The sample hashes and artifact hashes are synthetic test values, not real dataset digests.
 
@@ -78,7 +80,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-split-audit/Cargo.toml
 ```
 
-Nineteen Rust unit tests are authored for clean splits, volume and neuron overlap, multiple root IDs, source-operation and spatial-cube overlap, identical group provenance across task routes, missing group values, cross-split sample leakage, duplicate operation/view identity, task-view permission, inherited view identity, `em_best` rejection, malformed hashes and deterministic counts. They have **not** been compiled or executed in the current authoring environment.
+Twenty Rust unit tests are authored for clean splits, volume and neuron overlap, multiple root IDs, source-operation and spatial-cube overlap, identical group provenance across task routes, missing group values, cross-split sample leakage, duplicate operation/view identity, task-view permission, inherited view identity, `em_best` rejection, malformed hashes and deterministic counts. They have **not** been compiled or executed in the current authoring environment.
 
 ## Benchmark ladder
 
