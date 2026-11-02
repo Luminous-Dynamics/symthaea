@@ -199,6 +199,22 @@ The `cultural-frontier-sweep` binary runs 256 common seeds across a 3×3×3 grid
 It reports independent discovery, integrated prevalence and simulation-replicate confidence half-widths, social-only optimal acquisition/integration, top-teacher selection and the probability of optimal strategy appearing in every post-seed generation. This operationalizes the paper's discovery–learnability–advantage frontier in the simplified model; it does not estimate human parameters or reproduce the authors' ABM.
 
 
+
+## Intentional teaching under bandwidth constraints
+
+The `src/intentional_teaching.rs` module separates **what should be taught** from **who should be trusted as a teacher**. It implements five packet-selection policies:
+- random;
+- declared-benefit only;
+- evidence-calibrated (claimed benefit × reliability × (1 − uncertainty));
+- learner-context aware;
+- diversity-aware (evidence/context score plus a bounded lineage-rarity bonus).
+
+The teacher operates under an explicit bandwidth budget. Each knowledge item has separate fields for claimed benefit, evaluator-only true benefit, reliability, uncertainty, intrinsic difficulty, learning-resource cost, validity and held-out transferability. Selection policies cannot access the true-benefit, validity or transferability fields.
+
+The model records teacher offer, observation, acquisition, integration, correct execution, retention and held-out transfer as distinct stages. Individual-only attempts are reported as attempts rather than teacher offers, and run under a matched resource budget. The new `intentional-teaching-sweep` binary compares six conditions over 256 fixed seeds each and reports correct-execution/benefit means with simulation-replicate confidence intervals. It is a synthetic mechanism benchmark, not a reanalysis of the cited human experiments.
+
+Protocol and literature boundary: [INTENTIONAL_TEACHING_PROTOCOL_V0_1.md](INTENTIONAL_TEACHING_PROTOCOL_V0_1.md).
+
 ## Limitations
 
 - Binary beliefs are a tractable reference task, not a model of language, skill acquisition, norms, institutions, or plural interpretation.
