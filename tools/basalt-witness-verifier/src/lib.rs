@@ -954,7 +954,11 @@ mod tests {
             head_policy_digest: checkpoint.policy_digest.clone(),
         };
         let canonical = serde_json_canonicalizer::to_vec(&response).unwrap();
-        sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, &canonical, std::slice::from_ref(seed))
+        sign_payload(
+            HEAD_RESPONSE_PAYLOAD_TYPE,
+            &canonical,
+            std::slice::from_ref(seed),
+        )
     }
 
     fn evidence_fixture(
@@ -1048,14 +1052,8 @@ mod tests {
             evidence_fixture(&second, &seeds[1], &nonce, &seeds[..3]),
             evidence_fixture(&first, &seeds[2], &nonce, &seeds[..3]),
         ];
-        let selected = verify_head_read_quorum(
-            &evidence,
-            &trust_bytes,
-            &pin,
-            &nonce,
-            "incarnation-1",
-            "1",
-        );
+        let selected =
+            verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "rejected_witness_equivocation");
     }
 
@@ -1072,14 +1070,8 @@ mod tests {
             evidence_fixture(&lagging, &seeds[0], &nonce, &seeds[..3]),
             evidence_fixture(&latest, &seeds[1], &nonce, &seeds[..3]),
         ];
-        let selected = verify_head_read_quorum(
-            &evidence,
-            &trust_bytes,
-            &pin,
-            &nonce,
-            "incarnation-1",
-            "1",
-        );
+        let selected =
+            verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "rejected_witness_equivocation");
     }
 
@@ -1117,14 +1109,8 @@ mod tests {
             evidence_fixture(&latest, &seeds[2], &nonce, &seeds[..3]),
         ];
         evidence[0].checkpoint_envelope = sign_checkpoint_fixture(&latest, &seeds[..2]);
-        let selected = verify_head_read_quorum(
-            &evidence,
-            &trust_bytes,
-            &pin,
-            &nonce,
-            "incarnation-1",
-            "1",
-        );
+        let selected =
+            verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "rejected_checkpoint_certificate");
     }
 
@@ -1142,14 +1128,8 @@ mod tests {
             evidence_fixture(&latest, &seeds[2], &nonce, &seeds[..3]),
         ];
         evidence[0].checkpoint_envelope = sign_checkpoint_fixture(&lagging, &seeds[..3]);
-        let selected = verify_head_read_quorum(
-            &evidence,
-            &trust_bytes,
-            &pin,
-            &nonce,
-            "incarnation-1",
-            "1",
-        );
+        let selected =
+            verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "rejected_checkpoint_certificate");
     }
 
