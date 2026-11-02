@@ -425,3 +425,12 @@ The proposed gate is at least 20% relative top-3 localization improvement over t
 Keep Android, Apple applications, emulators, simulators and physical-device cohorts separate. Report confidence intervals, per-fault-family outcomes, negative controls and abstention performance. Never pool them into one headline score.
 
 The machine-readable benchmark manifest includes this ablation as its tenth family. See [#9911](https://github.com/Luminous-Dynamics/symthaea/issues/9911).
+
+
+### ECMAScript number semantics are a compatibility requirement
+
+REA parses JSON through JavaScript, where every JSON number becomes an IEEE-754 binary64 Number before semantic hashing. Rust's serde_json::Value can retain integer tokens as exact i64/u64 values. Passing those directly to an otherwise JCS-compatible serializer can therefore produce different bytes for unsafe integers.
+
+For example, JavaScript parses `9007199254740993` as `9007199254740992`; a Rust parser may retain the original integer exactly. The Rust compatibility core now wraps JSON nodes with a serializer that emits every number as f64 before canonical JCS output. This avoids cloning/normalizing the full tree and matches the upstream ECMAScript numeric representation.
+
+The test corpus now includes unsafe positive/negative integers and the u64 boundary, as well as negative zero and exponent/formatting boundaries. See the regression test in the current implementation PR #9910. This is a required interoperability behavior, not an optional parser hardening.
