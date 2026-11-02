@@ -10,6 +10,7 @@
 //! culture generally.
 
 pub mod cultural_evolution;
+pub mod few_shot_transfer;
 pub mod czaplicka_2025;
 pub mod cultural_situation;
 pub mod paper_abm;
