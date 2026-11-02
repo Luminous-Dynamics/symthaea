@@ -1,4 +1,4 @@
-name: Connectome Experiment Design Verification (EIG, Fisher D/A, EVSI)
+name: Connectome Experiment Design Verification (EIG, Fisher D/A, EVSI, Pareto)
 
 on:
   push:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   standalone-rust:
-    name: EIG, Fisher D/A and EVSI isolated Rust verification
+    name: EIG, Fisher D/A, EVSI and Pareto isolated Rust verification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
