@@ -6,6 +6,7 @@
 //! successful parse/evaluation is not proof of task-level semantic correctness.
 //! This module currently validates candidates; it does not generate repairs.
 
+use std::io::Write;
 use std::process::Command;
 
 #[derive(Debug, Clone)]
@@ -39,27 +40,25 @@ impl CompilerGroundedTrainer {
     /// Run nix-instantiate to check the candidate with the configured Nix
     /// parse/evaluation command. This does not run task-specific tests.
     pub fn verify_nix(&self, code: &str) -> CompilerVerdict {
-        let tmp_dir = std::env::temp_dir().join("symthaea_grounded_broca");
-        if let Err(e) = std::fs::create_dir_all(&tmp_dir) {
-            return CompilerVerdict::Fail {
-                error: format!("IO error creating temporary directory: {e}"),
-                stage: "setup",
-            };
-        }
-        let tmp_path = tmp_dir.join(format!("test_{:?}.nix", md5::compute(code.as_bytes())));
-
-        if let Err(e) = std::fs::write(&tmp_path, code) {
-            return CompilerVerdict::Fail {
-                error: format!("IO error writing candidate: {e}"),
-                stage: "setup",
-            };
-        }
+        // Use an atomically created, uniquely named file rather than a
+        // predictable candidate-derived path under a shared temporary directory.
+        // Keep the handle alive until the child process has finished; Drop then
+        // removes the file on both success and failure paths.
+        let mut candidate_file = match create_nix_temp_file(code) {
+            Ok(file) => file,
+            Err(e) => {
+                return CompilerVerdict::Fail {
+                    error: format!("IO error creating candidate file: {e}"),
+                    stage: "setup",
+                };
+            }
+        };
 
         let start = std::time::Instant::now();
         let output = Command::new("nix-instantiate")
             .arg("--eval")
             .arg("--parse")
-            .arg(&tmp_path)
+            .arg(candidate_file.path())
             .output();
 
         let duration = start.elapsed();
@@ -97,6 +96,19 @@ impl CompilerGroundedTrainer {
             final_code: code,
         }
     }
+}
+
+/// Create a uniquely named Nix candidate file with tempfile's exclusive
+/// creation and restrictive default permissions. The caller owns the handle
+/// and must keep it alive until the child process no longer needs the path.
+fn create_nix_temp_file(code: &str) -> std::io::Result<tempfile::NamedTempFile> {
+    let mut file = tempfile::Builder::new()
+        .prefix("symthaea-grounded-broca-")
+        .suffix(".nix")
+        .tempfile()?;
+    file.write_all(code.as_bytes())?;
+    file.flush()?;
+    Ok(file)
 }
 
 /// Convert a verifier verdict into a reward without consulting candidate
