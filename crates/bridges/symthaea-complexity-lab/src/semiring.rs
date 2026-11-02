@@ -1,0 +1,440 @@
+//! Exact semiring algebras and variable elimination for finite factor systems.
+//!
+//! Separate from the f64 belief-propagation crate. Exact variable elimination
+//! is generic over a semiring; its cost is exponential in induced width.
+
+use crate::profile::{ProfileError, WeightProfile};
+use std::collections::{BTreeMap, BTreeSet};
+use std::error::Error;
+use std::fmt;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SemiringError {
+    CountOverflow { operation: &'static str },
+    ScoreOverflow,
+    ObjectiveVectorOverflow { axis: usize },
+    DimensionMismatch { expected: usize, actual: usize },
+    Domain(String),
+}
+impl fmt::Display for SemiringError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CountOverflow { operation } => write!(f, "count overflow during {operation}"),
+            Self::ScoreOverflow => write!(f, "objective score overflow"),
+            Self::ObjectiveVectorOverflow { axis } => write!(f, "objective vector overflow on axis {axis}"),
+            Self::DimensionMismatch { expected, actual } => write!(f, "dimension {actual}; expected {expected}"),
+            Self::Domain(reason) => write!(f, "coefficient-domain error: {reason}"),
+        }
+    }
+}
+impl Error for SemiringError {}
+
+/// Values implement addition and multiplication; the evaluator receives
+/// explicit domain-specific zero and one values.
+pub trait ExactSemiring: Clone {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError>;
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError>;
+}
+
+impl ExactSemiring for bool {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> { Ok(*self || *other) }
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> { Ok(*self && *other) }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CheckedCount(pub u128);
+impl ExactSemiring for CheckedCount {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        self.0.checked_add(other.0).map(Self).ok_or(SemiringError::CountOverflow { operation: "addition" })
+    }
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        self.0.checked_mul(other.0).map(Self).ok_or(SemiringError::CountOverflow { operation: "multiplication" })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MaxCountTerm {
+    pub score: i128,
+    pub count: u128,
+}
+
+/// MaxCount algebra: max score, summing counts on ties; multiplication adds
+/// independent scores and multiplies their multiplicities.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MaxCountValue(pub Option<MaxCountTerm>);
+impl MaxCountValue {
+    pub fn zero() -> Self { Self(None) }
+    pub fn one() -> Self { Self(Some(MaxCountTerm { score: 0, count: 1 })) }
+    pub fn candidate(score: i128, count: u128) -> Self {
+        if count == 0 { Self::zero() } else { Self(Some(MaxCountTerm { score, count })) }
+    }
+    pub fn optimum(self) -> Option<MaxCountTerm> { self.0 }
+}
+impl ExactSemiring for MaxCountValue {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        match (self.0, other.0) {
+            (None, x) | (x, None) => Ok(Self(x)),
+            (Some(a), Some(b)) if a.score > b.score => Ok(Self(Some(a))),
+            (Some(a), Some(b)) if b.score > a.score => Ok(Self(Some(b))),
+            (Some(a), Some(b)) => {
+                let count = a.count.checked_add(b.count).ok_or(SemiringError::CountOverflow { operation: "MaxCount tie aggregation" })?;
+                Ok(Self(Some(MaxCountTerm { score: a.score, count })))
+            }
+        }
+    }
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        let (Some(a), Some(b)) = (self.0, other.0) else { return Ok(Self::zero()); };
+        let score = a.score.checked_add(b.score).ok_or(SemiringError::ScoreOverflow)?;
+        let count = a.count.checked_mul(b.count).ok_or(SemiringError::CountOverflow { operation: "MaxCount multiplicity multiplication" })?;
+        Ok(Self::candidate(score, count))
+    }
+}
+
+/// Exact Pareto antichain with multiplicity at each nondominated vector.
+/// Multiplication is Minkowski addition; addition merges equal vectors and
+/// removes dominated vectors. Frontier size can be exponential.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParetoCountValue {
+    dimensions: usize,
+    points: BTreeMap<Vec<i128>, u128>,
+}
+impl ParetoCountValue {
+    pub fn zero(dimensions: usize) -> Self { Self { dimensions, points: BTreeMap::new() } }
+    pub fn one(dimensions: usize) -> Self { Self::point(vec![0; dimensions], 1) }
+    pub fn point(vector: Vec<i128>, count: u128) -> Self {
+        let dimensions = vector.len();
+        let mut points = BTreeMap::new();
+        if count > 0 { points.insert(vector, count); }
+        Self { dimensions, points }
+    }
+    pub fn dimensions(&self) -> usize { self.dimensions }
+    pub fn points(&self) -> impl Iterator<Item = (&[i128], u128)> {
+        self.points.iter().map(|(v, c)| (v.as_slice(), *c))
+    }
+    pub fn is_zero(&self) -> bool { self.points.is_empty() }
+    fn check_dimensions(&self, other: &Self) -> Result<(), SemiringError> {
+        if self.dimensions != other.dimensions {
+            return Err(SemiringError::DimensionMismatch { expected: self.dimensions, actual: other.dimensions });
+        }
+        Ok(())
+    }
+    fn prune(points: &mut BTreeMap<Vec<i128>, u128>) {
+        let candidates: Vec<Vec<i128>> = points.keys().cloned().collect();
+        let dominated: Vec<Vec<i128>> = candidates.iter().filter(|candidate| {
+            candidates.iter().any(|other| other != *candidate
+                && other.iter().zip(candidate.iter()).all(|(a,b)| a >= b)
+                && other.iter().zip(candidate.iter()).any(|(a,b)| a > b))
+        }).cloned().collect();
+        for vector in dominated { points.remove(&vector); }
+    }
+}
+impl ExactSemiring for ParetoCountValue {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        self.check_dimensions(other)?;
+        let mut points = self.points.clone();
+        for (vector, count) in &other.points {
+            let value = points.get(vector).copied().unwrap_or(0)
+                .checked_add(*count)
+                .ok_or(SemiringError::CountOverflow { operation: "Pareto tie aggregation" })?;
+            if value == 0 { points.remove(vector); } else { points.insert(vector.clone(), value); }
+        }
+        Self::prune(&mut points);
+        Ok(Self { dimensions: self.dimensions, points })
+    }
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        self.check_dimensions(other)?;
+        let mut points = BTreeMap::new();
+        for (left, lc) in &self.points {
+            for (right, rc) in &other.points {
+                let mut vector = Vec::with_capacity(self.dimensions);
+                for axis in 0..self.dimensions {
+                    vector.push(left[axis].checked_add(right[axis]).ok_or(SemiringError::ObjectiveVectorOverflow { axis })?);
+                }
+                let count = lc.checked_mul(*rc).ok_or(SemiringError::CountOverflow { operation: "Pareto product" })?;
+                let value = points.get(&vector).copied().unwrap_or(0u128)
+                    .checked_add(count)
+                    .ok_or(SemiringError::CountOverflow { operation: "Pareto collision aggregation" })?;
+                points.insert(vector, value);
+            }
+        }
+        Self::prune(&mut points);
+        Ok(Self { dimensions: self.dimensions, points })
+    }
+}
+
+impl ExactSemiring for WeightProfile {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        WeightProfile::checked_add(self, other).map_err(|e: ProfileError| SemiringError::Domain(e.to_string()))
+    }
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        WeightProfile::checked_mul(self, other).map_err(|e: ProfileError| SemiringError::Domain(e.to_string()))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EliminationError {
+    ZeroCardinality { variable: usize },
+    InvalidScope { factor: usize, reason: &'static str },
+    VariableOutOfRange { factor: usize, variable: usize },
+    TableSizeOverflow { factor: Option<usize> },
+    TableLengthMismatch { factor: usize, expected: usize, actual: usize },
+    InvalidEliminationOrder { reason: &'static str },
+    Semiring(SemiringError),
+}
+impl fmt::Display for EliminationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZeroCardinality { variable } => write!(f, "variable {variable} has zero cardinality"),
+            Self::InvalidScope { factor, reason } => write!(f, "factor {factor} invalid scope: {reason}"),
+            Self::VariableOutOfRange { factor, variable } => write!(f, "factor {factor} variable {variable} out of range"),
+            Self::TableSizeOverflow { factor } => write!(f, "factor table size overflow: {factor:?}"),
+            Self::TableLengthMismatch { factor, expected, actual } => write!(f, "factor {factor} has {actual} entries; expected {expected}"),
+            Self::InvalidEliminationOrder { reason } => write!(f, "invalid elimination order: {reason}"),
+            Self::Semiring(error) => write!(f, "semiring evaluation error: {error}"),
+        }
+    }
+}
+impl Error for EliminationError {}
+impl From<SemiringError> for EliminationError { fn from(value: SemiringError) -> Self { Self::Semiring(value) } }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExactFactor<S> {
+    pub scope: Vec<usize>,
+    pub values: Vec<S>,
+}
+impl<S: Clone> ExactFactor<S> {
+    pub fn new(index: usize, scope: Vec<usize>, values: Vec<S>, cardinalities: &[usize]) -> Result<Self, EliminationError> {
+        if scope.windows(2).any(|p| p[0] >= p[1]) {
+            return Err(EliminationError::InvalidScope { factor: index, reason: "scope must be strictly increasing" });
+        }
+        let mut expected = 1usize;
+        for &variable in &scope {
+            if variable >= cardinalities.len() {
+                return Err(EliminationError::VariableOutOfRange { factor: index, variable });
+            }
+            expected = expected.checked_mul(cardinalities[variable])
+                .ok_or(EliminationError::TableSizeOverflow { factor: Some(index) })?;
+        }
+        if values.len() != expected {
+            return Err(EliminationError::TableLengthMismatch { factor: index, expected, actual: values.len() });
+        }
+        Ok(Self { scope, values })
+    }
+    fn table_index(&self, assignment: &[usize], cardinalities: &[usize]) -> usize {
+        self.scope.iter().fold(0usize, |index, &v| index * cardinalities[v] + assignment[v])
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EliminationStats {
+    pub eliminated_variables: usize,
+    pub maximum_bucket_variables: usize,
+    pub maximum_bucket_assignments: usize,
+    pub maximum_output_factor_entries: usize,
+    pub semiring_additions: u128,
+    pub semiring_multiplications: u128,
+    pub generated_factors: usize,
+}
+
+/// Exact finite-domain factor graph evaluated by bucket variable elimination.
+#[derive(Clone, Debug)]
+pub struct ExactFactorGraph<S> {
+    cardinalities: Vec<usize>,
+    factors: Vec<ExactFactor<S>>,
+    zero: S,
+    one: S,
+}
+impl<S: ExactSemiring> ExactFactorGraph<S> {
+    pub fn new(cardinalities: Vec<usize>, zero: S, one: S) -> Result<Self, EliminationError> {
+        for (variable, cardinality) in cardinalities.iter().enumerate() {
+            if *cardinality == 0 { return Err(EliminationError::ZeroCardinality { variable }); }
+        }
+        Ok(Self { cardinalities, factors: Vec::new(), zero, one })
+    }
+    pub fn variable_count(&self) -> usize { self.cardinalities.len() }
+    pub fn add_factor(&mut self, scope: Vec<usize>, values: Vec<S>) -> Result<usize, EliminationError> {
+        let index = self.factors.len();
+        self.factors.push(ExactFactor::new(index, scope, values, &self.cardinalities)?);
+        Ok(index)
+    }
+    pub fn factors(&self) -> &[ExactFactor<S>] { &self.factors }
+
+    /// Must list every variable once. Complexity is exponential in the
+    /// maximum induced bucket size.
+    pub fn evaluate(&self, order: &[usize]) -> Result<(S, EliminationStats), EliminationError> {
+        if order.len() != self.cardinalities.len() {
+            return Err(EliminationError::InvalidEliminationOrder { reason: "must list every variable exactly once" });
+        }
+        let mut seen = vec![false; self.cardinalities.len()];
+        for &v in order {
+            if v >= seen.len() || seen[v] {
+                return Err(EliminationError::InvalidEliminationOrder { reason: "out-of-range or duplicate variable" });
+            }
+            seen[v] = true;
+        }
+
+        let mut factors = self.factors.clone();
+        let mut stats = EliminationStats::default();
+
+        for &eliminated in order {
+            let bucket_indices: Vec<usize> = factors.iter().enumerate()
+                .filter_map(|(i, f)| f.scope.contains(&eliminated).then_some(i)).collect();
+            let mut joined = BTreeSet::new();
+            for &i in &bucket_indices { joined.extend(factors[i].scope.iter().copied()); }
+            joined.remove(&eliminated);
+            let output_scope: Vec<usize> = joined.into_iter().collect();
+
+            let mut output_entries = 1usize;
+            for &v in &output_scope {
+                output_entries = output_entries.checked_mul(self.cardinalities[v])
+                    .ok_or(EliminationError::TableSizeOverflow { factor: None })?;
+            }
+            let bucket_variables = output_scope.len() + 1;
+            let bucket_assignments = output_entries.checked_mul(self.cardinalities[eliminated])
+                .ok_or(EliminationError::TableSizeOverflow { factor: None })?;
+            stats.maximum_bucket_variables = stats.maximum_bucket_variables.max(bucket_variables);
+            stats.maximum_bucket_assignments = stats.maximum_bucket_assignments.max(bucket_assignments);
+            stats.maximum_output_factor_entries = stats.maximum_output_factor_entries.max(output_entries);
+
+            let mut output = Vec::with_capacity(output_entries);
+            for output_index in 0..output_entries {
+                let mut assignment = vec![0usize; self.cardinalities.len()];
+                decode_assignment(output_index, &output_scope, &self.cardinalities, &mut assignment);
+                let mut sum = self.zero.clone();
+                for state in 0..self.cardinalities[eliminated] {
+                    assignment[eliminated] = state;
+                    let mut product = self.one.clone();
+                    for &factor_index in &bucket_indices {
+                        let factor = &factors[factor_index];
+                        let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
+                        product = product.checked_mul(value)?;
+                        stats.semiring_multiplications += 1;
+                    }
+                    sum = sum.checked_add(&product)?;
+                    stats.semiring_additions += 1;
+                }
+                output.push(sum);
+            }
+
+            let mut retained = Vec::with_capacity(factors.len() + 1);
+            for (i, factor) in factors.into_iter().enumerate() {
+                if !bucket_indices.contains(&i) { retained.push(factor); }
+            }
+            retained.push(ExactFactor { scope: output_scope, values: output });
+            factors = retained;
+            stats.eliminated_variables += 1;
+            stats.generated_factors += 1;
+        }
+
+        let mut result = self.one.clone();
+        for factor in factors {
+            if !factor.scope.is_empty() {
+                return Err(EliminationError::InvalidEliminationOrder { reason: "factor retained an uneliminated variable" });
+            }
+            result = result.checked_mul(&factor.values[0])?;
+            stats.semiring_multiplications += 1;
+        }
+        Ok((result, stats))
+    }
+}
+
+fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignment: &mut [usize]) {
+    for &v in scope.iter().rev() {
+        assignment[v] = index % cards[v];
+        index /= cards[v];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn count_semiring_counts_triangle_independent_sets() {
+        let mut g = ExactFactorGraph::new(vec![2,2,2], CheckedCount(0), CheckedCount(1)).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            g.add_factor(vec![u,v], vec![CheckedCount(1),CheckedCount(1),CheckedCount(1),CheckedCount(0)]).unwrap();
+        }
+        let (value, stats) = g.evaluate(&[0,1,2]).unwrap();
+        assert_eq!(value, CheckedCount(4));
+        assert_eq!(stats.eliminated_variables, 3);
+        assert!(stats.maximum_bucket_variables >= 2);
+    }
+
+    #[test]
+    fn boolean_semiring_answers_triangle_independent_set_feasibility() {
+        let mut g = ExactFactorGraph::new(vec![2,2,2], false, true).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            g.add_factor(vec![u,v], vec![true,true,true,false]).unwrap();
+        }
+        let (value, _) = g.evaluate(&[2,1,0]).unwrap();
+        assert!(value);
+    }
+
+    #[test]
+    fn max_count_returns_maxcut_optimum_and_multiplicity() {
+        let mut g = ExactFactorGraph::new(vec![2,2,2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            g.add_factor(vec![u,v], vec![0,1,1,0].into_iter().map(|s| MaxCountValue::candidate(s,1)).collect()).unwrap();
+        }
+        let (value, _) = g.evaluate(&[0,1,2]).unwrap();
+        assert_eq!(value.optimum(), Some(MaxCountTerm { score: 2, count: 6 }));
+    }
+
+    #[test]
+    fn pareto_semiring_keeps_nondominated_vectors_and_counts() {
+        let mut g = ExactFactorGraph::new(vec![2,2], ParetoCountValue::zero(2), ParetoCountValue::one(2)).unwrap();
+        g.add_factor(vec![0,1], vec![
+            ParetoCountValue::point(vec![0,0],1),
+            ParetoCountValue::point(vec![0,1],1),
+            ParetoCountValue::point(vec![1,0],1),
+            ParetoCountValue::zero(2),
+        ]).unwrap();
+        let (value, _) = g.evaluate(&[0,1]).unwrap();
+        let points: Vec<(Vec<i128>,u128)> = value.points().map(|(v,c)|(v.to_vec(),c)).collect();
+        assert_eq!(points, vec![(vec![0,1],1),(vec![1,0],1)]);
+    }
+
+    #[test]
+    fn profile_ring_semiring_matches_triangle_maxcut_profile() {
+        let bounds = vec![4];
+        let zero = WeightProfile::zero(bounds.clone()).unwrap();
+        let one = WeightProfile::one(bounds.clone()).unwrap();
+        let w = WeightProfile::monomial(bounds.clone(), vec![1], 1).unwrap();
+        let mut g = ExactFactorGraph::new(vec![2,2,2], zero, one).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            let equal = WeightProfile::one(bounds.clone()).unwrap();
+            g.add_factor(vec![u,v], vec![equal.clone(),w.clone(),w.clone(),equal]).unwrap();
+        }
+        let (p, _) = g.evaluate(&[0,1,2]).unwrap();
+        assert_eq!(p.coefficient(&[0]).unwrap(), 2);
+        assert_eq!(p.coefficient(&[2]).unwrap(), 6);
+        assert_eq!(p.checked_total().unwrap(), 8);
+    }
+
+    #[test]
+    fn malformed_factors_and_elimination_orders_fail_closed() {
+        let mut g = ExactFactorGraph::new(vec![2,2], CheckedCount(0), CheckedCount(1)).unwrap();
+        assert!(matches!(g.add_factor(vec![1,0], vec![CheckedCount(1);4]), Err(EliminationError::InvalidScope{..})));
+        assert!(matches!(g.add_factor(vec![0,2], vec![CheckedCount(1);4]), Err(EliminationError::VariableOutOfRange{..})));
+        assert!(matches!(g.add_factor(vec![0,1], vec![CheckedCount(1);3]), Err(EliminationError::TableLengthMismatch{..})));
+        assert!(matches!(g.evaluate(&[0]), Err(EliminationError::InvalidEliminationOrder{..})));
+        assert!(matches!(g.evaluate(&[0,0]), Err(EliminationError::InvalidEliminationOrder{..})));
+    }
+
+    #[test]
+    fn count_overflow_fails_closed() {
+        let mut g = ExactFactorGraph::new(vec![1], CheckedCount(0), CheckedCount(1)).unwrap();
+        g.add_factor(vec![0], vec![CheckedCount(u128::MAX)]).unwrap();
+        // A zero-dimensional product does not overflow; multiplying max by one stays max.
+        assert_eq!(g.evaluate(&[0]).unwrap().0, CheckedCount(u128::MAX));
+        assert!(CheckedCount(u128::MAX).checked_add(&CheckedCount(1)).is_err());
+    }
+
+    #[test]
+    fn unconstrained_variables_count_all_states() {
+        let g = ExactFactorGraph::new(vec![2,3,4], CheckedCount(0), CheckedCount(1)).unwrap();
+        let (value, _) = g.evaluate(&[0,1,2]).unwrap();
+        assert_eq!(value, CheckedCount(24));
+    }
+}
