@@ -107,7 +107,7 @@ pub fn verify_evidence_bundle_value(input: &Value) -> Result<VerifiedEvidenceBun
     let root = as_object(&parsed, "EvidenceBundle")?;
     strict_keys(root, BUNDLE_KEYS, &[], "EvidenceBundle")?;
 
-    let records = require_array(field(root, "records", "EvidenceBundle")?, "records")?;
+    let records = require_array(field(root, "records", "EvidenceBundle")?, "records")?.clone();
     let mut records_by_id = HashMap::<String, Value>::with_capacity(records.len());
     for (index, record) in records.iter().enumerate() {
         let verified = verify_evidence_value(record).map_err(|error| {
@@ -124,7 +124,7 @@ pub fn verify_evidence_bundle_value(input: &Value) -> Result<VerifiedEvidenceBun
         }
     }
 
-    let unknowns = require_array(field(root, "unknowns", "EvidenceBundle")?, "unknowns")?;
+    let unknowns = require_array(field(root, "unknowns", "EvidenceBundle")?, "unknowns")?.clone();
     let normalized_unknowns = unknowns
         .iter()
         .enumerate()
