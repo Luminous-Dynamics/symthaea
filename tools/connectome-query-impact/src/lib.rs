@@ -58,6 +58,14 @@ impl Interval {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct PairedEffectBounds {
+    /// Tighter interval computed from matched baseline/post-edit latent graph worlds.
+    pub effect_interval: Interval,
+    /// Digest of the paired-world evaluation artifact and shared-world mapping.
+    pub evidence_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct QueryScenarioEvaluation {
     pub query_id: String,
     pub query_definition_sha256: String,
@@ -72,6 +80,9 @@ pub struct QueryScenarioEvaluation {
     pub scenario_id: String,
     pub baseline: Interval,
     pub hypothetical_after_edit: Interval,
+    /// Optional paired-world interval. If present, it must be contained by the rectangular
+    /// outer bound and have independently verifiable evidence.
+    pub paired_effect: Option<PairedEffectBounds>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,6 +119,12 @@ pub enum DecisionFlipStatus {
     NotConfigured,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectMethod {
+    RectangularOuterBound,
+    PairedSharedWorlds,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioImpact {
     pub scenario_id: String,
@@ -115,6 +132,7 @@ pub struct ScenarioImpact {
     pub hypothetical_after_edit: Interval,
     /// [after.lower - baseline.upper, after.upper - baseline.lower].
     pub effect_interval: Interval,
+    pub effect_method: EffectMethod,
     pub minimum_absolute_effect: f64,
     pub maximum_absolute_effect: f64,
     pub normalized_materiality_lower: f64,
@@ -174,6 +192,7 @@ pub enum QueryImpactError {
     MaterialityThresholdMismatch { query_id: String },
     DecisionThresholdMismatch { query_id: String },
     NonFiniteDerivedValue { query_id: String, scenario_id: String },
+    PairedEffectOutsideConservativeBound { query_id: String, scenario_id: String },
     NoQueryScenarios,
 }
 
@@ -225,6 +244,9 @@ impl fmt::Display for QueryImpactError {
             }
             Self::NonFiniteDerivedValue { query_id, scenario_id } => {
                 write!(f, "query {query_id} scenario {scenario_id} overflowed derived arithmetic")
+            }
+            Self::PairedEffectOutsideConservativeBound { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} paired effect lies outside its conservative interval bound")
             }
             Self::NoQueryScenarios => write!(f, "candidate has no query scenario evaluations"),
         }
@@ -381,9 +403,23 @@ pub fn analyze_candidate(
 fn analyze_scenario(
     evaluation: &QueryScenarioEvaluation,
 ) -> Result<ScenarioImpact, QueryImpactError> {
-    let effect_interval = evaluation
+    let rectangular_outer_bound = evaluation
         .hypothetical_after_edit
         .difference(evaluation.baseline)?;
+    let (effect_interval, effect_method) = match &evaluation.paired_effect {
+        None => (rectangular_outer_bound, EffectMethod::RectangularOuterBound),
+        Some(paired) => {
+            if paired.effect_interval.lower < rectangular_outer_bound.lower
+                || paired.effect_interval.upper > rectangular_outer_bound.upper
+            {
+                return Err(QueryImpactError::PairedEffectOutsideConservativeBound {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                });
+            }
+            (paired.effect_interval, EffectMethod::PairedSharedWorlds)
+        }
+    };
     let minimum_absolute_effect = effect_interval.min_absolute();
     let maximum_absolute_effect = effect_interval.max_absolute();
     let normalized_materiality_lower =
@@ -422,6 +458,7 @@ fn analyze_scenario(
         baseline: evaluation.baseline,
         hypothetical_after_edit: evaluation.hypothetical_after_edit,
         effect_interval,
+        effect_method,
         minimum_absolute_effect,
         maximum_absolute_effect,
         normalized_materiality_lower,
@@ -561,6 +598,23 @@ fn validate_evaluation(
         evaluation.hypothetical_after_edit.lower,
         evaluation.hypothetical_after_edit.upper,
     )?;
+    if let Some(paired) = &evaluation.paired_effect {
+        validate_sha("paired effect evidence", &paired.evidence_sha256)?;
+        validate_interval(
+            "paired effect",
+            paired.effect_interval.lower,
+            paired.effect_interval.upper,
+        )?;
+        let outer = evaluation.hypothetical_after_edit.difference(evaluation.baseline)?;
+        if paired.effect_interval.lower < outer.lower
+            || paired.effect_interval.upper > outer.upper
+        {
+            return Err(QueryImpactError::PairedEffectOutsideConservativeBound {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+            });
+        }
+    }
     Ok(())
 }
 
@@ -683,6 +737,7 @@ mod tests {
             scenario_id: scenario.to_owned(),
             baseline: before,
             hypothetical_after_edit: after,
+            paired_effect: None,
         }
     }
 
@@ -749,6 +804,71 @@ mod tests {
             classify_flip(interval(0.4, 0.6), interval(0.7, 0.8), 0.5),
             DecisionFlipStatus::Possible
         );
+    }
+
+    #[test]
+    fn paired_shared_world_effect_can_tighten_rectangular_outer_bound() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.0, 1.0),
+            interval(0.0, 1.0),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(0.0, 0.2),
+            evidence_sha256: SHA_C.to_owned(),
+        });
+
+        let report = analyze_candidate(&candidate(vec![item])).unwrap();
+        let scenario = &report.query_impacts[0].scenarios[0];
+        assert_eq!(scenario.effect_method, EffectMethod::PairedSharedWorlds);
+        assert_eq!(scenario.effect_interval, interval(0.0, 0.2));
+        assert_eq!(scenario.maximum_absolute_effect, 0.2);
+    }
+
+    #[test]
+    fn paired_effect_must_be_inside_conservative_outer_bound_and_have_evidence_digest() {
+        let mut outside = evaluation(
+            "pathway",
+            "h1",
+            interval(0.0, 1.0),
+            interval(0.0, 1.0),
+            Some(0.5),
+            0.1,
+        );
+        outside.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-1.1, 0.2),
+            evidence_sha256: SHA_C.to_owned(),
+        });
+        assert_eq!(
+            analyze_candidate(&candidate(vec![outside])),
+            Err(QueryImpactError::PairedEffectOutsideConservativeBound {
+                query_id: "pathway".to_owned(),
+                scenario_id: "h1".to_owned(),
+            })
+        );
+
+        let mut missing_digest = evaluation(
+            "pathway",
+            "h1",
+            interval(0.0, 1.0),
+            interval(0.0, 1.0),
+            Some(0.5),
+            0.1,
+        );
+        missing_digest.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(0.0, 0.2),
+            evidence_sha256: "bad".to_owned(),
+        });
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![missing_digest])),
+            Err(QueryImpactError::InvalidSha256 {
+                kind: "paired effect evidence",
+                ..
+            })
+        ));
     }
 
     #[test]
