@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-workflow-envelope-fixture-v0.1.schema.json",
+  "title": "Synthetic connectome workflow evidence envelope fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "synthetic_only",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "envelope"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "envelope": {
+            "$ref": "connectome-workflow-envelope-v0.1.schema.json"
+          },
+          "expected_status": {
+            "enum": [
+              "DatasetLicensePending",
+              "SplitAuditPending",
+              "BlockedBySplitLeakage",
+              "PredictionPending",
+              "PredictionUncalibrated",
+              "ViewDecisionPending",
+              "ReviewAllocationPending",
+              "ReviewPending",
+              "ReviewDeferred",
+              "ReviewRejected",
+              "EditPending",
+              "EditRejected",
+              "EditQuarantined",
+              "QueryAuditPending",
+              "QueryInsufficientHistory",
+              "QueryUnstable",
+              "QueryReadyObservedWindow"
+            ]
+          },
+          "expected_error": {
+            "enum": [
+              "InvalidIdentifier",
+              "InvalidSampleHash",
+              "InvalidSha256",
+              "InvalidCommitSha",
+              "DuplicateNeuronRoot",
+              "OperationMismatch",
+              "QuerySourceVolumeMismatch",
+              "ViewTaskMismatch",
+              "ViewSampleMismatch",
+              "LeakingViewForTask",
+              "ViewCostUnitMismatch",
+              "InvalidProbability",
+              "InvalidReviewReceipt",
+              "EditBaseSnapshotMismatch",
+              "EditResultMissing",
+              "EditNoopSnapshot",
+              "QueryFirstSnapshotMismatch",
+              "EditVerificationContradiction",
+              "EditAnnotationContradiction",
+              "QuerySnapshotMismatch",
+              "QueryFutureClaimForbidden",
+              "QueryUniversalClaimForbidden"
+            ]
+          },
+          "expected_canonical_snapshot_sha256": {
+            "$ref": "connectome-workflow-envelope-v0.1.schema.json#/$defs/sha"
+          },
+          "expected_query_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_unresolved_stages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "expected_status"
+            ],
+            "not": {
+              "required": [
+                "expected_error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "expected_error"
+            ],
+            "not": {
+              "required": [
+                "expected_status"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
