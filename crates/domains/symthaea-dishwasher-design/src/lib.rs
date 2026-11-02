@@ -690,8 +690,7 @@ pub mod hydraulic_network {
 
 /// Soil-specific empirical first-order cleaning kinetics.
 ///
-/// The parameters must be fitted to repeatable physical tests for one soil /
-— surface / detergent family. This is a response model, not a universal cleaning
+/// The parameters must be fitted to repeatable physical tests for one soil //// surface / detergent family. This is a response model, not a universal cleaning
 /// law, and it must not be used to certify hygiene or sanitization.
 pub mod kinetics {
     const GAS_CONSTANT_J_PER_MOL_K: f64 = 8.314_462_618;
