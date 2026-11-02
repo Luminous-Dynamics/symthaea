@@ -80,6 +80,12 @@ pub struct PairedEffectBounds {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PairedWorldSetCoverage {
     pub universe_id: String,
+    pub candidate_id: String,
+    pub operation_id: String,
+    pub sample_hash: String,
+    pub task_route: TaskRoute,
+    pub query_id: String,
+    pub scenario_id: String,
     pub query_definition_sha256: String,
     pub metric_id: String,
     pub unit_id: String,
@@ -400,6 +406,34 @@ pub fn analyze_candidate(
     for evaluation in &input.query_evaluations {
         validate_evaluation(evaluation)?;
         if let Some(coverage) = &evaluation.paired_world_set_coverage {
+            if coverage.candidate_id != input.candidate_id {
+                return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                    field: "candidate ID",
+                });
+            }
+            if coverage.operation_id != input.operation_id {
+                return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                    field: "operation ID",
+                });
+            }
+            if coverage.sample_hash != input.sample_hash {
+                return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                    field: "sample hash",
+                });
+            }
+            if coverage.task_route != input.task_route {
+                return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                    field: "task route",
+                });
+            }
             for (field, covered, actual) in [
                 ("source volume", coverage.source_volume_id.as_str(), input.source_volume_id.as_str()),
                 ("base graph snapshot", coverage.base_graph_snapshot_sha256.as_str(), input.base_graph_snapshot_sha256.as_str()),
@@ -811,6 +845,11 @@ fn validate_evaluation(
         evaluation.hypothetical_after_edit.upper,
     )?;
     if let Some(coverage) = &evaluation.paired_world_set_coverage {
+        validate_id("coverage candidate", &coverage.candidate_id)?;
+        validate_id("coverage operation", &coverage.operation_id)?;
+        validate_sample_hash(&coverage.sample_hash)?;
+        validate_id("coverage query", &coverage.query_id)?;
+        validate_id("coverage scenario", &coverage.scenario_id)?;
         validate_sha("coverage query definition", &coverage.query_definition_sha256)?;
         validate_id("coverage metric", &coverage.metric_id)?;
         validate_id("coverage metric unit", &coverage.unit_id)?;
@@ -821,6 +860,20 @@ fn validate_evaluation(
             ("coverage candidate patch", &coverage.candidate_patch_sha256),
         ] {
             validate_sha(kind, digest)?;
+        }
+        if coverage.query_id != evaluation.query_id {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "query ID",
+            });
+        }
+        if coverage.scenario_id != evaluation.scenario_id {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "scenario ID",
+            });
         }
         if coverage.query_definition_sha256 != evaluation.query_definition_sha256 {
             return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
@@ -1125,6 +1178,12 @@ mod tests {
     fn world_set_coverage(expected_world_ids: &[&str]) -> PairedWorldSetCoverage {
         PairedWorldSetCoverage {
             universe_id: "finite-universe-v1".to_owned(),
+            candidate_id: "candidate-1".to_owned(),
+            operation_id: "operation-1".to_owned(),
+            sample_hash: SAMPLE.to_owned(),
+            task_route: TaskRoute::FalseMergeIdentification,
+            query_id: "pathway".to_owned(),
+            scenario_id: "h1".to_owned(),
             query_definition_sha256: SHA_A.to_owned(),
             metric_id: "pathway-metric".to_owned(),
             unit_id: "normalized-strength".to_owned(),
