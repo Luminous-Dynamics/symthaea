@@ -98,7 +98,9 @@ pub struct AnytimeAxisReport {
     /// The comparison crosses when E >= comparison_family_size / alpha.
     pub threshold_numerator: u128,
     pub threshold_denominator: u32,
-    pub crossed: bool,
+    pub currently_crossed: bool,
+    pub ever_crossed: bool,
+    pub crossed_at_look: Option<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -190,6 +192,7 @@ pub struct AnytimeAuditState {
     positive: [u32; 3],
     negative: [u32; 3],
     ties: [u32; 3],
+    crossed_at_look: [Option<u32>; 3],
     pair_ids: BTreeSet<u64>,
     run_ids: BTreeSet<u64>,
     pair_contexts: BTreeSet<[u8; 32]>,
@@ -205,6 +208,7 @@ impl AnytimeAuditState {
             positive: [0; 3],
             negative: [0; 3],
             ties: [0; 3],
+            crossed_at_look: [None; 3],
             pair_ids: BTreeSet::new(),
             run_ids: BTreeSet::new(),
             pair_contexts: BTreeSet::new(),
@@ -251,7 +255,8 @@ impl AnytimeAuditState {
             i128::from(control[2]) - i128::from(treatment[2]),
         ];
 
-        // No fallible operation remains after this point.
+        // Identity and exposure validation is complete. All counters are
+        // bounded by maximum_pairs, so this update cannot overflow.
         self.pair_ids.insert(pair.pair_id);
         self.run_ids.insert(pair.first_run_id);
         self.run_ids.insert(pair.second_run_id);
@@ -268,41 +273,56 @@ impl AnytimeAuditState {
                 self.ties[index] += 1;
             }
         }
+        let current = self.report()?;
+        for (index, axis) in current.axes.iter().enumerate() {
+            if axis.currently_crossed && self.crossed_at_look[index].is_none() {
+                self.crossed_at_look[index] = Some(self.observed_pairs);
+            }
+        }
         self.report()
     }
 
+    fn axis_report(&self, index: usize) -> Result<AnytimeAxisReport, AnytimeAuditError> {
+        let wins = self.positive[index];
+        let losses = self.negative[index];
+        let tied = self.ties[index];
+        let non_ties = wins + losses;
+        let numerator = pow3(wins)?;
+        let denominator = 1_u128
+            .checked_shl(non_ties)
+            .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
+        let left = numerator
+            .checked_mul(u128::from(self.config.familywise_alpha_ppm))
+            .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
+        let threshold_numerator = u128::from(self.config.comparison_family_size)
+            .checked_mul(PPM)
+            .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
+        let right = denominator
+            .checked_mul(threshold_numerator)
+            .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
+        let crossed_at_look = self.crossed_at_look[index];
+        Ok(AnytimeAxisReport {
+            axis: AnytimeExposureAxis::ALL[index],
+            pair_count: self.observed_pairs,
+            positive_pairs: wins,
+            negative_pairs: losses,
+            tied_pairs: tied,
+            e_value_numerator: numerator,
+            e_value_denominator: denominator,
+            threshold_numerator,
+            threshold_denominator: self.config.familywise_alpha_ppm,
+            currently_crossed: left >= right,
+            ever_crossed: crossed_at_look.is_some(),
+            crossed_at_look,
+        })
+    }
+
     pub fn report(&self) -> Result<AnytimeAuditReport, AnytimeAuditError> {
-        let axes = std::array::try_from_fn(|index| {
-            let wins = self.positive[index];
-            let losses = self.negative[index];
-            let tied = self.ties[index];
-            let non_ties = wins + losses;
-            let numerator = pow3(wins)?;
-            let denominator = 1_u128
-                .checked_shl(non_ties)
-                .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
-            let left = numerator
-                .checked_mul(u128::from(self.config.familywise_alpha_ppm))
-                .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
-            let threshold_numerator = u128::from(self.config.comparison_family_size)
-                .checked_mul(PPM)
-                .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
-            let right = denominator
-                .checked_mul(threshold_numerator)
-                .ok_or(AnytimeAuditError::ArithmeticOverflow)?;
-            Ok(AnytimeAxisReport {
-                axis: AnytimeExposureAxis::ALL[index],
-                pair_count: self.observed_pairs,
-                positive_pairs: wins,
-                negative_pairs: losses,
-                tied_pairs: tied,
-                e_value_numerator: numerator,
-                e_value_denominator: denominator,
-                threshold_numerator,
-                threshold_denominator: self.config.familywise_alpha_ppm,
-                crossed: left >= right,
-            })
-        })?;
+        let axes = [
+            self.axis_report(0)?,
+            self.axis_report(1)?,
+            self.axis_report(2)?,
+        ];
 
         Ok(AnytimeAuditReport {
             task_sha256: self.config.task_sha256,
@@ -315,7 +335,7 @@ impl AnytimeAuditState {
             comparison_family_size: self.config.comparison_family_size,
             observed_pairs: self.observed_pairs,
             latest_sequence: u64::from(self.observed_pairs),
-            familywise_crossed: axes.iter().any(|axis| axis.crossed),
+            familywise_crossed: axes.iter().any(|axis| axis.ever_crossed),
             axes,
         })
     }
@@ -544,7 +564,7 @@ mod tests {
         let report = state.observe(2, &negative_pair(2)).unwrap();
         assert_eq!(report.axes[0].e_value_numerator, 1);
         assert_eq!(report.axes[0].e_value_denominator, 4);
-        assert!(!report.axes[0].crossed);
+        assert!(!report.axes[0].currently_crossed);
     }
 
     #[test]
@@ -565,10 +585,29 @@ mod tests {
             assert!(!report.axes[0].crossed);
         }
         let report = state.observe(11, &positive_pair(11)).unwrap();
-        assert!(report.axes[0].crossed);
+        assert!(report.axes[0].currently_crossed);
+        assert!(report.axes[0].ever_crossed);
+        assert_eq!(report.axes[0].crossed_at_look, Some(11));
         assert!(report.familywise_crossed);
         assert_eq!(report.axes[0].threshold_numerator, 3_000_000);
         assert_eq!(report.axes[0].threshold_denominator, 50_000);
+    }
+
+    #[test]
+    fn first_crossing_remains_latched_after_later_harmful_pairs() {
+        let mut state = AnytimeAuditState::new(config(20)).unwrap();
+        let mut report = state.report().unwrap();
+        for sequence in 1..=11 {
+            report = state.observe(sequence, &positive_pair(sequence)).unwrap();
+        }
+        assert!(report.axes[0].ever_crossed);
+        for sequence in 12..=14 {
+            report = state.observe(sequence, &negative_pair(sequence)).unwrap();
+        }
+        assert!(!report.axes[0].currently_crossed);
+        assert!(report.axes[0].ever_crossed);
+        assert_eq!(report.axes[0].crossed_at_look, Some(11));
+        assert!(report.familywise_crossed);
     }
 
     #[test]
