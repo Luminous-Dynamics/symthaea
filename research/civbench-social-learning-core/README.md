@@ -83,13 +83,17 @@ The Reward Network engine exposes `evaluate_zero_shot_transfer`, which applies o
 
 ## Held-out few-shot cultural transfer
 
-The `src/few_shot_transfer.rs` adapter implements the cultural-transmission metric used by the MEDAL-ADR line of work. For held-out task score (E) from the expert, learner score (A_{full}) with the expert present throughout, learner score (A_{half}) with the expert present for the first half then absent, and solo learner score (A_{solo}):
+The `src/few_shot_transfer.rs` adapter implements the cultural-transmission score used in the MEDAL-ADR paper. For held-out task expert score (E), learner score (A_{full}) with the expert present throughout, learner score (A_{half}) with the expert present for the first half and then absent, and solo learner score (A_{solo}):
 
 `CT = 0.5 * ((A_full - A_solo)/E + (A_half - A_solo)/E)`
 
-The adapter reports the two gain terms separately, the CT score, the half-exposure score normalized by expert score, and optional action fidelity. It rejects non-finite or non-positive expert scores, duplicate task IDs, task-ID train/test leakage, and (when requested) test tasks from non-held-out families. It macro-averages per task and supplies a simulation/task-level confidence interval. This is a metric and split validator only; it is not a MEDAL-ADR implementation or GoalCycle3D environment.
+The adapter reports full-expert following gain, half-exposure gain, the paper's CT score, the half-exposure score normalized by expert score, and optional action fidelity. It rejects non-finite/non-positive expert scores, duplicate task IDs, training/evaluation task overlap, and (when required) evaluation tasks outside predeclared held-out task families. It macro-averages one vote per task and supplies a task-level 95% normal-approximation interval. This is a metric/split adapter, not a MEDAL-ADR implementation or GoalCycle3D environment.
 
-The metric is deliberately distinct from Reward Network III population persistence. CT asks whether an agent can acquire and retain a demonstrated skill on held-out tasks after the expert leaves. Reward Network III asks whether strategies are discovered, selected, propagated and preserved across generations of people and agents. Keep both tracks.
+The score is distinct from Reward Network III generational persistence. MEDAL-ADR evaluates agent-to-agent imitation, recall and transfer after expert dropout; Reward Network III evaluates discovery, teacher selection, transmission and retention across a human population. Keep their results on separate tracks.
+
+## Original Reward Network III network assets
+
+The optional `.github/workflows/reward-network-iii-task-assets.yml` workflow and `scripts/hydrate_reward_network_task_assets.py` hydrate only the generated train/test/experiment network sets and myopic/take-loss/random solution files from the archive's Git LFS server. It verifies each object OID and declared size, audits task-ID split disjointness, and checks graph/solution structure. Raw objects stay in temporary runner storage; the uploaded artifact contains aggregate counts and integrity receipts only. It explicitly excludes participant tables, raw sessions, move histories and written strategies. A successful LFS download is required before claiming that original network assets are available in the benchmark.
 
 ## Reward Network III protocol
 
