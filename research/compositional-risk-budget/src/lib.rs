@@ -947,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn sequential_claim_requires_filtration_and_canonical_upstream_digest(){
+    fn sequential_claim_requires_filtration_but_upstream_receipt_is_optional(){
         let mut c=contract("seq","sequential_harm","marginal",RiskGuaranteeKind::SequentialAnytime,10,1);
         c.filtration_sha256=None;
         assert!(c.validate().is_err());
@@ -1000,7 +1000,7 @@ mod tests {
     #[test]
     fn fixture_plan_parses_and_validates(){
         let plan=load_builtin_plan().unwrap();
-        assert_eq!(plan.contracts.len(),6);
+        assert_eq!(plan.contracts.len(),7);
         assert_eq!(plan.groups.len(),2);
     }
 }
