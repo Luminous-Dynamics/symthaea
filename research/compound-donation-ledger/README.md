@@ -12,8 +12,8 @@ The crate implements two bounded pieces:
    reserves a precommitted fraction of its **own new adjusted-evidence
    increments**. Incoming donations cannot be re-donated. Reservations become
    source-tagged escrow tokens; tokens can be credited once (or split without
-   exceeding the original amount) to an active, strictly later, positive-weight
-   recipient.
+   exceeding the original amount) only to the donor's precommitted recipient
+   slot, once that recipient is active and has positive weight.
 2. A finite staircase calibrator. It evaluates the threshold-budget function
    A_pi(x) = sum_j pi_j K_j 1{x >= K_j} using integer arithmetic and a
    precommitted prior-mass budget.
@@ -38,8 +38,12 @@ p-values, or multiple-testing rejections.
 
 A reserve is generated deterministically on an evidence update. This makes
 the donor's withdrawal path independent of the currently declared future
-recipient roster. Routing is a separate operation and never rewrites a
-previous donor withdrawal or recipient credit.
+recipient roster. Each donor's destination slot is also committed in its
+candidate specification before evidence is observed. If that destination is
+outside the current horizon or remains dormant, the token stays in escrow.
+Routing never rewrites a previous donor withdrawal or recipient credit.
+This fixed-destination rule is the exact projective reference policy; adaptive
+recipient selection remains a separate research problem.
 
 ## Event order and predictability
 
