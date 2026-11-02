@@ -11,6 +11,8 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SequentialError {
     InvalidProbability(&'static str),
+    InvalidBounds,
+    ObservationOutOfBounds,
     AlreadyStopped,
     CountOverflow,
     NonFiniteStatistic,
