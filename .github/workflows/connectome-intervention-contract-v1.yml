@@ -6,11 +6,12 @@ on:
     paths:
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_*.json"
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_SCORECARD_V1.md"
+      - "docs/neuroscience/CPG_*"
       - "tools/connectome-intervention-contract/**"
       - ".github/workflows/connectome-intervention-contract-v1.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main, "feat/connectome-intervention-scorecard-v1"]
+    branches: [main, "feat/connectome-intervention-scorecard-v1", "feat/connectome-intervention-verifier-v1"]
     paths:
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_*.json"
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_SCORECARD_V1.md"
@@ -42,10 +43,14 @@ jobs:
       - name: Validate Draft 2020-12 schema and adversarial examples
         run: python3 tools/connectome-intervention-contract/validate_schema.py
       - name: Run semantic verifier tests
-        run: cargo test --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked
+        run: cargo test --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked --all-targets
       - name: Run strict Clippy
         run: cargo clippy --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked --all-targets -- -D warnings
-      - name: Verify the published example remains explicitly incomplete
+      - name: Verify the connectome benchmark example remains incomplete
         run: |
           cargo run --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked > verifier-report.json
           grep -F '"disposition":"INCOMPLETE"' verifier-report.json
+      - name: Verify the CPG numerical receipt example remains incomplete
+        run: |
+          cargo run --bin cpg-numerical-receipt --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked > cpg-receipt-report.json
+          grep -F '"disposition":"INCOMPLETE"' cpg-receipt-report.json
