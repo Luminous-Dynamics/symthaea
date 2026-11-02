@@ -1203,9 +1203,9 @@ mod tests {
         rows[3].row.present_slots.push("em_best".to_string());
         rows[3].row.has_em = true;
 
-        let report = report(&rows);
-        assert_eq!(report.status, "PASS", "{:?}", report.errors);
-        let denominators = report.denominator_audit;
+        let initial_report = report(&rows);
+        assert_eq!(initial_report.status, "PASS", "{:?}", initial_report.errors);
+        let denominators = initial_report.denominator_audit;
         assert_eq!(denominators.dataset_rows, 5);
         assert_eq!(denominators.unique_legacy_combined_sample_hashes, 5);
         assert_eq!(denominators.unique_source_identity_sha256, 5);
