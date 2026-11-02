@@ -155,8 +155,10 @@ impl CoupledResonatorV1 {
         let b = w2 * w2;
         let discriminant = ((a - b).powi(2) + 4.0 * k * k * a * b).sqrt();
         let denominator = 2.0 * (1.0 - k * k);
-        let lower_w2 = (a + b - discriminant) / denominator;
+        // Use the product-of-roots identity for the lower mode to avoid
+        // catastrophic cancellation when the isolated resonances are far apart.
         let upper_w2 = (a + b + discriminant) / denominator;
+        let lower_w2 = (2.0 * a * b) / (a + b + discriminant);
         if lower_w2 <= 0.0 || upper_w2 <= 0.0 {
             return Err(ModelErrorV1::InvalidCouplingCoefficient);
         }
