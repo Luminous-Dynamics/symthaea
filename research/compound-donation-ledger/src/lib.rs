@@ -495,11 +495,10 @@ impl DonationLedger {
         Ok(())
     }
 
-    /// Replays a receipt independently and optionally matches its final snapshot.
-    ///
-    /// Reserved rows are derived events: replay recomputes them from evidence
-    /// updates and compares the complete regenerated log with the supplied log.
-    /// They are never accepted as caller-issued transfers.
+    /// Replays a receipt with the reference transition engine and optionally
+    /// matches its final snapshot. Reserved rows are derived events, not
+    /// caller-issued transfers. This is deterministic self-replay, not yet a
+    /// separately implemented independent verifier.
     pub fn verify_receipt(
         specs: Vec<CandidateSpec>,
         receipt: &[AuditEvent],
@@ -760,6 +759,36 @@ mod tests {
             }),
             Err(LedgerError::InvalidTransferAmount)
         );
+        ledger.validate_invariants().unwrap();
+    }
+
+    #[test]
+    fn escrow_cannot_be_retargeted_away_from_precommitted_destination() {
+        let mut ledger = DonationLedger::new(basic_specs()).unwrap();
+        for id in [10, 20, 30] {
+            ledger.apply(InputEvent::Activate { round: 0, candidate_id: id }).unwrap();
+        }
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: EVIDENCE_ONE,
+        }).unwrap();
+
+        assert_eq!(
+            ledger.apply(InputEvent::Credit {
+                round: 2,
+                token_id: 1,
+                recipient_id: 30,
+                amount: 1,
+            }),
+            Err(LedgerError::InvalidRecipient)
+        );
+        ledger.apply(InputEvent::Credit {
+            round: 2,
+            token_id: 1,
+            recipient_id: 20,
+            amount: 1,
+        }).unwrap();
         ledger.validate_invariants().unwrap();
     }
 
