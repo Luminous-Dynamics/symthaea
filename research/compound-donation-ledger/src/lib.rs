@@ -1758,7 +1758,7 @@ mod tests {
             let before = reserve(previous_x);
             let after = reserve(current_x);
             assert!(after >= before);
-            assert!(after <= weight * previous_x.min(EVIDENCE_ONE));
+            assert!(before <= weight * previous_x.min(EVIDENCE_ONE));
             assert!(after <= weight * current_x.min(EVIDENCE_ONE));
             assert!(after - before <= weight * increment);
         }
