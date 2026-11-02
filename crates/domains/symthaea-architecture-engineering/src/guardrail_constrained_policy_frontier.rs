@@ -830,9 +830,9 @@ fn digest<T: Serialize>(value: &T) -> Result<String, GuardrailFrontierError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decision_functional_confidence::CalibrationTargetRelation;
     use crate::noncompensatory_guardrails::{
-        CalibrationTargetRelation, GuardrailEvidenceAvailability, GuardrailScope,
-        GuardrailPolicyBound,
+        GuardrailEvidenceAvailability, GuardrailScope, GuardrailPolicyBound,
     };
 
     const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
