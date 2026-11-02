@@ -372,6 +372,13 @@ jobs:
           assert fixed["iit4_2023"]["phi_s"] > 0.0
           assert fixed["iit4_2026"]["phi_s"] <= fixed["iit4_2023"]["phi_s"] + 1e-10
           assert fixed["iit4_2026"]["phi_s"] <= fixed["iit4_2026"]["intrinsic_information"] + 1e-10
+          fixed_ii_operands = fixed["iit4_2026"]
+          assert abs(fixed_ii_operands["intrinsic_information"] - min(
+              fixed_ii_operands["cause_intrinsic_specification"],
+              fixed_ii_operands["effect_intrinsic_specification"],
+              fixed_ii_operands["intrinsic_differentiation"]["cause"],
+              fixed_ii_operands["intrinsic_differentiation"]["effect"],
+          )) <= 1e-10
           full = data["full_search"]
           assert full["iit4_2023"]["phi_s"] > 0.0
           assert full["iit4_2026"]["phi_s"] <= full["iit4_2023"]["phi_s"] + 1e-10
