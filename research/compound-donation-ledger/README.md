@@ -231,3 +231,29 @@ cover the threshold boundary, the cumulative cap, the increment bound and
 receipt tampering. See Issue #9967 for the mathematical comparison and
 confirmatory benchmark plan.
 
+
+## Reserve-policy comparison benchmark
+
+The runner benchmarks/overshoot_donation_policy_comparison.py compares no
+donation, fixed-rate (1/20) donation, and capped weighted-overshoot donation
+on identical streams. It fixes one global weight sequence
+gamma_0=0.50, gamma_1=0.01, gamma_2..99=0.005 and routes only candidate 0 to
+candidate 1. It checks donor caps, own-increment bounds, prefix budgets,
+escrow conservation and monotone compound scores on every simulated look.
+
+Run:
+~~~sh
+python3 benchmarks/overshoot_donation_policy_comparison.py
+~~~
+
+The recorded 3,000-stream-per-cell exploratory results are in
+benchmarks/overshoot_donation_policy_comparison_2026-11-02.json. They show a
+small 0.3–0.4 percentage-point power gain in several weak-signal cells, with
+no consistent winner between fixed-rate and capped-overshoot donation. The
+one-sided 95% Hoeffding half-width for SupFDR at this sample size is about
+2.234 percentage points, so these runs are not confirmatory error-rate
+evidence. The run manifest records that the results came from a private
+Python reimplementation matching the committed runner; independently
+reproduce them from the committed script before using them as confirmatory
+evidence.
+
