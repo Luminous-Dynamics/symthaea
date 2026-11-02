@@ -18,7 +18,10 @@ It currently:
 - checks payload-type binding;
 - returns the exact authenticated payload bytes from the DSSE verification result;
 - requires those bytes to be byte-for-byte RFC 8785 canonical JSON;
-- reports exact envelope, payload and trust-store digests.
+- reports exact envelope, payload and trust-store digests;
+- verifies complete write-quorum checkpoint chains from sequence-zero genesis, with strict sequence/predecessor linkage, authority-incarnation continuity, monotonic revisions and transition-bundle digest commitments;
+- verifies a fresh nonce-bound read-quorum response against the exact verified chain head;
+- compares a restored store's authority identity, incarnation, revision, state digest and policy head against the independently witnessed head.
 
 The verifier uses the `dsse` crate for DSSE PAE, Ed25519 signing/verification and distinct-key threshold verification; `serde_json_canonicalizer` for RFC 8785 JCS; and `ed25519-dalek` for public-key identity fixtures. See [DSSE crate documentation](https://docs.rs/dsse/latest/dsse/), [serde_json_canonicalizer](https://docs.rs/serde_json_canonicalizer/latest/serde_json_canonicalizer/), and [ed25519-dalek](https://docs.rs/ed25519-dalek/latest/ed25519_dalek/).
 
@@ -75,10 +78,10 @@ A `pass` means only that a canonical payload was authenticated by the configured
 - that trust-root signatures, dual-threshold root rotation, revocation history or witness-set metadata chains are valid;
 - that the signers are independent in actual operations (the verifier checks only unique declared administrative-domain labels);
 - that the witness service durably persists before signing;
-- that a committed checkpoint is fresh, latest or immune to replay/freeze;
-- that a challenge nonce was unpredictable or answered by a live quorum;
+- that a committed checkpoint is fresh or latest absent a successful live nonce-bound read-quorum response;
+- that a challenge nonce was generated unpredictably by a production verifier or answered by a live quorum;
 - that a witness quorum has not been compromised beyond the declared threshold;
 - that any database snapshot is fresh or reconstructible;
 - that power-loss durability, replication or backend qualification passed.
 
-The next implementation slice must verify the offline trust-root and witness-set metadata chain, then implement challenge-bound read quorum/head selection and checkpoint predecessor/sequence validation. The protocol is documented in `docs/research/BASALT_INDEPENDENT_WITNESS_PROTOCOL_2026-11-01.md`.
+The remaining implementation slice must verify the offline trust-root and witness-set metadata signature chain and dual-threshold root rotation, replace the simple pinned trust-store bootstrap with signed metadata rotation, and retain independently retrievable transition-bundle content so that freshness detection can progress to reproducible recovery. The protocol is documented in `docs/research/BASALT_INDEPENDENT_WITNESS_PROTOCOL_2026-11-01.md`.
