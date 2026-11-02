@@ -146,7 +146,7 @@ impl RewardNetwork {
                 }
                 for &edge_index in &self.outgoing[node] {
                     let edge = self.edges[edge_index];
-                    let next_losses = (loss_count + usize::from(edge.reward < 0)).min(3);
+                    let next_losses = (loss_count + if edge.reward < 0 { 1 } else { 0 }).min(3);
                     if !visited[edge.to][next_losses] {
                         visited[edge.to][next_losses] = true;
                         queue.push_back((edge.to, next_losses));
