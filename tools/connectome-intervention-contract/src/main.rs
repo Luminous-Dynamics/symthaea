@@ -822,6 +822,25 @@ mod tests {
         format!("{:064x}", n)
     }
 
+    fn fixture_intervention(id: &str, role: &str, targets: &[&str]) -> Value {
+        json!({
+            "intervention_id":id,
+            "target_ids":targets,
+            "target_namespace":"synthetic-v1",
+            "manipulation_type":"simulated_ablation",
+            "waveform":{
+                "shape":"not_applicable","amplitude":null,"amplitude_unit":null,
+                "duration_seconds":0.0,"onset_seconds":0.0,"frequency_hz":null,
+                "duty_cycle":null,"waveform_sha256":null
+            },
+            "protocol_sha256":digest(id),
+            "randomization_block":"block-1",
+            "control_role":role,
+            "feasibility_status":"feasible",
+            "safety_constraints_sha256":digest("safety")
+        })
+    }
+
     fn complete_fixture() -> Value {
         let train = vec![token(1), token(2)];
         let validation = vec![token(3)];
@@ -835,7 +854,13 @@ mod tests {
         let scope = digest("training-scope");
         let artifact = digest("model-artifact");
         let models = vec![
-            json!({"model_id":"candidate","role":"candidate","model_family":"graph_constrained_state_space","hypothesis_id":"H_GRAPH","code_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","config_sha256":config,"parameter_count":10,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("structural"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"candidate"}),
+            let selected_interventions = vec![
+            fixture_intervention("primary", "intervention", &["n-1"]),
+            fixture_intervention("sham", "sham", &["n-1"]),
+            fixture_intervention("single-control", "single_target_control", &["n-1"]),
+            fixture_intervention("combination-control", "combination_control", &["n-1", "n-2"]),
+        ];
+        json!({"model_id":"candidate","role":"candidate","model_family":"graph_constrained_state_space","hypothesis_id":"H_GRAPH","code_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","config_sha256":config,"parameter_count":10,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("structural"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"candidate"}),
             json!({"model_id":"activity","role":"baseline","model_family":"activity_only","hypothesis_id":null,"code_commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","config_sha256":config,"parameter_count":8,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"activity baseline"}),
             json!({"model_id":"linear","role":"baseline","model_family":"linear_lds_var_glm","hypothesis_id":"H_LINEAR","code_commit_sha":"cccccccccccccccccccccccccccccccccccccccc","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"linear baseline"}),
             json!({"model_id":"rewired","role":"negative_control","model_family":"degree_type_rewired","hypothesis_id":null,"code_commit_sha":"dddddddddddddddddddddddddddddddddddddddd","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("rewired"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"negative control"})
@@ -867,11 +892,7 @@ mod tests {
                 "candidate_pool_sha256":digest("pool"),"selector":"manual_preregistered","selection_objective":"model_discrimination",
                 "preregistered_before_test":true,
                 "experiment_budget":{"compute_units":10.0,"wall_time_seconds":5.0,"energy_joules":1.0,"memory_bytes":1024,"training_samples":0,"notes":"synthetic"},
-                "selected_interventions":[{
-                    "intervention_id":"stim-a","target_ids":["n-1"],"target_namespace":"synthetic-v1","manipulation_type":"simulated_ablation",
-                    "waveform":{"shape":"not_applicable","amplitude":null,"amplitude_unit":null,"duration_seconds":0.0,"onset_seconds":0.0,"frequency_hz":null,"duty_cycle":null,"waveform_sha256":null},
-                    "protocol_sha256":digest("protocol"),"randomization_block":"block-1","control_role":"intervention","feasibility_status":"feasible","safety_constraints_sha256":digest("safety")
-                }],
+                "selected_interventions":selected_interventions,
                 "required_controls":["sham","single_target","combined_target","rewired_graph","activity_only"],
                 "feasibility_audit_sha256":digest("feasibility"),"stopping_rule":"fixed"
             },
