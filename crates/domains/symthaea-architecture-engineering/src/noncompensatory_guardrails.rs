@@ -144,6 +144,8 @@ pub struct NoncompensatoryGuardrailRequest {
     /// One simultaneous confidence failure probability for every policy × requirement bound.
     /// This is a guardrail false-safe budget, not the experiment's Type-I alpha.
     pub simultaneous_guardrail_failure_probability: f64,
+    /// Receipt binding the complete simultaneous confidence family and its method/split.
+    pub simultaneous_coverage_receipt_sha256: String,
     pub policy_bounds: Vec<GuardrailPolicyBound>,
 }
 
@@ -162,6 +164,7 @@ impl NoncompensatoryGuardrailRequest {
         calibration_independent_of_confirmatory_stream: bool,
         mixture_estimand_linear: bool,
         simultaneous_guardrail_failure_probability: f64,
+        simultaneous_coverage_receipt_sha256: impl Into<String>,
         policy_bounds: Vec<GuardrailPolicyBound>,
     ) -> Result<Self, GuardrailError> {
         let mut request = Self {
@@ -180,6 +183,7 @@ impl NoncompensatoryGuardrailRequest {
             calibration_independent_of_confirmatory_stream,
             mixture_estimand_linear,
             simultaneous_guardrail_failure_probability,
+            simultaneous_coverage_receipt_sha256: simultaneous_coverage_receipt_sha256.into(),
             policy_bounds,
         };
         request.canonicalize()?;
@@ -473,6 +477,7 @@ pub struct NoncompensatoryGuardrailReport {
     pub calibration_target_design_sha256: String,
     pub confirmatory_target_design_sha256: String,
     pub simultaneous_guardrail_failure_probability: f64,
+    pub simultaneous_coverage_receipt_sha256: String,
     pub overall_decision: GuardrailOverallDecision,
     pub requirement_results: Vec<GuardrailRequirementResult>,
     pub report_sha256: String,
@@ -488,6 +493,7 @@ struct ReportPayload<'a> {
     calibration_target_design_sha256: &'a str,
     confirmatory_target_design_sha256: &'a str,
     simultaneous_guardrail_failure_probability: f64,
+    simultaneous_coverage_receipt_sha256: &'a str,
     overall_decision: GuardrailOverallDecision,
     requirement_results: &'a [GuardrailRequirementResult],
 }
@@ -661,6 +667,7 @@ pub fn analyze_noncompensatory_guardrails(
         confirmatory_target_design_sha256: &request.confirmatory_target_design_sha256,
         simultaneous_guardrail_failure_probability: request
             .simultaneous_guardrail_failure_probability,
+        simultaneous_coverage_receipt_sha256: &request.simultaneous_coverage_receipt_sha256,
         overall_decision,
         requirement_results: &results,
     };
@@ -675,6 +682,7 @@ pub fn analyze_noncompensatory_guardrails(
         confirmatory_target_design_sha256: request.confirmatory_target_design_sha256,
         simultaneous_guardrail_failure_probability: request
             .simultaneous_guardrail_failure_probability,
+        simultaneous_coverage_receipt_sha256: request.simultaneous_coverage_receipt_sha256,
         overall_decision,
         requirement_results: results,
         report_sha256,
@@ -711,6 +719,7 @@ mod tests {
     const HASH_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const HASH_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const HASH_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const HASH_E: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn requirements() -> Vec<GuardrailRequirement> {
         vec![
@@ -801,6 +810,7 @@ mod tests {
             true,
             true,
             0.01,
+            HASH_E,
             bounds,
         )
         .unwrap()
