@@ -14,13 +14,13 @@ class CausalTriangulationTests(unittest.TestCase):
     def test_primary_sensor_artifact_mimics_mechanism(self):
         self.assertEqual(r.distribution("genuine_mechanism","randomized_primary"),r.distribution("primary_sensor_artefact","randomized_primary"))
     def test_orthogonal_reference_separates_primary_sensor_artifact(self):
-        self.assertNotEqual(r.distribution("genuine_mechanism","independent_reference"),r.distribution("primary_sensor_artefact","independent_reference"))
+        self.assertNotEqual(r.distribution("genuine_mechanism","secondary_reference"),r.distribution("primary_sensor_artefact","secondary_reference"))
     def test_execution_failure_mimics_then_readback_separates(self):
-        for probe in ("randomized_primary","independent_reference"):
+        for probe in ("randomized_primary","secondary_reference"):
             self.assertEqual(r.distribution("genuine_mechanism",probe),r.distribution("actuator_noncompliance",probe))
         self.assertNotEqual(r.distribution("genuine_mechanism","actuator_readback"),r.distribution("actuator_noncompliance","actuator_readback"))
     def test_common_mode_artifact_defeats_secondary_reference_but_blank_catches(self):
-        for probe in ("randomized_primary","independent_reference"):
+        for probe in ("randomized_primary","secondary_reference"):
             self.assertEqual(r.distribution("genuine_mechanism",probe),r.distribution("common_mode_reference_artefact",probe))
         self.assertNotEqual(r.distribution("genuine_mechanism","blank_common_mode_control"),r.distribution("common_mode_reference_artefact","blank_common_mode_control"))
     def test_sensor_self_test(self):
