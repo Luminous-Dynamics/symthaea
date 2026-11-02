@@ -14,7 +14,7 @@ P_DELIVERED_Z0, P_DELIVERED_Z1 = F(11,40), F(29,40)
 SENSOR_SENS, SENSOR_FPR = F(19,20), F(1,100)
 PROBES = {
     "observational_primary": F(1,4), "randomized_primary": F(1),
-    "independent_reference": F(2), "actuator_readback": F(3,2),
+    "secondary_reference": F(2), "actuator_readback": F(3,2),
     "sensor_self_test": F(1), "blank_common_mode_control": F(2),
 }
 
@@ -47,7 +47,7 @@ def distribution(model,probe):
                 ys=dose_response(z,P_DELIVERED_Z1 if z else P_DELIVERED_Z0) if model=="actuator_noncompliance" else binary(P_EFFECT if z else P_BASE)
             else: ys=((0,F(1,2)),(1,F(1,2)))
             for y,py in ys: add(d,(z,y),py*F(1,2))
-    elif probe=="independent_reference":
+    elif probe=="secondary_reference":
         for z in (0,1):
             if model in ("genuine_mechanism","actuator_noncompliance"):
                 ys=dose_response(z,P_DELIVERED_Z1 if z else P_DELIVERED_Z0) if model=="actuator_noncompliance" else binary(P_EFFECT if z else P_BASE)
@@ -91,13 +91,13 @@ def minimum_cost_suite():
 def run():
     obs_only=("observational_primary",)
     rand=obs_only+("randomized_primary",)
-    ref=rand+("independent_reference",)
+    ref=rand+("secondary_reference",)
     actuator=ref+("actuator_readback",)
     return {
         "benchmark":"HIST-CAUSAL-001","version":"0.4","arithmetic":"exact rational",
         "model_count":len(MODELS),"pair_count":15,
         "observational_only":score(obs_only),"randomized_primary":score(rand),
-        "independent_reference":score(ref),"actuator_witness":score(actuator),
+        "secondary_reference":score(ref),"actuator_witness":score(actuator),
         "full_witness_suite":score(PROBES),
         "minimum_cost_probe_suite":minimum_cost_suite(),
         "parameters":{"p_base":str(P_BASE),"p_effect":str(P_EFFECT),
