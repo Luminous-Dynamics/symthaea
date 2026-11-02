@@ -427,9 +427,9 @@ def run(
         },
         "methods": [
             "finite_envelope_baseline_e_bh",
-            "finite_envelope_anchored_same_weights",
-            "scaled_e_bh_delta",
-            "countable_global_slack_anchored",
+            "finite_envelope_anchored",
+            "scaled_e_bh_delta_<delta>",
+            "anchored_delta_<delta>",
         ],
         "one_sided_95pct_hoeffding_halfwidth_per_bounded_mean": hoeffding,
         "simultaneous_uncertainty": "not applied",
