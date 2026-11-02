@@ -198,6 +198,37 @@ This document is also useful because it explicitly distinguishes (in its own ter
 Hosted transcription: https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2
 The host warns that the transcription is machine-generated and may contain errors; use document ID CIA-RDP96-00787R000100190001-2 to retrieve/check the official CIA scan.
 
+## PH-013 — Eileen J. Garrett Parapsychology Foundation Collection at UMBC
+
+**Repository:** Albin O. Kuhn Library and Gallery Special Collections, University of Maryland, Baltimore County (UMBC).
+
+**Classification:** P1 for the archive's current institutional location and access procedure; a collection-level lead, not proof that a particular Puharich manuscript is held.
+
+The Parapsychology Foundation states that the Eileen J. Garrett Research Library has moved to UMBC's Albin O. Kuhn Library and Gallery Special Collections, and that the collection is open by appointment. Appointment contact: **speccoll@umbc.edu**. The Foundation describes the collection as a roughly 12,000-item archive spanning psychical research and adjacent disciplines, including journals, books and audio-visual material.
+
+Official sources:
+- Collection/access page: https://parapsychology.org/library/
+- Collection highlights: https://parapsychology.org/collection-highlights/
+- Collection development / archival context: https://parapsychology.org/building-the-collections/
+
+**Action:** ask UMBC Special Collections to search for Puharich-related correspondence, manuscripts, notes, trial reports, photographs, Round Table Foundation material, *Signal Detection in the Faraday Cage* (562 pp.), and any 1961 *Darshana* copies or references. Ask for collection/folder identifiers and access restrictions before requesting reproduction. Do not assume the full manuscript is in the archive simply because it was listed as "in press" or because the Garrett collection is large.
+
+## PH-014 — Oliver Leslie Reiser Papers, University of Pittsburgh Archives & Special Collections
+
+**Repository:** University of Pittsburgh Library System, Archives & Special Collections; Oliver Leslie Reiser Papers, 1930–1974.
+
+**Classification:** P1 for the catalogue description and repository identity; the specific Puharich draft/correspondence remains unlocated.
+
+The American Institute of Physics / Niels Bohr Library & Archives catalogue describes the Oliver Reiser Papers as containing correspondence, annotated drafts, diagrams, handwritten notes, clippings and thematically arranged scientific/philosophical literature. It states the collection is held by University of Pittsburgh Archives & Special Collections.
+
+Official finding-aid lead:
+- AIP catalogue: https://history.aip.org/catalog/icos/43641.html
+- University of Pittsburgh Archives & Special Collections: https://library.pitt.edu/archives-special-collections
+- Pitt A&SC contact: 412-648-8190 (Hillman); Archives Service Center 412-648-3232.
+- The University's citation guidance asks researchers to identify collection, series/subseries, box and folder: https://library.pitt.edu/sites/default/files/pdf/asc/citation%20guide%20for%20archives%20and%20manuscript%20collections.pdf
+
+**Action:** request a search of the Reiser Papers for correspondence from Henry K. Puharich and a document/draft dated 18 October 1968 titled or described as "Signal Detection in the Faraday Cage." Ask staff to check correspondence files, annotated drafts, notes, clippings and subject files. Preserve exact collection/series/box/folder citations. The AIP catalogue does not identify that specific letter or draft; it is a targeted search hypothesis, not a confirmed item.
+
 ## What we still need to recover
 
 For the reported Puharich cage experiments, search for:
