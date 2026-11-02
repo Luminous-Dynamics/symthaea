@@ -12,6 +12,11 @@
     "unexposed_dataset_count",
     "dataset_level_auroc",
     "dataset_level_auprc",
+    "dataset_level_auroc_cluster_bootstrap_95",
+    "dataset_level_auprc_cluster_bootstrap_95",
+    "bootstrap_replicates_requested",
+    "bootstrap_replicates_valid",
+    "bootstrap_seed_commitment_sha256",
     "unit_of_analysis",
     "independently_authenticated",
     "confirmatory_eligible",
@@ -59,6 +64,72 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "dataset_level_auroc_cluster_bootstrap_95": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower_95",
+            "upper_95"
+          ],
+          "properties": {
+            "lower_95": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "upper_95": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dataset_level_auprc_cluster_bootstrap_95": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower_95",
+            "upper_95"
+          ],
+          "properties": {
+            "lower_95": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "upper_95": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "bootstrap_replicates_requested": {
+      "const": 2000
+    },
+    "bootstrap_replicates_valid": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2000
+    },
+    "bootstrap_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
