@@ -40,6 +40,8 @@ pub struct QueryStopCalibrationInput {
     pub analysis_code_sha256: String,
     pub metric_id: String,
     pub unit_id: String,
+    /// Frozen pre-registered materiality tolerance in the original metric unit.
+    pub materiality_threshold: f64,
     /// Frozen stratum should encode all declared transport conditions (for example species,
     /// workflow and volume class). It is an identity, not an inferred embedding.
     pub calibration_stratum_id: String,
@@ -85,6 +87,7 @@ pub struct QueryStopCalibrationReport {
     pub analysis_code_sha256: String,
     pub metric_id: String,
     pub unit_id: String,
+    pub materiality_threshold: f64,
     pub calibration_stratum_id: String,
     pub future_horizon_edits: u64,
     pub alpha: f64,
@@ -261,6 +264,7 @@ fn report_base(
         analysis_code_sha256: input.analysis_code_sha256.clone(),
         metric_id: input.metric_id.clone(),
         unit_id: input.unit_id.clone(),
+        materiality_threshold: input.materiality_threshold,
         calibration_stratum_id: input.calibration_stratum_id.clone(),
         future_horizon_edits: input.future_horizon_edits,
         alpha: input.alpha,
