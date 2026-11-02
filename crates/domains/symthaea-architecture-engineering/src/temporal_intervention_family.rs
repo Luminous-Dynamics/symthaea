@@ -83,6 +83,14 @@ pub struct TemporalInterventionFamily {
     pub confidence_family: AnytimeConfidenceFamilyManifest,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TemporalInterventionAssignmentScheme {
+    IndependentFairCoin,
+    FixedCountBlocked,
+    ClusterRandomized,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TemporalInterventionPairOutcome {
@@ -90,8 +98,12 @@ pub struct TemporalInterventionPairOutcome {
     pub context_sha256: [u8; 32],
     pub source_family_sha256: [u8; 32],
     pub assignment_receipt_sha256: [u8; 32],
-    /// Evaluator-realized control exposure minus treatment exposure, in microseconds.
-    pub benefit_us: i128,
+    pub assignment_scheme: TemporalInterventionAssignmentScheme,
+    pub treatment_probability_ppm: u32,
+    pub treatment_was_first: bool,
+    pub episode_duration_us: u64,
+    pub treatment_exposure_us: u64,
+    pub control_exposure_us: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -528,12 +540,44 @@ fn encode_pair_outcomes(
             ));
         }
 
-        observations.push(if pair.benefit_us > 0 { 1.0 } else if pair.benefit_us < 0 { 0.0 } else { 0.5 });
+        if pair.assignment_scheme != TemporalInterventionAssignmentScheme::IndependentFairCoin {
+            return Err(TemporalInterventionLedgerError::new(
+                format!("pair_outcomes[{index}].assignment_scheme"),
+                "this adapter supports independent fair-coin pair assignment only",
+            ));
+        }
+        if pair.treatment_probability_ppm != 500_000 {
+            return Err(TemporalInterventionLedgerError::new(
+                format!("pair_outcomes[{index}].treatment_probability_ppm"),
+                "treatment probability must be exactly 500000 PPM",
+            ));
+        }
+        if pair.episode_duration_us == 0
+            || pair.treatment_exposure_us > pair.episode_duration_us
+            || pair.control_exposure_us > pair.episode_duration_us
+        {
+            return Err(TemporalInterventionLedgerError::new(
+                format!("pair_outcomes[{index}].exposure"),
+                "episode duration must be positive and each exposure must not exceed it",
+            ));
+        }
+        let benefit_us = i128::from(pair.control_exposure_us)
+            - i128::from(pair.treatment_exposure_us);
+        observations.push(if benefit_us > 0 { 1.0 } else if benefit_us < 0 { 0.0 } else { 0.5 });
         hasher.update(pair.pair_id.to_le_bytes());
         hasher.update(pair.context_sha256);
         hasher.update(pair.source_family_sha256);
         hasher.update(pair.assignment_receipt_sha256);
-        hasher.update(pair.benefit_us.to_le_bytes());
+        hasher.update([match pair.assignment_scheme {
+            TemporalInterventionAssignmentScheme::IndependentFairCoin => 0,
+            TemporalInterventionAssignmentScheme::FixedCountBlocked => 1,
+            TemporalInterventionAssignmentScheme::ClusterRandomized => 2,
+        }]);
+        hasher.update(pair.treatment_probability_ppm.to_le_bytes());
+        hasher.update([u8::from(pair.treatment_was_first)]);
+        hasher.update(pair.episode_duration_us.to_le_bytes());
+        hasher.update(pair.treatment_exposure_us.to_le_bytes());
+        hasher.update(pair.control_exposure_us.to_le_bytes());
     }
     Ok((observations, hex_digest(&hasher.finalize())))
 }
@@ -614,12 +658,24 @@ mod tests {
     }
 
     fn pair(id: u64, benefit_us: i128) -> TemporalInterventionPairOutcome {
+        let (treatment_exposure_us, control_exposure_us) = if benefit_us > 0 {
+            (0, 10)
+        } else if benefit_us < 0 {
+            (10, 0)
+        } else {
+            (10, 10)
+        };
         TemporalInterventionPairOutcome {
             pair_id: id,
             context_sha256: [20 + id as u8; 32],
             source_family_sha256: [9; 32],
             assignment_receipt_sha256: [80 + id as u8; 32],
-            benefit_us,
+            assignment_scheme: TemporalInterventionAssignmentScheme::IndependentFairCoin,
+            treatment_probability_ppm: 500_000,
+            treatment_was_first: id % 2 == 0,
+            episode_duration_us: 100,
+            treatment_exposure_us,
+            control_exposure_us,
         }
     }
 
@@ -754,6 +810,34 @@ mod tests {
         ).is_err());
 
         assert_eq!(ledger.evidence_ledger_sha256, digest_before);
+        verify_temporal_intervention_evidence_ledger(&ledger).unwrap();
+    }
+
+    #[test]
+    fn unsupported_assignment_and_exposure_outside_episode_are_rejected() {
+        let family = family();
+        let contrast_id = family.contrasts[0].contrast_id.clone();
+        let mut ledger = create_temporal_intervention_evidence_ledger(family).unwrap();
+
+        let mut blocked = pair(1, 10);
+        blocked.assignment_scheme = TemporalInterventionAssignmentScheme::FixedCountBlocked;
+        assert!(append_temporal_intervention_batch(
+            &mut ledger, &contrast_id, TemporalInterventionAxis::WrongBelief, &[blocked],
+        ).is_err());
+
+        let mut biased = pair(1, 10);
+        biased.treatment_probability_ppm = 250_000;
+        assert!(append_temporal_intervention_batch(
+            &mut ledger, &contrast_id, TemporalInterventionAxis::WrongBelief, &[biased],
+        ).is_err());
+
+        let mut overrun = pair(1, 10);
+        overrun.treatment_exposure_us = 101;
+        assert!(append_temporal_intervention_batch(
+            &mut ledger, &contrast_id, TemporalInterventionAxis::WrongBelief, &[overrun],
+        ).is_err());
+
+        assert!(ledger.pair_bindings.is_empty());
         verify_temporal_intervention_evidence_ledger(&ledger).unwrap();
     }
 
