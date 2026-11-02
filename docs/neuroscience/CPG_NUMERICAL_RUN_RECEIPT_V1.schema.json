@@ -921,6 +921,14 @@
               },
               "permission_receipt_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "immutable_code_ref": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
