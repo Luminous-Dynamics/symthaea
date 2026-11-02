@@ -318,6 +318,72 @@
         "zip_rs": "zip 8.6.0 candidate parser or differential oracle; compare already-locked versions and feature trees before adding another version",
         "executable_formats": "defer object/goblin until a separate ELF_MachO_PE semantic analyzer"
       }
+    },
+    {
+      "id": "causal_diagnosis_and_next_experiment",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
+      "ablations": [
+        {
+          "id": "A",
+          "name": "REA_only"
+        },
+        {
+          "id": "B",
+          "name": "Symthaea_without_REA_derived_analysis"
+        },
+        {
+          "id": "C",
+          "name": "REA_plus_Symthaea"
+        }
+      ],
+      "case_families": [
+        "single_component_semantic_defect",
+        "multi_component_confounded_defect",
+        "compiler_build_noise_without_behavior_change",
+        "configuration_only_change",
+        "runtime_environment_only_change",
+        "fault_injection_with_discriminating_intervention",
+        "no_defect_negative_control",
+        "ambiguous_or_unobservable_case"
+      ],
+      "metrics": [
+        "top1_component_localization",
+        "top3_component_localization",
+        "mean_reciprocal_rank",
+        "cause_precision_and_recall",
+        "false_cause_rate",
+        "brier_score",
+        "expected_calibration_error",
+        "selective_risk_vs_coverage",
+        "predicted_vs_measured_information_gain",
+        "time_to_first_correct_hypothesis",
+        "differential_test_precision_recall",
+        "evidence_citation_completeness",
+        "p50_p95_latency",
+        "peak_memory",
+        "energy_per_investigation"
+      ],
+      "target": "at_least_20_percent_relative_top3_gain_vs_stronger_single_baseline_without_false_cause_rate_increase",
+      "stretch_targets": {
+        "expected_calibration_error": 0.05,
+        "median_time_to_correct_diagnosis_relative_improvement": 0.15
+      },
+      "controls": [
+        "analysts_blinded_to_ablation_arm",
+        "same_artifact_build_and_observation_budget",
+        "held_out_source_to_binary_mapping",
+        "ambiguous_cases_require_abstention_not_confident_guess",
+        "per_platform_device_and_environment_cohorts_reported_separately"
+      ],
+      "reporting": {
+        "confidence_intervals": true,
+        "per_fault_family_metrics": true,
+        "per_platform_metrics": true,
+        "no_posthoc_case_exclusion": true,
+        "separate_observation_and_inference": true
+      },
+      "claim_ceiling": "Results apply only to the preregistered corpus, budgets, providers and named target configurations; they do not establish general causal reasoning superiority."
     }
   ],
   "promotion_policy": {
@@ -344,7 +410,11 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/9836",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9838",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9839",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/9840"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9840",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9907",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9908",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9909",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9911"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
