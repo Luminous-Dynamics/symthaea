@@ -126,7 +126,11 @@
             "primary_input_impedance_ohm",
             "secondary_current_per_volt_a_per_v",
             "secondary_resistor_voltage_per_volt",
-            "secondary_resistor_power_w_per_v2"
+            "secondary_resistor_power_w_per_v2",
+            "primary_current_per_volt_a_per_v",
+            "primary_input_power_w_per_v2",
+            "primary_resistor_power_w_per_v2",
+            "power_balance_residual_w_per_v2"
           ],
           "properties": {
             "mutual_inductance_h": {
@@ -178,6 +182,30 @@
               }
             },
             "secondary_resistor_power_w_per_v2": {
+              "type": "number"
+            },
+            "primary_current_per_volt_a_per_v": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "primary_input_power_w_per_v2": {
+              "type": "number"
+            },
+            "primary_resistor_power_w_per_v2": {
+              "type": "number"
+            },
+            "power_balance_residual_w_per_v2": {
               "type": "number"
             }
           }
