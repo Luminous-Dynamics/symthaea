@@ -203,7 +203,9 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
             _ => errors.push(format!("{label}: applied noise requires a sample SHA-256")),
         }
         if sample_count == 0 {
-            errors.push(format!("{label}: applied noise requires at least one realized sample"));
+            errors.push(format!(
+                "{label}: applied noise requires at least one realized sample"
+            ));
         }
     } else if applied
         || realized_mean != 0.0
