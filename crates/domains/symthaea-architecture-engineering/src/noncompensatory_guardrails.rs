@@ -582,6 +582,14 @@ pub fn analyze_noncompensatory_guardrails(
         let mut contributing_policy_evidence = Vec::with_capacity(weight_map.len());
         for policy_id in weight_map.keys() {
             let probability = weight_map[policy_id];
+            // A policy assigned exactly zero mass contributes nothing to the
+            // mixture estimand. Its missing or non-estimable evidence must not
+            // make an otherwise fully evidenced selected mixture indeterminate.
+            // The constrained optimizer separately records why such policies
+            // were excluded and never assigns them positive mass.
+            if probability <= TOLERANCE {
+                continue;
+            }
             let Some(bound) = bound_map.get(&(*policy_id, requirement.requirement_id.as_str())) else {
                 missing_evidence = true;
                 unavailable_reason.get_or_insert_with(|| "MISSING_POLICY_EVIDENCE".to_owned());
@@ -869,6 +877,23 @@ mod tests {
             bounds,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn zero_weight_policy_with_missing_bound_does_not_poison_selected_mixture() {
+        let mut request = request();
+        request.policy_weights[0].probability = 1.0;
+        request.policy_weights[1].probability = 0.0;
+        request.policy_bounds.retain(|row| {
+            !(row.policy_id == "policy-b" && row.requirement_id == "local-revenue-null")
+        });
+        let report = analyze_noncompensatory_guardrails(&request).unwrap();
+        assert_eq!(report.overall_decision, GuardrailOverallDecision::Pass);
+        assert!(report.requirement_results.iter().all(|row| {
+            row.contributing_policy_evidence
+                .iter()
+                .all(|evidence| evidence.policy_id == "policy-a")
+        }));
     }
 
     #[test]
