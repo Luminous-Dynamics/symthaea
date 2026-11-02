@@ -32,12 +32,12 @@ The policy declares which identities must be present and disjoint across splits:
 
 - `SourceArchive`: upstream source archive/reconstruction grouping;
 - `SourceVolume`: acquisition volume identity;
-- `SourceOperation`: original upstream proofreading event identity;
-- `SpatialCube`: stable 50 μm cube ID from the pinned split metadata/derivation;
+- `SourceOperation`: original upstream proofreading event identity, qualified by its source archive if the upstream ID is only locally unique;
+- `SpatialCube`: stable 50 μm cube ID from the pinned split metadata/derivation, qualified by source volume;
 - `Neuron`: union of relevant before/after neuron root IDs;
 - `Animal`, `Session`, `Species`, `Workflow`: additional holdout dimensions.
 
-For every required group key, a missing or empty identity fails closed. Do not invent placeholders, infer IDs from unrelated fields or conflate null with a shared group. The adapter must preserve exact source IDs and pin its group-derivation code/configuration.
+For every required group key, a missing or empty identity fails closed. When one sample hash has multiple task routes, every supplied source-group field must be identical across those task records; a task expansion cannot silently rewrite volume, operation, cube, neuron or other provenance. Do not invent placeholders, infer IDs from unrelated fields or conflate null with a shared group. The adapter must preserve exact source IDs and pin its group-derivation code/configuration.
 
 For neuron holdouts, populate `neuron_ids` with the deduplicated union of all relevant before/after root IDs from the source metadata. For spatial-cube holdouts, use the actual split-cube identity from the source split manifest or a separately documented, pinned derivation. Do not guess a cube origin from coordinates.
 
@@ -78,7 +78,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-split-audit/Cargo.toml
 ```
 
-Nineteen Rust unit tests are authored for clean splits, volume and neuron overlap, multiple root IDs, source-operation and spatial-cube overlap, missing group values, cross-split sample leakage, duplicate operation/view identity, task-view permission, inherited view identity, `em_best` rejection, malformed hashes and deterministic counts. They have **not** been compiled or executed in the current authoring environment.
+Nineteen Rust unit tests are authored for clean splits, volume and neuron overlap, multiple root IDs, source-operation and spatial-cube overlap, identical group provenance across task routes, missing group values, cross-split sample leakage, duplicate operation/view identity, task-view permission, inherited view identity, `em_best` rejection, malformed hashes and deterministic counts. They have **not** been compiled or executed in the current authoring environment.
 
 ## Benchmark ladder
 
