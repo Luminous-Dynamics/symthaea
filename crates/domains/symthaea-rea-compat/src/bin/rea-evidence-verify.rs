@@ -7,7 +7,7 @@
 use serde_json::{Value, json};
 use std::env;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use symthaea_rea_compat::{
@@ -306,6 +306,7 @@ mod tests {
         let bytes = serde_json::to_vec(&value).unwrap();
         let error = verify_evidence_json_for_report(&bytes).unwrap_err();
         assert_eq!(error.kind, "IdentityMismatch");
+        assert!(error.message.contains("semantic ID mismatch"));
     }
 
     fn verify_evidence_json_for_report(bytes: &[u8]) -> Result<Value, ReportError> {
