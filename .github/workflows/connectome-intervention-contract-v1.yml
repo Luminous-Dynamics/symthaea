@@ -36,6 +36,10 @@ jobs:
           components: rustfmt, clippy
       - name: Check formatting
         run: cargo fmt --manifest-path tools/connectome-intervention-contract/Cargo.toml -- --check
+      - name: Check benchmark JSON syntax
+        run: |
+          python3 -m json.tool docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_MANIFEST.schema.json > /dev/null
+          python3 -m json.tool docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_EXAMPLE_V1.json > /dev/null
       - name: Run semantic verifier tests
         run: cargo test --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked
       - name: Run strict Clippy
