@@ -15,6 +15,8 @@
     "measurement_paradigm",
     "model_count",
     "model_family_count",
+    "task_family_count",
+    "source_domain_count",
     "run_count",
     "independent_unit_kind",
     "independent_unit_count",
@@ -120,6 +122,7 @@
         "required": [
           "model_id",
           "model_family_id",
+          "task_family",
           "axis_id",
           "condition_id",
           "expected_count",
@@ -314,6 +317,12 @@
           "external_call_count": {
             "type": "integer",
             "minimum": 0
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
           }
         }
       }
@@ -324,6 +333,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "task_family",
           "axis_id",
           "condition_id",
           "model_count",
@@ -357,6 +367,12 @@
           },
           "status": {
             "type": "string"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
           }
         }
       }
@@ -427,6 +443,14 @@
     },
     "confirmatory_eligible": {
       "const": false
+    },
+    "task_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_domain_count": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }
