@@ -69,3 +69,61 @@ impl Default for DreamingService {
         Self::new()
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn syntax_accepted_proposals_are_not_internalized() {
+        let service = DreamingService::new();
+        let candidate = TrainingPair {
+            channels: vec![0.0, 0.5],
+            target_text: "{ value = 1; }".to_string(),
+            ..TrainingPair::default()
+        };
+
+        service.stage_proposal(candidate);
+
+        assert_eq!(service.proposed_dreams().len(), 1);
+        assert!(service.internalized_dreams().is_empty());
+    }
+
+    #[test]
+    fn replaying_the_same_proposal_is_idempotent() {
+        let service = DreamingService::new();
+        let candidate = TrainingPair {
+            channels: vec![0.0, 0.5],
+            target_text: "{ value = 1; }".to_string(),
+            ..TrainingPair::default()
+        };
+
+        service.stage_proposal(candidate.clone());
+        service.stage_proposal(candidate);
+
+        assert_eq!(service.proposed_dreams().len(), 1);
+        assert!(service.internalized_dreams().is_empty());
+    }
+
+    #[test]
+    fn different_channel_contexts_remain_separate() {
+        let service = DreamingService::new();
+        let first = TrainingPair {
+            channels: vec![0.0, 0.5],
+            target_text: "{ value = 1; }".to_string(),
+            ..TrainingPair::default()
+        };
+        let second = TrainingPair {
+            channels: vec![1.0, 0.5],
+            target_text: "{ value = 1; }".to_string(),
+            ..TrainingPair::default()
+        };
+
+        service.stage_proposal(first);
+        service.stage_proposal(second);
+
+        assert_eq!(service.proposed_dreams().len(), 2);
+        assert!(service.internalized_dreams().is_empty());
+    }
+}
