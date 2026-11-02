@@ -40,8 +40,11 @@ pub struct RawEvent {
     pub monotonic_ns: u64,
     pub phase: String,
     pub transaction_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub payload_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sqlstate: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fault_id: Option<String>,
 }
 
@@ -52,10 +55,15 @@ pub struct ObservedOperation {
     pub kind: String,
     pub request: Request,
     pub happens_after: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub retry_group_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub transaction_attempt: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_snapshot_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decision_input_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<Scope>,
     pub runner_id: String,
     pub client_id: String,
