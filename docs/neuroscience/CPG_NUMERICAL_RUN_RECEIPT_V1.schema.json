@@ -179,10 +179,10 @@
           ]
         },
         "equation_manifest_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "parameter_manifest_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "state_semantics": {
           "type": "string",
@@ -226,7 +226,7 @@
           "minLength": 1
         },
         "dependency_lock_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "backend": {
           "enum": [
@@ -303,7 +303,7 @@
         },
         "state_dimension": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         },
         "expected_saved_timepoints": {
           "type": "integer",
@@ -363,10 +363,10 @@
       ],
       "properties": {
         "protocol_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "waveform_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "stimulus_applied": {
           "type": "boolean"
@@ -396,10 +396,10 @@
       ],
       "properties": {
         "raw_state_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "raw_output_manifest_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "#/$defs/sha256OrNull"
         },
         "raw_state_finite_scan_performed": {
           "type": "boolean"
@@ -452,11 +452,11 @@
       "properties": {
         "wall_time_seconds": {
           "type": "number",
-          "exclusiveMinimum": 0
+          "minimum": 0
         },
         "peak_memory_bytes": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         },
         "energy_joules": {
           "type": [
@@ -473,8 +473,7 @@
       "required": [
         "resolved_config_sha256",
         "environment_sha256",
-        "logs_sha256",
-        "run_receipt_sha256"
+        "logs_sha256"
       ],
       "properties": {
         "resolved_config_sha256": {
@@ -484,9 +483,6 @@
           "$ref": "#/$defs/sha256"
         },
         "logs_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "run_receipt_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
@@ -572,7 +568,7 @@
                 "const": true
               },
               "realized_stddev": {
-                "exclusiveMinimum": 0
+                "minimum": 0
               },
               "sample_sha256": {
                 "$ref": "#/$defs/sha256"
@@ -611,6 +607,16 @@
               }
             }
           }
+        }
+      ]
+    },
+    "sha256OrNull": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
         }
       ]
     }
@@ -699,6 +705,14 @@
             "properties": {
               "dependency_lock_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "rtol": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "atol": {
+                "type": "number",
+                "exclusiveMinimum": 0
               }
             }
           },
@@ -708,6 +722,7 @@
                 "const": "success"
               },
               "actual_saved_timepoints": {
+                "type": "integer",
                 "minimum": 2
               },
               "accepted_steps": {
@@ -715,6 +730,14 @@
               },
               "function_evaluations": {
                 "minimum": 1
+              },
+              "state_dimension": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_time_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
               }
             }
           },
@@ -722,6 +745,12 @@
             "properties": {
               "stimulus_applied": {
                 "const": true
+              },
+              "protocol_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "waveform_sha256": {
+                "$ref": "#/$defs/sha256"
               }
             }
           },
@@ -750,6 +779,12 @@
               },
               "maximum_absolute_raw_value": {
                 "type": "number"
+              },
+              "raw_state_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "raw_output_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
               }
             }
           },
@@ -766,6 +801,28 @@
               },
               "run_receipt_sha256": {
                 "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "simulator": {
+            "properties": {
+              "equation_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "parameter_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "resources": {
+            "properties": {
+              "wall_time_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "peak_memory_bytes": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           }
@@ -803,30 +860,6 @@
             }
           }
         }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "run_state": {
-            "const": "complete"
-          }
-        },
-        "required": [
-          "run_state"
-        ]
-      },
-      "then": {
-        "properties": {
-          "simulation": {
-            "properties": {
-              "actual_saved_timepoints": {
-                "const": 0
-              }
-            }
-          }
-        },
-        "else": {}
       }
     }
   ]
