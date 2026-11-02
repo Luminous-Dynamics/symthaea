@@ -31,7 +31,7 @@ pub struct TrustStore {
     pub members: Vec<TrustMember>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct TrustMember {
     pub member_id: String,
@@ -453,7 +453,7 @@ pub struct WitnessSetMetadataPayload {
     pub members: Vec<TrustMember>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct VerifiedWitnessSet {
     metadata: WitnessSetMetadataPayload,
     digest: String,
