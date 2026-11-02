@@ -180,6 +180,13 @@
       "kind": "target",
       "path": "crates/api/Cargo.toml",
       "name": "cfg(windows)"
+    },
+    {
+      "id": "dep.windows-sys",
+      "kind": "external_dependency",
+      "name": "windows-sys",
+      "scope": "target_os=windows",
+      "optional_feature": "windows-native"
     }
   ],
   "edges": [
@@ -369,18 +376,34 @@
       "to": "sym.UserService.new",
       "relation": "calls",
       "authority": "expected_semantic"
+    },
+    {
+      "from": "pkg.api",
+      "to": "sym.Profile",
+      "relation": "reexports",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.api",
+      "to": "dep.windows-sys",
+      "relation": "target_dependency",
+      "authority": "manifest_declared",
+      "conditional": "target_os=windows && feature=windows-native"
     }
   ],
   "counts": {
     "package_nodes": 5,
-    "symbol_and_test_nodes": 22,
+    "symbol_and_test_nodes": 21,
     "feature_and_target_nodes": 3,
-    "edges": 31
+    "external_dependency_nodes": 1,
+    "total_nodes": 30,
+    "edges": 33
   },
   "limitations": [
     "Fixture has not been compiled.",
     "Expected semantic edges are design labels, not compiler-verified facts.",
     "No macro-generated or build-script-generated symbol evidence is present yet.",
-    "No fixture tree digest or immutable revision is frozen yet."
+    "No fixture tree digest or immutable revision is frozen yet.",
+    "The Windows-only external dependency is a manifest declaration; the target-specific package has not been resolved by Cargo."
   ]
 }
