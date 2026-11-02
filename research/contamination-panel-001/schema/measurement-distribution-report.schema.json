@@ -12,6 +12,7 @@
     "instance_manifest_sha256",
     "run_bundle_sha256",
     "claim_scope",
+    "measurement_paradigm",
     "model_count",
     "model_family_count",
     "run_count",
@@ -411,6 +412,13 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "measurement_paradigm": {
+      "type": "string",
+      "enum": [
+        "measurement_as_instance_restricted",
+        "measurement_as_distribution"
+      ]
     }
   }
 }
