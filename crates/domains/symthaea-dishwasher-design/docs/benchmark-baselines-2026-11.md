@@ -59,6 +59,7 @@ Therefore, dual compartments and turbidity sensing alone are not InstantClean di
 |---|---:|---:|---:|---:|---|
 | V-ZUG AdoraDish V6000 heat-pump, AS6T-41173 | 13 place settings | 0.394 kWh/cycle (39 kWh/100) | 8.6 L | 370 min (Topten listing) | Official V-ZUG product information and independent Topten listing |
 | V-ZUG AdoraDish V6000, AS6T-41171 | 14 place settings | 0.46 kWh/cycle | 9.0 L | 175 min | Official V-ZUG data sheet; 38 dB also listed |
+| V-ZUG AdoraDish V6000, AS6T-41147 | 14 place settings | 0.53 kWh/cycle | 6.7 L | 405 min | Official data sheet; 38 dB; low-water reference |
 | AEG GI9210X2TF (911474011) | 14 place settings | 0.488 kWh/cycle (49 kWh/100) | 8.4 L | 310 min | EPREL product record; cleaning index 1.121, drying index 1.061 |
 | Haier XS 63A4M4B | 16 place settings | 0.39 kWh/cycle (39 kWh/100) | 9.5 L | 315 min | Topten current featured-product table |
 | V-ZUG AS6T6HVI / AS6T-41171 Sprint programme | 13 settings on brochure | Not separately established for Sprint | Standard-cycle specification lists 6.5 L | Sprint duration 20 min | The 20-minute programme is real; do not attribute the standard-cycle kWh/L figures to Sprint without programme-specific test data |
@@ -66,6 +67,8 @@ Therefore, dual compartments and turbidity sensing alone are not InstantClean di
 
 Sources:
 - V-ZUG AS6T-41173: https://www.vzug.com/fr/en/energy-labels-dishwashers
+- V-ZUG AS6T-41147 data sheet (14 settings, 0.53 kWh, 6.7 L, 405 min): https://www.vzug.com/occ/v2/gb-site-spa/pdf/product/euDatasheet/V-ZUG-AS6T6GBHVI-4114700009.pdf?lang=en_GB&productCode=4114700009
+- ApplianceBench EU water-use report (updated 2026-09-25; 166 qualified models): https://appliancebench.com/en-gb/reports/dishwasher-water
 - V-ZUG AS6T-41171 data sheet: https://www.vzug.com/occ/v2/au-site-spa/pdf/product/euDatasheet/V-ZUG-AS6T6HVI-4117100007.pdf?lang=en_AU&productCode=4117100007
 - AEG EPREL: https://eprel.ec.europa.eu/screen/product/dishwashers2019/2400252?navigatingFrom=qr
 - Topten 2026 selection: https://www.topten.eu/private/products/dishwashers
@@ -170,6 +173,8 @@ https://www.vzug.com/medias/sys_master/root/h97/h1b/11172887560222/1228067_11714
 Topten's current featured-product table lists two separate 0.39 kWh/eco-cycle frontier examples:
 - Haier XS 63A4M4B: 16 place settings, 39 kWh/100 cycles, 9.5 L and 315-minute programme.
 - V-ZUG AdoraDish V6000 Heatpump: 13 place settings, 39 kWh/100 cycles, 8.6 L and 370-minute programme.
+
+A separate water-use screening report updated 25 September 2026 identifies 6.7 L/eco cycle as the lowest value in its 166-model qualified EU EPREL set, with Bosch SMV6ECX23E and V-ZUG AS6T-41147 at that value. The exact V-ZUG AS6T-41147 official data sheet lists 14 place settings, 0.53 kWh, 6.7 L and 405 minutes. This is the relevant captured low-water frontier; 6.0 L is about 10.4% below 6.7 L. The energy and water leaders are therefore distinct exact models, not one benchmark product.
 
 Do not combine those figures into a fictional single competitor. Both are listed at the same 0.39 kWh/cycle, but the Haier comparison is 16 places / 9.5 L / 315 min and the V-ZUG comparison is 13 places / 8.6 L / 370 min. The 0.39 kWh target is **energy parity with this 2026 market frontier**, not an energy-beating claim. The <=0.35 kWh stretch target is the first target in this ladder that aims to beat the listed 0.39 kWh frontier on energy. The <=6.0 L water target is nominally about 36.8% below the Haier's 9.5 L and 30.2% below the V-ZUG's 8.6 L, but these are target-vs-label arithmetic comparisons, not matched lab results.
 
