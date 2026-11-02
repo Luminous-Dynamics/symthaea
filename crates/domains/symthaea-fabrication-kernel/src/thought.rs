@@ -119,7 +119,9 @@ impl GeometricThought {
                 .indices
                 .iter()
                 .flatten()
-                .any(|index| *index as usize >= mesh.vertices.len())
+                .any(|index| {
+                    usize::try_from(*index).map_or(true, |index| index >= mesh.vertices.len())
+                })
         {
             return ConstraintFitStatus::InvalidGeometryBounds;
         }
