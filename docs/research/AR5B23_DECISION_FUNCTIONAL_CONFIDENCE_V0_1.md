@@ -78,7 +78,7 @@ The input records the evidence mode:
 - `SIMULATOR_GROUND_TRUTH`;
 - `OFF_POLICY_ESTIMATE` (rejected by V1).
 
-For randomized execution, V1 requires positive assignment probability for every candidate policy arm, assignment probabilities summing to one within each model family, and disjoint sampling-unit IDs across policy arms for that model. Repeated observations must be aggregated to the declared independent sampling unit before entry. Unmodeled interference is rejected by the V1 declaration contract.
+For randomized execution, V1 requires positive assignment probability for every candidate policy arm, assignment probabilities summing to one within each model family, and globally disjoint sampling-unit IDs across all randomized policy/model evidence rows. Repeated observations must be aggregated to the declared independent sampling unit before entry. Unmodeled interference is rejected by the V1 declaration contract.
 
 For simulator ground truth, paired/common-random-number experiments may reuse seed/unit identities across policy rows because the evaluator observes counterfactuals inside the simulator. This is not an assertion that real-world counterfactual outcomes are observed.
 
