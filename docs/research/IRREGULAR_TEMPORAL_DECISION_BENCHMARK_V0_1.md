@@ -87,7 +87,7 @@ Report cold-start and steady-state performance separately. Do not compare accele
 
 ## 4. Dataset and baseline protocol
 
-The versioned fixture references the existing real-irregular registry and adds BITS as a separately pinned evaluation lane. The BITS paper describes eleven datasets spanning nine domains and stratifies irregularity by missing rate, missing-pattern complexity, sampling irregularity and skewness. Pin the paper, released code, each dataset's license and each source artifact digest before execution; do not assume a paper's anonymous code snapshot is an immutable commit.
+The versioned fixture references the existing real-irregular registry and adds BITS and TIME as separate evaluation lanes. BITS describes eleven datasets spanning nine domains and stratifies irregularity by missing rate, missing-pattern complexity, sampling irregularity and skewness. TIME (ICML 2026) supplies 50 fresh datasets and 98 forecasting tasks for strict zero-shot time-series foundation model evaluation, with pattern-level temporal characterization. Their datasets, tasks, preprocessing and splits are not interchangeable. Pin each paper, released code or immutable software snapshot, leaderboard snapshot, dataset license and source artifact digest before execution; the anonymous BITS code snapshot must not be treated as an immutable commit.
 
 Required baseline families, subject to task compatibility:
 
@@ -173,6 +173,7 @@ Missing fields make the row incomplete; they are not silently filled with inferr
 ## 10. References
 
 - BITS, *Rethinking Fair and Comprehensive Evaluation for Irregular Time Series Forecasting*, arXiv:2609.33303 (2026-09-27), https://arxiv.org/abs/2609.33303
+- TIME, *It's TIME: Towards the Next Generation of Time Series Forecasting Benchmarks*, ICML 2026 / PMLR 306, https://proceedings.mlr.press/v306/qiao26g.html
 - QuITE, *Query-Based Irregular Time Series Embedding*, ICML 2026 / PMLR 306, https://proceedings.mlr.press/v306/lim26b.html
 - KAFNet, *Revitalizing Canonical Pre-Alignment for Irregular Multivariate Time Series Forecasting*, AAAI-26, https://ojs.aaai.org/index.php/AAAI/article/view/40149
 - MLPerf Tiny v1.4, MLCommons (2026-07-07), https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
