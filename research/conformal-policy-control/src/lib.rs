@@ -151,10 +151,12 @@ impl ExternalBaselineReference {
             || !self.code_commit.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
             return Err(fail("external baseline commit must be 40 lowercase hexadecimal characters"));
         }
-        if self.code_commit_date.len() != 10
-            || !self.code_commit_date.as_bytes().get(4).is_some_and(|b| *b == b'-')
-            || !self.code_commit_date.as_bytes().get(7).is_some_and(|b| *b == b'-') {
-            return Err(fail("external baseline commit date must use YYYY-MM-DD"));
+        let date = self.code_commit_date.as_bytes();
+        if date.len() != 10
+            || date[4] != b'-'
+            || date[7] != b'-'
+            || date.iter().enumerate().any(|(i, b)| i != 4 && i != 7 && !b.is_ascii_digit()) {
+            return Err(fail("external baseline commit date must use numeric YYYY-MM-DD"));
         }
         if !matches!(self.status.as_str(),
             "reference_implementation_pinned_reproduction_required"
@@ -488,6 +490,11 @@ mod tests{
         assert!(fixture.validate().is_err());
         let mut fixture=load_builtin_fixture().unwrap();
         fixture.external_baseline_references[1].id=fixture.external_baseline_references[0].id.clone();
+        assert!(fixture.validate().is_err());
+    }
+    #[test]fn malformed_baseline_commit_date_fails_closed(){
+        let mut fixture=load_builtin_fixture().unwrap();
+        fixture.external_baseline_references[0].code_commit_date="2026-ab-24".into();
         assert!(fixture.validate().is_err());
     }
     #[test]fn total_variation_is_exact(){
