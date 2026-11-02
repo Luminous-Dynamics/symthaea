@@ -1027,6 +1027,63 @@
         "no_single_composite_score": true
       },
       "claim_ceiling": "The minimax guarantee applies only to the supplied finite scenario set, terminal decisions and utilities; it does not cover unknown scenarios or validate caller-supplied value judgments."
+    },
+    {
+      "id": "held_out_decision_regret_under_distribution_shift",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10175",
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10174",
+      "arms": [
+        "point_EIG_nominal",
+        "scenario_robust_EIG_declared_ensemble",
+        "expected_EVSI_mixture_policy",
+        "exact_finite_scenario_minimax_regret",
+        "lower_tail_CVaR_EVSI",
+        "EVSI_minus_regret",
+        "random_authorized_probe",
+        "cost_only_probe"
+      ],
+      "held_out_dgp_families": [
+        "true_likelihood_outside_declared_scenario_set",
+        "omitted_latent_variable",
+        "hidden_environment_device_build_condition",
+        "prior_prevalence_shift",
+        "scenario_coverage_gap",
+        "correlated_or_nonstationary_outcomes",
+        "adversarially_optimistic_in_ensemble_likelihood",
+        "utility_perturbation",
+        "unmodelled_externality",
+        "probe_cost_or_impact_estimation_error"
+      ],
+      "metrics": [
+        "realized_expected_decision_regret",
+        "regret_p50_p90_p95",
+        "regret_CVaR90",
+        "wrong_action_rate",
+        "decision_stability_under_prior_and_scenario_perturbation",
+        "in_ensemble_vs_out_of_ensemble_regret_gap",
+        "abstention_correctness",
+        "energy_latency_and_target_impact",
+        "exact_policy_evaluation_count",
+        "search_budget_rejection_rate"
+      ],
+      "targets": {
+        "p90_realized_regret_reduction_vs_point_EIG": 0.2,
+        "wrong_action_rate": "no increase versus lower-regret baseline",
+        "target_impact": "no increase versus lower-regret baseline",
+        "missing_authority_or_utility_coverage": "100_percent explicit abstention",
+        "omitted_scenario": "report exact regret penalty; do not claim distribution-free robustness"
+      },
+      "protocol": [
+        "freeze priors_declared_scenarios_utility_matrices_and_action_set_before_hidden_DGP_reveal",
+        "hold_out_generator_seeds_and_DGP_families",
+        "never_tune_scenario_weights_on_hidden_split",
+        "report_in_ensemble_and_out_of_ensemble_separately",
+        "paired_confidence_intervals",
+        "report_policy_search_count_and_cap",
+        "no_silent_fallback"
+      ],
+      "claim_ceiling": "Exact minimax is exact only on the finite supplied scenario set; held-out results quantify rather than eliminate out-of-ensemble risk."
     }
   ],
   "promotion_policy": {
@@ -1067,7 +1124,9 @@
     "https://github.com/Luminous-Dynamics/symthaea/pull/10058",
     "https://github.com/Luminous-Dynamics/symthaea/pull/10074",
     "https://github.com/Luminous-Dynamics/symthaea/pull/9965",
-    "https://github.com/Luminous-Dynamics/symthaea/pull/10171"
+    "https://github.com/Luminous-Dynamics/symthaea/pull/10171",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10174",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10175"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
