@@ -1063,9 +1063,15 @@ mod tests {
         let mut high_impact = discriminating_experiment("high-impact");
         high_impact.target_impact = TargetImpact::DataMutation;
         items.push(high_impact);
-        let mut over_budget = discriminating_experiment("over-budget");
-        over_budget.estimated_time_seconds = 9999.0;
-        items.push(over_budget);
+        let mut over_time = discriminating_experiment("over-time");
+        over_time.estimated_time_seconds = 9999.0;
+        items.push(over_time);
+        let mut over_energy = discriminating_experiment("over-energy");
+        over_energy.estimated_energy_joules = 9999.0;
+        items.push(over_energy);
+        let mut over_risk = discriminating_experiment("over-risk");
+        over_risk.estimated_risk = 0.9;
+        items.push(over_risk);
 
         let plan = plan_next_experiment(
             &evidence(),
@@ -1210,6 +1216,63 @@ mod tests {
             .unwrap_err()
             .kind,
             PlannerErrorKind::UnqualifiedObservationEvidence
+        );
+    }
+
+    #[test]
+    fn duplicate_hypothesis_experiment_and_evidence_ids_are_rejected() {
+        let mut duplicate_hypotheses = hypotheses();
+        duplicate_hypotheses[1].id = duplicate_hypotheses[0].id.clone();
+        assert_eq!(
+            plan_next_experiment(
+                &evidence(),
+                &duplicate_hypotheses,
+                &[discriminating_experiment("probe")],
+                PlannerConfig::default(),
+            )
+            .unwrap_err()
+            .kind,
+            PlannerErrorKind::DuplicateHypothesisId
+        );
+
+        assert_eq!(
+            plan_next_experiment(
+                &evidence(),
+                &hypotheses(),
+                &[
+                    discriminating_experiment("same"),
+                    discriminating_experiment("same"),
+                ],
+                PlannerConfig::default(),
+            )
+            .unwrap_err()
+            .kind,
+            PlannerErrorKind::DuplicateExperimentId
+        );
+
+        let duplicate_evidence = vec![evidence()[0].clone(), evidence()[0].clone()];
+        assert_eq!(
+            plan_next_experiment(
+                &duplicate_evidence,
+                &hypotheses(),
+                &[discriminating_experiment("probe")],
+                PlannerConfig::default(),
+            )
+            .unwrap_err()
+            .kind,
+            PlannerErrorKind::DuplicateEvidenceId
+        );
+    }
+
+    #[test]
+    fn invalid_planner_configuration_is_rejected() {
+        let mut config = PlannerConfig::default();
+        config.max_time_seconds = 0.0;
+        assert_eq!(
+            plan_next_experiment(&evidence(), &hypotheses(), &[], config)
+                .unwrap_err()
+                .kind,
+            PlannerErrorKind::InvalidPlannerConfig
         );
     }
 
