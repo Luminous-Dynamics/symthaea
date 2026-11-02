@@ -1564,7 +1564,7 @@ mod tests {
             CandidateSpec {
                 id: 30,
                 weight: 200_000_000,
-                destination_id: None,
+                destination_id: Some(40),
                 reserve_rate_numerator: 0,
                 reserve_rate_denominator: 1,
             },
