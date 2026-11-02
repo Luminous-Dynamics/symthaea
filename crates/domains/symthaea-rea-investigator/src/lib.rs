@@ -191,6 +191,7 @@ pub struct RejectedExperiment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbstentionReason {
     NoCompetingHypotheses,
+    NoIndependentlyGroundedHypothesis,
     NoEligibleExperiment,
     NoDiscriminatingExperiment,
 }
@@ -417,14 +418,15 @@ fn evidence_has_independent_root(
 fn validate_hypotheses<'a>(
     hypotheses: &'a [Hypothesis],
     catalog: &HashMap<&str, &EvidenceProvenance>,
-) -> Result<(BTreeMap<&'a str, f64>, Vec<String>), PlannerError> {
+) -> Result<(BTreeMap<&'a str, f64>, Vec<String>, Vec<String>), PlannerError> {
     if hypotheses.is_empty() {
-        return Ok((BTreeMap::new(), Vec::new()));
+        return Ok((BTreeMap::new(), Vec::new(), Vec::new()));
     }
 
     let mut priors = BTreeMap::new();
     let mut total = 0.0;
     let mut grounded_ids = Vec::with_capacity(hypotheses.len());
+    let mut qualified_support_ids = BTreeSet::new();
     let mut visiting = HashSet::new();
     let mut memo = HashMap::new();
 
@@ -465,8 +467,12 @@ fn validate_hypotheses<'a>(
         }
 
         for id in &hypothesis.supporting_evidence_ids {
-            has_independent_root |=
+            let independently_rooted =
                 evidence_has_independent_root(id, catalog, &mut visiting, &mut memo)?;
+            has_independent_root |= independently_rooted;
+            if independently_rooted {
+                qualified_support_ids.insert(id.clone());
+            }
         }
         if !has_independent_root {
             return Err(PlannerError::new(
@@ -491,7 +497,7 @@ fn validate_hypotheses<'a>(
     }
 
     grounded_ids.sort();
-    Ok((priors, grounded_ids))
+    Ok((priors, grounded_ids, qualified_support_ids.into_iter().collect()))
 }
 
 fn rejected(
@@ -667,17 +673,25 @@ pub fn plan_next_experiment(
 ) -> Result<InvestigationPlan, PlannerError> {
     validate_config(config)?;
     let catalog = validate_evidence_catalog(evidence)?;
-    let (priors, grounded_hypothesis_ids) = validate_hypotheses(hypotheses, &catalog)?;
+    let (priors, grounded_hypothesis_ids, support_evidence_ids) =
+        match validate_hypotheses(hypotheses, &catalog) {
+            Ok(result) => result,
+            Err(error) if error.kind == PlannerErrorKind::UngroundedHypothesis => {
+                return Ok(InvestigationPlan {
+                    selected: None,
+                    ranked_experiments: Vec::new(),
+                    rejected_experiments: Vec::new(),
+                    abstention: Some(AbstentionReason::NoIndependentlyGroundedHypothesis),
+                    prior_entropy_bits: 0.0,
+                    grounded_hypothesis_ids: Vec::new(),
+                    claim_ceiling: PlannerClaimCeiling::default(),
+                });
+            }
+            Err(error) => return Err(error),
+        };
 
     let prior_entropy =
         entropy_bits(priors.values().copied().collect::<Vec<_>>().into_iter());
-    let support_evidence_ids: Vec<String> = hypotheses
-        .iter()
-        .flat_map(|hypothesis| hypothesis.supporting_evidence_ids.iter().cloned())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-
     let mut seen_experiments = HashSet::new();
     for experiment in experiments {
         if experiment.id.trim().is_empty() || !seen_experiments.insert(experiment.id.as_str()) {
@@ -765,6 +779,32 @@ pub fn plan_next_experiment(
     })
 }
 
+fn probability_map<'a>(
+    distribution: &'a [Probability],
+) -> Result<BTreeMap<&'a str, f64>, PlannerError> {
+    let mut result = BTreeMap::new();
+    for item in distribution {
+        if item.hypothesis_id.trim().is_empty()
+            || !probability_valid(item.probability)
+            || result
+                .insert(item.hypothesis_id.as_str(), item.probability)
+                .is_some()
+        {
+            return Err(PlannerError::new(
+                PlannerErrorKind::InvalidMeasuredDistribution,
+                "posterior distributions require unique hypothesis IDs and valid probabilities",
+            ));
+        }
+    }
+    if !distribution_valid(result.values().copied()) {
+        return Err(PlannerError::new(
+            PlannerErrorKind::InvalidMeasuredDistribution,
+            "prior and posterior probability mass must each sum to 1.0",
+        ));
+    }
+    Ok(result)
+}
+
 /// Calculate observed posterior entropy reduction after an independent Evidence
 /// observation has arrived. This does not authenticate the supplied provenance
 /// label or establish that the posterior itself is calibrated.
@@ -782,30 +822,8 @@ pub fn measure_observed_information_gain(
         ));
     }
 
-    let validate = |distribution: &[Probability]| -> Result<BTreeMap<&str, f64>, PlannerError> {
-        let mut result = BTreeMap::new();
-        for item in distribution {
-            if item.hypothesis_id.trim().is_empty()
-                || !probability_valid(item.probability)
-                || result.insert(item.hypothesis_id.as_str(), item.probability).is_some()
-            {
-                return Err(PlannerError::new(
-                    PlannerErrorKind::InvalidMeasuredDistribution,
-                    "posterior distributions require unique hypothesis IDs and valid probabilities",
-                ));
-            }
-        }
-        if !distribution_valid(result.values().copied()) {
-            return Err(PlannerError::new(
-                PlannerErrorKind::InvalidMeasuredDistribution,
-                "prior and posterior probability mass must each sum to 1.0",
-            ));
-        }
-        Ok(result)
-    };
-
-    let prior_map = validate(prior)?;
-    let posterior_map = validate(posterior)?;
+    let prior_map = probability_map(prior)?;
+    let posterior_map = probability_map(posterior)?;
     if prior_map.keys().ne(posterior_map.keys()) {
         return Err(PlannerError::new(
             PlannerErrorKind::InvalidMeasuredDistribution,
@@ -947,14 +965,18 @@ mod tests {
             for candidate in &mut candidates {
                 candidate.supporting_evidence_ids = vec![evidence_id('b')];
             }
-            let error = plan_next_experiment(
+            let plan = plan_next_experiment(
                 &records,
                 &candidates,
                 &[discriminating_experiment("probe")],
                 PlannerConfig::default(),
             )
-            .unwrap_err();
-            assert_eq!(error.kind, PlannerErrorKind::UngroundedHypothesis);
+            .unwrap();
+            assert!(plan.selected.is_none());
+            assert_eq!(
+                plan.abstention,
+                Some(AbstentionReason::NoIndependentlyGroundedHypothesis)
+            );
         }
     }
 
