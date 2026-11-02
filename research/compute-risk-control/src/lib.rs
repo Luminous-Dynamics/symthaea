@@ -273,7 +273,7 @@ pub struct CandidateEvaluation {
     pub sample_count: usize,
     pub upper_mean_loss_ceil_ppm: u32,
     pub lower_mean_loss_ceil_ppm: u32,
-    /// Descriptive output error rate; not part of the two stopping-risk UCBs.
+    /// Third simultaneous channel: error rate of the answer actually emitted.
     pub emitted_answer_error_mean_ceil_ppm: u32,
     pub emitted_answer_error_ucb_ppm: u32,
     pub simultaneous_ucb_correction_ppm: u32,
@@ -290,7 +290,7 @@ pub struct CandidateEvaluation {
 #[serde(rename_all = "snake_case")]
 pub enum SelectionStatus {
     FeasibleCandidateFoundOnValidationPanel,
-    NoCandidateMeetsBothRiskBudgets,
+    NoCandidateMeetsAllRiskBudgets,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -549,7 +549,7 @@ pub fn calibrate_joint_candidate_grid(
     if risk_upper_budget_ppm == 0 || risk_upper_budget_ppm > PPM as u32
         || risk_lower_budget_ppm == 0 || risk_lower_budget_ppm > PPM as u32
         || risk_output_error_budget_ppm == 0 || risk_output_error_budget_ppm > PPM as u32 {
-        return Err(fail("risk_budget", "both budgets must be in 1..=1,000,000 PPM"));
+        return Err(fail("risk_budget", "all three budgets must be in 1..=1,000,000 PPM"));
     }
     let mut ids = BTreeSet::new();
     let mut previous: Option<&str> = None;
@@ -617,7 +617,7 @@ pub fn calibrate_joint_candidate_grid(
         selection_status: if selected.is_some() {
             SelectionStatus::FeasibleCandidateFoundOnValidationPanel
         } else {
-            SelectionStatus::NoCandidateMeetsBothRiskBudgets
+            SelectionStatus::NoCandidateMeetsAllRiskBudgets
         },
         formal_theorem_verified: false,
         claim_ceiling: "simultaneous Hoeffding UCB arithmetic over the frozen finite candidate grid; any population-level statement is conditional on independent iid held-out task traces, bounded losses, and correct preregistration, none of which is verified by this runner".to_string(),
@@ -828,7 +828,7 @@ mod tests {
         }).collect::<Vec<_>>();
         let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::IidHeldOutTasksDeclared,10_000,10_000,800_000,50_000).unwrap();
         assert_eq!(report.selected_candidate_id,None);
-        assert_eq!(report.selection_status,SelectionStatus::NoCandidateMeetsBothRiskBudgets);
+        assert_eq!(report.selection_status,SelectionStatus::NoCandidateMeetsAllRiskBudgets);
     }
 
     #[test]
@@ -884,7 +884,7 @@ mod tests {
     }
 
     #[test]
-    fn builtin_joint_grid_selects_by_compute_only_after_both_risks_pass() {
+    fn builtin_joint_grid_selects_only_after_all_three_risks_pass() {
         let fixture=load_builtin_fixture().unwrap();
         let traces=generate_synthetic_validation_panel(&fixture).unwrap();
         let report=calibrate_joint_candidate_grid(
