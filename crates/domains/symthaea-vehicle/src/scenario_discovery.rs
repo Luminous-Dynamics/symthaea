@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 
 pub const INTERSECTION_CANDIDATE_SCHEMA: &str =
     "symthaea.vehicle.intersection-candidate.v0.1";
-const GENERATOR_POLICY_ID: &str = "stratified-affine-lhs-v0.1";
+const STRATIFIED_GENERATOR_POLICY_ID: &str = "stratified-affine-lhs-v0.1";
+const RANDOM_GENERATOR_POLICY_ID: &str = "seeded-splitmix64-random-v0.1";
 pub const MAX_INTERSECTION_CANDIDATES: u32 = 4096;
 
 const ROAD_GEOMETRY_ID: &str = "two-approach-one-marked-crossing-synthetic-v0.1";
@@ -102,81 +103,117 @@ pub fn generate_stratified_intersection_candidates(
     seed: u64,
     budget: u32,
 ) -> Result<Vec<IntersectionScenarioCandidate>, IntersectionGenerationError> {
+    validate_budget(budget)?;
+    let mut candidates = Vec::with_capacity(budget as usize);
+    for ordinal in 0..budget {
+        let factors = [
+            stratified_value(seed, ordinal, budget, 0, EGO_SPEED_RANGE_MPS),
+            stratified_value(seed, ordinal, budget, 1, CROSSING_START_RANGE_S),
+            stratified_value(seed, ordinal, budget, 2, OCCLUSION_RANGE),
+            stratified_value(seed, ordinal, budget, 3, SENSOR_DELAY_RANGE_S),
+            stratified_value(seed, ordinal, budget, 4, SENSOR_DROPOUT_RANGE_S),
+            stratified_value(seed, ordinal, budget, 5, LOCALIZATION_BIAS_RANGE_M),
+            stratified_value(seed, ordinal, budget, 6, BRAKE_DELAY_RANGE_S),
+        ];
+        candidates.push(candidate_from_factors(
+            seed,
+            ordinal,
+            budget,
+            STRATIFIED_GENERATOR_POLICY_ID,
+            factors,
+        ));
+    }
+    Ok(candidates)
+}
+
+/// Generate a deterministic pseudorandom candidate set using SplitMix64.
+///
+/// This is the simple-search baseline for equal-budget comparisons against
+/// stratified generation. It is reproducible for the named v0.1 algorithm;
+/// it does not represent a real-world probability distribution.
+pub fn generate_seeded_random_intersection_candidates(
+    seed: u64,
+    budget: u32,
+) -> Result<Vec<IntersectionScenarioCandidate>, IntersectionGenerationError> {
+    validate_budget(budget)?;
+    let mut rng = SplitMix64 { state: seed };
+    let mut candidates = Vec::with_capacity(budget as usize);
+    for ordinal in 0..budget {
+        let factors = [
+            rng.range(EGO_SPEED_RANGE_MPS),
+            rng.range(CROSSING_START_RANGE_S),
+            rng.range(OCCLUSION_RANGE),
+            rng.range(SENSOR_DELAY_RANGE_S),
+            rng.range(SENSOR_DROPOUT_RANGE_S),
+            rng.range(LOCALIZATION_BIAS_RANGE_M),
+            rng.range(BRAKE_DELAY_RANGE_S),
+        ];
+        candidates.push(candidate_from_factors(
+            seed,
+            ordinal,
+            budget,
+            RANDOM_GENERATOR_POLICY_ID,
+            factors,
+        ));
+    }
+    Ok(candidates)
+}
+
+fn validate_budget(budget: u32) -> Result<(), IntersectionGenerationError> {
     if budget == 0 {
         return Err(IntersectionGenerationError::ZeroBudget);
     }
     if budget > MAX_INTERSECTION_CANDIDATES {
         return Err(IntersectionGenerationError::BudgetTooLarge);
     }
+    Ok(())
+}
 
-    let mut candidates = Vec::with_capacity(budget as usize);
-    for ordinal in 0..budget {
-        let ego_initial_speed_mps = stratified_value(
-            seed,
-            ordinal,
-            budget,
-            0,
-            EGO_SPEED_RANGE_MPS,
-        );
-        let actor_crossing_start_s = stratified_value(
-            seed,
-            ordinal,
-            budget,
-            1,
-            CROSSING_START_RANGE_S,
-        );
-        let occlusion_fraction =
-            stratified_value(seed, ordinal, budget, 2, OCCLUSION_RANGE);
-        let sensor_delay_s =
-            stratified_value(seed, ordinal, budget, 3, SENSOR_DELAY_RANGE_S);
-        let sensor_dropout_duration_s = stratified_value(
-            seed,
-            ordinal,
-            budget,
-            4,
-            SENSOR_DROPOUT_RANGE_S,
-        );
-        let localization_lateral_bias_m = stratified_value(
-            seed,
-            ordinal,
-            budget,
-            5,
-            LOCALIZATION_BIAS_RANGE_M,
-        );
-        let brake_actuation_delay_s =
-            stratified_value(seed, ordinal, budget, 6, BRAKE_DELAY_RANGE_S);
-
-        let mut candidate = IntersectionScenarioCandidate {
-            schema_version: INTERSECTION_CANDIDATE_SCHEMA.into(),
-            candidate_id: String::new(),
-            seed,
-            ordinal,
-            generation_budget: budget,
-            generator_policy_id: GENERATOR_POLICY_ID.into(),
-            road_geometry_id: ROAD_GEOMETRY_ID.into(),
-            ego_spawn_x_m: EGO_SPAWN_X_M,
-            ego_lane_center_y_m: EGO_LANE_CENTER_Y_M,
-            ego_initial_speed_mps,
-            crossing_actor: CrossingActor::Pedestrian,
-            actor_spawn_x_m: ACTOR_SPAWN_X_M,
-            actor_spawn_y_m: ACTOR_SPAWN_Y_M,
-            actor_crossing_speed_mps: ACTOR_CROSSING_SPEED_MPS,
-            actor_crossing_path_length_m: ACTOR_CROSSING_PATH_LENGTH_M,
-            actor_crossing_start_s,
-            actor_crossing_direction_y: ACTOR_CROSSING_DIRECTION_Y,
-            occlusion_fraction,
-            sensor_delay_s,
-            sensor_dropout_duration_s,
-            localization_lateral_bias_m,
-            brake_actuation_delay_s,
-            timestep_s: SIMULATION_TIMESTEP_S,
-            horizon_s: SIMULATION_HORIZON_S,
-            range_semantics: ScenarioRangeSemantics::SyntheticAssumption,
-        };
-        candidate.candidate_id = candidate_identity(&candidate);
-        candidates.push(candidate);
-    }
-    Ok(candidates)
+fn candidate_from_factors(
+    seed: u64,
+    ordinal: u32,
+    budget: u32,
+    generator_policy_id: &str,
+    factors: [f64; 7],
+) -> IntersectionScenarioCandidate {
+    let [
+        ego_initial_speed_mps,
+        actor_crossing_start_s,
+        occlusion_fraction,
+        sensor_delay_s,
+        sensor_dropout_duration_s,
+        localization_lateral_bias_m,
+        brake_actuation_delay_s,
+    ] = factors;
+    let mut candidate = IntersectionScenarioCandidate {
+        schema_version: INTERSECTION_CANDIDATE_SCHEMA.into(),
+        candidate_id: String::new(),
+        seed,
+        ordinal,
+        generation_budget: budget,
+        generator_policy_id: generator_policy_id.into(),
+        road_geometry_id: ROAD_GEOMETRY_ID.into(),
+        ego_spawn_x_m: EGO_SPAWN_X_M,
+        ego_lane_center_y_m: EGO_LANE_CENTER_Y_M,
+        ego_initial_speed_mps,
+        crossing_actor: CrossingActor::Pedestrian,
+        actor_spawn_x_m: ACTOR_SPAWN_X_M,
+        actor_spawn_y_m: ACTOR_SPAWN_Y_M,
+        actor_crossing_speed_mps: ACTOR_CROSSING_SPEED_MPS,
+        actor_crossing_path_length_m: ACTOR_CROSSING_PATH_LENGTH_M,
+        actor_crossing_start_s,
+        actor_crossing_direction_y: ACTOR_CROSSING_DIRECTION_Y,
+        occlusion_fraction,
+        sensor_delay_s,
+        sensor_dropout_duration_s,
+        localization_lateral_bias_m,
+        brake_actuation_delay_s,
+        timestep_s: SIMULATION_TIMESTEP_S,
+        horizon_s: SIMULATION_HORIZON_S,
+        range_semantics: ScenarioRangeSemantics::SyntheticAssumption,
+    };
+    candidate.candidate_id = candidate_identity(&candidate);
+    candidate
 }
 
 impl IntersectionScenarioCandidate {
@@ -186,7 +223,8 @@ impl IntersectionScenarioCandidate {
             && self.generation_budget > 0
             && self.generation_budget <= MAX_INTERSECTION_CANDIDATES
             && self.ordinal < self.generation_budget
-            && self.generator_policy_id == GENERATOR_POLICY_ID
+            && (self.generator_policy_id == STRATIFIED_GENERATOR_POLICY_ID
+                || self.generator_policy_id == RANDOM_GENERATOR_POLICY_ID)
             && self.road_geometry_id == ROAD_GEOMETRY_ID
             && self.ego_spawn_x_m.to_bits() == EGO_SPAWN_X_M.to_bits()
             && self.ego_lane_center_y_m.to_bits() == EGO_LANE_CENTER_Y_M.to_bits()
@@ -241,6 +279,25 @@ fn stratified_value(
     let unit = (jitter_bits >> 11) as f64 / ((1_u64 << 53) as f64);
     let quantile = (stratum as f64 + unit) / n as f64;
     bounds.0 + quantile * (bounds.1 - bounds.0)
+}
+
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn next_unit(&mut self) -> f64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^= value >> 31;
+        (value >> 11) as f64 / ((1_u64 << 53) as f64)
+    }
+
+    fn range(&mut self, bounds: (f64, f64)) -> f64 {
+        bounds.0 + self.next_unit() * (bounds.1 - bounds.0)
+    }
 }
 
 fn gcd(mut a: u64, mut b: u64) -> u64 {
@@ -307,6 +364,47 @@ mod tests {
         let second = generate_stratified_intersection_candidates(42, 128).unwrap();
         assert_eq!(first, second);
         assert!(first.iter().all(IntersectionScenarioCandidate::identity_is_valid));
+    }
+
+    #[test]
+    fn seeded_random_generator_reproduces_exact_candidates() {
+        let first = generate_seeded_random_intersection_candidates(42, 128).unwrap();
+        let second = generate_seeded_random_intersection_candidates(42, 128).unwrap();
+        assert_eq!(first, second);
+        assert!(first.iter().all(IntersectionScenarioCandidate::identity_is_valid));
+    }
+
+    #[test]
+    fn random_and_stratified_policies_have_distinct_candidate_identity() {
+        let random = generate_seeded_random_intersection_candidates(42, 64).unwrap();
+        let stratified = generate_stratified_intersection_candidates(42, 64).unwrap();
+        assert!(random.iter().all(|candidate| {
+            candidate.generator_policy_id == RANDOM_GENERATOR_POLICY_ID
+                && candidate.identity_is_valid()
+        }));
+        assert!(stratified.iter().all(|candidate| {
+            candidate.generator_policy_id == STRATIFIED_GENERATOR_POLICY_ID
+                && candidate.identity_is_valid()
+        }));
+        assert_ne!(
+            random.iter().map(|candidate| &candidate.candidate_id).collect::<Vec<_>>(),
+            stratified.iter().map(|candidate| &candidate.candidate_id).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn random_generator_respects_all_declared_factor_bounds() {
+        let candidates = generate_seeded_random_intersection_candidates(7, 512).unwrap();
+        for candidate in candidates {
+            assert!(candidate.identity_is_valid());
+            assert!(in_range(candidate.ego_initial_speed_mps, EGO_SPEED_RANGE_MPS));
+            assert!(in_range(candidate.actor_crossing_start_s, CROSSING_START_RANGE_S));
+            assert!(in_range(candidate.occlusion_fraction, OCCLUSION_RANGE));
+            assert!(in_range(candidate.sensor_delay_s, SENSOR_DELAY_RANGE_S));
+            assert!(in_range(candidate.sensor_dropout_duration_s, SENSOR_DROPOUT_RANGE_S));
+            assert!(in_range(candidate.localization_lateral_bias_m, LOCALIZATION_BIAS_RANGE_M));
+            assert!(in_range(candidate.brake_actuation_delay_s, BRAKE_DELAY_RANGE_S));
+        }
     }
 
     #[test]
@@ -395,6 +493,14 @@ mod tests {
         );
         assert_eq!(
             generate_stratified_intersection_candidates(1, MAX_INTERSECTION_CANDIDATES + 1),
+            Err(IntersectionGenerationError::BudgetTooLarge)
+        );
+        assert_eq!(
+            generate_seeded_random_intersection_candidates(1, 0),
+            Err(IntersectionGenerationError::ZeroBudget)
+        );
+        assert_eq!(
+            generate_seeded_random_intersection_candidates(1, MAX_INTERSECTION_CANDIDATES + 1),
             Err(IntersectionGenerationError::BudgetTooLarge)
         );
     }
