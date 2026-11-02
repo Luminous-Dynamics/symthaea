@@ -496,6 +496,7 @@ pub struct GuardrailRequirementResult {
     pub model_id: String,
     pub direction: GuardrailDirection,
     pub threshold: f64,
+    pub minimum_sample_size: usize,
     pub mixture_lower_confidence_bound: Option<f64>,
     pub mixture_upper_confidence_bound: Option<f64>,
     pub contributing_policy_evidence: Vec<GuardrailPolicyEvidence>,
@@ -680,6 +681,7 @@ pub fn analyze_noncompensatory_guardrails(
             model_id: requirement.model_id.clone(),
             direction: requirement.direction,
             threshold: requirement.threshold,
+            minimum_sample_size: requirement.minimum_sample_size,
             mixture_lower_confidence_bound: lower,
             mixture_upper_confidence_bound: upper,
             contributing_policy_evidence,
@@ -999,6 +1001,27 @@ mod tests {
     fn rejects_unequal_target_designs() {
         let mut request = request();
         request.confirmatory_target_design_sha256 = HASH_B.into();
+        assert!(analyze_noncompensatory_guardrails(&request).is_err());
+    }
+
+    #[test]
+    fn rejects_non_independent_sampling_units() {
+        let mut request = request();
+        request.independent_sampling_units_declared = false;
+        assert!(analyze_noncompensatory_guardrails(&request).is_err());
+    }
+
+    #[test]
+    fn rejects_cross_unit_interference_declaration() {
+        let mut request = request();
+        request.no_cross_unit_interference_declared = false;
+        assert!(analyze_noncompensatory_guardrails(&request).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_simultaneous_coverage_receipt() {
+        let mut request = request();
+        request.simultaneous_coverage_receipt_sha256 = "not-a-sha256".into();
         assert!(analyze_noncompensatory_guardrails(&request).is_err());
     }
 
