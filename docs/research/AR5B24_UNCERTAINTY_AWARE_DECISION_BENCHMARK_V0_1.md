@@ -339,3 +339,20 @@ The policy utility objective must not compensate for a mandatory guardrail viola
 For a linear expected guardrail functional `g`, a randomized mixture with weights `q_i` can use:
 - upper-bound guardrail: `sum_i(q_i * U[i,g,s,m]) <= threshold[g,s,m]`;
 - lower-bound guardrail: `sum_i(q_i * L[i,g,s,m]) >= threshold[g,s,m]`.
+
+
+### Support-size scaling calculation (formula only)
+
+At `n = 5,000` and familywise `delta = 0.01`, compare one TV distribution row with scalar DFCE over `d` predeclared functionals. The TV column is only the Weissman concentration slack `sqrt((K * ln(2) + ln(1/delta)) / (2*n))`; it excludes the additional empirical TV distance to the nominal law. The DFCE column is the scalar Hoeffding radius `sqrt(ln(d/delta) / (2*n))` after Bonferroni across the `d` functionals.
+
+| Support K | Weissman TV slack | DFCE radius d=4 | DFCE radius d=64 |
+|---:|---:|---:|---:|
+| 8 | 0.03186 | 0.02448 | 0.02960 |
+| 32 | 0.05176 | 0.02448 | 0.02960 |
+| 128 | 0.09661 | 0.02448 | 0.02960 |
+| 512 | 0.18960 | 0.02448 | 0.02960 |
+| 2,048 | 0.37738 | 0.02448 | 0.02960 |
+| 8,192 | 0.75385 | 0.02448 | 0.02960 |
+| 32,768 | 1.50724 (radius capped at 1) | 0.02448 | 0.02960 |
+
+This isolates only the concentration term at one family row and matched 99% confidence. The full Weissman radius adds empirical TV distance to the nominal path law, and the family allocation must expand to include every policy/model row. The calculation is not a coverage simulation or an end-to-end decision result.
