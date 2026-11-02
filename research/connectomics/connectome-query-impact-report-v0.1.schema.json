@@ -78,7 +78,9 @@
         "decision_flip",
         "materiality_exceeded_possible",
         "materiality_exceeded_guaranteed",
-        "effect_method"
+        "effect_method",
+        "decision_flip_method",
+        "paired_decision_world_count"
       ],
       "properties": {
         "scenario_id": {
@@ -126,6 +128,13 @@
         },
         "effect_method": {
           "$ref": "#/$defs/effect_method"
+        },
+        "decision_flip_method": {
+          "$ref": "#/$defs/decision_flip_method"
+        },
+        "paired_decision_world_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -191,6 +200,13 @@
     "effect_method": {
       "enum": [
         "RectangularOuterBound",
+        "PairedSharedWorlds"
+      ]
+    },
+    "decision_flip_method": {
+      "enum": [
+        "NotConfigured",
+        "MarginalIntervalOuterBound",
         "PairedSharedWorlds"
       ]
     }
