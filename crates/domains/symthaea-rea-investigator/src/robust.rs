@@ -841,4 +841,91 @@ mod tests {
             second.ranked_experiments.iter().map(|item| &item.experiment_id).collect::<Vec<_>>()
         );
     }
+    #[test]
+    fn authorization_and_budget_rejections_preserve_their_specific_reasons() {
+        let scenarios = vec![scenarios_for(vec![matrix("probe", 0.9, 0.1)])];
+        let mut unauthorized = proposal("probe");
+        unauthorized.authorization = Authorization::Denied;
+        let plan = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[unauthorized],
+            &scenarios,
+            RobustPlannerConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.rejected_experiments[0].reason,
+            RobustRejectionReason::NotAuthorized
+        );
+
+        let mut over_budget = proposal("probe");
+        over_budget.estimated_time_seconds = 9999.0;
+        let plan = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[over_budget],
+            &scenarios,
+            RobustPlannerConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.rejected_experiments[0].reason,
+            RobustRejectionReason::TimeBudgetExceeded
+        );
+    }
+
+    #[test]
+    fn invalid_robust_configuration_is_rejected() {
+        let config = RobustPlannerConfig {
+            lower_tail_probability: 0.0,
+            ..RobustPlannerConfig::default()
+        };
+        assert_eq!(
+            plan_next_experiment_robust(
+                &evidence(),
+                &hypotheses(),
+                &[proposal("probe")],
+                &[scenarios_for(vec![matrix("probe", 0.9, 0.1)])],
+                config,
+            )
+            .unwrap_err()
+            .kind,
+            PlannerErrorKind::InvalidPlannerConfig
+        );
+    }
+
+    #[test]
+    fn scenario_ids_and_scenario_results_are_stably_sorted() {
+        let scenarios = vec![
+            LikelihoodModelScenario {
+                scenario_id: "z-shift".to_owned(),
+                scenario_probability: 0.5,
+                experiments: vec![matrix("probe", 0.8, 0.2)],
+            },
+            LikelihoodModelScenario {
+                scenario_id: "a-nominal".to_owned(),
+                scenario_probability: 0.5,
+                experiments: vec![matrix("probe", 0.9, 0.1)],
+            },
+        ];
+        let plan = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe")],
+            &scenarios,
+            RobustPlannerConfig {
+                minimum_top1_stability: 0.0,
+                ..RobustPlannerConfig::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(plan.scenario_ids, vec!["a-nominal", "z-shift"]);
+        let selected = plan.selected.unwrap();
+        assert_eq!(
+            selected.scenario_results.iter().map(|item| item.scenario_id.as_str()).collect::<Vec<_>>(),
+            vec!["a-nominal", "z-shift"]
+        );
+    }
+
 }
