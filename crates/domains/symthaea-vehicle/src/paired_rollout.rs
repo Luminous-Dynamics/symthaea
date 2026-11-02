@@ -30,6 +30,7 @@ pub const MAX_PAIRED_ROLLOUT_STEPS: usize = 100_000;
 pub enum VehiclePairedRolloutError {
     EmptyCandidateId,
     EmptyRoadProfileId,
+    InvalidRoadProfile,
     InvalidAdvancedControllerDigest,
     ControllerIdentityAliased,
     InvalidTargetSpeed,
@@ -59,6 +60,19 @@ pub struct VehiclePairedRolloutConfig {
     pub steps: usize,
     /// BLAKE3 over this struct's serde_json representation before this field is populated.
     pub experiment_profile_digest: String,
+}
+
+impl VehiclePairedRolloutConfig {
+    /// Verify that all frozen experiment inputs still match their profile digest.
+    pub fn identity_is_valid(&self) -> bool {
+        let mut profile = self.clone();
+        let expected = profile.experiment_profile_digest.clone();
+        profile.experiment_profile_digest.clear();
+        serde_json::to_vec(&profile)
+            .ok()
+            .map(|bytes| blake3::hash(&bytes).to_hex().to_string() == expected)
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +118,8 @@ pub struct VehiclePairedRolloutResult {
     /// error/effort metrics; positive is preferable for projected progress.
     pub advanced_minus_baseline: VehicleTrajectoryMetrics,
     pub frames: Vec<VehiclePairedRolloutFrame>,
+    /// BLAKE3 over the complete result with this field empty; not a signature.
+    pub run_output_digest: String,
     /// Explicitly records the simulator's actor-model limitation.
     pub actor_capabilities: Vec<String>,
 }
@@ -201,6 +217,9 @@ pub fn run_paired_lane_keep_rollout(
     }
     if road_profile_id.trim().is_empty() {
         return Err(VehiclePairedRolloutError::EmptyRoadProfileId);
+    }
+    if !road.total_length.is_finite() || road.total_length <= 0.0 {
+        return Err(VehiclePairedRolloutError::InvalidRoadProfile);
     }
     if !digest_is_valid(&advanced_controller_digest) {
         return Err(VehiclePairedRolloutError::InvalidAdvancedControllerDigest);
@@ -328,20 +347,38 @@ pub fn run_paired_lane_keep_rollout(
     let baseline_metrics = baseline_accumulator.finish(baseline_simulator.state(), road);
     let advanced_minus_baseline = subtract_metrics(&advanced_metrics, &baseline_metrics);
 
-    Ok(VehiclePairedRolloutResult {
+    let mut result = VehiclePairedRolloutResult {
         schema_version: VEHICLE_PAIRED_ROLLOUT_SCHEMA.into(),
         profile,
         advanced_metrics,
         baseline_metrics,
         advanced_minus_baseline,
         frames,
+        run_output_digest: String::new(),
         actor_capabilities: vec![
             "no-pedestrian-actors".into(),
             "no-cyclist-actors".into(),
             "no-dynamic-traffic-actors".into(),
             "no-intersection-collision-observable".into(),
         ],
-    })
+    };
+    let output_bytes = serde_json::to_vec(&result)
+        .map_err(|_| VehiclePairedRolloutError::InvalidRolloutProfile)?;
+    result.run_output_digest = blake3::hash(&output_bytes).to_hex().to_string();
+    Ok(result)
+}
+
+impl VehiclePairedRolloutResult {
+    /// Verify the retained output trace and summary have not changed.
+    pub fn output_identity_is_valid(&self) -> bool {
+        let mut result = self.clone();
+        let expected = result.run_output_digest.clone();
+        result.run_output_digest.clear();
+        serde_json::to_vec(&result)
+            .ok()
+            .map(|bytes| blake3::hash(&bytes).to_hex().to_string() == expected)
+            .unwrap_or(false)
+    }
 }
 
 fn advanced_observation_for_metrics(state: &VehicleState, road: &Road) -> VehicleState {
@@ -460,6 +497,8 @@ mod tests {
         )
         .unwrap();
 
+        assert!(result.profile.identity_is_valid());
+        assert!(result.output_identity_is_valid());
         assert_eq!(result.frames.len(), 8);
         assert_eq!(result.advanced_metrics.steps, 8);
         assert_eq!(result.baseline_metrics.steps, 8);
@@ -502,6 +541,27 @@ mod tests {
         .unwrap();
         assert_eq!(result.frames[0].advanced_plant_state_before.position_y,
                    result.frames[0].baseline_plant_state_before.position_y);
+    }
+
+    #[test]
+    fn output_digest_detects_frame_mutation() {
+        let (sim, road, perturbations, mut controller, mut encoder) = setup();
+        let mut result = run_paired_lane_keep_rollout(
+            "lane-keep-fixture-digest",
+            "straight-road-v1",
+            "c".repeat(64),
+            &sim,
+            &road,
+            &perturbations,
+            10.0,
+            0.005,
+            2,
+            &mut controller,
+            &mut encoder,
+        )
+        .unwrap();
+        result.frames[0].advanced_command.throttle = 0.99;
+        assert!(!result.output_identity_is_valid());
     }
 
     #[test]
