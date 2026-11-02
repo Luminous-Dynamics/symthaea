@@ -73,6 +73,34 @@ return explicit errors instead of a fabricated diagonal curve. AUC measures
 ranking discrimination; it does not measure probability calibration or
 choose an operating threshold.
 
+## Precision–recall curves
+
+For rare event detection, ROC AUC alone can obscure positive predictive value.
+The precision–recall API reports precision and recall at every tie-grouped
+threshold and non-interpolated average precision. It uses the same binary
+scored-observation input as ROC.
+
+```rust
+use symthaea_statistics::{RocObservation, try_precision_recall_curve};
+
+let observations = [
+    RocObservation { score: 0.9, is_signal: true },
+    RocObservation { score: 0.8, is_signal: false },
+    RocObservation { score: 0.7, is_signal: true },
+    RocObservation { score: 0.6, is_signal: false },
+];
+
+let curve = try_precision_recall_curve(&observations)?;
+assert!((curve.average_precision - 0.75).abs() < 1e-12);
+
+# Ok::<(), symthaea_statistics::RocError>(())
+```
+
+Average precision is computed as the sum of each recall increment multiplied
+by precision at that operating point. It is not trapezoidal area under the
+precision–recall curve. Both classes must be present; an absent class is not
+silently turned into a perfect curve.
+
 ## Existing statistical layers
 
 The crate also exposes descriptive statistics, probability distributions,
