@@ -62,7 +62,7 @@ The upstream C source's quirks are not silently fixed in the reference path. Whe
 
 The ExposureAwareUcb treatment is a CivBench extension, not part of Czaplicka et al.'s original C implementation. It ranks an available trait by:
 
-score(i) = payoff(i) + beta * sqrt(log(2 + total_exposures) / (1 + adoption_count(i))).
+score(i) = payoff(i) + beta * sqrt(log(2 + total_adoptions) / (1 + adoption_count(i))).
 
 The exploration bonus rewards promising but under-exposed trait lineages. This is a controlled intervention, not an assumption that novelty is always beneficial. The evaluation must show performance and diversity together.
 
