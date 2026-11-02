@@ -445,8 +445,8 @@ mod tests {
             primary_inductance_h: 0.01,
             primary_capacitance_f: 1.0e-6,
             secondary_resistance_ohm: 20.0,
-            secondary_inductance_h: 0.01,
-            secondary_capacitance_f: 1.0e-6,
+            secondary_inductance_h: 0.015,
+            secondary_capacitance_f: 1.5e-6,
             coupling_coefficient: 0.1,
             secondary_winding_polarity: 1,
         };
@@ -480,6 +480,34 @@ mod tests {
         close(positive.primary_input_impedance_ohm.imaginary, negative.primary_input_impedance_ohm.imaginary);
         close(positive.secondary_current_per_volt_a_per_v.imaginary, -negative.secondary_current_per_volt_a_per_v.imaginary);
         close(positive.secondary_resistor_power_w_per_v2, negative.secondary_resistor_power_w_per_v2);
+    }
+
+    #[test]
+    fn zero_mutual_coupling_recovers_the_standalone_primary_loop() {
+        let model = DrivenCoupledSeriesRlcV1 {
+            primary_resistance_ohm: 10.0,
+            primary_inductance_h: 0.01,
+            primary_capacitance_f: 1.0e-6,
+            secondary_resistance_ohm: 20.0,
+            secondary_inductance_h: 0.015,
+            secondary_capacitance_f: 1.5e-6,
+            coupling_coefficient: 0.0,
+            secondary_winding_polarity: 1,
+        };
+        let frequency = 1_000.0;
+        let response = model.response_at(frequency).unwrap();
+        let primary = SeriesRlcV1 {
+            resistance_ohm: model.primary_resistance_ohm,
+            inductance_h: model.primary_inductance_h,
+            capacitance_f: model.primary_capacitance_f,
+        }.impedance_at(frequency).unwrap();
+        close(response.mutual_inductance_h, 0.0);
+        close(response.primary_input_impedance_ohm.real, primary.real);
+        close(response.primary_input_impedance_ohm.imaginary, primary.imaginary);
+        close(response.secondary_current_per_volt_a_per_v.real, 0.0);
+        close(response.secondary_current_per_volt_a_per_v.imaginary, 0.0);
+        close(response.secondary_resistor_power_w_per_v2, 0.0);
+        close(response.power_balance_residual_w_per_v2, 0.0);
     }
 
     #[test]
