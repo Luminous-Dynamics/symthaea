@@ -4,6 +4,25 @@
 //! Provenance classes and likelihood models are caller-supplied and are not
 //! authenticated or calibrated by this module.
 
+pub use symthaea_rea_investigator::decision::{
+    DecisionAbstentionReason,
+    DecisionAwareConfig,
+    DecisionAwareExperimentResult,
+    DecisionAwarePlan,
+    DecisionClaimCeiling,
+    DecisionError,
+    DecisionErrorKind,
+    DecisionOutcomeResult,
+    DecisionRankingPolicy,
+    DecisionRejectionReason,
+    DecisionScenarioResult,
+    HypothesisUtility,
+    RejectedDecisionExperiment,
+    SharedPolicyOutcome,
+    TerminalDecision,
+    plan_next_experiment_decision_aware,
+};
+
 pub use symthaea_rea_investigator::robust::{
     LikelihoodModelScenario,
     RobustAbstentionReason,
