@@ -516,3 +516,34 @@ For our own reporting, keep the official SRE-Bench score unchanged, but add two 
 - **coverage-adjusted task yield** = passed tasks / all eligible tasks.
 
 Also publish refused, abstained, unsupported, timeout and tool-failure counts separately. Do not relabel the coverage-adjusted measure as the official SRE-Bench score. This is the guard against a system appearing stronger merely because it declines more difficult tasks.
+
+
+## 14. External benchmark baselines added: SRE-Bench, Decompile-Bench and OWASP MASTG
+
+The reverse-engineering programme now includes [REA-RUST-009 / #10026](https://github.com/Luminous-Dynamics/symthaea/issues/10026).
+
+### SRE-Bench (agentic binary reverse engineering)
+
+The October 2026 benchmark page reports 19 private programs, 262 binary instances and 1,572 graded tasks across firmware, malware, games, file formats and network protocols. It includes C/C++/Rust/Go, 44 in-house anti-analysis protections, isolated-container task environments and deterministic grading. Its public-facing model results include GPT-6-Astra at 5.55/6 mean score and 82.3% fully solved on 181 graded instances; its graded denominator is not the whole corpus.
+
+This is the strongest currently identified external reference for realistic agentic RE. Its program instances are private; access and participation must follow the maintainers' process. The benchmark's exact task, budget, tooling and safety settings must be reproduced before comparing scores. Do not mirror private task data.
+
+### Decompile-Bench (function-level decompilation)
+
+Stanford AIMS lists 72,059 released decompiler outputs from IDA and Ghidra over HumanEval, MBPP and GitHub2025 functions. Its edit-similarity metric measures textual similarity, not executable correctness. The published response matrix reports roughly 0.206 mean for IDA and 0.202 for Ghidra.
+
+Use the released metric as a text-reconstruction baseline only. Add compiled/tested behavior equivalence and semantic graph metrics as distinct outcome dimensions.
+
+### OWASP MASTG / MASVS / MASWE
+
+OWASP explicitly cautions that automated scanners alone cannot complete MASVS verification; contextual architecture and business-logic assessment are necessary. The comparative plan therefore separates scanner results from manual/agentic test evidence. MobSF is a useful automated baseline, but Android root/Frida Gadget/physical configurations and Corellium/jailbroken iOS configurations remain separate cohorts.
+
+### Experimental controls
+
+Use matched, blinded REA-only, Symthaea-only, REA+Symthaea, specialist decompiler and MobSF arms where relevant. Report per-domain, per-platform, per-hardening family and test configuration. Never combine SRE-Bench, Decompile-Bench and mobile security into one headline score.
+
+References:
+- SRE-Bench: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+- Decompile-Bench: https://aims.stanford.edu/measurement-db/decompile_bench
+- OWASP assessment and automation limitations: https://mas.owasp.org/MASVS/04-Assessment_and_Certification/
+- MobSF dynamic analysis requirements: https://github.com/MobSF/docs/blob/master/develop.md
