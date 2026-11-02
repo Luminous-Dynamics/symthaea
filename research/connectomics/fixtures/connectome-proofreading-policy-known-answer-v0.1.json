@@ -1,0 +1,88 @@
+{
+  "fixture_version": "0.1",
+  "synthetic_only": true,
+  "review_duration_minutes_per_case": 2,
+  "review_budget_minutes": 4,
+  "missed_error_cost_units_per_case": 10,
+  "tie_break": "operation_id_ascending",
+  "policies": [
+    {
+      "policy_id": "score_ranked_non_oracle",
+      "cases": [
+        {
+          "operation_id": "op-A",
+          "actual_error": true,
+          "error_probability": 0.95
+        },
+        {
+          "operation_id": "op-B",
+          "actual_error": false,
+          "error_probability": 0.8
+        },
+        {
+          "operation_id": "op-C",
+          "actual_error": true,
+          "error_probability": 0.4
+        },
+        {
+          "operation_id": "op-D",
+          "actual_error": false,
+          "error_probability": 0.1
+        }
+      ],
+      "expected": {
+        "reviewed_operation_ids": [
+          "op-A",
+          "op-B"
+        ],
+        "review_count": 2,
+        "total_error_count": 2,
+        "reviewed_error_count": 1,
+        "review_precision": 0.5,
+        "error_recall": 0.5,
+        "missed_error_count": 1,
+        "reviewer_minutes": 4,
+        "missed_error_cost_units": 10
+      }
+    },
+    {
+      "policy_id": "oracle_upper_bound_only",
+      "cases": [
+        {
+          "operation_id": "op-A",
+          "actual_error": true,
+          "error_probability": 0.99
+        },
+        {
+          "operation_id": "op-B",
+          "actual_error": false,
+          "error_probability": 0.02
+        },
+        {
+          "operation_id": "op-C",
+          "actual_error": true,
+          "error_probability": 0.98
+        },
+        {
+          "operation_id": "op-D",
+          "actual_error": false,
+          "error_probability": 0.01
+        }
+      ],
+      "expected": {
+        "reviewed_operation_ids": [
+          "op-A",
+          "op-C"
+        ],
+        "review_count": 2,
+        "total_error_count": 2,
+        "reviewed_error_count": 2,
+        "review_precision": 1,
+        "error_recall": 1,
+        "missed_error_count": 0,
+        "reviewer_minutes": 4,
+        "missed_error_cost_units": 0
+      }
+    }
+  ]
+}

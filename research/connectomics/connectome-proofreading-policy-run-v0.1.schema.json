@@ -1,0 +1,558 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-proofreading-policy-run-v0.1.schema.json",
+  "title": "Connectome proofreading policy evaluation run manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "track",
+    "dataset",
+    "evaluation_regime",
+    "model",
+    "prediction_artifact",
+    "split_policy",
+    "task_view_contract",
+    "cost_profile",
+    "review_budgets",
+    "baselines",
+    "metrics",
+    "impact_weighting",
+    "license_status",
+    "review_resolution_profile"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "track": {
+      "enum": [
+        "CB2_RETROSPECTIVE_TRIAGE",
+        "IMPACT_AWARE_TRIAGE"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revision",
+        "revision_commit_sha",
+        "dataset_card_sha256",
+        "shard_manifest_sha256",
+        "operation_identity_field"
+      ],
+      "properties": {
+        "repository": {
+          "const": "jeffbbrown2/ConnectomeBench2"
+        },
+        "revision": {
+          "const": "v2"
+        },
+        "revision_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "dataset_card_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shard_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "operation_identity_field": {
+          "const": "combined_sample_hash"
+        }
+      }
+    },
+    "evaluation_regime": {
+      "enum": [
+        "NATURAL_MIX_FULL_TEST",
+        "BALANCED_MOUSE_FLY",
+        "UNSEEN_SPECIES_TRANSFER",
+        "PROSPECTIVE_VOLUME_HOLDOUT"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "checkpoint_sha256",
+        "inference_config_sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "inference_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "prediction_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "row_count",
+        "unit",
+        "required_columns"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unit": {
+          "const": "task_operation"
+        },
+        "required_columns": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "combined_sample_hash",
+              "task_route",
+              "species",
+              "split",
+              "error_probability",
+              "predicted_action"
+            ]
+          },
+          "minItems": 6
+        }
+      }
+    },
+    "split_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_keys",
+        "no_group_overlap",
+        "fit_costs_on_validation_only",
+        "freeze_before_test"
+      ],
+      "properties": {
+        "group_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "source_volume_id",
+              "neuron_id",
+              "animal_id",
+              "session_id"
+            ]
+          },
+          "contains": {
+            "const": "source_volume_id"
+          }
+        },
+        "no_group_overlap": {
+          "const": true
+        },
+        "fit_costs_on_validation_only": {
+          "const": true
+        },
+        "freeze_before_test": {
+          "const": true
+        }
+      }
+    },
+    "task_view_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_error_views",
+        "merge_error_views",
+        "em_best_for_merge_error"
+      ],
+      "properties": {
+        "split_error_views": {
+          "const": [
+            "xy",
+            "xz",
+            "yz",
+            "oblique"
+          ]
+        },
+        "merge_error_views": {
+          "const": [
+            "xy",
+            "xz",
+            "yz"
+          ]
+        },
+        "em_best_for_merge_error": {
+          "const": false
+        }
+      }
+    },
+    "cost_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "sha256",
+        "frozen_before_test_access",
+        "review_minutes_per_case",
+        "missed_error_cost_units_by_task",
+        "unit"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frozen_before_test_access": {
+          "const": true
+        },
+        "review_minutes_per_case": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "missed_error_cost_units_by_task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "split_error",
+            "merge_error"
+          ],
+          "properties": {
+            "split_error": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "merge_error": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "review_budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fractions",
+        "reviewer_minutes"
+      ],
+      "properties": {
+        "fractions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        },
+        "reviewer_minutes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "SEEDED_RANDOM",
+          "FIXED_THRESHOLD",
+          "UNCERTAINTY_ONLY",
+          "SCORE_TIMES_FROZEN_COST",
+          "SUPERVISED_SPECIALIST",
+          "LORA_VLM",
+          "TIMED_HUMAN_WORKFLOW",
+          "ORACLE_UPPER_BOUND"
+        ]
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "review_recall_at_fraction",
+          "review_recall_at_minutes",
+          "review_precision",
+          "missed_error_count",
+          "false_review_count",
+          "reviewer_minutes_per_error_found",
+          "area_under_review_recall_curve",
+          "brier_score",
+          "log_loss",
+          "ece",
+          "selective_risk",
+          "coverage",
+          "latency_ms",
+          "throughput_ops_per_second",
+          "peak_vram_bytes",
+          "cluster_bootstrap_ci"
+        ]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "const": "review_recall_at_fraction"
+          }
+        },
+        {
+          "contains": {
+            "const": "review_recall_at_minutes"
+          }
+        },
+        {
+          "contains": {
+            "const": "review_precision"
+          }
+        },
+        {
+          "contains": {
+            "const": "missed_error_count"
+          }
+        },
+        {
+          "contains": {
+            "const": "brier_score"
+          }
+        },
+        {
+          "contains": {
+            "const": "cluster_bootstrap_ci"
+          }
+        },
+        {
+          "contains": {
+            "const": "ece"
+          }
+        },
+        {
+          "contains": {
+            "const": "selective_risk"
+          }
+        },
+        {
+          "contains": {
+            "const": "coverage"
+          }
+        }
+      ]
+    },
+    "impact_weighting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "unit",
+            "independent_source"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "independent_source": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "then": {
+            "required": [
+              "artifact"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "artifact"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "license_status": {
+      "enum": [
+        "APPROVED_FOR_EVALUATION"
+      ]
+    },
+    "review_resolution_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "sha256",
+        "calibration_population",
+        "calibration_unit",
+        "validation_protocol_sha256",
+        "frozen_before_test_access"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "calibration_population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frozen_before_test_access": {
+          "const": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "track": {
+            "const": "IMPACT_AWARE_TRIAGE"
+          }
+        },
+        "required": [
+          "track"
+        ]
+      },
+      "then": {
+        "properties": {
+          "impact_weighting": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "impact_weighting": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "impact_weighting"
+        ]
+      },
+      "then": {
+        "properties": {
+          "track": {
+            "const": "IMPACT_AWARE_TRIAGE"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-proofreading-policy-fixture-v0.1.schema.json",
+  "title": "Synthetic known-answer fixture for proofreading review policies",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture_version",
+    "synthetic_only",
+    "review_duration_minutes_per_case",
+    "review_budget_minutes",
+    "missed_error_cost_units_per_case",
+    "tie_break",
+    "policies"
+  ],
+  "properties": {
+    "fixture_version": {
+      "const": "0.1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "review_duration_minutes_per_case": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "review_budget_minutes": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "missed_error_cost_units_per_case": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "tie_break": {
+      "const": "operation_id_ascending"
+    },
+    "policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy_id",
+          "cases",
+          "expected"
+        ],
+        "properties": {
+          "policy_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation_id",
+                "actual_error",
+                "error_probability"
+              ],
+              "properties": {
+                "operation_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "actual_error": {
+                  "type": "boolean"
+                },
+                "error_probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewed_operation_ids",
+              "review_count",
+              "total_error_count",
+              "reviewed_error_count",
+              "review_precision",
+              "error_recall",
+              "missed_error_count",
+              "reviewer_minutes",
+              "missed_error_cost_units"
+            ],
+            "properties": {
+              "reviewed_operation_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "review_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_error_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reviewed_error_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "review_precision": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "error_recall": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "missed_error_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reviewer_minutes": {
+                "type": "number",
+                "minimum": 0
+              },
+              "missed_error_cost_units": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
