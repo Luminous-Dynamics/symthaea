@@ -96,9 +96,10 @@ pub struct VerifiedSnapshot {
 /// The verifier recomputes the exact rational SCORE-style refund from
 /// alpha, previous evidence, previous cumulative refund, and the new
 /// time-monotone e-process value. The receipt is data only; it is not trusted.
-pub fn verify_overshoot_refund_transition(
+fn verify_overshoot_refund_transition_with_cap(
     alpha_numerator: u64,
     alpha_denominator: u64,
+    refund_cap_numerator: Option<u128>,
     previous_round: Option<u64>,
     previous_evidence_value: u128,
     previous_refund_numerator: u128,
@@ -116,24 +117,12 @@ pub fn verify_overshoot_refund_transition(
     let denominator = (alpha_denominator as u128)
         .checked_mul(EVIDENCE_ONE)
         .ok_or(VerifyError::Overflow)?;
-    let cap = (alpha_numerator as u128)
-        .checked_mul(EVIDENCE_ONE)
-        .ok_or(VerifyError::Overflow)?;
-    let previous_scaled_evidence = (alpha_numerator as u128)
-        .checked_mul(previous_evidence_value)
-        .ok_or(VerifyError::Overflow)?;
-    let previous_expected_refund = previous_scaled_evidence
-        .saturating_sub(denominator)
-        .min(cap);
-    if previous_expected_refund != previous_refund_numerator {
-        return Err(VerifyError::RefundReplayMismatch);
-    }
-
     let alpha_scaled_evidence = (alpha_numerator as u128)
         .checked_mul(receipt.evidence_value)
         .ok_or(VerifyError::Overflow)?;
     let raw_overshoot = alpha_scaled_evidence.saturating_sub(denominator);
-    let expected_cumulative = raw_overshoot.min(cap);
+    let expected_cumulative = refund_cap_numerator
+        .map_or(raw_overshoot, |cap| raw_overshoot.min(cap));
     if expected_cumulative < previous_refund_numerator {
         return Err(VerifyError::RefundReplayMismatch);
     }
@@ -155,6 +144,48 @@ pub fn verify_overshoot_refund_transition(
     Ok(())
 }
 
+/// Independently verifies one bounded-credit persistent refund transition.
+pub fn verify_overshoot_refund_transition(
+    alpha_numerator: u64,
+    alpha_denominator: u64,
+    previous_round: Option<u64>,
+    previous_evidence_value: u128,
+    previous_refund_numerator: u128,
+    receipt: &OvershootRefundReceipt,
+) -> Result<(), VerifyError> {
+    let cap = (alpha_numerator as u128)
+        .checked_mul(EVIDENCE_ONE)
+        .ok_or(VerifyError::Overflow)?;
+    verify_overshoot_refund_transition_with_cap(
+        alpha_numerator,
+        alpha_denominator,
+        Some(cap),
+        previous_round,
+        previous_evidence_value,
+        previous_refund_numerator,
+        receipt,
+    )
+}
+
+/// Independently verifies a full, uncapped SCORE-style overshoot transition.
+pub fn verify_full_overshoot_refund_transition(
+    alpha_numerator: u64,
+    alpha_denominator: u64,
+    previous_round: Option<u64>,
+    previous_evidence_value: u128,
+    previous_refund_numerator: u128,
+    receipt: &OvershootRefundReceipt,
+) -> Result<(), VerifyError> {
+    verify_overshoot_refund_transition_with_cap(
+        alpha_numerator,
+        alpha_denominator,
+        None,
+        previous_round,
+        previous_evidence_value,
+        previous_refund_numerator,
+        receipt,
+    )
+}
 
 /// Replays a complete refund receipt sequence from the normalized V_0 = 1
 /// state and returns the final cumulative refund numerator.
@@ -268,6 +299,32 @@ pub fn verify_overshoot_refund_sequence_from(
 
     for receipt in receipts {
         verify_overshoot_refund_transition(
+            alpha_numerator,
+            alpha_denominator,
+            previous_round,
+            previous_evidence,
+            previous_refund,
+            receipt,
+        )?;
+        previous_round = Some(receipt.round);
+        previous_evidence = receipt.evidence_value;
+        previous_refund = receipt.cumulative_refund_numerator;
+    }
+    Ok(previous_refund)
+}
+
+/// Replays a complete full-overshoot sequence from normalized V_0 = 1.
+pub fn verify_full_overshoot_refund_sequence(
+    alpha_numerator: u64,
+    alpha_denominator: u64,
+    receipts: &[OvershootRefundReceipt],
+) -> Result<u128, VerifyError> {
+    let mut previous_round = None;
+    let mut previous_evidence = EVIDENCE_ONE;
+    let mut previous_refund = 0_u128;
+
+    for receipt in receipts {
+        verify_full_overshoot_refund_transition(
             alpha_numerator,
             alpha_denominator,
             previous_round,
@@ -725,6 +782,76 @@ mod tests {
         );
         assert_eq!(
             verify_overshoot_refund_sequence(1, 20, &receipts),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+    }
+
+
+    #[test]
+    fn independent_verifier_accepts_full_score_overshoot_receipt() {
+        let receipt = OvershootRefundReceipt {
+            round: 1,
+            evidence_value: 100 * EVIDENCE_ONE,
+            refund_increment_numerator: 80 * EVIDENCE_ONE,
+            cumulative_refund_numerator: 80 * EVIDENCE_ONE,
+            effective_cost_numerator: 20 * EVIDENCE_ONE,
+            denominator: 20 * EVIDENCE_ONE,
+            rejected: true,
+        };
+        assert_eq!(
+            verify_full_overshoot_refund_transition(
+                1, 20, Some(0), EVIDENCE_ONE, 0, &receipt
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_overshoot_refund_transition(
+                1, 20, Some(0), EVIDENCE_ONE, 0, &receipt
+            ),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+    }
+
+    #[test]
+    fn independent_verifier_replays_full_overshoot_sequence_without_double_count() {
+        let receipts = vec![
+            OvershootRefundReceipt {
+                round: 1,
+                evidence_value: 21 * EVIDENCE_ONE,
+                refund_increment_numerator: EVIDENCE_ONE,
+                cumulative_refund_numerator: EVIDENCE_ONE,
+                effective_cost_numerator: 20 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: true,
+            },
+            OvershootRefundReceipt {
+                round: 2,
+                evidence_value: 100 * EVIDENCE_ONE,
+                refund_increment_numerator: 79 * EVIDENCE_ONE,
+                cumulative_refund_numerator: 80 * EVIDENCE_ONE,
+                effective_cost_numerator: 20 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: true,
+            },
+            OvershootRefundReceipt {
+                round: 3,
+                evidence_value: 1000 * EVIDENCE_ONE,
+                refund_increment_numerator: 900 * EVIDENCE_ONE,
+                cumulative_refund_numerator: 980 * EVIDENCE_ONE,
+                effective_cost_numerator: 20 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: true,
+            },
+        ];
+        assert_eq!(
+            verify_full_overshoot_refund_sequence(1, 20, &receipts),
+            Ok(980 * EVIDENCE_ONE)
+        );
+
+        let mut tampered = receipts.clone();
+        tampered[2].refund_increment_numerator = 1000 * EVIDENCE_ONE;
+        assert_eq!(
+            verify_full_overshoot_refund_sequence(1, 20, &tampered),
             Err(VerifyError::RefundReplayMismatch)
         );
     }
