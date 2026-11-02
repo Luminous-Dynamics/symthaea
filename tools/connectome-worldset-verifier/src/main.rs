@@ -294,7 +294,10 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     })?;
     let manifest: Value = serde_json::from_slice(&bytes)
         .map_err(|error| vec![format!("manifest JSON is invalid: {error}")])?;
-    let root = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let root = manifest_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
 
     if manifest.get("protocol").and_then(Value::as_str) != Some(PROTOCOL) {
         errors.push(format!("protocol: expected {PROTOCOL}"));
@@ -356,6 +359,10 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
             binding.insert(field.to_owned(), Value::String(value.to_owned()));
         }
     }
+    let task_route = context.get("task_route").and_then(Value::as_str);
+    if !matches!(task_route, Some("false_split_correction" | "false_merge_identification" | "split_mask_generation")) {
+        errors.push("context.task_route: unsupported task route".to_owned());
+    }
     let decision_threshold = finite_number(&context, "decision_threshold", &mut errors);
     let materiality_threshold = finite_number(&context, "materiality_threshold", &mut errors);
     if materiality_threshold.is_some_and(|value| value <= 0.0) {
@@ -368,15 +375,27 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         binding.insert("materiality_threshold".to_owned(), json!(value));
     }
 
-    let baseline_interval = context
-        .get("baseline_interval")
-        .and_then(|value| validate_interval(value, "context.baseline_interval", &mut errors));
-    let after_interval = context
-        .get("after_edit_interval")
-        .and_then(|value| validate_interval(value, "context.after_edit_interval", &mut errors));
-    let paired_effect_interval = context
-        .get("paired_effect_interval")
-        .and_then(|value| validate_interval(value, "context.paired_effect_interval", &mut errors));
+    let baseline_interval = match context.get("baseline_interval") {
+        Some(value) => validate_interval(value, "context.baseline_interval", &mut errors),
+        None => {
+            errors.push("context.baseline_interval: missing".to_owned());
+            None
+        }
+    };
+    let after_interval = match context.get("after_edit_interval") {
+        Some(value) => validate_interval(value, "context.after_edit_interval", &mut errors),
+        None => {
+            errors.push("context.after_edit_interval: missing".to_owned());
+            None
+        }
+    };
+    let paired_effect_interval = match context.get("paired_effect_interval") {
+        Some(value) => validate_interval(value, "context.paired_effect_interval", &mut errors),
+        None => {
+            errors.push("context.paired_effect_interval: missing".to_owned());
+            None
+        }
+    };
     if let (Some(baseline), Some(after), Some(effect)) =
         (baseline_interval, after_interval, paired_effect_interval)
     {
@@ -405,7 +424,7 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
 
     let artifact_digests = validate_artifacts(&manifest, root, &mut errors);
     if let Some(receipt_sha) = freeze_receipt_digest {
-        if artifact_digests.get("prequery_freeze_receipt") != Some(&receipt_sha.to_owned()) {
+        if artifact_digests.get("prequery_freeze_receipt").map(String::as_str) != Some(receipt_sha) {
             errors.push("freeze.prequery_freeze_receipt_sha256: does not match verified artifact".to_owned());
         }
     }
@@ -415,7 +434,7 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         ("candidate_patch_sha256", "candidate_patch"),
     ] {
         if let Some(value) = context.get(context_field).and_then(Value::as_str) {
-            if artifact_digests.get(artifact_id) != Some(&value.to_owned()) {
+            if artifact_digests.get(artifact_id).map(String::as_str) != Some(value) {
                 errors.push(format!("context.{context_field}: does not match verified artifact"));
             }
         }
@@ -447,7 +466,7 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     });
     let mut expected_world_ids = Vec::new();
     match product_count {
-        Some(count) if count > 0 && count <= MAX_WORLDS && axes.len() == manifest.get("axes").and_then(Value::as_array).map_or(0, Vec::len) => {
+        Some(count) if count > 0 && count <= MAX_WORLDS && axes.len() == manifest.get("axes").and_then(Value::as_array).map_or(0, |values| values.len()) => {
             let mut assignment = Map::new();
             if let Err(error) = expand_world_ids(&axes, 0, &mut assignment, &mut expected_world_ids) {
                 errors.push(error);
@@ -588,21 +607,21 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
 
     let mut coverage = json!({
         "universe_id": universe_id,
-        "candidate_id": context.get("candidate_id"),
-        "operation_id": context.get("operation_id"),
-        "sample_hash": context.get("sample_hash"),
-        "task_route": context.get("task_route"),
-        "query_id": context.get("query_id"),
-        "scenario_id": context.get("scenario_id"),
-        "query_definition_sha256": context.get("query_definition_sha256"),
-        "metric_id": context.get("metric_id"),
-        "unit_id": context.get("unit_id"),
-        "decision_threshold": context.get("decision_threshold"),
-        "materiality_threshold": context.get("materiality_threshold"),
-        "source_volume_id": context.get("source_volume_id"),
-        "base_graph_snapshot_sha256": context.get("base_graph_snapshot_sha256"),
-        "hypothetical_result_graph_snapshot_sha256": context.get("hypothetical_result_graph_snapshot_sha256"),
-        "candidate_patch_sha256": context.get("candidate_patch_sha256"),
+        "candidate_id": binding.get("candidate_id"),
+        "operation_id": binding.get("operation_id"),
+        "sample_hash": binding.get("sample_hash"),
+        "task_route": binding.get("task_route"),
+        "query_id": binding.get("query_id"),
+        "scenario_id": binding.get("scenario_id"),
+        "query_definition_sha256": binding.get("query_definition_sha256"),
+        "metric_id": binding.get("metric_id"),
+        "unit_id": binding.get("unit_id"),
+        "decision_threshold": binding.get("decision_threshold"),
+        "materiality_threshold": binding.get("materiality_threshold"),
+        "source_volume_id": binding.get("source_volume_id"),
+        "base_graph_snapshot_sha256": binding.get("base_graph_snapshot_sha256"),
+        "hypothetical_result_graph_snapshot_sha256": binding.get("hypothetical_result_graph_snapshot_sha256"),
+        "candidate_patch_sha256": binding.get("candidate_patch_sha256"),
         "universe_manifest_sha256": computed_manifest_sha,
         "admissibility_policy_sha256": admissibility_policy_sha256,
         "enumeration_input_sha256": enumeration_input_sha256,
