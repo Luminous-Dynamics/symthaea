@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/adaptive-temporal-replay/run-receipt-v0.1.schema.json",
+  "title": "Adaptive Temporal Calibration Synthetic Run Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "scenario_id",
+    "scenario_kind",
+    "seed_id",
+    "generator_id",
+    "fixture_sha256",
+    "code_commit",
+    "outcome_count",
+    "feedback_event_count",
+    "revision_count",
+    "retraction_count",
+    "maximum_feedback_lag_steps",
+    "maximum_source_availability_lag_steps",
+    "residual_min_milli",
+    "residual_max_milli",
+    "label_ledger_sha256",
+    "label_ledger_verified"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.adaptive_temporal_calibration_run_receipt.v0.1"
+    },
+    "status": {
+      "const": "synthetic_only_not_a_real_data_or_coverage_claim"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generator_id": {
+      "const": "splitmix64-uniform-residual-v1"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "code_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "outcome_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "feedback_event_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "revision_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retraction_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_feedback_lag_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_source_availability_lag_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "residual_min_milli": {
+      "type": "integer"
+    },
+    "residual_max_milli": {
+      "type": "integer"
+    },
+    "label_ledger_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "label_ledger_verified": {
+      "const": true
+    }
+  }
+}
