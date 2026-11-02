@@ -65,6 +65,8 @@ Two entry points deliberately have different purposes:
 
 The file importer currently uses Serde JSON's default recursion guard. Inputs rejected by size, duplicate-key or nesting limits are explicit import failures, not successful or complete Evidence.
 
+Rust strings represent Unicode scalar values and cannot represent isolated UTF-16 surrogate code units. JavaScript strings can contain isolated surrogates, and JSON.parse/JSON.stringify can preserve them using escaped surrogate code units. The current Rust raw importer therefore rejects such inputs rather than pretending to provide full string-domain parity. The differential corpus must retain this as an explicit unsupported/stricter-ingestion case; do not normalize, replace or silently drop those code units.
+
 ## Validation
 
 From the Symthaea workspace:
