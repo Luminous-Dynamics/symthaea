@@ -80,6 +80,8 @@
         "materiality_exceeded_guaranteed",
         "effect_method",
         "decision_flip_method",
+        "paired_decision_world_count",
+        "decision_flip_method",
         "paired_decision_world_count"
       ],
       "properties": {
