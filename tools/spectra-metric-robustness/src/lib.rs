@@ -874,6 +874,48 @@ mod tests {
     }
 
     #[test]
+    fn lag_one_diagnostic_does_not_bridge_a_missing_period() {
+        let candidate = CandidateView {
+            trials: vec![
+                CandidateTrial {
+                    trial_id: 0, participant_id: 0, session_id: 0, period: 0,
+                    evidence_score: Some(0.0), response: Some(true), auxiliary_score: 0.0,
+                },
+                CandidateTrial {
+                    trial_id: 1, participant_id: 0, session_id: 0, period: 1,
+                    evidence_score: None, response: None, auxiliary_score: 0.0,
+                },
+                CandidateTrial {
+                    trial_id: 2, participant_id: 0, session_id: 0, period: 2,
+                    evidence_score: Some(0.1), response: Some(false), auxiliary_score: 0.0,
+                },
+                CandidateTrial {
+                    trial_id: 3, participant_id: 0, session_id: 0, period: 3,
+                    evidence_score: Some(0.3), response: Some(false), auxiliary_score: 0.0,
+                },
+            ],
+        };
+        let truth = EvaluatorTruth {
+            trial_ids: vec![0, 1, 2, 3],
+            event_present: vec![true, false, false, false],
+            missing: vec![false, true, false, false],
+            injected_d_prime: vec![1.0; 4],
+            world: StressWorld::SerialDependence,
+            seed: 7,
+        };
+
+        // Only periods 2->3 are adjacent and observed. One pair cannot define
+        // correlation; the missing period 1 must not create a 0->2 lag-one pair.
+        let result = residual_lag_one_correlation(
+            &candidate,
+            &truth,
+            &[0.0],
+            &[0.1, 0.3],
+        );
+        assert_eq!(result, 0.0);
+    }
+
+    #[test]
     fn malformed_records_fail_closed() {
         let mut bundle = simulate(StressWorld::GaussianReference, design(7)).unwrap();
         bundle.candidate.trials[0].evidence_score = Some(f64::NAN);
