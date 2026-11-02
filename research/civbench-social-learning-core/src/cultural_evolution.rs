@@ -256,6 +256,9 @@ impl TransmissionRun {
     /// This is a model-side persistence descriptor, not the paper's raw-data
     /// classification implementation.
     pub fn optimal_present_in_every_post_seed_generation(&self) -> bool {
+        if self.generations.len() < 2 {
+            return false;
+        }
         self.generations.iter().skip(1).all(|generation| {
             generation.agents.iter().any(|agent| agent.integrated_strategy == Strategy::Optimal)
         })
@@ -527,6 +530,16 @@ mod tests {
     fn fixed_seed_reproduces_the_entire_transmission_run() {
         let config = TransmissionConfig::default();
         assert_eq!(simulate_transmission(config, 2026).unwrap(), simulate_transmission(config, 2026).unwrap());
+    }
+
+    #[test]
+    fn one_generation_is_not_misreported_as_post_seed_retention() {
+        let config = TransmissionConfig {
+            generations: 1,
+            ..high_transmission_config()
+        };
+        let run = simulate_transmission(config, 7).unwrap();
+        assert!(!run.optimal_present_in_every_post_seed_generation());
     }
 
     #[test]
