@@ -1,0 +1,54 @@
+name: VIS-005 action-conditioned forecast contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-vision-manifold/**"
+      - ".github/workflows/vis005-action-conditioned-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-vision-manifold/**"
+      - ".github/workflows/vis005-action-conditioned-contract.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vis005-action-conditioned-contract-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  contract-tests:
+    name: VIS-005 isolated Rust contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+
+      - name: Format production module and harness
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-vision-manifold/src/action_conditioned.rs \
+            crates/domains/symthaea-vision-manifold/contract-tests/src/lib.rs
+
+      - name: Compile and run production-source contract tests
+        working-directory: crates/domains/symthaea-vision-manifold/contract-tests
+        run: cargo test --all-targets
+
+      - name: Retain resolved isolated dependency lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis005-contract-cargo-lock
+          path: crates/domains/symthaea-vision-manifold/contract-tests/Cargo.lock
+          if-no-files-found: ignore
+          retention-days: 14
