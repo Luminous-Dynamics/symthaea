@@ -78,6 +78,7 @@ pub enum ReasonCode {
     RowIdMissingFromAnnotations,
     ColumnIdMissingFromAnnotations,
     UnknownTargetId,
+    InvalidTargetId,
     DuplicateTargetId,
     KeepRemoveConflict,
 }
