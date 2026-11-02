@@ -6,9 +6,10 @@ Deterministic event-driven simulation of the proposed InstantClean QuickCell + F
 
 - `FullLoadOnly`: accumulate eligible jobs until full-load capacity or maximum batch wait.
 - `QuickCellOnly`: clean each eligible item individually as the single cell becomes available.
-- `HybridResourceAware`: use QuickCell for jobs that are ineligible for FullLoad, would miss their deadline in the next full batch, or belong to a timed-out partial batch that QuickCell Pareto-dominates on per-item energy, fresh water and total serial queue service duration.
+- `HybridResourceAware`: an **offline look-ahead reference** that uses known future arrivals to estimate the next full batch. Treat this as an optimistic benchmark, not a deployable policy.
+- `HybridConservativeNoOracle`: a deployable-style conservative policy that never exposes future arrivals to the dispatch estimate. It assumes a partial batch may wait until its configured timeout, then checks deadline feasibility.
 
-The hybrid policy has no opaque weighted score. If QuickCell is no worse on energy, fresh water and total serial service duration for a timed-out partial batch, and strictly better on at least one, it diverts the items to QuickCell. If any objective conflicts or FullLoad is no worse, it retains FullLoad and reports the resulting trade-off.
+Both hybrid policies retain the no-weighted-score Pareto rule for timed-out partial batches. If QuickCell is no worse on energy, fresh water and total serial service duration, and strictly better on at least one, it diverts the items to QuickCell. If objectives conflict or FullLoad is no worse, it retains FullLoad. The conservative policy adds a worst-case timeout estimate for deadline checks; the offline look-ahead policy uses future arrivals only as an optimistic comparison bound.
 
 ## What is explicit
 
@@ -40,7 +41,7 @@ Cleaning/rinse and sanitation flags are supplied assumptions. This crate cannot 
 
 ## Simulation semantics
 
-The finite workload trace is sorted by arrival and replayed deterministically. The hybrid deadline check uses known future arrivals in the replay trace to estimate the next possible full batch; that is an offline benchmark assumption, not a deployable forecast. A production controller must use a declared forecast or conservative no-forecast rule and report forecast error.
+The finite workload trace is sorted by arrival and replayed deterministically. `HybridResourceAware` uses known future arrivals and is therefore an offline look-ahead reference only. `HybridConservativeNoOracle` estimates completion from currently pending jobs plus the configured timeout; future arrivals do not alter its current dispatch decision. It is deliberately conservative and may choose QuickCell more often than an accurate production forecast would. A future predictive controller must declare its forecast, quantify forecast error and fall back to a conservative rule when confidence is inadequate.
 
 The result reports:
 - Energy and fresh water totals.
@@ -58,7 +59,7 @@ cargo run -p symthaea-dishwasher-scheduler --bin dispatch_bench
 cargo clippy -p symthaea-dishwasher-scheduler --all-targets -- -D warnings
 ~~~
 
-Synthetic workload generators use fixed seeds and explicit scenario families. They are reproducible but are not representative household-use data until calibrated.
+The benchmark binary emits raw CSV for 1,000 deterministic seeds per scenario family (sparse, meal-burst and irregular), comparing four policies. The output is 12,000 trace/policy rows and can be aggregated with confidence intervals by a separate analysis step. Synthetic workload generators are reproducible fixtures, not representative household-use data until calibrated. All current profile coefficients remain hypothetical.
 
 ## Illustrative crossover example
 
