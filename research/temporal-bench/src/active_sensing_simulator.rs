@@ -67,6 +67,9 @@ pub enum ActiveSensingShift {
 pub struct ActiveSensingScenario {
     pub seed: u64,
     pub steps: u64,
+    /// Maximum acceptable event-detection delay. This is an application contract,
+    /// not a value learned or exposed to the candidate policy.
+    pub decision_deadline_steps: u32,
     pub event_rate_ppm: u32,
     pub min_event_duration_steps: u32,
     pub max_event_duration_steps: u32,
@@ -79,6 +82,14 @@ impl ActiveSensingScenario {
             return Err(ActiveSensingSimulationError::new(
                 "scenario.steps",
                 format!("steps must be in 1..={MAX_EPISODE_STEPS}"),
+            ));
+        }
+        if self.decision_deadline_steps == 0
+            || u64::from(self.decision_deadline_steps) > self.steps
+        {
+            return Err(ActiveSensingSimulationError::new(
+                "scenario.decision_deadline_steps",
+                "decision deadline must be positive and no longer than the episode",
             ));
         }
         if self.event_rate_ppm > PROBABILITY_SCALE {
@@ -449,10 +460,14 @@ pub struct ActiveSensingEpisodeResult {
     pub steps: u64,
     pub event_count: u64,
     pub detected_events: u64,
+    pub on_time_detected_events: u64,
+    pub late_detected_events: u64,
     pub missed_events: u64,
     pub false_alarms: u64,
     pub duplicate_alarms: u64,
     pub event_recall_ppm: Option<u32>,
+    /// Events detected within the frozen application decision deadline / all events.
+    pub on_time_event_recall_ppm: Option<u32>,
     /// Detections divided by detections + false alarms + duplicate alarms.
     pub alarm_precision_ppm: Option<u32>,
     /// Exposure denominator is the complete number of simulated steps.
@@ -465,18 +480,20 @@ pub struct ActiveSensingEpisodeResult {
     pub wake_count: u64,
     pub sensor_energy_nj: u64,
     pub wake_energy_nj: u64,
-    pub modeled_energy_nj: u64,
+    /// Synthetic sensor-acquisition + wake energy only; excludes compute/radio/memory costs.
+    pub modeled_sensor_wake_energy_nj: u64,
     pub declared_compute_cycles: u64,
     pub declared_transmit_bytes: u64,
     pub declared_memory_write_bytes: u64,
-    pub modeled_energy_per_detected_event_nj: Option<u64>,
+    pub modeled_sensor_wake_energy_per_on_time_detected_event_nj: Option<u64>,
     pub result_sha256: [u8; 32],
 }
 
 fn scenario_digest(scenario: &ActiveSensingScenario) -> [u8; 32] {
-    let mut hash = CanonicalHasher::new(b"symthaea.temporal.active-sensing-scenario.v1");
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.active-sensing-scenario.v2");
     hash.u64(scenario.seed);
     hash.u64(scenario.steps);
+    hash.u32(scenario.decision_deadline_steps);
     hash.u32(scenario.event_rate_ppm);
     hash.u32(scenario.min_event_duration_steps);
     hash.u32(scenario.max_event_duration_steps);
@@ -512,7 +529,7 @@ fn scenario_digest(scenario: &ActiveSensingScenario) -> [u8; 32] {
 }
 
 fn result_digest(result: &ActiveSensingEpisodeResult) -> [u8; 32] {
-    let mut hash = CanonicalHasher::new(b"symthaea.temporal.active-sensing-result.v1");
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.active-sensing-result.v2");
     hash.bytes(&result.scenario_sha256);
     hash.bytes(&result.policy_sha256);
     hash.bytes(&result.trace_sha256);
@@ -520,6 +537,8 @@ fn result_digest(result: &ActiveSensingEpisodeResult) -> [u8; 32] {
         result.steps,
         result.event_count,
         result.detected_events,
+        result.on_time_detected_events,
+        result.late_detected_events,
         result.missed_events,
         result.false_alarms,
         result.duplicate_alarms,
@@ -530,7 +549,7 @@ fn result_digest(result: &ActiveSensingEpisodeResult) -> [u8; 32] {
         result.wake_count,
         result.sensor_energy_nj,
         result.wake_energy_nj,
-        result.modeled_energy_nj,
+        result.modeled_sensor_wake_energy_nj,
         result.declared_compute_cycles,
         result.declared_transmit_bytes,
         result.declared_memory_write_bytes,
@@ -538,13 +557,17 @@ fn result_digest(result: &ActiveSensingEpisodeResult) -> [u8; 32] {
         hash.u64(value);
     }
     hash.u32(result.event_recall_ppm.unwrap_or(u32::MAX));
+    hash.u32(result.on_time_event_recall_ppm.unwrap_or(u32::MAX));
     hash.u32(result.alarm_precision_ppm.unwrap_or(u32::MAX));
     hash.u64(result.detection_delay_p95_steps.unwrap_or(u64::MAX));
     hash.usize(result.detection_delays_steps.len());
     for delay in &result.detection_delays_steps {
         hash.u64(*delay);
     }
-    hash.u64(result.modeled_energy_per_detected_event_nj.unwrap_or(u64::MAX));
+    hash.u64(
+        result.modeled_sensor_wake_energy_per_on_time_detected_event_nj
+            .unwrap_or(u64::MAX),
+    );
     hash.finish()
 }
 
@@ -561,6 +584,7 @@ pub fn validate_active_sensing_result(
     }
     if result.steps == 0
         || result.detected_events + result.missed_events != result.event_count
+        || result.on_time_detected_events + result.late_detected_events != result.detected_events
         || result.detection_delays_steps.len() as u64 != result.detected_events
         || result.low_power_samples + result.high_fidelity_samples != result.samples_acquired
         || result.wake_count == 0
@@ -571,7 +595,7 @@ pub fn validate_active_sensing_result(
             "event, delay, sensor-sample, or wake denominators are inconsistent",
         ));
     }
-    if result.modeled_energy_nj
+    if result.modeled_sensor_wake_energy_nj
         != result.sensor_energy_nj.saturating_add(result.wake_energy_nj)
     {
         return Err(ActiveSensingSimulationError::new(
@@ -580,6 +604,7 @@ pub fn validate_active_sensing_result(
         ));
     }
     let expected_recall = ppm(result.detected_events, result.event_count);
+    let expected_on_time_recall = ppm(result.on_time_detected_events, result.event_count);
     let alarm_count = result.detected_events
         .saturating_add(result.false_alarms)
         .saturating_add(result.duplicate_alarms);
@@ -587,14 +612,15 @@ pub fn validate_active_sensing_result(
     let expected_false_alarm_rate = (u128::from(result.false_alarms) * 1_000
         / u128::from(result.steps)) as u64;
     if result.event_recall_ppm != expected_recall
+        || result.on_time_event_recall_ppm != expected_on_time_recall
         || result.alarm_precision_ppm != expected_precision
         || result.false_alarms_per_1_000_steps != expected_false_alarm_rate
         || result.detection_delay_p95_steps != p95_nearest_rank(&result.detection_delays_steps)
-        || result.modeled_energy_per_detected_event_nj
-            != if result.detected_events == 0 {
+        || result.modeled_sensor_wake_energy_per_on_time_detected_event_nj
+            != if result.on_time_detected_events == 0 {
                 None
             } else {
-                Some(result.modeled_energy_nj / result.detected_events)
+                Some(result.modeled_sensor_wake_energy_nj / result.on_time_detected_events)
             }
     {
         return Err(ActiveSensingSimulationError::new(
@@ -739,11 +765,21 @@ pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
 
     let event_count = hidden.events.len() as u64;
     let detected_events = detected.iter().filter(|value| **value).count() as u64;
+    let on_time_detected_events = detection_delays_steps
+        .iter()
+        .filter(|delay| **delay <= u64::from(scenario.decision_deadline_steps))
+        .count() as u64;
+    let late_detected_events = detected_events - on_time_detected_events;
     let missed_events = event_count - detected_events;
     let samples_acquired = low_power_samples + high_fidelity_samples;
-    let modeled_energy_nj = sensor_energy_nj.checked_add(wake_energy_nj).ok_or_else(|| {
-        ActiveSensingSimulationError::new("result.modeled_energy_nj", "counter overflow")
-    })?;
+    let modeled_sensor_wake_energy_nj = sensor_energy_nj
+        .checked_add(wake_energy_nj)
+        .ok_or_else(|| {
+            ActiveSensingSimulationError::new(
+                "result.modeled_sensor_wake_energy_nj",
+                "counter overflow",
+            )
+        })?;
     let alarm_count = detected_events
         .saturating_add(false_alarms)
         .saturating_add(duplicate_alarms);
@@ -754,10 +790,13 @@ pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
         steps: scenario.steps,
         event_count,
         detected_events,
+        on_time_detected_events,
+        late_detected_events,
         missed_events,
         false_alarms,
         duplicate_alarms,
         event_recall_ppm: ppm(detected_events, event_count),
+        on_time_event_recall_ppm: ppm(on_time_detected_events, event_count),
         alarm_precision_ppm: ppm(detected_events, alarm_count),
         false_alarms_per_1_000_steps: (u128::from(false_alarms) * 1_000
             / u128::from(scenario.steps)) as u64,
@@ -769,15 +808,16 @@ pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
         wake_count,
         sensor_energy_nj,
         wake_energy_nj,
-        modeled_energy_nj,
+        modeled_sensor_wake_energy_nj,
         declared_compute_cycles,
         declared_transmit_bytes,
         declared_memory_write_bytes,
-        modeled_energy_per_detected_event_nj: if detected_events == 0 {
-            None
-        } else {
-            Some(modeled_energy_nj / detected_events)
-        },
+        modeled_sensor_wake_energy_per_on_time_detected_event_nj:
+            if on_time_detected_events == 0 {
+                None
+            } else {
+                Some(modeled_sensor_wake_energy_nj / on_time_detected_events)
+            },
         result_sha256: [0; 32],
     };
     result.result_sha256 = result_digest(&result);
@@ -793,6 +833,7 @@ mod tests {
         ActiveSensingScenario {
             seed: 0xA11CE,
             steps: 2_000,
+            decision_deadline_steps: 3,
             event_rate_ppm: 35_000,
             min_event_duration_steps: 3,
             max_event_duration_steps: 8,
@@ -919,6 +960,43 @@ mod tests {
     }
 
     #[test]
+    fn event_detection_is_separated_into_on_time_and_late_success() {
+        struct AlarmAtFour;
+        impl ActiveSensingPolicy for AlarmAtFour {
+            fn decide(&mut self, observation: &PublicObservation) -> PolicyAction {
+                PolicyAction {
+                    alarm: observation.step == 4,
+                    sensor: None,
+                    next_wake_after_steps: 1,
+                    compute_cycles: 1,
+                    transmit_bytes: 0,
+                    memory_write_bytes: 0,
+                }
+            }
+        }
+
+        let scenario = ActiveSensingScenario {
+            seed: 7,
+            steps: 20,
+            decision_deadline_steps: 2,
+            event_rate_ppm: PROBABILITY_SCALE,
+            min_event_duration_steps: 20,
+            max_event_duration_steps: 20,
+            shift: ActiveSensingShift::Stable,
+        };
+        let mut policy = AlarmAtFour;
+        let result = run_active_sensing_episode(scenario, policy_digest(10), &mut policy).unwrap();
+        assert_eq!(result.event_count, 1);
+        assert_eq!(result.detected_events, 1);
+        assert_eq!(result.on_time_detected_events, 0);
+        assert_eq!(result.late_detected_events, 1);
+        assert_eq!(result.missed_events, 0);
+        assert_eq!(result.event_recall_ppm, Some(PROBABILITY_SCALE));
+        assert_eq!(result.on_time_event_recall_ppm, Some(0));
+        validate_active_sensing_result(&result).unwrap();
+    }
+
+    #[test]
     fn invalid_wake_interval_fails_closed() {
         struct InvalidPolicy;
         impl ActiveSensingPolicy for InvalidPolicy {
@@ -948,7 +1026,7 @@ mod tests {
             &mut policy,
         )
         .unwrap();
-        result.false_alarms = result.false_alarms.saturating_add(1);
+        result.on_time_detected_events = result.on_time_detected_events.saturating_add(1);
         assert!(validate_active_sensing_result(&result).is_err());
     }
 
