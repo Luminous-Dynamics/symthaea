@@ -7,7 +7,9 @@
 //!
 //! For hypothesis H and candidate experiment e with outcome Y:
 //!
-//!     EIG(e) = H(H) - E_Y[H(H | Y, e)] = I(H; Y | e)
+//! ```text
+//! EIG(e) = H(H) - E_Y[H(H | Y, e)] = I(H; Y | e)
+//! ```
 //!
 //! Entropy and EIG are reported in bits. Cost-normalized EIG is bits per unit of
 //! caller-defined cost. It is not interchangeable with downstream decision
