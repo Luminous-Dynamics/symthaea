@@ -1522,7 +1522,7 @@ fn search_linearizations(
     let mut ready: Vec<usize> = (0..trace.operations.len())
         .filter(|index| {
             let bit = 1u64 << index;
-            done & bit == 0 && predecessors[*index] & !done == 0
+            done & bit == 0 && context.predecessors[*index] & !done == 0
         })
         .collect();
     ready.sort_by_key(|index| trace.operations[*index].op_id.as_str());
