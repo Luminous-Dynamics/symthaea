@@ -1,0 +1,740 @@
+{
+  "schema": "symthaea.adaptive_temporal_calibration_benchmark.v0.1",
+  "version": "0.1.0",
+  "status": "protocol_and_synthetic_registry_only_no_results",
+  "tracking_issue": 9980,
+  "parent_benchmark_pr": 9955,
+  "target_coverage_ppm": 900000,
+  "generator_contract": {
+    "id": "splitmix64-uniform-residual-v1",
+    "prng": "SplitMix64",
+    "distribution_transform": "u32=next_u32(); signed_ppm=floor(2000000*u32/(2^32-1))-1000000; use z_ppm=signed_ppm for residual innovations",
+    "covariate_stream": "independent SplitMix64 substream with its own committed seed tag; x_ppm uses the identical integer u32-to-signed-PPM mapping; no floating-point conversion",
+    "residual_equation": "ordinary residual = location_milli + round_away(scale_milli*z_ppm/1000000) + round_away(covariate_slope_milli*x_ppm/1000000); on a tail event replace the scale*z term with +/- tail_scale_milli",
+    "seed_policy": "every scenario x seed is an independent stream; commit seed list before evaluation; no test-seed selection",
+    "candidate_visibility": "outcome labels only become visible at feedback_available_step; later revisions only after revision_available_step",
+    "substream_seed_derivation": "seed_id XOR FNV1A64(UTF8(scenario_id)) XOR stream_tag_u64",
+    "stream_tags": {
+      "residual": 1,
+      "covariate": 2,
+      "tail_decision": 3,
+      "tail_sign": 4,
+      "feedback_delay": 5
+    },
+    "uniform_integer_mapping": "u32=(next_u64>>32); signed_ppm=floor(2000000*u32/(2^32-1))-1000000; all mapping and residual arithmetic uses integer rational arithmetic with ties rounded away from zero",
+    "tail_draw": "tail occurs when next_u32*1000000 < tail_contamination_ppm*2^32; the separate tail_sign stream selects +/- tail_scale_milli",
+    "feedback_delay_draw": "uniform_integer modes use rejection sampling over the inclusive [minimum_steps,maximum_steps] range"
+  },
+  "window_lengths": {
+    "feedback_count_steps": [
+      64,
+      100,
+      250,
+      256,
+      1024,
+      4096
+    ],
+    "elapsed_feedback_time_us": [
+      3600000000,
+      21600000000,
+      86400000000,
+      604800000000
+    ],
+    "non_overlapping_recovery_window_steps": 128,
+    "consecutive_recovery_windows": 3
+  },
+  "scenarios": [
+    {
+      "id": "stable_exchangeable_control",
+      "kind": "stationary_null",
+      "length_steps": 12000,
+      "preregistered_change_points": [],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Stationary negative/control stream for nominal behavior and false adaptation.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "abrupt_location_shift",
+      "kind": "abrupt_location",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        6000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 2000,
+          "location_end_milli": 2000,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Exact change at step 6000; tests immediate undercoverage and recalibration lag.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "piecewise_gradual_drift",
+      "kind": "gradual_location_drift",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        3000,
+        6000,
+        9000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 3000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 3000,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 750,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 9000,
+          "location_start_milli": 750,
+          "location_end_milli": 1500,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 9000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 1500,
+          "location_end_milli": 2250,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Piecewise-linear location transition; change points mark drift phase boundaries, not necessarily abrupt jumps.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "recurring_regimes",
+      "kind": "recurring_regime",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        2000,
+        4000,
+        8000,
+        10000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 2000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 2000,
+          "end_step_exclusive": 4000,
+          "location_start_milli": 1500,
+          "location_end_milli": 1500,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 4000,
+          "end_step_exclusive": 8000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 8000,
+          "end_step_exclusive": 10000,
+          "location_start_milli": 1500,
+          "location_end_milli": 1500,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 10000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Tests remembering and forgetting when an earlier regime reappears.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "variance_only_shift",
+      "kind": "variance_shift",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        6000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 2500,
+          "scale_end_milli": 2500,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Mean stays fixed while scale increases 2.5x.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "tail_contamination_shift",
+      "kind": "tail_shift",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        6000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 10000,
+          "tail_scale_milli": 4000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 80000,
+          "tail_scale_milli": 4000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Tests tail coverage separately from mean and variance summaries.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "covariate_conditional_drift",
+      "kind": "covariate_drift",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        6000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 0,
+        "maximum_steps": 0
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 1000,
+          "covariate_slope_end_milli": 1000,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": -1000,
+          "covariate_slope_end_milli": -1000,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Marginal residual scale is similar, but a conditional feature relationship reverses; report subgroup coverage.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "delayed_outcome_feedback",
+      "kind": "delayed_feedback",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        6000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 25,
+        "maximum_steps": 25
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 2000,
+          "location_end_milli": 2000,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [],
+      "notes": "Every outcome is hidden for 25 decision steps; the candidate must update only when feedback arrives.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "superseded_outcome_feedback",
+      "kind": "revised_feedback",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        6000
+      ],
+      "feedback_delay": {
+        "mode": "constant",
+        "minimum_steps": 10,
+        "maximum_steps": 10
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 6000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        },
+        {
+          "start_step": 6000,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 1500,
+          "location_end_milli": 1500,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [
+        {
+          "target_step": 3000,
+          "initial_available_step": 3010,
+          "revision_available_step": 3400,
+          "revision_kind": "supersede"
+        },
+        {
+          "target_step": 6500,
+          "initial_available_step": 6510,
+          "revision_available_step": 7000,
+          "revision_kind": "retract"
+        }
+      ],
+      "source_outages": [],
+      "notes": "Later feedback supersedes or retracts prior target assertions; only future calibration state may react after revision knowledge time.",
+      "required_source_ids": [
+        1
+      ]
+    },
+    {
+      "id": "asynchronous_source_outage",
+      "kind": "asynchronous_source_outage",
+      "length_steps": 12000,
+      "preregistered_change_points": [
+        4000,
+        7000
+      ],
+      "feedback_delay": {
+        "mode": "uniform_integer",
+        "minimum_steps": 0,
+        "maximum_steps": 40
+      },
+      "regime_segments": [
+        {
+          "start_step": 0,
+          "end_step_exclusive": 12000,
+          "location_start_milli": 0,
+          "location_end_milli": 0,
+          "scale_start_milli": 1000,
+          "scale_end_milli": 1000,
+          "tail_contamination_ppm": 0,
+          "tail_scale_milli": 1000,
+          "covariate_slope_start_milli": 0,
+          "covariate_slope_end_milli": 0,
+          "source_availability_delay_steps": 0
+        }
+      ],
+      "label_revisions": [],
+      "source_outages": [
+        {
+          "source_id": 1,
+          "start_step": 4000,
+          "end_step_exclusive": 7000,
+          "recovery_delay_steps": 40
+        }
+      ],
+      "notes": "Two required asynchronous sources; source 1 is unavailable during a fixed interval and resumes with a 40-step delay.",
+      "required_source_ids": [
+        1,
+        2
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "id": "static_split_conformal",
+      "class": "formal_under_exchangeability",
+      "status": "baseline"
+    },
+    {
+      "id": "aci",
+      "class": "online_adaptive_conformal",
+      "status": "baseline"
+    },
+    {
+      "id": "faci",
+      "class": "multi_rate_online_adaptive_conformal",
+      "status": "baseline"
+    },
+    {
+      "id": "saocp_sfogd",
+      "class": "strongly_adaptive_online_conformal",
+      "status": "baseline"
+    },
+    {
+      "id": "gibbs_candes_local_regret",
+      "class": "online_local_interval_regret",
+      "status": "baseline"
+    },
+    {
+      "id": "vaze_simultaneous_coverage_efficiency",
+      "class": "simultaneous_coverage_and_efficiency",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "sliding_window_quantile",
+      "class": "empirical_windowed_calibration",
+      "status": "baseline"
+    },
+    {
+      "id": "pace",
+      "class": "heterogeneous_horizon_heuristic",
+      "status": "heuristic_no_matching_formal_guarantee"
+    },
+    {
+      "id": "symthaea_bmac",
+      "class": "bitemporal_multi_horizon_candidate",
+      "status": "research_candidate_not_implemented"
+    },
+    {
+      "id": "delayed_aci_interleaved_tau",
+      "class": "fixed_horizon_interleaved_delayed_aci",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "macp_multi_step_adaptive_conformal",
+      "class": "multi_step_adaptive_conformal_prediction",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "acmcp_autocorrelated_multistep",
+      "class": "autocorrelation_aware_multistep_conformal_prediction",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "up_ocp_universal_portfolio",
+      "class": "parameter_free_universal_portfolio_online_conformal",
+      "status": "reproduction_required",
+      "paper_url": "https://proceedings.mlr.press/v306/liu26y.html",
+      "code_url": "https://github.com/AdaMLLab/up-for-ocp",
+      "code_commit": "3575f1f94a14620e089422f52cf9e1a6766ec7b1",
+      "code_license": "MIT",
+      "code_audit_note": "Pinned public main commit inspected 2026-11-02; commit author/committer date is 2026-01-05, before the ICML 2026 paper publication. Treat this as a supplementary pre-publication reference snapshot, not a confirmed paper-matched release. Core UniversalPortfolio class includes Dirichlet/uniform mixture choices, an alpha -= 0.015 correction, wealth/betting updates and quantile-radius calculation. Confirm exact hyperparameters, corrected alpha and paper theorem mapping before calling it a reproduction."
+    }
+  ],
+  "metrics": {
+    "global": [
+      "empirical_coverage",
+      "signed_coverage_error",
+      "absolute_miscoverage_error",
+      "mean_interval_width",
+      "median_interval_width",
+      "interval_score",
+      "winkler_score",
+      "pinball_loss",
+      "crps_when_supported",
+      "worst_group_coverage"
+    ],
+    "temporal": [
+      "minimum_rolling_coverage",
+      "maximum_absolute_rolling_coverage_deviation",
+      "fraction_windows_below_coverage_floor",
+      "longest_undercoverage_duration",
+      "integrated_coverage_deficit",
+      "post_change_recovery_steps",
+      "recovery_interval_width",
+      "recovery_interval_score",
+      "worst_case_local_coverage_error_LCE_k_over_all_contiguous_windows"
+    ],
+    "feedback": [
+      "event_to_feedback_latency",
+      "forecast_to_feedback_latency",
+      "unavailable_outcome_share",
+      "calibrator_update_lag",
+      "revision_count",
+      "correction_lag",
+      "historical_receipt_mutation_count",
+      "delay_to_memory_ratio_r",
+      "residual_memory_timescale_estimate",
+      "memory_estimation_error",
+      "signed_residual_autocorrelation_memory",
+      "absolute_residual_autocorrelation_memory",
+      "squared_residual_autocorrelation_memory",
+      "markov_switching_transition_eigenvalue_memory"
+    ],
+    "systems": [
+      "calibration_update_latency_p50_p95_p99",
+      "peak_memory_bytes",
+      "bytes_per_update",
+      "joules_per_update_when_measured"
+    ]
+  },
+  "qualification_targets": {
+    "outcomes_consumed_before_feedback_availability": 0,
+    "historical_receipts_mutated_by_later_revisions": 0,
+    "stationary_control_coverage_absolute_error_max_ppm": 25000,
+    "post_change_recovery_coverage_error_max_ppm": 50000,
+    "consecutive_recovery_windows": 3,
+    "calibration_result_interval_width_ceiling": "pre_registered_per_task",
+    "independent_seed_count_minimum": 5,
+    "qualification_target_status": "targets_not_results"
+  },
+  "references": [
+    {
+      "name": "Gibbs_Candes_JMLR_2024",
+      "url": "https://jmlr.org/beta/papers/v25/22-1218.html"
+    },
+    {
+      "name": "Bhatnagar_et_al_ICML_2023_SAOCP",
+      "url": "https://proceedings.mlr.press/v202/bhatnagar23a.html"
+    },
+    {
+      "name": "Vaze_2026_preprint",
+      "url": "https://arxiv.org/abs/2607.26577"
+    },
+    {
+      "name": "PACE_2026_heuristic",
+      "url": "https://www.mdpi.com/2571-9394/8/5/77"
+    },
+    {
+      "name": "TIME_ICML_2026",
+      "url": "https://proceedings.mlr.press/v306/qiao26g.html"
+    }
+  ],
+  "seed_ids": [
+    11,
+    23,
+    47,
+    83,
+    20261102
+  ]
+}
