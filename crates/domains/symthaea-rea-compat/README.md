@@ -83,3 +83,45 @@ The committed unit fixture is a source-derived reference vector; its semantic di
 ## Claim ceiling
 
 A matching Evidence ID proves that the supplied object is internally consistent with this implementation's semantic projection and canonicalization. It does not prove producer authorship, provenance authenticity, observation truth, hardware identity, runtime behavior, or security compliance. Use HARDSEC and independently trusted signed/anchored receipts for those claims.
+
+
+## EvidenceBundle and residual-unknown graph compatibility
+
+The optional bundle module verifies a complete REA EvidenceBundle:
+- strict top-level and manifest schemas;
+- each record's Evidence semantic ID and analysis-profile commitment;
+- duplicate Evidence record ID rejection;
+- deterministic artifact/provider/environment/scenario/capture manifests;
+- canonical record and unknown ordering;
+- residual-unknown immutable IDs and per-revision digest chains;
+- contiguous revision histories starting at revision 1;
+- supporting, contradicting, mutation and resolution Evidence references;
+- complete unknown-to-unknown relationship closure;
+- verified resolutions backed by qualifying supporting Evidence;
+- dependency-cycle rejection.
+
+Use the root Symthaea facade:
+
+\`\`\`rust,ignore
+use symthaea::rea_bundle_compat::verify_evidence_bundle_json;
+
+let raw = std::fs::read("evidence-bundle.json")?;
+let verified = verify_evidence_bundle_json(&raw)?;
+println!("records: {}", verified.record_count);
+println!("canonical digest: {}", verified.canonical_sha256);
+println!("raw file digest: {:?}", verified.raw_file_sha256);
+\`\`\`
+
+Or use the inner package's \`symthaea_rea_compat::bundle\` module directly.
+
+### Internal consistency is not authenticity
+
+A valid EvidenceBundle is an internally consistent set of claims and references. It is not a producer signature, a trusted timestamp, a hardware attestation, or proof that the observations occurred. Producer identity and observation truth must come from separately authenticated acquisition and verifier receipts.
+
+The upstream REA bundle parser does not require every \`Evidence.evidence_links\` edge to resolve inside the same bundle. To preserve upstream parser disposition, \`verify_evidence_bundle_value\` keeps that behavior. \`audit_evidence_link_closure\` is a separate, stricter diagnostic returning unresolved links without upgrading or rejecting the bundle.
+
+Raw bundle ingestion rejects duplicate JSON object keys and applies the same 64 MiB ceiling as the single-record importer. It reports the exact-file SHA-256 separately from the JCS canonical bundle SHA-256.
+
+### Current qualification limit
+
+The bundle implementation is a first source-derived Rust port. It has not yet completed upstream-generated TypeScript↔Rust EvidenceBundle fixture parity. The Evidence single-record oracle in the parent branch is a prerequisite, not a substitute for bundle-specific upstream fixtures. The dedicated CI workflow compiles this module through the isolated Cargo harness after the bundle branch is opened as a PR.

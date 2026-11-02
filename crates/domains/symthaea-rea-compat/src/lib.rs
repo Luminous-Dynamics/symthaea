@@ -10,6 +10,8 @@
 //! is deliberately stricter than JavaScript JSON.parse, which resolves
 //! duplicate keys before REA's object-level schema sees the object.
 
+pub mod bundle;
+
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -790,14 +792,17 @@ pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, Evidence
 /// Duplicate-key rejection and the 64 MiB bound are deliberately stricter than
 /// upstream's JavaScript object-level schema boundary. For exact object-level
 /// disposition parity on a parsed JSON value, call verify_evidence_value.
-pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
-    if input.len() > MAX_EVIDENCE_JSON_BYTES {
+pub(crate) fn parse_strict_json_bytes(
+    input: &[u8],
+    max_bytes: usize,
+) -> Result<Value, EvidenceError> {
+    if input.len() > max_bytes {
         return Err(EvidenceError::new(
             EvidenceErrorKind::InputTooLarge,
             format!(
-                "Evidence JSON is {} bytes; native importer limit is {} bytes",
+                "JSON input is {} bytes; importer limit is {} bytes",
                 input.len(),
-                MAX_EVIDENCE_JSON_BYTES
+                max_bytes
             ),
         ));
     }
@@ -806,17 +811,21 @@ pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceEr
     let parsed = StrictJsonValue::deserialize(&mut deserializer).map_err(|error| {
         EvidenceError::new(
             EvidenceErrorKind::InvalidJson,
-            format!("Evidence JSON parsing failed: {error}"),
+            format!("JSON parsing failed: {error}"),
         )
     })?;
     deserializer.end().map_err(|error| {
         EvidenceError::new(
             EvidenceErrorKind::InvalidJson,
-            format!("Evidence JSON has trailing data: {error}"),
+            format!("JSON has trailing data: {error}"),
         )
     })?;
+    Ok(parsed.0)
+}
 
-    let mut verified = verify_evidence_value(&parsed.0)?;
+pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
+    let parsed = parse_strict_json_bytes(input, MAX_EVIDENCE_JSON_BYTES)?;
+    let mut verified = verify_evidence_value(&parsed)?;
     verified.raw_file_sha256 = Some(sha256_hex(input));
     Ok(verified)
 }
