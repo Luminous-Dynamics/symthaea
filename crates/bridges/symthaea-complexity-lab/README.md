@@ -141,3 +141,37 @@ Dependency-aware reuse of exact lemmas and certificates is tracked in ETH-008:
 https://github.com/Luminous-Dynamics/symthaea/issues/10113
 
 The broader work plan is tracked in ETH-001.
+
+
+## Exact semiring factor elimination
+
+The `semiring` module adds a generic exact bucket variable-elimination
+reference engine. A factor graph is evaluated using explicitly supplied
+additive and multiplicative identities and a fallible `ExactSemiring`
+implementation. It reports induced-bucket width, joined assignment count,
+maximum generated table size, and semiring operation counts.
+
+Included algebras:
+- Boolean OR/AND for feasibility;
+- checked `u128` natural counts;
+- MaxCount for optimum score plus number of optima;
+- ParetoCount for nondominated objective vectors and their multiplicities;
+- the existing bounded `WeightProfile` ring for complete objective profiles.
+
+The evaluator is exact but exponential in induced width. It is a separate
+reference backend from the f64 sum-product / max-product belief-propagation
+crate. It does not implement the subexponential shared-measurement routine.
+
+Algorithm compatibility is explicit: generic semiring variable elimination
+needs distributivity; shared-measurement Taylor/Hermite interpolation needs a
+commutative Q-algebra and rational subtraction; signed SNS identities need
+additive inverses unless a weaker-algebra theorem is separately proved. A
+planner must not silently send MaxCount/Pareto/Boolean values through a
+Q-algebra-only algorithm.
+
+Tests cover triangle independent-set feasibility/count, MaxCut optimum and
+multiplicity, a Pareto tradeoff, a triangle MaxCut polynomial profile,
+malformed factor and elimination inputs, count overflow, empty factor systems,
+MaxCount tie aggregation, and Pareto-pruning compatibility under Minkowski
+addition. Rust compilation remains unverified in environments without
+Cargo/Rust.
