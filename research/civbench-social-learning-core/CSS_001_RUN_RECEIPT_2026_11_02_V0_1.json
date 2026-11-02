@@ -1,0 +1,202 @@
+{
+  "receipt_schema_version": "0.1.0",
+  "receipt_id": "CSS-001-RUN-2026-11-02-001",
+  "status": "executed_and_independently_checked_by_ci",
+  "scenario": {
+    "scenario_id": "CSS-001",
+    "scenario_version": "0.1.0",
+    "scenario_kind": "synthetic_benchmark",
+    "geography": "abstract_two_region",
+    "tick_count": 4,
+    "service_floor": 0.9,
+    "canonical_manifest": {
+      "repository": "Luminous-Dynamics/symthaea",
+      "branch": "research/civbench-social-learning-core-2026-11",
+      "path": "research/civbench-social-learning-core/CSS_001_WATER_ENERGY_SHOCK_MANIFEST_V0_1.json",
+      "git_blob_sha": "43182f95f408f5e89a1cd14a0bacbd3e3d207491"
+    },
+    "protocol_path": "research/civbench-social-learning-core/CSS_001_WATER_ENERGY_SHOCK_PROTOCOL_V0_1.md"
+  },
+  "execution": {
+    "repository": "Luminous-Dynamics/symtropy",
+    "pull_request": 3391,
+    "branch": "research/civdyn-resource-ledger-2026-11",
+    "pull_request_head_sha": "71b6f46e61f2803fe670e3437fcf7fd0689a6d4f",
+    "checked_out_merge_commit_sha": "41169d5019bc5760de548bc68e33d7536dede4fd",
+    "base_commit_sha": "de5e97ee033da463ac009799cb04fa6e15dad30",
+    "workflow": {
+      "name": "CivDyn resource ledger",
+      "run_id": 41529979207,
+      "run_number": 35,
+      "conclusion": "success",
+      "job_id": 125567341344,
+      "job_name": "Format, check and test standalone CivDyn crate",
+      "checked_steps": [
+        "cargo fmt --all -- --check",
+        "cargo check --locked --all-targets",
+        "cargo test --locked --all-targets",
+        "execute css001-water-energy-shock",
+        "verify policy transfer totals and service-floor counts",
+        "verify 24 region-tick rows and three unit-specific conservation residuals"
+      ],
+      "test_results": [
+        {
+          "target": "library",
+          "passed": 17,
+          "failed": 0
+        },
+        {
+          "target": "css001-water-energy-shock binary",
+          "passed": 6,
+          "failed": 0
+        }
+      ]
+    },
+    "source_files": [
+      {
+        "path": "research/civdyn-resource-ledger/src/lib.rs",
+        "git_blob_sha": "d04e25084e46eb0529ea135305668eb70ed6ec3f"
+      },
+      {
+        "path": "research/civdyn-resource-ledger/src/bin/css001_water_energy_shock.rs",
+        "git_blob_sha": "bd2011bef4dfbccf715e10aa4147ec46f9beca84"
+      },
+      {
+        "path": "research/civdyn-resource-ledger/Cargo.toml",
+        "git_blob_sha": "03c2dc7bdb638d685fa8674ecc4d2396a8cca059"
+      },
+      {
+        "path": ".github/workflows/civdyn-resource-ledger.yml",
+        "git_blob_sha": "83f6daf2e37f1c3d0741eec64ddc8d636df89265"
+      }
+    ]
+  },
+  "outputs": {
+    "artifact": {
+      "repository": "Luminous-Dynamics/symtropy",
+      "workflow_run_id": 41529979207,
+      "artifact_id": 13182550320,
+      "artifact_name": "css001-water-energy-shock-output",
+      "artifact_zip_sha256": "831ceccf1695b986213adc0b64251265aed32554a3f1a24c8c030c3fd9e82549",
+      "artifact_size_bytes": 738,
+      "retention_expires_at": "2026-12-02T21:37:27Z"
+    },
+    "csv": {
+      "filename": "css001-output.csv",
+      "uncompressed_size_bytes": 4230,
+      "line_count": 32,
+      "sha256": "84183a363eb2b70a98b39ba27805cd18ba6d6a43ebc1b33a510d41ec97a93ace",
+      "data_rows": 24,
+      "resource_residual_columns": [
+        "residual_water_m3",
+        "residual_energy_kwh",
+        "residual_food_kg"
+      ],
+      "maximum_absolute_residual_by_resource": {
+        "water_m3": 0,
+        "energy_kwh": 0,
+        "food_kg": 0
+      }
+    }
+  },
+  "results": {
+    "units": {
+      "water": "m3",
+      "energy": "kWh",
+      "food": "kg"
+    },
+    "policies": [
+      {
+        "policy_id": "P0_NO_TRANSFER",
+        "floor_violations": 4,
+        "total_delivered": {
+          "water_m3": 0,
+          "energy_kwh": 0,
+          "food_kg": 0
+        },
+        "receiving_region_last_tick_coverage": {
+          "water": 0.052083333333333336,
+          "energy": 0.24,
+          "food": 0.3958333333333333
+        },
+        "final_stock": {
+          "synthetic_north": {
+            "water_m3": 700,
+            "energy_kwh": 1600,
+            "food_kg": 2340
+          },
+          "synthetic_south": {
+            "water_m3": 0,
+            "energy_kwh": 0,
+            "food_kg": 0
+          }
+        }
+      },
+      {
+        "policy_id": "P1_FIXED_SOLIDARITY",
+        "floor_violations": 0,
+        "total_delivered": {
+          "water_m3": 240,
+          "energy_kwh": 1000,
+          "food_kg": 320
+        },
+        "final_stock": {
+          "synthetic_north": {
+            "water_m3": 460,
+            "energy_kwh": 600,
+            "food_kg": 2020
+          },
+          "synthetic_south": {
+            "water_m3": 86,
+            "energy_kwh": 240,
+            "food_kg": 30
+          }
+        }
+      },
+      {
+        "policy_id": "P2_ADAPTIVE_SERVICE_DEFICIT",
+        "floor_violations": 0,
+        "total_delivered": {
+          "water_m3": 154,
+          "energy_kwh": 760,
+          "food_kg": 290
+        },
+        "final_stock": {
+          "synthetic_north": {
+            "water_m3": 546,
+            "energy_kwh": 840,
+            "food_kg": 2050
+          },
+          "synthetic_south": {
+            "water_m3": 0,
+            "energy_kwh": 0,
+            "food_kg": 0
+          }
+        }
+      }
+    ],
+    "comparative_observations": {
+      "adaptive_vs_fixed_transfer_reduction_percent": {
+        "water": 35.833333333333336,
+        "energy": 24,
+        "food": 9.375
+      },
+      "caveat": "Scenario-conditional comparison only. The policy is not shown to be globally optimal or superior on real infrastructure."
+    }
+  },
+  "validation_boundaries": {
+    "all_data_synthetic": true,
+    "real_world_hindcast": false,
+    "forecast": false,
+    "human_subjects": false,
+    "external_dataset_used": false,
+    "external_dataset_rights_check_required": false,
+    "environmental_flow_modelled": false,
+    "transport_loss_modelled": false,
+    "pumping_energy_modelled": false,
+    "infrastructure_capacity_modelled": false,
+    "price_or_affordability_modelled": false,
+    "independent_review_by_separate_human_expert": false,
+    "note": "CI independently compiles, executes and checks the declared outputs against the committed synthetic reference expectations. This is implementation verification, not scientific validation, external review or real-world policy evaluation."
+  }
+}
