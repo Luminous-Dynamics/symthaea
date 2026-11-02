@@ -17,6 +17,7 @@ symthaea-fep = { path = "../../core/symthaea-fep" }
 uuid = { workspace = true, features = ["v4"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.10"
 tracing = { workspace = true }
 candle-core = { workspace = true }
 candle-nn = { workspace = true }
