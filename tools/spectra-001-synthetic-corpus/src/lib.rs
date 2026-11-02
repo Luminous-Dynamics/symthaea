@@ -801,6 +801,65 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn null_and_signal_campaigns_match_independent_known_answers() {
+        let fixture: serde_json::Value = serde_json::from_str(
+            include_str!("../../../research/spectra-001/fixtures/corpus-known-answer-v0.1.json")
+        ).expect("known-answer fixture JSON");
+
+        let config = config();
+        let null_seed = u64::from_str_radix(
+            fixture["scenarios"][0]["seed_hex"].as_str().expect("null seed").trim_start_matches("0x"),
+            16
+        ).expect("valid null seed");
+        let null_campaign = generate_campaign_v1(
+            config, null_seed, SyntheticWorldV1::Null, None
+        ).expect("null campaign");
+        assert_eq!(
+            top_rank_accuracy_permille_v1(&null_campaign.public, &null_campaign.evaluator_truth).unwrap(),
+            fixture["scenarios"][0]["expected"]["top_rank_accuracy_permille"].as_u64().unwrap() as u16
+        );
+        let null_model = fit_red_team_v1(&null_campaign.public).unwrap();
+        let null_predictions = predict_red_team_v1(&null_model, &null_campaign.public).unwrap();
+        let null_report = score_red_team_v1(
+            &null_campaign.public, &null_campaign.evaluator_truth, &null_predictions,
+            RED_TEAM_THRESHOLD_PERMILLE, RED_TEAM_MINIMUM_PREDICTIONS
+        ).unwrap();
+        let null_scores: Vec<Option<u16>> = null_report.channel_scores.iter()
+            .map(|row| row.accuracy_permille).collect();
+        let expected_null_scores: Vec<Option<u16>> = fixture["scenarios"][0]["expected"]["channel_accuracies_permille"]
+            .as_array().unwrap().iter()
+            .map(|value| value.as_u64().map(|n| n as u16)).collect();
+        assert_eq!(null_scores, expected_null_scores);
+        assert!(null_report.detected_modalities.is_empty());
+
+        let signal_seed = u64::from_str_radix(
+            fixture["scenarios"][1]["seed_hex"].as_str().expect("signal seed").trim_start_matches("0x"),
+            16
+        ).expect("valid signal seed");
+        let signal_campaign = generate_campaign_v1(
+            config, signal_seed, SyntheticWorldV1::SignalInjected, None
+        ).expect("signal campaign");
+        assert_eq!(
+            top_rank_accuracy_permille_v1(&signal_campaign.public, &signal_campaign.evaluator_truth).unwrap(),
+            fixture["scenarios"][1]["expected"]["top_rank_accuracy_permille"].as_u64().unwrap() as u16
+        );
+        let signal_model = fit_red_team_v1(&signal_campaign.public).unwrap();
+        let signal_predictions = predict_red_team_v1(&signal_model, &signal_campaign.public).unwrap();
+        let signal_report = score_red_team_v1(
+            &signal_campaign.public, &signal_campaign.evaluator_truth, &signal_predictions,
+            RED_TEAM_THRESHOLD_PERMILLE, RED_TEAM_MINIMUM_PREDICTIONS
+        ).unwrap();
+        let signal_scores: Vec<Option<u16>> = signal_report.channel_scores.iter()
+            .map(|row| row.accuracy_permille).collect();
+        let expected_signal_scores: Vec<Option<u16>> = fixture["scenarios"][1]["expected"]["channel_accuracies_permille"]
+            .as_array().unwrap().iter()
+            .map(|value| value.as_u64().map(|n| n as u16)).collect();
+        assert_eq!(signal_scores, expected_signal_scores);
+        assert!(signal_report.detected_modalities.is_empty());
+    }
+
     #[test]
     fn invalid_world_leakage_pairs_are_rejected() {
         assert_eq!(
