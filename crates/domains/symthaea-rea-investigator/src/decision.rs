@@ -568,6 +568,22 @@ fn evaluate_candidate(
         }
     }
 
+    // MinimaxRegret uses an exact bounded search over deterministic shared
+    // outcome-to-decision policies. Other policies use the Bayes action under
+    // the scenario-mixture posterior for each outcome.
+    let minimax_policy = if config.ranking_policy == DecisionRankingPolicy::MinimaxRegret {
+        Some(minimax_shared_policy(
+            &outcomes,
+            scenario_results,
+            decisions,
+            utility_maps,
+            prior_distribution,
+            config.max_policy_evaluations,
+        )?)
+    } else {
+        None
+    };
+
     // Construct the shared mixture posterior for each outcome. The mixture is
     // weighted by scenario probability times that scenario's outcome mass;
     // averaging posterior vectors directly would be mathematically incorrect.
@@ -610,8 +626,15 @@ fn evaluate_candidate(
             mixture_joint = prior_distribution.clone();
         }
 
-        let (shared_decision_id, _) =
-            best_decision(decisions, utility_maps, &mixture_joint);
+        let shared_decision_id = match minimax_policy.as_ref() {
+            Some(policy) => policy.get(outcome).cloned().ok_or_else(|| {
+                DecisionError::new(
+                    DecisionErrorKind::InconsistentScenarioOutput,
+                    "minimax policy omitted a declared outcome",
+                )
+            })?,
+            None => best_decision(decisions, utility_maps, &mixture_joint).0,
+        };
         shared_decision_by_outcome.insert(outcome.clone(), shared_decision_id.clone());
         shared_policy.push(SharedPolicyOutcome {
             outcome: outcome.clone(),
@@ -623,8 +646,7 @@ fn evaluate_candidate(
     let mut scenario_decision_results = Vec::with_capacity(scenario_results.len());
     let mut evsi_samples = Vec::with_capacity(scenario_results.len());
     let mut regret_samples = Vec::with_capacity(scenario_results.len());
-    let mut agreement_mass_by_outcome: HashMap<String, HashMap<String, f64>> = HashMap::new();
-    let mut total_mass_by_outcome: HashMap<String, f64> = HashMap::new();
+    let mut decision_agreement_mass = 0.0;
 
     for scenario in scenario_results {
         let mut expected_posterior_utility = 0.0;
@@ -671,14 +693,9 @@ fn evaluate_candidate(
             regret += predicted.probability * decision_regret;
 
             let joint_mass = scenario.scenario_probability * predicted.probability;
-            *total_mass_by_outcome
-                .entry(predicted.outcome.clone())
-                .or_default() += joint_mass;
-            *agreement_mass_by_outcome
-                .entry(predicted.outcome.clone())
-                .or_default()
-                .entry(scenario_best_id.clone())
-                .or_default() += joint_mass;
+            if scenario_best_id == shared_id {
+                decision_agreement_mass += joint_mass;
+            }
 
             outcome_results.push(DecisionOutcomeResult {
                 outcome: predicted.outcome.clone(),
@@ -723,25 +740,10 @@ fn evaluate_candidate(
         .map(|(value, _)| *value)
         .fold(0.0, f64::max);
 
-    // Probability-weighted majority agreement across scenario-specific optimal
-    // decisions for each outcome. Each outcome's mass is already weighted by
-    // P(scenario) * P(outcome | scenario).
-    let decision_stability = total_mass_by_outcome
-        .iter()
-        .map(|(outcome, total)| {
-            if *total <= 0.0 {
-                0.0
-            } else {
-                agreement_mass_by_outcome[outcome]
-                    .values()
-                    .copied()
-                    .fold(0.0, f64::max)
-                    / total
-                    * total
-            }
-        })
-        .sum::<f64>()
-        .clamp(0.0, 1.0);
+    // Probability mass for which the actual shared policy action agrees
+    // with the scenario-specific optimal action. This is policy-specific;
+    // it must not report the best achievable modal agreement instead.
+    let decision_stability = decision_agreement_mass.clamp(0.0, 1.0);
 
     let selected_value = match config.ranking_policy {
         DecisionRankingPolicy::ExpectedEvsi => expected_evsi,
@@ -749,6 +751,11 @@ fn evaluate_candidate(
         DecisionRankingPolicy::LowerTailCvarEvsi => lower_tail_cvar_evsi,
         DecisionRankingPolicy::ExpectedEvsiMinusWorstCaseRegret => {
             expected_evsi - config.regret_penalty * worst_case_shared_policy_regret
+        }
+        DecisionRankingPolicy::MinimaxRegret => {
+            // Positive, monotone score for reporting; candidates are actually
+            // ordered by raw worst-case regret first in the caller.
+            1.0 / (1.0 + worst_case_shared_policy_regret)
         }
     };
 
