@@ -498,6 +498,26 @@ mod tests {
     }
 
     #[test]
+    fn serde_rejects_singular_csg_before_rehydrating_hdc() {
+        let json = r#"{
+            "operation_tree": {
+                "Transform": {
+                    "node": { "Primitive": "Cube" },
+                    "transform": {
+                        "scale": [1.0, 0.0, 1.0],
+                        "rotate": [0.0, 0.0, 0.0],
+                        "translate": [0.0, 0.0, 0.0]
+                    }
+                }
+            },
+            "material_binding": null,
+            "printer_constraints": null
+        }"#;
+        let restored = serde_json::from_str::<GeometricThought>(json);
+        assert!(restored.is_err());
+    }
+
+    #[test]
     fn test_transform_axes_affect_encoding() {
         let identity = encode_csg_as_hv(&CSGNode::cube().with_transform(Default::default()));
         let translated = encode_csg_as_hv(&CSGNode::cube().translate(10.0, 0.0, 0.0));
