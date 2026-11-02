@@ -27,7 +27,9 @@ Reported outcomes: machine-discovered strategies were preserved across every gen
 
 ## Source-version reconciliation
 
-A separate audit of the older public GitHub experiment repository is recorded in [LEGACY_GITHUB_SNAPSHOT_AUDIT.md](LEGACY_GITHUB_SNAPSHOT_AUDIT.md). That snapshot contains 841 networks of 10 nodes/20 stored edges, levels 0–4 (the old model validator admits up to 5), and 8-transition heuristic solutions. Its frontend follows directed outgoing edges and caps the task at 8 transitions. It is **not** the paper's final ten-move v2.0 task. The generic Rust engine therefore no longer hard-codes a 12-node/30-edge or level-0–3 published shape; it supports source-specific shape/level profiles and a generic terminal-level/loss-count contract. The remaining v2.0 import must resolve the final schema and semantics.
+A separate source audit is recorded in [LEGACY_GITHUB_SNAPSHOT_AUDIT.md](LEGACY_GITHUB_SNAPSHOT_AUDIT.md). The **2026 paper explicitly specifies** a 12-node/30-edge task, hidden node levels 0–3, +400 reward edges sourced at level 3, and at least three negative-reward edges on every level-0-to-level-3 path. The generic Rust engine exposes these as `PUBLISHED_NODE_COUNT`, `PUBLISHED_EDGE_COUNT`, `PUBLISHED_MAX_NODE_LEVEL`, `PUBLISHED_TERMINAL_LEVEL`, `PUBLISHED_REQUIRED_NEGATIVE_EDGES`, and `validate_published_profile()`.
+
+The older public GitHub repository snapshot inspected separately contains 841 networks of 10 nodes/20 stored edges, levels 0–4 (the old model validator admits up to 5), and 8-transition heuristic solutions. Its frontend follows directed outgoing edges and caps the task at 8 transitions. It is **not** the source of truth for the paper's final ten-move task and is not asserted to be the final Zenodo v2.0 archive. The generic Rust engine retains explicit `LEGACY_GITHUB_*` constants and generic shape/level/terminal-contract validation so these profiles cannot be silently conflated. The exact v2.0 network files, traversal/revisit semantics, tie-breaking and source split still require archive ingestion.
 
 
 ## Zero-shot transfer and held-out generalization
@@ -35,6 +37,13 @@ A separate audit of the older public GitHub experiment repository is recorded in
 The crate now includes `evaluate_zero_shot_transfer`, which applies one frozen, uninterpreted policy to multiple named network profiles and records policy reward, full-information oracle reward, regret, oracle fraction and invalid moves. Unit tests compare loss-seeking and immediate-greedy rules across the abstract ten-move synthetic incentive fixture and a separate synthetic compatibility fixture matching the older GitHub snapshot's eight-transition shape.
 
 This is intentionally labelled **zero-shot rule transfer**, not learned-agent generalization. It establishes only that the reference rule behaves consistently across two constructed graph profiles. The definitive transfer benchmark must partition the Zenodo v2.0 task pool by network identity and generator/topology family, train/select policies on training/validation only, then evaluate on held-out network families with no shared network IDs or near-duplicate graph seeds. Report raw reward, regret to a clearly distinguished full-information oracle, reward fraction, invalid action rate, and performance by family. Also compare the frozen strategy description and teach-back artifact against simple heuristics; no policy should access hidden node levels or future edges.
+
+
+## Separate exploratory agent-based model (ABM)
+
+The paper's exploratory ABM is a different experimental layer from the human population study above. The article describes 50 independent replications, 20 generations, 20 agents per generation, and five machine agents in the initial generation. The model varies machine exploration capacity/optimality bias, human exploration bias, optimal-strategy discoverability, the demonstrator-selection temperature, social-transmission probability and demonstration reward noise. Each agent's demonstration reward is based on the number of optimal and myopic demonstrations, with per-demonstration noise scaling with the number of demonstrations.
+
+Do not use the human experiment's 30-population/five-generation/eight-position layout as the ABM configuration. Conversely, do not present ABM trajectories as human participant results. The branch's `src/paper_abm.rs` is an auditable reference implementation of the article-described mechanism and `paper-abm-sweep` is a 50-replication sensitivity grid. Its convenient parameter defaults and probability mapping are not yet the authors' archived implementation/configuration. Exact parameter grid, candidate sampling, discovery law and random-number implementation must be checked against Zenodo v2.0 before reproduction is claimed.
 
 ## Baseline ladder
 
@@ -124,3 +133,6 @@ The model records the selected teacher and their strategy, what the learner acqu
 This decomposition helps localize failure: a strategy may fail to spread because it was not discovered, because the wrong teacher was selected, because the learner did not observe the demonstration, because it was not acquired, because transmission corrupted it, or because the acquired strategy was not integrated. V0 still simplifies the task to a three-strategy repertoire, one teacher per learner, scalar demonstration performance, one-step corruption and a Bernoulli integration gate. It does not reproduce the authors' experiment or ABM; the archive and supplementary parameters must be ingested before any reproduction claim.
 
 The sweep reports **individual optimal discovery** separately from **integrated optimal prevalence**. It also separates demonstration observation, content/strategy acquisition, corruption, and active integration. These are different denominators and must not be collapsed into an adoption score. Its reported 95% intervals are simulation-replicate uncertainty under the reference ABM, not confidence intervals for human participants.
+
+
+The Rust task engine now preserves the article-level paper profile explicitly and a separate older-repository compatibility profile. Unit fixtures for each are synthetic. A structural pass on `validate_published_profile()` checks article-described invariants only; it does not prove archive origin, split membership, or exact reproduction of the v2.0 generator.
