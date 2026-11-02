@@ -1131,6 +1131,12 @@ mod tests {
             .find(|row| row.model_id == "alt-b").unwrap().probability = 0.4;
         assert!(alt_mass.validate().is_err());
 
+        let mut supermartingale = fixture();
+        supermartingale.history_nodes.iter_mut()
+            .find(|node| node.node_id == "late").unwrap()
+            .interim_test_value = 0.08;
+        assert!(supermartingale.validate().is_err());
+
         let mut budget = fixture();
         let early_continuation = &mut budget.history_nodes.iter_mut()
             .find(|node| node.node_id == "early").unwrap().continuation_test;
