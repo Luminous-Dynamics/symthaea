@@ -504,6 +504,12 @@ pub struct HarthPairedComparisonAggregate {
     pub improved_subjects: u32,
     pub unchanged_subjects: u32,
     pub worsened_subjects: u32,
+    /// Exact two-sided binomial sign test on non-tied participant folds.
+    /// Ties are excluded; numerator/denominator preserve the exact rational value.
+    pub sign_test_extreme_outcomes: u64,
+    pub sign_test_total_outcomes: u64,
+    /// Rounded upward to ppm so a non-zero exact p-value cannot be rounded to zero.
+    pub sign_test_two_sided_p_value_ppm: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -542,7 +548,43 @@ fn paired_comparison_digest(
     hash.u32(receipt.aggregate.improved_subjects);
     hash.u32(receipt.aggregate.unchanged_subjects);
     hash.u32(receipt.aggregate.worsened_subjects);
+    hash.u64(receipt.aggregate.sign_test_extreme_outcomes);
+    hash.u64(receipt.aggregate.sign_test_total_outcomes);
+    hash.u32(receipt.aggregate.sign_test_two_sided_p_value_ppm);
     hash.finish()
+}
+
+
+fn binomial_coefficient(n: u32, k: u32) -> u64 {
+    let k = k.min(n.saturating_sub(k));
+    let mut value = 1_u64;
+    for index in 0..k {
+        value = value
+            .saturating_mul(u64::from(n - index))
+            / u64::from(index + 1);
+    }
+    value
+}
+
+fn exact_two_sided_sign_test(
+    improved: u32,
+    worsened: u32,
+) -> (u64, u64, u32) {
+    let non_tied = improved.saturating_add(worsened);
+    if non_tied == 0 {
+        return (1, 1, 1_000_000);
+    }
+    let lower_tail = improved.min(worsened);
+    let mut tail_sum = 0_u64;
+    for k in 0..=lower_tail {
+        tail_sum = tail_sum.saturating_add(binomial_coefficient(non_tied, k));
+    }
+    let total = 1_u64 << non_tied;
+    let extreme = tail_sum.saturating_mul(2).min(total);
+    let p_ppm = ((u128::from(extreme) * 1_000_000
+        + u128::from(total) - 1)
+        / u128::from(total)) as u32;
+    (extreme, total, p_ppm)
 }
 
 fn calculate_paired_comparison(
@@ -636,6 +678,9 @@ fn calculate_paired_comparison(
     let lower = (mean - half_width).floor().max(-1_000_000.0) as i64;
     let upper = (mean + half_width).ceil().min(1_000_000.0) as i64;
 
+    let (sign_test_extreme_outcomes, sign_test_total_outcomes, sign_test_two_sided_p_value_ppm) =
+        exact_two_sided_sign_test(improved_subjects, worsened_subjects);
+
     let mut receipt = HarthPairedComparisonReceipt {
         schema: "symthaea.temporal.harth-paired-loso-comparison".to_owned(),
         version: "0.1.0".to_owned(),
@@ -652,6 +697,9 @@ fn calculate_paired_comparison(
             improved_subjects,
             unchanged_subjects,
             worsened_subjects,
+            sign_test_extreme_outcomes,
+            sign_test_total_outcomes,
+            sign_test_two_sided_p_value_ppm,
         },
         comparison_sha256: [0; 32],
     };
@@ -945,6 +993,23 @@ mod tests {
         assert_eq!(paired.aggregate.improved_subjects, 22);
         assert_eq!(paired.aggregate.worsened_subjects, 0);
         validate_harth_paired_comparison(&paired, &baseline, &candidate_receipt).unwrap();
+    }
+
+    #[test]
+    fn exact_sign_test_uses_non_ties_and_preserves_small_p_values() {
+        let (extreme, total, p_ppm) = exact_two_sided_sign_test(22, 0);
+        assert_eq!(extreme, 2);
+        assert_eq!(total, 1 << 22);
+        assert_eq!(p_ppm, 1);
+
+        let (extreme_with_ties, total_with_ties, p_with_ties) =
+            exact_two_sided_sign_test(5, 0);
+        assert_eq!(extreme_with_ties, 2);
+        assert_eq!(total_with_ties, 32);
+        assert_eq!(p_with_ties, 62_500);
+
+        let (extreme_none, total_none, p_none) = exact_two_sided_sign_test(0, 0);
+        assert_eq!((extreme_none, total_none, p_none), (1, 1, 1_000_000));
     }
 
     #[test]
