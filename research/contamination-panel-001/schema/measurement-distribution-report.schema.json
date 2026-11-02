@@ -22,6 +22,8 @@
     "observation_count",
     "distributional_evidence_eligible",
     "claim_scope_eligible",
+    "independently_authenticated",
+    "confirmatory_eligible",
     "rank_stability_status",
     "profile_cells",
     "rank_stability",
@@ -419,6 +421,12 @@
         "measurement_as_instance_restricted",
         "measurement_as_distribution"
       ]
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
     }
   }
 }
