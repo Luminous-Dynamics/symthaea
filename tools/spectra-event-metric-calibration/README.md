@@ -61,8 +61,8 @@ log loss, and probability calibration are intentionally absent.
 
 From this directory:
 
-    cargo test --locked
-    cargo run --release --locked --bin run_sweep -- 256 > metric-calibration.csv
+    cargo test
+    cargo run --release --bin run_sweep -- 256 > metric-calibration.csv
 
 The optional integer argument is the number of independent campaign seeds per
 cell (default 256). The grid contains d-prime values
