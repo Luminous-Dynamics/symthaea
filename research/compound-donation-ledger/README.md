@@ -6,7 +6,7 @@ contract and API stabilize.
 
 ## Scope
 
-The crate implements two bounded pieces:
+The crate implements three bounded research primitives:
 
 1. A fixed-point, append-only donation ledger. Each donor automatically
    reserves a precommitted fraction of its **own new adjusted-evidence
@@ -21,6 +21,13 @@ The crate implements two bounded pieces:
    e-BH rank-geometric constructors: a family-size-specialized version and
    a horizon-independent candidate-weighted rank prior that works across
    family-size growth without changing earlier candidates' calibrators.
+
+
+3. An exact persistent SCORE-style overshoot-refund account for one
+   already-valid, time-monotone e-process. It tracks a capped cumulative refund,
+   releases only the newly earned increment, stores exact rational numerators,
+   and reports the effective test cost and threshold-crossing bit. It does not
+   implement the global alpha-wealth/FDR spending algorithm.
 
 The ledger receives already-calibrated, nondecreasing evidence values. It does
 not compute likelihood ratios, test martingales, e-processes, null models,
@@ -151,3 +158,30 @@ Its recorded exploratory output is
 300 streams per cell, so its SupFDR point estimates have wide Monte Carlo
 uncertainty; the main value of the experiment is the power-transfer comparison
 under one horizon-coherent weight sequence.
+
+## Persistent SCORE-style overshoot refund
+
+For a precommitted rational level alpha and an already-valid time-monotone
+e-process V_t, the Rust reference defines
+
+~~~text
+O_t = min(max(alpha * V_t - 1, 0), alpha)
+C_t = alpha * V_t - O_t
+~~~
+
+Only the difference O_t - O_(t-1) is released on an update, so old overshoot
+is never credited again. The writer uses a common exact rational denominator
+for the refund and effective cost; it rejects evidence or round rollback and
+commits each update atomically.
+
+The separate verifier recomputes the update from the precommitted alpha,
+previous evidence/refund state and new evidence value. A sequence verifier
+starts at V_0=1 and independently checks all cumulative refunds, increments,
+costs and decisions. It rejects a forged or repeated refund increment.
+
+This is a primitive, not a completed online FDR algorithm. The process-level
+inequalities are documented in RESEARCH.md. A global alpha-wealth theorem is
+still required before released refunds can be spent across hypotheses. Do not
+mix these alpha-wealth units with the weighted evidence-capital units of the
+donation ledger without a joint proof.
+
