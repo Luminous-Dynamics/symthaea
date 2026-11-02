@@ -40,5 +40,9 @@ jobs:
         run: cargo clippy --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml --all-targets -- -D warnings
       - name: Run exact checked-in reference trace
         run: cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --trace benchmarks/basalt/storage-conformance-trace.v1.json --schema benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json --out "$RUNNER_TEMP/basalt-reference-report.json"
-      - name: Preserve exact-head report
-        run: cat "$RUNNER_TEMP/basalt-reference-report.json"
+      - name: Search legal linearizations for the checked-in history
+        run: cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --trace benchmarks/basalt/storage-conformance-trace.v1.json --schema benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json --check-linearization --max-states 100000 --out "$RUNNER_TEMP/basalt-linearization-report.json"
+      - name: Preserve exact-head reports
+        run: |
+          cat "$RUNNER_TEMP/basalt-reference-report.json"
+          cat "$RUNNER_TEMP/basalt-linearization-report.json"
