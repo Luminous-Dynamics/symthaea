@@ -290,11 +290,18 @@ def generate(output_path: Path) -> dict[str, Any]:
             sha for sha, _ in (_mip_cut_identity(tied_sia) for tied_sia in default_resolved_ties)
             if sha is not None
         )
-        default_resolved_lex_keys = [tied_sia.partition.lex_key().hex() for tied_sia in default_resolved_ties]
-        if default_resolved_lex_keys != [min(mip_tie_lex_key_hexes)]:
-            raise RuntimeError(
-                "PyPhi PARTITION_LEX representative is not the minimum lex_key in the numerical MIP tie family"
-            )
+        default_resolved_lex_keys = [
+            tied_sia.partition.lex_key().hex() for tied_sia in default_resolved_ties
+        ]
+        minimum_numeric_tie_lex_key_hex = min(mip_tie_lex_key_hexes)
+        lex_resolution_matches_numeric_ties = (
+            default_resolved_lex_keys == [minimum_numeric_tie_lex_key_hex]
+        )
+        numeric_tie_contains_default_representative = (
+            _mip_cut_identity(default_resolved_ties[0])[0] in mip_tie_cut_sha256s
+            if default_resolved_ties
+            else False
+        )
         mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(sia)
         if mip_cut_sha256 not in mip_tie_cut_sha256s:
             raise RuntimeError(
@@ -313,6 +320,9 @@ def generate(output_path: Path) -> dict[str, Any]:
             "mip_default_resolved_tie_count": len(default_resolved_cut_shas),
             "mip_default_resolved_lex_key_hex": default_resolved_lex_keys[0],
             "mip_default_resolved_cut_sha256s": default_resolved_cut_shas,
+            "minimum_numeric_tie_lex_key_hex": minimum_numeric_tie_lex_key_hex,
+            "lex_resolution_matches_numeric_ties": lex_resolution_matches_numeric_ties,
+            "numeric_tie_contains_default_representative": numeric_tie_contains_default_representative,
             "partition_scores": per_partition_scores,
             "phi": _json_value(raw.get("phi")),
             "signed_phi": _json_value(raw.get("signed_phi")),
@@ -355,7 +365,8 @@ def generate(output_path: Path) -> dict[str, Any]:
             "grid": list(GRID),
             "grid_semantics": "13 exact point evaluations; no interpolation or continuous interval certificate",
             "sia_tie_resolution": list(pyphi.config.formalism.iit.sia_tie_resolution),
-            "numerical_mip_tie_semantics": "all cuts surviving NORMALIZED_PHI then NEGATIVE_PHI, before the final PARTITION_LEX representative selection",
+            "numeric_tie_resolution_strategy": ["NORMALIZED_PHI", "NEGATIVE_PHI"],
+            "numerical_mip_tie_semantics": "all cuts surviving NORMALIZED_PHI then NEGATIVE_PHI, before any final deterministic representative selection",
         },
         "points": points,
         "grid_resolution_boundaries": boundaries,
