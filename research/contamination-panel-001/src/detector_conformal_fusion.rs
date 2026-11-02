@@ -630,6 +630,8 @@ pub fn calibrate_detector_panel(
                     final_p_rank_numerator: None,
                     final_p_rank_denominator: None,
                     final_p_value: None,
+                    by_adjusted_p_value: None,
+                    by_family_size: None,
                     minimum_attainable_p_value: None,
                     decision: SelectiveDecisionV1::AbstainUnsupportedGroup,
                     ground_truth_contaminated: row.ground_truth_contaminated,
@@ -655,6 +657,8 @@ pub fn calibrate_detector_panel(
                 empirical_tpr_permille: if contaminated == 0 { None } else { Some(0.0) },
                 decision_coverage_permille: 0.0,
                 minimum_attainable_p_value: 1.0,
+                minimum_detector_rank_p_value: 1.0,
+                pairwise_rank_correlations: Vec::new(),
                 target_alpha_permille: request.target_alpha_permille,
             });
             continue;
@@ -752,18 +756,9 @@ pub fn calibrate_detector_panel(
                             Some(p_value),
                             SelectiveDecisionV1::AbstainInsufficientCalibrationResolution,
                         )
-                    } else if u128::from(numerator) * 1_000
-                        <= u128::from(request.target_alpha_permille) * u128::from(denominator)
-                    {
-                        flagged += 1;
-                        (
-                            p_values,
-                            Some(fused_score),
-                            Some((numerator, denominator)),
-                            Some(p_value),
-                            SelectiveDecisionV1::FlagContaminated,
-                        )
                     } else {
+                        // Final decisions are assigned after BY correction across
+                        // all eligible test units in this group.
                         no_flag += 1;
                         (
                             p_values,
@@ -800,6 +795,8 @@ pub fn calibrate_detector_panel(
                 final_p_rank_numerator: final_rank.map(|rank| rank.0),
                 final_p_rank_denominator: final_rank.map(|rank| rank.1),
                 final_p_value: final_p,
+                by_adjusted_p_value: None,
+                by_family_size: None,
                 minimum_attainable_p_value: matching_features.then_some(min_p),
                 decision,
                 ground_truth_contaminated: row.ground_truth_contaminated,
@@ -831,6 +828,12 @@ pub fn calibrate_detector_panel(
             empirical_tpr_permille: tpr,
             decision_coverage_permille: (flagged + no_flag) as f64 * 1_000.0 / rows.len() as f64,
             minimum_attainable_p_value: min_p,
+            minimum_detector_rank_p_value: 1.0
+                / (calibration_a.scores.values().next().map_or(0, Vec::len) as f64 + 1.0),
+            pairwise_rank_correlations: pairwise_detector_spearman(
+                rows,
+                &calibration_a.detector_ids,
+            ),
             target_alpha_permille: request.target_alpha_permille,
         });
     }
