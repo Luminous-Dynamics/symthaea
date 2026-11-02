@@ -6,6 +6,8 @@ from fractions import Fraction as F
 from anchored_compound_ebh import (
     anchor_slack,
     anchored_rejections,
+    finite_envelope_slack,
+    finite_envelope_weight_prefix,
     brute_largest_anchored_superset,
     closure_deficit,
     is_closure_certified,
@@ -167,6 +169,17 @@ class AnchoredCompoundEBHTests(unittest.TestCase):
         self.assertEqual(old_set, ())
         self.assertIn(0, extended_set)
         self.assertEqual(extended_set, (1, 0))
+
+    def test_finite_envelope_uses_precommitted_tail_mass(self):
+        short = finite_envelope_weight_prefix(5)
+        long = finite_envelope_weight_prefix(50)
+        self.assertEqual(short, long[:5])
+        self.assertEqual(sum(short, F(0)), F(5, 6))
+        self.assertEqual(finite_envelope_slack(5), F(1, 6))
+        self.assertEqual(finite_envelope_slack(50), F(1, 51))
+        # For a fixed finite envelope, the slack is constant over all looks;
+        # it is not recomputed from the currently active roster.
+        self.assertEqual(finite_envelope_slack(24), F(1, 25))
 
     def test_local_intersection_process_is_pathwise_monotone(self):
         delta = F(1, 20)
