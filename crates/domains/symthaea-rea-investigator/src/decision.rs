@@ -34,6 +34,9 @@ pub enum DecisionRankingPolicy {
     WorstCaseEvsi,
     LowerTailCvarEvsi,
     ExpectedEvsiMinusWorstCaseRegret,
+    /// Minimize the maximum scenario-specific expected regret of one shared
+    /// deterministic outcome-to-decision policy.
+    MinimaxRegret,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -50,6 +53,9 @@ pub struct DecisionAwareConfig {
     pub regret_penalty: f64,
     /// Minimum utility-valued selection score after the selected risk policy.
     pub minimum_selection_value: f64,
+    /// Hard cap on deterministic outcome-to-decision policies evaluated by
+    /// the exact minimax-regret solver. Exceeding it rejects that experiment.
+    pub max_policy_evaluations: usize,
 }
 
 impl Default for DecisionAwareConfig {
@@ -61,6 +67,7 @@ impl Default for DecisionAwareConfig {
             maximum_worst_case_regret: None,
             regret_penalty: 1.0,
             minimum_selection_value: 1.0e-9,
+            max_policy_evaluations: 65_536,
         }
     }
 }
@@ -71,6 +78,7 @@ pub enum DecisionErrorKind {
     InvalidDecisionSet,
     InvalidDecisionUtility,
     InconsistentScenarioOutput,
+    PolicySearchBudgetExceeded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,6 +126,7 @@ pub enum DecisionRejectionReason {
     NoPositiveValueOfInformation,
     DecisionUnstableAcrossScenarios,
     WorstCaseRegretExceeded,
+    PolicySearchBudgetExceeded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,6 +143,7 @@ pub enum DecisionAbstentionReason {
     NoPositiveValueOfInformation,
     DecisionUnstableAcrossScenarios,
     WorstCaseRegretExceeded,
+    PolicySearchBudgetExceeded,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -243,6 +253,7 @@ fn validate_config(config: DecisionAwareConfig) -> Result<(), DecisionError> {
         || !(0.0..=1.0).contains(&config.minimum_decision_stability)
         || robust.lower_tail_probability <= 0.0
         || robust.lower_tail_probability > 1.0
+        || config.max_policy_evaluations == 0
         || config.maximum_worst_case_regret.is_some_and(|value| {
             !value.is_finite() || value < 0.0
         })
