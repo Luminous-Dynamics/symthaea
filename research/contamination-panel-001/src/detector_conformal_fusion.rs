@@ -156,6 +156,8 @@ pub struct ConformalGroupSummaryV1 {
     pub false_negative_count: u64,
     pub empirical_fpr_permille: Option<f64>,
     pub empirical_tpr_permille: Option<f64>,
+    pub fpr_one_sided_95_upper_permille: Option<f64>,
+    pub tpr_one_sided_95_lower_permille: Option<f64>,
     pub decision_coverage_permille: f64,
     pub minimum_attainable_p_value: f64,
     pub minimum_detector_rank_p_value: f64,
@@ -477,6 +479,155 @@ fn outer_conformal_p_value(
     Ok((numerator, denominator, numerator as f64 / denominator as f64))
 }
 
+fn ln_gamma_lanczos(value: f64) -> f64 {
+    const COEFFICIENTS: [f64; 9] = [
+        0.999_999_999_999_809_93,
+        676.520_368_121_885_1,
+        -1_259.139_216_722_402_8,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
+        12.507_343_278_686_905,
+        -0.138_571_095_265_720_12,
+        9.984_369_578_019_572e-6,
+        1.505_632_735_149_311_6e-7,
+    ];
+    let z = value - 1.0;
+    let mut x = COEFFICIENTS[0];
+    for (index, coefficient) in COEFFICIENTS.iter().enumerate().skip(1) {
+        x += coefficient / (z + index as f64);
+    }
+    let t = z + 7.5;
+    0.918_938_533_204_672_7 + (z + 0.5) * t.ln() - t + x.ln()
+}
+
+fn beta_continued_fraction(a: f64, b: f64, x: f64) -> f64 {
+    const MAX_ITERATIONS: usize = 300;
+    const EPSILON: f64 = 3.0e-14;
+    const FLOOR: f64 = 1.0e-300;
+    let qab = a + b;
+    let qap = a + 1.0;
+    let qam = a - 1.0;
+    let mut c = 1.0;
+    let mut d = 1.0 - qab * x / qap;
+    if d.abs() < FLOOR {
+        d = FLOOR;
+    }
+    d = 1.0 / d;
+    let mut h = d;
+    for iteration in 1..=MAX_ITERATIONS {
+        let m = iteration as f64;
+        let m2 = 2.0 * m;
+        let mut aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+        d = 1.0 + aa * d;
+        if d.abs() < FLOOR {
+            d = FLOOR;
+        }
+        c = 1.0 + aa / c;
+        if c.abs() < FLOOR {
+            c = FLOOR;
+        }
+        d = 1.0 / d;
+        h *= d * c;
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+        d = 1.0 + aa * d;
+        if d.abs() < FLOOR {
+            d = FLOOR;
+        }
+        c = 1.0 + aa / c;
+        if c.abs() < FLOOR {
+            c = FLOOR;
+        }
+        d = 1.0 / d;
+        let delta = d * c;
+        h *= delta;
+        if (delta - 1.0).abs() < EPSILON {
+            break;
+        }
+    }
+    h
+}
+
+fn regularized_incomplete_beta(x: f64, a: f64, b: f64) -> f64 {
+    if x <= 0.0 {
+        return 0.0;
+    }
+    if x >= 1.0 {
+        return 1.0;
+    }
+    let log_beta_factor = ln_gamma_lanczos(a + b)
+        - ln_gamma_lanczos(a)
+        - ln_gamma_lanczos(b)
+        + a * x.ln()
+        + b * (-x).ln_1p();
+    let beta_factor = log_beta_factor.exp();
+    if x < (a + 1.0) / (a + b + 2.0) {
+        (beta_factor * beta_continued_fraction(a, b, x) / a).clamp(0.0, 1.0)
+    } else {
+        (1.0 - beta_factor * beta_continued_fraction(b, a, 1.0 - x) / b)
+            .clamp(0.0, 1.0)
+    }
+}
+
+fn inverse_regularized_beta(probability: f64, a: f64, b: f64) -> Result<f64, String> {
+    if !(0.0..=1.0).contains(&probability) || a <= 0.0 || b <= 0.0
+        || !a.is_finite() || !b.is_finite()
+    {
+        return Err("invalid beta quantile parameters".to_owned());
+    }
+    if probability == 0.0 {
+        return Ok(0.0);
+    }
+    if probability == 1.0 {
+        return Ok(1.0);
+    }
+    let mut lower = 0.0;
+    let mut upper = 1.0;
+    for _ in 0..96 {
+        let middle = (lower + upper) / 2.0;
+        if regularized_incomplete_beta(middle, a, b) < probability {
+            lower = middle;
+        } else {
+            upper = middle;
+        }
+    }
+    let result = (lower + upper) / 2.0;
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err("beta quantile calculation is non-finite".to_owned())
+    }
+}
+
+/// One-sided 95% Clopper-Pearson upper confidence bound for a binomial rate.
+fn exact_binomial_upper_95(successes: u64, trials: u64) -> Result<f64, String> {
+    if trials == 0 || successes > trials {
+        return Err("binomial counts require 0 <= successes <= positive trials".to_owned());
+    }
+    if successes == trials {
+        return Ok(1.0);
+    }
+    inverse_regularized_beta(
+        0.95,
+        successes as f64 + 1.0,
+        (trials - successes) as f64,
+    )
+}
+
+/// One-sided 95% Clopper-Pearson lower confidence bound for a binomial rate.
+fn exact_binomial_lower_95(successes: u64, trials: u64) -> Result<f64, String> {
+    if trials == 0 || successes > trials {
+        return Err("binomial counts require 0 <= successes <= positive trials".to_owned());
+    }
+    if successes == 0 {
+        return Ok(0.0);
+    }
+    inverse_regularized_beta(
+        0.05,
+        successes as f64,
+        (trials - successes) as f64 + 1.0,
+    )
+}
+
 fn benjamini_yekutieli_adjusted_p_values(
     values: &[(String, f64)],
 ) -> Result<BTreeMap<String, f64>, String> {
@@ -663,6 +814,16 @@ fn apply_by_adjustment(
             (clean > 0).then_some(fp as f64 * 1_000.0 / clean as f64);
         summary.empirical_tpr_permille =
             (contaminated > 0).then_some(tp as f64 * 1_000.0 / contaminated as f64);
+        summary.fpr_one_sided_95_upper_permille = if clean > 0 {
+            Some(exact_binomial_upper_95(fp, clean)? * 1_000.0)
+        } else {
+            None
+        };
+        summary.tpr_one_sided_95_lower_permille = if contaminated > 0 {
+            Some(exact_binomial_lower_95(tp, contaminated)? * 1_000.0)
+        } else {
+            None
+        };
         summary.decision_coverage_permille =
             (flagged + no_flag) as f64 * 1_000.0 / rows.len().max(1) as f64;
     }
@@ -1256,6 +1417,29 @@ mod tests {
         assert!((adjusted["p1"] - 0.055).abs() < 1.0e-12);
         assert!((adjusted["p2"] - (0.04 * 5.5 / 3.0)).abs() < 1.0e-12);
         assert!((adjusted["p3"] - (0.04 * 5.5 / 3.0)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn exact_zero_false_positive_upper_bound_matches_closed_form() {
+        let bound = exact_binomial_upper_95(0, 300).unwrap();
+        let expected = 1.0 - 0.05_f64.powf(1.0 / 300.0);
+        assert!((bound - expected).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn exact_all_success_lower_bound_matches_closed_form() {
+        let bound = exact_binomial_lower_95(300, 300).unwrap();
+        let expected = 0.05_f64.powf(1.0 / 300.0);
+        assert!((bound - expected).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn exact_binomial_bounds_are_ordered_for_interior_counts() {
+        let lower = exact_binomial_lower_95(20, 30).unwrap();
+        let upper = exact_binomial_upper_95(20, 30).unwrap();
+        assert!(lower < 20.0 / 30.0);
+        assert!(upper > 20.0 / 30.0);
+        assert!(lower < upper);
     }
 
     #[test]
