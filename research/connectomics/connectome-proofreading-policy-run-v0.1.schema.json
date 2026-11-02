@@ -32,8 +32,7 @@
     "track": {
       "enum": [
         "CB2_RETROSPECTIVE_TRIAGE",
-        "IMPACT_AWARE_TRIAGE",
-        "PROSPECTIVE_EDIT_SAFETY"
+        "IMPACT_AWARE_TRIAGE"
       ]
     },
     "dataset": {
@@ -140,7 +139,8 @@
               "error_probability",
               "predicted_action"
             ]
-          }
+          },
+          "minItems": 6
         }
       }
     },
@@ -165,6 +165,9 @@
               "animal_id",
               "session_id"
             ]
+          },
+          "contains": {
+            "const": "source_volume_id"
           }
         },
         "no_group_overlap": {
@@ -301,7 +304,7 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 6,
       "uniqueItems": true,
       "items": {
         "enum": [
@@ -322,7 +325,39 @@
           "peak_vram_bytes",
           "cluster_bootstrap_ci"
         ]
-      }
+      },
+      "allOf": [
+        {
+          "contains": {
+            "const": "review_recall_at_fraction"
+          }
+        },
+        {
+          "contains": {
+            "const": "review_recall_at_minutes"
+          }
+        },
+        {
+          "contains": {
+            "const": "review_precision"
+          }
+        },
+        {
+          "contains": {
+            "const": "missed_error_count"
+          }
+        },
+        {
+          "contains": {
+            "const": "brier_score"
+          }
+        },
+        {
+          "contains": {
+            "const": "cluster_bootstrap_ci"
+          }
+        }
+      ]
     },
     "impact_weighting": {
       "type": "object",
@@ -404,9 +439,7 @@
     },
     "license_status": {
       "enum": [
-        "APPROVED_FOR_EVALUATION",
-        "PENDING_REVIEW",
-        "RESTRICTED"
+        "APPROVED_FOR_EVALUATION"
       ]
     }
   }
