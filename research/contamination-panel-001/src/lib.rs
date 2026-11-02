@@ -1360,7 +1360,7 @@ mod tests {
     }
 }
 
-pub mod training_receipt;
-
+pub mod adjudication_attrition;
 pub mod causal_analysis;
 pub mod exposure_transfer;
+pub mod training_receipt;
