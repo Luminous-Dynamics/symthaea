@@ -417,8 +417,12 @@ impl fmt::Display for AppraisalError {
             }
             Self::NonFinite(name) => write!(f, "{name} must be finite"),
             Self::OutOfRange(name) => write!(f, "{name} is outside its declared range"),
-            Self::InvalidVersion => write!(f, "appraisal profile version must be greater than zero"),
-            Self::InvalidWeights => write!(f, "each appraisal weight group must have a positive sum"),
+            Self::InvalidVersion => {
+                write!(f, "appraisal profile version must be greater than zero")
+            }
+            Self::InvalidWeights => {
+                write!(f, "each appraisal weight group must have a positive sum")
+            }
             Self::NonIncreasingSequence => {
                 write!(f, "perceptual observation sequence must increase strictly")
             }
