@@ -167,3 +167,21 @@ No target should be declared achieved from synthetic unit fixtures alone.
 ## Current status and limits
 
 This roadmap is included in draft PR #9970. The standalone Rust crate passed its exact-head `cargo check --locked --all-targets` and `cargo test --locked --all-targets` gate on the earlier run #222 (105 tests); the newer archived-notebook ABM module and sweep were added after that run and require their own exact-head validation. The Reward Network III Zenodo v2.0 ZIP (28,279,082 bytes) passed the published MD5 and ZIP checks; its SHA-256 and the extracted ABM notebook source digest are recorded in the protocol. The ZIP contains 306 files, including 42 Git LFS pointers; the pointer objects have recorded OIDs/sizes but are not hydrated. No participant-data reanalysis, DQN reproduction, NumPy RNG parity, or full paper-result replication is claimed. The Czaplicka model now has a source-pinned Rust semantic port, but no C/Rust conformance or paper-result replication is claimed. The telephone-game channel does not call an LLM. The official LiveCultureBench repository currently lacks its data-download link, so its simulator is not yet reproduced; only adapter-neutral metrics are implemented. No SOTA superiority, empirical human effect or exact paper reproduction is claimed.
+
+
+## New evidence and benchmark track: intentional transmission and causal assistance
+
+Two 2026 human studies sharpen the next research question:
+- Mackintosh et al., *Intentional transmission of knowledge optimises cumulative cultural evolution*, Scientific Reports (19 September 2026), DOI 10.1038/s41598-026-62734-6. Adults strategically preferred beneficial information when teaching; this selective transmission improved cumulative cultural accumulation compared with random selection. The pattern was not uniform across age groups.
+- Saral, Ibáñez de Aldecoa & Derex, *The roles of cultural transmission and causal reasoning in the cultural evolution of technology*, PNAS Nexus 5(4), pgag090 (26 March 2026), DOI 10.1093/pnasnexus/pgag090. In two transmission-chain experiments (n=900), cumulative improvement occurred even without causal structure; causal reasoning helped early search but its incremental contribution diminished over generations; technical/physical framing did not add advantage over the abstract causal framing.
+
+This supports a separate **intentional teaching** benchmark: teacher selection (who), content selection (what), learner-context adaptation (for whom), representation (how) and budget allocation (how much) are independently controlled. A teacher with a high overall score may still transmit the wrong subset of its repertoire.
+
+The branch now includes `src/intentional_teaching.rs` and `INTENTIONAL_TEACHING_PROTOCOL_V0_1.md`. The model compares random, declared-benefit, evidence-calibrated, learner-context-aware and diversity-aware packet selection under a fixed bandwidth budget, plus a matched individual-only condition. It explicitly separates learning-resource cost from intrinsic item difficulty and reports observation, acquisition, integration, correct execution, retention and held-out transfer separately. The six-condition sweep uses 256 fixed synthetic seeds; it does not reproduce either paper or estimate human effects.
+
+New experiments to prioritize:
+1. Compare example replay, causal explanation, executable rule and proof-carrying capsule under matched learner-time and token/bandwidth budgets.
+2. Test strategic teaching for beneficial but difficult items versus easy/high-reward items.
+3. Test robustness to inflated claims, weak evidence, context shifts and rare high-benefit skills.
+4. Test whether teaching policies improve held-out cumulative utility over matched individual learning.
+5. Report capability, error adoption, knowledge diversity and learner autonomy as separate outcomes.
