@@ -134,7 +134,8 @@
         "filtration_sha256",
         "action_id",
         "action_support_sha256",
-        "source_receipt_sha256"
+        "source_receipt_sha256",
+        "source_repository_url"
       ],
       "properties": {
         "claim_id": {
@@ -236,6 +237,10 @@
             "null"
           ],
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_repository_url": {
+          "type": "string",
+          "format": "uri"
         }
       }
     }
