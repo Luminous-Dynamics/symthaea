@@ -86,6 +86,57 @@ recipient credit increases one point balance; the root maximum-prefix query
 checks all prefix budgets in O(log n). The independent verifier should remain
 a linear scan, rather than reusing that optimized tree.
 
+### Alternative reserve policy: capped weighted overshoot
+
+The ledger retains the fixed rational-rate baseline and adds a separate
+SCORE-informed reserve policy. For a fixed global candidate weight
+\(\gamma_i\in[0,1]\) and an already time-monotone evidence process \(X_{i,t}\),
+define
+\[
+D_{i,t}
+=\min\{(\gamma_iX_{i,t}-1)_+,\gamma_i\}.
+\]
+This is not the uncapped SCORE refund: it is a bounded transfer reserve
+designed to satisfy the compound-donation donor budget.
+
+For all \(x\ge0\) and \(\gamma\in[0,1]\),
+\[
+0\le \min\{(\gamma x-1)_+,\gamma\}
+\le\gamma\min(x,1).
+\]
+If \(x\le1\), then \(\gamma x\le1\) and the left side is zero. If \(x>1\),
+the left side is at most \(\gamma=\gamma\min(x,1)\).
+
+The map \(f_\gamma(x)=\min\{(\gamma x-1)_+,\gamma\}\) is nondecreasing and
+\(\gamma\)-Lipschitz. Therefore for nondecreasing evidence,
+\[
+0\le \Delta D_{i,t}\le\gamma_i\Delta X_{i,t}.
+\]
+The reserve satisfies the existing donor cap and own-increment cap, so the
+prefix-budget and compound null-mass/SupFDR arguments in Sections 2–4 are
+unchanged. No additional statistical assumption is introduced beyond the
+validity and time monotonicity of \(X_i\), and the original fixed-destination
+routing and predictable arrival requirements.
+
+The bounded-refund tail argument at level \(a=\gamma_i\) also gives, under
+the null,
+\[
+\mathbb E[D_{i,\infty}]
+\le\gamma_i\log(1+\gamma_i)
+\le\gamma_i^2.
+\]
+This is a tighter expected null debit than the worst-case deterministic
+donor cap. It does **not** prove improved power. It suggests a policy that
+preserves all evidence until the donor crosses its own weighted boundary,
+then withdraws at most one unit of weighted mass.
+
+The Rust writer implements this as the explicit
+DonationReservePolicy::CappedOvershoot mode. The independent verifier
+replays the same policy using its own BTreeMap state model; the rate policy
+remains the default reference. Candidate specifications use zero reserve
+rate in overshoot mode, and a missing destination disables donation for that
+candidate. Both modes retain fixed destination IDs and exact receipt replay.
+
 ## 3. Compound null-mass bound
 
 Let N(P) be the fixed true-null set under data-generating law P. For any
