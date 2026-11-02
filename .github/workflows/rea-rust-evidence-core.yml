@@ -83,11 +83,15 @@ jobs:
             "$RUNNER_TEMP/rea-evidence-upstream-v1"
           echo "REA_UPSTREAM_EVIDENCE_FIXTURE_DIR=$RUNNER_TEMP/rea-evidence-upstream-v1" >> "$GITHUB_ENV"
 
-      - name: Validate Symthaea workspace metadata
-        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/symthaea-metadata.json"
+      - name: Validate isolated Evidence harness metadata
+        run: |
+          cargo metadata \
+            --manifest-path tools/rea-evidence-compat-harness/Cargo.toml \
+            --locked --no-deps --format-version 1 \
+            > "$RUNNER_TEMP/rea-evidence-harness-metadata.json"
 
       - name: Rust format check
-        run: cargo fmt --check --package symthaea-rea-compat
+        run: cargo fmt --manifest-path tools/rea-evidence-compat-harness/Cargo.toml -- --check
 
-      - name: Rust Evidence identity and negative-control tests
-        run: cargo test --locked -p symthaea-rea-compat
+      - name: Rust Evidence identity and upstream differential tests
+        run: cargo test --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked
