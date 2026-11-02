@@ -130,6 +130,7 @@ pub enum RmiValidationIssueV1 {
     EmptyTrialId,
     InvalidPreStateDigest,
     EmptySourceEventId { arm: String },
+    SourceEventIdMismatch,
     TargetFeatureNotChanged { target: RmiTargetFeatureV1 },
     UncontrolledFeatureChanged { feature: RmiTargetFeatureV1 },
     MotifIntervalOutOfRange { field: String },
@@ -165,6 +166,10 @@ pub fn validate_rmi_intervention_pair(
             });
         }
         issues.extend(observation.features.validation_issues(arm));
+    }
+
+    if pair.control_observation.source_event_id != pair.treatment_observation.source_event_id {
+        issues.push(RmiValidationIssueV1::SourceEventIdMismatch);
     }
 
     let control = &pair.control_observation.features;
@@ -629,6 +634,36 @@ mod tests {
                 "expected target sensitivity for {target:?}"
             );
         }
+    }
+
+    #[test]
+    fn synthetic_positive_control_changes_only_the_manipulated_output_dimension() {
+        let policy = SyntheticContingentPolicyV1 {
+            id: "synthetic-contingent".into(),
+            version: "1".into(),
+        };
+        for target in [
+            RmiTargetFeatureV1::Motif,
+            RmiTargetFeatureV1::Rhythm,
+            RmiTargetFeatureV1::Tempo,
+            RmiTargetFeatureV1::Role,
+        ] {
+            let result = evaluate_rmi_pair(&policy, &pair_for(target)).unwrap();
+            assert!(result.payload.action_delta.targeted_feature_changed(target));
+            assert_eq!(
+                result.payload.collateral_changed_feature_count,
+                0,
+                "unexpected collateral change for {target:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn intervention_rejects_mismatched_source_event_ids() {
+        let mut pair = pair_for(RmiTargetFeatureV1::Motif);
+        pair.treatment_observation.source_event_id = "different-event".into();
+        let issues = validate_rmi_intervention_pair(&pair).unwrap_err();
+        assert!(issues.contains(&RmiValidationIssueV1::SourceEventIdMismatch));
     }
 
     #[test]
