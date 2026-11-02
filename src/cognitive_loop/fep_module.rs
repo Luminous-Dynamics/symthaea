@@ -156,8 +156,12 @@ pub struct TrajectoryRollout {
 pub struct TrajectoryTelemetry {
     /// Expected free energy of the best trajectory.
     pub best_efe: f64,
-    /// Action selected by trajectory planning.
+    /// Action selected by trajectory planning. Meaningful only when has_best_rollout is true.
     pub best_action: usize,
+    /// Whether at least one complete, successful rollout was ranked.
+    pub has_best_rollout: bool,
+    /// Number of complete, successful rollouts admitted to EFE ranking.
+    pub successful_ode_rollouts: usize,
     /// Planning horizon used.
     pub horizon: f64,
     /// Total ODE steps across all action rollouts.
@@ -309,6 +313,7 @@ impl FepModule {
         let mut rollouts = Vec::with_capacity(num_actions);
         let mut total_ode_steps = 0;
         let mut failed_ode_rollouts = 0;
+        let mut successful_ode_rollouts = 0;
         let mut total_ode_rejections = 0;
 
         let limits = OdeSolveLimits {
@@ -358,6 +363,7 @@ impl FepModule {
                 .cloned()
                 .unwrap_or_else(|| belief_state.to_vec());
 
+            successful_ode_rollouts += 1;
             rollouts.push(TrajectoryRollout {
                 action,
                 expected_free_energy: efe,
@@ -378,7 +384,9 @@ impl FepModule {
                 total_ode_steps,
                 actions_evaluated: num_actions,
                 failed_ode_rollouts,
+                successful_ode_rollouts,
                 total_ode_rejections,
+                has_best_rollout: false,
                 ..TrajectoryTelemetry::default()
             };
             return None;
@@ -405,7 +413,9 @@ impl FepModule {
             total_ode_steps,
             actions_evaluated: num_actions,
             failed_ode_rollouts,
+            successful_ode_rollouts,
             total_ode_rejections,
+            has_best_rollout: true,
             best_trajectory_surprise: best_rollout.trajectory_surprise,
         };
 
