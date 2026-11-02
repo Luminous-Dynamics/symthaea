@@ -1,0 +1,45 @@
+{
+  "scope": "Exact Fraction source-escrow accounting and independent event replay only; not statistical validity, power, Rust tests or production execution.",
+  "policy_digest": "sha256:two-phase-source-escrow-v1",
+  "parameters": {
+    "traces": 50,
+    "candidate_universe": 16,
+    "rounds_per_trace": 40,
+    "weight_sequence": "gamma_i=1/[(i+1)(i+2)]",
+    "reserve": "D_i,t=min((gamma_i*X_i,t-1)_+,gamma_i)",
+    "arithmetic": "fractions.Fraction exact"
+  },
+  "deterministic_seed_schedule": "10075 + trace_index",
+  "observed": {
+    "events_replayed": 27376,
+    "negative_controls_rejected": 6,
+    "all_randomized_traces_passed": true,
+    "writer_vs_independent_replay_final_state_equal": true
+  },
+  "checked_invariants": [
+    "source-only donor cap",
+    "reserve increment <= gamma_i * new evidence increment",
+    "forward-only destination",
+    "assignment only after reservation",
+    "assignment amount <= unassigned source balance",
+    "source-scoped token IDs",
+    "source-local assignment ordinals",
+    "immutable assignment destination",
+    "credit only after assignment and recipient activation",
+    "partial-credit conservation",
+    "per-token original = unassigned + assigned face",
+    "per-assignment face = remaining + credited",
+    "prefix budget after every event",
+    "nonnegative and nondecreasing weighted compound scores",
+    "global outgoing = incoming + all escrow"
+  ],
+  "negative_controls": [
+    "backwards destination",
+    "assignment overdraw",
+    "credit overdraw",
+    "credit destination tampering",
+    "duplicate assignment event",
+    "policy digest tampering"
+  ],
+  "claim_boundary": "This tests the ledger state machine. It does not prove the e-process assumptions, SupFDR, projectivity of adaptive routing, or statistical power."
+}
