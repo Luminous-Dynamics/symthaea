@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "run_date": "2026-11-02",
   "execution_method": "Executed in the private Python 3.13.5 / NumPy 2.3.5 environment using a direct reimplementation of the committed harness logic. The generator, fixed-point rank priors, seeds, e-BH decisions and metrics matched the committed script. The committed script itself was not invoked as a shell command from the GitHub checkout; independent reproduction from the committed script remains a gate.",
   "reference_harness": {
@@ -106,18 +106,18 @@
           "probability_any_false": 0.033666666666666664
         },
         "rank_geometric_projective": {
-          "fixed_time_fdr": 0.002939,
-          "sup_fdr": 0.005728,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.028072769237094362,
+          "fixed_time_fdr": 0.002938888888888889,
+          "sup_fdr": 0.005727777777777778,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02807254701487214,
           "terminal_power": 0.8884,
-          "probability_any_false": 0.015333333333333334
+          "probability_any_false": 0.015333333333333332
         },
         "rank_geometric_projective_hybrid": {
-          "fixed_time_fdr": 0.002939,
+          "fixed_time_fdr": 0.0020444444444444442,
           "sup_fdr": 0.0038611111111111107,
           "sup_fdr_one_sided_95_hoeffding_upper": 0.026205880348205472,
           "terminal_power": 0.8568,
-          "probability_any_false": 0.015333333333333334
+          "probability_any_false": 0.01
         }
       }
     },
@@ -148,18 +148,18 @@
           "probability_any_false": 0.11133333333333334
         },
         "rank_geometric_projective": {
-          "fixed_time_fdr": 0.001172,
-          "sup_fdr": 0.003138,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.02548276923709436,
+          "fixed_time_fdr": 0.001172059177206236,
+          "sup_fdr": 0.003138152717022686,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.025482921954117048,
           "terminal_power": 0.9068833333333333,
           "probability_any_false": 0.022
         },
         "rank_geometric_projective_hybrid": {
-          "fixed_time_fdr": 0.001172,
+          "fixed_time_fdr": 0.0009829250413615738,
           "sup_fdr": 0.0019152316566016256,
           "sup_fdr_one_sided_95_hoeffding_upper": 0.02426000089369599,
           "terminal_power": 0.89925,
-          "probability_any_false": 0.022
+          "probability_any_false": 0.018666666666666668
         }
       }
     },
@@ -190,18 +190,18 @@
           "probability_any_false": 0.14466666666666667
         },
         "rank_geometric_projective": {
-          "fixed_time_fdr": 0.000522,
-          "sup_fdr": 0.001214,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.023558769237094362,
+          "fixed_time_fdr": 0.0005222935712376317,
+          "sup_fdr": 0.0012143898664468396,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.023559159103541203,
           "terminal_power": 0.9238466666666667,
           "probability_any_false": 0.024
         },
         "rank_geometric_projective_hybrid": {
-          "fixed_time_fdr": 0.000522,
+          "fixed_time_fdr": 0.0005162970548978178,
           "sup_fdr": 0.0009714949043293678,
           "sup_fdr_one_sided_95_hoeffding_upper": 0.02331626414142373,
           "terminal_power": 0.9218133333333332,
-          "probability_any_false": 0.024
+          "probability_any_false": 0.023666666666666666
         }
       }
     },
@@ -274,18 +274,18 @@
           "probability_any_false": 0.02666666666666667
         },
         "rank_geometric_projective": {
-          "fixed_time_fdr": 0.001928,
-          "sup_fdr": 0.004533,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.02687776923709436,
+          "fixed_time_fdr": 0.0019277777777777778,
+          "sup_fdr": 0.004533333333333333,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.026878102570427696,
           "terminal_power": 0.8912,
           "probability_any_false": 0.010333333333333333
         },
         "rank_geometric_projective_hybrid": {
-          "fixed_time_fdr": 0.001928,
+          "fixed_time_fdr": 0.000888888888888889,
           "sup_fdr": 0.0022333333333333333,
           "sup_fdr_one_sided_95_hoeffding_upper": 0.024578102570427696,
           "terminal_power": 0.8600666666666666,
-          "probability_any_false": 0.010333333333333333
+          "probability_any_false": 0.004666666666666667
         }
       }
     },
@@ -316,18 +316,18 @@
           "probability_any_false": 0.11533333333333333
         },
         "rank_geometric_projective": {
-          "fixed_time_fdr": 0.00137,
-          "sup_fdr": 0.003057,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.025401769237094363,
+          "fixed_time_fdr": 0.0013704242223205074,
+          "sup_fdr": 0.003056877251575394,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.025401646488669757,
           "terminal_power": 0.9048333333333334,
           "probability_any_false": 0.025666666666666667
         },
         "rank_geometric_projective_hybrid": {
-          "fixed_time_fdr": 0.00137,
+          "fixed_time_fdr": 0.0010533887824135503,
           "sup_fdr": 0.002422805393780626,
           "sup_fdr_one_sided_95_hoeffding_upper": 0.024767574630874988,
           "terminal_power": 0.8980833333333333,
-          "probability_any_false": 0.025666666666666667
+          "probability_any_false": 0.019666666666666666
         }
       }
     },
@@ -358,18 +358,18 @@
           "probability_any_false": 0.15166666666666667
         },
         "rank_geometric_projective": {
-          "fixed_time_fdr": 0.000523,
-          "sup_fdr": 0.00115,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.023494769237094364,
+          "fixed_time_fdr": 0.0005232125771126466,
+          "sup_fdr": 0.0011496105220649483,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.02349437975915931,
           "terminal_power": 0.9249466666666667,
-          "probability_any_false": 0.024333333333333335
+          "probability_any_false": 0.024333333333333332
         },
         "rank_geometric_projective_hybrid": {
-          "fixed_time_fdr": 0.000523,
-          "sup_fdr": 0.001002709711607711,
-          "sup_fdr_one_sided_95_hoeffding_upper": 0.023347478948702073,
+          "fixed_time_fdr": 0.0005108309674639563,
+          "sup_fdr": 0.0010027097116074612,
+          "sup_fdr_one_sided_95_hoeffding_upper": 0.023347478948701823,
           "terminal_power": 0.9227933333333334,
-          "probability_any_false": 0.024333333333333335
+          "probability_any_false": 0.023666666666666666
         }
       }
     }
