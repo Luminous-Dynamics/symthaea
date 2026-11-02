@@ -996,7 +996,7 @@ mod tests {
     #[test]
     fn jcs_orders_keys_by_utf16_code_units_and_uses_ecmascript_number_formatting() {
         let value: Value = serde_json::from_str(
-            r#"{"":1,"𐀀":2,"numbers":[-0,333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001]}"#,
+            r#"{"":1,"𐀀":2,"numbers":[-0,-0.0,333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001]}"#,
         )
         .unwrap();
         let canonical = String::from_utf8(canonical_jcs_bytes(&value).unwrap()).unwrap();
