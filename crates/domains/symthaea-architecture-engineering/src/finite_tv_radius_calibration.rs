@@ -24,6 +24,7 @@ const REQUEST_VERSION: &str = "0.1.0";
 const REPORT_SCHEMA: &str = "symthaea.architecture-engineering.finite-tv-calibration-report";
 const REPORT_VERSION: &str = "0.1.0";
 const MAX_PATH_SUPPORT: usize = 100_000;
+const MAX_EXACT_F64_INTEGER: u64 = 9_007_199_254_740_992;
 const PROBABILITY_SUM_TOLERANCE: f64 = 1e-10;
 const LN_2: f64 = std::f64::consts::LN_2;
 
@@ -398,12 +399,19 @@ fn validate_policy_samples(
 }
 
 fn checked_sample_size(counts: &[u64], path: &str) -> Result<u64, FiniteTvCalibrationError> {
-    counts.iter().try_fold(0_u64, |sum, count| {
+    let total = counts.iter().try_fold(0_u64, |sum, count| {
         sum.checked_add(*count).ok_or_else(|| FiniteTvCalibrationError::new(
             format!("{path}.observed_path_counts"),
             "calibration sample count overflow",
         ))
-    })
+    })?;
+    if total > MAX_EXACT_F64_INTEGER {
+        return Err(FiniteTvCalibrationError::new(
+            format!("{path}.observed_path_counts"),
+            "sample size exceeds exact f64 integer conversion supported by this reference implementation",
+        ));
+    }
+    Ok(total)
 }
 
 fn validate_request_against_plan(
