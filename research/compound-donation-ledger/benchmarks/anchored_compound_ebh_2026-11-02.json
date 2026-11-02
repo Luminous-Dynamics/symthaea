@@ -1,0 +1,65 @@
+{
+  "benchmark": "slack_anchored_compound_ebh_exact_rational_validation",
+  "scope": "Exact deterministic closure algebra and solver checks. Not a statistical power study, FDR/SupFDR simulation, Rust test, or proof of the underlying compound-process assumptions.",
+  "arithmetic": "fractions.Fraction exact",
+  "algorithm": "Sort compound scores once; prefix sums; binary search threshold count q_r for each r; scan for the largest certified r. O(n log n).",
+  "local_validation": {
+    "all_subset_closure_equivalence": {
+      "comparisons": 133320,
+      "dimensions": "n=1..4",
+      "score_grid": ["0", "1/4", "1/2", "1", "2"],
+      "alphas": ["1/2", "1/3", "1/10"],
+      "deltas": ["0", "1/10", "1/2", "1"],
+      "result": "Direct enumeration of every nonempty intersection matched the exact positive-part deficit condition in every case."
+    },
+    "exhaustive_solver_vs_bruteforce": {
+      "comparisons": 9360,
+      "dimensions": "n=1..4",
+      "score_grid": ["0", "1/2", "1", "2", "5"],
+      "alphas": ["1/2", "1/5", "1/10"],
+      "deltas": ["0", "1/10", "1/2", "1"],
+      "result": "The O(n log n) solver matched brute-force maximum cardinality, retained the baseline e-BH set, and satisfied closure."
+    },
+    "randomized_solver_vs_bruteforce": {
+      "comparisons": 144,
+      "dimensions": "n=1..8, 3 seeded vectors per dimension",
+      "alphas": ["1/5", "1/10"],
+      "deltas": ["0", "1/10", "1/2"],
+      "result": "All selected cardinalities and closure conditions matched exhaustive search."
+    },
+    "neutral_zero_padding": {
+      "comparisons": 112320,
+      "dimensions": "n=1..4",
+      "score_grid": ["0", "1/4", "1/2", "1", "2", "5", "10", "100"],
+      "alphas": ["1/10", "1/5", "1/2", "1"],
+      "deltas": ["0", "1/100", "1/20", "1/5", "1/2", "1"],
+      "result": "Appending one zero-score candidate did not change the selected prefix of any pre-existing candidate."
+    },
+    "strict_addition_witness": {
+      "alpha": "1/10",
+      "delta": "1/5",
+      "scores": ["199/20", "0"],
+      "baseline_e_bh": [],
+      "anchored_rejections": [0],
+      "closure_deficit": "1/200",
+      "available_anchor_budget": "1/50"
+    },
+    "future_high_score_extension_witness": {
+      "alpha": "1/10",
+      "delta": "1/20",
+      "old_scores": ["99/10"],
+      "old_anchored_rejections": [],
+      "extended_scores": ["99/10", "100"],
+      "extended_anchored_rejections": [1, 0],
+      "interpretation": "An appended high-scoring candidate can change an old candidate's decision. The local certificate and global weights are horizon-independent, but arbitrary high-score extension of the rejection set is not."
+    },
+    "global_weight_prefix": {
+      "formula": "gamma_i = lambda/[i(i+1)], i>=1",
+      "infinite_mass": "lambda",
+      "finite_prefix_mass": "lambda*n/(n+1)",
+      "renormalization": "none"
+    }
+  },
+  "execution_note": "These checks were run in a local Python exact-rational reimplementation of the committed functions. The committed unittest suite is authored for independent reproduction but was not run by GitHub Actions. No Rust build or test was performed.",
+  "claim_boundary": "The exact closure identity and finite solver are deterministic results. The SupFDR guarantee remains conditional on globally valid time-monotone base e-processes, common filtration, fixed global weights, source-only reserve caps, and forward-only transfers. No statistical superiority or SOTA claim."
+}
