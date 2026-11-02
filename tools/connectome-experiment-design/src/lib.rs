@@ -86,6 +86,15 @@ pub enum DesignError {
         matrix: String,
         pivot: usize,
     },
+    JointExperimentIdMismatch {
+        hypothesis_experiment_id: String,
+        parameter_design_id: String,
+    },
+    JointExperimentCostMismatch {
+        experiment_id: String,
+        hypothesis_cost: f64,
+        parameter_cost: f64,
+    },
     NumericalInstability,
 }
 
@@ -192,6 +201,21 @@ impl fmt::Display for DesignError {
             Self::MatrixNotPositiveDefinite { matrix, pivot } => write!(
                 f,
                 "{matrix} is not positive definite at Cholesky pivot {pivot}"
+            ),
+            Self::JointExperimentIdMismatch {
+                hypothesis_experiment_id,
+                parameter_design_id,
+            } => write!(
+                f,
+                "joint experiment IDs differ: hypothesis model {hypothesis_experiment_id:?}, parameter design {parameter_design_id:?}"
+            ),
+            Self::JointExperimentCostMismatch {
+                experiment_id,
+                hypothesis_cost,
+                parameter_cost,
+            } => write!(
+                f,
+                "joint experiment {experiment_id:?} declares different costs: hypothesis {hypothesis_cost}, parameter {parameter_cost}"
             ),
             Self::NumericalInstability => {
                 write!(f, "information or decision-value calculation exceeded its numerical tolerance")
@@ -349,6 +373,132 @@ pub struct ParameterSelectionRegret {
     pub selected_value_per_cost: f64,
     pub best_value_per_cost: f64,
     pub regret_per_cost: f64,
+}
+
+/// One declared protocol represented in all objective-specific model spaces.
+///
+/// The hypothesis likelihood model and the parameter sensitivity/noise model
+/// must use the same experiment ID and exact caller-declared cost.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JointExperiment {
+    pub hypothesis_model: CandidateExperiment,
+    pub parameter_design: LinearGaussianDesign,
+}
+
+/// Raw and cost-normalized values for a single multi-objective experiment.
+///
+/// The Pareto relation uses the raw values plus cost as separate axes. The
+/// cost-normalized values are reported for interpretation, but are not added
+/// as extra dominance axes (which would double-count cost).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MultiObjectiveExperimentScore {
+    pub eig_bits: f64,
+    pub eig_bits_per_cost: f64,
+    pub d_optimal_information_bits: f64,
+    pub d_optimal_bits_per_cost: f64,
+    pub a_optimal_trace_reduction: f64,
+    pub a_optimal_reduction_per_cost: f64,
+    pub evsi_utility: f64,
+    pub evsi_utility_per_cost: f64,
+    pub cost: f64,
+}
+
+/// Scored joint candidate retained on the non-dominated Pareto frontier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParetoExperiment {
+    pub experiment_id: String,
+    pub score: MultiObjectiveExperimentScore,
+}
+
+/// Check whether the left experiment weakly improves every raw objective,
+/// costs no more, and strictly improves at least one axis.
+fn dominates(left: &ParetoExperiment, right: &ParetoExperiment) -> bool {
+    let a = left.score;
+    let b = right.score;
+    let no_worse = a.eig_bits >= b.eig_bits
+        && a.d_optimal_information_bits >= b.d_optimal_information_bits
+        && a.a_optimal_trace_reduction >= b.a_optimal_trace_reduction
+        && a.evsi_utility >= b.evsi_utility
+        && a.cost <= b.cost;
+    let strictly_better = a.eig_bits > b.eig_bits
+        || a.d_optimal_information_bits > b.d_optimal_information_bits
+        || a.a_optimal_trace_reduction > b.a_optimal_trace_reduction
+        || a.evsi_utility > b.evsi_utility
+        || a.cost < b.cost;
+    no_worse && strictly_better
+}
+
+/// Evaluate each joint experiment using EIG, Fisher D/A and EVSI, then return
+/// the non-dominated candidates sorted by stable experiment ID.
+///
+/// Dominance is coordinate-wise over raw EIG bits, D-optimal bits,
+/// A-optimal trace reduction, EVSI utility and resource cost (minimized).
+/// No weighted scalarization is performed. The caller must use consistent
+/// units/cost definitions and provide a shared feasible candidate set.
+pub fn pareto_frontier(
+    priors: &[f64],
+    parameter_prior: &ParameterPrior,
+    decision_problem: &DecisionProblem,
+    candidates: &[JointExperiment],
+) -> Result<Vec<ParetoExperiment>, DesignError> {
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut scored = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        let hypothesis = &candidate.hypothesis_model;
+        let parameter = &candidate.parameter_design;
+        if hypothesis.id != parameter.id {
+            return Err(DesignError::JointExperimentIdMismatch {
+                hypothesis_experiment_id: hypothesis.id.clone(),
+                parameter_design_id: parameter.id.clone(),
+            });
+        }
+        if hypothesis.cost.to_bits() != parameter.cost.to_bits() {
+            return Err(DesignError::JointExperimentCostMismatch {
+                experiment_id: hypothesis.id.clone(),
+                hypothesis_cost: hypothesis.cost,
+                parameter_cost: parameter.cost,
+            });
+        }
+        if !ids.insert(hypothesis.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: hypothesis.id.clone(),
+            });
+        }
+
+        let eig = evaluate_candidate(priors, hypothesis)?;
+        let parameter_score = evaluate_parameter_design(parameter_prior, parameter)?;
+        let decision = evaluate_decision_value(priors, hypothesis, decision_problem)?;
+        scored.push(ParetoExperiment {
+            experiment_id: hypothesis.id.clone(),
+            score: MultiObjectiveExperimentScore {
+                eig_bits: eig.information_gain_bits,
+                eig_bits_per_cost: eig.information_gain_bits_per_cost,
+                d_optimal_information_bits: parameter_score.d_optimal_information_bits,
+                d_optimal_bits_per_cost: parameter_score.d_optimal_bits_per_cost,
+                a_optimal_trace_reduction: parameter_score.a_optimal_trace_reduction,
+                a_optimal_reduction_per_cost: parameter_score.a_optimal_reduction_per_cost,
+                evsi_utility: decision.expected_value_of_sample_information,
+                evsi_utility_per_cost: decision.expected_value_per_cost,
+                cost: hypothesis.cost,
+            },
+        });
+    }
+
+    let mut frontier: Vec<ParetoExperiment> = scored
+        .iter()
+        .filter(|candidate| {
+            !scored.iter().any(|other| {
+                other.experiment_id != candidate.experiment_id && dominates(other, candidate)
+            })
+        })
+        .cloned()
+        .collect();
+    frontier.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
+    Ok(frontier)
 }
 
 const MATRIX_SYMMETRY_TOLERANCE: f64 = 1.0e-10;
@@ -1617,6 +1767,141 @@ mod tests {
             evaluate_parameter_design(&prior, &design),
             Err(DesignError::NumericalInstability)
         );
+    }
+
+    fn pareto_hypothesis_experiment(
+        id: &str,
+        cost: f64,
+        likelihoods_by_hypothesis: Vec<Vec<f64>>,
+    ) -> CandidateExperiment {
+        CandidateExperiment {
+            id: id.to_owned(),
+            cost,
+            outcomes: vec!["outcome_0".into(), "outcome_1".into()],
+            likelihoods_by_hypothesis,
+        }
+    }
+
+    fn pareto_parameter_design(
+        id: &str,
+        cost: f64,
+        sensitivities: Vec<Vec<f64>>,
+    ) -> LinearGaussianDesign {
+        let measurement_count = sensitivities.len();
+        LinearGaussianDesign {
+            id: id.to_owned(),
+            cost,
+            sensitivities,
+            noise_covariance: (0..measurement_count)
+                .map(|row| (0..measurement_count).map(|column| if row == column { 1.0 } else { 0.0 }).collect())
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn pareto_frontier_preserves_objective_tradeoffs_without_weighting() {
+        let priors = [0.25, 0.25, 0.25, 0.25];
+        let decision = DecisionProblem {
+            actions: vec!["action_a".into(), "action_b".into()],
+            utilities_by_hypothesis: vec![
+                vec![1.0, 0.0],
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![0.0, 1.0],
+            ],
+        };
+        let parameter_prior = ParameterPrior {
+            covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let within_group = JointExperiment {
+            hypothesis_model: pareto_hypothesis_experiment(
+                "within-group",
+                1.0,
+                vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![1.0, 0.0], vec![0.0, 1.0]],
+            ),
+            parameter_design: pareto_parameter_design("within-group", 1.0, vec![vec![10.0, 0.0]]),
+        };
+        let decision_group = JointExperiment {
+            hypothesis_model: pareto_hypothesis_experiment(
+                "decision-group",
+                1.0,
+                vec![vec![0.8, 0.2], vec![0.8, 0.2], vec![0.2, 0.8], vec![0.2, 0.8]],
+            ),
+            parameter_design: pareto_parameter_design("decision-group", 1.0, vec![vec![2.0, 0.0], vec![0.0, 2.0]]),
+        };
+        let dominated = JointExperiment {
+            hypothesis_model: pareto_hypothesis_experiment(
+                "dominated",
+                1.0,
+                vec![vec![0.5, 0.5], vec![0.5, 0.5], vec![0.5, 0.5], vec![0.5, 0.5]],
+            ),
+            parameter_design: pareto_parameter_design("dominated", 1.0, vec![vec![0.5, 0.0], vec![0.0, 0.5]]),
+        };
+
+        let frontier = pareto_frontier(
+            &priors,
+            &parameter_prior,
+            &decision,
+            &[dominated, decision_group, within_group],
+        ).unwrap();
+
+        assert_eq!(
+            frontier.iter().map(|candidate| candidate.experiment_id.as_str()).collect::<Vec<_>>(),
+            vec!["decision-group", "within-group"]
+        );
+        let decision_front = frontier.iter().find(|item| item.experiment_id == "decision-group").unwrap();
+        let within_front = frontier.iter().find(|item| item.experiment_id == "within-group").unwrap();
+        close(decision_front.score.evsi_utility, 0.3, 1.0e-12);
+        close(within_front.score.eig_bits, 1.0, 1.0e-12);
+        close(decision_front.score.a_optimal_trace_reduction, 1.6, 1.0e-12);
+        close(within_front.score.d_optimal_information_bits, 0.5 * 101.0_f64.log2(), 1.0e-12);
+    }
+
+    #[test]
+    fn joint_pareto_experiment_requires_matching_identity_and_cost() {
+        let priors = [0.5, 0.5];
+        let decision = DecisionProblem {
+            actions: vec!["a".into(), "b".into()],
+            utilities_by_hypothesis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let prior = ParameterPrior { covariance: vec![vec![1.0]] };
+        let hypothesis = pareto_hypothesis_experiment("joint", 1.0, vec![vec![0.9, 0.1], vec![0.1, 0.9]]);
+        let wrong_id = pareto_parameter_design("different", 1.0, vec![vec![1.0]]);
+        assert!(matches!(
+            pareto_frontier(&priors, &prior, &decision, &[JointExperiment {
+                hypothesis_model: hypothesis.clone(),
+                parameter_design: wrong_id,
+            }]),
+            Err(DesignError::JointExperimentIdMismatch { .. })
+        ));
+
+        let wrong_cost = pareto_parameter_design("joint", 2.0, vec![vec![1.0]]);
+        assert!(matches!(
+            pareto_frontier(&priors, &prior, &decision, &[JointExperiment {
+                hypothesis_model: hypothesis,
+                parameter_design: wrong_cost,
+            }]),
+            Err(DesignError::JointExperimentCostMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn pareto_frontier_rejects_duplicate_joint_experiment_ids() {
+        let priors = [0.5, 0.5];
+        let decision = DecisionProblem {
+            actions: vec!["a".into(), "b".into()],
+            utilities_by_hypothesis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let prior = ParameterPrior { covariance: vec![vec![1.0]] };
+        let first = JointExperiment {
+            hypothesis_model: pareto_hypothesis_experiment("same", 1.0, vec![vec![0.9, 0.1], vec![0.1, 0.9]]),
+            parameter_design: pareto_parameter_design("same", 1.0, vec![vec![1.0]]),
+        };
+        let second = first.clone();
+        assert!(matches!(
+            pareto_frontier(&priors, &prior, &decision, &[first, second]),
+            Err(DesignError::DuplicateExperimentId { .. })
+        ));
     }
 
     #[test]
