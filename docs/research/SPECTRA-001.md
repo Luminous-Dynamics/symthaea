@@ -284,6 +284,8 @@ The first deliverable should be a reproducible report that can return Better, Wo
 - Tressoldi & Storm (2024), Stage 2 Registered Report: Anomalous perception in a Ganzfeld condition: https://pubmed.ncbi.nlm.nih.gov/38813059/
 - Tressoldi & Storm (2026 preprint), Outcomes of Preregistered Studies Related to ESP and Mind-Matter Interaction: https://doi.org/10.31234/osf.io/ha4np
 - Marks & Kammann (1978), Information transmission in remote viewing experiments: https://www.nature.com/articles/274680a0
+- Puharich-authored 1971/72 background paper and bibliography (lists the 1961 Darshana article and 562-page Faraday-cage manuscript as in press): https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2
+- *Tomorrow*, Vol. 8, No. 3, Summer 1960, Susy Smith, "TV Gilds a Lily" (contemporary secondary account of the Hurkos cage/object task): https://iapsop.com/archive/materials/tomorrow_garrett/tomorrow_2s_v8_n3_summer_1960.pdf
 - Center for Open Science, Registered Reports: https://www.cos.io/initiatives/registered-reports
 - openEMS documentation: https://docs.openems.de/en/latest/intro.html
 - BIDS specification: https://bids-specification.readthedocs.io/en/stable/
