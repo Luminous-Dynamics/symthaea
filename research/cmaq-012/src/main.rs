@@ -1997,6 +1997,12 @@ mod tests {
         let input = synthetic_tsv(4,1.0,2.0,4.0,2.0,5.0);
         let report = build_report(&input,500,42).unwrap();
         assert_eq!(report.input_sha256,sha256_hex(input.as_bytes()));
-        assert_eq!(render_report(&report),render_report(&report));
+        let rendered = render_report(&report);
+        assert_eq!(rendered,render_report(&report));
+        assert!(
+            parse_json(&rendered).is_ok(),
+            "render_report produced invalid JSON: {:?}",
+            parse_json(&rendered).err()
+        );
     }
 }
