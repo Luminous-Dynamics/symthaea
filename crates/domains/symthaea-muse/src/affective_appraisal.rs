@@ -60,7 +60,16 @@ impl Default for AffectVectorV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PerceptualEvidenceRefV1 {
     pub observation_id: String,
-    /// SHA-256 of the exact audio bytes that were perceived.
+    /// Stable identity of the independent perception pipeline.
+    pub perceptual_pipeline_id: String,
+    /// Immutable pipeline/model version used to produce this observation.
+    pub perceptual_pipeline_version: String,
+    /// SHA-256 of the canonical perceptual-analysis record. The producer must
+    /// compute this from the serialized observation; validate() checks format
+    /// only and does not have access to the source bytes.
+    pub analysis_sha256: String,
+    /// SHA-256 of the exact audio bytes that were perceived. The producer must
+    /// compute this from those bytes; validate() checks format only.
     pub audio_sha256: String,
     /// Optional SHA-256 of the exact symbolic score used for alignment.
     pub score_sha256: Option<String>,
@@ -73,6 +82,13 @@ impl PerceptualEvidenceRefV1 {
         if self.observation_id.trim().is_empty() {
             return Err(AppraisalError::EmptyIdentifier("observation_id"));
         }
+        if self.perceptual_pipeline_id.trim().is_empty() {
+            return Err(AppraisalError::EmptyIdentifier("perceptual_pipeline_id"));
+        }
+        if self.perceptual_pipeline_version.trim().is_empty() {
+            return Err(AppraisalError::EmptyIdentifier("perceptual_pipeline_version"));
+        }
+        validate_sha256("analysis_sha256", &self.analysis_sha256)?;
         validate_sha256("audio_sha256", &self.audio_sha256)?;
         if let Some(score_sha256) = &self.score_sha256 {
             validate_sha256("score_sha256", score_sha256)?;
@@ -479,6 +495,9 @@ mod tests {
         IndependentPerceptualObservationV1 {
             evidence: PerceptualEvidenceRefV1 {
                 observation_id: format!("listen-{sequence}"),
+                perceptual_pipeline_id: "muse-audio-perception".into(),
+                perceptual_pipeline_version: "0.1.0".into(),
+                analysis_sha256: "c".repeat(64),
                 audio_sha256: "a".repeat(64),
                 score_sha256: Some("b".repeat(64)),
                 sequence,
@@ -568,6 +587,26 @@ mod tests {
         let mut bad = observation(1);
         bad.novelty = 1.1;
         assert_eq!(bad.validate(), Err(AppraisalError::OutOfRange("novelty")));
+    }
+
+    #[test]
+    fn perceptual_pipeline_identity_is_required() {
+        let mut bad = observation(1);
+        bad.evidence.perceptual_pipeline_version = " ".into();
+        assert_eq!(
+            bad.validate(),
+            Err(AppraisalError::EmptyIdentifier("perceptual_pipeline_version"))
+        );
+    }
+
+    #[test]
+    fn invalid_analysis_identity_fails_closed() {
+        let mut bad = observation(1);
+        bad.evidence.analysis_sha256 = "missing-digest".into();
+        assert_eq!(
+            bad.validate(),
+            Err(AppraisalError::InvalidDigest("analysis_sha256"))
+        );
     }
 
     #[test]
