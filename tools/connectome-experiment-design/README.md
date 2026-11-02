@@ -65,3 +65,23 @@ The analytical values are independently recorded in `fixtures/known-answers.json
 6. Prospective utility requires running the selected experiment and comparing the realized outcome to the preregistered predictions.
 
 The fixture evidence class is `synthetic_known_answer` and claim ceiling is `SYNTHETIC_ONLY`. No empirical experiment ranking or biological result is claimed.
+
+
+## Decision value is not information gain
+
+The crate now also exposes a separate, caller-utility-aware objective:
+
+- `DecisionProblem` declares available actions and a utility matrix `U[hypothesis][action]`.
+- `evaluate_decision_value(...)` computes expected value of sample information (EVSI): the improvement in the best expected action utility after observing the experiment outcome, versus choosing before the experiment.
+- `rank_candidates_by_decision_value(...)` ranks by EVSI/cost, then EVSI, then stable ID.
+- `decision_selection_regret(...)` reports the opportunity gap relative to the best candidate in the declared pool under EVSI/cost.
+
+EVSI is reported in caller-defined utility units, not bits. It is not the same as EIG, EIG/cost, a parameter-identification objective, or realized biological utility.
+
+A frozen four-hypothesis control demonstrates the distinction:
+- Hypotheses H0/H1 support action A; H2/H3 support action B.
+- An experiment that perfectly distinguishes H0 from H1 and H2 from H3 has 1.0 bit EIG but 0 EVSI because it cannot change the best action.
+- A noisy experiment that identifies the action-relevant group with 80% accuracy has only about 0.2780719 bits EIG but 0.3 utility units EVSI for the declared 0/1 utility matrix.
+- EIG therefore ranks the within-group experiment first, while EVSI ranks the decision-relevant experiment first.
+
+This is a synthetic known-answer demonstration. Utility functions, hypotheses, priors, likelihoods, costs and action feasibility remain caller-supplied and must be calibrated/preregistered for biological use. Fisher-information D-/A-optimal parameter identification remains a distinct comparator, not an implementation hidden inside EIG or EVSI.
