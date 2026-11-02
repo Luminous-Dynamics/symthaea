@@ -620,7 +620,37 @@ impl StaircaseAdjuster {
         alpha_numerator: u64,
         alpha_denominator: u64,
     ) -> Result<Self, LedgerError> {
+        Self::weighted_e_bh_rank_geometric(
+            family_size,
+            1,
+            family_size,
+            alpha_numerator,
+            alpha_denominator,
+        )
+    }
+
+    /// Builds a candidate-specific rank-geometric calibrator for weighted e-BH.
+    ///
+    /// The candidate weight is weight_numerator / weight_denominator. For
+    /// rejection rank r, its weighted e-BH boundary is
+    ///
+    ///     C_i >= 1 / (alpha * r * gamma_i).
+    ///
+    /// The same geometric rank grid and fixed prior budget are used as in
+    /// e_bh_rank_geometric, but each raw threshold is scaled by this
+    /// candidate's precommitted weight. The family size is a fixed design
+    /// envelope, not the current active roster size.
+    pub fn weighted_e_bh_rank_geometric(
+        family_size: u64,
+        weight_numerator: u64,
+        weight_denominator: u64,
+        alpha_numerator: u64,
+        alpha_denominator: u64,
+    ) -> Result<Self, LedgerError> {
         if family_size == 0
+            || weight_numerator == 0
+            || weight_denominator == 0
+            || weight_numerator > weight_denominator
             || alpha_numerator == 0
             || alpha_denominator == 0
             || alpha_numerator >= alpha_denominator
@@ -651,15 +681,16 @@ impl StaircaseAdjuster {
         }
 
         // Multiple rank targets can map to the same integer raw threshold for
-        // small families or extreme alpha values. Merge their masses exactly.
+        // small families or extreme alpha/weight values. Merge their masses.
         let mut merged = BTreeMap::<u128, u128>::new();
         for rank in ranks {
-            let h_numerator = (family_size as u128)
-                .checked_mul(alpha_denominator as u128)
+            let h_numerator = (alpha_denominator as u128)
+                .checked_mul(weight_denominator as u128)
                 .and_then(|value| value.checked_mul(EVIDENCE_ONE))
                 .ok_or(LedgerError::ArithmeticOverflow)?;
             let h_denominator = (alpha_numerator as u128)
                 .checked_mul(rank as u128)
+                .and_then(|value| value.checked_mul(weight_numerator as u128))
                 .ok_or(LedgerError::ArithmeticOverflow)?;
             let h_ticks = h_numerator
                 .checked_add(h_denominator - 1)
@@ -1069,6 +1100,42 @@ mod tests {
             // raw-threshold penalty is bounded by about 2Q (plus rounding).
             assert!(raw <= 17 * ideal_boundary + EVIDENCE_ONE);
         }
+    }
+
+    #[test]
+    fn weighted_rank_geometric_scales_thresholds_by_candidate_weight() {
+        let unit_weight = StaircaseAdjuster::weighted_e_bh_rank_geometric(
+            100, 1, 100, 1, 20
+        ).unwrap();
+        let half_weight = StaircaseAdjuster::weighted_e_bh_rank_geometric(
+            100, 1, 200, 1, 20
+        ).unwrap();
+        assert_eq!(
+            half_weight.points().len(),
+            unit_weight.points().len()
+        );
+        for (half, unit) in half_weight.points().iter().zip(unit_weight.points()) {
+            assert!(half.threshold >= unit.threshold);
+        }
+
+        let equal_weight = StaircaseAdjuster::e_bh_rank_geometric(100, 1, 20).unwrap();
+        assert_eq!(equal_weight, unit_weight);
+    }
+
+    #[test]
+    fn weighted_rank_geometric_rejects_invalid_weights() {
+        assert_eq!(
+            StaircaseAdjuster::weighted_e_bh_rank_geometric(100, 0, 100, 1, 20),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
+        assert_eq!(
+            StaircaseAdjuster::weighted_e_bh_rank_geometric(100, 101, 100, 1, 20),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
+        assert_eq!(
+            StaircaseAdjuster::weighted_e_bh_rank_geometric(100, 1, 100, 1, 1),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
     }
 
     #[test]
