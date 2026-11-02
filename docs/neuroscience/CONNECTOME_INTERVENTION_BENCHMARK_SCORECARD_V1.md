@@ -133,6 +133,12 @@ The primary estimand, metric ID, metric version, direction, units and aggregatio
 
 For measured intervention results, the independent unit is usually the randomized animal/session/assay block, not each neuron-timepoint. Use cluster-aware uncertainty. Report both pooled and per-stratum results; do not let a large easy stratum hide a failure in a smaller important one.
 
+### Exact scorecard cohort binding
+
+Each scorecard now carries its own `unit_tokens` and `unit_manifest_sha256`. Measured scorecards require at least two pseudonymous tokens. The verifier recomputes the scorecard membership digest, checks that every token belongs to the held-out test partition, and requires candidate, baseline and paired-comparison token sets to be identical before reconciling mean candidate-minus-baseline arithmetic. Equal sample counts alone are not accepted as evidence of matched units.
+
+This prevents a candidate and baseline computed on different animals/sessions/targets from being called paired merely because both report the same `n`.
+
 ## 8. Paired comparisons and uncertainty
 
 Every candidate-vs-baseline comparison binds:
