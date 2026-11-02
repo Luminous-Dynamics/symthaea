@@ -1,0 +1,202 @@
+name: Symthaea IIT Rust Core
+
+on:
+  push:
+    branches:
+      - research/symthaea-iit-rust-core-20261029
+  pull_request:
+    paths:
+      - "crates/core/symthaea-iit/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/symthaea-iit-core.yml"
+
+permissions:
+  contents: read
+
+env:
+  # PRs test the exact contributor head, not GitHub's synthetic merge commit.
+  TESTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+# Explicit bash enables pipefail so tee cannot mask Cargo/test failures.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  rust-core:
+    name: Compile and test the IIT model/repertoire core
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TESTED_SOURCE_SHA }}
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+
+      - name: Capture benchmark environment and source identity
+        shell: bash
+        run: |
+          mkdir -p target/iit-benchmark-evidence
+          {
+            echo "tested_source_sha=$(git rev-parse HEAD)"
+            echo "github_event_sha=${GITHUB_SHA}"
+            echo "pull_request_head_sha=${PULL_REQUEST_HEAD_SHA}"
+            echo "git_ref=${GITHUB_REF}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "captured_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "----- rustc -----"
+            rustc --version --verbose
+            echo
+            echo "----- cargo -----"
+            cargo --version
+            echo
+            echo "----- kernel -----"
+            uname -a
+            echo
+            echo "----- cpu -----"
+            lscpu
+          } > target/iit-benchmark-evidence/environment.txt
+
+      - name: Test locked workspace package
+        run: cargo test --locked -p symthaea-iit 2>&1 | tee target/iit-benchmark-evidence/cargo-test.log
+
+      # Keep the locked gate fail-closed, but capture the exact resolver delta
+      # if the submitted lockfile is stale. The generated lock exists only on the
+      # ephemeral runner; contributors must review and commit it explicitly.
+      - name: Diagnose Cargo.lock drift after a locked-test failure
+        if: failure()
+        shell: bash
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          set +e
+          cargo metadata --format-version 1 >/tmp/cargo-metadata.json 2>/tmp/cargo-metadata.stderr
+          metadata_status=$?
+          set -e
+          echo "cargo metadata exit: $metadata_status"
+          cat /tmp/cargo-metadata.stderr
+          echo "----- Cargo.lock delta generated for diagnosis only -----"
+          git diff --no-index -- /tmp/Cargo.lock.before Cargo.lock || true
+          echo "----- End Cargo.lock delta -----"
+
+      - name: Build isolated benchmark examples in release mode
+        run: cargo build --release --locked -p symthaea-iit --examples 2>&1 | tee target/iit-benchmark-evidence/release-build.log
+
+      - name: Exercise deterministic partition sweep
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/directed-partitions.time.txt target/release/examples/directed_partition_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/directed-partitions.csv
+
+      - name: Exercise bounded factor-graph elimination sweep
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/factor-elimination.time.txt target/release/examples/factor_elimination_sweep 2>&1 | tee target/iit-benchmark-evidence/factor-elimination.csv
+
+      - name: Exercise exact cutset conditioning under a bounded factor budget
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/cutset-conditioning.time.txt target/release/examples/cutset_conditioning_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/cutset-conditioning.csv
+
+      - name: Rank exact cutset separator candidates before inference
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/cutset-frontier.time.txt target/release/examples/cutset_frontier_sweep 2>&1 | tee target/iit-benchmark-evidence/cutset-frontier.csv
+
+      - name: Benchmark proper-system Eq4 with sparse external backgrounds
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/eq4-background.time.txt target/release/examples/eq4_sparse_background_sweep 2>&1 | tee target/iit-benchmark-evidence/eq4-background.csv
+
+      - name: Benchmark sparse local-CPT Eq4 across growing substrates
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-eq4-scale.time.txt target/release/examples/sparse_eq4_scale_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-scale.csv
+
+      - name: Benchmark sparse Eq4 across ring, hub-spoke, and grid topologies
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-eq4-topologies.time.txt target/release/examples/sparse_eq4_topology_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-topologies.csv
+
+      - name: Benchmark sparse fixed-state partition scoring
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-partition-score.time.txt target/release/examples/sparse_partition_score_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/sparse-partition-score.csv
+
+      - name: Benchmark exact sparse system-search reuse
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-full-system-search.time.txt target/release/examples/sparse_system_search_reuse_sweep --repeats 5 --max-units 2048 2>&1 | tee target/iit-benchmark-evidence/sparse-full-system-search.csv
+
+      - name: Compare legacy and optimized min-fill planners on identical graphs
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/min-fill-planner-comparison.time.txt target/release/examples/min_fill_planner_comparison_sweep 2>&1 | tee target/iit-benchmark-evidence/min-fill-planner-comparison.csv
+
+      - name: Benchmark bounded macro mapping-family enumeration
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/macro-mapping-families.time.txt target/release/examples/macro_mapping_family_sweep 2>&1 | tee target/iit-benchmark-evidence/macro-mapping-families.csv
+
+      - name: Sweep exact IIT selections across a one-parameter landscape
+        shell: bash
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/parameter-landscape.time.txt target/release/examples/sparse_phi_landscape_sweep 2>&1 | tee target/iit-benchmark-evidence/parameter-landscape.csv
+
+      - name: Record every exact IIT partition score along the landscape
+        shell: bash
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/parameter-landscape-partitions.time.txt target/release/examples/sparse_phi_partition_diagnostic_sweep 2>&1 | tee target/iit-benchmark-evidence/parameter-landscape-partitions.csv
+
+      - name: Probe local CPT uncertainty around IIT selection switches
+        shell: bash
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/local-selection-robustness.time.txt target/release/examples/sparse_phi_local_selection_robustness 2>&1 | tee target/iit-benchmark-evidence/local-selection-robustness.csv
+
+      - name: Clippy the isolated crate
+        run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
+
+      - name: Validate benchmark evidence completeness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s target/iit-benchmark-evidence/environment.txt
+          test -s target/iit-benchmark-evidence/cargo-test.log
+          test -s target/iit-benchmark-evidence/release-build.log
+          test -s target/iit-benchmark-evidence/clippy.log
+          for stem in \
+            directed-partitions \
+            factor-elimination \
+            cutset-conditioning \
+            cutset-frontier \
+            eq4-background \
+            sparse-eq4-scale \
+            sparse-eq4-topologies \
+            sparse-partition-score \
+            sparse-full-system-search \
+            min-fill-planner-comparison \
+            macro-mapping-families \
+            parameter-landscape \
+            parameter-landscape-partitions \
+            local-selection-robustness
+          do
+            csv="target/iit-benchmark-evidence/${stem}.csv"
+            timing="target/iit-benchmark-evidence/${stem}.time.txt"
+            test -s "$csv"
+            test -s "$timing"
+            test "$(wc -l < "$csv")" -ge 2
+            grep -q "Maximum resident set size (kbytes):" "$timing"
+            printf 'PASS %s: CSV rows=%s; peak-RSS record present\n' "$stem" "$(( $(wc -l < "$csv") - 1 ))"
+          done
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | grep -c 'EXACT_SAMPLE_ONLY')" -eq 13
+          awk -F, 'NR > 1 && (NF != 36 || $12 != "true" || $36 != "EXACT_SAMPLE_ONLY") { exit 1 }' target/iit-benchmark-evidence/parameter-landscape.csv
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f9 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f11 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f33 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f35 | sort -u | wc -l)" -ge 1
+          awk -F, 'NR > 1 && ($28 < 1 || $27 == "" || $27 == "NA") { exit 1 }' target/iit-benchmark-evidence/parameter-landscape.csv
+          printf 'PASS parameter-landscape: 13 exact samples; common input digests; signed values, full MIP tie families, regimes and unique receipts; no interval certification claimed\\n'
+          awk -F, 'NR > 1 && (NF != 28 || $28 != "EXACT_PARTITION_SAMPLE" || length($6) != 64 || length($7) != 64 || length($8) != 64 || length($15) != 64 || length($26) != 64 || length($27) != 64) { exit 1 }' target/iit-benchmark-evidence/parameter-landscape-partitions.csv
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape-partitions.csv | cut -d, -f4 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape-partitions.csv | cut -d, -f15 | sort -u | wc -l)" -ge 1
+          test "$(wc -l < target/iit-benchmark-evidence/parameter-landscape-partitions.csv)" -gt 14
+          printf 'PASS parameter-landscape-partitions: complete per-cut sample rows with model, request, cut, score-request and score-receipt identities\\n'
+          awk -F, 'NR > 1 && (NF != 37 || $2 != "IIT_4_0_2023" || $12 != "true" || $37 != "EXACT_LOCAL_PERTURBATION" || length($9) != 64 || length($10) != 64 || length($11) != 64 || length($35) != 64) { exit 1 }' target/iit-benchmark-evidence/local-selection-robustness.csv
+          test "$(wc -l < target/iit-benchmark-evidence/local-selection-robustness.csv)" -eq 217
+          test "$(tail -n +2 target/iit-benchmark-evidence/local-selection-robustness.csv | cut -d, -f9 | sort -u | wc -l)" -eq 216
+          test "$(tail -n +2 target/iit-benchmark-evidence/local-selection-robustness.csv | cut -d, -f7 | sort -u | wc -l)" -eq 6
+          awk -F, 'NR > 1 && ($5 < 0 || $5 > 2 || $6 < 0 || $6 > 3 || $8 < 0 || $8 > 1) { exit 1 }' target/iit-benchmark-evidence/local-selection-robustness.csv
+          printf 'PASS local-selection-robustness: 216 exact local CPT perturbations across 3 switch-region anchors, all complete and content-addressed\\n'
+
+      - name: Upload immutable IIT benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: symthaea-iit-evidence-${{ env.TESTED_SOURCE_SHA }}
+          path: target/iit-benchmark-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
