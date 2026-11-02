@@ -71,7 +71,7 @@ It is more conservative as the candidate grid grows. The Hoeffding radius scales
 
 ## 5. Synthetic fixture
 
-The committed fixture has 512 eight-step trajectories and four frozen joint candidate policies. Scenarios include easy, unsolvable, late-solvable, overconfident-wrong and noisy-solved cases. It uses:
+The committed fixture has 512 eight-step trajectories and four frozen joint candidate policies. Its fixture schema is `fixture-v0.1.schema.json`. Scenarios include easy, unsolvable, late-solvable, overconfident-wrong and noisy-solved cases. It uses:
 - upper risk target: 230,000 PPM (23%);
 - lower risk target: 150,000 PPM (15%);
 - family statistical delta: 50,000 PPM (5%);
@@ -83,6 +83,17 @@ Independent replay of the fixture gives:
 - selected candidate empirical upper risk: 146,485 PPM; upper UCB: 216,886 PPM;
 - selected candidate empirical lower risk: 56,641 PPM; lower UCB: 127,042 PPM;
 - mean normalized token cost: 507,813 PPM (about 50.8% of the full reasoning budget).
+
+All four candidates are feasible under this synthetic pair of budgets; the chosen policy is the lowest-compute one:
+
+| Candidate | Upper risk UCB | Lower risk UCB | Mean normalized compute | Feasible |
+|---|---:|---:|---:|---|
+| aggressive_dual | 216,886 PPM | 127,042 PPM | 507,813 PPM | yes |
+| dual_balanced | 216,886 PPM | 114,347 PPM | 735,840 PPM | yes |
+| upper_conservative | 216,886 PPM | 70,401 PPM | 770,020 PPM | yes |
+| late_confidence | 216,886 PPM | 70,401 PPM | 929,200 PPM | yes |
+
+A separate 20,000-family Monte Carlo sanity experiment used eight independent Bernoulli risk streams (four candidate policies × two risk axes), each with true mean 0.5 and 512 samples per family. The simultaneous UCB covered every population mean in 99.43% of families (95% Wilson interval 99.316%–99.525%). The Hoeffding target was 95%. This tests the numerical bound implementation under a simple synthetic design; it is not evidence about LLM task distributions or the Rust execution itself.
 
 This is a deterministic synthetic fixture, not 512 independent real observations. These figures only verify that the implementation and independent reference calculation agree; they are not model performance or a valid deployment risk certificate.
 
