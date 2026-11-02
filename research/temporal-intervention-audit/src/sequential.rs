@@ -741,11 +741,10 @@ mod tests {
     #[test]
     fn exact_integer_evidence_is_safe_at_the_sixty_four_pair_limit() {
         let mut state = AnytimeAuditState::new(config(64)).unwrap();
-        let mut report = None;
         for sequence in 1..=64 {
-            report = Some(state.observe(sequence, &positive_pair(sequence)).unwrap());
+            state.observe(sequence, &positive_pair(sequence)).unwrap();
         }
-        let report = report.expect("64 sequential observations produce a report");
+        let report = state.report().unwrap();
         assert_eq!(report.axes[0].e_value_numerator, 3_u128.pow(64));
         assert_eq!(report.axes[0].e_value_denominator, 1_u128 << 64);
         assert!(matches!(
