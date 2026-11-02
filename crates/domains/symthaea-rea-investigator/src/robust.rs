@@ -344,7 +344,7 @@ pub fn plan_next_experiment_robust(
     if hypotheses.len() < 2 {
         return Ok(RobustInvestigationPlan {
             selected: None,
-            ranked_experiments,
+            ranked_experiments: Vec::new(),
             rejected_experiments,
             abstention: Some(RobustAbstentionReason::NoCompetingHypotheses),
             prior_entropy_bits,
