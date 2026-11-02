@@ -13,6 +13,14 @@ use core::fmt;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RecommenderObjective {
+    /// Rank candidates solely by demonstrated capability quality.
+    PerformanceOnly,
+    /// Add a bounded bonus for underrepresented capability lineages.
+    PerformanceDiversity { novelty_weight: f64 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NetworkedMediationConfig {
     pub population_size: usize,
     pub generations: usize,
@@ -24,6 +32,7 @@ pub struct NetworkedMediationConfig {
     pub recommender_candidate_count: usize,
     /// Temperature for selecting among high-scoring recommender candidates.
     pub recommender_temperature: f64,
+    pub recommender_objective: RecommenderObjective,
     pub initial_seed_agents: usize,
     pub initial_seed_quality: u16,
     pub individual_innovation_probability: f64,
@@ -44,6 +53,7 @@ impl Default for NetworkedMediationConfig {
             mediation_fraction: 0.5,
             recommender_candidate_count: 4,
             recommender_temperature: 0.25,
+            recommender_objective: RecommenderObjective::PerformanceOnly,
             initial_seed_agents: 1,
             initial_seed_quality: 10,
             individual_innovation_probability: 0.01,
@@ -67,6 +77,7 @@ pub enum MediationError {
     CandidateCountTooLarge { candidates: usize, population: usize },
     InvalidProbability { name: &'static str },
     InvalidTemperature,
+    InvalidNoveltyWeight,
     InvalidNoise,
     ZeroInnovationGain,
 }
@@ -86,6 +97,7 @@ impl fmt::Display for MediationError {
             }
             Self::InvalidProbability { name } => write!(f, "{name} must be finite and in [0, 1]"),
             Self::InvalidTemperature => write!(f, "recommender temperature must be finite and positive"),
+            Self::InvalidNoveltyWeight => write!(f, "recommender novelty weight must be finite and in [0, 1]"),
             Self::InvalidNoise => write!(f, "demonstration noise must be finite and non-negative"),
             Self::ZeroInnovationGain => write!(f, "innovation_gain must be positive"),
         }
@@ -133,6 +145,11 @@ impl NetworkedMediationConfig {
         }
         if !self.recommender_temperature.is_finite() || self.recommender_temperature <= 0.0 {
             return Err(MediationError::InvalidTemperature);
+        }
+        if let RecommenderObjective::PerformanceDiversity { novelty_weight } = self.recommender_objective {
+            if !novelty_weight.is_finite() || !(0.0..=1.0).contains(&novelty_weight) {
+                return Err(MediationError::InvalidNoveltyWeight);
+            }
         }
         if !self.demonstration_noise_std.is_finite() || self.demonstration_noise_std < 0.0 {
             return Err(MediationError::InvalidNoise);
@@ -374,6 +391,59 @@ impl DeterministicRng {
 
 }
 
+/// Rank global recommender candidates using normalized performance and,
+/// optionally, a bounded rarity bonus for underrepresented lineages.
+/// Unknown/empty knowledge receives no novelty bonus.
+fn rank_recommender_candidates(
+    candidates: &[usize],
+    previous: &[NetworkedAgent],
+    objective: RecommenderObjective,
+    noise_std: f64,
+    rng: &mut DeterministicRng,
+) -> Vec<(usize, f64)> {
+    let mut lineage_counts = BTreeMap::<u64, usize>::new();
+    let mut knowledgeable = 0usize;
+    let max_quality = candidates.iter()
+        .map(|&index| previous[index].quality)
+        .max()
+        .unwrap_or(0);
+
+    for &index in candidates {
+        let agent = previous[index];
+        if agent.quality > 0 && agent.lineage_id != 0 {
+            knowledgeable += 1;
+            *lineage_counts.entry(agent.lineage_id).or_default() += 1;
+        }
+    }
+
+    let mut scored: Vec<(usize, f64)> = candidates.iter().copied().map(|index| {
+        let agent = previous[index];
+        let performance = if max_quality > 0 {
+            f64::from(agent.quality) / f64::from(max_quality)
+        } else {
+            0.0
+        };
+        let rarity = if agent.quality > 0 && knowledgeable > 0 {
+            let count = *lineage_counts.get(&agent.lineage_id).unwrap_or(&0);
+            1.0 - count as f64 / knowledgeable as f64
+        } else {
+            0.0
+        };
+        let novelty = match objective {
+            RecommenderObjective::PerformanceOnly => 0.0,
+            RecommenderObjective::PerformanceDiversity { novelty_weight } => {
+                novelty_weight * rarity
+            }
+        };
+        (index, performance + novelty + noise_std * rng.normal())
+    }).collect();
+
+    scored.sort_by(|left, right| {
+        right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+    });
+    scored
+}
+
 fn choose_softmax_candidate(
     scored: &[(usize, f64)],
     temperature: f64,
@@ -487,18 +557,27 @@ pub fn simulate_networked_mediation(
                 demonstration_observed = rng.bernoulli(config.observation_probability);
             }
             if demonstration_observed {
-                let mut scored: Vec<(usize, f64)> = candidate_pool.iter().copied()
-                    .map(|candidate| {
-                        (
+                let mut scored: Vec<(usize, f64)> = if uses_recommender {
+                    rank_recommender_candidates(
+                        candidate_pool,
+                        previous,
+                        config.recommender_objective,
+                        config.demonstration_noise_std,
+                        &mut rng,
+                    )
+                } else {
+                    candidate_pool.iter().copied()
+                        .map(|candidate| (
                             candidate,
                             f64::from(previous[candidate].quality)
                                 + config.demonstration_noise_std * rng.normal(),
-                        )
-                    })
-                    .collect();
-                scored.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        ))
+                        .collect()
+                };
                 if uses_recommender {
                     scored.truncate(config.recommender_candidate_count);
+                } else {
+                    scored.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
                 }
 
                 let teacher_index = if uses_recommender {
@@ -574,6 +653,7 @@ mod tests {
             mediation_fraction,
             recommender_candidate_count: 1,
             recommender_temperature: 0.1,
+            recommender_objective: RecommenderObjective::PerformanceOnly,
             initial_seed_agents: 1,
             initial_seed_quality: 10,
             individual_innovation_probability: 0.0,
@@ -664,6 +744,61 @@ mod tests {
             simulate_networked_mediation(config, 2026).unwrap(),
             simulate_networked_mediation(config, 2026).unwrap()
         );
+    }
+
+    #[test]
+    fn performance_diversity_ranking_can_resurface_a_rare_lineage() {
+        let previous = vec![
+            NetworkedAgent { quality: 10, lineage_id: 1, source: KnowledgeSource::InitialMachine,
+                individual_innovated: false, demonstration_observed: false,
+                strategy_acquisition_succeeded: false, acquisition_source: None, parent_index: None },
+            NetworkedAgent { quality: 10, lineage_id: 1, source: KnowledgeSource::PeerSocial,
+                individual_innovated: false, demonstration_observed: false,
+                strategy_acquisition_succeeded: false, acquisition_source: None, parent_index: None },
+            NetworkedAgent { quality: 10, lineage_id: 1, source: KnowledgeSource::PeerSocial,
+                individual_innovated: false, demonstration_observed: false,
+                strategy_acquisition_succeeded: false, acquisition_source: None, parent_index: None },
+            NetworkedAgent { quality: 9, lineage_id: 2, source: KnowledgeSource::IndividualInnovation,
+                individual_innovated: true, demonstration_observed: false,
+                strategy_acquisition_succeeded: false, acquisition_source: None, parent_index: None },
+        ];
+        let candidates = [0, 1, 2, 3];
+        let mut performance_rng = DeterministicRng::new(1);
+        let mut diversity_rng = DeterministicRng::new(1);
+
+        let performance = rank_recommender_candidates(
+            &candidates, &previous, RecommenderObjective::PerformanceOnly, 0.0, &mut performance_rng,
+        );
+        let diversity = rank_recommender_candidates(
+            &candidates, &previous,
+            RecommenderObjective::PerformanceDiversity { novelty_weight: 1.0 },
+            0.0, &mut diversity_rng,
+        );
+
+        assert_eq!(performance[0].0, 0);
+        assert_eq!(diversity[0].0, 3);
+    }
+
+    #[test]
+    fn diversity_recommender_never_invents_knowledge_for_empty_lineage() {
+        let previous = vec![
+            NetworkedAgent { quality: 0, lineage_id: 0, source: KnowledgeSource::None,
+                individual_innovated: false, demonstration_observed: false,
+                strategy_acquisition_succeeded: false, acquisition_source: None, parent_index: None },
+            NetworkedAgent { quality: 4, lineage_id: 1, source: KnowledgeSource::InitialMachine,
+                individual_innovated: false, demonstration_observed: false,
+                strategy_acquisition_succeeded: false, acquisition_source: None, parent_index: None },
+        ];
+        let candidates = [0, 1];
+        let mut rng = DeterministicRng::new(2);
+        let ranked = rank_recommender_candidates(
+            &candidates,
+            &previous,
+            RecommenderObjective::PerformanceDiversity { novelty_weight: 1.0 },
+            0.0,
+            &mut rng,
+        );
+        assert_eq!(ranked[0].0, 1);
     }
 
     #[test]
