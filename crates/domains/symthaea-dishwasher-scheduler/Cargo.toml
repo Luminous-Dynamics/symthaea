@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-dishwasher-scheduler"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Deterministic simulation of QuickCell and FullLoad dishwasher dispatch policies"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+keywords = ["dishwasher", "scheduling", "simulation", "optimization"]
+categories = ["simulation", "science"]
+
+[dependencies]
