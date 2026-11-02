@@ -541,6 +541,7 @@ mod tests {
         let mut config = VehicleRtaConfig::default();
         config.recovery_dwell_s = 1.0;
         config.transition_duration_s = 1.0;
+        config.maximum_observation_gap_s = 2.0;
         VehicleRuntimeAssurance::new(config).expect("default profile should validate")
     }
 
@@ -612,7 +613,8 @@ mod tests {
 
     #[test]
     fn detects_observation_gap_and_stale_state() {
-        let mut monitor = monitor();
+        let config = VehicleRtaConfig::default();
+        let mut monitor = VehicleRuntimeAssurance::new(config).expect("default profile");
         let _ = monitor.evaluate(&observation(0.0));
         let decision = monitor.evaluate(&observation(0.2));
         assert!(decision.reasons.contains(&VehicleRtaReason::ObservationGapExceeded));
@@ -681,11 +683,11 @@ mod tests {
         assert_eq!(dwell_complete.mode, VehicleRtaMode::TransitionToAdvanced);
         assert_eq!(dwell_complete.advanced_weight, 0.0);
 
-        let halfway = monitor.evaluate(&observation(1.61));
+        let halfway = monitor.evaluate(&observation(1.6));
         assert_eq!(halfway.mode, VehicleRtaMode::TransitionToAdvanced);
         assert!((halfway.advanced_weight - 0.5).abs() < 1e-6);
 
-        let complete = monitor.evaluate(&observation(2.21));
+        let complete = monitor.evaluate(&observation(2.1));
         assert_eq!(complete.mode, VehicleRtaMode::Advanced);
         assert_eq!(complete.advanced_weight, 1.0);
     }
@@ -703,6 +705,33 @@ mod tests {
         let decision = monitor.evaluate(&interrupted);
         assert_eq!(decision.mode, VehicleRtaMode::Baseline);
         assert_eq!(decision.advanced_weight, 0.0);
+    }
+
+    #[test]
+    fn monitor_decisions_bind_deterministic_configuration_digest() {
+        let config = VehicleRtaConfig::default();
+        let mut first = VehicleRuntimeAssurance::new(config.clone()).expect("valid profile");
+        let mut second = VehicleRuntimeAssurance::new(config.clone()).expect("same profile");
+        let first_decision = first.evaluate(&observation(0.0));
+        let second_decision = second.evaluate(&observation(0.0));
+        assert_eq!(first_decision.profile_digest, second_decision.profile_digest);
+        assert_eq!(first_decision.profile_id, second_decision.profile_id);
+
+        let mut changed_config = config;
+        changed_config.maximum_speed_mps += 1.0;
+        let mut changed = VehicleRuntimeAssurance::new(changed_config).expect("changed profile");
+        let changed_decision = changed.evaluate(&observation(0.0));
+        assert_ne!(first_decision.profile_digest, changed_decision.profile_digest);
+    }
+
+    #[test]
+    fn rejects_non_finite_safety_margins_as_unknown() {
+        let mut monitor = monitor();
+        let mut bad = observation(0.0);
+        bad.envelope_margin = f64::NAN;
+        let decision = monitor.evaluate(&bad);
+        assert!(decision.reasons.contains(&VehicleRtaReason::MarginInvalid));
+        assert_eq!(decision.mode, VehicleRtaMode::Baseline);
     }
 
     #[test]
