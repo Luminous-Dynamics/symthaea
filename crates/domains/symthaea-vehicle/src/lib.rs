@@ -85,6 +85,7 @@ pub mod reward;
 pub mod road;
 pub mod runtime_assurance;
 pub mod scenario_discovery;
+pub mod shadow_evaluation;
 pub mod scenarios;
 pub mod simulator;
 pub mod subterranean;
@@ -103,6 +104,11 @@ pub use scenario_discovery::{
     CrossingActor, IntersectionGenerationError, IntersectionScenarioCandidate,
     ScenarioRangeSemantics, generate_seeded_random_intersection_candidates,
     generate_stratified_intersection_candidates,
+};
+pub use shadow_evaluation::{
+    PD_ROAD_BASELINE_POLICY_ID, VEHICLE_SHADOW_SCHEMA, VehicleShadowError,
+    VehicleShadowEvaluator, VehicleShadowInput, VehicleShadowProfile, VehicleShadowRecord,
+    VehicleShadowReport, pd_road_baseline_digest,
 };
 pub use runtime_assurance::{
     VehicleRtaConfig, VehicleRtaDecision, VehicleRtaError, VehicleRtaMode, VehicleRtaObservation,
