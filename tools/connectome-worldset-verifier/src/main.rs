@@ -232,7 +232,7 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
             };
             alternatives.push(Alternative { id: alternative_id, evidence_artifact_id: artifact_id, evidence_sha256 });
         }
-        alternatives.sort();
+        alternatives.sort_by(|left, right| left.id.cmp(&right.id));
         axes.push(Axis { id, alternatives });
     }
     axes.sort_by(|left, right| left.id.cmp(&right.id));
@@ -511,7 +511,12 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     let axis_ids: BTreeSet<String> = axes.iter().map(|axis| axis.id.clone()).collect();
     let axis_values: BTreeMap<String, BTreeSet<String>> = axes
         .iter()
-        .map(|axis| (axis.id.clone(), axis.alternatives.iter().cloned().collect()))
+        .map(|axis| {
+            (
+                axis.id.clone(),
+                axis.alternatives.iter().map(|alternative| alternative.id.clone()).collect(),
+            )
+        })
         .collect();
     for (index, world) in paired_worlds.iter().enumerate() {
         let Some(assignment_json) = world.get("assignment").and_then(Value::as_object) else {
