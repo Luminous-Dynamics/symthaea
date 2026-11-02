@@ -681,7 +681,7 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
                 prefix_max_level = agents[agent_id].level;
             }
             legacy_prefix_max_payoff_sum += prefix_max_payoff;
-            legacy_prefix_max_level_sum += prefix_max_level;
+            legacy_prefix_max_level_sum += prefix_max_level as u64;
             let _ = acquired_by_recommendation;
         }
 
