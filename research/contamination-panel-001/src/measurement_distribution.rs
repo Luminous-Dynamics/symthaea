@@ -322,6 +322,8 @@ pub struct MeasurementDistributionReportV1 {
     pub observation_count: u64,
     pub distributional_evidence_eligible: bool,
     pub claim_scope_eligible: bool,
+    /// Paired deltas are multiplied by metric direction so positive always means better.
+    pub paired_delta_positive_is_better: bool,
     pub independently_authenticated: bool,
     pub confirmatory_eligible: bool,
     pub rank_stability_status: String,
@@ -963,10 +965,15 @@ pub fn analyze_measurement_distribution(
                         .get(&baseline_key)
                         .and_then(|row| row.score)
                         .ok_or_else(|| "scored perturbation has no paired scored baseline observation".to_owned())?;
+                    let direction = if protocol.evaluation.higher_is_better {
+                        1.0
+                    } else {
+                        -1.0
+                    };
                     deltas_by_unit
                         .entry(observation.independent_unit_id.clone())
                         .or_default()
-                        .push(score - baseline);
+                        .push((score - baseline) * direction);
                     paired_count += 1;
                 }
             }
@@ -1192,6 +1199,7 @@ pub fn analyze_measurement_distribution(
         observation_count: bundle.observations.len() as u64,
         distributional_evidence_eligible,
         claim_scope_eligible,
+        paired_delta_positive_is_better: true,
         independently_authenticated: false,
         confirmatory_eligible: false,
         rank_stability_status: if rank_met { "qualified_or_not_required" } else { "non_estimable" }.to_owned(),
@@ -1254,6 +1262,13 @@ mod tests {
                     source_domain_id: "source-b".to_owned(),
                     source_cluster_id: "cluster-2".to_owned(),
                     source_lineage_sha256: digest('7'),
+                },
+                MeasurementInstanceV1 {
+                    item_id: "item-3".to_owned(),
+                    task_family: "code".to_owned(),
+                    source_domain_id: "source-c".to_owned(),
+                    source_cluster_id: "cluster-3".to_owned(),
+                    source_lineage_sha256: digest('8'),
                 },
             ],
         }
@@ -1415,9 +1430,15 @@ mod tests {
         let cell = report.profile_cells.iter()
             .find(|cell| cell.condition_id == "paraphrased")
             .unwrap();
-        assert_eq!(cell.scored_count, 4);
-        assert_eq!(cell.paired_observation_count, 4);
-        assert_eq!(cell.paired_independent_unit_count, 2);
+        assert_eq!(cell.scored_count, 6);
+        assert_eq!(cell.paired_observation_count, 6);
+        assert_eq!(cell.paired_independent_unit_count, 3);
+        assert_eq!(report.profile_cells.len(), 4);
+        assert!(report.profile_cells.iter().any(|profile| profile.task_family == "math"));
+        assert!(report.profile_cells.iter().any(|profile| profile.task_family == "code"));
+        assert_eq!(report.task_family_count, 2);
+        assert_eq!(report.source_domain_count, 3);
+        assert!(report.paired_delta_positive_is_better);
         assert!((cell.paired_delta_vs_baseline.as_ref().unwrap().mean - (-0.2)).abs() < 1.0e-12);
         assert!(report.distributional_evidence_eligible);
     }
@@ -1441,6 +1462,17 @@ mod tests {
         let report = analyze_measurement_distribution(&p, &b).unwrap();
         assert_eq!(report.measurement_paradigm, "measurement_as_instance_restricted");
         assert!(!report.distributional_evidence_eligible);
+        assert!(report.claim_scope_eligible);
+    }
+
+    #[test]
+    fn cross_domain_scope_requires_multiple_task_families_and_source_domains() {
+        let mut p = protocol();
+        p.construct.claim_scope = ClaimScopeV1::CrossDomain;
+        let b = bundle(&p);
+        let report = analyze_measurement_distribution(&p, &b).unwrap();
+        assert_eq!(report.task_family_count, 2);
+        assert_eq!(report.source_domain_count, 3);
         assert!(report.claim_scope_eligible);
     }
 
