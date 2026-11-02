@@ -517,14 +517,21 @@ pub fn fit_red_team_v1(
 
     for channel in 0..LEAKAGE_CHANNEL_COUNT {
         for (code, target_counts) in &counts[channel] {
-            let best = target_counts
-                .iter()
-                .max_by(|(target_a, count_a), (target_b, count_b)| {
-                    count_a.cmp(count_b).then_with(|| target_b.cmp(target_a))
-                })
-                .map(|(target, _)| *target)
-                .ok_or(CorpusErrorV1::InvalidPredictionTarget)?;
-            maps[channel].insert(*code, best);
+            let mut best = None::<(u8, u32)>;
+            for (&target, &count) in target_counts {
+                let replace = match best {
+                    None => true,
+                    Some((best_target, best_count)) => {
+                        count > best_count || (count == best_count && target < best_target)
+                    }
+                };
+                if replace {
+                    best = Some((target, count));
+                }
+            }
+            let (best_target, _) =
+                best.ok_or(CorpusErrorV1::InvalidPredictionTarget)?;
+            maps[channel].insert(*code, best_target);
         }
     }
 
