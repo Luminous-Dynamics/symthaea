@@ -55,6 +55,8 @@ class PyPhiDualFormalismPositiveAnchorContractTests(unittest.TestCase):
         sia = self.schema["$defs"]["siaSummary"]["properties"]
         self.assertEqual(sia["phi_s"]["minimum"], 0)
         self.assertEqual(sia["intrinsic_information"]["minimum"], 0)
+        self.assertEqual(sia["cause_intrinsic_specification"]["minimum"], 0)
+        self.assertEqual(sia["effect_intrinsic_specification"]["minimum"], 0)
         self.assertEqual(sia["cause_phi"]["minimum"], 0)
         self.assertEqual(sia["effect_phi"]["minimum"], 0)
         invariants = self.schema["properties"]["invariants"]["properties"]
