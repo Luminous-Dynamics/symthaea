@@ -648,7 +648,9 @@ fn verify_paired(
             let baseline = item.get("baseline_model_id").and_then(Value::as_str).unwrap_or("");
             let metric = item.get("metric_id").and_then(Value::as_str).unwrap_or("");
             let stratum = item.get("stratum").and_then(Value::as_str).unwrap_or("");
-            paired_keys.insert((candidate.to_owned(), baseline.to_owned(), metric.to_owned(), stratum.to_owned()));
+            if !paired_keys.insert((candidate.to_owned(), baseline.to_owned(), metric.to_owned(), stratum.to_owned())) {
+                errors.push(format!("paired_comparisons[{index}]: duplicate candidate/baseline/metric/stratum comparison"));
+            }
             if models.get(candidate).and_then(|m| m.get("role")).and_then(Value::as_str) != Some("candidate") {
                 errors.push(format!("paired_comparisons[{index}]: candidate model ref/role invalid"));
             }
@@ -1141,6 +1143,54 @@ mod tests {
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
         assert!(report.errors.iter().any(|e| e.contains("paired units must exactly match")));
+    }
+
+    #[test]
+    fn paired_scorecards_must_use_the_identical_unit_cohort() {
+        let mut value = complete_fixture();
+        value["split"]["test_unit_tokens"].as_array_mut().unwrap().push(json!(token(6)));
+        let test = value["split"]["test_unit_tokens"].as_array().unwrap().iter()
+            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        value["split"]["test_membership_sha256"] = json!(membership_digest(&test));
+
+        // Both candidate and baseline have n=2 and remain within the test set,
+        // but the baseline cohort differs by one pseudonymous unit.
+        value["results"]["scorecards"][1]["unit_tokens"][1] = json!(token(6));
+        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"].as_array().unwrap().iter()
+            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        value["results"]["scorecards"][1]["unit_manifest_sha256"] = json!(membership_digest(&baseline_units));
+
+        let report = verify_manifest(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|e| e.contains("paired units must exactly match")));
+    }
+
+    #[test]
+    fn prior_probabilities_must_be_normalized_before_complete_run() {
+        let mut value = complete_fixture();
+        value["hypothesis_set"][0]["prior_probability"] = json!(0.9);
+        let report = verify_manifest(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|e| e.contains("prior probabilities sum")));
+    }
+
+    #[test]
+    fn declared_sham_control_must_be_materialized() {
+        let mut value = complete_fixture();
+        value["intervention_design"]["selected_interventions"][1]["control_role"] = json!("other");
+        let report = verify_manifest(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|e| e.contains("declared sham control has no materialized")));
+    }
+
+    #[test]
+    fn duplicate_paired_comparison_is_rejected() {
+        let mut value = complete_fixture();
+        let duplicate = value["results"]["paired_comparisons"][0].clone();
+        value["results"]["paired_comparisons"].as_array_mut().unwrap().push(duplicate);
+        let report = verify_manifest(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|e| e.contains("duplicate candidate/baseline/metric/stratum")));
     }
 
     #[test]
