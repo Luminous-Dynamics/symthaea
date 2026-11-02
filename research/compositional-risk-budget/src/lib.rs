@@ -565,8 +565,10 @@ pub fn append_risk_evidence(
         receipt_sha256: String::new(),
     };
     receipt.receipt_sha256 = compute_receipt_digest(&receipt)?;
-    ledger.receipts.push(receipt.clone());
-    ledger.ledger_sha256 = compute_ledger_digest(ledger)?;
+    let mut candidate_ledger = ledger.clone();
+    candidate_ledger.receipts.push(receipt.clone());
+    candidate_ledger.ledger_sha256 = compute_ledger_digest(&candidate_ledger)?;
+    *ledger = candidate_ledger;
     Ok(receipt)
 }
 
@@ -1026,6 +1028,31 @@ mod tests {
         let mut changed=report.clone();
         changed.operational_alpha_bound_ppb=Some(999);
         assert!(verify_risk_composition_report(&changed).is_err());
+    }
+
+    #[test]
+    fn synthetic_fixture_expected_alpha_and_delta_composition(){
+        let plan=load_builtin_plan().unwrap();
+        let mut ledger=create_risk_budget_ledger(plan).unwrap();
+        append_all(&mut ledger).unwrap();
+        let report=compose_risk_budget(&ledger).unwrap();
+        assert_eq!(report.operational_alpha_bound_ppb,Some(42_000_000));
+        assert_eq!(report.operational_alpha_budget_ppb,50_000_000);
+        assert_eq!(report.statistical_delta_sum_ppb,10_000_000);
+        assert_eq!(report.statistical_delta_budget_ppb,20_000_000);
+        assert_eq!(report.status,CompositionStatus::ArithmeticValidComponentsUnverified);
+        verify_risk_composition_report(&report).unwrap();
+    }
+
+    #[test]
+    fn append_failure_is_transactional(){
+        let contract=contract("a","event-a","marginal",RiskGuaranteeKind::MarginalFiniteSample,10,1);
+        let plan=plan_with(vec![contract],vec![marginal_group("marginal")],20,10);
+        let mut ledger=create_risk_budget_ledger(plan).unwrap();
+        let before=ledger.clone();
+        let bad=sha256_hex(b"valid");
+        assert!(append_risk_evidence(&mut ledger,"a",&bad,"bad-digest",None).is_err());
+        assert_eq!(ledger,before);
     }
 
     #[test]
