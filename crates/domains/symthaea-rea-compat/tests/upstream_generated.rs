@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 use symthaea_rea_compat::{
-    analysis_profile_digest, sha256_hex, verify_evidence_json, EvidenceErrorKind,
+    EvidenceErrorKind, analysis_profile_digest, sha256_hex, verify_evidence_json,
 };
 
 fn fixture_file(directory: &Path, name: &str) -> Vec<u8> {
@@ -34,8 +34,7 @@ fn verify_display_only_mutation(
             Value::String("/relocated/display-only.apk".to_owned()),
         );
     }
-    value["caller_input_path"] =
-        Value::String("/relocated/caller-display-only.json".to_owned());
+    value["caller_input_path"] = Value::String("/relocated/caller-display-only.json".to_owned());
 
     let relocated = serde_json::to_vec(&value).unwrap();
     let verified = verify_evidence_json(&relocated)
@@ -73,10 +72,7 @@ fn verify_stricter_importer_case(directory: &Path, fixture: &Value) {
     assert_eq!(error.kind, EvidenceErrorKind::InvalidJson);
 }
 
-fn verify_negative_control(
-    directory: &Path,
-    fixture: &Value,
-) {
+fn verify_negative_control(directory: &Path, fixture: &Value) {
     let filename = fixture["file"].as_str().expect("negative fixture file");
     let expected_hash = fixture["raw_file_sha256"]
         .as_str()
@@ -92,8 +88,7 @@ fn verify_negative_control(
         other => panic!("unsupported expected error category: {other:?}"),
     };
     assert_eq!(
-        error.kind,
-        expected_kind,
+        error.kind, expected_kind,
         "negative control {} had an unexpected Rust disposition",
         fixture["name"]
     );
@@ -126,8 +121,7 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         "8250bf2320ea57aab4e664db4b4d44b8abd2004e"
     );
     assert_eq!(
-        manifest["producer"]["node_version"],
-        "v22.23.4",
+        manifest["producer"]["node_version"], "v22.23.4",
         "the upstream producer runtime must match the pinned CI runtime"
     );
     assert_eq!(manifest["producer"]["npm_version"], "11.16.0");
@@ -142,7 +136,10 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         manifest["fixture_count"].as_u64(),
         Some(fixtures.len() as u64)
     );
-    assert!(fixtures.len() >= 8, "the upstream corpus must cover multiple schema families");
+    assert!(
+        fixtures.len() >= 8,
+        "the upstream corpus must cover multiple schema families"
+    );
 
     for fixture in fixtures {
         let filename = fixture["file"].as_str().expect("fixture filename");
@@ -163,16 +160,16 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         let verified = verify_evidence_json(&bytes)
             .unwrap_or_else(|error| panic!("Rust rejected upstream case {filename}: {error}"));
         assert_eq!(verified.evidence_id, upstream_id);
-        assert_eq!(
-            verified.raw_file_sha256.as_deref(),
-            Some(expected_sha256)
-        );
+        assert_eq!(verified.raw_file_sha256.as_deref(), Some(expected_sha256));
         assert_ne!(
             verified.raw_file_sha256.as_deref(),
             Some(verified.semantic_sha256.as_str())
         );
 
-        if let Some(profile) = upstream.get("analysis_profile").filter(|value| !value.is_null()) {
+        if let Some(profile) = upstream
+            .get("analysis_profile")
+            .filter(|value| !value.is_null())
+        {
             let expected_profile_digest = fixture["analysis_profile_digest"]
                 .as_str()
                 .expect("profile digest in manifest");
@@ -186,8 +183,7 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         }
 
         assert_eq!(
-            upstream["relationship_coverage"],
-            fixture["relationship_coverage"],
+            upstream["relationship_coverage"], fixture["relationship_coverage"],
             "coverage state must be retained for {filename}"
         );
 
