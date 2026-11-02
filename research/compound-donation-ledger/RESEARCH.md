@@ -250,7 +250,7 @@ prior is extended under a precommitted horizon-independent rule.
 
 ### e-BH rank-geometric staircase
 
-For a fixed finite family size \(m\) and target level \(\alpha=a/b\), define the
+For a fixed finite family-size envelope \(m\) and target level \(\alpha=a/b\), define the
 geometric rank grid
 \[
 \mathcal R_m=\{1,2,4,\ldots,2^{\lfloor\log_2m\rfloor}\}\cup\{m\},
@@ -266,7 +266,13 @@ h_r=\frac{m}{\alpha r},\qquad
 H_r=\lceil P_E h_r\rceil,\qquad
 K_r=\left\lceil\frac{H_r}{\pi_r}\right\rceil,
 \]
-where \(P_E=10^6\) is the evidence fixed-point scale. The staircase
+where \(P_E=10^6\) is the evidence fixed-point scale. The displayed formula
+uses equal weights \(\gamma_i=1/m\). For a candidate with an arbitrary
+precommitted rational weight \(\gamma_i=u_i/v_i\), replace the boundary by
+\(h_{i,r}=v_i/(\alpha r u_i)=1/(\alpha r\gamma_i)\) and compute
+\(H_{i,r}=\lceil P_E h_{i,r}\rceil\). Each candidate receives its own
+fixed calibrator; the ledger's global weight budget still requires
+\(\sum_i\gamma_i\leq1\). The staircase
 \[
 A_m(x)=\sum_{r\in\mathcal R_m}\pi_rK_r\,\mathbf1\{x\ge K_r\}
 \]
@@ -300,11 +306,13 @@ this may be conservative when the active roster is much smaller. A countably
 unbounded family requires a separate universal prior or fixed mixture over
 predeclared family-size designs.
 
-The Rust reference adds the e_bh_rank_geometric(m, alpha_numerator,
-alpha_denominator) constructor. It uses O(log m) prior points, exact rational
-ceiling arithmetic, merges coincident integer thresholds, and precomputes
-prefix numerators so evaluation is O(log log m) (binary search over O(log m)
-points). The independent verifier continues to use a linear scan.
+The Rust reference adds e_bh_rank_geometric(m, alpha_numerator,
+alpha_denominator) for equal weights and weighted_e_bh_rank_geometric(m,
+weight_numerator, weight_denominator, alpha_numerator, alpha_denominator)
+for arbitrary precommitted candidate weights. Both use O(log m) prior points,
+exact rational ceiling arithmetic, merge coincident integer thresholds, and
+precompute prefix numerators so evaluation is O(log log m) (binary search
+over O(log m) points). The independent verifier continues to use a linear scan.
 
 ### Exploratory rank-calibration experiment
 
