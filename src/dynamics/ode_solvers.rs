@@ -806,8 +806,18 @@ impl OdeSolverEngine {
             );
 
             if !err.is_finite() {
+                let finite_outputs = y4
+                    .iter()
+                    .chain(y5.iter())
+                    .chain(k7.iter())
+                    .all(|value| value.is_finite());
+                let reason = if finite_outputs {
+                    OdeSolveFailureKind::NonFiniteErrorEstimate
+                } else {
+                    OdeSolveFailureKind::NonFiniteStageOrErrorEstimate
+                };
                 return Err(fail(
-                    OdeSolveFailureKind::NonFiniteStageOrErrorEstimate,
+                    reason,
                     Some(t),
                     attempts,
                     Some(h),
