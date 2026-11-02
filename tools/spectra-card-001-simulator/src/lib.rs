@@ -74,6 +74,8 @@ pub struct PublicCardCampaignV1 {
     pub schema: String,
     pub generator_version: String,
     pub campaign_id: String,
+    pub participant_count: u16,
+    pub cycles_per_participant: u16,
     pub trials: Vec<PublicCardTrialV1>,
 }
 
@@ -109,6 +111,7 @@ pub enum CardErrorV1 {
     InvalidTarget,
     InvalidConditionCode,
     InvalidConditionCodebook,
+    InsideContextMismatch,
     ParticipantBlockIncomplete,
     ParticipantConditionMissing,
     EmptyParticipantSet,
@@ -340,6 +343,8 @@ pub fn generate_card_campaign_v1(
             schema: SCHEMA_V0_1.to_owned(),
             generator_version: GENERATOR_V0_1.to_owned(),
             campaign_id: format!("spectra-card-{0:016x}", config.campaign_instance_id),
+            participant_count: config.participant_count,
+            cycles_per_participant: config.cycles_per_participant,
             trials,
         },
         evaluator_truth: CardEvaluatorTruthV1 {
@@ -364,6 +369,18 @@ pub fn evaluate_card_campaign_v1(
     if public.trials.len() != truth.target_indices.len() {
         return Err(CardErrorV1::TruthLengthMismatch);
     }
+    let expected_trial_count = public.participant_count as usize
+        * public.cycles_per_participant as usize
+        * CONDITIONS_PER_CYCLE;
+    if public.participant_count < MIN_PARTICIPANTS
+        || public.participant_count > MAX_PARTICIPANTS
+        || public.cycles_per_participant < MIN_CYCLES
+        || public.cycles_per_participant > MAX_CYCLES
+        || public.trials.len() != expected_trial_count
+        || expected_trial_count > MAX_TRIALS
+    {
+        return Err(CardErrorV1::ParticipantBlockIncomplete);
+    }
     if !validate_codebook(&truth.condition_codebook) {
         return Err(CardErrorV1::InvalidConditionCodebook);
     }
@@ -379,7 +396,10 @@ pub fn evaluate_card_campaign_v1(
     let mut sham_period_sum = 0_u64;
     let mut active_period_count = 0_u64;
     let mut sham_period_count = 0_u64;
-    let mut participant_cycles = BTreeMap::<String, BTreeMap<u16, BTreeSet<usize>>>::new();
+    let mut participant_cycles = BTreeMap::<
+        String,
+        BTreeMap<u16, ([u8; CONDITIONS_PER_CYCLE], BTreeSet<u8>)>,
+    >::new();
 
     for (index, row) in public.trials.iter().enumerate() {
         if !trial_ids.insert(row.trial_id.as_str()) { return Err(CardErrorV1::DuplicateTrialId); }
@@ -392,6 +412,15 @@ pub fn evaluate_card_campaign_v1(
         if row.period_index > MAX_PERIOD_INDEX { return Err(CardErrorV1::ParticipantBlockIncomplete); }
         let condition = truth.condition_codebook[row.blinded_condition_code as usize];
         let ci = condition_index(condition);
+        let expected_inside = !matches!(condition, CardConditionV1::OutsideReference);
+        if row.inside_context_visible != expected_inside {
+            return Err(CardErrorV1::InsideContextMismatch);
+        }
+        if row.cycle_index >= public.cycles_per_participant
+            || row.session_id != format!("{}-cycle-{:03}", row.participant_id, row.cycle_index)
+        {
+            return Err(CardErrorV1::ParticipantBlockIncomplete);
+        }
         let correct = u64::from(row.response_index == target);
         let entry = per_participant.entry(row.participant_id.clone())
             .or_insert([(0, 0, 0); 4]);
@@ -401,8 +430,13 @@ pub fn evaluate_card_campaign_v1(
         condition_totals[ci].0 += correct;
         condition_totals[ci].1 += 1;
         condition_totals[ci].2 += row.period_index as u64;
-        participant_cycles.entry(row.participant_id.clone())
-            .or_default().entry(row.cycle_index).or_default().insert(ci);
+        let (condition_counts, periods) = participant_cycles
+            .entry(row.participant_id.clone())
+            .or_default()
+            .entry(row.cycle_index)
+            .or_insert(([0; CONDITIONS_PER_CYCLE], BTreeSet::new()));
+        condition_counts[ci] = condition_counts[ci].saturating_add(1);
+        periods.insert(row.period_index);
 
         if condition == CardConditionV1::InsideActive {
             active_period_sum += row.period_index as u64;
@@ -413,9 +447,17 @@ pub fn evaluate_card_campaign_v1(
         }
     }
 
+    if participant_cycles.len() != public.participant_count as usize {
+        return Err(CardErrorV1::ParticipantBlockIncomplete);
+    }
     for cycles in participant_cycles.values() {
-        for conditions in cycles.values() {
-            if conditions.len() != CONDITIONS_PER_CYCLE {
+        if cycles.len() != public.cycles_per_participant as usize {
+            return Err(CardErrorV1::ParticipantBlockIncomplete);
+        }
+        for (condition_counts, periods) in cycles.values() {
+            if *condition_counts != [1; CONDITIONS_PER_CYCLE]
+                || periods.len() != CONDITIONS_PER_CYCLE
+            {
                 return Err(CardErrorV1::ParticipantBlockIncomplete);
             }
         }
@@ -510,6 +552,26 @@ mod tests {
     fn report(world: CardWorldV1, seed: u64) -> CardReportV1 {
         let campaign = generate_card_campaign_v1(config(), seed, world).unwrap();
         evaluate_card_campaign_v1(&campaign.public, &campaign.evaluator_truth).unwrap()
+    }
+
+    #[test]
+    fn evaluator_rejects_duplicate_condition_assignment_and_context_mismatch() {
+        let campaign = generate_card_campaign_v1(config(), 987, CardWorldV1::Null).unwrap();
+
+        let mut duplicate = campaign.public.clone();
+        duplicate.trials[1].blinded_condition_code = duplicate.trials[0].blinded_condition_code;
+        assert_eq!(
+            evaluate_card_campaign_v1(&duplicate, &campaign.evaluator_truth),
+            Err(CardErrorV1::ParticipantBlockIncomplete)
+        );
+
+        let mut context_mismatch = campaign.public.clone();
+        context_mismatch.trials[0].inside_context_visible =
+            !context_mismatch.trials[0].inside_context_visible;
+        assert_eq!(
+            evaluate_card_campaign_v1(&context_mismatch, &campaign.evaluator_truth),
+            Err(CardErrorV1::InsideContextMismatch)
+        );
     }
 
     #[test]
