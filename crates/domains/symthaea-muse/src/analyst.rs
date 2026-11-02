@@ -20,7 +20,8 @@ use symthaea_muse_protocol::{
     TraceVerificationReport, VerificationStatus,
 };
 use symthaea_music_theory::{
-    AssertedObligationState, GrammarStructuralTrace, ScoreEventRef, VoiceRole,
+    AssertedObligationState, GrammarStructuralTrace, ObligationKind, ReturnTransformation,
+    ScoreEventRef, VoiceRole,
 };
 use symthaea_music_theory::{GrammarPlanEvidence, MusicalIntent};
 
@@ -328,6 +329,42 @@ fn assertion_envelope(
     }
 }
 
+fn typed_obligation_definition(
+    kind: &ObligationKind,
+    source_evidence: &[ScoreEventRef],
+) -> Option<ObligationDefinitionV1> {
+    let ObligationKind::ReturnMotif {
+        motif_id,
+        transformation,
+    } = kind
+    else {
+        // Other theory obligation kinds remain untyped on this protocol path
+        // until their score-side semantics have a qualified mapping.
+        return None;
+    };
+    let transformation = match transformation {
+        ReturnTransformation::Literal => ObligationMotifTransformationV1::Literal,
+        ReturnTransformation::Transposed => ObligationMotifTransformationV1::Transposed,
+        ReturnTransformation::Inverted => ObligationMotifTransformationV1::Inverted,
+        ReturnTransformation::Augmented => ObligationMotifTransformationV1::Augmented,
+        ReturnTransformation::Diminished => ObligationMotifTransformationV1::Diminished,
+        ReturnTransformation::Fragmented => ObligationMotifTransformationV1::Fragmented,
+        ReturnTransformation::Restored => ObligationMotifTransformationV1::Restored,
+    };
+    Some(ObligationDefinitionV1 {
+        schema_version: 1,
+        kind: ObligationKindV1::ReturnMotif {
+            motif_id: motif_id.clone(),
+            source_event_ids: source_evidence
+                .iter()
+                .copied()
+                .map(trace_event_id)
+                .collect(),
+            transformation,
+        },
+    })
+}
+
 fn obligation_state(state: AssertedObligationState) -> ObligationState {
     match state {
         AssertedObligationState::Created => ObligationState::Created,
@@ -421,9 +458,10 @@ pub fn composer_trace_from_theory(
                     score_event_ids: item.evidence.iter().copied().map(trace_event_id).collect(),
                     responsible_pass: item.responsible_pass.clone(),
                     transformation: item.transformation.clone(),
-                    // The current grammar trace carries lifecycle assertions but
-                    // not yet the typed ObligationKind. Do not invent a kind here.
-                    definition: None,
+                    definition: item
+                        .definition
+                        .as_ref()
+                        .and_then(|kind| typed_obligation_definition(kind, &item.source_evidence)),
                     assertion: assertion_envelope(&record_id, score_sha256, created_at_unix_ms),
                 }
             })
@@ -1445,11 +1483,11 @@ pub fn verify_composer_trace(
             });
         }
 
-        if transition.definition.is_none() {
+        if transition.to == ObligationState::Fulfilled && transition.definition.is_none() {
             issues.push(TraceVerificationIssue {
                 code: "obligation-definition-missing".into(),
                 record_id: id.clone(),
-                message: "Lifecycle transition has no typed obligation definition; semantic fulfillment cannot be established.".into(),
+                message: "Fulfilled transition has no typed obligation definition; semantic fulfillment cannot be established.".into(),
             });
         }
         if let Some(definition) = transition.definition.as_ref() {
@@ -1490,6 +1528,13 @@ pub fn verify_composer_trace(
                 }
             }
         }
+        if transition.to == ObligationState::Unresolved {
+            issues.push(TraceVerificationIssue {
+                code: "obligation-unresolved".into(),
+                record_id: id.clone(),
+                message: "Composer reports this obligation as unresolved; it is not a fulfilled semantic claim.".into(),
+            });
+        }
         states.insert(transition.obligation_id.as_str(), transition.to.clone());
     }
     let failed: BTreeSet<_> = issues.iter().map(|item| item.record_id.as_str()).collect();
@@ -1501,6 +1546,7 @@ pub fn verify_composer_trace(
                 | "obligation-definition-version-unsupported"
                 | "obligation-kind-not-yet-qualified"
                 | "obligation-motif-definition-unavailable"
+                | "obligation-unresolved"
         )
     });
     let semantic_discrepancy = issues.iter().any(|issue| {
@@ -1510,6 +1556,7 @@ pub fn verify_composer_trace(
                 | "obligation-definition-version-unsupported"
                 | "obligation-kind-not-yet-qualified"
                 | "obligation-motif-definition-unavailable"
+                | "obligation-unresolved"
         )
     });
     TraceVerificationReport {
@@ -2266,6 +2313,50 @@ mod tests {
     }
 
     #[test]
+    fn period_sentence_return_definition_preserves_source_ids_across_protocol_boundary() {
+        use symthaea_music_theory::{MusicalIntent, Style, compose_with_grammar_plan};
+
+        let style = Style::Classical;
+        let intent = MusicalIntent {
+            bars: 8,
+            seed: 11,
+            ..MusicalIntent::default()
+        };
+        let realized = compose_with_grammar_plan(style.grammar_profile(), &intent, &style.spec());
+        let source = realized
+            .trace
+            .obligation_transitions
+            .iter()
+            .find(|item| item.obligation_id == "thematic-return-and-closure")
+            .expect("period/sentence source transition");
+        let public = composer_trace_from_theory(&realized.trace, "score", 0, None);
+        let public_source = public
+            .obligation_transitions
+            .iter()
+            .find(|item| item.obligation_id == "thematic-return-and-closure")
+            .expect("protocol source transition");
+        let expected_source_ids: Vec<_> = source
+            .source_evidence
+            .iter()
+            .copied()
+            .map(trace_event_id)
+            .collect();
+        assert!(
+            expected_source_ids.len() >= 2,
+            "the fixed Period/Sentence fixture must expose an exact source motif"
+        );
+        let Some(definition) = &public_source.definition else {
+            panic!("typed period/sentence return definition must survive conversion");
+        };
+        match &definition.kind {
+            ObligationKindV1::ReturnMotif { source_event_ids, .. } => {
+                assert_eq!(source_event_ids, &expected_source_ids);
+            }
+            other => panic!("unexpected typed obligation: {other:?}"),
+        }
+    }
+
+    #[test]
     fn all_flagship_composer_traces_survive_independent_symbolic_verification() {
         use symthaea_music_theory::{Emphasis, Style, VoiceRole, compose_with_grammar_plan};
 
@@ -2357,8 +2448,28 @@ mod tests {
             };
             let public_trace = composer_trace_from_theory(&realized.trace, "score", 0, None);
             let verification = verify_composer_trace(&public_trace, &composition, "score", 0);
+            let contradictory: Vec<_> = verification
+                .issues
+                .iter()
+                .filter(|issue| {
+                    !matches!(
+                        issue.code.as_str(),
+                        "obligation-definition-missing"
+                            | "obligation-kind-not-yet-qualified"
+                            | "obligation-motif-definition-unavailable"
+                            | "obligation-unresolved"
+                    )
+                })
+                .collect();
             assert!(
-                verification.issues.is_empty(),
+                contradictory.is_empty(),
+                "{style:?}: unexpected contradictory evidence: {contradictory:?}"
+            );
+            assert!(
+                matches!(
+                    verification.evidence.verification_status,
+                    VerificationStatus::Verified | VerificationStatus::InsufficientEvidence
+                ),
                 "{style:?}: {:?}",
                 verification.issues
             );

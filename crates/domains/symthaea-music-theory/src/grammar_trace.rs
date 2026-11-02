@@ -9,6 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::obligation::ObligationKind;
+
 use crate::form::Form;
 use crate::grammar::{GrammarFamily, GrammarPlanEvidence};
 use crate::motif::Motif;
@@ -74,6 +76,13 @@ pub struct ObligationAssertion {
     pub evidence: Vec<ScoreEventRef>,
     pub responsible_pass: String,
     pub transformation: Option<String>,
+    /// The typed musical promise, if the grammar planner supplied one.
+    #[serde(default)]
+    pub definition: Option<ObligationKind>,
+    /// Source identity for relational obligations such as motif return.
+    /// `evidence` remains the target/fulfilment evidence.
+    #[serde(default)]
+    pub source_evidence: Vec<ScoreEventRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -136,6 +145,39 @@ fn structure_for_region(
 
 fn ratio_close(left: f64, right: f64) -> bool {
     (left - right).abs() <= 1e-6
+}
+
+fn event_bounds(score: &Score, events: &[ScoreEventRef]) -> Option<(f64, f64)> {
+    let first_ref = events.first()?;
+    let last_ref = events.last()?;
+    let first = score.voice(first_ref.role).get(first_ref.role_index)?;
+    let last = score.voice(last_ref.role).get(last_ref.role_index)?;
+    Some((first.onset.beats(), (last.onset + last.duration).beats()))
+}
+
+/// Bind a Period/Sentence return only when an early source and a distinct
+/// late target are both present in the exact score. This is still an
+/// assertion; the Analyst independently checks the typed transformation.
+fn period_sentence_return_binding(
+    score: &Score,
+    occurrences: &[MotifAssertion],
+) -> Option<(Vec<ScoreEventRef>, Option<Vec<ScoreEventRef>>)> {
+    let total = score.total_beats.beats();
+    let source = occurrences.iter().find(|item| {
+        event_bounds(score, &item.events)
+            .is_some_and(|(start, _)| start <= total * 0.2)
+    })?;
+    let (_, source_end) = event_bounds(score, &source.events)?;
+    // Preserve the promised source even when no later return is found. An
+    // unresolved obligation still needs an exact identity for future edits.
+    let target = occurrences.iter().rev().find_map(|item| {
+        let (target_start, _) = event_bounds(score, &item.events)?;
+        (item.events != source.events
+            && target_start >= total * 0.8
+            && target_start > source_end)
+            .then(|| item.events.clone())
+    });
+    Some((source.events.clone(), target))
 }
 
 fn motif_assertions(
@@ -472,9 +514,23 @@ pub fn build_grammar_trace(
         }
     }
 
+    let motif_occurrences = motif_assertions(score, motif, &structures);
+    let period_sentence_return = period_sentence_return_binding(score, &motif_occurrences);
     let mut obligations = Vec::new();
     match plan {
-        GrammarPlanEvidence::PeriodSentence(_) => {
+        GrammarPlanEvidence::PeriodSentence(plan) => {
+            let source_evidence = period_sentence_return
+                .as_ref()
+                .map(|(source, _)| source.clone())
+                .unwrap_or_default();
+            let target_evidence = period_sentence_return
+                .as_ref()
+                .and_then(|(_, target)| target.clone())
+                .unwrap_or_default();
+            let fulfilled = period_sentence_return
+                .as_ref()
+                .is_some_and(|(_, target)| target.is_some());
+            let definition = plan.typed_return_obligation.clone();
             obligations.push(ObligationAssertion {
                 obligation_id: "thematic-return-and-closure".into(),
                 from: None,
@@ -482,17 +538,22 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "period-sentence-planner".into(),
                 transformation: None,
+                definition: definition.clone(),
+                source_evidence: source_evidence.clone(),
             });
             obligations.push(ObligationAssertion {
                 obligation_id: "thematic-return-and-closure".into(),
                 from: Some(AssertedObligationState::Created),
-                to: AssertedObligationState::Fulfilled,
-                evidence: structures
-                    .iter()
-                    .flat_map(|region| [region.start, region.end])
-                    .collect(),
+                to: if fulfilled {
+                    AssertedObligationState::Fulfilled
+                } else {
+                    AssertedObligationState::Unresolved
+                },
+                evidence: target_evidence,
                 responsible_pass: "period-sentence-engine".into(),
                 transformation: Some("return-and-cadential-liquidation".into()),
+                definition,
+                source_evidence,
             });
         }
         GrammarPlanEvidence::Contrapuntal(_) => {
@@ -503,6 +564,8 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "compact-fugue-planner".into(),
                 transformation: None,
+                definition: None,
+                source_evidence: Vec::new(),
             });
             obligations.push(ObligationAssertion {
                 obligation_id: "subject-transformation-and-final-combination".into(),
@@ -514,6 +577,8 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "compact-fugue-engine".into(),
                 transformation: Some("inversion-stretto-augmentation".into()),
+                definition: None,
+                source_evidence: Vec::new(),
             });
         }
         GrammarPlanEvidence::GrooveCycle(plan) => {
@@ -525,6 +590,8 @@ pub fn build_grammar_trace(
                     evidence: Vec::new(),
                     responsible_pass: "groove-cycle-planner".into(),
                     transformation: None,
+                    definition: None,
+                    source_evidence: Vec::new(),
                 });
                 obligations.push(ObligationAssertion {
                     obligation_id: item.code.clone(),
@@ -540,6 +607,8 @@ pub fn build_grammar_trace(
                         .collect(),
                     responsible_pass: "groove-cycle-realizer".into(),
                     transformation: None,
+                    definition: None,
+                    source_evidence: Vec::new(),
                 });
             }
         }
@@ -551,6 +620,8 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "additive-process-planner".into(),
                 transformation: None,
+                definition: None,
+                source_evidence: Vec::new(),
             });
             obligations.push(ObligationAssertion {
                 obligation_id: "audible-grow-shrink-rule".into(),
@@ -562,6 +633,8 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "additive-process-realizer".into(),
                 transformation: Some("prefix-trajectory-realized".into()),
+                definition: None,
+                source_evidence: Vec::new(),
             });
         }
         GrammarPlanEvidence::ModalArc(_) => {
@@ -572,6 +645,8 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "modal-arc-planner".into(),
                 transformation: None,
+                definition: None,
+                source_evidence: Vec::new(),
             });
             obligations.push(ObligationAssertion {
                 obligation_id: "ordered-modal-stages".into(),
@@ -583,6 +658,8 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "modal-arc-realizer".into(),
                 transformation: Some("exposition-pulse-intensification".into()),
+                definition: None,
+                source_evidence: Vec::new(),
             });
         }
         GrammarPlanEvidence::CallResponse(_) => {
@@ -593,6 +670,8 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "call-response-planner".into(),
                 transformation: None,
+                definition: None,
+                source_evidence: Vec::new(),
             });
             obligations.push(ObligationAssertion {
                 obligation_id: "call-answered-by-response".into(),
@@ -604,6 +683,8 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "call-response-engine".into(),
                 transformation: Some("inverted-response-per-call".into()),
+                definition: None,
+                source_evidence: Vec::new(),
             });
         }
         GrammarPlanEvidence::JazzChorus(_) => {
@@ -614,6 +695,8 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "jazz-chorus-planner".into(),
                 transformation: None,
+                definition: None,
+                source_evidence: Vec::new(),
             });
             obligations.push(ObligationAssertion {
                 obligation_id: "chorus-trajectory-develops".into(),
@@ -625,13 +708,15 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "jazz-chorus-engine".into(),
                 transformation: Some("role-transformed-theme-per-chorus".into()),
+                definition: None,
+                source_evidence: Vec::new(),
             });
         }
         GrammarPlanEvidence::Compatibility { .. } => {}
     }
 
     GrammarStructuralTrace {
-        motif_occurrences: motif_assertions(score, motif, &structures),
+        motif_occurrences,
         cadences: cadence_assertions(score, family),
         structures,
         obligation_transitions: obligations,
@@ -666,4 +751,57 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn legacy_obligation_assertion_defaults_typed_binding_fields() {
+        let legacy = r#"{
+            "obligation_id":"legacy",
+            "from":null,
+            "to":"created",
+            "evidence":[],
+            "responsible_pass":"legacy-producer",
+            "transformation":null
+        }"#;
+        let decoded: super::ObligationAssertion = serde_json::from_str(legacy).unwrap();
+        assert!(decoded.definition.is_none());
+        assert!(decoded.source_evidence.is_empty());
+    }
+
+    #[test]
+    fn period_sentence_return_is_only_claimed_with_distinct_early_and_late_events() {
+        use crate::{MusicalIntent, Style, compose_with_grammar_plan};
+
+        let style = Style::Classical;
+        let intent = MusicalIntent {
+            bars: 8,
+            seed: 11,
+            ..MusicalIntent::default()
+        };
+        let realized = compose_with_grammar_plan(style.grammar_profile(), &intent, &style.spec());
+        let transitions: Vec<_> = realized
+            .trace
+            .obligation_transitions
+            .iter()
+            .filter(|item| item.obligation_id == "thematic-return-and-closure")
+            .collect();
+        assert_eq!(transitions.len(), 2);
+        let created = transitions[0];
+        let resolved = transitions[1];
+        assert!(created.definition.is_some());
+        assert!(
+            created.source_evidence.len() >= 2,
+            "the opening motif identity must remain bound even before a return is found"
+        );
+        assert_eq!(created.definition, resolved.definition);
+        assert_eq!(created.source_evidence, resolved.source_evidence);
+        if resolved.to == super::AssertedObligationState::Fulfilled {
+            assert!(!created.source_evidence.is_empty());
+            assert!(!resolved.evidence.is_empty());
+            assert_ne!(created.source_evidence, resolved.evidence);
+        } else {
+            assert_eq!(resolved.to, super::AssertedObligationState::Unresolved);
+            assert!(resolved.evidence.is_empty());
+        }
+    }
+
 }
