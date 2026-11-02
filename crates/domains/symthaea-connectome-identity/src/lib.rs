@@ -238,8 +238,8 @@ fn canonical_identity_digest(
     push_string(&mut hasher, &artifact.release_id);
     push_string(&mut hasher, &artifact.taxon_id);
     push_string(&mut hasher, &artifact.life_stage_id);
-    push_string(&mut hasher, &artifact.matrix_sha256);
-    push_string(&mut hasher, &artifact.annotation_sha256);
+    // Semantic identity excludes raw payload digests, which change when an
+    // otherwise identical source export is reordered.
     push_string(&mut hasher, &artifact.mapping_protocol_sha256);
     push_string(&mut hasher, orientation_tag(orientation));
     for id in canonical_ids {
@@ -250,6 +250,8 @@ fn canonical_identity_digest(
 
 fn source_binding_digest(
     identity_digest: &str,
+    matrix_sha256: &str,
+    annotation_sha256: &str,
     matrix_rows: usize,
     matrix_columns: usize,
     row_ids: &[String],
@@ -259,6 +261,9 @@ fn source_binding_digest(
     let mut hasher = Sha256::new();
     push_string(&mut hasher, "CONNECTOME-SOURCE-ORDER-BINDING-V1");
     push_string(&mut hasher, identity_digest);
+    // Exact payload custody belongs here, not in the order-invariant semantic ID.
+    push_string(&mut hasher, matrix_sha256);
+    push_string(&mut hasher, annotation_sha256);
     hasher.update((matrix_rows as u64).to_le_bytes());
     hasher.update((matrix_columns as u64).to_le_bytes());
     for id in row_ids {
@@ -391,6 +396,8 @@ pub fn validate_identity_join(
         canonical_identity_digest(&input.artifact, orientation, &canonical_ids);
     let source_binding_sha256 = source_binding_digest(
         &canonical_identity_sha256,
+        &input.artifact.matrix_sha256,
+        &input.artifact.annotation_sha256,
         input.matrix_rows,
         input.matrix_columns,
         &input.row_ids,
@@ -581,17 +588,19 @@ mod tests {
     }
 
     #[test]
-    fn canonical_identity_digest_is_order_invariant_but_binding_digest_is_not() {
+    fn canonical_identity_digest_ignores_payload_order_but_binding_digest_does_not() {
         let first = validate_identity_join(&input()).expect("first join");
         let mut source = input();
         source.row_ids = vec!["200".to_string(), "300".to_string(), "100".to_string()];
         source.column_ids = vec!["300".to_string(), "100".to_string(), "200".to_string()];
         source.annotation_ids = vec!["200".to_string(), "100".to_string(), "300".to_string()];
+        // Reordering a real export changes its exact payload digests.
+        source.artifact.matrix_sha256 = digest('d');
+        source.artifact.annotation_sha256 = digest('e');
         let second = validate_identity_join(&source).expect("permuted join");
         assert_eq!(first.canonical_identity_sha256(), second.canonical_identity_sha256());
         assert_ne!(first.source_binding_sha256(), second.source_binding_sha256());
     }
-
     #[test]
     fn leading_zero_ids_are_not_coerced() {
         let mut source = input();
