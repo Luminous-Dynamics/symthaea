@@ -610,6 +610,24 @@ mod tests {
     }
 
     #[test]
+    fn memoization_agrees_with_exhaustive_oracle_and_prunes_equivalent_states() {
+        let mut trace = three_overlapping_restore_reads();
+        let (predecessors, _) = build_partial_order(&trace).unwrap();
+        let all = (1_u64 << trace.operations.len()) - 1;
+        let oracle_count = exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
+        assert_eq!(oracle_count, 6, "all six overlapping read orders are legal");
+
+        // Make the final authority revision unreachable without changing the valid
+        // invocation/response history. The checker must exhaustively reject it.
+        trace.final_observation.authority_revision = "rev-999".to_string();
+        let report = verify_observed_history(&trace, &HistorySearchConfig::default());
+        assert_eq!(report.status, "fail", "{:#?}", report.counterexamples);
+        assert!(!report.search_budget_exhausted);
+        assert!(report.memo_hits > 0, "equivalent remaining/model states should be memoized");
+        assert!(report.states_explored < 6, "memoization should prune repeated prefixes");
+    }
+
+    #[test]
     fn exhausted_search_never_reports_pass_or_fail() {
         let trace = fixture();
         let report = verify_observed_history(
