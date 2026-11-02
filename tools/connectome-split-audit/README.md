@@ -80,7 +80,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-split-audit/Cargo.toml
 ```
 
-Twenty Rust unit tests are authored for clean splits, volume and neuron overlap, multiple root IDs, source-operation and spatial-cube overlap, identical group provenance across task routes, missing group values, cross-split sample leakage, duplicate operation/view identity, task-view permission, inherited view identity, `em_best` rejection, malformed hashes and deterministic counts. They have **not** been compiled or executed in the current authoring environment.
+Twenty-three Rust unit tests are authored for clean splits, volume and neuron overlap, multiple root IDs, source-operation and spatial-cube overlap, identical group provenance across task routes, missing group values, cross-split sample leakage, duplicate operation/view identity, task-view permission, inherited sample/split/task view identity, `em_best` rejection, malformed hashes, stable output ordering and deterministic counts. They have **not** been compiled or executed in the current authoring environment.
 
 ## Benchmark ladder
 
