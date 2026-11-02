@@ -297,6 +297,39 @@ pub struct TransportedExpectationInterval {
     pub transport_report_sha256: String,
 }
 
+/// Error-budget composition for a top-level null Type-I claim after transport.
+///
+/// This composes simultaneous calibration, transport and any additional null-side
+/// confidence failures by the union bound, then derives the conditional alpha
+/// required to keep the unconditional null rejection probability at most alpha.
+/// The independence declarations must match the upstream calibration contract.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TransportAdjustedNullErrorBudget {
+    pub nominal_alpha: f64,
+    pub calibration_null_failure_probability: f64,
+    pub transport_failure_probability: f64,
+    pub other_null_failure_probability: f64,
+    pub total_null_failure_probability: f64,
+    pub conditional_alpha: f64,
+    pub calibration_evidence_independent_of_confirmatory_stream: bool,
+    pub other_null_evidence_independent_of_confirmatory_stream: bool,
+    pub transport_report_sha256: String,
+}
+
+fn validate_closed_failure_probability(
+    value: f64,
+    path: &str,
+) -> Result<(), FiniteTvTransportError> {
+    if !value.is_finite() || !(0.0..1.0).contains(&value) && value != 0.0 {
+        return Err(FiniteTvTransportError::new(
+            path,
+            "failure probability must be finite and lie in [0, 1)",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_open_probability(value: f64, path: &str) -> Result<(), FiniteTvTransportError> {
     if !value.is_finite() || !(0.0..1.0).contains(&value) {
         return Err(FiniteTvTransportError::new(
@@ -573,6 +606,80 @@ pub fn transport_bounded_expectation_interval(
     })
 }
 
+/// Compose transport and upstream confidence failures before conditional-alpha spending.
+///
+/// Calibration and any additional null-side confidence event must each be
+/// independently sourced from the confirmatory outcome stream. Transport
+/// reference-sample independence is verified from the typed request/report.
+/// All failure events are combined conservatively by a union bound; no
+/// independence among the failure events themselves is assumed.
+#[allow(clippy::too_many_arguments)]
+pub fn compose_null_error_budget_after_transport(
+    request: &FiniteTvTwoSampleTransportRequest,
+    report: &FiniteTvTwoSampleTransportReport,
+    nominal_alpha: f64,
+    calibration_null_failure_probability: f64,
+    calibration_evidence_independent_of_confirmatory_stream: bool,
+    other_null_failure_probability: f64,
+    other_null_evidence_independent_of_confirmatory_stream: bool,
+) -> Result<TransportAdjustedNullErrorBudget, FiniteTvTransportError> {
+    verify_finite_tv_two_sample_transport_report(request, report)?;
+    validate_open_probability(nominal_alpha, "budget.nominal_alpha")?;
+    validate_closed_failure_probability(
+        calibration_null_failure_probability,
+        "budget.calibration_null_failure_probability",
+    )?;
+    validate_closed_failure_probability(
+        other_null_failure_probability,
+        "budget.other_null_failure_probability",
+    )?;
+    if !calibration_evidence_independent_of_confirmatory_stream {
+        return Err(FiniteTvTransportError::new(
+            "budget.calibration_evidence_independent_of_confirmatory_stream",
+            "upstream calibration confidence event must be independent of confirmation for v1 conditional-alpha composition",
+        ));
+    }
+    if other_null_failure_probability > 0.0
+        && !other_null_evidence_independent_of_confirmatory_stream
+    {
+        return Err(FiniteTvTransportError::new(
+            "budget.other_null_evidence_independent_of_confirmatory_stream",
+            "additional null-side confidence event is not declared independent of confirmation",
+        ));
+    }
+    let total_null_failure_probability = calibration_null_failure_probability
+        + report.transport_failure_probability
+        + other_null_failure_probability;
+    if !total_null_failure_probability.is_finite()
+        || total_null_failure_probability >= nominal_alpha
+    {
+        return Err(FiniteTvTransportError::new(
+            "budget.total_null_failure_probability",
+            "combined null-side confidence failure budget must be finite and strictly below nominal alpha",
+        ));
+    }
+    let conditional_alpha =
+        (nominal_alpha - total_null_failure_probability)
+            / (1.0 - total_null_failure_probability);
+    if !conditional_alpha.is_finite() || !(0.0..1.0).contains(&conditional_alpha) {
+        return Err(FiniteTvTransportError::new(
+            "budget.conditional_alpha",
+            "derived conditional alpha is non-finite or outside (0, 1)",
+        ));
+    }
+    Ok(TransportAdjustedNullErrorBudget {
+        nominal_alpha,
+        calibration_null_failure_probability,
+        transport_failure_probability: report.transport_failure_probability,
+        other_null_failure_probability,
+        total_null_failure_probability,
+        conditional_alpha,
+        calibration_evidence_independent_of_confirmatory_stream,
+        other_null_evidence_independent_of_confirmatory_stream,
+        transport_report_sha256: report.report_sha256.clone(),
+    })
+}
+
 fn report_digest(report: &FiniteTvTwoSampleTransportReport) -> Result<String, FiniteTvTransportError> {
     let payload = ReportPayload {
         schema: &report.schema,
@@ -727,6 +834,43 @@ mod tests {
         let mut request = request(vec![80, 20], vec![50, 50]);
         request.iid_calibration_complete_path_draws = false;
         assert!(request.validate().is_err());
+    }
+
+    #[test]
+    fn composes_calibration_transport_and_other_null_failures_before_alpha_spending() {
+        let request = request(vec![80, 20], vec![50, 50]);
+        let report = calibrate_finite_tv_two_sample_transport(&request).unwrap();
+        let budget = compose_null_error_budget_after_transport(
+            &request,
+            &report,
+            0.05,
+            0.01,
+            true,
+            0.002,
+            true,
+        )
+        .unwrap();
+        assert!((budget.total_null_failure_probability - 0.022).abs() < 1e-12);
+        assert!((budget.conditional_alpha - ((0.05 - 0.022) / (1.0 - 0.022))).abs() < 1e-12);
+        assert!(budget.conditional_alpha < budget.nominal_alpha);
+    }
+
+    #[test]
+    fn rejects_confirmation_dependent_or_excessive_error_budgets() {
+        let request = request(vec![80, 20], vec![50, 50]);
+        let report = calibrate_finite_tv_two_sample_transport(&request).unwrap();
+        assert!(compose_null_error_budget_after_transport(
+            &request, &report, 0.05, 0.01, false, 0.0, true
+        ).is_err());
+        assert!(compose_null_error_budget_after_transport(
+            &request, &report, 0.05, 0.01, true, 0.0, false
+        ).is_ok());
+        assert!(compose_null_error_budget_after_transport(
+            &request, &report, 0.05, 0.02, true, 0.02, true
+        ).is_err());
+        assert!(compose_null_error_budget_after_transport(
+            &request, &report, 0.05, 0.0, true, 0.002, false
+        ).is_err());
     }
 
     #[test]
