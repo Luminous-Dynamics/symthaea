@@ -483,6 +483,9 @@ pub fn check_algorithm_compatibility(
             Ok(())
         }
         ExactAlgorithm::CarryFreeScalarization => {
+            if !algebra.semiring_operations {
+                return Err(CompatibilityError::SemiringRequired);
+            }
             if !algebra.exact_scalar_embedding {
                 return Err(CompatibilityError::ExactScalarEmbeddingRequired);
             }
@@ -634,7 +637,9 @@ mod tests {
     fn output_contract_selects_an_algebra_with_the_same_semantics() {
         assert_eq!(suggested_algebra(OutputContract::Feasibility), SuggestedAlgebra::Boolean);
         assert_eq!(suggested_algebra(OutputContract::ExactCount), SuggestedAlgebra::NaturalCount);
+        assert_eq!(suggested_algebra(OutputContract::WeightedPartitionFunction), SuggestedAlgebra::CommutativeQAlgebra);
         assert_eq!(suggested_algebra(OutputContract::OptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
+        assert_eq!(suggested_algebra(OutputContract::FixedLexicographicOptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
         assert_eq!(suggested_algebra(OutputContract::FullObjectiveProfile), SuggestedAlgebra::WeightProfile);
         assert_eq!(suggested_algebra(OutputContract::ParetoFrontierWithMultiplicity), SuggestedAlgebra::ParetoCount);
     }
@@ -701,6 +706,7 @@ mod tests {
             exact_scalar_embedding: true,
             final_coefficients_nonnegative: false,
             coefficient_bound_proven: true,
+            local_scalarization_verified: true,
         };
         assert_eq!(
             check_algorithm_compatibility(ExactAlgorithm::CarryFreeScalarization, signed_profile),
