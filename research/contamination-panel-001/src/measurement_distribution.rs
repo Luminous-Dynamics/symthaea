@@ -413,7 +413,9 @@ pub fn compute_measurement_protocol_sha256(
     protocol: &MeasurementProtocolV1,
 ) -> Result<String, String> {
     if protocol.schema != MEASUREMENT_PROTOCOL_SCHEMA {
-        return Err(format!("protocol schema must be {MEASUREMENT_PROTOCOL_SCHEMA}"));
+        return Err(format!(
+            "protocol schema must be {MEASUREMENT_PROTOCOL_SCHEMA}"
+        ));
     }
     let bytes = serde_json::to_vec(protocol)
         .map_err(|error| format!("cannot serialize measurement protocol: {error}"))?;
@@ -428,12 +430,17 @@ pub fn compute_instance_manifest_sha256(
     }
     let bytes = serde_json::to_vec(manifest)
         .map_err(|error| format!("cannot serialize measurement instance manifest: {error}"))?;
-    Ok(hash_domain(b"measurement-distribution-instance-manifest.v1", &bytes))
+    Ok(hash_domain(
+        b"measurement-distribution-instance-manifest.v1",
+        &bytes,
+    ))
 }
 
 pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result<(), String> {
     if protocol.schema != MEASUREMENT_PROTOCOL_SCHEMA {
-        return Err(format!("protocol schema must be {MEASUREMENT_PROTOCOL_SCHEMA}"));
+        return Err(format!(
+            "protocol schema must be {MEASUREMENT_PROTOCOL_SCHEMA}"
+        ));
     }
     if !valid_id(&protocol.benchmark_id, 128)
         || !valid_id(&protocol.benchmark_version, 64)
@@ -444,8 +451,7 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
     {
         return Err("benchmark and construct identity/definition fields are required".to_owned());
     }
-    if protocol.construct.invariants.is_empty() || protocol.construct.prohibited_claims.is_empty()
-    {
+    if protocol.construct.invariants.is_empty() || protocol.construct.prohibited_claims.is_empty() {
         return Err("construct invariants and prohibited claims must be explicit".to_owned());
     }
     let generator = &protocol.generator;
@@ -453,16 +459,24 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
         return Err("generator identity is invalid".to_owned());
     }
     for (digest, label) in [
-        (&generator.generator_config_sha256, "generator_config_sha256"),
+        (
+            &generator.generator_config_sha256,
+            "generator_config_sha256",
+        ),
         (&generator.source_dataset_sha256, "source_dataset_sha256"),
-        (&generator.generated_manifest_sha256, "generated_manifest_sha256"),
+        (
+            &generator.generated_manifest_sha256,
+            "generated_manifest_sha256",
+        ),
         (&generator.seed_commitment_sha256, "seed_commitment_sha256"),
     ] {
         require_digest(digest, label)?;
     }
     if generator.fresh_instances_after_checkpoint_freeze {
         if !generator.generated_after_checkpoint_freeze {
-            return Err("fresh instances require explicit post-freeze generation evidence".to_owned());
+            return Err(
+                "fresh instances require explicit post-freeze generation evidence".to_owned(),
+            );
         }
         let receipt = generator
             .checkpoint_freeze_receipt_sha256
@@ -470,7 +484,10 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
             .ok_or_else(|| "fresh instances require a checkpoint-freeze receipt".to_owned())?;
         require_digest(receipt, "checkpoint_freeze_receipt_sha256")?;
     } else if generator.checkpoint_freeze_receipt_sha256.is_some() {
-        let receipt = generator.checkpoint_freeze_receipt_sha256.as_deref().unwrap();
+        let receipt = generator
+            .checkpoint_freeze_receipt_sha256
+            .as_deref()
+            .unwrap();
         require_digest(receipt, "checkpoint_freeze_receipt_sha256")?;
     }
     if protocol.axes.is_empty() || protocol.axes.len() > MAX_AXES {
@@ -493,7 +510,10 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
             && !protocol.construct.instruction_following_is_target
             && !axis.auxiliary_only
         {
-            return Err("prompt sensitivity must be auxiliary unless instruction following is the target".to_owned());
+            return Err(
+                "prompt sensitivity must be auxiliary unless instruction following is the target"
+                    .to_owned(),
+            );
         }
         if axis.families.len() > MAX_FAMILIES_PER_AXIS
             || (axis.families.is_empty()
@@ -515,11 +535,17 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
                 || family.acceptance_rule.trim().is_empty()
                 || !(500..=1_000).contains(&family.minimum_acceptance_permille)
             {
-                return Err(format!("axis {} has an invalid or duplicate perturbation family", axis.axis_id));
+                return Err(format!(
+                    "axis {} has an invalid or duplicate perturbation family",
+                    axis.axis_id
+                ));
             }
             for (digest, label) in [
                 (&family.transformer_sha256, "transformer_sha256"),
-                (&family.validation_protocol_sha256, "validation_protocol_sha256"),
+                (
+                    &family.validation_protocol_sha256,
+                    "validation_protocol_sha256",
+                ),
             ] {
                 require_digest(digest, label)?;
             }
@@ -536,7 +562,10 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
             if let Some(fallback) = &family.fallback_condition_id
                 && !condition_ids.contains(&(axis.axis_id.as_str(), fallback.as_str()))
             {
-                return Err(format!("fallback condition {fallback} is not declared in axis {}", axis.axis_id));
+                return Err(format!(
+                    "fallback condition {fallback} is not declared in axis {}",
+                    axis.axis_id
+                ));
             }
         }
     }
@@ -555,16 +584,29 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
         || evaluation.minimum_runs_per_model < 1
         || evaluation.minimum_independent_units_for_delta < 2
     {
-        return Err("evaluation metric and minimum model/run/independent-unit counts are invalid".to_owned());
+        return Err(
+            "evaluation metric and minimum model/run/independent-unit counts are invalid"
+                .to_owned(),
+        );
     }
     if protocol.reporting.minimum_coverage_permille > 1_000
         || protocol.reporting.minimum_acceptance_permille > 1_000
         || protocol.reporting.minimum_models_for_rank_stability < 2
-        || protocol.reporting.quantiles_basis_points.iter().any(|value| *value > 10_000)
-        || protocol.reporting.quantiles_basis_points.windows(2).any(|pair| pair[0] >= pair[1])
+        || protocol
+            .reporting
+            .quantiles_basis_points
+            .iter()
+            .any(|value| *value > 10_000)
+        || protocol
+            .reporting
+            .quantiles_basis_points
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
         || protocol.reporting.multiple_comparison_policy != "holm_when_tests_are_reported"
     {
-        return Err("reporting thresholds, quantiles or multiplicity policy are invalid".to_owned());
+        return Err(
+            "reporting thresholds, quantiles or multiplicity policy are invalid".to_owned(),
+        );
     }
     if protocol.reporting.require_rank_stability
         && protocol.reporting.minimum_models_for_rank_stability < 3
@@ -589,7 +631,10 @@ fn sample_sd(values: &[f64], mean: f64) -> Option<f64> {
     if values.len() < 2 {
         return None;
     }
-    let variance = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>()
+    let variance = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
         / (values.len() - 1) as f64;
     Some(variance.sqrt())
 }
@@ -625,7 +670,10 @@ fn kendall_tau_b(left: &[f64], right: &[f64]) -> Option<f64> {
     }
 }
 
-fn score_summary(values: &[f64], quantiles: [u16; 5]) -> (Option<f64>, Option<f64>, [Option<f64>; 5]) {
+fn score_summary(
+    values: &[f64],
+    quantiles: [u16; 5],
+) -> (Option<f64>, Option<f64>, [Option<f64>; 5]) {
     if values.is_empty() {
         return (None, None, [None; 5]);
     }
@@ -651,7 +699,9 @@ pub fn analyze_measurement_distribution(
 ) -> Result<MeasurementDistributionReportV1, String> {
     validate_measurement_protocol(protocol)?;
     if bundle.schema != MEASUREMENT_RUN_BUNDLE_SCHEMA {
-        return Err(format!("run bundle schema must be {MEASUREMENT_RUN_BUNDLE_SCHEMA}"));
+        return Err(format!(
+            "run bundle schema must be {MEASUREMENT_RUN_BUNDLE_SCHEMA}"
+        ));
     }
     let protocol_bytes = serde_json::to_vec(protocol)
         .map_err(|error| format!("cannot serialize measurement protocol: {error}"))?;
@@ -677,13 +727,18 @@ pub fn analyze_measurement_distribution(
         return Err("instance manifest digest mismatch".to_owned());
     }
     if protocol.generator.generated_manifest_sha256 != manifest_sha {
-        return Err("generator's committed output manifest does not match the evaluator instance manifest".to_owned());
+        return Err(
+            "generator's committed output manifest does not match the evaluator instance manifest"
+                .to_owned(),
+        );
     }
     if bundle.models.is_empty() || bundle.models.len() > MAX_MODELS {
         return Err(format!("model count must be in 1..={MAX_MODELS}"));
     }
     if bundle.observations.is_empty() || bundle.observations.len() > MAX_OBSERVATIONS {
-        return Err(format!("observation count must be in 1..={MAX_OBSERVATIONS}"));
+        return Err(format!(
+            "observation count must be in 1..={MAX_OBSERVATIONS}"
+        ));
     }
 
     let mut models = BTreeMap::<String, &MeasurementModelV1>::new();
@@ -704,9 +759,13 @@ pub fn analyze_measurement_distribution(
         if !models.contains_key(&run.model_id)
             || !valid_id(&run.run_id, 128)
             || !valid_id(&run.independent_unit_id, 128)
-            || runs.insert((run.model_id.clone(), run.run_id.clone()), run).is_some()
+            || runs
+                .insert((run.model_id.clone(), run.run_id.clone()), run)
+                .is_some()
         {
-            return Err("run identity is invalid, duplicated or references an unknown model".to_owned());
+            return Err(
+                "run identity is invalid, duplicated or references an unknown model".to_owned(),
+            );
         }
         require_digest(&run.seed_commitment_sha256, "run seed_commitment_sha256")?;
         *runs_by_model.entry(run.model_id.clone()).or_default() += 1;
@@ -718,7 +777,9 @@ pub fn analyze_measurement_distribution(
         if runs_by_model.get(model_id).copied().unwrap_or(0)
             < protocol.evaluation.minimum_runs_per_model as u64
         {
-            return Err(format!("model {model_id} does not meet minimum evaluation-run count"));
+            return Err(format!(
+                "model {model_id} does not meet minimum evaluation-run count"
+            ));
         }
     }
 
@@ -730,13 +791,19 @@ pub fn analyze_measurement_distribution(
             || !valid_id(&item.source_cluster_id, 128)
             || instances.insert(item.item_id.clone(), item).is_some()
         {
-            return Err("instance IDs/task-family/source-cluster fields are invalid or duplicated".to_owned());
+            return Err(
+                "instance IDs/task-family/source-cluster fields are invalid or duplicated"
+                    .to_owned(),
+            );
         }
         require_digest(&item.source_lineage_sha256, "source_lineage_sha256")?;
     }
 
-    let axes: BTreeMap<&str, &PerturbationAxisSpecV1> =
-        protocol.axes.iter().map(|axis| (axis.axis_id.as_str(), axis)).collect();
+    let axes: BTreeMap<&str, &PerturbationAxisSpecV1> = protocol
+        .axes
+        .iter()
+        .map(|axis| (axis.axis_id.as_str(), axis))
+        .collect();
     let mut conditions_by_axis = BTreeMap::<String, BTreeSet<String>>::new();
     for axis in &protocol.axes {
         let mut conditions = BTreeSet::new();
@@ -759,10 +826,8 @@ pub fn analyze_measurement_distribution(
         ));
     }
 
-    let mut observation_map =
-        BTreeMap::<ObservationKey, &MeasurementObservationV1>::new();
-    let mut profile_observations =
-        BTreeMap::<ProfileKey, Vec<&MeasurementObservationV1>>::new();
+    let mut observation_map = BTreeMap::<ObservationKey, &MeasurementObservationV1>::new();
+    let mut profile_observations = BTreeMap::<ProfileKey, Vec<&MeasurementObservationV1>>::new();
     let mut independent_units = BTreeSet::<(String, String)>::new();
 
     for observation in &bundle.observations {
@@ -781,7 +846,10 @@ pub fn analyze_measurement_distribution(
         if observation.task_family != item.task_family
             || observation.source_cluster_id != item.source_cluster_id
         {
-            return Err("observation task family/source cluster differs from its instance manifest".to_owned());
+            return Err(
+                "observation task family/source cluster differs from its instance manifest"
+                    .to_owned(),
+            );
         }
         let independent_unit_matches = match protocol.evaluation.independent_unit_kind {
             IndependentUnitKindV1::ModelPairReplicate => {
@@ -790,15 +858,14 @@ pub fn analyze_measurement_distribution(
             IndependentUnitKindV1::SourceCluster => {
                 observation.independent_unit_id == item.source_cluster_id
             }
-            IndependentUnitKindV1::BaseItem => {
-                observation.independent_unit_id == item.item_id
-            }
-            IndependentUnitKindV1::EvaluationRun => {
-                observation.independent_unit_id == run.run_id
-            }
+            IndependentUnitKindV1::BaseItem => observation.independent_unit_id == item.item_id,
+            IndependentUnitKindV1::EvaluationRun => observation.independent_unit_id == run.run_id,
         };
         if !independent_unit_matches {
-            return Err("observation independent unit does not match the protocol's declared unit kind".to_owned());
+            return Err(
+                "observation independent unit does not match the protocol's declared unit kind"
+                    .to_owned(),
+            );
         }
         let is_baseline = observation.condition_id == axis.baseline_condition_id;
         let family = axis
@@ -816,33 +883,47 @@ pub fn analyze_measurement_distribution(
                     return Err("baseline observations must not claim perturbation validation or seed receipts".to_owned());
                 }
             }
-            (true, _, _) => return Err("baseline condition requires Baseline decision and a finite score".to_owned()),
+            (true, _, _) => {
+                return Err(
+                    "baseline condition requires Baseline decision and a finite score".to_owned(),
+                );
+            }
             (false, ObservationDecisionV1::Validated, Some(score)) if score.is_finite() => {
                 let seed = observation
                     .perturbation_seed_commitment_sha256
                     .as_deref()
-                    .ok_or_else(|| "perturbation observation requires a seed commitment".to_owned())?;
+                    .ok_or_else(|| {
+                        "perturbation observation requires a seed commitment".to_owned()
+                    })?;
                 require_digest(seed, "perturbation_seed_commitment_sha256")?;
                 let receipt = observation
                     .validation_receipt_sha256
                     .as_deref()
-                    .ok_or_else(|| "validated perturbation requires a validation receipt".to_owned())?;
+                    .ok_or_else(|| {
+                        "validated perturbation requires a validation receipt".to_owned()
+                    })?;
                 require_digest(receipt, "validation_receipt_sha256")?;
             }
             (false, ObservationDecisionV1::FallbackApplied, Some(score)) if score.is_finite() => {
                 let seed = observation
                     .perturbation_seed_commitment_sha256
                     .as_deref()
-                    .ok_or_else(|| "fallback observation requires a perturbation seed commitment".to_owned())?;
+                    .ok_or_else(|| {
+                        "fallback observation requires a perturbation seed commitment".to_owned()
+                    })?;
                 require_digest(seed, "perturbation_seed_commitment_sha256")?;
                 let family = family.unwrap();
                 if family.fallback_condition_id.is_none() {
-                    return Err("fallback observation has no declared fallback condition".to_owned());
+                    return Err(
+                        "fallback observation has no declared fallback condition".to_owned()
+                    );
                 }
                 let receipt = observation
                     .validation_receipt_sha256
                     .as_deref()
-                    .ok_or_else(|| "fallback application requires a validation receipt".to_owned())?;
+                    .ok_or_else(|| {
+                        "fallback application requires a validation receipt".to_owned()
+                    })?;
                 require_digest(receipt, "validation_receipt_sha256")?;
             }
             (false, ObservationDecisionV1::Rejected, None)
@@ -859,11 +940,22 @@ pub fn analyze_measurement_distribution(
         if let Some(receipt) = &observation.validation_receipt_sha256 {
             require_digest(receipt, "validation_receipt_sha256")?;
         }
-        match (observation.external_calls, observation.external_egress_receipt_sha256.as_deref()) {
+        match (
+            observation.external_calls,
+            observation.external_egress_receipt_sha256.as_deref(),
+        ) {
             (0, None) => {}
-            (0, Some(_)) => return Err("zero external calls must not carry an external-egress receipt".to_owned()),
+            (0, Some(_)) => {
+                return Err(
+                    "zero external calls must not carry an external-egress receipt".to_owned(),
+                );
+            }
             (_, Some(receipt)) => require_digest(receipt, "external_egress_receipt_sha256")?,
-            (_, None) => return Err("external calls require a destination/egress evidence receipt".to_owned()),
+            (_, None) => {
+                return Err(
+                    "external calls require a destination/egress evidence receipt".to_owned(),
+                );
+            }
         }
         independent_units.insert((
             observation.model_id.clone(),
@@ -877,7 +969,9 @@ pub fn analyze_measurement_distribution(
             item_id: observation.item_id.clone(),
         };
         if observation_map.insert(key, observation).is_some() {
-            return Err("duplicate observation for a model/run/axis/condition/item combination".to_owned());
+            return Err(
+                "duplicate observation for a model/run/axis/condition/item combination".to_owned(),
+            );
         }
         let profile_key = ProfileKey {
             model_id: observation.model_id.clone(),
@@ -885,7 +979,10 @@ pub fn analyze_measurement_distribution(
             axis_id: observation.axis_id.clone(),
             condition_id: observation.condition_id.clone(),
         };
-        profile_observations.entry(profile_key).or_default().push(observation);
+        profile_observations
+            .entry(profile_key)
+            .or_default()
+            .push(observation);
     }
 
     for model_id in models.keys() {
@@ -904,7 +1001,9 @@ pub fn analyze_measurement_distribution(
                             item_id: item_id.clone(),
                         };
                         if !observation_map.contains_key(&key) {
-                            return Err("explicit observation matrix contains a missing key".to_owned());
+                            return Err(
+                                "explicit observation matrix contains a missing key".to_owned()
+                            );
                         }
                     }
                 }
@@ -922,26 +1021,49 @@ pub fn analyze_measurement_distribution(
             .values()
             .filter(|item| item.task_family == key.task_family)
             .count() as u64;
-        let expected = runs_by_model.get(&key.model_id).copied().unwrap_or(0)
-            * family_instance_count;
-        let scored: Vec<&MeasurementObservationV1> =
-            observations.iter().copied().filter(|row| row.score.is_some()).collect();
+        let expected =
+            runs_by_model.get(&key.model_id).copied().unwrap_or(0) * family_instance_count;
+        let scored: Vec<&MeasurementObservationV1> = observations
+            .iter()
+            .copied()
+            .filter(|row| row.score.is_some())
+            .collect();
         let scores: Vec<f64> = scored.iter().filter_map(|row| row.score).collect();
-        let (mean, sd, quantiles) = score_summary(
-            &scores,
-            protocol.reporting.quantiles_basis_points,
-        );
-        let rejected = observations.iter().filter(|row| row.decision == ObservationDecisionV1::Rejected).count() as u64;
-        let indeterminate = observations.iter().filter(|row| row.decision == ObservationDecisionV1::Indeterminate).count() as u64;
-        let fallback = observations.iter().filter(|row| row.decision == ObservationDecisionV1::FallbackApplied).count() as u64;
-        let failed = observations.iter().filter(|row| row.decision == ObservationDecisionV1::ExecutionFailed).count() as u64;
-        let missing = observations.iter().filter(|row| row.decision == ObservationDecisionV1::Missing).count() as u64;
+        let (mean, sd, quantiles) =
+            score_summary(&scores, protocol.reporting.quantiles_basis_points);
+        let rejected = observations
+            .iter()
+            .filter(|row| row.decision == ObservationDecisionV1::Rejected)
+            .count() as u64;
+        let indeterminate = observations
+            .iter()
+            .filter(|row| row.decision == ObservationDecisionV1::Indeterminate)
+            .count() as u64;
+        let fallback = observations
+            .iter()
+            .filter(|row| row.decision == ObservationDecisionV1::FallbackApplied)
+            .count() as u64;
+        let failed = observations
+            .iter()
+            .filter(|row| row.decision == ObservationDecisionV1::ExecutionFailed)
+            .count() as u64;
+        let missing = observations
+            .iter()
+            .filter(|row| row.decision == ObservationDecisionV1::Missing)
+            .count() as u64;
         let perturbation_attempted = observations
             .iter()
             .filter(|row| row.decision != ObservationDecisionV1::Baseline)
             .count() as u64;
-        let validated = observations.iter().filter(|row| row.decision == ObservationDecisionV1::Validated).count() as u64;
-        let coverage = if expected == 0 { 0.0 } else { scores.len() as f64 * 1_000.0 / expected as f64 };
+        let validated = observations
+            .iter()
+            .filter(|row| row.decision == ObservationDecisionV1::Validated)
+            .count() as u64;
+        let coverage = if expected == 0 {
+            0.0
+        } else {
+            scores.len() as f64 * 1_000.0 / expected as f64
+        };
         let acceptance = if perturbation_attempted == 0 {
             None
         } else {
@@ -964,7 +1086,10 @@ pub fn analyze_measurement_distribution(
                     let baseline = observation_map
                         .get(&baseline_key)
                         .and_then(|row| row.score)
-                        .ok_or_else(|| "scored perturbation has no paired scored baseline observation".to_owned())?;
+                        .ok_or_else(|| {
+                            "scored perturbation has no paired scored baseline observation"
+                                .to_owned()
+                        })?;
                     let direction = if protocol.evaluation.higher_is_better {
                         1.0
                     } else {
@@ -981,7 +1106,8 @@ pub fn analyze_measurement_distribution(
                 .values()
                 .map(|values| values.iter().sum::<f64>() / values.len() as f64)
                 .collect();
-            if unit_means.len() >= protocol.evaluation.minimum_independent_units_for_delta as usize {
+            if unit_means.len() >= protocol.evaluation.minimum_independent_units_for_delta as usize
+            {
                 Some(mean_interval(&unit_means)?)
             } else {
                 None
@@ -995,7 +1121,10 @@ pub fn analyze_measurement_distribution(
         } else {
             "insufficient_independent_units".to_owned()
         };
-        let runtime: Vec<f64> = scored.iter().map(|row| row.runtime_milliseconds as f64).collect();
+        let runtime: Vec<f64> = scored
+            .iter()
+            .map(|row| row.runtime_milliseconds as f64)
+            .collect();
         let input_tokens: Vec<f64> = scored.iter().map(|row| row.input_tokens as f64).collect();
         let output_tokens: Vec<f64> = scored.iter().map(|row| row.output_tokens as f64).collect();
         let external_call_count = scored.iter().map(|row| row.external_calls as u64).sum();
@@ -1022,9 +1151,21 @@ pub fn analyze_measurement_distribution(
             paired_independent_unit_count: unit_count,
             paired_delta_vs_baseline: paired_delta,
             paired_delta_status: delta_status,
-            mean_runtime_milliseconds: if runtime.is_empty() { None } else { Some(runtime.iter().sum::<f64>() / runtime.len() as f64) },
-            mean_input_tokens: if input_tokens.is_empty() { None } else { Some(input_tokens.iter().sum::<f64>() / input_tokens.len() as f64) },
-            mean_output_tokens: if output_tokens.is_empty() { None } else { Some(output_tokens.iter().sum::<f64>() / output_tokens.len() as f64) },
+            mean_runtime_milliseconds: if runtime.is_empty() {
+                None
+            } else {
+                Some(runtime.iter().sum::<f64>() / runtime.len() as f64)
+            },
+            mean_input_tokens: if input_tokens.is_empty() {
+                None
+            } else {
+                Some(input_tokens.iter().sum::<f64>() / input_tokens.len() as f64)
+            },
+            mean_output_tokens: if output_tokens.is_empty() {
+                None
+            } else {
+                Some(output_tokens.iter().sum::<f64>() / output_tokens.len() as f64)
+            },
             external_call_count,
         };
         cell_lookup.insert(key.clone(), cell.clone());
@@ -1033,8 +1174,12 @@ pub fn analyze_measurement_distribution(
 
     let mut rank_stability = Vec::new();
     let mut any_rank_not_estimable = false;
-    let task_families: BTreeSet<String> =
-        bundle.instance_manifest.instances.iter().map(|item| item.task_family.clone()).collect();
+    let task_families: BTreeSet<String> = bundle
+        .instance_manifest
+        .instances
+        .iter()
+        .map(|item| item.task_family.clone())
+        .collect();
     for task_family in &task_families {
         for axis in &protocol.axes {
             if axis.auxiliary_only {
@@ -1062,17 +1207,24 @@ pub fn analyze_measurement_distribution(
                         axis_id: axis.axis_id.clone(),
                         condition_id: condition_id.clone(),
                     };
-                    if let (Some(base), Some(condition)) =
-                        (cell_lookup.get(&baseline_key), cell_lookup.get(&condition_key))
-                        && let (Some(base_score), Some(condition_score)) =
-                            (base.mean_score, condition.mean_score)
+                    if let (Some(base), Some(condition)) = (
+                        cell_lookup.get(&baseline_key),
+                        cell_lookup.get(&condition_key),
+                    ) && let (Some(base_score), Some(condition_score)) =
+                        (base.mean_score, condition.mean_score)
                     {
-                        let direction = if protocol.evaluation.higher_is_better { 1.0 } else { -1.0 };
+                        let direction = if protocol.evaluation.higher_is_better {
+                            1.0
+                        } else {
+                            -1.0
+                        };
                         baseline_scores.push(base_score * direction);
                         condition_scores.push(condition_score * direction);
                     }
                 }
-                let tau = if baseline_scores.len() >= protocol.reporting.minimum_models_for_rank_stability as usize {
+                let tau = if baseline_scores.len()
+                    >= protocol.reporting.minimum_models_for_rank_stability as usize
+                {
                     kendall_tau_b(&baseline_scores, &condition_scores)
                 } else {
                     None
@@ -1095,10 +1247,17 @@ pub fn analyze_measurement_distribution(
         }
     }
 
-    let model_families: BTreeSet<String> =
-        bundle.models.iter().map(|model| model.model_family_id.clone()).collect();
-    let source_domains: BTreeSet<String> = bundle.instance_manifest.instances
-        .iter().map(|item| item.source_domain_id.clone()).collect();
+    let model_families: BTreeSet<String> = bundle
+        .models
+        .iter()
+        .map(|model| model.model_family_id.clone())
+        .collect();
+    let source_domains: BTreeSet<String> = bundle
+        .instance_manifest
+        .instances
+        .iter()
+        .map(|item| item.source_domain_id.clone())
+        .collect();
     let minimum_model_count_met = models.len() >= protocol.evaluation.minimum_model_count as usize;
     let minimum_runs_met = bundle.models.iter().all(|model| {
         runs_by_model.get(&model.model_id).copied().unwrap_or(0)
@@ -1109,26 +1268,29 @@ pub fn analyze_measurement_distribution(
         .filter(|cell| !axes[cell.axis_id.as_str()].auxiliary_only)
         .cloned()
         .collect();
-    let coverage_met = primary_cells.iter().all(|cell| {
-        cell.coverage_permille >= protocol.reporting.minimum_coverage_permille as f64
-    });
+    let coverage_met = primary_cells
+        .iter()
+        .all(|cell| cell.coverage_permille >= protocol.reporting.minimum_coverage_permille as f64);
     let acceptance_met = primary_cells.iter().all(|cell| {
-        cell.validation_acceptance_permille.is_none_or(|value| {
-            value >= protocol.reporting.minimum_acceptance_permille as f64
-        })
+        cell.validation_acceptance_permille
+            .is_none_or(|value| value >= protocol.reporting.minimum_acceptance_permille as f64)
     });
     let independent_units_met = primary_cells
         .iter()
         .filter(|cell| cell.condition_id != axes[cell.axis_id.as_str()].baseline_condition_id)
-        .all(|cell| cell.paired_independent_unit_count
-            >= protocol.evaluation.minimum_independent_units_for_delta as u64
-            && cell.paired_delta_vs_baseline.is_some());
+        .all(|cell| {
+            cell.paired_independent_unit_count
+                >= protocol.evaluation.minimum_independent_units_for_delta as u64
+                && cell.paired_delta_vs_baseline.is_some()
+        });
     let scope_population_met = match protocol.construct.claim_scope {
         ClaimScopeV1::FixedConfiguration => true,
         ClaimScopeV1::TaskFamily => !task_families.is_empty(),
         ClaimScopeV1::CrossDomain => task_families.len() >= 2 && source_domains.len() >= 2,
         ClaimScopeV1::ModelFamily => model_families.len() >= 2,
-        ClaimScopeV1::DeploymentDistribution => task_families.len() >= 2 && source_domains.len() >= 2 && model_families.len() >= 2,
+        ClaimScopeV1::DeploymentDistribution => {
+            task_families.len() >= 2 && source_domains.len() >= 2 && model_families.len() >= 2
+        }
     };
     let rank_met = !protocol.reporting.require_rank_stability
         || (!rank_stability.is_empty()
@@ -1139,17 +1301,17 @@ pub fn analyze_measurement_distribution(
         && coverage_met
         && acceptance_met
         && independent_units_met;
-    let primary_perturbation_count = protocol.axes
+    let primary_perturbation_count = protocol
+        .axes
         .iter()
         .filter(|axis| !axis.auxiliary_only)
         .map(|axis| axis.families.len())
         .sum::<usize>();
-    let distributional_evidence_eligible =
-        primary_perturbation_count > 0 && core_evidence_met;
-    let fixed_configuration_evidence_eligible =
-        protocol.construct.claim_scope == ClaimScopeV1::FixedConfiguration
-            && primary_perturbation_count == 0
-            && core_evidence_met;
+    let distributional_evidence_eligible = primary_perturbation_count > 0 && core_evidence_met;
+    let fixed_configuration_evidence_eligible = protocol.construct.claim_scope
+        == ClaimScopeV1::FixedConfiguration
+        && primary_perturbation_count == 0
+        && core_evidence_met;
     let claim_scope_eligible = (distributional_evidence_eligible
         || fixed_configuration_evidence_eligible)
         && scope_population_met
@@ -1161,17 +1323,39 @@ pub fn analyze_measurement_distribution(
     };
 
     let mut issues = Vec::new();
-    if !minimum_model_count_met { issues.push("model count is below the protocol minimum".to_owned()); }
-    if !minimum_runs_met { issues.push("one or more models are below the minimum run count".to_owned()); }
-    if !coverage_met { issues.push("one or more profile cells are below minimum coverage".to_owned()); }
-    if !acceptance_met { issues.push("one or more perturbation axes are below minimum validation acceptance".to_owned()); }
-    if !independent_units_met { issues.push("one or more paired deltas lack the minimum independent units".to_owned()); }
-    if !scope_population_met { issues.push("observed model/task population is too narrow for the declared claim scope".to_owned()); }
-    if !rank_met { issues.push("rank stability is required but is not estimable for every declared primary axis/condition".to_owned()); }
+    if !minimum_model_count_met {
+        issues.push("model count is below the protocol minimum".to_owned());
+    }
+    if !minimum_runs_met {
+        issues.push("one or more models are below the minimum run count".to_owned());
+    }
+    if !coverage_met {
+        issues.push("one or more profile cells are below minimum coverage".to_owned());
+    }
+    if !acceptance_met {
+        issues.push(
+            "one or more perturbation axes are below minimum validation acceptance".to_owned(),
+        );
+    }
+    if !independent_units_met {
+        issues.push("one or more paired deltas lack the minimum independent units".to_owned());
+    }
+    if !scope_population_met {
+        issues.push(
+            "observed model/task population is too narrow for the declared claim scope".to_owned(),
+        );
+    }
+    if !rank_met {
+        issues.push("rank stability is required but is not estimable for every declared primary axis/condition".to_owned());
+    }
     if primary_perturbation_count == 0 {
         issues.push("fixed-configuration Measurement-as-Instance evidence does not support a distributional robustness claim".to_owned());
     }
-    if protocol.axes.iter().any(|axis| axis.auxiliary_only && axis.kind == PerturbationAxisKindV1::Prompt) {
+    if protocol
+        .axes
+        .iter()
+        .any(|axis| axis.auxiliary_only && axis.kind == PerturbationAxisKindV1::Prompt)
+    {
         issues.push("prompt sensitivity is reported as a separate auxiliary axis and is not included in the primary construct claim".to_owned());
     }
 
@@ -1215,24 +1399,46 @@ fn build_model_summaries(
     models: &BTreeMap<String, &MeasurementModelV1>,
     cells: &[DistributionProfileCellV1],
 ) -> Vec<ModelRobustnessSummaryV1> {
-    models.iter().map(|(model_id, model)| {
-        let model_cells: Vec<&DistributionProfileCellV1> =
-            cells.iter().filter(|cell| &cell.model_id == model_id).collect();
-        let deltas: Vec<f64> = model_cells.iter()
-            .filter_map(|cell| cell.paired_delta_vs_baseline.as_ref().map(|interval| interval.mean))
-            .collect();
-        let coverages: Vec<f64> = model_cells.iter().map(|cell| cell.coverage_permille).collect();
-        let acceptances: Vec<f64> = model_cells.iter()
-            .filter_map(|cell| cell.validation_acceptance_permille)
-            .collect();
-        ModelRobustnessSummaryV1 {
-            model_id: model_id.clone(),
-            model_family_id: model.model_family_id.clone(),
-            worst_axis_mean_delta: deltas.iter().copied().reduce(f64::min),
-            minimum_axis_coverage_permille: coverages.iter().copied().reduce(f64::min).unwrap_or(0.0),
-            minimum_axis_acceptance_permille: acceptances.iter().copied().reduce(f64::min).unwrap_or(1_000.0),
-        }
-    }).collect()
+    models
+        .iter()
+        .map(|(model_id, model)| {
+            let model_cells: Vec<&DistributionProfileCellV1> = cells
+                .iter()
+                .filter(|cell| &cell.model_id == model_id)
+                .collect();
+            let deltas: Vec<f64> = model_cells
+                .iter()
+                .filter_map(|cell| {
+                    cell.paired_delta_vs_baseline
+                        .as_ref()
+                        .map(|interval| interval.mean)
+                })
+                .collect();
+            let coverages: Vec<f64> = model_cells
+                .iter()
+                .map(|cell| cell.coverage_permille)
+                .collect();
+            let acceptances: Vec<f64> = model_cells
+                .iter()
+                .filter_map(|cell| cell.validation_acceptance_permille)
+                .collect();
+            ModelRobustnessSummaryV1 {
+                model_id: model_id.clone(),
+                model_family_id: model.model_family_id.clone(),
+                worst_axis_mean_delta: deltas.iter().copied().reduce(f64::min),
+                minimum_axis_coverage_permille: coverages
+                    .iter()
+                    .copied()
+                    .reduce(f64::min)
+                    .unwrap_or(0.0),
+                minimum_axis_acceptance_permille: acceptances
+                    .iter()
+                    .copied()
+                    .reduce(f64::min)
+                    .unwrap_or(1_000.0),
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -1295,7 +1501,8 @@ mod tests {
                 generator_version: "1".to_owned(),
                 generator_config_sha256: digest('a'),
                 source_dataset_sha256: digest('b'),
-                generated_manifest_sha256: compute_instance_manifest_sha256(&fixture_manifest()).unwrap(),
+                generated_manifest_sha256: compute_instance_manifest_sha256(&fixture_manifest())
+                    .unwrap(),
                 seed_commitment_sha256: digest('d'),
                 checkpoint_freeze_receipt_sha256: None,
                 fresh_instances_after_checkpoint_freeze: false,
@@ -1352,10 +1559,7 @@ mod tests {
         assert_eq!(manifest.benchmark_version, protocol.benchmark_version);
         let manifest_sha = compute_instance_manifest_sha256(&manifest).unwrap();
         let protocol_bytes = serde_json::to_vec(protocol).unwrap();
-        let protocol_sha = hash_domain(
-            b"measurement-distribution-protocol.v1",
-            &protocol_bytes,
-        );
+        let protocol_sha = hash_domain(b"measurement-distribution-protocol.v1", &protocol_bytes);
         let mut runs = Vec::new();
         let mut observations = Vec::new();
         for run_idx in 0..2 {
@@ -1369,7 +1573,12 @@ mod tests {
             for item in &manifest.instances {
                 for (condition_id, score, decision, receipt) in [
                     ("original", 1.0, ObservationDecisionV1::Baseline, None),
-                    ("paraphrased", 0.8, ObservationDecisionV1::Validated, Some(digest('a'))),
+                    (
+                        "paraphrased",
+                        0.8,
+                        ObservationDecisionV1::Validated,
+                        Some(digest('a')),
+                    ),
                 ] {
                     observations.push(MeasurementObservationV1 {
                         model_id: "model-a".to_owned(),
@@ -1382,7 +1591,9 @@ mod tests {
                         source_cluster_id: item.source_cluster_id.clone(),
                         decision,
                         validation_receipt_sha256: receipt,
-                        perturbation_seed_commitment_sha256: if decision == ObservationDecisionV1::Baseline {
+                        perturbation_seed_commitment_sha256: if decision
+                            == ObservationDecisionV1::Baseline
+                        {
                             None
                         } else {
                             Some(digest('f'))
@@ -1427,15 +1638,27 @@ mod tests {
         let p = protocol();
         let b = bundle(&p);
         let report = analyze_measurement_distribution(&p, &b).unwrap();
-        let cell = report.profile_cells.iter()
+        let cell = report
+            .profile_cells
+            .iter()
             .find(|cell| cell.condition_id == "paraphrased")
             .unwrap();
         assert_eq!(cell.scored_count, 6);
         assert_eq!(cell.paired_observation_count, 6);
         assert_eq!(cell.paired_independent_unit_count, 3);
         assert_eq!(report.profile_cells.len(), 4);
-        assert!(report.profile_cells.iter().any(|profile| profile.task_family == "math"));
-        assert!(report.profile_cells.iter().any(|profile| profile.task_family == "code"));
+        assert!(
+            report
+                .profile_cells
+                .iter()
+                .any(|profile| profile.task_family == "math")
+        );
+        assert!(
+            report
+                .profile_cells
+                .iter()
+                .any(|profile| profile.task_family == "code")
+        );
         assert_eq!(report.task_family_count, 2);
         assert_eq!(report.source_domain_count, 3);
         assert!(report.paired_delta_positive_is_better);
@@ -1460,7 +1683,10 @@ mod tests {
         b.observations.retain(|row| row.condition_id == "original");
         b.protocol_sha256 = compute_measurement_protocol_sha256(&p).unwrap();
         let report = analyze_measurement_distribution(&p, &b).unwrap();
-        assert_eq!(report.measurement_paradigm, "measurement_as_instance_restricted");
+        assert_eq!(
+            report.measurement_paradigm,
+            "measurement_as_instance_restricted"
+        );
         assert!(!report.distributional_evidence_eligible);
         assert!(report.claim_scope_eligible);
     }
@@ -1480,13 +1706,16 @@ mod tests {
     fn invalid_perturbation_is_counted_not_scored() {
         let p = protocol();
         let mut b = bundle(&p);
-        let row = b.observations.iter_mut()
+        let row = b
+            .observations
+            .iter_mut()
             .find(|row| row.condition_id == "paraphrased")
             .unwrap();
         row.decision = ObservationDecisionV1::Rejected;
         row.score = None;
         row.validation_receipt_sha256 = Some(digest('f'));
-        b.instance_manifest_sha256 = compute_instance_manifest_sha256(&b.instance_manifest).unwrap();
+        b.instance_manifest_sha256 =
+            compute_instance_manifest_sha256(&b.instance_manifest).unwrap();
         assert!(analyze_measurement_distribution(&p, &b).is_ok());
     }
 
@@ -1511,6 +1740,9 @@ mod tests {
     #[test]
     fn kendall_tau_b_handles_ties_and_perfect_rank_reversal() {
         assert!((kendall_tau_b(&[1.0, 2.0, 3.0], &[3.0, 2.0, 1.0]).unwrap() + 1.0).abs() < 1.0e-12);
-        assert!((kendall_tau_b(&[1.0, 1.0, 3.0], &[1.0, 2.0, 3.0]).unwrap() - 0.816496580927726).abs() < 1.0e-12);
+        assert!(
+            (kendall_tau_b(&[1.0, 1.0, 3.0], &[1.0, 2.0, 3.0]).unwrap() - 0.816496580927726).abs()
+                < 1.0e-12
+        );
     }
 }
