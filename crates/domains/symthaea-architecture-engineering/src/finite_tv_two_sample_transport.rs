@@ -634,6 +634,7 @@ pub fn transport_bounded_expectation_interval(
 pub fn compose_null_error_budget_after_transport(
     request: &FiniteTvTwoSampleTransportRequest,
     report: &FiniteTvTwoSampleTransportReport,
+    calibration_functional_contract_sha256: &str,
     nominal_alpha: f64,
     calibration_null_failure_probability: f64,
     calibration_evidence_independent_of_confirmatory_stream: bool,
@@ -641,6 +642,16 @@ pub fn compose_null_error_budget_after_transport(
     other_null_evidence_independent_of_confirmatory_stream: bool,
 ) -> Result<TransportAdjustedNullErrorBudget, FiniteTvTransportError> {
     verify_finite_tv_two_sample_transport_report(request, report)?;
+    validate_hash(
+        calibration_functional_contract_sha256,
+        "budget.calibration_functional_contract_sha256",
+    )?;
+    if calibration_functional_contract_sha256 != request.functional_contract_sha256 {
+        return Err(FiniteTvTransportError::new(
+            "budget.calibration_functional_contract_sha256",
+            "upstream calibration failure event does not match the transport certificate's frozen functional contract",
+        ));
+    }
     validate_open_probability(nominal_alpha, "budget.nominal_alpha")?;
     validate_closed_failure_probability(
         calibration_null_failure_probability,
@@ -866,6 +877,7 @@ mod tests {
         let budget = compose_null_error_budget_after_transport(
             &request,
             &report,
+            FUNCTION_HASH,
             0.05,
             0.01,
             true,
@@ -883,16 +895,19 @@ mod tests {
         let request = request(vec![80, 20], vec![50, 50]);
         let report = calibrate_finite_tv_two_sample_transport(&request).unwrap();
         assert!(compose_null_error_budget_after_transport(
-            &request, &report, 0.05, 0.01, false, 0.0, true
+            &request, &report, FUNCTION_HASH, 0.05, 0.01, false, 0.0, true
         ).is_err());
         assert!(compose_null_error_budget_after_transport(
-            &request, &report, 0.05, 0.01, true, 0.0, false
+            &request, &report, FUNCTION_HASH, 0.05, 0.01, true, 0.0, false
         ).is_ok());
         assert!(compose_null_error_budget_after_transport(
-            &request, &report, 0.05, 0.02, true, 0.02, true
+            &request, &report, FUNCTION_HASH, 0.05, 0.02, true, 0.02, true
         ).is_err());
         assert!(compose_null_error_budget_after_transport(
-            &request, &report, 0.05, 0.0, true, 0.002, false
+            &request, &report, FUNCTION_HASH, 0.05, 0.0, true, 0.002, false
+        ).is_err());
+        assert!(compose_null_error_budget_after_transport(
+            &request, &report, TARGET_DESIGN_HASH, 0.05, 0.01, true, 0.0, true
         ).is_err());
     }
 
