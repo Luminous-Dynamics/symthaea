@@ -547,9 +547,9 @@ mod tests {
     #[test]
     fn beneficial_signs_grow_the_exact_rational_e_process() {
         let mut state = AnytimeAuditState::new(config(10)).unwrap();
-        let mut report = state.observe(1, &positive_pair(1)).unwrap();
-        report = state.observe(2, &positive_pair(2)).unwrap();
-        report = state.observe(3, &positive_pair(3)).unwrap();
+        state.observe(1, &positive_pair(1)).unwrap();
+        state.observe(2, &positive_pair(2)).unwrap();
+        let report = state.observe(3, &positive_pair(3)).unwrap();
         let axis = &report.axes[0];
         assert_eq!(axis.e_value_numerator, 27);
         assert_eq!(axis.e_value_denominator, 8);
@@ -741,10 +741,11 @@ mod tests {
     #[test]
     fn exact_integer_evidence_is_safe_at_the_sixty_four_pair_limit() {
         let mut state = AnytimeAuditState::new(config(64)).unwrap();
-        let mut report = state.report().unwrap();
+        let mut report = None;
         for sequence in 1..=64 {
-            report = state.observe(sequence, &positive_pair(sequence)).unwrap();
+            report = Some(state.observe(sequence, &positive_pair(sequence)).unwrap());
         }
+        let report = report.expect("64 sequential observations produce a report");
         assert_eq!(report.axes[0].e_value_numerator, 3_u128.pow(64));
         assert_eq!(report.axes[0].e_value_denominator, 1_u128 << 64);
         assert!(matches!(
