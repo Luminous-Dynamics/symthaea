@@ -335,9 +335,9 @@ impl VehicleRuntimeAssurance {
             && observation.baseline_inputs_healthy
             && observation.baseline_controller_healthy
             && observation.baseline_control_path_healthy
-            && advanced_identity_valid
             && baseline_identity_valid
-            && !observation.advanced_controller_digest.eq_ignore_ascii_case(&observation.baseline_controller_digest)
+            && !(advanced_identity_valid
+                && observation.advanced_controller_digest.eq_ignore_ascii_case(&observation.baseline_controller_digest))
             && baseline_independence_recorded
             && observation.realtime_healthy
             && observation.actuator_healthy
@@ -649,6 +649,17 @@ mod tests {
         let decision = monitor.evaluate(&malformed);
         assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
         assert!(decision.reasons.contains(&VehicleRtaReason::BaselineControllerIdentityInvalid));
+    }
+
+    #[test]
+    fn invalid_advanced_identity_falls_back_to_valid_baseline() {
+        let mut monitor = monitor();
+        let mut invalid_advanced = observation(0.0);
+        invalid_advanced.advanced_controller_digest = "missing-or-malformed".into();
+        let decision = monitor.evaluate(&invalid_advanced);
+        assert_eq!(decision.mode, VehicleRtaMode::Baseline);
+        assert!(decision.selected_command.is_some());
+        assert!(decision.reasons.contains(&VehicleRtaReason::AdvancedControllerIdentityInvalid));
     }
 
     #[test]
