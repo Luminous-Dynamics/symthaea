@@ -12,9 +12,15 @@ use core::fmt;
 use std::collections::HashSet;
 
 pub const PUBLISHED_REWARD_VALUES: [i16; 5] = [-50, 0, 100, 200, 400];
-pub const PUBLISHED_NODE_COUNT: usize = 12;
-pub const PUBLISHED_EDGE_COUNT: usize = 30;
+/// The 2026 paper specifies ten moves. Exact v2.0 graph shape is not hard-coded.
 pub const PUBLISHED_MOVE_BUDGET: usize = 10;
+
+/// Older public GitHub repository snapshot observations; not asserted to be
+/// the final Zenodo v2.0 schema.
+pub const LEGACY_GITHUB_NODE_COUNT: usize = 10;
+pub const LEGACY_GITHUB_EDGE_COUNT: usize = 20;
+pub const LEGACY_GITHUB_MOVE_BUDGET: usize = 8;
+pub const LEGACY_GITHUB_MAX_NODE_LEVEL: u8 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RewardEdge {
@@ -41,10 +47,11 @@ pub enum RewardNetworkError {
     SelfLoop { edge: usize, node: usize },
     DuplicateEdge { from: usize, to: usize },
     UnsupportedReward { edge: usize, reward: i16 },
-    PublishedShapeMismatch { nodes: usize, edges: usize },
-    LevelThreeUnreachable { start: usize },
-    TooFewLossesOnPath { start: usize, reached: usize, losses: usize },
-    MaxRewardOutsideLevelThree { edge: usize, source_level: u8 },
+    ShapeMismatch { nodes: usize, edges: usize, expected_nodes: usize, expected_edges: usize },
+    LevelOutOfRange { node: usize, level: u8, max_level: u8 },
+    TerminalLevelUnreachable { start: usize, terminal_level: u8 },
+    TooFewLossesOnPath { start: usize, reached: usize, losses: usize, required_losses: usize },
+    MaxRewardOutsideTerminalLevel { edge: usize, source_level: u8, terminal_level: u8 },
 }
 
 impl fmt::Display for RewardNetworkError {
@@ -58,10 +65,11 @@ impl fmt::Display for RewardNetworkError {
             Self::SelfLoop { edge, node } => write!(f, "edge {edge} is a self-loop at {node}"),
             Self::DuplicateEdge { from, to } => write!(f, "duplicate directed edge {from}->{to}"),
             Self::UnsupportedReward { edge, reward } => write!(f, "edge {edge} has unsupported reward {reward}"),
-            Self::PublishedShapeMismatch { nodes, edges } => write!(f, "expected 12 nodes/30 edges, got {nodes}/{edges}"),
-            Self::LevelThreeUnreachable { start } => write!(f, "no level-3 node is reachable from level-0 start node {start}"),
-            Self::TooFewLossesOnPath { start, reached, losses } => write!(f, "level-3 node {reached} is reachable from level-0 node {start} with only {losses} negative edges"),
-            Self::MaxRewardOutsideLevelThree { edge, source_level } => write!(f, "edge {edge} offers +400 from level {source_level}, expected level 3"),
+            Self::ShapeMismatch { nodes, edges, expected_nodes, expected_edges } => write!(f, "expected {expected_nodes} nodes/{expected_edges} edges, got {nodes}/{edges}"),
+            Self::LevelOutOfRange { node, level, max_level } => write!(f, "node {node} has level {level}, above declared maximum {max_level}"),
+            Self::TerminalLevelUnreachable { start, terminal_level } => write!(f, "terminal level {terminal_level} is unreachable from level-0 node {start}"),
+            Self::TooFewLossesOnPath { start, reached, losses, required_losses } => write!(f, "terminal node {reached} is reachable from level-0 node {start} with {losses} negative edges; require at least {required_losses}"),
+            Self::MaxRewardOutsideTerminalLevel { edge, source_level, terminal_level } => write!(f, "edge {edge} offers +400 from level {source_level}, expected terminal level {terminal_level}"),
         }
     }
 }
@@ -73,9 +81,8 @@ impl RewardNetwork {
         if start_node >= node_levels.len() {
             return Err(RewardNetworkError::StartOutOfRange { start: start_node, nodes: node_levels.len() });
         }
-        for (node, &level) in node_levels.iter().enumerate() {
-            if level > 3 { return Err(RewardNetworkError::InvalidLevel { node, level }); }
-        }
+        // Level bounds are source-profile specific. Validate separately so
+        // archived task snapshots with different level ranges remain importable.
         if node_levels[start_node] != 0 {
             return Err(RewardNetworkError::StartNotLevelZero { start: start_node, level: node_levels[start_node] });
         }
@@ -101,54 +108,63 @@ impl RewardNetwork {
         Ok(Self { node_levels, edges, outgoing, start_node })
     }
 
-    pub fn validate_published_shape(&self) -> Result<(), RewardNetworkError> {
-        if self.node_levels.len() != PUBLISHED_NODE_COUNT || self.edges.len() != PUBLISHED_EDGE_COUNT {
-            return Err(RewardNetworkError::PublishedShapeMismatch { nodes: self.node_levels.len(), edges: self.edges.len() });
+    /// Validate a source-specific shape without baking one repository's
+    /// topology into the generic task engine.
+    pub fn validate_shape(&self, expected_nodes: usize, expected_edges: usize) -> Result<(), RewardNetworkError> {
+        if self.node_levels.len() != expected_nodes || self.edges.len() != expected_edges {
+            return Err(RewardNetworkError::ShapeMismatch {
+                nodes: self.node_levels.len(), edges: self.edges.len(), expected_nodes, expected_edges,
+            });
         }
         Ok(())
     }
 
-    /// Validate the published level/reward constraints on an imported task.
-    ///
-    /// This is a structural check only; it does not prove that the network
-    /// originated in the article's experimental pool.
-    pub fn validate_published_constraints(&self) -> Result<(), RewardNetworkError> {
-        self.validate_published_shape()?;
+    /// Validate a source-specific node-level bound.
+    pub fn validate_level_range(&self, max_level: u8) -> Result<(), RewardNetworkError> {
+        if let Some((node, level)) = self.node_levels.iter().copied().enumerate()
+            .find(|(_, level)| *level > max_level)
+        {
+            return Err(RewardNetworkError::LevelOutOfRange { node, level, max_level });
+        }
+        Ok(())
+    }
+
+    /// Validate a generic "losses before maximum reward" contract. This is a
+    /// structural check, not proof of origin in the 2026 paper's experimental pool.
+    pub fn validate_terminal_strategy(&self, terminal_level: u8, required_losses: usize) -> Result<(), RewardNetworkError> {
         for (index, edge) in self.edges.iter().enumerate() {
-            if edge.reward == 400 && self.node_levels[edge.from] != 3 {
-                return Err(RewardNetworkError::MaxRewardOutsideLevelThree {
+            if edge.reward == 400 && self.node_levels[edge.from] != terminal_level {
+                return Err(RewardNetworkError::MaxRewardOutsideTerminalLevel {
                     edge: index,
                     source_level: self.node_levels[edge.from],
+                    terminal_level,
                 });
             }
         }
 
-        // State = (node, negative-edge count capped at 3). This finite state
-        // search detects any path from a level-0 node to level 3 with <3 losses,
-        // including paths that contain cycles.
+        // State = (node, negative-edge count capped at required_losses).
+        // This catches shortcuts, including paths that traverse cycles.
         for (start, &level) in self.node_levels.iter().enumerate() {
             if level != 0 { continue; }
-            let mut visited = vec![[false; 4]; self.node_levels.len()];
+            let mut visited = vec![vec![false; required_losses.saturating_add(1)]; self.node_levels.len()];
             let mut queue = std::collections::VecDeque::new();
             queue.push_back((start, 0usize));
             visited[start][0] = true;
-            let mut reached_level_three = false;
+            let mut reached_terminal = false;
 
             while let Some((node, loss_count)) = queue.pop_front() {
-                if self.node_levels[node] == 3 {
-                    if loss_count < 3 {
+                if self.node_levels[node] == terminal_level {
+                    if loss_count < required_losses {
                         return Err(RewardNetworkError::TooFewLossesOnPath {
-                            start,
-                            reached: node,
-                            losses: loss_count,
+                            start, reached: node, losses: loss_count, required_losses,
                         });
                     }
-                    reached_level_three = true;
+                    reached_terminal = true;
                     continue;
                 }
                 for &edge_index in &self.outgoing[node] {
                     let edge = self.edges[edge_index];
-                    let next_losses = (loss_count + if edge.reward < 0 { 1 } else { 0 }).min(3);
+                    let next_losses = (loss_count + usize::from(edge.reward < 0)).min(required_losses);
                     if !visited[edge.to][next_losses] {
                         visited[edge.to][next_losses] = true;
                         queue.push_back((edge.to, next_losses));
@@ -156,8 +172,8 @@ impl RewardNetwork {
                 }
             }
 
-            if !reached_level_three {
-                return Err(RewardNetworkError::LevelThreeUnreachable { start });
+            if !reached_terminal {
+                return Err(RewardNetworkError::TerminalLevelUnreachable { start, terminal_level });
             }
         }
         Ok(())
@@ -271,8 +287,8 @@ pub fn full_information_oracle(network: &RewardNetwork, move_budget: usize) -> i
 mod tests {
     use super::*;
 
-    /// Synthetic only: demonstrates the published three-loss incentive and
-    /// the 12-node/30-edge shape. Not an original article network.
+    /// Synthetic only: demonstrates a three-loss route on a 12-node/30-edge
+    /// graph. Not an original article or repository task network.
     fn synthetic_network() -> RewardNetwork {
         let mut edges = Vec::new();
         for from in 0..3 { for to in 0..3 { if from != to { edges.push(RewardEdge { from, to, reward: 200 }); } } }
@@ -293,10 +309,11 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_fixture_has_published_shape() {
+    fn synthetic_fixture_obeys_its_declared_test_profile() {
         let n = synthetic_network();
-        assert!(n.validate_published_shape().is_ok());
-        assert!(n.validate_published_constraints().is_ok());
+        assert!(n.validate_shape(12, 30).is_ok());
+        assert!(n.validate_level_range(3).is_ok());
+        assert!(n.validate_terminal_strategy(3, 3).is_ok());
         assert_eq!(n.evaluator_node_level(9), Some(3));
     }
     #[test]
@@ -341,15 +358,21 @@ mod tests {
             0,
         ).unwrap();
         assert!(matches!(
-            n.validate_published_constraints(),
-            Err(RewardNetworkError::TooFewLossesOnPath { start: 0, reached: 9, losses: 0 })
+            n.validate_terminal_strategy(3, 3),
+            Err(RewardNetworkError::TooFewLossesOnPath {
+                start: 0, reached: 9, losses: 0, required_losses: 3,
+            })
         ));
     }
 
     #[test]
     fn malformed_network_is_rejected() {
         assert_eq!(RewardNetwork::new(vec![0], vec![], 1), Err(RewardNetworkError::StartOutOfRange { start: 1, nodes: 1 }));
-        assert_eq!(RewardNetwork::new(vec![0,4], vec![], 0), Err(RewardNetworkError::InvalidLevel { node: 1, level: 4 }));
+        let above_bound = RewardNetwork::new(vec![0, 4], vec![], 0).unwrap();
+        assert_eq!(
+            above_bound.validate_level_range(3),
+            Err(RewardNetworkError::LevelOutOfRange { node: 1, level: 4, max_level: 3 })
+        );
         assert_eq!(RewardNetwork::new(vec![0], vec![RewardEdge { from: 0, to: 0, reward: 200 }], 0), Err(RewardNetworkError::SelfLoop { edge: 0, node: 0 }));
     }
 }
