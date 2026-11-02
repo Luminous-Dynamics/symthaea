@@ -11,7 +11,7 @@ dependencies, and does not link `symthaea-core`.
 | DC | `dc::{current, voltage, power, series_resistance, parallel_resistance, voltage_divider}` | Ideal resistive networks |
 | Transients | `transient::{rc_time_constant, rc_charging_voltage, rc_discharging_voltage, rl_time_constant}` | First-order RC/RL responses |
 | AC | `ac::{capacitive_reactance, inductive_reactance, resonant_frequency, series_rlc_impedance}` | Scalar textbook helpers |
-| Resonance | `resonance::{SeriesRlc, CoupledSeriesRlc}` | Validated series-RLC metrics, complex impedance, mutual-inductance coupled modes |
+| Resonance | `resonance::{SeriesRlc, ParallelRlc, CoupledSeriesRlc}` | Validated series/parallel-RLC metrics, complex impedance, mutual-inductance coupled modes |
 
 ## Validated resonance references
 
@@ -31,6 +31,27 @@ assume linear, lumped, passive components. They do not model distributed
 transmission-line effects, radiation, nonlinear components, core loss,
 frequency-dependent material properties or omitted parasitics. Simulation
 evidence must be supplied separately by a qualified backend.
+
+## Series and parallel resonance references
+
+`SeriesRlc::new(R, L, C)` models an ideal series resistance, inductance
+and capacitance. It provides the natural resonance frequency, series Q,
+half-power bandwidth, and complex steady-state input impedance.
+
+`ParallelRlc::new(R, L, C)` models an ideal resistor, inductor and capacitor
+in parallel. It exposes the corresponding parallel Q,
+`Q = R * sqrt(C / L)`, bandwidth `1 / (2 pi R C)`, and complex input
+impedance calculated from the admittance.
+
+Both types reject non-finite, non-positive and non-representable reference
+metrics. Their bandwidth and Q definitions apply to the stated ideal
+topologies; do not transfer them to a different loading or coupling
+configuration without deriving the appropriate network response.
+
+The analytical unit fixtures cover natural resonance, Q, bandwidth,
+impedance at resonance, half-power points, invalid inputs, detuned coupled
+modes and coupling-sign invariance. They are independent known-answer
+software tests, not solver or physical measurements.
 
 ## Example
 
