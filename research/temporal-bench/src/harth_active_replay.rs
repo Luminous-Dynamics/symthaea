@@ -849,6 +849,23 @@ pub fn validate_harth_active_replay_receipt(
     if matrix_total != receipt.row_count {
         return Err(HarthActiveReplayError::new("confusion_counts", "matrix does not sum to row count"));
     }
+    let class_count = receipt.label_track.class_count();
+    let expected_matrix_len = class_count.checked_mul(class_count + 1).ok_or_else(|| {
+        HarthActiveReplayError::new("confusion_counts", "matrix dimensions overflow")
+    })?;
+    if receipt.confusion_counts.len() != expected_matrix_len
+        || receipt.class_metrics.len() != class_count
+    {
+        return Err(HarthActiveReplayError::new("confusion_counts", "matrix or class metric dimensions do not match label track"));
+    }
+    let abstention_count = (0..class_count).try_fold(0_u64, |sum, truth| {
+        sum.checked_add(receipt.confusion_counts[truth * (class_count + 1) + class_count])
+    }).ok_or_else(|| HarthActiveReplayError::new("confusion_counts", "abstention count overflow"))?;
+    if abstention_count != receipt.abstained_rows
+        || matrix_total.checked_sub(abstention_count) != Some(receipt.covered_rows)
+    {
+        return Err(HarthActiveReplayError::new("coverage", "abstention/coverage counts do not reproduce from confusion matrix"));
+    }
     if receipt.wake_count == 0
         || receipt.wake_count > receipt.row_count
         || receipt.wake_intervals_ns.len() as u64 + 1 != receipt.wake_count
@@ -882,8 +899,8 @@ pub fn validate_harth_active_replay_receipt(
     if expected_ece != receipt.expected_calibration_error_ppm {
         return Err(HarthActiveReplayError::new("expected_calibration_error_ppm", "ECE does not reproduce from calibration bins"));
     }
-    if receipt.transitions.detected_transition_count + receipt.transitions.missed_transition_count
-        != receipt.transitions.true_transition_count
+    if receipt.transitions.detected_transition_count.checked_add(receipt.transitions.missed_transition_count)
+        != Some(receipt.transitions.true_transition_count)
         || receipt.transitions.detected_transition_delays_ns.len() as u64
             != receipt.transitions.detected_transition_count
         || receipt.transitions.transition_delay_p95_ns
