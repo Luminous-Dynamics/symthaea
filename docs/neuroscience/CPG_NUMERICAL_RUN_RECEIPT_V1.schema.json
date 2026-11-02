@@ -557,7 +557,8 @@
         "applied",
         "realized_mean",
         "realized_stddev",
-        "sample_sha256"
+        "sample_sha256",
+        "sample_count"
       ],
       "properties": {
         "requested_mean": {
@@ -579,6 +580,10 @@
         },
         "sample_sha256": {
           "$ref": "#/$defs/sha256OrNull"
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "allOf": [
@@ -619,6 +624,10 @@
               },
               "sample_sha256": {
                 "$ref": "#/$defs/sha256"
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           }
@@ -651,6 +660,9 @@
               },
               "sample_sha256": {
                 "type": "null"
+              },
+              "sample_count": {
+                "const": 0
               }
             }
           }
