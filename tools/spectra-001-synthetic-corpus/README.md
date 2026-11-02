@@ -63,3 +63,19 @@ physical channel exists, is measurable or explains a human result.
 
 No participant recruitment, physical instrument control, hardware actuation,
 human exposure, ESP claim or new-field theory is included.
+
+## Frozen reference campaign
+
+The independent reference fixture is stored at
+research/spectra-001/fixtures/corpus-known-answer-v0.1.json. It freezes exact
+null and injected-signal scores, per-channel red-team accuracies, all nine
+leakage-channel seeds, and the chronology-mutation disposition. The Rust unit
+tests replay the exact null and signal scores; the leakage tests require
+1,000-permille recovery on the channel deliberately wired to the target.
+
+The current implementation covers W0 null, W1 injected response signal, W2
+single-channel leakage, and W4 response-after-reveal integrity mutation. W3
+session/operator/day/instrument confounding, repeated-target imbalance,
+outcome-dependent stopping, and selective missingness remain explicit follow-up
+work under issue 10046. No false-positive rate or statistical power claim is
+made from one frozen seed.
