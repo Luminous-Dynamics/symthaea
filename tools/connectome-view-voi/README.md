@@ -45,7 +45,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-view-voi/Cargo.toml
 ```
 
-Twelve unit tests are authored for perfect information, redundant views, entropy/decision-utility divergence, scenario disagreement, robust selection, empty candidate sets, target-leak rejection, task-route rejection, malformed distributions, missing scenarios and deterministic order. They have **not** been compiled or executed in the current environment.
+Thirteen unit tests are authored for perfect information, redundant views, entropy/decision-utility divergence, scenario disagreement, robust selection, empty candidate sets, target-leak rejection, task-route rejection, malformed distributions, missing scenarios and deterministic order. They have **not** been compiled or executed in the current environment.
 
 ## Research plan
 
