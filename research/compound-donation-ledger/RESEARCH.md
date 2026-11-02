@@ -241,16 +241,24 @@ The benchmark must keep guarantee classes separate.
 - Dynamic e-closure: de Heide, arXiv:2608.09927 (August 2026). Compare
   future-extension coherence, stopping and time-monotone persistence under
   its global-filtration assumptions.
+- e-GAI: Zhang, Wei, Ren and Zou, ICML 2025. The framework introduces
+  e-LORD and e-SAFFRON, with dynamic test-level allocation and strategies
+  against alpha-death. Include their paper and author reference implementation
+  as serious online e-value investing comparators; inspect exact theorem
+  assumptions before placing a method in an arbitrary-dependence lane.
+  Paper: https://proceedings.mlr.press/v267/zhang25cd.html
+  Code: https://github.com/zijianwei01/e-GAI
 - Adaptive sequential mergers: Vovk and Wang (2024), Merging sequential
   e-values via martingales. Include as a matched baseline only when the
   order in which same-round coordinate observations are revealed preserves
   the required conditional validity.
-- P-value software: Bioconductor onlineFDR provides LOND, LORD, SAFFRON,
-  ADDIS and supLORD, among other procedures. A Python online-fdr package also
-  exposes sequential/batch p-value and e-value methods and optional parity
-  tests against the R package. These are useful API, parity and systems
-  baselines; their dependence assumptions and exact guarantee classes must
-  be carried through rather than treated as interchangeable.
+- P-value/e-value software: Bioconductor onlineFDR 2.20.0 (Bioconductor
+  3.23 release) documents LOND, LORD, SAFFRON, ADDIS and supLORD. The Python
+  online-fdr package exposes sequential/batch p-value methods, e-BH/e-LOND
+  and e-process utilities. Its live parity suite currently targets
+  onlineFDR 2.18.0, so do not silently describe that as parity with current
+  2.20.0. Both package versions, commit hashes, method defaults and guarantee
+  assumptions must be pinned in the benchmark manifest.
 
 ## 7. Confirmatory benchmark protocol
 
