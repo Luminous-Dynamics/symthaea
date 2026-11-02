@@ -137,7 +137,7 @@ impl TestGenerator {
                 }
                 "f32" => &[("zero", "0.0f32")],
                 "f64" => &[("zero", "0.0f64")],
-                "&str" => &[("empty", "\"\"\"")],
+                "&str" => &[("empty", "\"\"")],
                 "&String" => &[("empty", "&String::new()")],
                 "String" => &[("empty", "String::new()")],
                 t if t.starts_with("&[") => &[("empty", "&[]")],
