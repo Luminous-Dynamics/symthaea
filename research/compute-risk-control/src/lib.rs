@@ -6,7 +6,7 @@
 //!
 //! This is a Symthaea joint-grid variant inspired by Conformal Thinking. It
 //! evaluates all candidates and uses one simultaneous Hoeffding correction
-//! over 2 * grid_size bounded losses. It does not reproduce the paper's
+//! over 3 * grid_size bounded losses. It does not reproduce the paper's
 //! sequential two-stage threshold fitting procedure.
 
 use serde::{Deserialize, Serialize};
@@ -180,6 +180,7 @@ pub struct ComputeRiskFixture {
     pub seed: u64,
     pub risk_upper_budget_ppm: u32,
     pub risk_lower_budget_ppm: u32,
+    pub risk_output_error_budget_ppm: u32,
     pub confidence_delta_ppm: u32,
     pub candidates: Vec<StoppingCandidate>,
     pub generator_id: String,
@@ -205,7 +206,8 @@ impl ComputeRiskFixture {
             return Err(fail("budget_tokens", "must be in 1..=1e12"));
         }
         if self.risk_upper_budget_ppm == 0 || self.risk_upper_budget_ppm > PPM as u32
-            || self.risk_lower_budget_ppm == 0 || self.risk_lower_budget_ppm > PPM as u32 {
+            || self.risk_lower_budget_ppm == 0 || self.risk_lower_budget_ppm > PPM as u32
+            || self.risk_output_error_budget_ppm == 0 || self.risk_output_error_budget_ppm > PPM as u32 {
             return Err(fail("risk_budget", "both operational risk budgets must be in 1..=1,000,000 PPM"));
         }
         if self.confidence_delta_ppm == 0 || self.confidence_delta_ppm >= PPM as u32 {
@@ -273,13 +275,14 @@ pub struct CandidateEvaluation {
     pub lower_mean_loss_ceil_ppm: u32,
     /// Descriptive output error rate; not part of the two stopping-risk UCBs.
     pub emitted_answer_error_mean_ceil_ppm: u32,
+    pub emitted_answer_error_ucb_ppm: u32,
     pub simultaneous_ucb_correction_ppm: u32,
     pub upper_risk_ucb_ppm: u32,
     pub lower_risk_ucb_ppm: u32,
     pub mean_tokens_used_ppm: u32,
     pub mean_upper_efficiency_loss_ppm: u32,
     pub mean_lower_efficiency_loss_ppm: u32,
-    pub meets_both_risk_budgets: bool,
+    pub meets_all_three_risk_budgets: bool,
     pub task_loss_receipt_sha256: String,
 }
 
@@ -299,6 +302,7 @@ pub struct ComputeRiskReport {
     pub confidence_delta_ppm: u32,
     pub risk_upper_budget_ppm: u32,
     pub risk_lower_budget_ppm: u32,
+    pub risk_output_error_budget_ppm: u32,
     pub correction_ppm: u32,
     pub sample_count: usize,
     pub candidate_grid_sha256: String,
@@ -439,10 +443,10 @@ fn simultaneous_hoeffding_correction_ppm(
         || confidence_delta_ppm >= PPM as u32 {
         return Err(fail("hoeffding", "grid, sample count, or delta is invalid"));
     }
-    // 2G one-sided claims: one upper-risk and one lower-risk statement per
-    // candidate. Equal Bonferroni allocation gives delta/(2G) per claim.
+    // 3G one-sided claims: upper-stop risk, lower-abandon risk, and emitted
+    // answer error for every candidate. Bonferroni allocates delta/(3G).
     // One extra PPM is added after ceil to avoid optimistic output rounding.
-    let claims = (candidate_count as f64) * 2.0;
+    let claims = (candidate_count as f64) * 3.0;
     let delta = confidence_delta_ppm as f64 / PPM as f64;
     let log_term = (claims / delta).ln();
     let correction = (log_term / (2.0 * sample_count as f64)).sqrt();
@@ -455,6 +459,7 @@ fn aggregate_candidate(
     traces: &[ReasoningTrace],
     risk_upper_budget_ppm: u32,
     risk_lower_budget_ppm: u32,
+    risk_output_error_budget_ppm: u32,
     correction_ppm: u32,
 ) -> Result<CandidateEvaluation, ComputeRiskError> {
     let mut losses = Vec::with_capacity(traces.len());
@@ -494,6 +499,7 @@ fn aggregate_candidate(
         .map_err(|_| fail("emitted_error_mean", "overflow"))?;
     let upper_ucb = upper_mean.saturating_add(correction_ppm).min(PPM as u32);
     let lower_ucb = lower_mean.saturating_add(correction_ppm).min(PPM as u32);
+    let emitted_error_ucb = emitted_error_mean.saturating_add(correction_ppm).min(PPM as u32);
     let mean_tokens = u32::try_from(ceil_div(tokens_fraction_sum, n)?)
         .map_err(|_| fail("mean_tokens", "overflow"))?;
     let mean_upper_efficiency = u32::try_from(ceil_div(upper_efficiency_sum, n)?)
@@ -511,13 +517,16 @@ fn aggregate_candidate(
         upper_mean_loss_ceil_ppm: upper_mean,
         lower_mean_loss_ceil_ppm: lower_mean,
         emitted_answer_error_mean_ceil_ppm: emitted_error_mean,
+        emitted_answer_error_ucb_ppm: emitted_error_ucb,
         simultaneous_ucb_correction_ppm: correction_ppm,
         upper_risk_ucb_ppm: upper_ucb,
         lower_risk_ucb_ppm: lower_ucb,
         mean_tokens_used_ppm: mean_tokens,
         mean_upper_efficiency_loss_ppm: mean_upper_efficiency,
         mean_lower_efficiency_loss_ppm: mean_lower_efficiency,
-        meets_both_risk_budgets: upper_ucb <= risk_upper_budget_ppm && lower_ucb <= risk_lower_budget_ppm,
+        meets_all_three_risk_budgets: upper_ucb <= risk_upper_budget_ppm
+            && lower_ucb <= risk_lower_budget_ppm
+            && emitted_error_ucb <= risk_output_error_budget_ppm,
         task_loss_receipt_sha256: loss_digest,
     })
 }
@@ -528,6 +537,7 @@ pub fn calibrate_joint_candidate_grid(
     design: CalibrationDesign,
     risk_upper_budget_ppm: u32,
     risk_lower_budget_ppm: u32,
+    risk_output_error_budget_ppm: u32,
     confidence_delta_ppm: u32,
 ) -> Result<ComputeRiskReport, ComputeRiskError> {
     if candidates.is_empty() || candidates.len() > MAX_CANDIDATES {
@@ -537,7 +547,8 @@ pub fn calibrate_joint_candidate_grid(
         return Err(fail("traces", "validation panel must be non-empty and bounded"));
     }
     if risk_upper_budget_ppm == 0 || risk_upper_budget_ppm > PPM as u32
-        || risk_lower_budget_ppm == 0 || risk_lower_budget_ppm > PPM as u32 {
+        || risk_lower_budget_ppm == 0 || risk_lower_budget_ppm > PPM as u32
+        || risk_output_error_budget_ppm == 0 || risk_output_error_budget_ppm > PPM as u32 {
         return Err(fail("risk_budget", "both budgets must be in 1..=1,000,000 PPM"));
     }
     let mut ids = BTreeSet::new();
@@ -575,11 +586,11 @@ pub fn calibrate_joint_candidate_grid(
     let correction = simultaneous_hoeffding_correction_ppm(candidates.len(), traces.len(), confidence_delta_ppm)?;
     let mut evaluations = Vec::with_capacity(candidates.len());
     for candidate in candidates {
-        evaluations.push(aggregate_candidate(candidate, traces, risk_upper_budget_ppm, risk_lower_budget_ppm, correction)?);
+        evaluations.push(aggregate_candidate(candidate, traces, risk_upper_budget_ppm, risk_lower_budget_ppm, risk_output_error_budget_ppm, correction)?);
     }
 
     let selected = evaluations.iter()
-        .filter(|evaluation| evaluation.meets_both_risk_budgets)
+        .filter(|evaluation| evaluation.meets_all_three_risk_budgets)
         .min_by(|left, right| {
             left.mean_tokens_used_ppm.cmp(&right.mean_tokens_used_ppm)
                 .then_with(|| left.candidate_id.cmp(&right.candidate_id))
@@ -592,10 +603,11 @@ pub fn calibrate_joint_candidate_grid(
         schema: "symthaea.compute_risk_joint_report.v0.1".to_string(),
         design,
         confidence_claim_eligible_under_declared_design: design == CalibrationDesign::IidHeldOutTasksDeclared,
-        simultaneous_claim_count: candidates.len() * 2,
+        simultaneous_claim_count: candidates.len() * 3,
         confidence_delta_ppm,
         risk_upper_budget_ppm,
         risk_lower_budget_ppm,
+        risk_output_error_budget_ppm,
         correction_ppm: correction,
         sample_count: traces.len(),
         candidate_grid_sha256: domain_digest(PLAN_DOMAIN, &candidate_json),
@@ -800,9 +812,9 @@ mod tests {
             t.task_id=format!("t{i:03}");
             t
         }).collect::<Vec<_>>();
-        let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::IidHeldOutTasksDeclared,400_000,400_000,100_000).unwrap();
+        let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::IidHeldOutTasksDeclared,400_000,400_000,800_000,100_000).unwrap();
         assert_eq!(report.candidate_evaluations.len(),3);
-        assert_eq!(report.simultaneous_claim_count,6);
+        assert_eq!(report.simultaneous_claim_count,9);
         assert!(report.candidate_evaluations.iter().all(|x|x.sample_count==64));
     }
 
@@ -814,7 +826,7 @@ mod tests {
             t.task_id=format!("t{i:03}");
             t
         }).collect::<Vec<_>>();
-        let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::IidHeldOutTasksDeclared,10_000,10_000,50_000).unwrap();
+        let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::IidHeldOutTasksDeclared,10_000,10_000,800_000,50_000).unwrap();
         assert_eq!(report.selected_candidate_id,None);
         assert_eq!(report.selection_status,SelectionStatus::NoCandidateMeetsBothRiskBudgets);
     }
@@ -823,7 +835,7 @@ mod tests {
     fn validation_trace_ids_must_be_unique() {
         let candidates=vec![candidate("a",900_000,100_000,300,500_000)];
         let t=trace(&[false,true,true,true,true,true,true,true], &[100_000,850_000,900_000,930_000,950_000,960_000,970_000,980_000]);
-        assert!(calibrate_joint_candidate_grid(&candidates,&[t.clone(),t],CalibrationDesign::SyntheticFixedPanel,500_000,500_000,100_000).is_err());
+        assert!(calibrate_joint_candidate_grid(&candidates,&[t.clone(),t],CalibrationDesign::SyntheticFixedPanel,500_000,500_000,800_000,100_000).is_err());
     }
 
     #[test]
@@ -833,10 +845,31 @@ mod tests {
             let mut t=trace(&[false,true,true,true,true,true,true,true], &[100_000,850_000,900_000,930_000,950_000,960_000,970_000,980_000]);
             t.task_id=format!("t{i:03}"); t
         }).collect::<Vec<_>>();
-        let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::SyntheticFixedPanel,500_000,500_000,100_000).unwrap();
+        let report=calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::SyntheticFixedPanel,500_000,500_000,800_000,100_000).unwrap();
         verify_compute_risk_report(&report).unwrap();
         let mut tampered=report.clone(); tampered.correction_ppm+=1;
         assert!(verify_compute_risk_report(&tampered).is_err());
+    }
+
+    #[test]
+    fn emitted_answer_error_budget_blocks_low_compute_low_accuracy_candidate() {
+        let candidates=vec![
+            candidate("a",900_000,100_000,300,500_000),
+            candidate("b",1_000_000,0,0,0),
+        ];
+        let traces=(0..64).map(|i| {
+            let mut t=trace(&[false,false,true,true,true,true,true,true], &[200_000,300_000,500_000,800_000,850_000,900_000,930_000,950_000]);
+            if i%2==0 { t.steps.iter_mut().for_each(|step|step.correct=false); }
+            t.task_id=format!("quality-{i:03}");
+            t
+        }).collect::<Vec<_>>();
+        let report=calibrate_joint_candidate_grid(
+            &candidates,&traces,CalibrationDesign::IidHeldOutTasksDeclared,
+            900_000,900_000,300_000,100_000
+        ).unwrap();
+        let fast=report.candidate_evaluations.iter().find(|x|x.candidate_id=="a").unwrap();
+        assert!(!fast.meets_all_three_risk_budgets);
+        assert!(fast.emitted_answer_error_ucb_ppm>300_000);
     }
 
     #[test]
@@ -856,12 +889,12 @@ mod tests {
         let traces=generate_synthetic_validation_panel(&fixture).unwrap();
         let report=calibrate_joint_candidate_grid(
             &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
-            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,fixture.confidence_delta_ppm
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
         ).unwrap();
         assert_eq!(report.candidate_evaluations.len(),fixture.candidates.len());
-        assert_eq!(report.selected_candidate_id.as_deref(),Some("a_fast_aggressive"));
+        assert_eq!(report.selected_candidate_id.as_deref(),Some("d_full_budget"));
         assert!(!report.confidence_claim_eligible_under_declared_design);
-        assert!(report.candidate_evaluations.iter().all(|x|x.emitted_answer_error_mean_ceil_ppm<=PPM as u32));
+        assert!(!report.candidate_evaluations.iter().find(|x|x.candidate_id=="a_fast_aggressive").unwrap().meets_all_three_risk_budgets);
     }
 
     #[test]
@@ -879,7 +912,7 @@ mod tests {
             candidate("a",900_000,100_000,300,500_000),
         ];
         let traces=vec![trace(&[false,true,true,true,true,true,true,true], &[100_000,850_000,900_000,930_000,950_000,960_000,970_000,980_000])];
-        assert!(calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::SyntheticFixedPanel,500_000,500_000,100_000).is_err());
+        assert!(calibrate_joint_candidate_grid(&candidates,&traces,CalibrationDesign::SyntheticFixedPanel,500_000,500_000,800_000,100_000).is_err());
     }
 }
 
