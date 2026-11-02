@@ -100,7 +100,7 @@ impl ModeProfile {
 pub enum Policy {
     FullLoadOnly { max_batch_wait_s: u64 },
     QuickCellOnly,
-    HybridDeadlineAware { max_batch_wait_s: u64 },
+    HybridResourceAware { max_batch_wait_s: u64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,6 +197,30 @@ fn predicted_full_finish(
     Some(now_s.max(full_free_s).max(ready_at).saturating_add(full.duration_s))
 }
 
+/// True when cleaning a partial FullLoad batch in QuickCell is no worse
+/// on both modeled resource objectives and strictly better on at least one.
+/// This comparison is made per item and never trades cleaning eligibility away.
+fn quick_dominates_partial_batch(
+    quick: &ModeProfile,
+    full: &ModeProfile,
+    batch_item_count: usize,
+) -> bool {
+    if batch_item_count == 0 {
+        return false;
+    }
+    let quick_energy = quick.energy_for(1);
+    let quick_water = quick.water_for(1);
+    let full_energy_per_item = full.energy_for(batch_item_count) / batch_item_count as f64;
+    let full_water_per_item = full.water_for(batch_item_count) / batch_item_count as f64;
+    let tolerance = 1.0e-12;
+
+    let no_worse = quick_energy <= full_energy_per_item + tolerance
+        && quick_water <= full_water_per_item + tolerance;
+    let strictly_better = quick_energy < full_energy_per_item - tolerance
+        || quick_water < full_water_per_item - tolerance;
+    no_worse && strictly_better
+}
+
 fn execute_operation(
     mode: ModeKind,
     profile: &ModeProfile,
@@ -253,7 +277,7 @@ pub fn simulate(
 
     let max_batch_wait_s = match policy {
         Policy::FullLoadOnly { max_batch_wait_s }
-        | Policy::HybridDeadlineAware { max_batch_wait_s } => {
+        | Policy::HybridResourceAware { max_batch_wait_s } => {
             if max_batch_wait_s == 0 {
                 return Err("max_batch_wait_s must be positive");
             }
@@ -319,7 +343,7 @@ pub fn simulate(
 
         // Hybrid mode uses QuickCell for jobs that cannot safely enter FullLoad,
         // or whose deadline would be missed by the next possible full batch.
-        if matches!(policy, Policy::HybridDeadlineAware { .. }) && quick_free_s <= now_s {
+        if matches!(policy, Policy::HybridResourceAware { .. }) && quick_free_s <= now_s {
             let predicted_finish = predicted_full_finish(
                 now_s,
                 &pending,
@@ -329,6 +353,25 @@ pub fn simulate(
                 max_batch_wait_s,
             );
 
+            let full_eligible_count = pending.iter().filter(|job| full.supports(job)).count();
+            let oldest_full_arrival = pending
+                .iter()
+                .filter(|job| full.supports(job))
+                .map(|job| job.arrival_s)
+                .min();
+            let partial_batch_wait_expired = full_eligible_count > 0
+                && full_eligible_count < full.capacity
+                && oldest_full_arrival.is_some_and(|arrival| {
+                    now_s >= arrival.saturating_add(max_batch_wait_s)
+                });
+            let all_full_jobs_are_quick_eligible = pending
+                .iter()
+                .filter(|job| full.supports(job))
+                .all(|job| quick.supports(job));
+            let quick_pareto_dominates_partial = partial_batch_wait_expired
+                && all_full_jobs_are_quick_eligible
+                && quick_dominates_partial_batch(quick, full, full_eligible_count);
+
             let selected = pending
                 .iter()
                 .enumerate()
@@ -336,6 +379,7 @@ pub fn simulate(
                 .filter(|(_, job)| {
                     !full.supports(job)
                         || predicted_finish.is_some_and(|finish| finish > job.deadline_s)
+                        || quick_pareto_dominates_partial
                 })
                 .min_by_key(|(_, job)| (job.deadline_s, job.arrival_s, job.id))
                 .map(|(index, _)| index);
@@ -639,6 +683,55 @@ mod tests {
     }
 
     #[test]
+    fn hybrid_uses_quickcell_when_a_timed_out_partial_batch_is_pareto_dominated() {
+        let (quick, full) = profiles();
+        let jobs = [
+            sample_job(1, 0, 86_400),
+            sample_job(2, 60, 86_400),
+        ];
+
+        let full_only = simulate(
+            &jobs,
+            &quick,
+            &full,
+            Policy::FullLoadOnly { max_batch_wait_s: 300 },
+        )
+        .unwrap();
+        let hybrid = simulate(
+            &jobs,
+            &quick,
+            &full,
+            Policy::HybridResourceAware { max_batch_wait_s: 300 },
+        )
+        .unwrap();
+
+        assert_eq!(hybrid.quick_cell_cycles, 2);
+        assert_eq!(hybrid.full_load_cycles, 0);
+        assert!(hybrid.total_energy_kwh < full_only.total_energy_kwh);
+        assert!(hybrid.total_fresh_water_l < full_only.total_fresh_water_l);
+    }
+
+    #[test]
+    fn hybrid_keeps_full_load_when_a_dense_batch_dominates_quickcell() {
+        let (quick, full) = profiles();
+        let jobs: Vec<Job> = (0..14)
+            .map(|id| sample_job(id, id, 86_400))
+            .collect();
+
+        let hybrid = simulate(
+            &jobs,
+            &quick,
+            &full,
+            Policy::HybridResourceAware { max_batch_wait_s: 300 },
+        )
+        .unwrap();
+
+        assert_eq!(hybrid.quick_cell_cycles, 0);
+        assert_eq!(hybrid.full_load_cycles, 1);
+        assert_eq!(hybrid.completed_items(), 14);
+    }
+
+    #[test]
     fn hybrid_routes_urgent_job_to_quickcell_and_batches_remainder() {
         let (quick, full) = profiles();
         let mut jobs: Vec<Job> = (0..15)
@@ -650,7 +743,7 @@ mod tests {
             &jobs,
             &quick,
             &full,
-            Policy::HybridDeadlineAware { max_batch_wait_s: 10_800 },
+            Policy::HybridResourceAware { max_batch_wait_s: 10_800 },
         )
         .unwrap();
 
@@ -673,7 +766,7 @@ mod tests {
             &[sample_job(1, 0, 600)],
             &quick,
             &full,
-            Policy::HybridDeadlineAware { max_batch_wait_s: 300 },
+            Policy::HybridResourceAware { max_batch_wait_s: 300 },
         )
         .unwrap();
 
@@ -700,7 +793,7 @@ mod tests {
             &[protein, sanitization],
             &quick,
             &full,
-            Policy::HybridDeadlineAware { max_batch_wait_s: 300 },
+            Policy::HybridResourceAware { max_batch_wait_s: 300 },
         )
         .unwrap();
         assert_eq!(result.completed_items(), 0);
