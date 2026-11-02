@@ -49,6 +49,7 @@ pub enum DesignError {
     ImpossibleObservedOutcome { outcome_index: usize },
     SelectedExperimentNotFound { experiment_id: String },
     EmptyActionSet,
+    EmptyActionLabel,
     DuplicateActionLabel { label: String },
     DecisionUtilityRowCountMismatch { expected: usize, actual: usize },
     DecisionUtilityActionCountMismatch {
@@ -120,6 +121,7 @@ impl fmt::Display for DesignError {
                 write!(f, "selected experiment {experiment_id:?} is not in the candidate set")
             }
             Self::EmptyActionSet => write!(f, "decision action set must not be empty"),
+            Self::EmptyActionLabel => write!(f, "decision action label must not be empty"),
             Self::DuplicateActionLabel { label } => {
                 write!(f, "duplicate decision action label {label:?}")
             }
@@ -521,7 +523,10 @@ fn validate_decision_problem(
     }
     let mut action_labels = HashSet::with_capacity(problem.actions.len());
     for label in &problem.actions {
-        if label.trim().is_empty() || !action_labels.insert(label.as_str()) {
+        if label.trim().is_empty() {
+            return Err(DesignError::EmptyActionLabel);
+        }
+        if !action_labels.insert(label.as_str()) {
             return Err(DesignError::DuplicateActionLabel { label: label.clone() });
         }
     }
@@ -811,6 +816,28 @@ mod tests {
         .unwrap();
         assert_eq!(regret.best_experiment_id, "decision-relevant-group");
         close(regret.regret_per_cost, 0.3, 1.0e-12);
+    }
+
+    #[test]
+    fn empty_and_duplicate_decision_action_labels_reject() {
+        let candidate = binary_experiment("candidate", 1.0, 0.9, 0.1);
+        let empty = DecisionProblem {
+            actions: vec![" ".into()],
+            utilities_by_hypothesis: vec![vec![1.0], vec![0.0]],
+        };
+        assert_eq!(
+            evaluate_decision_value(&[0.5, 0.5], &candidate, &empty),
+            Err(DesignError::EmptyActionLabel)
+        );
+
+        let duplicate = DecisionProblem {
+            actions: vec!["same".into(), "same".into()],
+            utilities_by_hypothesis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        assert!(matches!(
+            evaluate_decision_value(&[0.5, 0.5], &candidate, &duplicate),
+            Err(DesignError::DuplicateActionLabel { .. })
+        ));
     }
 
     #[test]
