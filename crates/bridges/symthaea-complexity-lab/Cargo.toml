@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-complexity-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Exact finite-grid transforms and proof-certificate experiments for complexity research."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
