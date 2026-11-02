@@ -705,7 +705,9 @@ mod tests {
         assert!(decision.reasons.contains(&VehicleRtaReason::RealtimeUnhealthy));
         assert!(decision.reasons.contains(&VehicleRtaReason::ActuatorUnhealthy));
         assert!(decision.reasons.contains(&VehicleRtaReason::ModelNotApplicable));
-        assert_eq!(decision.mode, VehicleRtaMode::Baseline);
+        // A late monitor / unavailable actuator path cannot deliver a fallback.
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.selected_command.is_none());
     }
 
     #[test]
