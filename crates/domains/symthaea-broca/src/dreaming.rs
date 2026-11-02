@@ -156,3 +156,71 @@ mod tests {
         assert!(service.internalized_dreams().is_empty());
     }
 }
+
+
+#[cfg(test)]
+mod proposal_identity_tests {
+    use super::*;
+
+    fn candidate() -> TrainingPair {
+        TrainingPair {
+            channels: vec![0.0, 0.5],
+            target_text: "{ value = 1; }".to_string(),
+            target_ids: vec![1, 2, 3],
+            valence: 0.25,
+            arousal: 0.5,
+            semantic_hv: Some(vec![0.1, 0.2]),
+        }
+    }
+
+    #[test]
+    fn different_valence_is_not_deduplicated() {
+        let service = DreamingService::new();
+        let first = candidate();
+        let mut second = candidate();
+        second.valence = 0.75;
+
+        service.stage_proposal(first);
+        service.stage_proposal(second);
+
+        assert_eq!(service.proposed_dreams().len(), 2);
+    }
+
+    #[test]
+    fn different_semantic_conditioning_is_not_deduplicated() {
+        let service = DreamingService::new();
+        let first = candidate();
+        let mut second = candidate();
+        second.semantic_hv = Some(vec![0.1, 0.9]);
+
+        service.stage_proposal(first);
+        service.stage_proposal(second);
+
+        assert_eq!(service.proposed_dreams().len(), 2);
+    }
+
+    #[test]
+    fn different_tokenizer_ids_are_not_deduplicated() {
+        let service = DreamingService::new();
+        let first = candidate();
+        let mut second = candidate();
+        second.target_ids = vec![9, 8, 7];
+
+        service.stage_proposal(first);
+        service.stage_proposal(second);
+
+        assert_eq!(service.proposed_dreams().len(), 2);
+    }
+
+    #[test]
+    fn identical_complete_training_pairs_are_deduplicated() {
+        let service = DreamingService::new();
+        let first = candidate();
+        let second = candidate();
+
+        service.stage_proposal(first);
+        service.stage_proposal(second);
+
+        assert_eq!(service.proposed_dreams().len(), 1);
+    }
+}
