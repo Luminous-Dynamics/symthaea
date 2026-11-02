@@ -1,3 +1,7 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
 [package]
 name = "symthaea-rea-artifact-reader"
 version = "0.1.0"
