@@ -17,7 +17,8 @@ use super::noncompensatory_guardrails::{
     NoncompensatoryGuardrailRequest, GuardrailOverallDecision,
 };
 use super::policy_frontier_lp::{
-    analyze_policy_frontier_with_constraints, FrontierAdditionalLinearConstraint,
+    analyze_policy_frontier_with_constraints, verify_policy_frontier_report_digest,
+    FrontierAdditionalLinearConstraint,
     FrontierAlternativeMetrics, FrontierNullSize, FrontierPolicyWeight, PolicyFrontierError,
     PolicyFrontierPlan, PolicyFrontierReport,
 };
@@ -619,6 +620,8 @@ pub fn verify_guardrail_constrained_frontier_report(
             "nested optimizer report is not bound to the supplied frontier plan",
         ));
     }
+    verify_policy_frontier_report_digest(&report.optimizer_report)
+        .map_err(GuardrailFrontierError::from)?;
     let weights = plan
         .policies
         .iter()
