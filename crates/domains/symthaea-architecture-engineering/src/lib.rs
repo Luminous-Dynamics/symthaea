@@ -45,6 +45,7 @@ pub mod policy_frontier_lp;
 pub mod tv_robust_policy_frontier;
 pub mod finite_tv_radius_calibration;
 pub mod finite_tv_two_sample_transport;
+pub mod direct_functional_transport;
 pub mod decision_functional_confidence;
 pub mod noncompensatory_guardrails;
 pub mod guardrail_constrained_policy_frontier;
