@@ -544,7 +544,7 @@ fn parse_end_record_candidate(
             ),
         ));
     }
-    if count.checked_mul(CENTRAL_HEADER_FIXED_BYTES).unwrap_or(u64::MAX) > directory_bytes {
+    if count.saturating_mul(CENTRAL_HEADER_FIXED_BYTES) > directory_bytes {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
             "entry count cannot fit in the declared central-directory byte range",
@@ -730,7 +730,7 @@ fn read_central_directory(
         let record_start = file
             .stream_position()
             .map_err(|error| ReaderError::io("cannot inspect central-directory position", error))?;
-        if record_start.checked_add(CENTRAL_HEADER_FIXED_BYTES).unwrap_or(u64::MAX) > directory_end {
+        if record_start.saturating_add(CENTRAL_HEADER_FIXED_BYTES) > directory_end {
             return Err(ReaderError::new(
                 ReaderErrorKind::InvalidArchive,
                 "central-directory record exceeds the declared byte range",
@@ -875,16 +875,18 @@ fn read_central_directory(
 
         let local = verify_local_header(
             file,
-            end_record.archive_start,
-            end_record.central_directory_offset,
-            local_offset,
-            &raw_name,
-            flags,
-            compression_method,
-            declared_crc32,
-            declared_compressed_size,
-            declared_uncompressed_size,
-            uses_data_descriptor,
+            LocalHeaderExpectation {
+                archive_start: end_record.archive_start,
+                central_directory_offset: end_record.central_directory_offset,
+                relative_local_offset: local_offset,
+                expected_name: &raw_name,
+                expected_flags: flags,
+                expected_compression: compression_method,
+                expected_crc32: declared_crc32,
+                expected_compressed_size: declared_compressed_size,
+                expected_uncompressed_size: declared_uncompressed_size,
+                uses_data_descriptor,
+            },
             limits,
         )?;
         let descriptor = if uses_data_descriptor {
@@ -1066,25 +1068,29 @@ fn parse_zip64_extra(
     Ok(values)
 }
 
-fn verify_local_header(
-    file: &mut File,
+struct LocalHeaderExpectation<'a> {
     archive_start: u64,
     central_directory_offset: u64,
     relative_local_offset: u64,
-    expected_name: &[u8],
+    expected_name: &'a [u8],
     expected_flags: u16,
     expected_compression: u16,
     expected_crc32: u32,
     expected_compressed_size: u64,
     expected_uncompressed_size: u64,
     uses_data_descriptor: bool,
+}
+
+fn verify_local_header(
+    file: &mut File,
+    expected: LocalHeaderExpectation<'_>,
     limits: &ReaderLimits,
 ) -> Result<LocalEntryFacts, ReaderError> {
-    let local_offset = archive_start.checked_add(relative_local_offset).ok_or_else(|| {
+    let local_offset = expected.archive_start.checked_add(expected.relative_local_offset).ok_or_else(|| {
         ReaderError::new(ReaderErrorKind::InvalidArchive, "local header offset overflow")
     })?;
-    if local_offset.checked_add(LOCAL_HEADER_FIXED_BYTES).unwrap_or(u64::MAX)
-        > central_directory_offset
+    if local_offset.saturating_add(LOCAL_HEADER_FIXED_BYTES)
+        > expected.central_directory_offset
     {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
@@ -1111,7 +1117,7 @@ fn verify_local_header(
     let local_name_len = read_u16(&header[26..28]) as u64;
     let local_extra_len = read_u16(&header[28..30]) as u64;
 
-    if local_flags != expected_flags || local_compression != expected_compression {
+    if local_flags != expected.expected_flags || local_compression != expected.expected_compression {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
             "local and central file headers disagree on flags or compression method",
@@ -1134,14 +1140,14 @@ fn verify_local_header(
         .map_err(|error| ReaderError::io("cannot read local member name", error))?;
     file.read_exact(&mut local_extra)
         .map_err(|error| ReaderError::io("cannot read local member extra field", error))?;
-    if local_name != expected_name {
+    if local_name != expected.expected_name {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
             "local and central file headers disagree on raw member name",
         ));
     }
 
-    if !uses_data_descriptor {
+    if !expected.uses_data_descriptor {
         let local_zip64 = parse_zip64_extra(
             &local_extra,
             local_uncompressed32 == u32::MAX,
@@ -1159,9 +1165,9 @@ fn verify_local_header(
         } else {
             local_compressed32 as u64
         };
-        if local_crc32 != expected_crc32
-            || local_compressed != expected_compressed_size
-            || local_uncompressed != expected_uncompressed_size
+        if local_crc32 != expected.expected_crc32
+            || local_compressed != expected.expected_compressed_size
+            || local_uncompressed != expected.expected_uncompressed_size
         {
             return Err(ReaderError::new(
                 ReaderErrorKind::InvalidArchive,
@@ -1176,9 +1182,9 @@ fn verify_local_header(
         .and_then(|value| value.checked_add(local_extra_len))
         .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "member data offset overflow"))?;
     let compressed_data_end = data_offset
-        .checked_add(expected_compressed_size)
+        .checked_add(expected.expected_compressed_size)
         .ok_or_else(|| ReaderError::new(ReaderErrorKind::InvalidArchive, "compressed member end overflow"))?;
-    if compressed_data_end > central_directory_offset {
+    if compressed_data_end > expected.central_directory_offset {
         return Err(ReaderError::new(
             ReaderErrorKind::InvalidArchive,
             "compressed member extent overlaps the central directory",
