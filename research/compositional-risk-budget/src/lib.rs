@@ -100,6 +100,7 @@ pub struct RiskContract {
     pub method_id: String,
     pub method_version: String,
     pub paper_or_spec_url: String,
+    pub source_repository_url: String,
     /// Pinned source revision (40-character lowercase Git commit SHA).
     pub source_revision: String,
     /// Set only for sequential-anytime claims. It binds the filtration identity.
@@ -142,6 +143,9 @@ impl RiskContract {
         }
         if !self.paper_or_spec_url.starts_with("https://") {
             return Err(fail("paper_or_spec_url", "must use HTTPS"));
+        }
+        if !self.source_repository_url.starts_with("https://") {
+            return Err(fail("source_repository_url", "must use HTTPS"));
         }
         if !is_git_sha(&self.source_revision) {
             return Err(fail("source_revision", "must be a 40-character lowercase Git SHA"));
@@ -779,7 +783,7 @@ mod tests {
             target_population_sha256:h('a'), execution_scope_sha256:h('b'), subject_sha256:h('c'),
             certification_experiment_sha256:h('d'), calibration_data_sha256:h('e'),
             assumptions_sha256:h('f'), method_id:"synthetic-test-method".into(), method_version:"0.1".into(),
-            paper_or_spec_url:"https://example.org/paper".into(), source_revision:git('1'),
+            paper_or_spec_url:"https://example.org/paper".into(), source_repository_url:"https://github.com/example/research".into(), source_revision:git('1'),
             filtration_sha256:None, action_id:None, action_support_sha256:None, source_receipt_sha256:None,
         };
         if kind == RiskGuaranteeKind::SequentialAnytime { c.filtration_sha256=Some(h('9')); c.source_receipt_sha256=Some(h('8')); }
