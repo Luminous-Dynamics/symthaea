@@ -31,6 +31,7 @@ METHODS = (
     "geometric_fixed",
     "prior_weighted_hedge",
     "fixed_share_hedge",
+    "boundary_aware_predictable",
     "raw_supremum_invalid_control",
 )
 
@@ -253,13 +254,16 @@ def evaluate_method(
     total_credited = np.zeros(streams, dtype=np.float64)
 
     adaptive = method in ("prior_weighted_hedge", "fixed_share_hedge")
+    boundary_adaptive = method == "boundary_aware_predictable"
     q_weights: list[np.ndarray] = []
     priors: list[np.ndarray] = []
-    if adaptive:
+    if adaptive or boundary_adaptive:
         for i in range(n):
             p = prior_for_donor(n, i, "telescope")
             priors.append(p)
-            q_weights.append(np.broadcast_to(p, (streams, len(p))).copy())
+            if adaptive:
+                q_weights.append(np.broadcast_to(p, (streams, len(p))).copy())
+    last_dreserve = np.zeros((streams, n), dtype=np.float64)
 
     for t in range(looks):
         active = t >= scenario.arrivals
@@ -273,6 +277,11 @@ def evaluate_method(
         x = x_path[:, t, :]
         dx = np.maximum(x - previous_x, 0.0)
         old_reserve = previous_reserve.copy()
+        if boundary_adaptive:
+            # Route shares use only the previous-look score/rejection state.
+            previous_rejected = weighted_ebh(previous_z, alpha)
+            previous_k = np.maximum(previous_rejected.sum(axis=1), 1)
+            previous_boundary = 1.0 / (alpha * previous_k)
         if method == "raw_supremum_invalid_control":
             # Dormant candidates are excluded from the current active family.
             z = gamma[None, :] * np.where(
@@ -287,7 +296,36 @@ def evaluate_method(
                 dreserve = np.maximum(reserve - old_reserve, 0.0)
                 for i in range(n):
                     k = n - i - 1
-                    if adaptive:
+                    if boundary_adaptive:
+                        if k:
+                            gap = np.maximum(
+                                previous_boundary[:, None]
+                                - previous_z[:, i + 1:i + 1 + k],
+                                0.0,
+                            )
+                            eligible = ~previous_rejected[:, i + 1:i + 1 + k]
+                            budget_scale = np.maximum(
+                                last_dreserve[:, i], 0.5 * gamma[i]
+                            )
+                            utility = np.exp(-np.minimum(
+                                gap / (budget_scale[:, None] + 1e-12),
+                                700.0,
+                            )) * eligible
+                            weights = np.broadcast_to(
+                                priors[i], (streams, len(priors[i]))
+                            ).copy()
+                            weights[:, :k] *= utility
+                            normalizer = weights.sum(axis=1, keepdims=True)
+                            q = np.where(
+                                normalizer > 0,
+                                weights / np.maximum(normalizer, 1e-300),
+                                np.broadcast_to(
+                                    priors[i], (streams, len(priors[i]))
+                                ),
+                            )
+                        else:
+                            q = np.ones((streams, 1), dtype=np.float64)
+                    elif adaptive:
                         q = q_weights[i]
                     elif method == "fixed_next":
                         q = prior_for_donor(n, i, "fixed_next")[None, :]
@@ -328,6 +366,7 @@ def evaluate_method(
                             + share * priors[i][None, :]
                         )
                 previous_reserve = reserve
+                last_dreserve = dreserve.copy()
 
             z = gamma[None, :] * x + incoming - outgoing
 
