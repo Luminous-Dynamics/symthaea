@@ -55,37 +55,39 @@ The trust-store shape is described in `benchmarks/basalt/schema/witness-verifier
 
 ## Challenge-bound read API
 
-The library exposes three staged calls:
+The public entry point is `verify_head_read_quorum`. It accepts a batch of `WitnessHeadEvidence` values, each containing one member-signed head-response envelope and the corresponding write-quorum-certified checkpoint envelope. It:
 
-1. `verify_member_head_response(...)` authenticates one member's response under the exact pinned trust-store bytes and checks the expected incarnation and caller-supplied 32-byte Base64URL challenge nonce.
-2. `verify_write_checkpoint(...)` requires the configured write quorum, validates checkpoint identity and canonical counters/digests, and computes the domain-separated checkpoint digest.
-3. `aggregate_witness_read(...)` requires the read quorum of distinct active member keys, matches every response to a supplied write-certified checkpoint, rejects same-sequence certified forks, permits lagging heads and selects the highest certified sequence.
+- checks the caller-generated 32-byte unpadded Base64URL nonce and expected authority incarnation/epoch;
+- authenticates each head response with `QuorumKind::Member` (one active trusted Ed25519 key);
+- authenticates each checkpoint with `QuorumKind::Write` (the configured write threshold);
+- validates response/checkpoint identity, sequence, revision, state digest and policy digest binding;
+- recomputes the checkpoint digest over the exact canonical payload bytes;
+- counts distinct member keys, ignores exact duplicate reports from the same member, and rejects a member reporting conflicting heads;
+- permits lagging replicas, then selects the highest write-certified sequence;
+- rejects different write-certified digests at the same sequence.
 
-The caller must generate and retain the challenge nonce using a cryptographically secure RNG; this crate validates nonce shape and binding but does not generate challenges. A head response from one member does not establish a commit. Every selected head must be backed by a write-quorum certificate.
+The caller must generate the challenge nonce using a cryptographically secure RNG; this crate validates nonce shape and binding but does not generate it. A single member response never establishes a commit: the corresponding checkpoint envelope must meet the write quorum.
 
-Example protocol pseudocode:
+Example:
 
 ```rust
-let nonce = secure_random_32_bytes_base64url();
-let responses = collect_member_responses(&nonce).await?;
-let verified_responses = responses.iter()
-    .map(|raw| verify_member_head_response(
-        raw, &trust_bytes, &trust_pin, &incarnation_id, &nonce
-    ))
-    .collect::<Result<Vec<_>, _>>()?;
-let certificates = collect_referenced_checkpoint_envelopes(&verified_responses).await?;
-let verified_checkpoints = certificates.iter()
-    .map(|raw| verify_write_checkpoint(
-        raw, &trust_bytes, &trust_pin, &incarnation_id
-    ))
-    .collect::<Result<Vec<_>, _>>()?;
-let selected = aggregate_witness_read(
-    &verified_responses, &verified_checkpoints, &trust_bytes,
-    &trust_pin, &incarnation_id, &nonce
-)?;
+let selected = verify_head_read_quorum(
+    &evidence,                 // Vec<WitnessHeadEvidence>
+    &trust_store_bytes,
+    &out_of_band_trust_pin,
+    &fresh_nonce_base64url,
+    &expected_authority_incarnation_id,
+    &expected_authority_epoch,
+);
+match selected.status.as_str() {
+    "fresh_head_selected" => { /* compare full state manifest with restored store */ }
+    "anti_rollback_unknown" => { /* fail closed: no freshness verdict */ }
+    "rejected_witness_equivocation" => { /* halt writes and investigate */ }
+    _ => { /* preserve typed rejection; never fall back to local revision */ }
+}
 ```
 
-The pseudocode intentionally leaves network transport and nonce generation outside this verification crate.
+The function currently verifies the supplied checkpoint certificates and detects same-sequence certified forks, but it does not walk predecessor links to pinned genesis. Network transport, nonce generation and persist-before-sign service behavior are outside this crate.
 
 ## Tests authored
 
@@ -102,12 +104,15 @@ The pseudocode intentionally leaves network transport and nonce generation outsi
 - Duplicate public-key identity under a second member ID fails.
 - Duplicate administrative failure domain fails.
 - Incorrect out-of-band trust-store pin fails.
-- Three-of-four challenge-bound read with one lagging replica selects sequence five.
+- Three-of-four challenge-bound read with one lagging replica selects the highest certified sequence.
 - Two-of-four read is anti_rollback_unknown.
 - Repeating one member response does not increase read quorum.
+- One member reporting two different heads for the same challenge is rejected.
+- A checkpoint envelope below write quorum is rejected.
+- A response paired with a different checkpoint is rejected.
 - Two different write-quorum-certified checkpoint digests at the same sequence are rejected as equivocation.
 - A response with a replayed/wrong nonce is rejected.
-- A head response without its write-quorum certificate is anti_rollback_unknown.
+- A head response without an adequate write-quorum certificate is rejected.
 - Malformed or padded Base64URL challenge nonce is rejected.
 
 These are authored tests. They are not described as passing until the exact-head Rust workflow reports success.
