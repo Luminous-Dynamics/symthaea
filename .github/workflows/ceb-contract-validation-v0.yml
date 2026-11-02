@@ -231,6 +231,7 @@ jobs:
 
           for label, mutate in [
               ("regrade without parent receipt", lambda p: p["execution"].update({"stage": "pristine_regrade", "regrade_of_receipt_sha256": None})),
+              ("primary receipt with regrade parent", lambda p: p["execution"].update({"regrade_of_receipt_sha256": "a" * 64})),
               ("pass on simulation runner", lambda p: p["execution"].update({"runner_profile": "simulation"})),
               ("pass without image digest", lambda p: p["execution"].update({"image_digest": None})),
               ("pass with unrestricted network", lambda p: p["execution"].update({"network_policy": "unrestricted_not_qualifying"})),
@@ -239,6 +240,10 @@ jobs:
               ("forged required-pass counter", lambda p: p["result"].update({"required_pass_count": 0})),
               ("duplicate check identity", lambda p: p["checks"].append(copy.deepcopy(p["checks"][0]))),
               ("candidate subject digest mismatch", lambda p: p["subject"][0]["digest"].update({"sha256": "8" * 64})),
+              ("base tree provenance mismatch", lambda p: p["candidate"].update({"base_tree_sha256": "7" * 64})),
+              ("execution finish precedes start", lambda p: p["execution"].update({"started_at_utc": "2026-11-03T00:00:00Z", "finished_at_utc": "2026-11-02T00:00:00Z"})),
+              ("path traversal in changed paths", lambda p: p["candidate"].update({"changed_paths": ["../grader.sh"]})),
+              ("fail without a failed/error check", lambda p: p["result"].update({"verdict": "fail"})),
           ]:
               mutant = copy.deepcopy(valid_primary_pass)
               mutate(mutant["predicate"] if label != "candidate subject digest mismatch" else mutant)
