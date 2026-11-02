@@ -17,11 +17,11 @@ Standalone Rust research crate for executing the v0.1 adaptive temporal calibrat
 
 From this directory:
 
-    cargo run --bin atcb-synthetic -- abrupt_location_shift 20261102
-    cargo run --bin atcb-synthetic -- superseded_outcome_feedback 83
+    GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run --bin atcb-synthetic -- abrupt_location_shift 20261102
+    GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run --bin atcb-synthetic -- superseded_outcome_feedback 83
     cargo test
 
-The crate is standalone and uses serde/serde_json for fixture parsing. The first Cargo invocation must resolve dependencies and create Cargo.lock; commit that lockfile, then rerun with --locked for reproducible builds. No lockfile is claimed until cargo actually generates it.
+The crate is standalone and uses serde/serde_json plus sha2 for fixture parsing and receipt digests. The CLI refuses to emit a receipt unless GIT_COMMIT_SHA is set to a 40-character lowercase commit SHA. Run from a clean worktree and commit Cargo.lock after the first Cargo resolution; then rerun with --locked. The receipt schema is run-receipt-v0.1.schema.json. The code SHA is caller-supplied metadata, not a cryptographic signature or proof that the worktree is clean.
 
 ## Limitations
 
