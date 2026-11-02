@@ -745,7 +745,10 @@ The benchmark must keep guarantee classes separate.
   positive quadrant dependence (CPQD). Include the published method and
   author code, if available, as a mandatory one-shot baseline. Do not assign
   the CPQD assumption to ordinary SCORE, and do not reuse the one-shot theorem
-  for repeated evidence by refreshing old e-values.
+  for repeated evidence by refreshing old e-values. The PMLR proceedings page
+  links the paper PDF and OpenReview but does not expose an implementation
+  repository; record any independently located author code separately rather
+  than inventing a code baseline.
   Paper: https://proceedings.mlr.press/v306/kuang26c.html
   Preprint: https://arxiv.org/abs/2601.20386
 - e-GAI: Zhang, Wei, Ren and Zou, ICML 2025. The framework introduces
@@ -774,7 +777,10 @@ The benchmark must keep guarantee classes separate.
   e-LORD, e-SAFFRON, pL-RAI and pS-RAI implementations and simulation drivers:
   https://github.com/zijianwei01/e-GAI . Include this repository as a
   reproducibility baseline, and preserve its theorem assumptions and exact
-  version/commit.
+  version/commit. The repository includes e-LORD/e-SAFFRON and pL-RAI/pS-RAI
+  functions plus simulation and real-data drivers; it is a useful direct
+  algorithm implementation, not a substitute for matching the paper's
+  dependence assumptions.
 
 ## 7. Confirmatory benchmark protocol
 
