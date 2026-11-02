@@ -214,6 +214,29 @@ Since \(j_h=\log_2 h+O(\log\log h)\), the raw-threshold overhead is
 \(O((\log h)^2)\) relative to \(h\), rather than the \(O(h)\) multiplicative
 overhead of the square-root adjuster, whose raw threshold is \((h+1)^2\).
 
+
+For the implemented 64-point prefix, with each mass rounded down to
+\(10^{-9}\), the exact integer staircase reaches the following target values
+at these first dyadic raw thresholds:
+
+| Target \(h\) | Dyadic raw supremum | Square-root raw supremum \((h+1)^2\) | Ratio |
+|---:|---:|---:|---:|
+| 1 | 2 | 4 | 0.500 |
+| 20 | 1,024 | 441 | 2.322 |
+| 200 | 32,768 | 40,401 | 0.811 |
+| 2,000 | 524,288 | 4,004,001 | 0.131 |
+| 20,000 | 8,388,608 | 400,040,001 | 0.021 |
+| 1,000,000 | 536,870,912 | 1,000,002,000,001 | 0.000537 |
+| 1,000,000,000 | 1,099,511,627,776 | 1,000,000,002,000,000,001 | 0.00000110 |
+
+These are exact fixed-point threshold calculations for the finite staircase
+formula (using the sum of all activated dyadic terms), not statistical
+power measurements. The small-threshold penalty is real; at larger adjusted
+thresholds the universal grid becomes much more efficient in raw-evidence
+scale. A fixed-prior mixture with the square-root adjuster is an obvious
+robustness candidate, but its threshold cost must be computed and its power
+measured rather than inferred from this table.
+
 This is an asymptotic threshold-geometry result, not a claim of empirical
 power dominance. At moderate thresholds, the constants can make the dyadic
 prior less efficient than the square-root adjuster; at other scales it may
