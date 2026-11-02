@@ -18,7 +18,7 @@ pub const CONFORMAL_FUSION_REQUEST_SCHEMA: &str =
     "symthaea.detector_conformal_fusion_request.v1";
 pub const CONFORMAL_FUSION_REPORT_SCHEMA: &str =
     "symthaea.detector_conformal_fusion_report.v1";
-pub const FUSION_METHOD_ID: &str = "sum_negative_log_empirical_detector_pvalues_v1";
+pub const FUSION_METHOD_ID: &str = "weighted_sum_negative_log_empirical_detector_pvalues_v2";
 pub const MAX_CALIBRATION_ROWS: usize = 1_000_000;
 pub const MAX_EVALUATION_ROWS: usize = 1_000_000;
 pub const MAX_DETECTORS_PER_ROW: usize = 64;
@@ -39,6 +39,17 @@ pub struct DetectorFeatureV1 {
     pub detector_id: String,
     pub direction: DetectorScoreDirectionV1,
     pub score: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DetectorSpecV1 {
+    pub detector_id: String,
+    pub direction: DetectorScoreDirectionV1,
+    /// Fixed, preregistered weight in permille. All detector weights sum to 1000.
+    pub weight_permille: u16,
+    /// Binds the declared detector feature meaning, extraction and score semantics.
+    pub feature_contract_sha256: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -74,6 +85,8 @@ pub struct DetectorConformalFusionRequestV1 {
     /// Alpha in permille; 10 means 1%, 50 means 5%.
     pub target_alpha_permille: u16,
     pub fusion_method_id: String,
+    /// Complete detector set and fixed weights, pinned before calibration.
+    pub detector_specs: Vec<DetectorSpecV1>,
     /// Independent clean reference cohort used to form detector-specific ranks.
     pub calibration_a: Vec<CalibrationFeatureRowV1>,
     /// Disjoint clean cohort used to calibrate the fixed fused statistic.
@@ -101,6 +114,8 @@ pub struct DetectorEmpiricalPValueV1 {
     pub rank_numerator: u64,
     pub rank_denominator: u64,
     pub p_value: f64,
+    pub weight_permille: u16,
+    pub weighted_contribution: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -114,6 +129,8 @@ pub struct SelectiveFusionScoreV1 {
     pub final_p_rank_numerator: Option<u64>,
     pub final_p_rank_denominator: Option<u64>,
     pub final_p_value: Option<f64>,
+    pub by_adjusted_p_value: Option<f64>,
+    pub by_family_size: Option<u64>,
     pub minimum_attainable_p_value: Option<f64>,
     pub decision: SelectiveDecisionV1,
     pub ground_truth_contaminated: Option<bool>,
@@ -141,7 +158,18 @@ pub struct ConformalGroupSummaryV1 {
     pub empirical_tpr_permille: Option<f64>,
     pub decision_coverage_permille: f64,
     pub minimum_attainable_p_value: f64,
+    pub minimum_detector_rank_p_value: f64,
+    pub pairwise_rank_correlations: Vec<DetectorDisagreementV1>,
     pub target_alpha_permille: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DetectorDisagreementV1 {
+    pub left_detector_id: String,
+    pub right_detector_id: String,
+    pub paired_unit_count: u64,
+    pub spearman_rank_correlation: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -155,7 +183,12 @@ pub struct DetectorConformalFusionReportV1 {
     pub calibration_protocol_sha256: String,
     pub detector_registry_sha256: String,
     pub request_sha256: String,
+    pub calibration_a_manifest_sha256: String,
+    pub calibration_b_manifest_sha256: String,
+    pub evaluation_manifest_sha256: String,
     pub target_alpha_permille: u16,
+    pub multiple_testing_method: String,
+    pub fdr_control_conditional_on_exchangeability: bool,
     pub group_count: u64,
     pub evaluation_unit_count: u64,
     pub flagged_count: u64,
@@ -181,6 +214,7 @@ struct GroupKey {
 struct GroupCalibrationA {
     detector_ids: Vec<String>,
     directions: BTreeMap<String, DetectorScoreDirectionV1>,
+    weights_permille: BTreeMap<String, u16>,
     scores: BTreeMap<String, Vec<f64>>,
 }
 
@@ -233,6 +267,67 @@ fn validate_features(features: &[DetectorFeatureV1], label: &str) -> Result<(), 
         }
     }
     Ok(())
+}
+
+fn validate_evaluation_features(features: &[DetectorFeatureV1], label: &str) -> Result<(), String> {
+    if features.len() > MAX_DETECTORS_PER_ROW {
+        return Err(format!("{label} exceeds {MAX_DETECTORS_PER_ROW} detector features"));
+    }
+    let mut ids = BTreeSet::new();
+    for feature in features {
+        if !valid_id(&feature.detector_id, 128) {
+            return Err(format!("{label} contains an invalid detector ID"));
+        }
+        if !ids.insert(feature.detector_id.as_str()) {
+            return Err(format!("{label} contains duplicate detector IDs"));
+        }
+        if !feature.score.is_finite() {
+            return Err(format!("{label} contains a non-finite detector score"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_detector_specs(specs: &[DetectorSpecV1]) -> Result<(), String> {
+    if !(MIN_DETECTORS_PER_GROUP..=MAX_DETECTORS_PER_ROW).contains(&specs.len()) {
+        return Err(format!("detector registry requires {MIN_DETECTORS_PER_GROUP}..={MAX_DETECTORS_PER_ROW} specs"));
+    }
+    let mut ids = BTreeSet::new();
+    let mut total_weight = 0_u32;
+    for spec in specs {
+        if !valid_id(&spec.detector_id, 128) || !ids.insert(spec.detector_id.as_str()) {
+            return Err("detector registry IDs must be unique opaque identifiers".to_owned());
+        }
+        if spec.weight_permille == 0 || spec.weight_permille > 1_000 {
+            return Err("detector weights must be in 1..=1000 permille".to_owned());
+        }
+        validate_digest(&spec.feature_contract_sha256, "feature_contract_sha256")?;
+        total_weight += u32::from(spec.weight_permille);
+    }
+    if total_weight != 1_000 {
+        return Err("fixed detector weights must sum to exactly 1000 permille".to_owned());
+    }
+    Ok(())
+}
+
+fn canonical_calibration_manifest(rows: &[CalibrationFeatureRowV1]) -> Result<Vec<u8>, String> {
+    let mut normalized = rows.to_vec();
+    normalized.sort_by(|left, right| left.calibration_unit_id.cmp(&right.calibration_unit_id));
+    for row in &mut normalized {
+        row.features.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
+    }
+    serde_json::to_vec(&normalized)
+        .map_err(|error| format!("cannot serialize calibration manifest: {error}"))
+}
+
+fn canonical_evaluation_manifest(rows: &[EvaluationFeatureRowV1]) -> Result<Vec<u8>, String> {
+    let mut normalized = rows.to_vec();
+    normalized.sort_by(|left, right| left.evaluation_unit_id.cmp(&right.evaluation_unit_id));
+    for row in &mut normalized {
+        row.features.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
+    }
+    serde_json::to_vec(&normalized)
+        .map_err(|error| format!("cannot serialize evaluation manifest: {error}"))
 }
 
 fn group_key(task_family: &str, model_regime: &str) -> GroupKey {
@@ -309,6 +404,12 @@ fn fused_nonconformity(
             .ok_or_else(|| "detector calibration reference scores missing".to_owned())?;
         let (rank_numerator, rank_denominator, p_value) =
             detector_rank_p_value(reference, feature.direction, feature.score)?;
+        let weight_permille = *calibration
+            .weights_permille
+            .get(&feature.detector_id)
+            .ok_or_else(|| "detector weight missing from fixed registry".to_owned())?;
+        let weighted_contribution =
+            f64::from(weight_permille) / 1_000.0 * -p_value.ln();
         p_values.push(DetectorEmpiricalPValueV1 {
             detector_id: feature.detector_id.clone(),
             direction: feature.direction,
@@ -316,6 +417,8 @@ fn fused_nonconformity(
             rank_numerator,
             rank_denominator,
             p_value,
+            weight_permille,
+            weighted_contribution,
         });
     }
     p_values.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
@@ -326,7 +429,7 @@ fn combine_detector_p_values(p_values: &[DetectorEmpiricalPValueV1]) -> Result<f
     if p_values.len() < MIN_DETECTORS_PER_GROUP {
         return Err("fused statistic requires at least two detector p-values".to_owned());
     }
-    let result = p_values.iter().map(|value| -value.p_value.ln()).sum::<f64>();
+    let result = p_values.iter().map(|value| value.weighted_contribution).sum::<f64>();
     if result.is_finite() {
         Ok(result)
     } else {
