@@ -518,20 +518,27 @@ mod tests {
     }
 
     #[test]
-    fn forward_term_count_uses_product_grid_pair_count() {
+    fn forward_term_count_matches_explicit_axis_work() {
         for degree in 0..=3 {
             for variables in 0..=4 {
                 let shape = GridShape::new(degree, variables).unwrap();
-                if variables == 0 {
-                    assert_eq!(forward_term_count(&shape), Some(0));
-                } else {
-                    let side = shape.alphabet_size() as u128;
-                    let expected = (variables as u128)
-                        * (shape.point_count() as u128)
-                        * (side + 1)
-                        / 2;
-                    assert_eq!(forward_term_count(&shape), Some(expected));
+                let mut explicit = 0u128;
+                let mut stride = 1usize;
+
+                for _axis in 0..variables {
+                    let width = stride * shape.alphabet_size();
+                    let blocks = shape.point_count() / width;
+                    for _block in 0..blocks {
+                        for _offset in 0..stride {
+                            for target_coordinate in 0..shape.alphabet_size() {
+                                explicit += (target_coordinate + 1) as u128;
+                            }
+                        }
+                    }
+                    stride *= shape.alphabet_size();
                 }
+
+                assert_eq!(forward_term_count(&shape), Some(explicit));
             }
         }
     }
