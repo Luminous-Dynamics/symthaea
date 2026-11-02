@@ -43,15 +43,16 @@ pub enum DecisionRankingPolicy {
 pub struct DecisionAwareConfig {
     pub robust: RobustPlannerConfig,
     pub ranking_policy: DecisionRankingPolicy,
-    /// Fraction of scenario/outcome probability mass that must agree on the
-    /// scenario-optimal decision for an outcome, averaged over outcomes.
+    /// Probability mass under the declared scenario/outcome model on which
+    /// the chosen shared policy agrees with scenario-specific optimal actions.
     pub minimum_decision_stability: f64,
-    /// Optional hard limit on regret of the shared mixture policy in any
+    /// Optional hard limit on regret of the selected shared policy in any
     /// supplied scenario.
     pub maximum_worst_case_regret: Option<f64>,
     /// Dimensionless multiplier for worst-case regret in the adjusted policy.
     pub regret_penalty: f64,
-    /// Minimum utility-valued selection score after the selected risk policy.
+    /// Minimum selection threshold. For MinimaxRegret this is applied to
+    /// expected EVSI; for other policies it is applied to the selected score.
     pub minimum_selection_value: f64,
     /// Hard cap on deterministic outcome-to-decision policies evaluated by
     /// the exact minimax-regret solver. Exceeding it rejects that experiment.
@@ -502,7 +503,7 @@ fn minimax_shared_policy(
             Some(current_key) => {
                 worst_regret.total_cmp(&best_worst_regret).is_lt()
                     || (worst_regret.total_cmp(&best_worst_regret).is_eq()
-                        && policy_key < *current_key)
+                        && policy_key.as_slice() < current_key.as_slice())
             }
         };
         if replace {
