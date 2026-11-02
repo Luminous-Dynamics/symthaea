@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, error::Error, fmt};
+use std::{collections::{BTreeMap, BTreeSet}, error::Error, fmt};
 
 const PLAN_SCHEMA: &str = "symthaea.architecture-engineering.policy-frontier-lp-plan";
 const PLAN_VERSION: &str = "0.1.0";
@@ -27,6 +27,30 @@ const MAX_POLICIES: usize = 6;
 const MAX_NULL_MODELS: usize = 4;
 const MAX_ALTERNATIVE_MODELS: usize = 4;
 const MAX_BASIS_COUNT: usize = 100_000;
+
+/// Frozen settings for the bounded exact-reference frontier implementation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierSolverSettings {
+    pub algorithm_id: String,
+    pub max_policy_count: usize,
+    pub max_active_basis_count: usize,
+    pub feasibility_tolerance: f64,
+    pub pivot_tolerance: f64,
+    pub objective_tolerance: f64,
+}
+
+/// Return the immutable solver settings used by the reference LP implementation.
+pub fn frontier_solver_settings() -> FrontierSolverSettings {
+    FrontierSolverSettings {
+        algorithm_id: "EXHAUSTIVE_ACTIVE_BASIS_PARTIAL_PIVOT_GAUSSIAN_V1".into(),
+        max_policy_count: MAX_POLICIES,
+        max_active_basis_count: MAX_BASIS_COUNT,
+        feasibility_tolerance: FEASIBILITY_TOLERANCE,
+        pivot_tolerance: PIVOT_TOLERANCE,
+        objective_tolerance: OBJECTIVE_TOLERANCE,
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyFrontierError {
@@ -412,6 +436,80 @@ struct FrontierCandidate {
     entropy: f64,
 }
 
+/// A single policy coefficient, keyed by stable policy identity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierPolicyCoefficient {
+    pub policy_id: String,
+    pub coefficient: f64,
+}
+
+/// An additional hard linear inequality over the randomized policy weights.
+///
+/// The represented relation is sum_i coefficient_i * q_i <= upper_bound.
+/// Coefficients are keyed by policy ID, never by an implicit positional order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierAdditionalLinearConstraint {
+    pub constraint_id: String,
+    pub policy_coefficients: Vec<FrontierPolicyCoefficient>,
+    pub upper_bound: f64,
+}
+
+fn canonical_additional_coefficients(
+    plan: &PolicyFrontierPlan,
+    additional: &[FrontierAdditionalLinearConstraint],
+) -> Result<Vec<Vec<f64>>, PolicyFrontierError> {
+    let expected_ids = plan.policies
+        .iter()
+        .map(|policy| policy.policy_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut constraint_ids = BTreeSet::new();
+    let mut canonical = Vec::with_capacity(additional.len());
+    for (index, constraint) in additional.iter().enumerate() {
+        let path = format!("additional_constraints[{index}]");
+        if constraint.constraint_id.trim().is_empty()
+            || !constraint_ids.insert(constraint.constraint_id.as_str())
+        {
+            return Err(PolicyFrontierError::new(
+                format!("{path}.constraint_id"),
+                "constraint IDs must be non-empty and unique",
+            ));
+        }
+        if !constraint.upper_bound.is_finite() {
+            return Err(PolicyFrontierError::new(
+                format!("{path}.upper_bound"),
+                "constraint upper bound must be finite",
+            ));
+        }
+        let mut by_policy = BTreeMap::new();
+        for (coefficient_index, item) in constraint.policy_coefficients.iter().enumerate() {
+            if item.policy_id.trim().is_empty()
+                || !item.coefficient.is_finite()
+                || !by_policy.insert(item.policy_id.as_str(), item.coefficient)
+            {
+                return Err(PolicyFrontierError::new(
+                    format!("{path}.policy_coefficients[{coefficient_index}]"),
+                    "policy IDs must be unique/non-empty and coefficients finite",
+                ));
+            }
+        }
+        if by_policy.keys().copied().collect::<BTreeSet<_>>() != expected_ids {
+            return Err(PolicyFrontierError::new(
+                format!("{path}.policy_coefficients"),
+                "constraint must contain exactly one coefficient for every frozen policy ID",
+            ));
+        }
+        canonical.push(
+            plan.policies
+                .iter()
+                .map(|policy| by_policy[policy.policy_id.as_str()])
+                .collect::<Vec<_>>(),
+        );
+    }
+    Ok(canonical)
+}
+
 fn dot(left: &[f64], right: &[f64]) -> f64 {
     left.iter().zip(right).map(|(a, b)| a * b).sum()
 }
@@ -695,9 +793,32 @@ fn same_weights(left: &[f64], right: &[f64]) -> bool {
 pub fn analyze_policy_frontier(
     input: &PolicyFrontierPlan,
 ) -> Result<PolicyFrontierReport, PolicyFrontierError> {
+    analyze_policy_frontier_with_constraints(input, &[])
+}
+
+/// Optimize the existing robust policy frontier with additional hard linear
+/// constraints over policy-mixture probabilities. Additional inequalities
+/// participate in exhaustive active-basis enumeration and feasibility checks.
+/// They are not utility penalties and cannot be traded away for objective value.
+pub fn analyze_policy_frontier_with_constraints(
+    input: &PolicyFrontierPlan,
+    additional_constraints: &[FrontierAdditionalLinearConstraint],
+) -> Result<PolicyFrontierReport, PolicyFrontierError> {
     let mut plan = input.clone();
     plan.canonicalize()?;
-    let constraints = build_constraints(&plan)?;
+    let canonical_coefficients =
+        canonical_additional_coefficients(&plan, additional_constraints)?;
+    let mut constraints = build_constraints(&plan)?;
+    for (constraint, policy_coefficients) in
+        additional_constraints.iter().zip(&canonical_coefficients)
+    {
+        let mut coefficients = policy_coefficients.clone();
+        coefficients.push(0.0); // no coefficient on the utility hypograph variable z
+        constraints.push(LinearConstraint {
+            coefficients,
+            rhs: constraint.upper_bound,
+        });
+    }
     let policy_count = plan.policies.len();
     let variable_count = policy_count + 1;
     let basis_count = choose_count(constraints.len(), policy_count).ok_or_else(|| {
@@ -742,6 +863,16 @@ pub fn analyze_policy_frontier(
         let Some(candidate) = evaluate_weights(&plan, weights)? else {
             continue;
         };
+        if additional_constraints
+            .iter()
+            .zip(&canonical_coefficients)
+            .any(|(constraint, coefficients)| {
+                dot(coefficients, &candidate.weights)
+                    > constraint.upper_bound + FEASIBILITY_TOLERANCE
+            })
+        {
+            continue;
+        }
         // The LP basis must satisfy every utility hypograph inequality, and
         // z must touch the lower envelope. Reconstructing the lower envelope
         // independently prevents a malformed basis from overstating utility.
@@ -824,6 +955,38 @@ pub fn analyze_policy_frontier(
     })
 }
 
+/// Verify the canonical payload digest of a policy-frontier report without
+/// rerunning the optimizer. This checks report integrity, not LP optimality.
+pub fn verify_policy_frontier_report_digest(
+    report: &PolicyFrontierReport,
+) -> Result<(), PolicyFrontierError> {
+    let payload = ReportPayload {
+        schema: &report.schema,
+        version: &report.version,
+        plan_id: &report.plan_id,
+        plan_sha256: &report.plan_sha256,
+        enumerated_basis_count: report.enumerated_basis_count,
+        feasible_vertex_count: report.feasible_vertex_count,
+        support_size: report.support_size,
+        policy_weights: &report.policy_weights,
+        null_model_sizes: &report.null_model_sizes,
+        alternatives: &report.alternatives,
+        worst_case_null_size: report.worst_case_null_size,
+        worst_case_rejection_power: report.worst_case_rejection_power,
+        worst_case_decision_utility: report.worst_case_decision_utility,
+        maximum_expected_evaluator_cost: report.maximum_expected_evaluator_cost,
+        mixture_entropy_nats: report.mixture_entropy_nats,
+        remaining_alpha_budget: report.remaining_alpha_budget,
+    };
+    if digest(&payload)? != report.report_sha256 {
+        return Err(PolicyFrontierError::new(
+            "report.report_sha256",
+            "policy-frontier report digest does not match its canonical payload",
+        ));
+    }
+    Ok(())
+}
+
 pub fn verify_policy_frontier_report(
     plan: &PolicyFrontierPlan,
     report: &PolicyFrontierReport,
@@ -886,6 +1049,71 @@ mod tests {
                 policy("policy-c", 3.0, [0.0, 0.0, 1.0]),
             ],
         ).unwrap()
+    }
+
+    #[test]
+    fn additional_constraint_coefficients_bind_by_policy_identity() {
+        let plan = fixture(None);
+        let constraint_a = FrontierAdditionalLinearConstraint {
+            constraint_id: "cap-policy-a".into(),
+            policy_coefficients: vec![
+                FrontierPolicyCoefficient { policy_id: "policy-c".into(), coefficient: 0.0 },
+                FrontierPolicyCoefficient { policy_id: "policy-a".into(), coefficient: 1.0 },
+                FrontierPolicyCoefficient { policy_id: "policy-b".into(), coefficient: 0.0 },
+            ],
+            upper_bound: 0.2,
+        };
+        let first = analyze_policy_frontier_with_constraints(
+            &plan,
+            &[constraint_a.clone()],
+        ).unwrap();
+
+        let mut reordered_plan = plan.clone();
+        reordered_plan.policies.reverse();
+        let constraint_b = FrontierAdditionalLinearConstraint {
+            constraint_id: "cap-policy-a".into(),
+            policy_coefficients: vec![
+                FrontierPolicyCoefficient { policy_id: "policy-b".into(), coefficient: 0.0 },
+                FrontierPolicyCoefficient { policy_id: "policy-c".into(), coefficient: 0.0 },
+                FrontierPolicyCoefficient { policy_id: "policy-a".into(), coefficient: 1.0 },
+            ],
+            upper_bound: 0.2,
+        };
+        let second = analyze_policy_frontier_with_constraints(
+            &reordered_plan,
+            &[constraint_b],
+        ).unwrap();
+        assert_eq!(first, second);
+        let weights = first.policy_weights.iter()
+            .map(|row| (row.policy_id.as_str(), row.probability))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        assert!((weights["policy-a"] - 0.2).abs() < 1e-10);
+        assert!((weights["policy-b"] - 0.4).abs() < 1e-10);
+        assert!((weights["policy-c"] - 0.4).abs() < 1e-10);
+    }
+
+    #[test]
+    fn additional_constraint_rejects_missing_or_duplicate_policy_ids() {
+        let plan = fixture(None);
+        let incomplete = FrontierAdditionalLinearConstraint {
+            constraint_id: "incomplete".into(),
+            policy_coefficients: vec![
+                FrontierPolicyCoefficient { policy_id: "policy-a".into(), coefficient: 1.0 },
+            ],
+            upper_bound: 0.2,
+        };
+        assert!(analyze_policy_frontier_with_constraints(&plan, &[incomplete]).is_err());
+
+        let duplicate = FrontierAdditionalLinearConstraint {
+            constraint_id: "duplicate".into(),
+            policy_coefficients: vec![
+                FrontierPolicyCoefficient { policy_id: "policy-a".into(), coefficient: 1.0 },
+                FrontierPolicyCoefficient { policy_id: "policy-a".into(), coefficient: 0.0 },
+                FrontierPolicyCoefficient { policy_id: "policy-c".into(), coefficient: 0.0 },
+            ],
+            upper_bound: 0.2,
+        };
+        assert!(analyze_policy_frontier_with_constraints(&plan, &[duplicate]).is_err());
     }
 
     #[test]

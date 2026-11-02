@@ -46,6 +46,7 @@ pub mod tv_robust_policy_frontier;
 pub mod finite_tv_radius_calibration;
 pub mod decision_functional_confidence;
 pub mod noncompensatory_guardrails;
+pub mod guardrail_constrained_policy_frontier;
 pub mod pareto_robust_decision;
 pub mod pareto_wasserstein_decision;
 pub mod correlated_noise_benchmark;
