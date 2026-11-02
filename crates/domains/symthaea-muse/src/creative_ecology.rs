@@ -92,7 +92,9 @@ pub struct FunctionalRecurrenceAssessmentV1 {
     pub organization_id: String,
     pub revision: u64,
     pub required_components_without_producer: Vec<String>,
+    pub required_components_without_consumer: Vec<String>,
     pub boundary_components_without_producer: Vec<String>,
+    pub boundary_components_without_consumer: Vec<String>,
     pub process_network_strongly_connected: bool,
     pub internal_feedback_edge_count: usize,
     /// Engineering diagnostic only; never a biological-life or consciousness claim.
@@ -175,7 +177,9 @@ impl CreativeOrganizationV1 {
         self.validate()?;
 
         let mut required_components_without_producer = Vec::new();
+        let mut required_components_without_consumer = Vec::new();
         let mut boundary_components_without_producer = Vec::new();
+        let mut boundary_components_without_consumer = Vec::new();
         for component in &self.components {
             let has_producer = self.processes.iter().any(|process| {
                 process
@@ -183,11 +187,23 @@ impl CreativeOrganizationV1 {
                     .iter()
                     .any(|produced| produced == &component.component_id)
             });
+            let has_consumer = self.processes.iter().any(|process| {
+                process
+                    .consumes
+                    .iter()
+                    .any(|consumed| consumed == &component.component_id)
+            });
             if component.required_for_operation && !has_producer {
                 required_components_without_producer.push(component.component_id.clone());
             }
+            if component.required_for_operation && !has_consumer {
+                required_components_without_consumer.push(component.component_id.clone());
+            }
             if component.boundary_component && !has_producer {
                 boundary_components_without_producer.push(component.component_id.clone());
+            }
+            if component.boundary_component && !has_consumer {
+                boundary_components_without_consumer.push(component.component_id.clone());
             }
         }
 
@@ -195,14 +211,18 @@ impl CreativeOrganizationV1 {
             process_recurrence(&self.processes);
         let functionally_recurrent = !self.processes.is_empty()
             && required_components_without_producer.is_empty()
+            && required_components_without_consumer.is_empty()
             && boundary_components_without_producer.is_empty()
+            && boundary_components_without_consumer.is_empty()
             && process_network_strongly_connected;
 
         Ok(FunctionalRecurrenceAssessmentV1 {
             organization_id: self.organization_id.clone(),
             revision: self.revision,
             required_components_without_producer,
+            required_components_without_consumer,
             boundary_components_without_producer,
+            boundary_components_without_consumer,
             process_network_strongly_connected,
             internal_feedback_edge_count,
             functionally_recurrent,
@@ -1136,6 +1156,27 @@ mod tests {
         assert!(!report.process_network_strongly_connected);
         assert!(!report.functionally_recurrent);
         assert!(report.required_components_without_producer.is_empty());
+    }
+
+    #[test]
+    fn required_component_without_consumer_fails_closed() {
+        let mut organization = organization();
+        organization.components.push(OrganizationComponentV1 {
+            component_id: "unused_generated_state".into(),
+            required_for_operation: true,
+            boundary_component: false,
+        });
+        organization.processes.push(ProductionProcessV1 {
+            process_id: "unused_state_producer".into(),
+            consumes: vec!["perceptual_state".into()],
+            produces: vec!["unused_generated_state".into()],
+            external_inputs: vec![],
+        });
+        let report = organization.assess_functional_recurrence().unwrap();
+        assert!(report
+            .required_components_without_consumer
+            .contains(&"unused_generated_state".to_string()));
+        assert!(!report.functionally_recurrent);
     }
 
     #[test]
