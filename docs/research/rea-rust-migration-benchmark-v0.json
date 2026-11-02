@@ -163,7 +163,8 @@
         "canonical_byte_parity",
         "sha256_parity",
         "unicode_key_order_parity",
-        "number_serialization_parity"
+        "number_serialization_parity",
+        "ECMAScript_binary64_number_parity"
       ],
       "target": "100_percent_parity_for_all_frozen_vectors",
       "vectors": [
@@ -174,7 +175,10 @@
         "negative_zero",
         "number_format_thresholds",
         "safe_integer_boundaries",
-        "nested_large_payloads"
+        "nested_large_payloads",
+        "unsafe_integer_rounding_from_JavaScript_Number_parse",
+        "u64_i64_boundary_to_binary64",
+        "negative_zero_from_integer_and_float_tokens"
       ]
     },
     {
