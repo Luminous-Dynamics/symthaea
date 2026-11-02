@@ -983,6 +983,39 @@ mod tests {
     }
 
     #[test]
+    fn selective_advantage_is_an_explicit_demonstration_reward_gap() {
+        let config = TransmissionConfig {
+            myopic_demonstration_reward: 0.5,
+            optimal_demonstration_reward: 0.75,
+            reward_noise_epsilon: 0.0,
+            ..TransmissionConfig::default()
+        };
+        let mut rng = DeterministicRng::new(99);
+        assert_eq!(
+            demonstration_score(Strategy::Myopic, config, &mut rng),
+            5.0
+        );
+        assert_eq!(
+            demonstration_score(Strategy::Optimal, config, &mut rng),
+            7.5
+        );
+    }
+
+    #[test]
+    fn negative_demonstration_reward_signal_is_rejected() {
+        let config = TransmissionConfig {
+            optimal_demonstration_reward: -0.1,
+            ..TransmissionConfig::default()
+        };
+        assert_eq!(
+            simulate_transmission(config, 3),
+            Err(TransmissionError::InvalidRewardSignal {
+                name: "optimal demonstration reward",
+            })
+        );
+    }
+
+    #[test]
     fn fixed_seed_reproduces_the_entire_transmission_run() {
         let config = TransmissionConfig::default();
         assert_eq!(
