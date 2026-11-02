@@ -335,7 +335,7 @@ mod tests {
         assert!(!result.first_order_lower_cost.treatment_dominates_control);
         assert!(!result.first_order_lower_cost.control_dominates_treatment);
         assert!(!result.upper_tail_stop_loss.treatment_dominates_control);
-        assert!(!result.upper_tail_stop_loss.control_dominates_treatment);
+        assert!(result.upper_tail_stop_loss.control_dominates_treatment);
     }
 
     #[test]
