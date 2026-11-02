@@ -13,6 +13,7 @@ use digest::CanonicalHasher;
 pub mod digest;
 pub mod active_sensing;
 pub mod active_sensing_simulator;
+pub mod candidate_wire;
 pub mod harth_stream;
 pub mod edge_adapter;
 pub mod real_dataset_manifest;
