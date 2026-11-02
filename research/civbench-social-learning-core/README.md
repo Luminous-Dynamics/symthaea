@@ -48,6 +48,18 @@ Protocol: [ITERATED_TRANSMISSION_ATTRACTOR_PROTOCOL_V0_1.md](ITERATED_TRANSMISSI
 Run:
 ```sh
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin telephone-attractor-sweep > telephone-attractor-sweep.csv
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin branching-culture-sweep > branching-culture-sweep.csv
+```
+
+## Branching cultural populations
+
+The iterated-transmission module also exposes `simulate_branching_population`: a fixed-size population where each descendant selects one parent from the previous generation, inherits that root lineage and transforms the content through the same attribute-specific channel. It records parent indices, root identity, lineage extinction, HHI/effective diversity, pairwise content distance and cumulative distance from the root artifact.
+
+The `branching-culture-sweep` binary evaluates 4 open-endedness values × 4 generation depths (16 conditions), with 128 replicate populations per condition and four distinct initial lineages. This complements the linear telephone chain: linear chains measure cumulative drift along one path; branching populations measure which cultural lineages survive, dominate or disappear. The parent rule is uniform random, so results are a neutral-drift mechanism fixture—not an empirical model of human or LLM parent selection.
+
+Run:
+```sh
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin branching-culture-sweep > branching-culture-sweep.csv
 ```
 
 ## Zero-shot rule transfer
