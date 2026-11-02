@@ -599,10 +599,12 @@ pub enum RmiEvaluationErrorV1 {
     EmptyPolicyVersion,
     InvalidActionId { arm: String },
     InvalidActionFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
+    NonDeterministicPolicyOutput { arm: String },
     EmptyPartnerPolicyId,
     EmptyPartnerPolicyVersion,
     InvalidPartnerResponseId { arm: String },
     InvalidPartnerResponseFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
+    NonDeterministicPartnerOutput { arm: String },
     SerializationFailure(String),
 }
 
@@ -627,11 +629,29 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         &pair.control_observation,
         pair.seed,
     );
+    if control_action != policy.respond(
+        &pair.pre_intervention_history,
+        &pair.control_observation,
+        pair.seed,
+    ) {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput {
+            arm: "control".to_string(),
+        });
+    }
     let treatment_action = policy.respond(
         &pair.pre_intervention_history,
         &pair.treatment_observation,
         pair.seed,
     );
+    if treatment_action != policy.respond(
+        &pair.pre_intervention_history,
+        &pair.treatment_observation,
+        pair.seed,
+    ) {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput {
+            arm: "treatment".to_string(),
+        });
+    }
 
     for (arm, action) in [
         ("control", &control_action),
@@ -711,11 +731,29 @@ where
         &agent.payload.control_action,
         pair.seed,
     );
+    if control_partner_response != partner_policy.respond(
+        &pair.pre_intervention_history,
+        &agent.payload.control_action,
+        pair.seed,
+    ) {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput {
+            arm: "control".to_string(),
+        });
+    }
     let treatment_partner_response = partner_policy.respond(
         &pair.pre_intervention_history,
         &agent.payload.treatment_action,
         pair.seed,
     );
+    if treatment_partner_response != partner_policy.respond(
+        &pair.pre_intervention_history,
+        &agent.payload.treatment_action,
+        pair.seed,
+    ) {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput {
+            arm: "treatment".to_string(),
+        });
+    }
     for (arm, response) in [
         ("control", &control_partner_response),
         ("treatment", &treatment_partner_response),
@@ -879,6 +917,59 @@ mod tests {
         assert_eq!(result.payload.partner_collateral_changed_feature_count, 0);
         assert_eq!(result.payload.agent_evaluation_sha256.len(), 64);
         assert_eq!(result.payload_sha256.len(), 64);
+    }
+
+    #[test]
+    fn fixed_agent_with_responsive_partner_has_no_agent_to_partner_effect() {
+        let pair = pair_for(RmiTargetFeatureV1::Role);
+        let agent = FixedResponsePolicyV1 {
+            id: "fixed-agent".into(),
+            version: "1".into(),
+            response: fixed_action(),
+        };
+        let partner = SyntheticResponsivePartnerPolicyV1 {
+            id: "responsive-partner".into(),
+            version: "1".into(),
+            target: RmiTargetFeatureV1::Role,
+        };
+        let result = evaluate_rmi_reciprocal_pair(&agent, &partner, &pair).unwrap();
+        assert!(!result.payload.targeted_partner_sensitivity);
+    }
+
+    #[test]
+    fn rejects_hidden_mutable_policy_state() {
+        use std::cell::Cell;
+
+        struct HiddenCounterPolicy {
+            calls: Cell<u32>,
+        }
+
+        impl RmiPolicyV1 for HiddenCounterPolicy {
+            fn policy_id(&self) -> &str { "hidden-counter" }
+            fn policy_version(&self) -> &str { "1" }
+
+            fn respond(
+                &self,
+                _history: &[RmiHistoryEventV1],
+                observation: &RmiPartnerObservationV1,
+                _seed: u64,
+            ) -> RmiAgentActionV1 {
+                let next = self.calls.get() + 1;
+                self.calls.set(next);
+                let mut features = observation.features.clone();
+                features.tempo_milli_bpm += next;
+                RmiAgentActionV1 {
+                    action_id: format!("counter-{next}"),
+                    features,
+                }
+            }
+        }
+
+        let policy = HiddenCounterPolicy { calls: Cell::new(0) };
+        assert!(matches!(
+            evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Role)),
+            Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput { .. })
+        ));
     }
 
     #[test]
