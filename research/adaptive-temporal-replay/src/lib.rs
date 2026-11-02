@@ -4,6 +4,7 @@
 //! UP-OCP, a formal conformal guarantee, or a validated Symthaea model.
 
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const SCALE_PPM: i64 = 1_000_000;
@@ -418,6 +419,39 @@ impl BitemporalLabelLedger {
         }
         Ok(())
     }
+    /// Domain-separated digest of the ordered revision history. The digest
+    /// binds availability/knowledge times and distinguishes Supersede/Retract.
+    pub fn sha256_hex(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"SYMTHAEA-ATCB-BITEMPORAL-LABEL-LEDGER-V1");
+        hasher.update((self.records.len() as u64).to_le_bytes());
+        for record in &self.records {
+            hasher.update(record.decision_id.to_le_bytes());
+            hasher.update(record.target_step.to_le_bytes());
+            hasher.update(record.revision.to_le_bytes());
+            hasher.update(record.available_at_step.to_le_bytes());
+            hasher.update(record.recorded_at_step.to_le_bytes());
+            hasher.update([match record.kind {
+                RevisionKind::Assert => 0,
+                RevisionKind::Supersede => 1,
+                RevisionKind::Retract => 2,
+            }]);
+            match record.label_milli {
+                Some(value) => {
+                    hasher.update([1]);
+                    hasher.update(value.to_le_bytes());
+                }
+                None => hasher.update([0]),
+            }
+        }
+        let digest = hasher.finalize();
+        let mut output = String::with_capacity(64);
+        for byte in digest {
+            use std::fmt::Write;
+            let _ = write!(output, "{byte:02x}");
+        }
+        output
+    }
 }
 pub fn replay_feedback_events(events: &[FeedbackEvent]) -> Result<BitemporalLabelLedger, ReplayError> {
     let mut ledger = BitemporalLabelLedger::default();
@@ -624,6 +658,22 @@ mod tests {
         assert!(generate_outcomes(spec, 83).is_err());
     }
 
+    #[test]
+    fn ledger_digest_is_stable_and_binds_revision_changes() {
+        let mut ledger = BitemporalLabelLedger::default();
+        ledger.append(LabelRevisionRecord {
+            decision_id: 2, target_step: 1, revision: 1, available_at_step: 4,
+            recorded_at_step: 4, kind: RevisionKind::Assert, label_milli: Some(19),
+        }).unwrap();
+        let original = ledger.sha256_hex();
+        assert_eq!(original, ledger.clone().sha256_hex());
+        ledger.append(LabelRevisionRecord {
+            decision_id: 2, target_step: 1, revision: 2, available_at_step: 8,
+            recorded_at_step: 8, kind: RevisionKind::Supersede, label_milli: Some(-19),
+        }).unwrap();
+        assert_ne!(original, ledger.sha256_hex());
+        ledger.verify().unwrap();
+    }
     #[test]
     fn complete_replay_builds_verified_bitemporal_ledger() {
         let (_, scenarios) = load_builtin_registry().unwrap();
