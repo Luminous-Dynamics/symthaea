@@ -131,7 +131,15 @@ fn verify_bytes(input: &[u8]) -> Result<Value, EvidenceError> {
         .and_then(|subject| subject.get("digest"))
         .and_then(|digest| digest.get("sha256"))
         .and_then(Value::as_str);
-    let provider = value.get("provider").unwrap_or(&Value::Null);
+    let provider_id = value
+        .get("provider")
+        .and_then(|provider| provider.get("id"))
+        .and_then(Value::as_str);
+    let provider_version = value
+        .get("provider")
+        .and_then(|provider| provider.get("version"))
+        .cloned()
+        .unwrap_or(Value::Null);
     let profile_digest = value
         .get("analysis_profile")
         .and_then(|profile| profile.get("digest"))
@@ -149,8 +157,8 @@ fn verify_bytes(input: &[u8]) -> Result<Value, EvidenceError> {
             "semantic_sha256": verified.semantic_sha256,
             "raw_file_sha256": verified.raw_file_sha256,
             "subject_sha256": subject_sha256,
-            "provider_id": provider.get("id").and_then(Value::as_str),
-            "provider_version": provider.get("version"),
+            "provider_id": provider_id,
+            "provider_version": provider_version,
             "analysis_profile_digest": profile_digest,
             "predicate_type": value.get("predicate_type"),
             "operation": value.get("operation"),
