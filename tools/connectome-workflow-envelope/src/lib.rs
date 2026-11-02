@@ -50,6 +50,7 @@ pub struct DatasetProvenance {
     pub card_sha256: String,
     pub shard_manifest_sha256: String,
     pub operation_manifest_sha256: String,
+    pub license_review_sha256: String,
     pub license_approved: bool,
 }
 
@@ -73,6 +74,10 @@ pub struct OperationIdentity {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SplitAuditReceipt {
     pub receipt_sha256: String,
+    pub operation_id: String,
+    pub sample_hash: String,
+    pub task_route: TaskRoute,
+    pub split: DataSplit,
     pub policy_sha256: String,
     pub input_manifest_sha256: String,
     pub operation_assignment_sha256: String,
@@ -158,6 +163,8 @@ pub struct EditTransactionReceipt {
     pub receipt_sha256: String,
     pub event_stream_sha256: String,
     pub transaction_id: String,
+    /// Independently computed digest binding the transaction to this sample/task operation.
+    pub operation_binding_sha256: String,
     pub operation_id: String,
     pub sample_hash: String,
     pub task_route: TaskRoute,
@@ -260,6 +267,8 @@ pub enum EnvelopeError {
     InvalidReviewReceipt,
     EditBaseSnapshotMismatch,
     EditResultMissing,
+    EditNoopSnapshot,
+    QueryFirstSnapshotMismatch,
     EditVerificationContradiction,
     EditAnnotationContradiction,
     QuerySnapshotMismatch,
@@ -303,6 +312,10 @@ impl fmt::Display for EnvelopeError {
                 write!(f, "edit transaction base snapshot differs from envelope base graph")
             }
             Self::EditResultMissing => write!(f, "committed edit lacks resulting snapshot digest"),
+            Self::EditNoopSnapshot => write!(f, "committed edit result snapshot equals its base snapshot"),
+            Self::QueryFirstSnapshotMismatch => {
+                write!(f, "query report first snapshot does not match envelope base snapshot")
+            }
             Self::EditVerificationContradiction => {
                 write!(f, "committed edit lacks a passing independent verifier")
             }
@@ -335,6 +348,7 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
     let mut completed_stages = vec!["DATASET_IDENTITY", "OPERATION_IDENTITY"];
     let mut unresolved_stages = Vec::new();
 
+    validate_sha("license review", &envelope.dataset.license_review_sha256)?;
     if !envelope.dataset.license_approved {
         unresolved_stages.push("LICENSE_APPROVAL");
         return Ok(build_audit(
@@ -347,6 +361,7 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
         ));
     }
 
+    completed_stages.push("LICENSE_APPROVED");
     let Some(split) = &envelope.split_audit else {
         unresolved_stages.push("SPLIT_AUDIT");
         return Ok(build_audit(
@@ -358,7 +373,7 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
             None,
         ));
     };
-    validate_split_receipt(split)?;
+    validate_split_receipt(split, &envelope.operation)?;
     match split.outcome {
         SplitAuditOutcome::LeakageDetected => {
             unresolved_stages.push("GROUP_DISJOINTNESS");
@@ -524,7 +539,12 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
             None,
         ));
     };
-    validate_query_receipt(query, &envelope.operation, &resulting_snapshot)?;
+    validate_query_receipt(
+        query,
+        &envelope.operation,
+        &envelope.base_graph_snapshot_sha256,
+        &resulting_snapshot,
+    )?;
     completed_stages.push("QUERY_STABILITY_AUDIT");
 
     match query.outcome {
@@ -590,6 +610,7 @@ fn validate_envelope_identity(envelope: &WorkflowEnvelope) -> Result<(), Envelop
     validate_sha("dataset card", &envelope.dataset.card_sha256)?;
     validate_sha("dataset shard manifest", &envelope.dataset.shard_manifest_sha256)?;
     validate_sha("dataset operation manifest", &envelope.dataset.operation_manifest_sha256)?;
+    validate_sha("license review", &envelope.dataset.license_review_sha256)?;
 
     validate_id("operation", &envelope.operation.operation_id)?;
     validate_sample_hash(&envelope.operation.sample_hash)?;
@@ -616,8 +637,35 @@ fn validate_envelope_identity(envelope: &WorkflowEnvelope) -> Result<(), Envelop
     Ok(())
 }
 
-fn validate_split_receipt(receipt: &SplitAuditReceipt) -> Result<(), EnvelopeError> {
+fn validate_split_receipt(
+    receipt: &SplitAuditReceipt,
+    operation: &OperationIdentity,
+) -> Result<(), EnvelopeError> {
     validate_sha("split receipt", &receipt.receipt_sha256)?;
+    if receipt.operation_id != operation.operation_id {
+        return Err(EnvelopeError::OperationMismatch {
+            stage: "split audit",
+            field: "operation_id",
+        });
+    }
+    if receipt.sample_hash != operation.sample_hash {
+        return Err(EnvelopeError::OperationMismatch {
+            stage: "split audit",
+            field: "sample_hash",
+        });
+    }
+    if receipt.task_route != operation.task_route {
+        return Err(EnvelopeError::OperationMismatch {
+            stage: "split audit",
+            field: "task_route",
+        });
+    }
+    if receipt.split != operation.split {
+        return Err(EnvelopeError::OperationMismatch {
+            stage: "split audit",
+            field: "split",
+        });
+    }
     validate_sha("split policy", &receipt.policy_sha256)?;
     validate_sha("split input manifest", &receipt.input_manifest_sha256)?;
     validate_sha("split operation assignment", &receipt.operation_assignment_sha256)?;
@@ -764,6 +812,7 @@ fn validate_edit_receipt(
 ) -> Result<(), EnvelopeError> {
     validate_sha("edit receipt", &receipt.receipt_sha256)?;
     validate_sha("edit event stream", &receipt.event_stream_sha256)?;
+    validate_sha("edit operation binding", &receipt.operation_binding_sha256)?;
     validate_id("transaction ID", &receipt.transaction_id)?;
     validate_sha("edit base snapshot", &receipt.base_snapshot_sha256)?;
     validate_sha("edit verifier artifact", &receipt.verification_artifact_sha256)?;
@@ -786,6 +835,9 @@ fn validate_edit_receipt(
             .as_ref()
             .ok_or(EnvelopeError::EditResultMissing)?;
         validate_sha("edit result snapshot", result)?;
+        if result == &receipt.base_snapshot_sha256 {
+            return Err(EnvelopeError::EditNoopSnapshot);
+        }
         if !receipt.verification_passed {
             return Err(EnvelopeError::EditVerificationContradiction);
         }
@@ -801,6 +853,7 @@ fn validate_edit_receipt(
 fn validate_query_receipt(
     receipt: &QueryStabilityReceipt,
     operation: &OperationIdentity,
+    base_snapshot: &str,
     canonical_snapshot: &str,
 ) -> Result<(), EnvelopeError> {
     validate_sha("query receipt", &receipt.receipt_sha256)?;
@@ -813,6 +866,9 @@ fn validate_query_receipt(
     validate_sha("query latest snapshot", &receipt.latest_graph_snapshot_sha256)?;
     if receipt.source_volume_id != operation.source_volume_id {
         return Err(EnvelopeError::QuerySourceVolumeMismatch);
+    }
+    if receipt.first_graph_snapshot_sha256 != base_snapshot {
+        return Err(EnvelopeError::QueryFirstSnapshotMismatch);
     }
     if receipt.latest_graph_snapshot_sha256 != canonical_snapshot {
         return Err(EnvelopeError::QuerySnapshotMismatch);
@@ -892,6 +948,7 @@ mod tests {
                 card_sha256: SHA_A.to_owned(),
                 shard_manifest_sha256: SHA_B.to_owned(),
                 operation_manifest_sha256: SHA_C.to_owned(),
+                license_review_sha256: SHA_D.to_owned(),
                 license_approved: true,
             },
             operation: OperationIdentity {
@@ -922,6 +979,10 @@ mod tests {
     fn split_receipt(outcome: SplitAuditOutcome) -> SplitAuditReceipt {
         SplitAuditReceipt {
             receipt_sha256: SHA_A.to_owned(),
+            operation_id: "op-1".to_owned(),
+            sample_hash: "0123456789abcdef0123456789abcdef".to_owned(),
+            task_route: TaskRoute::FalseMergeIdentification,
+            split: DataSplit::Test,
             policy_sha256: SHA_B.to_owned(),
             input_manifest_sha256: SHA_C.to_owned(),
             operation_assignment_sha256: SHA_D.to_owned(),
@@ -984,6 +1045,7 @@ mod tests {
             receipt_sha256: SHA_A.to_owned(),
             event_stream_sha256: SHA_B.to_owned(),
             transaction_id: "tx-1".to_owned(),
+            operation_binding_sha256: SHA_D.to_owned(),
             operation_id: "op-1".to_owned(),
             sample_hash: "0123456789abcdef0123456789abcdef".to_owned(),
             task_route: TaskRoute::FalseMergeIdentification,
