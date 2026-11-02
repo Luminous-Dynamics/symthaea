@@ -153,7 +153,11 @@ impl RewardNetwork {
 
     /// Validate a generic "losses before maximum reward" contract. This is a
     /// structural check, not proof of origin in the 2026 paper's experimental pool.
-    pub fn validate_terminal_strategy(&self, terminal_level: u8, required_losses: usize) -> Result<(), RewardNetworkError> {
+    pub fn validate_terminal_strategy(
+        &self,
+        terminal_level: u8,
+        required_losses: usize,
+    ) -> Result<(), RewardNetworkError> {
         for (index, edge) in self.edges.iter().enumerate() {
             if edge.reward == 400 && self.node_levels[edge.from] != terminal_level {
                 return Err(RewardNetworkError::MaxRewardOutsideTerminalLevel {
@@ -165,41 +169,60 @@ impl RewardNetwork {
         }
 
         // State = (node, negative-edge count capped at required_losses).
-        // This catches shortcuts, including paths that traverse cycles.
+        // Check every existing directed path from every level-0 node. A
+        // disconnected non-start level-0 node is allowed; the designated
+        // task start must have at least one route to the terminal level.
+        let mut start_reaches_terminal = false;
         for (start, &level) in self.node_levels.iter().enumerate() {
-            if level != 0 { continue; }
-            let mut visited = vec![vec![false; required_losses.saturating_add(1)]; self.node_levels.len()];
+            if level != 0 {
+                continue;
+            }
+            let mut visited = vec![
+                vec![false; required_losses.saturating_add(1)];
+                self.node_levels.len()
+            ];
             let mut queue = std::collections::VecDeque::new();
             queue.push_back((start, 0usize));
             visited[start][0] = true;
-            let mut reached_terminal = false;
 
             while let Some((node, loss_count)) = queue.pop_front() {
                 if self.node_levels[node] == terminal_level {
                     if loss_count < required_losses {
                         return Err(RewardNetworkError::TooFewLossesOnPath {
-                            start, reached: node, losses: loss_count, required_losses,
+                            start,
+                            reached: node,
+                            losses: loss_count,
+                            required_losses,
                         });
                     }
-                    reached_terminal = true;
+                    if start == self.start_node {
+                        start_reaches_terminal = true;
+                    }
                     continue;
                 }
+
                 for &edge_index in &self.outgoing[node] {
                     let edge = self.edges[edge_index];
-                    let next_losses = (loss_count + if edge.reward < 0 { 1 } else { 0 }).min(required_losses);
+                    let next_losses = (
+                        loss_count + if edge.reward < 0 { 1 } else { 0 }
+                    ).min(required_losses);
                     if !visited[edge.to][next_losses] {
                         visited[edge.to][next_losses] = true;
                         queue.push_back((edge.to, next_losses));
                     }
                 }
             }
+        }
 
-            if !reached_terminal {
-                return Err(RewardNetworkError::TerminalLevelUnreachable { start, terminal_level });
-            }
+        if !start_reaches_terminal {
+            return Err(RewardNetworkError::TerminalLevelUnreachable {
+                start: self.start_node,
+                terminal_level,
+            });
         }
         Ok(())
     }
+
     pub fn node_count(&self) -> usize { self.node_levels.len() }
     pub fn edges(&self) -> &[RewardEdge] { &self.edges }
     pub fn outgoing_edge_indices(&self, node: usize) -> Option<&[usize]> { self.outgoing.get(node).map(Vec::as_slice) }
@@ -479,6 +502,38 @@ mod tests {
                 node: 1,
                 level: 4,
                 max_level: PUBLISHED_MAX_NODE_LEVEL,
+            })
+        );
+    }
+
+    #[test]
+    fn disconnected_non_start_level_zero_node_does_not_invalidate_task() {
+        let network = RewardNetwork::new(
+            vec![0, 0, 1, 2, 3],
+            vec![
+                RewardEdge { from: 0, to: 2, reward: -50 },
+                RewardEdge { from: 2, to: 3, reward: -50 },
+                RewardEdge { from: 3, to: 4, reward: -50 },
+            ],
+            0,
+        ).unwrap();
+        assert!(network.validate_terminal_strategy(3, 3).is_ok());
+    }
+
+    #[test]
+    fn designated_start_must_reach_terminal_level() {
+        let network = RewardNetwork::new(
+            vec![0, 0, 3],
+            vec![
+                RewardEdge { from: 1, to: 2, reward: -50 },
+            ],
+            0,
+        ).unwrap();
+        assert_eq!(
+            network.validate_terminal_strategy(3, 1),
+            Err(RewardNetworkError::TerminalLevelUnreachable {
+                start: 0,
+                terminal_level: 3,
             })
         );
     }
