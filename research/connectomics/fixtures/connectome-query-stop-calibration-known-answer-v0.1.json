@@ -169,7 +169,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_report": {
         "report_version": "0.1",
@@ -195,7 +196,9 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
       }
     },
     {
@@ -373,7 +376,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_report": {
         "report_version": "0.1",
@@ -399,7 +403,9 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
       }
     },
     {
@@ -577,7 +583,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_report": {
         "report_version": "0.1",
@@ -603,7 +610,9 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
       }
     },
     {
@@ -781,7 +790,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_report": {
         "report_version": "0.1",
@@ -807,7 +817,9 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
       }
     },
     {
@@ -985,7 +997,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_report": {
         "report_version": "0.1",
@@ -1011,7 +1024,9 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
       }
     },
     {
@@ -1189,7 +1204,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_error": "TargetClusterAppearsInCalibration"
     },
@@ -1368,7 +1384,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_error": "DuplicateIndependenceCluster"
     },
@@ -1547,7 +1564,8 @@
           }
         ],
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": false
+        "target_exchangeability_supported": false,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "expected_report": {
         "report_version": "0.1",
@@ -1573,7 +1591,9 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": false
+        "target_exchangeability_supported": false,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
       }
     }
   ]
