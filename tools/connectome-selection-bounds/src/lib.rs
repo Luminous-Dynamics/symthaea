@@ -381,6 +381,33 @@ pub fn joint_response_prevalence_bounds(
     Ok(NumericInterval { lower, upper })
 }
 
+
+/// Sharp bounds on P(target response | source response) given only marginal intervals.
+///
+/// This is the source-then-target conditional event probability, not a causal effect.
+/// It is derived from the Fréchet coupling bounds and makes no independence assumption.
+/// Returns None when the source prevalence interval includes zero, because the
+/// conditioning denominator is then not guaranteed to be positive.
+pub fn target_given_source_prevalence_bounds(
+    source: NumericInterval,
+    target: NumericInterval,
+) -> Result<Option<NumericInterval>, EvalError> {
+    validate_probability_interval(source, "source_prevalence")?;
+    validate_probability_interval(target, "target_prevalence")?;
+    if source.lower <= 0.0 {
+        return Ok(None);
+    }
+    let lower = ((source.lower + target.lower - 1.0).max(0.0)) / source.lower;
+    let upper = (target.upper / source.lower).min(1.0);
+    if !lower.is_finite() || !upper.is_finite() || lower > upper {
+        return Err(EvalError::NumericOverflow);
+    }
+    Ok(Some(NumericInterval {
+        lower: lower.max(0.0),
+        upper: upper.min(1.0),
+    }))
+}
+
 /// Partially identify latent binary response prevalence from an observed detector-positive
 /// fraction and externally qualified sensitivity/specificity ranges.
 ///
@@ -715,6 +742,44 @@ mod tests {
         let result = joint_response_prevalence_bounds(
             NumericInterval { lower: 0.6, upper: 0.5 },
             NumericInterval { lower: 0.3, upper: 0.7 },
+        );
+        assert_eq!(result.unwrap_err(), EvalError::InvalidProbabilityInterval("source_prevalence"));
+    }
+
+    #[test]
+    fn conditional_target_given_source_bounds_match_point_marginal_answer() {
+        let conditional = target_given_source_prevalence_bounds(
+            NumericInterval { lower: 0.8, upper: 0.8 },
+            NumericInterval { lower: 0.6, upper: 0.6 },
+        ).unwrap().unwrap();
+        close(conditional.lower, 0.5);
+        close(conditional.upper, 0.75);
+    }
+
+    #[test]
+    fn conditional_target_given_source_respects_marginal_uncertainty() {
+        let conditional = target_given_source_prevalence_bounds(
+            NumericInterval { lower: 0.7, upper: 0.8 },
+            NumericInterval { lower: 0.6, upper: 0.9 },
+        ).unwrap().unwrap();
+        close(conditional.lower, 3.0/7.0);
+        close(conditional.upper, 1.0);
+    }
+
+    #[test]
+    fn conditional_target_given_source_is_not_estimable_if_source_can_be_zero() {
+        let conditional = target_given_source_prevalence_bounds(
+            NumericInterval { lower: 0.0, upper: 0.8 },
+            NumericInterval { lower: 0.6, upper: 0.9 },
+        ).unwrap();
+        assert_eq!(conditional, None);
+    }
+
+    #[test]
+    fn conditional_target_bounds_fail_closed_on_invalid_marginals() {
+        let result = target_given_source_prevalence_bounds(
+            NumericInterval { lower: 0.2, upper: 1.1 },
+            NumericInterval { lower: 0.6, upper: 0.9 },
         );
         assert_eq!(result.unwrap_err(), EvalError::InvalidProbabilityInterval("source_prevalence"));
     }

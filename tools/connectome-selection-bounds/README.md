@@ -150,3 +150,14 @@ A synthetic validation fixture uses TP=90, FN=10, TN=95, FP=5 at z=1.9599639845.
 Detector-count calibration contracts:
 - `schemas/detector-validation-counts-input.schema.json` defines the TP/FN/TN/FP counts and Wilson z-score.
 - `schemas/detector-validation-counts-fixture.schema.json` validates the wrapper for `fixtures/detector-validation-counts-known-answer.json`.
+
+
+## Source-to-target conditional response
+
+`target_given_source_prevalence_bounds(source, target)` derives sharp bounds for the conditional target-response probability P(target | source) from the same marginal prevalence intervals:
+
+    [max(0, s_L + t_L - 1) / s_L, min(1, t_U / s_L)]
+
+This result is returned only when the source lower bound is strictly positive. If the source prevalence interval includes zero, the function returns `None` because the conditioning denominator is not guaranteed to exist. It is an associational probability bound, not a causal propagation effect or proof of a direct synapse.
+
+For point marginals source=0.8 and target=0.6, the conditional target-response probability is bounded by [0.5,0.75]. With intervals source=[0.7,0.8] and target=[0.6,0.9], it is [3/7,1]. These are sharp over all compatible source/target couplings.
