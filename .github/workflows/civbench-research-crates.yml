@@ -1,0 +1,48 @@
+name: CivBench standalone research crates
+
+on:
+  pull_request:
+    paths:
+      - "research/**/Cargo.toml"
+      - "research/**/Cargo.lock"
+      - "research/**/src/**"
+      - ".github/workflows/civbench-research-crates.yml"
+  push:
+    paths:
+      - "research/**/Cargo.toml"
+      - "research/**/Cargo.lock"
+      - "research/**/src/**"
+      - ".github/workflows/civbench-research-crates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-research-crates:
+    name: Test standalone Rust research crates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test every standalone research crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          manifests=(research/*/Cargo.toml)
+          if (("${#manifests[@]}" == 0)); then
+            echo "No standalone research crates found."
+            exit 0
+          fi
+
+          for manifest in "${manifests[@]}"; do
+            echo "::group::${manifest}"
+            cargo check --locked --manifest-path "${manifest}" --all-targets
+            cargo test --locked --manifest-path "${manifest}" --all-targets
+            echo "::endgroup::"
+          done
