@@ -1,0 +1,12 @@
+[package]
+name = "dopri-min-step-termination-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Isolated verification harness for Symthaea's Dormand-Prince ODE solver"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+
+[workspace]
