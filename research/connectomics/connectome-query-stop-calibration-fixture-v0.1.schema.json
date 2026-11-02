@@ -51,7 +51,9 @@
               "TargetVolumeAppearsInCalibration",
               "TargetClusterAppearsInCalibration",
               "EmptySourceVolume",
-              "RankOverflow"
+              "RankOverflow",
+              "DuplicateIndependenceCluster",
+              "TargetClusterAppearsInCalibration"
             ]
           }
         },
