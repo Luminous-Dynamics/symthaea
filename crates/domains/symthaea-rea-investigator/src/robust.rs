@@ -236,10 +236,7 @@ fn validate_scenarios(
                 ));
             }
         }
-        if experiment_ids
-            .iter()
-            .any(|id| !seen.contains(id))
-        {
+        if experiment_ids.iter().any(|id| !seen.contains(id)) {
             return Err(PlannerError::new(
                 PlannerErrorKind::InvalidLikelihoods,
                 format!(
@@ -330,8 +327,7 @@ pub fn plan_next_experiment_robust(
 
     let mut unique_experiment_ids = HashSet::new();
     for experiment in experiments {
-        if experiment.id.trim().is_empty()
-            || !unique_experiment_ids.insert(experiment.id.as_str())
+        if experiment.id.trim().is_empty() || !unique_experiment_ids.insert(experiment.id.as_str())
         {
             return Err(PlannerError::new(
                 PlannerErrorKind::DuplicateExperimentId,
@@ -354,10 +350,13 @@ pub fn plan_next_experiment_robust(
             prior_entropy_bits,
             grounded_hypothesis_ids: grounded_ids,
             scenario_ids: {
-            let mut ids: Vec<String> = scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect();
-            ids.sort();
-            ids
-        },
+                let mut ids: Vec<String> = scenarios
+                    .iter()
+                    .map(|scenario| scenario.scenario_id.clone())
+                    .collect();
+                ids.sort();
+                ids
+            },
             claim_ceiling: RobustClaimCeiling::default(),
         });
     }
@@ -409,18 +408,22 @@ pub fn plan_next_experiment_robust(
         if let Some(reason) = rejection {
             // A metadata/budget policy rejection applies to every scenario.
             let mapped = match reason {
-                RejectionReason::AuthorizationUnknown => RobustRejectionReason::AuthorizationUnknown,
+                RejectionReason::AuthorizationUnknown => {
+                    RobustRejectionReason::AuthorizationUnknown
+                }
                 RejectionReason::NotAuthorized => RobustRejectionReason::NotAuthorized,
                 RejectionReason::Irreversible => RobustRejectionReason::Irreversible,
                 RejectionReason::Destructive => RobustRejectionReason::Destructive,
-                RejectionReason::TargetImpactExceeded => RobustRejectionReason::TargetImpactExceeded,
-                RejectionReason::TimeBudgetExceeded => RobustRejectionReason::TimeBudgetExceeded,
-                RejectionReason::EnergyBudgetExceeded => RobustRejectionReason::EnergyBudgetExceeded,
-                RejectionReason::RiskBudgetExceeded => RobustRejectionReason::RiskBudgetExceeded,
-                RejectionReason::InvalidOutcomeSpace => {
-                    RobustRejectionReason::InvalidOutcomeSpace
+                RejectionReason::TargetImpactExceeded => {
+                    RobustRejectionReason::TargetImpactExceeded
                 }
-                | RejectionReason::InvalidLikelihoods
+                RejectionReason::TimeBudgetExceeded => RobustRejectionReason::TimeBudgetExceeded,
+                RejectionReason::EnergyBudgetExceeded => {
+                    RobustRejectionReason::EnergyBudgetExceeded
+                }
+                RejectionReason::RiskBudgetExceeded => RobustRejectionReason::RiskBudgetExceeded,
+                RejectionReason::InvalidOutcomeSpace => RobustRejectionReason::InvalidOutcomeSpace,
+                RejectionReason::InvalidLikelihoods
                 | RejectionReason::NoPredictedInformationGain => {
                     RobustRejectionReason::NoRobustInformationGain
                 }
@@ -477,10 +480,12 @@ pub fn plan_next_experiment_robust(
     for (experiment_id, items) in scenario_results {
         let samples: Vec<(f64, f64)> = items
             .iter()
-            .map(|item| (
-                item.result.expected_information_gain_bits,
-                item.result.scenario_probability,
-            ))
+            .map(|item| {
+                (
+                    item.result.expected_information_gain_bits,
+                    item.result.scenario_probability,
+                )
+            })
             .collect();
         let expected_information_gain_bits = samples
             .iter()
@@ -527,14 +532,22 @@ pub fn plan_next_experiment_robust(
     }
 
     ranked_experiments.sort_by(|left, right| {
-        right.utility.total_cmp(&left.utility)
-            .then_with(|| right.selected_information_gain_bits.total_cmp(&left.selected_information_gain_bits))
+        right
+            .utility
+            .total_cmp(&left.utility)
+            .then_with(|| {
+                right
+                    .selected_information_gain_bits
+                    .total_cmp(&left.selected_information_gain_bits)
+            })
             .then_with(|| left.experiment_id.cmp(&right.experiment_id))
     });
     rejected_experiments.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
 
     for candidate in &mut ranked_experiments {
-        candidate.scenario_results.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+        candidate
+            .scenario_results
+            .sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
     }
     let selected = ranked_experiments
         .iter()
@@ -552,7 +565,10 @@ pub fn plan_next_experiment_robust(
         Some(_) => None,
         None if ranked_experiments.iter().any(|candidate| {
             candidate.selected_information_gain_bits > config.base.minimum_information_gain_bits
-        }) => Some(RobustAbstentionReason::UnstableRanking),
+        }) =>
+        {
+            Some(RobustAbstentionReason::UnstableRanking)
+        }
         None if experiments.is_empty() => Some(RobustAbstentionReason::NoEligibleExperiment),
         None if rejected_experiments
             .iter()
@@ -563,9 +579,7 @@ pub fn plan_next_experiment_robust(
         None => Some(RobustAbstentionReason::NoEligibleExperiment),
     };
 
-    rejected_experiments.sort_by(|left, right| {
-        left.experiment_id.cmp(&right.experiment_id)
-    });
+    rejected_experiments.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
 
     Ok(RobustInvestigationPlan {
         selected,
@@ -574,7 +588,10 @@ pub fn plan_next_experiment_robust(
         abstention,
         prior_entropy_bits,
         grounded_hypothesis_ids: grounded_ids,
-        scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+        scenario_ids: scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_id.clone())
+            .collect(),
         claim_ceiling: RobustClaimCeiling::default(),
     })
 }
@@ -646,9 +663,7 @@ mod tests {
         }
     }
 
-    fn scenarios_for(
-        experiments: Vec<ScenarioExperimentLikelihood>,
-    ) -> LikelihoodModelScenario {
+    fn scenarios_for(experiments: Vec<ScenarioExperimentLikelihood>) -> LikelihoodModelScenario {
         LikelihoodModelScenario {
             scenario_id: "nominal".to_owned(),
             scenario_probability: 1.0,
@@ -697,18 +712,12 @@ mod tests {
             LikelihoodModelScenario {
                 scenario_id: "nominal".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![
-                    matrix("fragile", 0.9, 0.1),
-                    matrix("steady", 0.75, 0.25),
-                ],
+                experiments: vec![matrix("fragile", 0.9, 0.1), matrix("steady", 0.75, 0.25)],
             },
             LikelihoodModelScenario {
                 scenario_id: "shifted".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![
-                    matrix("fragile", 0.5, 0.5),
-                    matrix("steady", 0.75, 0.25),
-                ],
+                experiments: vec![matrix("fragile", 0.5, 0.5), matrix("steady", 0.75, 0.25)],
             },
         ];
         let plan = plan_next_experiment_robust(
@@ -720,7 +729,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.selected.unwrap().experiment_id, "steady");
-        let fragile = plan.ranked_experiments.iter().find(|item| item.experiment_id == "fragile").unwrap();
+        let fragile = plan
+            .ranked_experiments
+            .iter()
+            .find(|item| item.experiment_id == "fragile")
+            .unwrap();
         assert!(fragile.top1_rank_stability < 1.0);
     }
 
@@ -730,18 +743,12 @@ mod tests {
             LikelihoodModelScenario {
                 scenario_id: "nominal".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![
-                    matrix("probe-a", 0.9, 0.1),
-                    matrix("probe-b", 0.75, 0.25),
-                ],
+                experiments: vec![matrix("probe-a", 0.9, 0.1), matrix("probe-b", 0.75, 0.25)],
             },
             LikelihoodModelScenario {
                 scenario_id: "shifted".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![
-                    matrix("probe-a", 0.75, 0.25),
-                    matrix("probe-b", 0.9, 0.1),
-                ],
+                experiments: vec![matrix("probe-a", 0.75, 0.25), matrix("probe-b", 0.9, 0.1)],
             },
         ];
         let plan = plan_next_experiment_robust(
@@ -756,7 +763,10 @@ mod tests {
         )
         .unwrap();
         assert!(plan.selected.is_none());
-        assert_eq!(plan.abstention, Some(RobustAbstentionReason::UnstableRanking));
+        assert_eq!(
+            plan.abstention,
+            Some(RobustAbstentionReason::UnstableRanking)
+        );
     }
 
     #[test]
@@ -799,18 +809,12 @@ mod tests {
             LikelihoodModelScenario {
                 scenario_id: "nominal".to_owned(),
                 scenario_probability: 0.7,
-                experiments: vec![
-                    matrix("probe-a", 0.9, 0.1),
-                    matrix("probe-b", 0.75, 0.25),
-                ],
+                experiments: vec![matrix("probe-a", 0.9, 0.1), matrix("probe-b", 0.75, 0.25)],
             },
             LikelihoodModelScenario {
                 scenario_id: "shift".to_owned(),
                 scenario_probability: 0.3,
-                experiments: vec![
-                    matrix("probe-a", 0.8, 0.2),
-                    matrix("probe-b", 0.6, 0.4),
-                ],
+                experiments: vec![matrix("probe-a", 0.8, 0.2), matrix("probe-b", 0.6, 0.4)],
             },
         ];
         let proposals = vec![proposal("probe-a"), proposal("probe-b")];
@@ -839,8 +843,16 @@ mod tests {
             second.selected.as_ref().map(|item| &item.experiment_id)
         );
         assert_eq!(
-            first.ranked_experiments.iter().map(|item| &item.experiment_id).collect::<Vec<_>>(),
-            second.ranked_experiments.iter().map(|item| &item.experiment_id).collect::<Vec<_>>()
+            first
+                .ranked_experiments
+                .iter()
+                .map(|item| &item.experiment_id)
+                .collect::<Vec<_>>(),
+            second
+                .ranked_experiments
+                .iter()
+                .map(|item| &item.experiment_id)
+                .collect::<Vec<_>>()
         );
     }
     #[test]
@@ -903,18 +915,12 @@ mod tests {
             LikelihoodModelScenario {
                 scenario_id: "fragile-high".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![
-                    matrix("probe-a", 0.95, 0.05),
-                    matrix("probe-b", 0.75, 0.25),
-                ],
+                experiments: vec![matrix("probe-a", 0.95, 0.05), matrix("probe-b", 0.75, 0.25)],
             },
             LikelihoodModelScenario {
                 scenario_id: "fragile-zero".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![
-                    matrix("probe-a", 0.5, 0.5),
-                    matrix("probe-b", 0.75, 0.25),
-                ],
+                experiments: vec![matrix("probe-a", 0.5, 0.5), matrix("probe-b", 0.75, 0.25)],
             },
         ];
         let expected = plan_next_experiment_robust(
@@ -927,7 +933,8 @@ mod tests {
                 minimum_top1_stability: 0.0,
                 ..RobustPlannerConfig::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(expected.selected.unwrap().experiment_id, "probe-a");
 
         let worst = plan_next_experiment_robust(
@@ -940,7 +947,8 @@ mod tests {
                 minimum_top1_stability: 0.0,
                 ..RobustPlannerConfig::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(worst.selected.unwrap().experiment_id, "probe-b");
     }
 
@@ -964,9 +972,13 @@ mod tests {
             &[proposal("probe")],
             &scenarios,
             RobustPlannerConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(plan.selected.is_none());
-        assert_eq!(plan.abstention, Some(RobustAbstentionReason::NoDiscriminatingExperiment));
+        assert_eq!(
+            plan.abstention,
+            Some(RobustAbstentionReason::NoDiscriminatingExperiment)
+        );
         assert_eq!(
             plan.rejected_experiments[0].reason,
             RobustRejectionReason::NoRobustInformationGain
@@ -984,7 +996,8 @@ mod tests {
             &[invalid],
             &scenarios,
             RobustPlannerConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             plan.rejected_experiments[0].reason,
             RobustRejectionReason::InvalidOutcomeSpace
@@ -1019,9 +1032,12 @@ mod tests {
         assert_eq!(plan.scenario_ids, vec!["a-nominal", "z-shift"]);
         let selected = plan.selected.unwrap();
         assert_eq!(
-            selected.scenario_results.iter().map(|item| item.scenario_id.as_str()).collect::<Vec<_>>(),
+            selected
+                .scenario_results
+                .iter()
+                .map(|item| item.scenario_id.as_str())
+                .collect::<Vec<_>>(),
             vec!["a-nominal", "z-shift"]
         );
     }
-
 }
