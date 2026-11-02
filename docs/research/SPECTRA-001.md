@@ -281,3 +281,26 @@ This document does not claim:
 - that a simulation or HDC representation is physical evidence;
 - that a synthetic benchmark implies human-subject or operational validity;
 - that a single positive study supports a mechanism or universal capability.
+
+## 12. Implementation state and 2026 evidence update
+
+The following are implementation work items, not experimental results:
+
+- [SPECTRA-001 T0 synthetic qualifier PR #10040](https://github.com/Luminous-Dynamics/symthaea/pull/10040): standalone trial-structure validator, strict role/time/candidate/ranking checks, exact descriptive target-rank score, frozen null/signal/RF-leakage/adversarial fixtures and schema. It deliberately gives the signal and RF-leakage fixtures the same score, so score alone cannot identify cause.
+- [RESONANCE-001 analytical reference PR #10041](https://github.com/Luminous-Dynamics/symthaea/pull/10041): ideal series/parallel RLC and two-resonator mutual-inductance closed-form references. This is the R0 analytical layer only.
+- [Symtropy SPECTRA-SIM-001 issue #3374](https://github.com/Luminous-Dynamics/symtropy/issues/3374) remains the owner for enclosure field simulation and shielding-transfer validation. Compose the work with [SIM-REL-050](https://github.com/Luminous-Dynamics/symtropy/pull/3381) and [SIM-REL-053](https://github.com/Luminous-Dynamics/symtropy/pull/3384); do not fork a second generic adversarial-evaluation framework.
+
+The synthetic fixtures were independently replayed with a separate JavaScript reference implementation. The five SPECTRA cases matched their expected accept/reject dispositions and rank summaries; all 16 RLC/coupled-mode fixture fields matched within the fixture tolerance. Rust compilation, Cargo tests, Clippy, physical measurement and CI qualification have not yet been established. The two implementation PRs are drafts and their exact-head GitHub workflows were skipped; skipped is not pass.
+
+### Literature interpretation guardrail
+
+Acunzo et al. (2026) reviewed 143 neuroimaging reports and qualitatively assessed 129 studies. They report that explicit ESP paradigms rarely showed above-chance behaviour, while neural analyses often proceeded despite that behavioural result; small samples, inadequate multiplicity control and analytical flexibility were recurrent limitations. Therefore, behavioural outcome must remain the locked primary endpoint. Neurophysiology may characterize a preregistered secondary mechanism, but it must not become a post-hoc replacement endpoint after a behavioural null.
+
+Tressoldi and Storm's version posted to OSF Preprints on 2026-10-28 reports 50 preregistered studies and 60 experiments; 17 experiments (28.3%) had at least one positive confirmatory outcome, while 20 of 97 confirmatory hypotheses were positive. Preserve this as a relevant preprint result, report experiment- and hypothesis-level counts separately, and inspect effect sizes, uncertainty, heterogeneity and replication. A positive-outcome fraction is not an effect-size estimate and does not identify a mechanism.
+
+Puharich's biographical record supports studying his medical electronics, biophysics, neurophysiology and biocybernetics as historical engineering work. It also records the controversy around his Geller investigations and the difficulty of excluding conjuring. Reconstruct any claimed cage/ELF apparatus from primary documents and independent measurement records before treating an anecdote or historical description as a reproducible protocol.
+
+References added:
+- Acunzo et al. (2026), NeuroImage systematic and critical review: https://pubmed.ncbi.nlm.nih.gov/42009267/
+- Tressoldi & Storm (2026-10-28), OSF Preprints version: https://sciety.org/articles/activity/10.31234/osf.io/ha4np_v4
+- Jenkins (2015, updated 2026-05-27), Andrija Puharich, Psi Encyclopedia: https://psi-encyclopedia.spr.ac.uk/articles/andrija-puharich/
