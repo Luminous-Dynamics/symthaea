@@ -41,7 +41,17 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft202012Validator, validate
 
-          report = json.loads(Path("/tmp/cmaq-012-report.json").read_text())
+          report_text = Path("/tmp/cmaq-012-report.json").read_text()
+          try:
+              report = json.loads(report_text)
+          except json.JSONDecodeError as error:
+              lines = report_text.splitlines()
+              start = max(0, error.lineno - 4)
+              end = min(len(lines), error.lineno + 3)
+              print(f"CMAQ-012 renderer emitted invalid JSON: {error}")
+              for index in range(start, end):
+                  print(f"{index + 1}: {lines[index]}")
+              raise
           schema = json.loads(Path("report.schema.json").read_text())
           profile_schema = json.loads(Path("resource-profile.schema.json").read_text())
           receipt_schema = json.loads(Path("profiling-receipt.schema.json").read_text())
