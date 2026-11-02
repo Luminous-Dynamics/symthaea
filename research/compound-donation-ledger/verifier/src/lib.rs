@@ -203,6 +203,7 @@ pub fn verify_receipt(
                         round: *round,
                         token_id,
                         donor_id: *candidate_id,
+                        destination_id: destination,
                         amount: reserve,
                     });
                 }
@@ -336,14 +337,10 @@ pub fn verify_receipt(
                 // The reference snapshot omits the fixed destination field. Reconstruct
                 // it from the precommitted candidate specification.
                 expected.escrow.iter().map(|token| {
-                    let destination = spec_map
-                        .get(&token.donor_id)
-                        .and_then(|spec| spec.destination_id)
-                        .unwrap_or(0);
                     VerifiedToken {
                         token_id: token.token_id,
                         donor_id: token.donor_id,
-                        destination_id: destination,
+                        destination_id: token.destination_id,
                         created_round: token.created_round,
                         original_amount: token.original_amount,
                         remaining_amount: token.remaining_amount,
