@@ -451,6 +451,16 @@ impl NoncompensatoryGuardrailRequest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct GuardrailPolicyEvidence {
+    pub policy_id: String,
+    pub availability: GuardrailEvidenceAvailability,
+    pub sample_size: usize,
+    pub source_receipt_sha256: String,
+    pub reason_code: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GuardrailRequirementResult {
     pub requirement_id: String,
     pub guardrail_id: String,
@@ -462,6 +472,7 @@ pub struct GuardrailRequirementResult {
     pub threshold: f64,
     pub mixture_lower_confidence_bound: Option<f64>,
     pub mixture_upper_confidence_bound: Option<f64>,
+    pub contributing_policy_evidence: Vec<GuardrailPolicyEvidence>,
     pub decision: GuardrailCellDecision,
     pub reason_code: Option<String>,
 }
@@ -539,6 +550,7 @@ pub fn analyze_noncompensatory_guardrails(
         let mut upper_sum = 0.0;
         let mut unavailable_reason: Option<String> = None;
         let mut missing_evidence = false;
+        let mut contributing_policy_evidence = Vec::with_capacity(weight_map.len());
         for policy_id in weight_map.keys() {
             let probability = weight_map[policy_id];
             let Some(bound) = bound_map.get(&(*policy_id, requirement.requirement_id.as_str())) else {
@@ -546,6 +558,13 @@ pub fn analyze_noncompensatory_guardrails(
                 unavailable_reason.get_or_insert_with(|| "MISSING_POLICY_EVIDENCE".to_owned());
                 continue;
             };
+            contributing_policy_evidence.push(GuardrailPolicyEvidence {
+                policy_id: bound.policy_id.clone(),
+                availability: bound.availability,
+                sample_size: bound.sample_size,
+                source_receipt_sha256: bound.source_receipt_sha256.clone(),
+                reason_code: bound.reason_code.clone(),
+            });
             let requirement_minimum = minimum_sample_sizes
                 .get(requirement.requirement_id.as_str())
                 .copied()
@@ -635,6 +654,7 @@ pub fn analyze_noncompensatory_guardrails(
             threshold: requirement.threshold,
             mixture_lower_confidence_bound: lower,
             mixture_upper_confidence_bound: upper,
+            contributing_policy_evidence,
             decision,
             reason_code,
         });
