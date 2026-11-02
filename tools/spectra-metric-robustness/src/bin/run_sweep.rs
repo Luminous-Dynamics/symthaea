@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "world,seed,total_trials,observed_trials,missing_trials,d_prime,criterion_c,auc,average_precision,prevalence,variance_ratio,signal_skew,noise_skew,signal_excess_kurtosis,noise_excess_kurtosis,lag1_residual_correlation,early_late_d_prime_delta,early_late_criterion_delta,participant_d_prime_sd,signal_missing_rate,noise_missing_rate,auxiliary_auc,disposition,flags"
+        "world,seed,total_trials,observed_trials,missing_trials,d_prime,criterion_c,auc,average_precision,prevalence,variance_ratio,signal_skew,noise_skew,signal_excess_kurtosis,noise_excess_kurtosis,lag1_residual_correlation,early_late_d_prime_delta,early_late_criterion_delta,participant_d_prime_sd,signal_missing_rate,noise_missing_rate,session_missingness_range,auxiliary_auc,disposition,flags"
     );
 
     for world in StressWorld::ALL {
@@ -71,6 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 participant_sd,
                 report.signal_missing_rate,
                 report.noise_missing_rate,
+                report.session_missingness_range,
                 report.auxiliary_channel_auc,
                 report.disposition.as_str(),
                 flags
