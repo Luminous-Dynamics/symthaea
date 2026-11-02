@@ -1092,6 +1092,29 @@ mod tests {
     }
 
     #[test]
+    fn preserves_authorization_rejection_in_decision_aware_report() {
+        let mut unsafe_probe = proposal("unsafe-probe");
+        unsafe_probe.authorization = Authorization::Denied;
+        let plan = plan_next_experiment_decision_aware(
+            &evidence(),
+            &hypotheses(),
+            &[unsafe_probe],
+            &[scenario("nominal", 1.0, vec![matrix("unsafe-probe", 0.9, 0.1)])],
+            &decisions(),
+            DecisionAwareConfig::default(),
+        ).unwrap();
+        assert!(plan.selected.is_none());
+        assert_eq!(
+            plan.abstention,
+            Some(DecisionAbstentionReason::NoEligibleExperiment)
+        );
+        assert_eq!(
+            plan.rejected_experiments[0].reasons,
+            vec![DecisionRejectionReason::NotAuthorized]
+        );
+    }
+
+    #[test]
     fn rejects_when_shared_policy_regret_exceeds_limit() {
         let scenarios = vec![
             scenario("world-a", 0.5, vec![matrix("probe", 0.9, 0.1)]),
