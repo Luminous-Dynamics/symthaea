@@ -76,6 +76,7 @@ pub enum VehicleRtaReason {
     StateInvalid,
     StateStale,
     StateOutsideEnvelope,
+    MarginInvalid,
     EstimatorUnhealthy,
     RealtimeUnhealthy,
     ActuatorUnhealthy,
@@ -128,6 +129,8 @@ pub struct VehicleRtaWitness {
 pub struct VehicleRtaDecision {
     pub schema_version: String,
     pub profile_id: String,
+    /// BLAKE3 of canonical serde_json serialization of VehicleRtaConfig v0.1.
+    pub profile_digest: String,
     pub observation_timestamp_s: Option<f64>,
     pub mode: VehicleRtaMode,
     pub selected_command: Option<VehicleCommand>,
@@ -149,6 +152,7 @@ pub struct VehicleRuntimeAssurance {
     last_timestamp_s: Option<f64>,
     safe_since_s: Option<f64>,
     transition_started_s: Option<f64>,
+    profile_digest: String,
 }
 
 impl VehicleRuntimeAssurance {
@@ -156,12 +160,17 @@ impl VehicleRuntimeAssurance {
         if !config_is_valid(&config) {
             return Err(VehicleRtaError::InvalidConfiguration);
         }
+        let profile_bytes =
+            serde_json::to_vec(&config).map_err(|_| VehicleRtaError::InvalidConfiguration)?;
+        let profile_digest = blake3::hash(&profile_bytes).to_hex().to_string();
+
         Ok(Self {
             config,
             mode: VehicleRtaMode::Baseline,
             last_timestamp_s: None,
             safe_since_s: None,
             transition_started_s: None,
+            profile_digest,
         })
     }
 
@@ -246,7 +255,7 @@ impl VehicleRuntimeAssurance {
         if !observation.envelope_margin.is_finite()
             || !observation.controllability_margin.is_finite()
         {
-            reasons.push(VehicleRtaReason::StateInvalid);
+            reasons.push(VehicleRtaReason::MarginInvalid);
         } else {
             if observation.envelope_margin < self.config.minimum_envelope_margin {
                 reasons.push(VehicleRtaReason::EnvelopeMarginInsufficient);
@@ -367,6 +376,7 @@ impl VehicleRuntimeAssurance {
         VehicleRtaDecision {
             schema_version: self.config.schema_version.clone(),
             profile_id: self.config.profile_id.clone(),
+            profile_digest: self.profile_digest.clone(),
             observation_timestamp_s,
             mode: self.mode,
             selected_command,
