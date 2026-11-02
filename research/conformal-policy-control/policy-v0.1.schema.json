@@ -17,7 +17,8 @@
     "calibration_mixture_policy",
     "beta_grid",
     "calibration_samples",
-    "notes"
+    "notes",
+    "external_baseline_references"
   ],
   "properties": {
     "schema": {
@@ -139,6 +140,66 @@
       "minItems": 1,
       "items": {
         "type": "string"
+      }
+    },
+    "external_baseline_references": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "role",
+          "paper_url",
+          "code_url",
+          "code_commit",
+          "code_commit_date",
+          "license",
+          "status",
+          "audit_note"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paper_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "code_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "code_commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "code_commit_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "reference_implementation_pinned_reproduction_required",
+              "paper_matched_reproduction_verified",
+              "preliminary_reference_only_no_license"
+            ]
+          },
+          "audit_note": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   },
