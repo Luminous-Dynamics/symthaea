@@ -10,6 +10,7 @@ on:
       - "src/rea_compat.rs"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-evidence-compat-harness/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   push:
     branches: [main]

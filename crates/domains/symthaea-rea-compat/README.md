@@ -83,3 +83,25 @@ The committed unit fixture is a source-derived reference vector; its semantic di
 ## Claim ceiling
 
 A matching Evidence ID proves that the supplied object is internally consistent with this implementation's semantic projection and canonicalization. It does not prove producer authorship, provenance authenticity, observation truth, hardware identity, runtime behavior, or security compliance. Use HARDSEC and independently trusted signed/anchored receipts for those claims.
+
+
+## Offline CLI
+
+The package includes `rea-evidence-verify`, an offline command for checking saved Evidence without Node.js, MCP, ADB or an external provider:
+
+```bash
+rea-evidence-verify --text ./evidence.json
+rea-evidence-verify --json ./evidence.json
+```
+
+The command:
+- reads at most 64 MiB + 1 byte, so the size limit applies during the read rather than only to file metadata;
+- rejects duplicate JSON keys and trailing JSON data;
+- validates the Evidence envelope, analysis-profile digest/provider binding and semantic Evidence ID;
+- reports the raw-file SHA-256 separately;
+- omits subject paths and raw/normalized result payloads from default output;
+- returns stable error categories and non-zero exit codes for rejected inputs.
+
+The JSON output includes explicit false values for producer authentication, observation truth, hardware attestation, runtime integrity and security compliance. A successful exit means only that the saved record is internally consistent under the pinned compatibility contract. It does not mean that the producer is trusted, the observation occurred or a device is secure.
+
+The CLI contains no network, shell, process-launch, provider-discovery or device-access implementation. Its only target-side effect is opening and reading the caller-selected file.
