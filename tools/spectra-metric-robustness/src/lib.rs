@@ -438,12 +438,12 @@ pub fn evaluate(
             if row.evidence_score.is_some() {
                 return Err(RobustnessError::MisalignedRecords);
             }
-            missing_by_class[usize::from(is_signal)] += 1;
+            missing_by_class[if is_signal { 1 } else { 0 }] += 1;
             continue;
         }
         let score = row.evidence_score.ok_or(RobustnessError::MisalignedRecords)?;
         let response = row.response.ok_or(RobustnessError::MisalignedRecords)?;
-        observed_by_class[usize::from(is_signal)] += 1;
+        observed_by_class[if is_signal { 1 } else { 0 }] += 1;
         main_observations.push(RocObservation { score, is_signal });
 
         match (is_signal, response) {
