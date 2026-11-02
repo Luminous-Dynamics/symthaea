@@ -741,7 +741,8 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         "closure_proof_sha256": closure_proof_sha256,
         "verifier_sha256": verifier_sha256,
         "expected_world_ids": expected_world_ids,
-        "closure_verified": true
+        "closure_verified": false,
+        "finite_cartesian_enumeration_verified": true
     });
     let mut receipt = json!({
         "protocol": RECEIPT_PROTOCOL,
@@ -998,9 +999,14 @@ mod tests {
         let receipt = verify_manifest(&path, verifier).expect("verified finite universe");
         assert_eq!(receipt["disposition"], "VERIFIED");
         assert!(
-            receipt["coverage"]["closure_verified"]
+            !receipt["coverage"]["closure_verified"]
                 .as_bool()
-                .expect("closure flag")
+                .expect("trusted closure flag must remain false without external trust")
+        );
+        assert!(
+            receipt["coverage"]["finite_cartesian_enumeration_verified"]
+                .as_bool()
+                .expect("finite product enumeration result")
         );
         assert_eq!(receipt["expected_world_count"], 4);
         assert_eq!(receipt["evaluated_world_count"], 4);
