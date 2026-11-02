@@ -11,6 +11,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SequentialError {
     InvalidProbability(&'static str),
+    InvalidErrorBudget,
     InvalidBounds,
     ObservationOutOfBounds,
     AlreadyStopped,
@@ -62,6 +63,9 @@ impl BernoulliSprt {
         }
         if p0 == p1 {
             return Err(SequentialError::InvalidProbability("distinct p0 and p1"));
+        }
+        if alpha + beta >= 1.0 {
+            return Err(SequentialError::InvalidErrorBudget);
         }
 
         let upper_log_boundary = (1.0 - beta).ln() - alpha.ln();
@@ -340,6 +344,14 @@ mod tests {
             decision = test.observe(false).unwrap();
         }
         assert_eq!(decision, SequentialDecision::AcceptAlternative);
+    }
+
+    #[test]
+    fn rejects_overlapping_wald_error_budget() {
+        assert_eq!(
+            BernoulliSprt::new(0.3, 0.7, 0.7, 0.3),
+            Err(SequentialError::InvalidErrorBudget)
+        );
     }
 
     #[test]
