@@ -412,6 +412,48 @@ struct FrontierCandidate {
     entropy: f64,
 }
 
+/// An additional hard linear inequality over the randomized policy weights.
+///
+/// The represented relation is sum_i coefficients[i] * q_i <= upper_bound.
+/// Coefficients are bound to the canonical policy order of the supplied plan.
+/// These constraints are included in active-basis enumeration, not applied as
+/// a post-hoc penalty.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierAdditionalLinearConstraint {
+    pub constraint_id: String,
+    pub coefficients: Vec<f64>,
+    pub upper_bound: f64,
+}
+
+fn validate_additional_constraints(
+    plan: &PolicyFrontierPlan,
+    additional: &[FrontierAdditionalLinearConstraint],
+) -> Result<(), PolicyFrontierError> {
+    let mut ids = BTreeSet::new();
+    for (index, constraint) in additional.iter().enumerate() {
+        let path = format!("additional_constraints[{index}]");
+        if constraint.constraint_id.trim().is_empty()
+            || !ids.insert(constraint.constraint_id.as_str())
+        {
+            return Err(PolicyFrontierError::new(
+                format!("{path}.constraint_id"),
+                "constraint IDs must be non-empty and unique",
+            ));
+        }
+        if constraint.coefficients.len() != plan.policies.len()
+            || constraint.coefficients.iter().any(|value| !value.is_finite())
+            || !constraint.upper_bound.is_finite()
+        {
+            return Err(PolicyFrontierError::new(
+                &path,
+                "constraint coefficients must match the policy count and all values must be finite",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn dot(left: &[f64], right: &[f64]) -> f64 {
     left.iter().zip(right).map(|(a, b)| a * b).sum()
 }
@@ -695,9 +737,29 @@ fn same_weights(left: &[f64], right: &[f64]) -> bool {
 pub fn analyze_policy_frontier(
     input: &PolicyFrontierPlan,
 ) -> Result<PolicyFrontierReport, PolicyFrontierError> {
+    analyze_policy_frontier_with_constraints(input, &[])
+}
+
+/// Optimize the existing robust policy frontier with additional hard linear
+/// constraints over policy-mixture probabilities. Additional inequalities
+/// participate in exhaustive active-basis enumeration and feasibility checks.
+/// They are not utility penalties and cannot be traded away for objective value.
+pub fn analyze_policy_frontier_with_constraints(
+    input: &PolicyFrontierPlan,
+    additional_constraints: &[FrontierAdditionalLinearConstraint],
+) -> Result<PolicyFrontierReport, PolicyFrontierError> {
     let mut plan = input.clone();
     plan.canonicalize()?;
-    let constraints = build_constraints(&plan)?;
+    validate_additional_constraints(&plan, additional_constraints)?;
+    let mut constraints = build_constraints(&plan)?;
+    for constraint in additional_constraints {
+        let mut coefficients = constraint.coefficients.clone();
+        coefficients.push(0.0); // no coefficient on the utility hypograph variable z
+        constraints.push(LinearConstraint {
+            coefficients,
+            rhs: constraint.upper_bound,
+        });
+    }
     let policy_count = plan.policies.len();
     let variable_count = policy_count + 1;
     let basis_count = choose_count(constraints.len(), policy_count).ok_or_else(|| {
@@ -742,6 +804,12 @@ pub fn analyze_policy_frontier(
         let Some(candidate) = evaluate_weights(&plan, weights)? else {
             continue;
         };
+        if additional_constraints.iter().any(|constraint| {
+            dot(&constraint.coefficients, &candidate.weights)
+                > constraint.upper_bound + FEASIBILITY_TOLERANCE
+        }) {
+            continue;
+        }
         // The LP basis must satisfy every utility hypograph inequality, and
         // z must touch the lower envelope. Reconstructing the lower envelope
         // independently prevents a malformed basis from overstating utility.
