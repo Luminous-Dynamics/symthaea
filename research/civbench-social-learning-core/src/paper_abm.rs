@@ -63,7 +63,7 @@ pub struct Agent {
     pub social_strategy: Option<Strategy>,
     pub integrated_strategy: Strategy,
     pub teacher_index: Option<usize>,
-    pub social_transmission_succeeded: bool,
+    pub social_transmission_event: bool,
     pub demonstration_reward: f64,
     pub machine_originated_strategy: bool,
 }
@@ -104,10 +104,10 @@ impl Generation {
             .map(|agent| agent.demonstration_reward)
             .sum::<f64>() / self.agents.len() as f64;
         let social_transmissions = self.agents.iter()
-            .filter(|agent| agent.social_transmission_succeeded)
+            .filter(|agent| agent.social_transmission_event)
             .count();
         let successful_non_null_transmissions = self.agents.iter()
-            .filter(|agent| agent.social_transmission_succeeded
+            .filter(|agent| agent.social_transmission_event
                 && agent.social_strategy.is_some())
             .count();
         let optimal_transmissions = self.agents.iter()
@@ -461,7 +461,7 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
             social_strategy: None,
             integrated_strategy: individual_strategy,
             teacher_index: None,
-            social_transmission_succeeded: false,
+            social_transmission_event: false,
             demonstration_reward: score,
             machine_originated_strategy: kind == AgentKind::Machine
                 && individual_strategy == Strategy::Optimal,
@@ -496,10 +496,9 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
             };
             let integrated_strategy = integrate(individual_strategy, social_strategy);
             let score = demonstration_reward(integrated_strategy, config, &mut rng);
-            let machine_originated_strategy = match social_strategy {
-                Some(Strategy::Optimal) => previous[teacher_index].machine_originated_strategy,
-                _ => individual_strategy == Strategy::Optimal && false,
-            };
+            let machine_originated_strategy = integrated_strategy == Strategy::Optimal
+                && social_strategy == Some(Strategy::Optimal)
+                && previous[teacher_index].machine_originated_strategy;
 
             agents.push(Agent {
                 kind: AgentKind::Human,
@@ -507,11 +506,9 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
                 social_strategy,
                 integrated_strategy,
                 teacher_index: Some(teacher_index),
-                social_transmission_succeeded: transmission_succeeded,
+                social_transmission_event: transmission_succeeded,
                 demonstration_reward: score,
-                machine_originated_strategy: integrated_strategy == Strategy::Optimal
-                    && (machine_originated_strategy
-                        || individual_strategy == Strategy::Optimal && false),
+                machine_originated_strategy,
             });
         }
 
