@@ -15,6 +15,9 @@ use contamination_panel_bench::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
         randomize_intervention,
     },
+    measurement_distribution::{
+        MeasurementProtocolV1, MeasurementRunBundleV1, analyze_measurement_distribution,
+    },
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
@@ -349,6 +352,40 @@ fn analyze_adjudication_attrition_cli(args: &[String]) -> Result<(), Box<dyn Err
     Ok(())
 }
 
+fn analyze_measurement_distribution_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench analyze-measurement-distribution <protocol.json> <run-bundle.json> <robustness-report.json>"
+                .into(),
+        );
+    }
+    const MAX_MEASUREMENT_BYTES: u64 = 512 * 1024 * 1024;
+    let protocol_bytes = read_file_bounded(&args[1], MAX_MEASUREMENT_BYTES)?;
+    let bundle_bytes = read_file_bounded(&args[2], MAX_MEASUREMENT_BYTES)?;
+    let protocol: MeasurementProtocolV1 = serde_json::from_slice(&protocol_bytes)?;
+    let bundle: MeasurementRunBundleV1 = serde_json::from_slice(&bundle_bytes)?;
+    let report = analyze_measurement_distribution(&protocol, &bundle)
+        .map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "models={} model_families={} runs={} independent_units={} instances={} observations={} distributional_eligible={} claim_scope_eligible={} rank_status={}",
+        report.model_count,
+        report.model_family_count,
+        report.run_count,
+        report.independent_unit_count,
+        report.instance_count,
+        report.observation_count,
+        report.distributional_evidence_eligible,
+        report.claim_scope_eligible,
+        report.rank_stability_status
+    );
+    for issue in &report.issues {
+        println!("qualification issue: {issue}");
+    }
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -436,9 +473,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("analyze-adjudication-attrition") => analyze_adjudication_attrition_cli(&args),
+        Some("analyze-measurement-distribution") => analyze_measurement_distribution_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | analyze-measurement-distribution | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
