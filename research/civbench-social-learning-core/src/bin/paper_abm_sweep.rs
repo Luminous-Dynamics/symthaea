@@ -202,7 +202,7 @@ fn build_conditions() -> Vec<Condition> {
 fn main() {
     let conditions = build_conditions();
     println!(
-        "family,condition,replications,generation,population_size,machine_count,machine_availability,machine_placement,machine_capacity,machine_bias,d_opt,teacher_candidate_count,lambda,tau,epsilon,optimal_prevalence,human_optimal_prevalence,machine_optimal_prevalence,machine_originated_optimal_prevalence,human_machine_originated_optimal_prevalence,myopic_prevalence,null_prevalence,mean_demonstration_reward,social_transmission_event_rate,successful_non_null_transmission_rate"
+        "family,condition,replications,generation,population_size,machine_count,machine_availability,machine_placement,machine_capacity,machine_bias,d_opt,teacher_candidate_count,lambda,tau,epsilon,optimal_prevalence,human_optimal_prevalence,machine_optimal_prevalence,machine_originated_optimal_prevalence,human_machine_originated_optimal_prevalence,optimal_prevalence_ci95,human_optimal_prevalence_ci95,myopic_prevalence,null_prevalence,mean_demonstration_reward,social_transmission_event_rate,successful_non_null_transmission_rate"
     );
 
     for (condition_index, condition) in conditions.iter().enumerate() {
@@ -269,7 +269,7 @@ fn main() {
 
         for (generation, stats) in generation_stats.iter().enumerate() {
             println!(
-                "{},{},{},{},{},{},{},{},{},{:.3},{:.6},{},{:.3},{:.3},{:.3},{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{:.3},{:.6},{},{:.3},{:.3},{:.3},{},{},{},{},{},{},{},{},{},{},{},{}",
                 condition.family,
                 condition.name,
                 PAPER_ABM_REPLICATIONS,
@@ -293,6 +293,8 @@ fn main() {
                 fmt(stats.machine_optimal_prevalence.mean()),
                 fmt(stats.machine_originated_optimal_prevalence.mean()),
                 fmt(stats.human_machine_originated_optimal_prevalence.mean()),
+                fmt(stats.optimal_prevalence.ci95_half_width()),
+                fmt(stats.human_optimal_prevalence.ci95_half_width()),
                 fmt(stats.myopic_prevalence.mean()),
                 fmt(stats.null_prevalence.mean()),
                 fmt(stats.mean_demonstration_reward.mean()),
