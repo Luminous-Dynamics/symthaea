@@ -1042,9 +1042,6 @@ pub fn analyze_decision_functional_frontier(
         frontier: &frontier,
     };
     let report_sha256 = digest(&payload)?;
-    // Bind the robustified plan digest into the request digest's report identity.
-    let _ = robustified_sha256;
-
     Ok(DecisionFunctionalCalibrationReport {
         schema: REPORT_SCHEMA.into(),
         version: REPORT_VERSION.into(),
