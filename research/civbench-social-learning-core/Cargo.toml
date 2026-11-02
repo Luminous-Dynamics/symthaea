@@ -23,4 +23,8 @@ path = "src/bin/cultural_transmission_sweep.rs"
 name = "cultural-frontier-sweep"
 path = "src/bin/cultural_frontier_sweep.rs"
 
+[[bin]]
+name = "networked-mediation-sweep"
+path = "src/bin/networked_mediation_sweep.rs"
+
 [dependencies]
