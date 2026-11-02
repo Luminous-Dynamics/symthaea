@@ -925,7 +925,7 @@ mod tests {
     }
 
     #[test]
-    fn active_lineage_hhi_is_bounded_and_zero_when_every_agent_is_uninformed() {
+    fn active_lineage_hhi_stays_bounded_over_a_complete_run() {
         let config = Config {
             population_size: 8,
             steps_per_agent: 1,
@@ -941,6 +941,30 @@ mod tests {
         for step in &run.steps {
             assert!((0.0..=1.0).contains(&step.active_lineage_hhi));
         }
+    }
+
+    #[test]
+    fn zero_lineage_hhi_when_population_has_no_traits() {
+        let agents = vec![
+            AgentState::naive(100, 2),
+            AgentState::naive(100, 2),
+            AgentState::naive(100, 2),
+        ];
+        let metrics = step_metrics(
+            0,
+            &agents,
+            &[],
+            &[Vec::new(), Vec::new()],
+            0,
+            0,
+            0,
+            0,
+            0,
+            true,
+        );
+        assert_eq!(metrics.active_unique_trait_count, 0);
+        assert_eq!(metrics.active_lineage_count, 0);
+        assert_eq!(metrics.active_lineage_hhi, 0.0);
     }
 
     #[test]
