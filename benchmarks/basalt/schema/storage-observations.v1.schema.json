@@ -9,6 +9,8 @@
     "version",
     "trace_id",
     "reference_trace_sha256",
+    "authority",
+    "initial_state",
     "backend",
     "raw_event_log_sha256",
     "runner_clock_windows",
@@ -19,10 +21,19 @@
     "final_observation"
   ],
   "properties": {
-    "suite_id": { "const": "basalt-storage-observations" },
-    "version": { "const": 1 },
-    "trace_id": { "type": "string", "minLength": 1 },
-    "reference_trace_sha256": { "$ref": "#/$defs/digest" },
+    "suite_id": {
+      "const": "basalt-storage-observations"
+    },
+    "version": {
+      "const": 1
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_trace_sha256": {
+      "$ref": "#/$defs/digest"
+    },
     "backend": {
       "type": "object",
       "additionalProperties": false,
@@ -36,63 +47,207 @@
         "durability_profile"
       ],
       "properties": {
-        "backend_id": { "type": "string", "minLength": 1 },
-        "engine_name": { "type": "string", "minLength": 1 },
-        "engine_version": { "type": "string", "minLength": 1 },
-        "adapter_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-        "executable_sha256": { "$ref": "#/$defs/digest" },
-        "configuration_sha256": { "$ref": "#/$defs/digest" },
-        "durability_profile": { "type": "string", "minLength": 1 }
+        "backend_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "executable_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "durability_profile": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "raw_event_log_sha256": { "$ref": "#/$defs/digest" },
+    "raw_event_log_sha256": {
+      "$ref": "#/$defs/digest"
+    },
     "runner_clock_windows": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["runner_id", "clock_basis", "capture_start_ns", "capture_end_ns"],
+        "required": [
+          "runner_id",
+          "clock_basis",
+          "capture_start_ns",
+          "capture_end_ns"
+        ],
         "properties": {
-          "runner_id": { "type": "string", "minLength": 1 },
-          "clock_basis": { "const": "monotonic_nanoseconds" },
-          "capture_start_ns": { "type": "integer", "minimum": 0 },
-          "capture_end_ns": { "type": "integer", "minimum": 0 }
+          "runner_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "clock_basis": {
+            "const": "monotonic_nanoseconds"
+          },
+          "capture_start_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capture_end_ns": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
     "raw_events": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/raw_event" }
+      "items": {
+        "$ref": "#/$defs/raw_event"
+      }
     },
     "observed_operations": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/observed_operation" }
+      "items": {
+        "$ref": "#/$defs/observed_operation"
+      }
     },
     "observed_faults": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["fault_id", "applied", "observed_at_ns", "runner_id"],
+        "required": [
+          "fault_id",
+          "target_op_id",
+          "fault_class",
+          "action",
+          "applied",
+          "observed_at_ns",
+          "runner_id"
+        ],
         "properties": {
-          "fault_id": { "type": "string", "minLength": 1 },
-          "applied": { "type": "boolean" },
-          "observed_at_ns": { "type": "integer", "minimum": 0 },
-          "runner_id": { "type": "string", "minLength": 1 }
+          "fault_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "observed_at_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "runner_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_op_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fault_class": {
+            "enum": [
+              "process_crash",
+              "power_loss_image",
+              "io_error",
+              "response_loss",
+              "network_partition",
+              "network_delay",
+              "serialization_failure",
+              "member_restart",
+              "snapshot_restore",
+              "witness_unavailable"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
     "witness_observations": {
       "type": "array",
-      "items": { "$ref": "#/$defs/witness_observation" }
+      "items": {
+        "$ref": "#/$defs/witness_observation"
+      }
     },
-    "final_observation": { "$ref": "#/$defs/final_observation" }
+    "final_observation": {
+      "$ref": "#/$defs/final_observation"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "incarnation_id"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "incarnation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_revision",
+        "state_digest",
+        "policy_digest",
+        "source_cursors",
+        "log_cursors"
+      ],
+      "properties": {
+        "authority_revision": {
+          "type": "string",
+          "pattern": "^rev-(0|[1-9][0-9]*)$"
+        },
+        "state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_cursors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source_cursor"
+          }
+        },
+        "log_cursors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/log_cursor"
+          }
+        }
+      }
+    }
   },
   "$defs": {
-    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "observed_operation": {
       "type": "object",
       "additionalProperties": false,
@@ -113,20 +268,70 @@
         "observed_store_revision"
       ],
       "properties": {
-        "op_id": { "type": "string", "minLength": 1 },
-        "kind": { "enum": ["advance", "receipt_lookup", "restore_verify", "policy_publish"] },
-        "request": { "$ref": "#/$defs/request" },
-        "happens_after": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "retry_group_id": { "type": "string", "minLength": 1 },
-        "transaction_attempt": { "type": "integer", "minimum": 1 },
-        "read_snapshot_sha256": { "$ref": "#/$defs/digest" },
-        "decision_input_sha256": { "$ref": "#/$defs/digest" },
-        "runner_id": { "type": "string", "minLength": 1 },
-        "client_id": { "type": "string", "minLength": 1 },
-        "client_sequence": { "type": "integer", "minimum": 0 },
-        "invoked_at_ns": { "type": "integer", "minimum": 0 },
-        "completed_at_ns": { "type": ["integer", "null"], "minimum": 0 },
+        "op_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "advance",
+            "receipt_lookup",
+            "restore_verify",
+            "policy_publish"
+          ]
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "happens_after": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "retry_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transaction_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "read_snapshot_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "decision_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "runner_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invoked_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed_at_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
         "outcome": {
+          "type": [
+            "string",
+            "null"
+          ],
           "enum": [
             "committed",
             "duplicate",
@@ -136,25 +341,110 @@
             "receipt_found",
             "restore_verified",
             "rejected_anti_rollback_unknown",
-            "rejected_anti_rollback"
+            "rejected_anti_rollback",
+            null
           ]
         },
-        "receipt_id": { "type": ["string", "null"] },
-        "receipt_acceptance_revision": { "type": ["string", "null"] },
-        "current_authority_revision": { "type": ["string", "null"] },
-        "observed_store_revision": { "type": ["string", "null"] }
-      }
+        "receipt_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "receipt_acceptance_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_authority_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_store_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": null
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "completed_at_ns": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "completed_at_ns": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "raw_event": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["event_id", "runner_id", "operation_id", "runner_sequence", "monotonic_ns", "phase", "transaction_id"],
+      "required": [
+        "event_id",
+        "runner_id",
+        "operation_id",
+        "runner_sequence",
+        "monotonic_ns",
+        "phase",
+        "transaction_id"
+      ],
       "properties": {
-        "event_id": { "type": "string", "minLength": 1 },
-        "runner_id": { "type": "string", "minLength": 1 },
-        "operation_id": { "type": "string", "minLength": 1 },
-        "runner_sequence": { "type": "integer", "minimum": 0 },
-        "monotonic_ns": { "type": "integer", "minimum": 0 },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
         "phase": {
           "enum": [
             "invoke",
@@ -173,29 +463,75 @@
             "fault"
           ]
         },
-        "transaction_id": { "type": ["string", "null"] },
-        "payload_sha256": { "$ref": "#/$defs/digest" },
-        "sqlstate": { "type": "string", "pattern": "^[0-9A-Z]{5}$" }
+        "transaction_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sqlstate": {
+          "type": "string",
+          "pattern": "^[0-9A-Z]{5}$"
+        }
       }
     },
     "request": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "expected_source_generation": { "type": "integer", "minimum": 0 },
-        "expected_source_predecessor_digest": { "$ref": "#/$defs/digest" },
-        "expected_log_checkpoint": { "type": "string", "minLength": 1 },
-        "expected_policy_digest": { "$ref": "#/$defs/digest" },
-        "receipt_id": { "type": "string", "minLength": 1 },
-        "receipt_digest": { "$ref": "#/$defs/digest" },
-        "next_source_cursor": { "type": "string", "minLength": 1 },
-        "next_source_predecessor_digest": { "$ref": "#/$defs/digest" },
-        "next_log_checkpoint": { "type": "string", "minLength": 1 },
-        "restored_incarnation_id": { "type": "string", "minLength": 1 },
-        "restored_authority_revision": { "type": "string", "minLength": 1 },
-        "restored_state_digest": { "$ref": "#/$defs/digest" },
-        "witness_sequence_seen": { "type": "integer", "minimum": 0 },
-        "next_policy_digest": { "$ref": "#/$defs/digest" }
+        "expected_source_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_source_predecessor_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "expected_log_checkpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "next_source_cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_source_predecessor_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "next_log_checkpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restored_incarnation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restored_authority_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restored_state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "witness_sequence_seen": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_policy_digest": {
+          "$ref": "#/$defs/digest"
+        }
       }
     },
     "witness_observation": {
@@ -212,17 +548,39 @@
         "signed_record_digest"
       ],
       "properties": {
-        "witness_id": { "type": "string", "minLength": 1 },
-        "sequence": { "type": "integer", "minimum": 0 },
-        "authority_id": { "type": "string", "minLength": 1 },
-        "incarnation_id": { "type": "string", "minLength": 1 },
-        "authority_revision": { "type": "string", "minLength": 1 },
-        "state_digest": { "$ref": "#/$defs/digest" },
+        "witness_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "authority_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "incarnation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_digest": {
+          "$ref": "#/$defs/digest"
+        },
         "predecessor_witness_digest": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
-        "signed_record_digest": { "$ref": "#/$defs/digest" }
+        "signed_record_digest": {
+          "$ref": "#/$defs/digest"
+        }
       }
     },
     "final_observation": {
@@ -237,51 +595,101 @@
         "accepted_receipts"
       ],
       "properties": {
-        "authority_revision": { "type": "string", "minLength": 1 },
-        "state_digest": { "$ref": "#/$defs/digest" },
-        "policy_digest": { "$ref": "#/$defs/digest" },
+        "authority_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
         "source_cursors": {
           "type": "array",
-          "items": { "$ref": "#/$defs/source_cursor" }
+          "items": {
+            "$ref": "#/$defs/source_cursor"
+          }
         },
         "log_cursors": {
           "type": "array",
-          "items": { "$ref": "#/$defs/log_cursor" }
+          "items": {
+            "$ref": "#/$defs/log_cursor"
+          }
         },
         "accepted_receipts": {
           "type": "array",
-          "items": { "$ref": "#/$defs/receipt" }
+          "items": {
+            "$ref": "#/$defs/receipt"
+          }
         }
       }
     },
     "source_cursor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_id", "generation", "cursor", "predecessor_digest"],
+      "required": [
+        "source_id",
+        "generation",
+        "cursor",
+        "predecessor_digest"
+      ],
       "properties": {
-        "source_id": { "type": "string", "minLength": 1 },
-        "generation": { "type": "integer", "minimum": 0 },
-        "cursor": { "type": "string", "minLength": 1 },
-        "predecessor_digest": { "$ref": "#/$defs/digest" }
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "predecessor_digest": {
+          "$ref": "#/$defs/digest"
+        }
       }
     },
     "log_cursor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["log_origin_id", "checkpoint"],
+      "required": [
+        "log_origin_id",
+        "checkpoint"
+      ],
       "properties": {
-        "log_origin_id": { "type": "string", "minLength": 1 },
-        "checkpoint": { "type": "string", "minLength": 1 }
+        "log_origin_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkpoint": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "receipt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["receipt_id", "receipt_digest", "receipt_acceptance_revision"],
+      "required": [
+        "receipt_id",
+        "receipt_digest",
+        "receipt_acceptance_revision"
+      ],
       "properties": {
-        "receipt_id": { "type": "string", "minLength": 1 },
-        "receipt_digest": { "$ref": "#/$defs/digest" },
-        "receipt_acceptance_revision": { "type": "string", "minLength": 1 }
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "receipt_acceptance_revision": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }

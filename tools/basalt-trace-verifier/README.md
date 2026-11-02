@@ -22,6 +22,7 @@ The standalone package is intentionally not a root workspace member. It uses a p
 
 - Strict typed deserialization with unknown fields rejected.
 - Unique operation IDs, exact reference linearization membership, dependencies, per-client sequence and same-runner real-time precedence.
+- Bounded legal-linearization search over fully completed trace-shaped histories (up to 32 operations), independent of the fixture's declared tie-break.
 - No comparison of monotonic clock values across different runner IDs.
 - Fault-to-operation identity, runner, interval, class and expected outcome.
 - Explicit fixture digest preimages against SHA-256.
@@ -36,17 +37,20 @@ The standalone package is intentionally not a root workspace member. It uses a p
 
 - It does not execute SQLite, PostgreSQL, Turso or etcd.
 - It does not ingest the separate observed backend event-log schema yet.
-- It does not find legal linearizations for arbitrary concurrent observed histories; the fixture supplies one deterministic legal reference order.
+- The new search API does not yet ingest raw backend observation artifacts; callers must provide a strict Trace-shaped object populated with actual observed request/response values.
+- The v1 search is limited to fully completed operations and at most 32 operations. Pending/no-response operations return unsupported/inconclusive until their commit/no-commit possibilities are modelled.
+- Search-budget exhaustion returns `inconclusive`; it never becomes a pass or a definitive fail.
 - It does not verify witness signatures, key rotation, quorum independence or trust-root authorization. The witness digests are symbolic fixture records.
 - It does not test process crashes, filesystem ordering, power loss, hardware flush behavior, replication or physical restore.
 - It does not qualify performance, availability or any storage engine.
 
-The optional `--schema` argument binds the schema file's SHA-256 into the report. The current CLI uses strict Rust types for the reference fixture; it does not claim to be a full JSON Schema Draft 2020-12 implementation.
+The optional `--schema` argument binds the schema file's SHA-256 into the report. The current CLI runs the deterministic reference fixture. The history-search API ignores the fixture's declared reference order; `reference_linearization_order` defaults empty when deserializing an observed history. The library additionally exposes `verify_observed_history(&Trace, &HistorySearchConfig)`, which searches for a legal order subject to causal constraints and a hard state-expansion budget. It currently uses the same strict Rust Trace types; it does not claim to ingest the backend-observation JSON schema or implement full JSON Schema Draft 2020-12 validation.
 
 ## Result interpretation
 
-- `pass`: the reference fixture is internally consistent with this reducer and every seeded negative control is detected.
-- `fail`: the well-formed reference trace contradicts the reducer or a seeded negative control was not detected.
+- `pass`: a legal sequential interpretation was found, final state matches, and all relevant operation outcomes agree. For reference CLI mode, every seeded negative control is also detected.
+- `fail`: a fully explored, well-formed history has no legal sequential interpretation, or the reference fixture contradicts the reducer.
 - `invalid_evidence`: strict deserialization, required-field, dependency, ordering, digest, fault-schedule or witness-chain validation failed.
+- `inconclusive`: the search bound was reached before a legal order was found or all candidate orders were eliminated.
 
 A `pass` is not a backend result or a cryptographic/storage durability claim. Live adapter observations must be written separately and checked by the next verifier increment.

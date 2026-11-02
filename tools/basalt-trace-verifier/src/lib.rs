@@ -13,6 +13,7 @@ pub struct Trace {
     pub authority: Authority,
     pub initial_state: InitialState,
     pub operations: Vec<Operation>,
+    #[serde(default)]
     pub reference_linearization_order: Vec<String>,
     pub faults: Vec<Fault>,
     pub witness_observations: Vec<WitnessObservation>,
@@ -49,7 +50,7 @@ pub struct InitialState {
     pub log_cursors: Vec<LogCursor>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SourceCursor {
     pub source_id: String,
@@ -58,7 +59,7 @@ pub struct SourceCursor {
     pub predecessor_digest: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct LogCursor {
     pub log_origin_id: String,
@@ -204,13 +205,13 @@ pub struct VerificationReport {
     pub counterexamples: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 struct ModelReceipt {
     receipt_digest: String,
     acceptance_revision: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct ModelState {
     revision: u64,
     policy_digest: String,
@@ -1064,8 +1065,8 @@ fn advance(state: &mut ModelState, trace: &Trace, operation: &Operation) -> Comp
     }
 }
 
-fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedResult> {
-    let mut state = ModelState {
+fn initial_model_state(trace: &Trace) -> ModelState {
+    ModelState {
         revision: parse_revision(&trace.initial_state.authority_revision).unwrap_or(0),
         policy_digest: trace.initial_state.policy_digest.clone(),
         sources: trace
@@ -1083,7 +1084,93 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
             .collect(),
         receipts: BTreeMap::new(),
         indeterminate_receipts: BTreeSet::new(),
-    };
+    }
+}
+
+fn apply_operation(
+    state: &mut ModelState,
+    trace: &Trace,
+    operation: &Operation,
+    errors: &mut Vec<String>,
+) -> ComputedResult {
+    match operation.kind.as_str() {
+        "advance" => advance(state, trace, operation),
+        "receipt_lookup" => {
+            let receipt_id = operation.request.receipt_id.as_deref().unwrap_or("");
+            let receipt_digest = operation.request.receipt_digest.as_deref().unwrap_or("");
+            match state.receipts.get(receipt_id) {
+                Some(receipt) if receipt.receipt_digest == receipt_digest => {
+                    let outcome = if state.indeterminate_receipts.contains(receipt_id) {
+                        "receipt_found"
+                    } else {
+                        "duplicate"
+                    };
+                    ComputedResult::new(outcome, Some(state.revision))
+                        .receipt(receipt_id, receipt.acceptance_revision)
+                }
+                _ => ComputedResult::new("compare_conflict", Some(state.revision)),
+            }
+        }
+        "policy_publish" => {
+            if operation.request.expected_policy_digest.as_deref()
+                == Some(state.policy_digest.as_str())
+            {
+                if let Some(next_policy) = operation.request.next_policy_digest.as_ref() {
+                    if let Some(next_revision) = state.revision.checked_add(1) {
+                        state.policy_digest = next_policy.clone();
+                        state.revision = next_revision;
+                        ComputedResult::new("committed", Some(state.revision))
+                    } else {
+                        ComputedResult::new("compare_conflict", Some(state.revision))
+                    }
+                } else {
+                    ComputedResult::new("compare_conflict", Some(state.revision))
+                }
+            } else {
+                ComputedResult::new("compare_conflict", Some(state.revision))
+            }
+        }
+        "restore_verify" => {
+            let observed_revision = operation.request.restored_authority_revision.clone();
+            let observed_state = operation.request.restored_state_digest.as_deref();
+            match trace.witness_observations.last() {
+                None => {
+                    let mut result = ComputedResult::new("rejected_anti_rollback_unknown", None);
+                    result.observed_store_revision = observed_revision;
+                    result
+                }
+                Some(head) => {
+                    let fresh = operation.request.restored_incarnation_id.as_deref()
+                        == Some(head.incarnation_id.as_str())
+                        && observed_state == Some(head.state_digest.as_str())
+                        && observed_revision.as_deref() == Some(head.authority_revision.as_str())
+                        && operation.request.witness_sequence_seen == Some(head.sequence);
+                    let mut result = ComputedResult::new(
+                        if fresh {
+                            "restore_verified"
+                        } else {
+                            "rejected_anti_rollback"
+                        },
+                        parse_revision(&head.authority_revision),
+                    );
+                    result.observed_store_revision = observed_revision;
+                    result
+                }
+            }
+        }
+        other => {
+            push_error(
+                errors,
+                format!("unsupported operation kind {other} in {}", operation.op_id),
+            );
+            ComputedResult::new("compare_conflict", Some(state.revision))
+        }
+    }
+}
+
+fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedResult> {
+    let mut state = initial_model_state(trace);
+
     let operations: HashMap<String, &Operation> = trace
         .operations
         .iter()
@@ -1095,81 +1182,7 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
         let Some(operation) = operations.get(id).copied() else {
             continue;
         };
-        let computed = match operation.kind.as_str() {
-            "advance" => advance(&mut state, trace, operation),
-            "receipt_lookup" => {
-                let receipt_id = operation.request.receipt_id.as_deref().unwrap_or("");
-                let receipt_digest = operation.request.receipt_digest.as_deref().unwrap_or("");
-                match state.receipts.get(receipt_id) {
-                    Some(receipt) if receipt.receipt_digest == receipt_digest => {
-                        let outcome = if state.indeterminate_receipts.contains(receipt_id) {
-                            "receipt_found"
-                        } else {
-                            "duplicate"
-                        };
-                        ComputedResult::new(outcome, Some(state.revision))
-                            .receipt(receipt_id, receipt.acceptance_revision)
-                    }
-                    _ => ComputedResult::new("compare_conflict", Some(state.revision)),
-                }
-            }
-            "policy_publish" => {
-                if operation.request.expected_policy_digest.as_deref()
-                    == Some(state.policy_digest.as_str())
-                {
-                    if let Some(next_policy) = operation.request.next_policy_digest.as_ref() {
-                        if let Some(next_revision) = state.revision.checked_add(1) {
-                            state.policy_digest = next_policy.clone();
-                            state.revision = next_revision;
-                            ComputedResult::new("committed", Some(state.revision))
-                        } else {
-                            ComputedResult::new("compare_conflict", Some(state.revision))
-                        }
-                    } else {
-                        ComputedResult::new("compare_conflict", Some(state.revision))
-                    }
-                } else {
-                    ComputedResult::new("compare_conflict", Some(state.revision))
-                }
-            }
-            "restore_verify" => {
-                let observed_revision = operation.request.restored_authority_revision.clone();
-                let observed_state = operation.request.restored_state_digest.as_deref();
-                match trace.witness_observations.last() {
-                    None => {
-                        let mut result =
-                            ComputedResult::new("rejected_anti_rollback_unknown", None);
-                        result.observed_store_revision = observed_revision;
-                        result
-                    }
-                    Some(head) => {
-                        let fresh = operation.request.restored_incarnation_id.as_deref()
-                            == Some(head.incarnation_id.as_str())
-                            && observed_state == Some(head.state_digest.as_str())
-                            && observed_revision.as_deref()
-                                == Some(head.authority_revision.as_str())
-                            && operation.request.witness_sequence_seen == Some(head.sequence);
-                        let mut result = ComputedResult::new(
-                            if fresh {
-                                "restore_verified"
-                            } else {
-                                "rejected_anti_rollback"
-                            },
-                            parse_revision(&head.authority_revision),
-                        );
-                        result.observed_store_revision = observed_revision;
-                        result
-                    }
-                }
-            }
-            other => {
-                push_error(
-                    errors,
-                    format!("unsupported operation kind {other} in {}", operation.op_id),
-                );
-                ComputedResult::new("compare_conflict", Some(state.revision))
-            }
-        };
+        let computed = apply_operation(&mut state, trace, operation, errors);
 
         if !expected_fields_match(&operation.expected_result, &computed) {
             push_error(
@@ -1405,6 +1418,9 @@ pub fn verify_mutants(trace: &Trace) -> Vec<(String, bool)> {
         })
         .collect()
 }
+
+mod history;
+pub use history::{HistorySearchConfig, HistorySearchReport, verify_observed_history};
 
 #[cfg(test)]
 mod tests {
