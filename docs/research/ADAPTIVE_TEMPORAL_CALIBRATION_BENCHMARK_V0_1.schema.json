@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/ADAPTIVE_TEMPORAL_CALIBRATION_BENCHMARK_V0_1.schema.json",
+  "title": "Symthaea Adaptive Temporal Calibration Benchmark v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "status",
+    "tracking_issue",
+    "parent_benchmark_pr",
+    "target_coverage_ppm",
+    "generator_contract",
+    "window_lengths",
+    "scenarios",
+    "methods",
+    "metrics",
+    "qualification_targets",
+    "references"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.adaptive_temporal_calibration_benchmark.v0.1"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "protocol_and_synthetic_registry_only_no_results"
+    },
+    "tracking_issue": {
+      "const": 9980
+    },
+    "parent_benchmark_pr": {
+      "const": 9955
+    },
+    "target_coverage_ppm": {
+      "type": "integer",
+      "minimum": 500000,
+      "maximum": 999999
+    },
+    "generator_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "prng",
+        "distribution_transform",
+        "covariate_stream",
+        "residual_equation",
+        "seed_policy",
+        "candidate_visibility"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "prng": {
+          "const": "SplitMix64"
+        },
+        "distribution_transform": {
+          "type": "string"
+        },
+        "covariate_stream": {
+          "type": "string"
+        },
+        "residual_equation": {
+          "type": "string"
+        },
+        "seed_policy": {
+          "type": "string"
+        },
+        "candidate_visibility": {
+          "type": "string"
+        }
+      }
+    },
+    "window_lengths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feedback_count_steps",
+        "elapsed_feedback_time_us",
+        "non_overlapping_recovery_window_steps",
+        "consecutive_recovery_windows"
+      ],
+      "properties": {
+        "feedback_count_steps": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "elapsed_feedback_time_us": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "non_overlapping_recovery_window_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "consecutive_recovery_windows": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "length_steps",
+          "preregistered_change_points",
+          "feedback_delay",
+          "regime_segments",
+          "label_revisions",
+          "source_outages",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "stationary_null",
+              "abrupt_location",
+              "gradual_location_drift",
+              "recurring_regime",
+              "variance_shift",
+              "tail_shift",
+              "covariate_drift",
+              "delayed_feedback",
+              "revised_feedback",
+              "asynchronous_source_outage"
+            ]
+          },
+          "length_steps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "preregistered_change_points": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "feedback_delay": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "minimum_steps",
+              "maximum_steps"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "constant",
+                  "uniform_integer",
+                  "bimodal"
+                ]
+              },
+              "minimum_steps": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "maximum_steps": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "regime_segments": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start_step",
+                "end_step_exclusive",
+                "location_start_milli",
+                "location_end_milli",
+                "scale_start_milli",
+                "scale_end_milli",
+                "tail_contamination_ppm",
+                "tail_scale_milli",
+                "covariate_slope_start_milli",
+                "covariate_slope_end_milli",
+                "source_availability_delay_steps"
+              ],
+              "properties": {
+                "start_step": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end_step_exclusive": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "location_start_milli": {
+                  "type": "integer"
+                },
+                "location_end_milli": {
+                  "type": "integer"
+                },
+                "scale_start_milli": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "scale_end_milli": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "tail_contamination_ppm": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "tail_scale_milli": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "covariate_slope_start_milli": {
+                  "type": "integer"
+                },
+                "covariate_slope_end_milli": {
+                  "type": "integer"
+                },
+                "source_availability_delay_steps": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "label_revisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target_step",
+                "initial_available_step",
+                "revision_available_step",
+                "revision_kind"
+              ],
+              "properties": {
+                "target_step": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "initial_available_step": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "revision_available_step": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "revision_kind": {
+                  "enum": [
+                    "supersede",
+                    "retract"
+                  ]
+                }
+              }
+            }
+          },
+          "source_outages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_id",
+                "start_step",
+                "end_step_exclusive",
+                "recovery_delay_steps"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "start_step": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end_step_exclusive": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "recovery_delay_steps": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "methods": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "baseline",
+              "reproduction_required",
+              "heuristic_no_matching_formal_guarantee",
+              "research_candidate_not_implemented"
+            ]
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "global",
+        "temporal",
+        "feedback",
+        "systems"
+      ],
+      "properties": {
+        "global": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "temporal": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "feedback": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "systems": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "qualification_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcomes_consumed_before_feedback_availability",
+        "historical_receipts_mutated_by_later_revisions",
+        "stationary_control_coverage_absolute_error_max_ppm",
+        "post_change_recovery_coverage_error_max_ppm",
+        "consecutive_recovery_windows",
+        "calibration_result_interval_width_ceiling",
+        "independent_seed_count_minimum",
+        "qualification_target_status"
+      ],
+      "properties": {
+        "outcomes_consumed_before_feedback_availability": {
+          "const": 0
+        },
+        "historical_receipts_mutated_by_later_revisions": {
+          "const": 0
+        },
+        "stationary_control_coverage_absolute_error_max_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "post_change_recovery_coverage_error_max_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "consecutive_recovery_windows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_result_interval_width_ceiling": {
+          "type": "string"
+        },
+        "independent_seed_count_minimum": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "qualification_target_status": {
+          "const": "targets_not_results"
+        }
+      }
+    },
+    "references": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "url"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    }
+  }
+}
