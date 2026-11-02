@@ -581,7 +581,7 @@ fn witness_for(observation: &VehicleRtaObservation) -> VehicleRtaWitness {
         baseline_independence_evidence_id: observation.baseline_independence_evidence_id.clone(),
         observation_digest: observation_is_fingerprintable(observation)
             .then(|| serde_json::to_vec(observation))
-            .and_then(Result::ok)
+            .and_then(|serialized| serialized.ok())
             .map(|bytes| blake3::hash(&bytes).to_hex().to_string()),
     }
 }
