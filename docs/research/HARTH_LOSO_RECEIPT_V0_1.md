@@ -64,6 +64,18 @@ The canonical receipt binds:
 
 A receipt hash is an integrity commitment, not proof that a trusted evaluator generated the confusion counts or that test labels were isolated. Confirmatory model evaluation still requires the separate candidate/evaluator process boundary specified by the edge benchmark bridge.
 
+## Paired candidate-vs-baseline comparison
+
+`build_harth_paired_comparison` accepts two complete LOSO receipts only when the dataset manifest, preprocessing digest, label track and all 22 held-out subject identities match exactly.
+
+It computes the candidate-minus-baseline macro-F1 delta for each participant, then reports:
+- mean paired subject delta;
+- standard error across the 22 paired deltas;
+- two-sided 95% paired Student-t interval with 21 degrees of freedom (pinned (t^*=2.0796), rounded outward);
+- counts of subjects improved, unchanged and worsened.
+
+The comparison digest binds both input receipt digests and the per-subject deltas. Its validator recomputes the entire comparison. The interval applies to this fixed 22-subject benchmark sample and assumes independent subject-level fold deltas; do not treat overlapping windows as independent samples or use the marginal standard errors of two separate model receipts to claim a paired win.
+
 ## Comparator alignment
 
 ### SelfPAB
@@ -78,6 +90,6 @@ The external papers' scores are reference values, not results reproduced by this
 
 ## Tests and status
 
-Eleven synthetic tests cover label mapping, valid 22-fold receipt creation, 10-class dimensions, test/train leakage, duplicate held-out subjects, missing training subjects, invalid matrix shape/empty denominator, confusion-derived F1, receipt tamper detection and canonical sorting.
+Fifteen synthetic tests cover label mapping, valid 22-fold receipt creation, 10-class dimensions, test/train leakage, duplicate held-out subjects, missing training subjects, invalid matrix shape/empty denominator, confusion-derived F1, receipt tamper detection, canonical sorting, paired subject deltas, paired protocol-mismatch rejection and paired receipt tamper detection.
 
 **Execution status:** tests are authored but have not been compiled or run. No model, HARTH data archive or baseline has been executed. No accuracy or SOTA claim is made.
