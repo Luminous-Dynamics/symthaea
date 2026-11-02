@@ -34,6 +34,7 @@ pub struct QueryStopCalibrationInput {
     pub profile_id: String,
     pub calibration_profile_sha256: String,
     pub group_disjointness_report_sha256: String,
+    pub exchangeability_assessment_sha256: String,
     pub query_id: String,
     pub query_definition_sha256: String,
     pub analysis_code_sha256: String,
@@ -52,6 +53,9 @@ pub struct QueryStopCalibrationInput {
     pub target_independence_cluster_id: String,
     /// Supplied by an independent group-disjoint split auditor; adapters must verify the receipt.
     pub target_is_disjoint_from_calibration: bool,
+    /// Explicit, evidence-backed assessment that target and calibration trajectory units are
+    /// exchangeable within the frozen stratum and horizon.
+    pub target_exchangeability_supported: bool,
     /// Observed historical max-drift ratio for the target rolling origin.
     pub target_observed_max_drift_ratio: f64,
     /// Current identified-set hull width divided by the query materiality threshold.
@@ -63,6 +67,7 @@ pub struct QueryStopCalibrationInput {
 pub enum StopCalibrationStatus {
     InsufficientCalibration,
     NotCalibratedGroupOverlap,
+    NotCalibratedExchangeability,
     ProjectedStableWithinHorizon,
     ProjectedUnstableWithinHorizon,
 }
@@ -73,6 +78,8 @@ pub struct QueryStopCalibrationReport {
     pub profile_id: String,
     pub calibration_profile_sha256: String,
     pub group_disjointness_report_sha256: String,
+    pub exchangeability_assessment_sha256: String,
+    pub target_exchangeability_supported: bool,
     pub query_id: String,
     pub query_definition_sha256: String,
     pub analysis_code_sha256: String,
@@ -199,6 +206,10 @@ pub fn calibrate_query_stop(
         base.status = StopCalibrationStatus::NotCalibratedGroupOverlap;
         return Ok(base);
     }
+    if !input.target_exchangeability_supported {
+        base.status = StopCalibrationStatus::NotCalibratedExchangeability;
+        return Ok(base);
+    }
 
     if rank > n {
         base.status = StopCalibrationStatus::InsufficientCalibration;
@@ -243,6 +254,8 @@ fn report_base(
         profile_id: input.profile_id.clone(),
         calibration_profile_sha256: input.calibration_profile_sha256.clone(),
         group_disjointness_report_sha256: input.group_disjointness_report_sha256.clone(),
+        exchangeability_assessment_sha256: input.exchangeability_assessment_sha256.clone(),
+        target_exchangeability_supported: input.target_exchangeability_supported,
         query_id: input.query_id.clone(),
         query_definition_sha256: input.query_definition_sha256.clone(),
         analysis_code_sha256: input.analysis_code_sha256.clone(),
@@ -278,6 +291,7 @@ fn validate_input(input: &QueryStopCalibrationInput) -> Result<(), StopCalibrati
     }
     validate_sha("calibration profile", &input.calibration_profile_sha256)?;
     validate_sha("group-disjointness report", &input.group_disjointness_report_sha256)?;
+    validate_sha("exchangeability assessment", &input.exchangeability_assessment_sha256)?;
     validate_sha("query definition", &input.query_definition_sha256)?;
     validate_sha("analysis code", &input.analysis_code_sha256)?;
 
@@ -409,6 +423,7 @@ mod tests {
             profile_id: "profile-v1".to_owned(),
             calibration_profile_sha256: SHA_A.to_owned(),
             group_disjointness_report_sha256: SHA_B.to_owned(),
+            exchangeability_assessment_sha256: SHA_C.to_owned(),
             query_id: "pathway-strength".to_owned(),
             query_definition_sha256: SHA_C.to_owned(),
             analysis_code_sha256: SHA_A.to_owned(),
@@ -421,6 +436,7 @@ mod tests {
             target_source_volume_id: "target-volume".to_owned(),
             target_independence_cluster_id: "target-cluster".to_owned(),
             target_is_disjoint_from_calibration: true,
+            target_exchangeability_supported: true,
             target_observed_max_drift_ratio: 0.20,
             target_current_uncertainty_width_ratio: 0.30,
             calibration_trajectories: (0..n)
@@ -487,6 +503,19 @@ mod tests {
         let report = calibrate_query_stop(&value).unwrap();
         assert_eq!(report.status, StopCalibrationStatus::NotCalibratedGroupOverlap);
         assert_eq!(report.residual_quantile_ratio, None);
+    }
+
+    #[test]
+    fn unsupported_exchangeability_abstains_even_with_disjoint_volumes() {
+        let mut value = input(19, 0.05);
+        value.target_exchangeability_supported = false;
+        let report = calibrate_query_stop(&value).unwrap();
+        assert_eq!(
+            report.status,
+            StopCalibrationStatus::NotCalibratedExchangeability
+        );
+        assert_eq!(report.residual_quantile_ratio, None);
+        assert_eq!(report.projected_future_drift_upper_ratio, None);
     }
 
     #[test]
