@@ -1,6 +1,6 @@
 //! Domain records and authorization contract.
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserId(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
