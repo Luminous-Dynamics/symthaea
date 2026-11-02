@@ -582,7 +582,7 @@ mod tests {
         let mut state = AnytimeAuditState::new(config(12)).unwrap();
         for sequence in 1..=10 {
             let report = state.observe(sequence, &positive_pair(sequence)).unwrap();
-            assert!(!report.axes[0].crossed);
+            assert!(!report.axes[0].currently_crossed);
         }
         let report = state.observe(11, &positive_pair(11)).unwrap();
         assert!(report.axes[0].currently_crossed);
