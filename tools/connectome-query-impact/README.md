@@ -53,6 +53,14 @@ The interval difference above is a conservative *rectangular outer bound*. It tr
 
 Do not call this a sharp causal or biological effect bound. A later paired-scenario adapter should carry shared latent state / paired graph hypotheses and calculate the joint feasible effect set. The current primitive is deliberately fail-safe against overstating certainty, at the cost of possible overstatement of effect magnitude.
 
+## Paired shared-world effect bounds
+
+An adapter may optionally supply a `PairedEffectBounds` interval computed from matched baseline and post-edit graph worlds under the same latent structural hypothesis, plus a digest of the paired-world evidence artifact. The paired interval must be contained inside the rectangular outer bound. A pair-derived interval that expands beyond that outer bound is rejected.
+
+This permits a tighter effect estimate when shared uncertainty is modeled jointly. The core only checks containment and digest shape; the adapter must verify that the same world/latent state was used on both sides and that the paired effect artifact is authentic. A paired interval is not trusted merely because it is narrower.
+
+One important limitation remains: threshold-decision flip classification is still computed conservatively from the marginal baseline and post-edit intervals. A narrow paired metric-effect interval does not by itself prove that a threshold decision cannot flip. Sharp decision-flip certification requires paired decision-state evidence, which is future work.
+
 ## Scenario handling
 
 - Each query/scenario row is preserved in the output.
@@ -80,6 +88,8 @@ Every query must be marked pre-registered. The same query must carry the same de
 - Fixture schema: `research/connectomics/connectome-query-impact-fixture-v0.1.schema.json`.
 - Known-answer cases: `research/connectomics/fixtures/connectome-query-impact-known-answer-v0.1.json`.
 
+The fixture also checks a paired-world interval that tightens a rectangular bound and a negative control that rejects a paired interval outside it.
+
 The fixture covers guaranteed threshold flips, scenario disagreement, independent units across different queries and conflicting query-unit declarations.
 
 ## Tests
@@ -90,7 +100,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-query-impact/Cargo.toml
 ```
 
-Eighteen Rust unit tests are authored for interval difference, threshold-flip classifications, materiality bounds, uncertainty/scenario preservation, differing query units, pre-registration, duplicate scenarios, inconsistent query signatures, malformed intervals/hashes and deterministic ordering.
+Twenty Rust unit tests are authored for interval difference, threshold-flip classifications, materiality bounds, uncertainty/scenario preservation, differing query units, pre-registration, duplicate scenarios, inconsistent query signatures, malformed intervals/hashes and deterministic ordering, paired-world interval containment and paired evidence digests.
 
 They have **not** been compiled or executed in the current authoring environment.
 
