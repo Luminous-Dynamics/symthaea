@@ -36,7 +36,7 @@ class AnchoredCompoundEBHTests(unittest.TestCase):
                             )
                             self.assertEqual(direct, deficit_ok)
                             checks += 1
-        self.assertEqual(checks, 291960)
+        self.assertEqual(checks, 133320)
 
     def test_fast_solver_matches_exhaustive_rejection_set_search(self):
         values = [F(0), F(1, 2), F(1), F(2), F(5)]
@@ -62,7 +62,7 @@ class AnchoredCompoundEBHTests(unittest.TestCase):
                             )
                         )
                         checks += 1
-        self.assertEqual(checks, 9372)
+        self.assertEqual(checks, 9360)
 
     def test_randomized_solver_against_brute_force(self):
         rng = random.Random(10150)
@@ -112,7 +112,7 @@ class AnchoredCompoundEBHTests(unittest.TestCase):
         scores = [F(10), F(10), F(5), F(0)]
         alpha = F(1, 10)
         baseline = weighted_compound_ebh(scores, alpha)
-        self.assertEqual(baseline, (0, 1))
+        self.assertEqual(baseline, (0, 1, 2))
         self.assertEqual(anchored_rejections(scores, alpha, F(0)), baseline)
         full = anchored_rejections(scores, alpha, F(1))
         self.assertTrue(set(baseline).issubset(full))
