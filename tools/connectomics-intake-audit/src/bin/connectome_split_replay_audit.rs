@@ -146,6 +146,11 @@ struct Report {
     scope_note: &'static str,
 }
 
+fn valid_sha1(value: &str) -> bool {
+    value.len() == 40
+        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
 fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
@@ -156,15 +161,6 @@ fn read_inside_root(root: &Path, path: &Path, label: &str) -> Result<Vec<u8>, St
         return Err(format!("{label} resolves outside the pinned split root"));
     }
     fs::read(&canonical).map_err(|error| format!("cannot read {label}: {error}"))
-}
-
-fn file_digest(path: &Path, relative: &str) -> Result<FileDigest, String> {
-    let bytes = fs::read(path).map_err(|error| format!("cannot read {relative}: {error}"))?;
-    Ok(FileDigest {
-        relative_path: relative.to_owned(),
-        bytes: bytes.len() as u64,
-        sha256: sha256(&bytes),
-    })
 }
 
 fn sample_key_md5(source_archive: &str, source_hash: &str) -> String {
@@ -469,10 +465,11 @@ fn load_species_split_index(
             }
         };
         let relative = format!("{species}/{filename}");
-        match file_digest(&path, &relative) {
-            Ok(digest) => { split_files.insert(split.to_owned(), digest); }
-            Err(error) => errors.push(Finding::global("split_file_digest_failed", error)),
-        }
+        split_files.insert(split.to_owned(), FileDigest {
+            relative_path: relative,
+            bytes: bytes.len() as u64,
+            sha256: sha256(&bytes),
+        });
         let value: Value = match serde_json::from_slice(&bytes) {
             Ok(value) if value.is_object() => value,
             Ok(_) => {
@@ -637,9 +634,7 @@ fn audit(
 
 fn run() -> Result<i32, String> {
     let args = Args::parse();
-    if args.dataset_revision_commit_sha.len() != 40
-        || !args.dataset_revision_commit_sha.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
+    if !valid_sha1(&args.dataset_revision_commit_sha) {
         return Err("--dataset-revision-commit-sha must be the lowercase 40-character commit SHA resolved from Hugging Face revision=v2".into());
     }
     if args.upstream_commit != UPSTREAM_COMMIT {
@@ -834,10 +829,10 @@ mod tests {
 
     #[test]
     fn rejects_invalid_source_revision_sha() {
-        assert_eq!("x".repeat(39).len(), 39);
-        assert!(!"x".repeat(40).bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
+        assert!(!valid_sha1(&"x".repeat(40)));
+        assert!(!valid_sha1(&"a".repeat(39)));
+        assert!(valid_sha1(&"a".repeat(40)));
     }
-
     #[test]
     fn sample_hash_is_a_row_key_not_a_provenance_digest() {
         let value = sample_key_md5("edits_and_adj_controls_mouse", "000000000011");
@@ -845,11 +840,14 @@ mod tests {
         assert_ne!(value, sha256(b"edits_and_adj_controls_mouse|000000000011"));
     }
     #[test]
-    fn rejects_species_path_traversal_from_sidecar() {
+    fn rejects_unrecognized_species_in_source_archive_before_path_construction() {
         let (root, bytes) = fixture();
-        let altered = String::from_utf8(bytes).unwrap().replace("\"species\":\"mouse\"", "\"species\":\"../outside\"");
+        let altered = String::from_utf8(bytes).unwrap().replace(
+            "edits_and_adj_controls_mouse",
+            "edits_and_adj_controls_../../outside"
+        );
         let report = audit(altered.as_bytes(), sha256(altered.as_bytes()), &root, "a".repeat(40));
-        assert!(report.errors.iter().any(|finding| finding.code == "unsupported_species"));
+        assert!(report.errors.iter().any(|finding| finding.code == "sidecar_archive_species_unknown"));
     }
 
     #[test]
