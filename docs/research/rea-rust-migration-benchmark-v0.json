@@ -254,6 +254,70 @@
       ],
       "target": "100_percent_semantic_parity_across_all_adapters_for_the_same_native_operation",
       "note": "Transport framing may differ; normalized semantic Evidence and effect behavior must not."
+    },
+    {
+      "id": "archive_reader_contract",
+      "status": "planned",
+      "upstream_reference": {
+        "repository": "morluto/rea",
+        "commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
+        "source_files": [
+          "src/artifacts/ArtifactReader.ts",
+          "src/artifacts/ZipArtifactReader.ts",
+          "src/artifacts/ArtifactResourceScope.ts",
+          "src/artifacts/inventory/scanReader.ts",
+          "src/domain/zipEndOfCentralDirectory.ts",
+          "src/domain/zipPackageFormat.ts"
+        ]
+      },
+      "cases": [
+        "EOCD_comment_candidate_ambiguity",
+        "ZIP64_locator_and_record",
+        "split_multidisk_refusal",
+        "prepended_stub_offset_adjustment",
+        "duplicate_archive_paths_distinct_occurrences",
+        "duplicate_content_distinct_locations",
+        "CP437_and_UTF8_names",
+        "Unicode_Path_extra_field",
+        "invalid_filename_bytes",
+        "central_directory_local_header_mismatch",
+        "overlapping_member_extents",
+        "encrypted_entry_unavailable",
+        "symlink_and_directory_occurrences",
+        "unsupported_compression",
+        "CRC_mismatch",
+        "truncated_member_stream",
+        "declared_observed_size_mismatch",
+        "source_mutation_between_admission_and_open",
+        "cancellation_during_scan_stream_and_cleanup",
+        "declared_and_actual_expansion_budget",
+        "case_and_unicode_normalization_collisions"
+      ],
+      "metrics": [
+        "entry_occurrence_precision_recall",
+        "logical_path_and_collision_classification",
+        "coverage_status_parity",
+        "source_stability_rejection_rate",
+        "integrity_check_disposition",
+        "false_accept_rate",
+        "abstention_rate",
+        "bytes_read",
+        "peak_memory_bytes",
+        "p50_latency_ms",
+        "p95_latency_ms",
+        "cleanup_retry_failures"
+      ],
+      "target": "100_percent_supported_behavior_parity_against_pinned_REA_oracles; zero_false_accepts_on_malformed_or_racy_source_fixtures",
+      "boundaries": {
+        "first_lane": "metadata_only_and_bounded_streamed_member_hashes; no extraction or decryption",
+        "non_entry_regions": "leading_stub_APK_signing_block_and_trailing_comment_are_not_inventory_occurrences",
+        "archive_mutation": "must_reject_or_report_explicit_partial_unknown_if_source_identity_changes",
+        "resource_lifecycle": "failed_close_retains_owned_resource_for_retry"
+      },
+      "library_candidates": {
+        "zip_rs": "zip 8.6.0 candidate parser or differential oracle; compare already-locked versions and feature trees before adding another version",
+        "executable_formats": "defer object/goblin until a separate ELF_MachO_PE semantic analyzer"
+      }
     }
   ],
   "promotion_policy": {
