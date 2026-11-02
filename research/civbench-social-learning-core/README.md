@@ -215,6 +215,17 @@ The model records teacher offer, observation, acquisition, integration, correct 
 
 Protocol and literature boundary: [INTENTIONAL_TEACHING_PROTOCOL_V0_1.md](INTENTIONAL_TEACHING_PROTOCOL_V0_1.md).
 
+
+## Intentional teaching and selective knowledge transmission
+
+The `src/intentional_teaching.rs` module answers a different question from demonstrator selection: **which knowledge items should be taught under a limited bandwidth budget?** It separates resource cost from intrinsic learning difficulty and keeps evaluator-only true benefit, validity and held-out transferability out of the teacher-selection policy.
+
+The module compares random, declared-benefit, evidence-calibrated, learner-context-aware and diversity-aware packet selection. It records teacher offers, observations, acquisitions, integrations, correct executions, false adoptions, retention and held-out transfer separately. The individual-only baseline receives the same resource budget and is explicitly not counted as a teacher offer.
+
+The `intentional-teaching-sweep` binary runs 256 deterministic seeds per condition and reports mean correct-execution rate and realized benefit with 95% normal-approximation intervals over simulation replicates. These are synthetic mechanism checks, not effect estimates for the cited studies.
+
+Protocol: [INTENTIONAL_TEACHING_PROTOCOL_V0_1.md](INTENTIONAL_TEACHING_PROTOCOL_V0_1.md).
+
 ## Limitations
 
 - Binary beliefs are a tractable reference task, not a model of language, skill acquisition, norms, institutions, or plural interpretation.
