@@ -99,6 +99,6 @@ Report each scenario and subgroup separately. Do not collapse quality, latency, 
 
 ## Authored tests
 
-The module authors tests for deterministic replay, paired sensor-noise consistency, sensor-cost monotonicity, sleeping without acquisition, adaptive-policy denominator integrity, on-time versus late event qualification, action-bound rejection, result-tamper detection, scenario commitment changes, and invalid shift bounds.
+The module authors tests for deterministic replay, paired sensor-noise consistency, sensor-cost monotonicity, sleeping without acquisition, adaptive-policy denominator integrity, on-time versus late event qualification, action-bound rejection, result-tamper detection including overflowing forged counters, scenario commitment changes, and invalid shift bounds.
 
-**Execution status:** ten tests are authored but have not been compiled or run. No performance or SOTA result is claimed.
+**Execution status:** eleven tests are authored but have not been compiled or run. No performance or SOTA result is claimed.
