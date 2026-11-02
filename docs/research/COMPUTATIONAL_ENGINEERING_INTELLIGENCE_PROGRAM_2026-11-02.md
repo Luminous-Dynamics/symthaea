@@ -455,3 +455,47 @@ References:
 - [in-toto Attestation Framework](https://github.com/in-toto/attestation)
 - [in-toto envelope specification](https://github.com/in-toto/attestation/blob/main/spec/v1/envelope.md)
 - [DSSE v1 protocol](https://github.com/secure-systems-lab/dsse/blob/master/protocol.md)
+
+
+## 15. Industry benchmark snapshot and target calibration (2026-11-02)
+
+The latest public comparisons reinforce a two-track benchmark strategy:
+
+### SWE-Bench Pro V2
+
+Scale's September 22, 2026 V2 refresh has 642 tasks across 11 repositories after removing 89 invalid tasks. It enforces a reference-patch/empty-patch gate and re-grades candidate diffs on pristine images. The current public results list Opus 5 + Claude Code at 99.40% ±0.40, Gemini 4 Argon + mini-swe-agent at 99.22% ±0.45, Fable 5.1 + Claude Code at 99.10% ±0.50, and GPT-6 Astra + Codex at 96.90% ±1.10. Most displayed entries use an uncapped cost policy and 250-turn limit; capped 50-turn/cost results are visually distinguished.
+
+This public split is now close to saturation for leading agents. Use it for compatibility and regression checks, but place the improvement emphasis on SWE-Bench Pro V2 Hard, private/held-out tasks, unseen repositories, security-sensitive changes and task quality. Do not claim to beat the industry by comparing against a different cost/turn budget.
+
+### SWE-rebench
+
+The live SWE-rebench dashboard currently has its selected time window set to **15 May–1 July 2026**, with 111 problems from 65 repositories. Its displayed selected-window table reports Fable 5 at 64.5% ±1.41, Grok 4.5 at 63.8% ±0.60, Opus 5 at 63.4% ±1.35 and GPT-5.6 Sol at 62.3% ±1.83. It exposes pass@5, cost per problem and tokens per problem as well: GPT-5.6 Sol is listed at $0.85/problem, while Junie Agent is listed at 61.8% and $0.81/problem, Claude Code Agent at 60.4% and $3.39/problem, and Codex Agent at 58.0% and $1.59/problem.
+
+The dashboard's selected date range is not a November-wide live task sample. Save the exact filter, task IDs, dataset commit and collection cutoff with every result. It also includes both model-only and agent rows; compare the same category and harness, not an agent row to a model-only row.
+
+### Revised industry comparison matrix
+
+For each frozen task revision, run:
+
+1. Same foundation model with a minimal, fixed shell/repository harness.
+2. Same foundation model with a strong general coding-agent harness.
+3. Same model with Symthaea's repository twin, Causal/FEP experiment selection, evidence receipts and risk policy.
+4. Symthaea native generation, explicitly excluding any external model fallback.
+
+Keep model revision, effort, prompt, budget, image, network policy and grader fixed. Use at least five repeated attempts for stochastic systems, with task-family or repository-cluster uncertainty rather than treating tests within one task as independent observations.
+
+### Targets worth aiming for
+
+- **Fresh-task resolution:** first establish paired same-model baseline; then aim for ≥+5 percentage points on the first independently graded CEB/SWE-rebench development set, and ≥+10 pp on a larger sealed, rotating-fresh set. Treat these as pre-registered targets, not current capability.
+- **Economics:** target ≥30% lower cost per independently accepted patch at no more than a 1 pp correctness loss against the matched harness. Report cost per accepted patch, not cost per attempt.
+- **Regression:** 100% of accepted patches retain all required pass-to-pass invariants; critical regressions are a hard fail.
+- **Verifier quality:** 0 false accepts in 1,000 varied negative controls, and 0 false rejects in 100 independently adjudicated positive controls, with exact confidence bounds and attack-family reporting.
+- **Transfer:** report a separate score on repositories and task families never used to tune the repository twin or learning memory.
+- **Human oversight:** measure human review minutes, correction rate and accepted-patch reversal rate. A high automated score that transfers excessive review burden is not an engineering win.
+
+The practical competitive objective is to move the quality/cost/safety Pareto frontier, not to maximize an isolated headline percentage. A 2 pp improvement at half the cost and lower regression risk can be a stronger engineering result than a 5 pp score gain obtained with unbounded inference and no independent regrade.
+
+Sources:
+- [SWE-Bench Pro V2 leaderboard and September 22 methodology](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), accessed 2026-11-02.
+- [SWE-rebench leaderboard](https://swe-rebench.com/), selected dashboard window 2026-05-15 through 2026-07-01, accessed 2026-11-02.
+- [SWE-rebench V2 dataset collection](https://huggingface.co/collections/nebius/swe-rebench-v2), viewer updated 2026-10-01.
