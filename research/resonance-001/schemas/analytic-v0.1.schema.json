@@ -4,23 +4,62 @@
   "title": "RESONANCE-001 analytical reference fixture v0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "claim_ceiling", "series_rlc", "parallel_rlc", "coupled_identical_resonators"],
+  "required": [
+    "schema",
+    "claim_ceiling",
+    "series_rlc",
+    "parallel_rlc",
+    "coupled_identical_resonators"
+  ],
   "properties": {
-    "schema": { "const": "symthaea.resonance.analytic_reference.v0.1" },
-    "claim_ceiling": { "const": "ideal_lumped_analytical_only" },
-    "series_rlc": { "$ref": "#/$defs/series" },
-    "parallel_rlc": { "$ref": "#/$defs/parallel" },
+    "schema": {
+      "const": "symthaea.resonance.analytic_reference.v0.1"
+    },
+    "claim_ceiling": {
+      "const": "ideal_lumped_analytical_only"
+    },
+    "series_rlc": {
+      "$ref": "#/$defs/series"
+    },
+    "parallel_rlc": {
+      "$ref": "#/$defs/parallel"
+    },
     "coupled_identical_resonators": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["inductance_1_h", "capacitance_1_f", "inductance_2_h", "capacitance_2_f", "coupling_coefficient", "expected"],
+      "required": [
+        "inductance_1_h",
+        "capacitance_1_f",
+        "inductance_2_h",
+        "capacitance_2_f",
+        "coupling_coefficient",
+        "expected"
+      ],
       "properties": {
-        "inductance_1_h": { "type": "number", "exclusiveMinimum": 0 },
-        "capacitance_1_f": { "type": "number", "exclusiveMinimum": 0 },
-        "inductance_2_h": { "type": "number", "exclusiveMinimum": 0 },
-        "capacitance_2_f": { "type": "number", "exclusiveMinimum": 0 },
-        "coupling_coefficient": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
-        "expected": { "type": "object" }
+        "inductance_1_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capacitance_1_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inductance_2_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capacitance_2_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "coupling_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "expected": {
+          "type": "object"
+        }
       }
     }
   },
@@ -29,31 +68,70 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "resistance_ohm": { "type": "number", "exclusiveMinimum": 0 },
-        "inductance_h": { "type": "number", "exclusiveMinimum": 0 },
-        "capacitance_f": { "type": "number", "exclusiveMinimum": 0 },
+        "resistance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inductance_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capacitance_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "expected": {
           "type": "object",
-          "required": ["angular_frequency_rad_s", "frequency_hz", "quality_factor", "half_power_bandwidth_hz", "impedance_at_resonance_ohm"],
+          "required": [
+            "angular_frequency_rad_s",
+            "frequency_hz",
+            "quality_factor",
+            "half_power_bandwidth_hz",
+            "impedance_at_resonance_ohm"
+          ],
           "properties": {
-            "angular_frequency_rad_s": { "type": "number" },
-            "frequency_hz": { "type": "number" },
-            "quality_factor": { "type": "number" },
-            "half_power_bandwidth_hz": { "type": "number" },
+            "angular_frequency_rad_s": {
+              "type": "number"
+            },
+            "frequency_hz": {
+              "type": "number"
+            },
+            "quality_factor": {
+              "type": "number"
+            },
+            "half_power_bandwidth_hz": {
+              "type": "number"
+            },
             "impedance_at_resonance_ohm": {
               "type": "object",
-              "required": ["real", "imaginary"],
+              "required": [
+                "real",
+                "imaginary"
+              ],
               "properties": {
-                "real": { "type": "number" },
-                "imaginary": { "type": "number" }
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
               }
             }
           }
         }
       },
-      "required": ["resistance_ohm", "inductance_h", "capacitance_f", "expected"]
+      "required": [
+        "resistance_ohm",
+        "inductance_h",
+        "capacitance_f",
+        "expected"
+      ]
     },
-    "series": { "$ref": "#/$defs/common" },
-    "parallel": { "$ref": "#/$defs/common" }
+    "series": {
+      "$ref": "#/$defs/common"
+    },
+    "parallel": {
+      "$ref": "#/$defs/common"
+    }
   }
 }
