@@ -434,3 +434,75 @@ REA parses JSON through JavaScript, where every JSON number becomes an IEEE-754 
 For example, JavaScript parses `9007199254740993` as `9007199254740992`; a Rust parser may retain the original integer exactly. The Rust compatibility core now wraps JSON nodes with a serializer that emits every number as f64 before canonical JCS output. This avoids cloning/normalizing the full tree and matches the upstream ECMAScript numeric representation.
 
 The test corpus now includes unsafe positive/negative integers and the u64 boundary, as well as negative zero and exponent/formatting boundaries. See the regression test in the current implementation PR #9910. This is a required interoperability behavior, not an optional parser hardening.
+
+
+## 14. External benchmark alignment: public mobile challenges plus held-out agentic RE
+
+The benchmark programme now has 13 machine-readable families. It adds two independent external tracks, tracked in [REA-RUST-010 / #9969](https://github.com/Luminous-Dynamics/symthaea/issues/9969).
+
+### 14.1 SRE-Bench: realistic agentic reverse engineering
+
+SRE-Bench (updated October 2026) is the strongest external reference identified for general agentic binary reverse engineering. Its published snapshot contains 19 private programs, 262 binary instances and 1,572 deterministically graded tasks. The five domains are firmware, malware, games, file formats and network protocols; it includes four implementation languages and 44 anti-analysis mechanisms. It isolates each task in a container, withholds source and reference solutions, supplies a standard RE toolkit, and grades task outputs deterministically. Its per-binary score is the number of tasks passed out of six, with fully solved and zero-credit instance counts reported as well. [SRE-Bench methodology and snapshot](https://daplab.cs.columbia.edu/benchmarks/sre-bench/)
+
+**What this means for us:** build an official evaluation adapter if the benchmark offers authorized access. Do not mirror private artifacts, reverse engineer the grader, or claim an SRE-Bench result from a locally reconstructed subset. Report eligible, attempted, completed and graded tasks separately, together with refusal/abstention, cost and resource use. The public leaderboard is a dated snapshot; model and configuration differences must be disclosed. A SRE-Bench result is not a mobile-specific result.
+
+### 14.2 OWASP MAS Crackmes: public Android and iOS evaluation
+
+Use OWASP MAS Crackmes for reproducible mobile-specific tasks: Android UnCrackable Levels 1–4, the DRM and License Validator challenges, and iOS UnCrackable Levels 1–2. The collection is used in the OWASP Mobile Application Security Testing Guide and includes both Android and iOS examples. [OWASP MAS Crackmes](https://mas.owasp.org/crackmes/)
+
+Public challenges are useful for reproducibility but are vulnerable to solution contamination because challenge descriptions and community solutions are public. Preserve the upstream release, input digest, license and oracle version; add newly built, source-known variants with randomized secrets, library versions, architecture, and defensive transformations as a held-out cohort. Never call the public cohort contamination-free.
+
+### 14.3 Compare tools by the task they are designed to perform
+
+| System | Established role | Fair comparison |
+|---|---|---|
+| Ghidra | General reverse-engineering workbench: disassembly, decompilation, graphing and scripting | Function recovery, call/data-flow localization, cross-architecture coverage and analyst-assisted task completion |
+| MobSF | Mobile application security platform with static and dynamic analysis for Android, iOS and Windows Mobile | Manifest/resource/security checks, vulnerability findings, runtime observations and integration cost |
+| JADX | Android DEX-to-Java decompilation | Decompiled-code recovery, class/method localization and semantic parity against source-built variants |
+| apktool | Android resource and manifest decode/rebuild workflow | Resource/manifest fidelity and round-trip behavior |
+| REA | Structured artifact inventory and provenance-bearing Evidence contract | Inventory correctness, coverage, evidence identity, schema and provenance integrity |
+| Symthaea | Cognitive orchestration, evidence-grounded hypothesis generation and next-experiment selection | Diagnosis lift, calibration, abstention, information gain and investigation time/cost |
+
+Do not compare outputs with different task definitions as one aggregate score. Measure Ghidra on code-understanding tasks and MobSF on its static/dynamic mobile security scope; measure REA on artifact/evidence contracts; measure Symthaea on the extra decision quality it contributes. Then compare the composed stack with every constituent arm to test whether integration helps or merely adds latency.
+
+The official MobSF project describes an automated mobile security framework with both static and dynamic analysis; the Ghidra project describes a multi-platform software reverse-engineering suite including disassembly, decompilation, graphing and scripting. [MobSF project](https://github.com/MobSF/Mobile-Security-Framework-MobSF) · [Ghidra project](https://github.com/NationalSecurityAgency/ghidra)
+
+### 14.4 Required ablations and baselines
+
+For each pinned APK/IPA cohort, evaluate:
+- REA alone;
+- Symthaea without REA-derived analysis;
+- REA + Symthaea;
+- specialist tools alone (MobSF, Ghidra, JADX, apktool where applicable);
+- specialist stack + REA + Symthaea;
+- human expert as a separately budgeted reference.
+
+All automated arms receive the same binary, auxiliary material, CPU/RAM/time/network/tool budgets and grader. Separate public and held-out splits. Blind the graders. Freeze task oracles before evaluating. Store the exact model, prompts, tool versions, configuration, input hashes, evidence IDs, environment and result receipt.
+
+For the public SRE-Bench snapshot, report:
+- mean passed tasks per binary out of six;
+- fully solved and zero-credit instances;
+- graded/eligible coverage and refusal rate;
+- cost per passed task, latency and resource consumption.
+
+For mobile challenge cohorts, report:
+- deterministic challenge pass rate and complete challenge solve rate;
+- class/function top-1/top-3 and MRR;
+- evidence-backed claim precision/recall and false-cause rate;
+- calibration and selective risk versus coverage;
+- time and cost to a correct finding;
+- runtime observations, package coverage, crash/resource cost and energy where measured.
+
+### 14.5 What "better than SOTA" means here
+
+There is no defensible single "reverse engineering SOTA" number. SRE-Bench is a general, five-domain agentic RE benchmark; OWASP MAS Crackmes are mobile-centric educational challenges; Ghidra and MobSF have materially different products and task surfaces. Do not pool the scores or compare unaligned outputs.
+
+The first target is not to claim the best decompiler. It is to show that evidence-bound orchestration improves the **quality of decisions**:
+- >=20% relative top-3 localization gain versus the stronger single-system baseline, without higher false-cause rate;
+- >=15% lower median time-to-correct-diagnosis as a stretch target, without >5% higher investigation cost;
+- Brier/ECE and selective risk that improve or at least do not degrade as coverage increases;
+- zero confident causal claims on seeded unobservable and ambiguous negative controls;
+- 100% accepted causal claims linked to exact source Evidence and intervention records;
+- explicit coverage, refusals, timeouts and unsupported cases in all denominators.
+
+These are proposed gates, not measured results and not universal industry standards. The benchmark manifest includes separate families for the SRE-Bench external track and OWASP public mobile challenges.
