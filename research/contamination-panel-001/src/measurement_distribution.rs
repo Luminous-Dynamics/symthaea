@@ -761,7 +761,7 @@ pub fn analyze_measurement_distribution(
         BTreeMap::<ObservationKey, &MeasurementObservationV1>::new();
     let mut profile_observations =
         BTreeMap::<ProfileKey, Vec<&MeasurementObservationV1>>::new();
-    let mut independent_units = BTreeSet::<String>::new();
+    let mut independent_units = BTreeSet::<(String, String)>::new();
 
     for observation in &bundle.observations {
         if !models.contains_key(&observation.model_id) {
