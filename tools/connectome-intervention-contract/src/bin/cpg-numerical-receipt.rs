@@ -392,8 +392,24 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     if state_dimension.is_none_or(|count| count == 0) {
         errors.push("simulation.state_dimension must be positive".to_owned());
     }
-    if uint_at(value, &["simulation", "accepted_steps"]).is_none_or(|n| n == 0) {
+    let attempted = uint_at(value, &["simulation", "attempted_steps"]);
+    let accepted = uint_at(value, &["simulation", "accepted_steps"]);
+    let rejected = uint_at(value, &["simulation", "rejected_steps"]);
+    if attempted.is_none_or(|n| n == 0) {
+        errors.push("simulation.attempted_steps must be positive".to_owned());
+    }
+    if accepted.is_none_or(|n| n == 0) {
         errors.push("simulation.accepted_steps must be positive".to_owned());
+    }
+    if let (Some(attempted), Some(accepted), Some(rejected)) = (attempted, accepted, rejected) {
+        if accepted.checked_add(rejected) != Some(attempted) {
+            errors.push(
+                "simulation.attempted_steps must equal accepted_steps + rejected_steps".to_owned(),
+            );
+        }
+    }
+    if at(value, &["solver", "throw_on_failure"]).and_then(Value::as_bool) != Some(true) {
+        errors.push("solver.throw_on_failure must be true for a complete run".to_owned());
     }
     if uint_at(value, &["simulation", "function_evaluations"]).is_none_or(|n| n == 0) {
         errors.push("simulation.function_evaluations must be positive".to_owned());
@@ -823,6 +839,38 @@ mod tests {
                 .errors
                 .iter()
                 .any(|error| error.contains("solver_status"))
+        );
+    }
+
+    #[test]
+    fn attempted_steps_must_reconcile_with_accepted_and_rejected_steps() {
+        let values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let bytes = f64_bytes(&values);
+        let mut fixture = complete_fixture(&values);
+        fixture["simulation"]["attempted_steps"] = json!(2);
+        let report = verify_manifest(&fixture, Some(&bytes));
+        assert_eq!(report.disposition, "INVALID");
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("attempted_steps must equal"))
+        );
+    }
+
+    #[test]
+    fn complete_run_requires_solver_to_throw_on_failure() {
+        let values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let bytes = f64_bytes(&values);
+        let mut fixture = complete_fixture(&values);
+        fixture["solver"]["throw_on_failure"] = json!(false);
+        let report = verify_manifest(&fixture, Some(&bytes));
+        assert_eq!(report.disposition, "INVALID");
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("throw_on_failure"))
         );
     }
 
