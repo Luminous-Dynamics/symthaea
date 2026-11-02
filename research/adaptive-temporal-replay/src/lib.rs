@@ -346,7 +346,9 @@ impl BitemporalLabelLedger {
             None if record.revision == 1 && record.kind == RevisionKind::Assert && record.label_milli.is_some() => {}
             None => return Err(invalid("first label revision must be revision-1 Assert with a value")),
             Some(previous) => {
-                if record.revision != previous.revision + 1 || record.target_step != previous.target_step {
+                let expected_revision = previous.revision.checked_add(1)
+                    .ok_or_else(|| invalid("label revision counter overflow"))?;
+                if record.revision != expected_revision || record.target_step != previous.target_step {
                     return Err(invalid("label revision sequence/target is not contiguous"));
                 }
                 match record.kind {
