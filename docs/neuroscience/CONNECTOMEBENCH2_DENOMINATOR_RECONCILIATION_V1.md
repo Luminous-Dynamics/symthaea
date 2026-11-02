@@ -58,7 +58,7 @@ No value is imputed when a modality or identity field is absent. Missing task ro
 
 ## Adversarial tests and acceptance targets
 
-The metadata auditor adds deterministic fixtures for:
+The metadata auditor has two new Rust regression tests for denominator reconciliation and source-identity SHA-256, plus the existing identity, routing and lineage negative controls. The Rust tests are authored but have not been executed in this environment. The protocol's acceptance targets are:
 
 - one row routed to multiple task operations;
 - the same modality being counted once per task-operation, not once per row;
