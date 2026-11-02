@@ -7,6 +7,7 @@ on:
       - "tools/connectome-experiment-design/**"
       - ".github/workflows/connectome-experiment-design-v1.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     paths:
       - "tools/connectome-experiment-design/**"
