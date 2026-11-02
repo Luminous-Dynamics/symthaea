@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! Exact finite-grid Newton/Möbius transforms for ETH-002.
+//! Exact finite-grid binomial/Newton transforms for ETH-002.
 //!
 //! This is a finite-table reference implementation, not a complexity-theoretic
 //! speedup. Values use checked i128 arithmetic; overflow is an explicit error.
@@ -411,17 +411,17 @@ mod tests {
         let shape = GridShape::new(1, 2).unwrap();
         // Axis 0 is the least significant coordinate:
         // f(0,0)=3, f(1,0)=5, f(0,1)=-1, f(1,1)=8.
-        let values = [3, 5, -1, 8];
-        assert_eq!(shape.forward_differences(&values).unwrap(), [3, 2, -4, 7]);
+        let values = vec![3i128, 5, -1, 8];
+        assert_eq!(shape.forward_differences(&values).unwrap(), vec![3i128, 2, -4, 7]);
     }
 
     #[test]
     fn qary_newton_coefficients_reconstruct_a_quadratic() {
         let shape = GridShape::new(2, 1).unwrap();
         // f(x)=x^2 on {0,1,2}; Newton coefficients are [0,1,2].
-        let values = [0, 1, 4];
+        let values = vec![0i128, 1, 4];
         let coefficients = shape.forward_differences(&values).unwrap();
-        assert_eq!(coefficients, [0, 1, 2]);
+        assert_eq!(coefficients, vec![0i128, 1, 2]);
         assert_eq!(shape.reconstruct(&coefficients).unwrap(), values);
     }
 
@@ -429,13 +429,13 @@ mod tests {
     fn zero_variables_and_zero_degree_are_well_defined() {
         let empty_product = GridShape::new(3, 0).unwrap();
         assert_eq!(empty_product.point_count(), 1);
-        assert_eq!(empty_product.forward_differences(&[17]).unwrap(), [17]);
-        assert_eq!(empty_product.reconstruct(&[17]).unwrap(), [17]);
+        assert_eq!(empty_product.forward_differences(&[17]).unwrap(), vec![17i128]);
+        assert_eq!(empty_product.reconstruct(&[17]).unwrap(), vec![17i128]);
 
         let singleton_alphabet = GridShape::new(0, 5).unwrap();
         assert_eq!(singleton_alphabet.point_count(), 1);
-        assert_eq!(singleton_alphabet.forward_differences(&[23]).unwrap(), [23]);
-        assert_eq!(singleton_alphabet.reconstruct(&[23]).unwrap(), [23]);
+        assert_eq!(singleton_alphabet.forward_differences(&[23]).unwrap(), vec![23i128]);
+        assert_eq!(singleton_alphabet.reconstruct(&[23]).unwrap(), vec![23i128]);
     }
 
     #[test]
