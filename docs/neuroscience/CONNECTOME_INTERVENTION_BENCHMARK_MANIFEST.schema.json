@@ -1,0 +1,1818 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_MANIFEST.schema.json",
+  "title": "Connectome Intervention Benchmark Run Manifest",
+  "description": "Fail-closed manifest for blinded, intervention-conditioned connectome model comparison. It binds source data, connectome identity, observation kernels, leakage-resistant splits, hypotheses, model/baseline identities, intervention design, compute budgets, uncertainty and scorecards. A schema-valid manifest is not by itself evidence of biological validity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_state",
+    "evidence_tier",
+    "claim_ceiling",
+    "created_at_utc",
+    "source",
+    "connectome",
+    "observation_model",
+    "split",
+    "hypothesis_set",
+    "models",
+    "intervention_design",
+    "budgets",
+    "evaluation",
+    "results",
+    "artifacts",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "CONNECTOME-INTERVENTION-RUN-V1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,127}$"
+    },
+    "run_state": {
+      "enum": [
+        "planned",
+        "incomplete",
+        "running",
+        "complete",
+        "failed",
+        "invalid"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "synthetic_known_answer",
+        "observational_structure_function",
+        "in_silico_intervention",
+        "measured_intervention"
+      ]
+    },
+    "claim_ceiling": {
+      "enum": [
+        "synthetic_only",
+        "observational_prediction_only",
+        "model_counterfactual_only",
+        "measured_intervention_prediction"
+      ]
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "parent_run_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 3
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "dataset_id",
+        "dataset_version",
+        "immutable_reference",
+        "source_manifest_sha256",
+        "rights_state",
+        "permission_receipt_sha256",
+        "provenance_notes"
+      ],
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "synthetic",
+            "observational",
+            "measured_intervention"
+          ]
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "immutable_reference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "rights_state": {
+          "enum": [
+            "synthetic",
+            "documented_permitted",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "permission_receipt_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "provenance_notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    },
+    "connectome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taxon_id",
+        "taxon_name",
+        "connectome_id",
+        "reconstruction_version",
+        "neuron_id_namespace",
+        "row_axis_sha256",
+        "column_axis_sha256",
+        "canonical_identity_sha256",
+        "structural_edge_manifest_sha256",
+        "edge_semantics",
+        "coverage_statement"
+      ],
+      "properties": {
+        "taxon_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "taxon_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "connectome_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "reconstruction_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "neuron_id_namespace": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "row_axis_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "column_axis_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "canonical_identity_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "structural_edge_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "edge_semantics": {
+          "enum": [
+            "chemical_and_electrical",
+            "chemical_only",
+            "electrical_only",
+            "declared_subset",
+            "synthetic_graph",
+            "unknown"
+          ]
+        },
+        "coverage_statement": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "source_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          }
+        }
+      }
+    },
+    "observation_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_model_id",
+        "modality",
+        "observation_kernel_id",
+        "observation_kernel_parameters_sha256",
+        "sampling_interval_seconds",
+        "time_origin",
+        "preprocessing_manifest_sha256",
+        "latent_observation_separation",
+        "units"
+      ],
+      "properties": {
+        "observation_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modality": {
+          "enum": [
+            "synthetic_latent",
+            "calcium_imaging",
+            "voltage_imaging",
+            "electrophysiology",
+            "kinematics",
+            "force_contact",
+            "multi_modal",
+            "other"
+          ]
+        },
+        "observation_kernel_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "observation_kernel_parameters_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "sampling_interval_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "time_origin": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preprocessing_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "latent_observation_separation": {
+          "type": "boolean"
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "indicator_or_sensor_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_id",
+        "split_strategy",
+        "generalization_axes",
+        "split_manifest_sha256",
+        "train_membership_sha256",
+        "validation_membership_sha256",
+        "test_membership_sha256",
+        "preprocessing_fit_on_train_only",
+        "feature_selection_fit_on_train_only",
+        "model_selection_blind_to_test",
+        "target_identity_split_before_preprocessing",
+        "overlap_audit_sha256",
+        "status"
+      ],
+      "properties": {
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_strategy": {
+          "enum": [
+            "held_out_animal",
+            "held_out_session",
+            "held_out_target",
+            "held_out_target_combination",
+            "held_out_intervention_schedule",
+            "held_out_state_context",
+            "held_out_site",
+            "held_out_study",
+            "held_out_connectome_reconstruction",
+            "blocked_future_time",
+            "nested_grouped",
+            "synthetic_known_answer",
+            "other_declared"
+          ]
+        },
+        "generalization_axes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "animal",
+              "session",
+              "target_neuron",
+              "target_combination",
+              "intervention_schedule",
+              "state_context",
+              "site",
+              "study",
+              "connectome_reconstruction",
+              "future_time"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "train_membership_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "validation_membership_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "test_membership_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "preprocessing_fit_on_train_only": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "feature_selection_fit_on_train_only": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "model_selection_blind_to_test": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "target_identity_split_before_preprocessing": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "overlap_audit_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "status": {
+          "enum": [
+            "not_qualified",
+            "qualified",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "grouping_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "leakage_notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    },
+    "hypothesis_set": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "model_family",
+          "mechanistic_channels",
+          "prior_probability",
+          "prior_source",
+          "frozen_before_test",
+          "prediction_manifest_sha256"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$"
+          },
+          "model_family": {
+            "enum": [
+              "linear_lds_var_glm",
+              "activity_only",
+              "pairwise_effective_response",
+              "graph_constrained_state_space",
+              "cell_type_mechanistic",
+              "connectome_cpg",
+              "phenomenological_cpg",
+              "nonlinear_higher_order",
+              "anatomical_plus_latent",
+              "rewired_connectome",
+              "other_declared"
+            ]
+          },
+          "mechanistic_channels": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "direct_anatomical",
+                "polysynaptic_anatomical",
+                "extrasynaptic_latent",
+                "shared_input",
+                "cell_intrinsic",
+                "state_modulation",
+                "observation_kernel",
+                "body_mechanics",
+                "unknown"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "prior_probability": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "prior_source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "frozen_before_test": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "prediction_manifest_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "role",
+          "model_family",
+          "hypothesis_id",
+          "code_commit_sha",
+          "config_sha256",
+          "parameter_count",
+          "training_data_scope_sha256",
+          "training_budget",
+          "observation_model_id",
+          "structural_channel_sha256",
+          "latent_channel_sha256",
+          "model_artifact_sha256"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "candidate",
+              "baseline",
+              "negative_control",
+              "oracle_reference"
+            ]
+          },
+          "model_family": {
+            "enum": [
+              "linear_lds_var_glm",
+              "activity_only",
+              "pairwise_effective_response",
+              "graph_constrained_state_space",
+              "cell_type_mechanistic",
+              "connectome_cpg",
+              "phenomenological_cpg",
+              "nonlinear_higher_order",
+              "anatomical_plus_latent",
+              "degree_type_rewired",
+              "spatial_rewired",
+              "other_declared"
+            ]
+          },
+          "hypothesis_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "code_commit_sha": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{40}$"
+          },
+          "config_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "parameter_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "training_data_scope_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "training_budget": {
+            "$ref": "#/$defs/resourceBudget"
+          },
+          "observation_model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "structural_channel_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "latent_channel_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "model_artifact_sha256": {
+            "$ref": "#/$defs/sha256OrNull"
+          },
+          "training_seed": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "training_complete": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "intervention_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_pool_sha256",
+        "selector",
+        "selection_objective",
+        "preregistered_before_test",
+        "experiment_budget",
+        "selected_interventions",
+        "required_controls",
+        "feasibility_audit_sha256",
+        "stopping_rule"
+      ],
+      "properties": {
+        "candidate_pool_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "selector": {
+          "enum": [
+            "random",
+            "degree",
+            "centrality",
+            "expert_prior",
+            "largest_predicted_response",
+            "fisher_d_optimal",
+            "fisher_a_optimal",
+            "expected_information_gain",
+            "cost_normalized_eig",
+            "joint_pareto",
+            "manual_preregistered",
+            "not_selected"
+          ]
+        },
+        "selection_objective": {
+          "enum": [
+            "parameter_identifiability",
+            "model_discrimination",
+            "prediction_improvement",
+            "decision_regret",
+            "multi_objective",
+            "not_applicable"
+          ]
+        },
+        "preregistered_before_test": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "experiment_budget": {
+          "$ref": "#/$defs/resourceBudget"
+        },
+        "selected_interventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/intervention"
+          }
+        },
+        "required_controls": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "sham",
+              "single_target",
+              "pairwise",
+              "combined_target",
+              "reversed_order",
+              "washout",
+              "randomized_order",
+              "degree_matched",
+              "rewired_graph",
+              "activity_only",
+              "observation_kernel_only"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "feasibility_audit_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "stopping_rule": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_mode",
+        "training_budget_policy",
+        "evaluation_budget_policy",
+        "hardware",
+        "wall_time_seconds_limit",
+        "energy_joules_limit"
+      ],
+      "properties": {
+        "comparison_mode": {
+          "enum": [
+            "matched_budget",
+            "declared_unequal_budget_tradeoff",
+            "not_comparable"
+          ]
+        },
+        "training_budget_policy": {
+          "enum": [
+            "matched",
+            "reported_separately",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "evaluation_budget_policy": {
+          "enum": [
+            "matched",
+            "reported_separately",
+            "unknown"
+          ]
+        },
+        "hardware": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "wall_time_seconds_limit": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "energy_joules_limit": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "memory_bytes_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "budget_exception_rationale": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_ids",
+        "primary_metric_ids",
+        "metrics",
+        "uncertainty",
+        "strata",
+        "promotion_targets"
+      ],
+      "properties": {
+        "task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "primary_metric_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metricDefinition"
+          },
+          "minItems": 1
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertaintyProtocol"
+        },
+        "strata": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "promotion_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/promotionTarget"
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "observed_outcomes_sha256",
+        "heldout_prediction_sha256",
+        "scorecards",
+        "paired_comparisons",
+        "calibration",
+        "failures"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "incomplete",
+            "complete",
+            "invalid"
+          ]
+        },
+        "observed_outcomes_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "heldout_prediction_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "scorecards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scorecard"
+          }
+        },
+        "paired_comparisons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pairedComparison"
+          }
+        },
+        "calibration": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/calibrationResult"
+          }
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/failureRecord"
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_receipt_sha256",
+        "resolved_config_sha256",
+        "environment_sha256",
+        "raw_output_manifest_sha256",
+        "logs_manifest_sha256"
+      ],
+      "properties": {
+        "run_receipt_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "resolved_config_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "raw_output_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "logs_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "artifact_references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactReference"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "sha256OrNull": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "immutable_reference",
+        "sha256",
+        "artifact_kind"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "immutable_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "artifact_kind": {
+          "enum": [
+            "raw_data",
+            "preprocessed_data",
+            "connectome",
+            "annotation",
+            "model",
+            "prediction",
+            "metric_definition",
+            "split_manifest",
+            "run_log",
+            "other"
+          ]
+        }
+      }
+    },
+    "resourceBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compute_units",
+        "wall_time_seconds",
+        "energy_joules",
+        "memory_bytes",
+        "training_samples",
+        "notes"
+      ],
+      "properties": {
+        "compute_units": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "wall_time_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "energy_joules": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "memory_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "training_samples": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "target_ids",
+        "target_namespace",
+        "manipulation_type",
+        "waveform",
+        "protocol_sha256",
+        "randomization_block",
+        "control_role",
+        "feasibility_status"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "target_namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manipulation_type": {
+          "enum": [
+            "optogenetic_activation",
+            "optogenetic_inhibition",
+            "electrical_stimulation",
+            "pharmacological",
+            "genetic",
+            "mechanical",
+            "sensory_deprivation",
+            "simulated_ablation",
+            "simulated_edge_deletion",
+            "other_declared"
+          ]
+        },
+        "waveform": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "shape",
+            "amplitude",
+            "amplitude_unit",
+            "duration_seconds",
+            "onset_seconds",
+            "frequency_hz",
+            "duty_cycle"
+          ],
+          "properties": {
+            "shape": {
+              "enum": [
+                "step",
+                "pulse",
+                "train",
+                "sinusoid",
+                "chirp",
+                "impulse",
+                "arbitrary",
+                "not_applicable"
+              ]
+            },
+            "amplitude": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "amplitude_unit": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "duration_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "onset_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "frequency_hz": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "duty_cycle": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "waveform_sha256": {
+              "$ref": "#/$defs/sha256OrNull"
+            }
+          }
+        },
+        "protocol_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "randomization_block": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "control_role": {
+          "enum": [
+            "intervention",
+            "sham",
+            "single_target_control",
+            "combination_control",
+            "washout",
+            "other"
+          ]
+        },
+        "feasibility_status": {
+          "enum": [
+            "not_audited",
+            "feasible",
+            "infeasible",
+            "unknown"
+          ]
+        },
+        "safety_constraints_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        }
+      }
+    },
+    "metricDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "metric_family",
+        "definition_version",
+        "unit",
+        "direction",
+        "aggregation",
+        "primary"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_family": {
+          "enum": [
+            "negative_log_predictive_density",
+            "trajectory_rmse",
+            "normalized_rmse",
+            "correlation",
+            "parameter_error",
+            "parameter_coverage",
+            "predictive_interval_coverage",
+            "interval_sharpness",
+            "expected_information_gain_bits",
+            "realized_information_gain_bits",
+            "decision_regret",
+            "calibration_error",
+            "response_latency",
+            "compute_cost",
+            "failure_rate",
+            "other_declared"
+          ]
+        },
+        "definition_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "higher_is_better",
+            "lower_is_better",
+            "target_range",
+            "descriptive_only"
+          ]
+        },
+        "aggregation": {
+          "enum": [
+            "per_timepoint",
+            "per_trial",
+            "per_animal",
+            "per_target",
+            "per_session",
+            "stratum_macro_mean",
+            "pooled_micro_mean",
+            "distributional"
+          ]
+        },
+        "primary": {
+          "type": "boolean"
+        },
+        "formula_reference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "uncertaintyProtocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_id",
+        "confidence_level",
+        "resampling_unit",
+        "cluster_keys",
+        "two_sided",
+        "minimum_independent_units",
+        "seed"
+      ],
+      "properties": {
+        "method_id": {
+          "enum": [
+            "cluster_bootstrap_percentile",
+            "cluster_bootstrap_bc_a",
+            "hierarchical_bootstrap",
+            "permutation",
+            "bayesian_posterior",
+            "analytic",
+            "none_not_eligible"
+          ]
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "resampling_unit": {
+          "enum": [
+            "animal",
+            "session",
+            "target",
+            "intervention_block",
+            "study",
+            "other_declared"
+          ]
+        },
+        "cluster_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "two_sided": {
+          "type": "boolean"
+        },
+        "minimum_independent_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "promotionTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "target_value",
+        "comparison",
+        "status"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_value": {
+          "type": "number"
+        },
+        "comparison": {
+          "enum": [
+            "at_least",
+            "at_most",
+            "within_abs_tolerance",
+            "non_inferior_by_margin"
+          ]
+        },
+        "absolute_tolerance": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "status": {
+          "const": "aspirational_not_measured"
+        }
+      }
+    },
+    "scorecard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "metric_id",
+        "stratum",
+        "n_independent_units",
+        "score",
+        "ci_low",
+        "ci_high",
+        "score_state"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratum": {
+          "type": "string",
+          "minLength": 1
+        },
+        "n_independent_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ci_low": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ci_high": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "score_state": {
+          "enum": [
+            "measured",
+            "abstained",
+            "failed",
+            "not_assessed",
+            "incomplete"
+          ]
+        }
+      }
+    },
+    "pairedComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_model_id",
+        "baseline_model_id",
+        "metric_id",
+        "stratum",
+        "paired_unit_manifest_sha256",
+        "n_independent_units",
+        "mean_candidate_minus_baseline",
+        "ci_low",
+        "ci_high",
+        "minimum_meaningful_effect",
+        "non_inferiority_margin",
+        "outcome"
+      ],
+      "properties": {
+        "candidate_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratum": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paired_unit_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "n_independent_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mean_candidate_minus_baseline": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ci_low": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ci_high": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "minimum_meaningful_effect": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "non_inferiority_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "outcome": {
+          "enum": [
+            "outperforms_by_margin",
+            "non_inferior",
+            "regresses_beyond_margin",
+            "uncertain",
+            "not_assessed",
+            "incomplete"
+          ]
+        }
+      }
+    },
+    "calibrationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "metric_id",
+        "stratum",
+        "nominal_coverage",
+        "observed_coverage",
+        "interval_sharpness",
+        "n_independent_units"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratum": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nominal_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "observed_coverage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interval_sharpness": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "n_independent_units": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "failureRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "failure_id",
+        "model_id",
+        "intervention_id",
+        "failure_kind",
+        "count",
+        "notes"
+      ],
+      "properties": {
+        "failure_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "intervention_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "failure_kind": {
+          "enum": [
+            "numerical_non_convergence",
+            "non_finite_state",
+            "missing_observation",
+            "resource_budget_exceeded",
+            "protocol_violation",
+            "safety_constraint_violation",
+            "invalid_score",
+            "other"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "synthetic_known_answer"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "synthetic_only"
+          },
+          "source": {
+            "properties": {
+              "source_kind": {
+                "const": "synthetic"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "observational_structure_function"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "observational_prediction_only"
+          },
+          "source": {
+            "properties": {
+              "source_kind": {
+                "const": "observational"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "in_silico_intervention"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "model_counterfactual_only"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "measured_intervention"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "measured_intervention_prediction"
+          },
+          "source": {
+            "properties": {
+              "source_kind": {
+                "const": "measured_intervention"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_state": {
+            "const": "complete"
+          }
+        },
+        "required": [
+          "run_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "source_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "split": {
+            "properties": {
+              "status": {
+                "const": "qualified"
+              },
+              "split_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "train_membership_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "test_membership_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "preprocessing_fit_on_train_only": {
+                "const": true
+              },
+              "feature_selection_fit_on_train_only": {
+                "const": true
+              },
+              "model_selection_blind_to_test": {
+                "const": true
+              },
+              "target_identity_split_before_preprocessing": {
+                "const": true
+              },
+              "overlap_audit_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "results": {
+            "properties": {
+              "status": {
+                "const": "complete"
+              },
+              "observed_outcomes_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "heldout_prediction_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "artifacts": {
+            "properties": {
+              "run_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "resolved_config_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "environment_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "raw_output_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_state": {
+            "const": "planned"
+          }
+        },
+        "required": [
+          "run_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "results": {
+            "properties": {
+              "status": {
+                "const": "not_run"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
