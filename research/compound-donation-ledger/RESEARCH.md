@@ -137,6 +137,65 @@ remains the default reference. Candidate specifications use zero reserve
 rate in overshoot mode, and a missing destination disables donation for that
 candidate. Both modes retain fixed destination IDs and exact receipt replay.
 
+### Exploratory reserve-policy comparison
+
+The new runner compares three methods on the same streams:
+1. no donation;
+2. fixed-rate donation at \(1/20\) of each donor's own weighted evidence
+   increment, subject to the existing donor cap;
+3. capped weighted overshoot, \(D_{i,t}=\min\{(\gamma_iX_{i,t}-1)_+,\gamma_i\}\).
+
+The design uses \(m=100\), \(T=100\), \(\alpha=0.05\), 3,000 independent
+simulation streams per cell, and the fixed global weights
+\[
+\gamma_0=0.50,\quad \gamma_1=0.01,\quad
+\gamma_2=\cdots=\gamma_{99}=0.005,
+\qquad \sum_i\gamma_i=1.
+\]
+Only candidate 0 has a precommitted destination (candidate 1); the other
+candidates have no destination and therefore cannot donate. The donor is
+strong (Bernoulli \(p=0.90\)) in the "strong-to-many-weak" scenario, and
+candidates 1–40 are weaker alternatives (Bernoulli \(p=0.71\)); remaining
+candidates are null (\(p=0.5\)). Other cells include all-null, weak-only and
+strong-donor-only alternatives. Null likelihood-ratio factors are 1.5 on
+success and 0.5 on failure, so each null coordinate has conditional mean-one
+increments. The dependent generators share a uniform shock across null
+coordinates or use a randomized balanced count of null successes while
+preserving each coordinate's conditional success probability.
+
+| Dependence | Alternative pattern | No-donation power | Fixed-rate power | Capped-overshoot power | No-donation SupFDR | Capped SupFDR |
+|---|---|---:|---:|---:|---:|---:|
+| Independent | Strong donor + weak alternatives | 43.34% | 43.77% | 43.77% | 0.0061% | 0.0061% |
+| Independent | Weak alternatives only | 42.35% | 42.71% | 42.70% | 0.0047% | 0.0050% |
+| Shared-uniform null | Strong donor + weak alternatives | 43.33% | 43.74% | 43.74% | 0.0555% | 0.0547% |
+| Shared-uniform null | Weak alternatives only | 42.50% | 42.89% | 42.89% | 0.0000% | 0.0000% |
+| Balanced-negative null | Strong donor + weak alternatives | 43.12% | 43.56% | 43.56% | 0.0033% | 0.0033% |
+| Balanced-negative null | Weak alternatives only | 42.73% | 43.07% | 43.06% | 0.0151% | 0.0151% |
+
+These results suggest a small, regime-dependent power gain of about 0.3–0.4
+percentage points in the weak-signal cells when a high-weight donor can
+transfer capital to a low-weight recipient. The fixed-rate and capped-
+overshoot methods tie in the strong-donor cases because both reach the
+donor's cumulative cap by the terminal look. In the weak-only cells, the
+capped policy's extra donation is small and does not consistently improve on
+the fixed-rate policy. In all-null cells the observed SupFDR is small, but
+that is not evidence of a theorem or calibration at the nominal boundary.
+
+At \(n=3{,}000\), the one-sided 95% Hoeffding half-width for each bounded
+FDP-mean estimand is \(0.02234\), or 2.234 percentage points. The resulting
+bounds are much wider than the observed point estimates. This experiment is
+exploratory and only tests one weight topology, one alpha, one LR model and
+three dependence constructions. It is **not** confirmatory evidence and it
+does not justify superiority over fixed-rate donation, SCORE, e-LOND or
+industry methods.
+
+The committed runner and seed-by-cell output are
+benchmarks/overshoot_donation_policy_comparison.py and
+benchmarks/overshoot_donation_policy_comparison_2026-11-02.json.
+The recorded run was executed by a private Python reimplementation matching
+the committed harness logic; independently run the committed script before
+using the numbers as confirmatory evidence.
+
 ## 3. Compound null-mass bound
 
 Let N(P) be the fixed true-null set under data-generating law P. For any
