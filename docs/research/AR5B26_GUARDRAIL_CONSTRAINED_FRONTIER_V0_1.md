@@ -119,12 +119,12 @@ The new module includes eight tests:
 2. **Non-estimable evidence:** a policy with a NOT_ESTIMABLE required cell is excluded and receives zero selected mass.
 3. **Missing evidence:** an absent policy/requirement row is not imputed as zero and cannot receive positive mass.
 4. **Family expansion:** adding a policy after calibration is rejected.
-5. **Tampering:** changes to guardrail results or the outer report digest are rejected.
+5. **Tampering:** changes to guardrail results, solver settings, or the outer report digest are rejected.
 6. **Inclusive boundary:** guardrail feasibility is checked using the frozen tolerance.
 7. **Local-stratum trap:** a local lower-bound guardrail binds even though the global upper-bound guardrail has positive slack.
 8. **Infeasible polytope:** when every policy violates a mandatory global guardrail, optimization fails closed.
 
-The generic policy-frontier module also adds two tests for policy-ID-bound coefficient order invariance and missing/duplicate policy identities.
+The generic policy-frontier module also adds two tests for policy-ID-bound coefficient order invariance and missing/duplicate policy identities. The utility-trap test additionally asserts that the experiment Type-I alpha (0.05) and guardrail confidence failure budget (0.01) remain separately recorded.
 
 The earlier noncompensatory verifier module adds a regression test showing that a zero-weight policy with a missing bound does not make an otherwise fully evidenced mixture indeterminate.
 
