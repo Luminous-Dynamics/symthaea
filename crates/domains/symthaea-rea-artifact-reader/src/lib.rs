@@ -838,6 +838,15 @@ fn read_central_directory(
         total_declared_uncompressed = total_declared_uncompressed
             .checked_add(declared_uncompressed_size)
             .ok_or_else(|| ReaderError::new(ReaderErrorKind::LimitExceeded, "aggregate declared size overflow"))?;
+        if total_declared_uncompressed > limits.max_total_declared_uncompressed_bytes {
+            return Err(ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                format!(
+                    "entries declare {total_declared_uncompressed} uncompressed bytes; aggregate limit is {}",
+                    limits.max_total_declared_uncompressed_bytes
+                ),
+            ));
+        }
 
         let decoded_name = decode_member_name(&raw_name, flags, &extra);
         let path_disposition = decoded_name
