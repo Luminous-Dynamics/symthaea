@@ -165,6 +165,24 @@ pub struct Iit4SystemIntrinsicSpecification {
     pub effect: Iit4IntrinsicSpecificationResult,
 }
 
+/// IIT 4.0 (2026) system intrinsic information for one explicitly specified
+/// cause/effect system-state pair.
+///
+/// The value is the minimum of the positive-part intrinsic specification and
+/// intrinsic differentiation in both directions. Cause differentiation is
+/// evaluated on the Bayes-normalized full-system cause repertoire; effect
+/// differentiation is evaluated on the full-system forward effect repertoire.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Iit4SystemIntrinsicInformation {
+    pub cause_state_probability: f64,
+    pub effect_state_probability: f64,
+    pub cause_intrinsic_specification: f64,
+    pub effect_intrinsic_specification: f64,
+    pub cause_intrinsic_differentiation: f64,
+    pub effect_intrinsic_differentiation: f64,
+    pub intrinsic_information: f64,
+}
+
 impl Iit4SystemIntrinsicSpecification {
     /// Cartesian product of every tied cause/effect state, preserving stable order.
     ///
@@ -801,6 +819,8 @@ pub enum SystemPhiError {
         expected: usize,
         actual: usize,
     },
+    #[error("{direction:?} specified state is not in the intrinsic-specification maximum tie family")]
+    SpecifiedStateNotIntrinsicMaximizer { direction: CausalDirection },
     #[error("system partition cuts no connections and therefore has no EdgeCut normalization")]
     ZeroSeveredConnections,
     #[error("candidate system must be in strictly ascending unit-index order")]
@@ -2478,6 +2498,75 @@ impl BinaryCausalModel {
         Ok(Iit4SystemIntrinsicSpecification { cause, effect })
     }
 
+    /// Compute IIT 4.0 (2026) intrinsic information ii(s) for one selected
+    /// cause/effect system-state pair.
+    ///
+    /// This is the fixed-state Eq. 13 primitive only. It does not select an
+    /// MIP, apply the post-MIP system-phi cap, or choose among cause/effect
+    /// state pairs. Those are separate steps in the full 2026 system search.
+    ///
+    /// Cause differentiation uses the Bayes-normalized whole-system cause
+    /// repertoire; effect differentiation uses the whole-system forward
+    /// effect repertoire. Zero-probability states follow PyPhi 2.0 semantics:
+    /// their pointwise surprisal is zero rather than positive infinity.
+    pub fn system_intrinsic_information_iit4_2026(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        system_state: &Iit4SystemState,
+        decimal_precision: u32,
+    ) -> Result<Iit4SystemIntrinsicInformation, SystemPhiError> {
+        let specification = self.system_intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            decimal_precision,
+        )?;
+        if system_state.cause_specified_state.len() != candidate_system.len() {
+            return Err(SystemPhiError::SpecifiedStateLength {
+                direction: CausalDirection::Cause,
+                expected: candidate_system.len(),
+                actual: system_state.cause_specified_state.len(),
+            });
+        }
+        if system_state.effect_specified_state.len() != candidate_system.len() {
+            return Err(SystemPhiError::SpecifiedStateLength {
+                direction: CausalDirection::Effect,
+                expected: candidate_system.len(),
+                actual: system_state.effect_specified_state.len(),
+            });
+        }
+        if !specification.cause.specified_states.contains(&system_state.cause_specified_state) {
+            return Err(SystemPhiError::SpecifiedStateNotIntrinsicMaximizer {
+                direction: CausalDirection::Cause,
+            });
+        }
+        if !specification.effect.specified_states.contains(&system_state.effect_specified_state) {
+            return Err(SystemPhiError::SpecifiedStateNotIntrinsicMaximizer {
+                direction: CausalDirection::Effect,
+            });
+        }
+
+        let cause_repertoire = self.cause_repertoire_iit4(
+            candidate_system,
+            candidate_system,
+            current_state,
+            candidate_system,
+        )?;
+        let effect_repertoire = self.effect_repertoire_iit4(
+            candidate_system,
+            candidate_system,
+            current_state,
+            candidate_system,
+        )?;
+        compute_iit4_2026_intrinsic_information(
+            &specification,
+            system_state,
+            &cause_repertoire,
+            &effect_repertoire,
+            decimal_precision,
+        )
+    }
+
     /// Select the system's intrinsically specified past/future state in one direction.
     ///
     /// The current qualified path requires the full substrate as the candidate
@@ -3335,6 +3424,101 @@ pub fn primitive_repertoire_request_sha256(
         }
     }
     Ok(hex_digest(&bytes))
+}
+
+/// Compute Eq. 13 from already evaluated full-system repertoires.
+fn compute_iit4_2026_intrinsic_information(
+    specification: &Iit4SystemIntrinsicSpecification,
+    system_state: &Iit4SystemState,
+    cause_repertoire: &[f64],
+    effect_repertoire: &[f64],
+    decimal_precision: u32,
+) -> Result<Iit4SystemIntrinsicInformation, SystemPhiError> {
+    let expected = specification.cause.specified_states.first()
+        .map(Vec::len)
+        .unwrap_or(0);
+    if system_state.cause_specified_state.len() != expected {
+        return Err(SystemPhiError::SpecifiedStateLength {
+            direction: CausalDirection::Cause,
+            expected,
+            actual: system_state.cause_specified_state.len(),
+        });
+    }
+    if system_state.effect_specified_state.len() != expected {
+        return Err(SystemPhiError::SpecifiedStateLength {
+            direction: CausalDirection::Effect,
+            expected,
+            actual: system_state.effect_specified_state.len(),
+        });
+    }
+    let expected_entries = 1usize.checked_shl(expected as u32)
+        .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+    if cause_repertoire.len() != expected_entries {
+        return Err(RepertoireError::DistributionLengthMismatch {
+            forward: cause_repertoire.len(),
+            partitioned: expected_entries,
+            selectivity: expected_entries,
+        }.into());
+    }
+    if effect_repertoire.len() != expected_entries {
+        return Err(RepertoireError::DistributionLengthMismatch {
+            forward: effect_repertoire.len(),
+            partitioned: expected_entries,
+            selectivity: expected_entries,
+        }.into());
+    }
+    validate_probability_distribution(cause_repertoire, "cause_intrinsic_differentiation")?;
+    validate_probability_distribution(effect_repertoire, "effect_intrinsic_differentiation")?;
+
+    let cause_index = system_state.cause_specified_state.iter()
+        .enumerate()
+        .fold(0usize, |index, (slot, bit)| {
+            if *bit { index | (1usize << slot) } else { index }
+        });
+    let effect_index = system_state.effect_specified_state.iter()
+        .enumerate()
+        .fold(0usize, |index, (slot, bit)| {
+            if *bit { index | (1usize << slot) } else { index }
+        });
+    let cause_probability = cause_repertoire[cause_index];
+    let effect_probability = effect_repertoire[effect_index];
+
+    // PyPhi's pointwise intrinsic differentiation maps p=0 to zero.
+    let cause_surprisal = if cause_probability > 0.0 {
+        -cause_probability.log2()
+    } else {
+        0.0
+    };
+    let effect_surprisal = if effect_probability > 0.0 {
+        -effect_probability.log2()
+    } else {
+        0.0
+    };
+    if !cause_surprisal.is_finite() || !effect_surprisal.is_finite() {
+        return Err(SystemPhiError::NonFinitePartitionScore);
+    }
+
+    let epsilon = 10.0_f64.powi(-(decimal_precision as i32));
+    let positive_cause_specification = specification.cause.intrinsic_specification.max(0.0);
+    let positive_effect_specification = specification.effect.intrinsic_specification.max(0.0);
+    let cause_intrinsic_differentiation =
+        if pyphi_is_positive(cause_surprisal, epsilon) { cause_surprisal } else { 0.0 };
+    let effect_intrinsic_differentiation =
+        if pyphi_is_positive(effect_surprisal, epsilon) { effect_surprisal } else { 0.0 };
+    let intrinsic_information = positive_cause_specification
+        .min(positive_effect_specification)
+        .min(cause_intrinsic_differentiation)
+        .min(effect_intrinsic_differentiation);
+
+    Ok(Iit4SystemIntrinsicInformation {
+        cause_state_probability: cause_probability,
+        effect_state_probability: effect_probability,
+        cause_intrinsic_specification: positive_cause_specification,
+        effect_intrinsic_specification: positive_effect_specification,
+        cause_intrinsic_differentiation,
+        effect_intrinsic_differentiation,
+        intrinsic_information,
+    })
 }
 
 /// PyPhi numerics.eq: symmetric relative tolerance with an absolute floor.
