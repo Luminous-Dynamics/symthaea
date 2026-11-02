@@ -641,7 +641,16 @@ mod tests {
 
     #[test]
     fn stage_counts_never_inflate_acquisition_or_execution() {
-        let all = items();
+        let mut all = items();
+        for item in &mut all {
+            item.evidence_reliability = 1.0;
+            item.uncertainty = 0.0;
+            item.difficulty = 0.0;
+        }
+        let mut learner = learner();
+        for (_, fit) in &mut learner.context_fit_by_item {
+            *fit = 1.0;
+        }
         let config = TeachingConfig {
             bandwidth_budget: 20.0,
             observation_probability: 1.0,
@@ -652,7 +661,7 @@ mod tests {
         };
         let episode = run_teaching_episode(
             &all,
-            &learner(),
+            &learner,
             LearningMode::Social { policy: TeachingPolicy::EvidenceCalibrated },
             config,
             42,
@@ -661,7 +670,7 @@ mod tests {
         assert_eq!(episode.observed_count, episode.acquired_count);
         assert_eq!(episode.acquired_count, episode.integrated_count);
         assert!(episode.correct_execution_count <= episode.integrated_count);
-        assert!(episode.retained_count <= episode.integrated_count);
+        assert_eq!(episode.retained_count, episode.integrated_count);
         assert!(episode.transfer_success_count <= episode.retained_count);
     }
 
