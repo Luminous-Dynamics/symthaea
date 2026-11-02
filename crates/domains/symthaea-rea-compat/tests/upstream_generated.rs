@@ -35,20 +35,22 @@ fn verifies_evidence_emitted_by_pinned_upstream_rea_runtime() {
         analysis_profile_digest(&upstream["analysis_profile"]).unwrap(),
         upstream_profile_digest
     );
-    assert_eq!(verified.raw_file_sha256.as_deref(), Some(
-        symthaea_rea_compat::sha256_hex(&bytes).as_str()
-    ));
+    let expected_raw_sha256 = symthaea_rea_compat::sha256_hex(&bytes);
+    assert_eq!(
+        verified.raw_file_sha256.as_deref(),
+        Some(expected_raw_sha256.as_str())
+    );
     assert_ne!(verified.raw_file_sha256.as_deref(), Some(verified.semantic_sha256.as_str()));
-    assert_ne!(verified.evidence_id, "");
-    assert_ne!(verified.raw_file_sha256.as_deref(), Some(""));
+    assert!(!verified.evidence_id.is_empty());
     assert_eq!(
         verified.value["relationship_coverage"],
         Value::Null,
-        "upstream unknown coverage omission/default must remain explicit null",
+        "upstream omission must remain explicit null in Evidence",
     );
-    assert_ne!(
-        EvidenceErrorKind::IdentityMismatch,
-        EvidenceErrorKind::SchemaViolation,
-        "error categories remain distinct",
-    );
+
+    let mut tampered = upstream;
+    tampered["normalized_result"]["entries"][0]["size"] = Value::from(43);
+    let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
+    let error = verify_evidence_json(&tampered_bytes).unwrap_err();
+    assert_eq!(error.kind, EvidenceErrorKind::IdentityMismatch);
 }
