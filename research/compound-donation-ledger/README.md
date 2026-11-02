@@ -63,11 +63,12 @@ log equals the reconstructed log, and optionally compares the exact terminal
 snapshot. It detects edits, omitted/duplicated reserve records, invalid
 credits, backward routing, overdraws, and inconsistent final state.
 
-The next verifier tranche must use a separately implemented transition checker
-and a different data structure (for example, an augmented prefix-sum tree with
-a linear-scan oracle). This crate is not yet an independent verifier. It is
-also not a digital signature, Merkle proof, source attestation, or proof that
-the evidence itself is statistically valid. Those
+The next validation tranche must compile and run both crates, then exercise
+the separate verifier against independently generated and tampered receipts.
+The optimized writer can later use an augmented prefix-sum tree while the
+verifier retains a linear scan. Neither crate is a digital signature, Merkle
+proof, source attestation, or proof that the evidence itself is statistically
+valid. Those
 layers require separate authenticated envelopes and independently verified
 global-filtration evidence inputs.
 
