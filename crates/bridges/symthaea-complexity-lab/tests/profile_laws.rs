@@ -69,10 +69,10 @@ fn signed_leading_term_cancellation_defeats_naive_max_plus() {
 }
 
 #[test]
-fn exponent_and_coefficient_overflow_remain_distinct_failures() {
+fn exponent_sums_truncate_before_machine_integer_overflow() {
     let high = WeightProfile::monomial(vec![u32::MAX], vec![u32::MAX - 1], 2).unwrap();
     let next = WeightProfile::monomial(vec![u32::MAX], vec![u32::MAX - 1], 3).unwrap();
-    assert!(matches!(high.checked_mul(&next), Err(ProfileError::ExponentOverflow { .. })));
+    assert!(high.checked_mul(&next).unwrap().is_zero());
 
     let max = WeightProfile::monomial(vec![1], vec![0], i128::MAX).unwrap();
     let two = WeightProfile::monomial(vec![1], vec![0], 2).unwrap();
