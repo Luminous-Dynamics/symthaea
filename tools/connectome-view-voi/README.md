@@ -37,6 +37,12 @@ All probabilities must be normalized and finite. Every view needs one likelihood
 - The library chooses an evidence view only. It does not label a neuron, infer synaptic causality, propose a segmentation edit, or certify an edit as safe.
 - Cached-view replay estimates policy behaviour under a simulation protocol; it is not a prospective acquisition or human-workflow study.
 
+## Reproducible run manifest
+
+The repository schema `research/connectomics/connectome-view-voi-run-v0.1.schema.json` defines the artifact contract for cached CB2 replay and prospective acquisition runs. It requires immutable dataset/card/shard/operation manifests; operation evidence-state digest; model and calibration digests; task-specific view policy and leakage-audit digests; per-view likelihood artifact digests; explicit unweighted scenario-set provenance; action-loss and cost-profile digests; source-volume grouped splits; a decision receipt; and approved evaluation license status.
+
+The schema pins required fields and formats, but JSON Schema alone cannot enforce equality between values in different objects (for example, `decision_loss.loss_unit_id` and `acquisition_cost_profile.cost_unit_id`). Run ingestion must compare those values exactly, verify every SHA-256 against the referenced bytes, and verify that candidate-view and per-view-cost ID sets agree before accepting a receipt.
+
 ## Tests
 
 Run in a Rust environment:
