@@ -103,6 +103,7 @@ pub struct GeneratorSpecV1 {
     pub seed_commitment_sha256: String,
     pub checkpoint_freeze_receipt_sha256: Option<String>,
     pub fresh_instances_after_checkpoint_freeze: bool,
+    pub generated_after_checkpoint_freeze: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -723,9 +724,8 @@ pub fn analyze_measurement_distribution(
         conditions_by_axis.insert(axis.axis_id.clone(), conditions);
     }
     let expected_observation_count = bundle
-        .models
+        .runs
         .len()
-        .checked_mul(bundle.runs.len())
         .and_then(|value| value.checked_mul(bundle.instance_manifest.instances.len()))
         .and_then(|value| value.checked_mul(conditions_by_axis.values().map(BTreeSet::len).sum()))
         .ok_or_else(|| "expected observation count overflows".to_owned())?;
@@ -758,9 +758,25 @@ pub fn analyze_measurement_distribution(
             .ok_or_else(|| "observation references an unknown perturbation axis".to_owned())?;
         if observation.task_family != item.task_family
             || observation.source_cluster_id != item.source_cluster_id
-            || observation.independent_unit_id != run.independent_unit_id
         {
-            return Err("observation task family/source cluster/independent unit differs from its manifest or run".to_owned());
+            return Err("observation task family/source cluster differs from its instance manifest".to_owned());
+        }
+        let independent_unit_matches = match protocol.evaluation.independent_unit_kind {
+            IndependentUnitKindV1::ModelPairReplicate => {
+                observation.independent_unit_id == run.independent_unit_id
+            }
+            IndependentUnitKindV1::SourceCluster => {
+                observation.independent_unit_id == item.source_cluster_id
+            }
+            IndependentUnitKindV1::BaseItem => {
+                observation.independent_unit_id == item.item_id
+            }
+            IndependentUnitKindV1::EvaluationRun => {
+                observation.independent_unit_id == run.run_id
+            }
+        };
+        if !independent_unit_matches {
+            return Err("observation independent unit does not match the protocol's declared unit kind".to_owned());
         }
         let is_baseline = observation.condition_id == axis.baseline_condition_id;
         let family = axis
@@ -1068,10 +1084,7 @@ pub fn analyze_measurement_distribution(
     let run_bundle_bytes = serde_json::to_vec(bundle)
         .map_err(|error| format!("cannot serialize measurement run bundle: {error}"))?;
     let run_bundle_sha = hash_domain(b"measurement-distribution-run-bundle.v1", &run_bundle_bytes);
-    let independent_unit_count = bundle.runs.iter()
-        .map(|run| run.independent_unit_id.as_str())
-        .collect::<BTreeSet<_>>()
-        .len() as u64;
+    let independent_unit_count = independent_units.len() as u64;
     Ok(MeasurementDistributionReportV1 {
         schema: MEASUREMENT_REPORT_SCHEMA.to_owned(),
         benchmark_id: protocol.benchmark_id.clone(),
@@ -1250,7 +1263,7 @@ mod tests {
                     observations.push(MeasurementObservationV1 {
                         model_id: "model-a".to_owned(),
                         run_id: run_id.clone(),
-                        independent_unit_id: format!("unit-{run_idx}"),
+                        independent_unit_id: item.source_cluster_id.clone(),
                         axis_id: "surface".to_owned(),
                         condition_id: condition_id.to_owned(),
                         item_id: item.item_id.clone(),
