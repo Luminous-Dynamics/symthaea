@@ -44,13 +44,13 @@ The family manifest digest must be committed to an external preregistration reco
 
 ## 3. Paired outcome encoding
 
-For each evaluator-validated randomized pair and each exposure axis, define realized benefit:
+For each evaluator-validated randomized pair and each exposure axis, the adapter consumes the measured treatment and control exposure values, episode duration, treatment orientation, assignment scheme and treatment probability. It requires independent fair-coin assignment with treatment probability 0.5, a positive episode duration, and both exposure values no greater than that duration. It derives:
 
 \[
 d_i = Y_i^{control} - Y_i^{treatment}.
 \]
 
-Encode:
+A caller cannot supply a precomputed benefit sign. The encoded value is derived from the two measured arm exposures. Encode:
 
 | Paired benefit | Bounded observation | Interpretation |
 |---|---:|---|
@@ -94,7 +94,7 @@ The pair binding is still a commitment, not proof that the assignment was genuin
 
 ## 6. Qualification tests authored
 
-Fourteen Rust tests cover:
+Fifteen Rust tests cover:
 
 1. exactly three sorted streams per contrast;
 2. sorted/unique contrast declarations;
