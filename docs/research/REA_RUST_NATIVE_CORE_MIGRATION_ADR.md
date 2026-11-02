@@ -649,3 +649,39 @@ For the Luminous evaluation, adopt AgentRE's 25-call budget as one constrained t
 Official references:
 - AgentRE-Bench: https://www.agentre-bench.ai/
 - SRE-Bench owner page: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+
+
+## 14. Decision quality is a separate objective from information gain
+
+The investigation planner now has three conceptually distinct layers:
+1. Point EIG: rank probes by expected entropy reduction.
+2. Scenario-robust EIG: expose expected, worst-case and lower-tail information gain under supplied likelihood models.
+3. Decision-aware EVSI/minimax regret: rank probes by expected improvement in a caller-declared terminal engineering decision, and optionally minimize worst-case expected regret of a shared outcome-to-action policy.
+
+The implementation is in [#10171](https://github.com/Luminous-Dynamics/symthaea/pull/10171), stacked on the scenario-robust planner.
+
+### Why this is a genuine paradigm shift
+
+A probe can reveal a large amount of information about a nuisance variable without changing the correct remediation. A different probe can yield less entropy reduction while sharply distinguishing between two costly remediation choices. The benchmark must reward the latter when it improves the engineering decision.
+
+### Exact finite minimax policy
+
+For each experiment, enumerate deterministic policies mapping every declared outcome to one terminal decision. For every supplied scenario, compute the expected posterior decision regret of that shared policy against the scenario-specific posterior-optimal action. Select the policy with minimum maximum scenario regret.
+
+This implementation:
+- uses scenario/outcome probabilities to compute expected regret in each supplied scenario;
+- uses deterministic lexicographic tie-breaking over decision IDs;
+- exposes a hard policy-evaluation cap (default 65,536);
+- returns an explicit per-experiment `PolicySearchBudgetExceeded` rejection if the policy space is too large;
+- never silently falls back to the mixture-Bayes policy;
+- preserves the existing authorization, reversibility, destruction, target-impact, time, energy and risk gates.
+
+The guarantee is exact only over the supplied finite scenario set and declared utility matrix. It is not an adversarial guarantee over unenumerated conditions, and it does not execute experiments or remediations.
+
+### Matched benchmark
+
+Compare point EIG, scenario-robust EIG, expected EVSI, worst-case/CVaR EVSI, EVSI-minus-regret, exact finite minimax regret, random authorized probe and cost-only baselines. Use asymmetric loss, hidden scenario shift, likelihood misspecification, uninformative high-EIG probes, lower-EIG decision-changing probes, unauthorized actions and search-budget overflow.
+
+Measure realized held-out regret, wrong terminal decisions, EVSI prediction error, policy stability, target impact and total investigation cost. Proposed target: reduce 90th-percentile realized regret by at least 20% versus point EIG on a preregistered misspecification corpus, without increasing target impact or investigation cost beyond the declared tolerance. This is a research target, not a measured result.
+
+The machine-readable benchmark manifest now includes the decision-value/minimax-regret suite as a separate family.
