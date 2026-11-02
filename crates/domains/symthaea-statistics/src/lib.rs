@@ -42,6 +42,7 @@ pub mod inference;
 pub mod regression;
 pub mod special;
 pub mod signal_detection;
+pub mod roc;
 
 pub use bayes::{Confusion, posterior, posterior_positive};
 pub use descriptive::{correlation, covariance, mean, median, quantile, std_dev, variance};
@@ -55,3 +56,4 @@ pub use inference::{
 };
 pub use regression::{LinearFit, linear_regression};
 pub use signal_detection::{SignalDetectionCounts, SignalDetectionMetrics};
+pub use roc::{RocCurve, RocError, RocObservation, RocPoint, try_roc_curve};
