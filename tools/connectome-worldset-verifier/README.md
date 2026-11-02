@@ -23,7 +23,7 @@ Every combination of every declared axis is admissible. There are no arbitrary p
 - deterministic world IDs generated from canonical assignment objects;
 - full Cartesian enumeration, exact expected/evaluated world-set equality, no duplicates and no unresolved frontier;
 - matched before/after values inside their corresponding marginal intervals and paired differences inside the supplied effect interval;
-- an adapter-ready receipt containing universe, policy, enumerator, expected-world-manifest, closure-proof and verification-receipt digests.
+- a coverage-evidence receipt containing universe, policy, enumerator, expected-world-manifest, closure-proof and verification-receipt digests; the trusted parent `closure_verified` flag remains false until external trust checks pass.
 
 ## Run
 
@@ -38,7 +38,7 @@ Artifact paths in the manifest are relative to the manifest's directory. The ver
 
 ## Receipt integration
 
-The output's `coverage` object contains the structural fields consumed by `PairedWorldSetCoverage` in `tools/connectome-query-impact/src/lib.rs`, but **do not copy its `closure_verified` flag directly into a trusted report**. The receipt explicitly says pre-query freeze authentication and outcome-independent universe selection were not performed. Before propagating `closure_verified=true` in a production adapter, the adapter/operator must:
+The output's `coverage` object contains the structural fields consumed by `PairedWorldSetCoverage` in `tools/connectome-query-impact/src/lib.rs`. It sets `finite_cartesian_enumeration_verified=true` after hashing artifacts and independently matching the complete declared product, but intentionally leaves the parent kernel's trusted `closure_verified=false`. This prevents an untrusted manifest from self-promoting into a trusted finite-universe claim. The receipt explicitly says pre-query freeze authentication and outcome-independent universe selection were not performed. Only a separate production adapter/operator can promote the trusted flag after:
 
 1. independently pin the verifier binary SHA-256 in a trust policy outside the submitted manifest;
 2. hash and retain the emitted receipt bytes (the receipt includes its own canonical digest);
