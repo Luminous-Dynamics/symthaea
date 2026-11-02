@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-split-audit-input-v0.1.schema.json",
+  "title": "Connectome proofreading group-disjoint split audit input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy",
+    "operations"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sample_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "split": {
+      "enum": [
+        "Train",
+        "Validation",
+        "Test",
+        "Adaptation",
+        "Calibration"
+      ]
+    },
+    "task": {
+      "enum": [
+        "FalseSplitCorrection",
+        "FalseMergeIdentification",
+        "SplitMaskGeneration"
+      ]
+    },
+    "view_kind": {
+      "enum": [
+        "EmXy",
+        "EmXz",
+        "EmYz",
+        "EmBest",
+        "GeometrySingle",
+        "GeometryDual",
+        "Other"
+      ]
+    },
+    "group_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_archive_id",
+        "source_volume_id",
+        "source_operation_id",
+        "spatial_cube_id",
+        "neuron_ids",
+        "animal_id",
+        "session_id",
+        "species",
+        "workflow_id"
+      ],
+      "properties": {
+        "source_archive_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "source_volume_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "source_operation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "spatial_cube_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "neuron_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "animal_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "species": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "workflow_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "view_permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_route",
+        "view_kind"
+      ],
+      "properties": {
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "view_kind": {
+          "$ref": "#/$defs/view_kind"
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "view_id",
+        "sample_hash",
+        "split",
+        "task_route",
+        "view_kind",
+        "artifact_sha256"
+      ],
+      "properties": {
+        "view_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "view_kind": {
+          "$ref": "#/$defs/view_kind"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "sample_hash",
+        "split",
+        "task_route",
+        "groups",
+        "label_artifact_sha256",
+        "views"
+      ],
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "groups": {
+          "$ref": "#/$defs/group_identity"
+        },
+        "label_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "views": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/view"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task_route": {
+                "const": "FalseMergeIdentification"
+              }
+            },
+            "required": [
+              "task_route"
+            ]
+          },
+          "then": {
+            "properties": {
+              "views": {
+                "items": {
+                  "properties": {
+                    "view_kind": {
+                      "not": {
+                        "const": "EmBest"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "group_keys",
+        "view_permissions"
+      ],
+      "properties": {
+        "policy_id": {
+          "$ref": "#/$defs/id"
+        },
+        "group_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SourceArchive",
+              "SourceVolume",
+              "SourceOperation",
+              "SpatialCube",
+              "Neuron",
+              "Animal",
+              "Session",
+              "Species",
+              "Workflow"
+            ]
+          }
+        },
+        "view_permissions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/view_permission"
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/operation"
+      }
+    }
+  }
+}
