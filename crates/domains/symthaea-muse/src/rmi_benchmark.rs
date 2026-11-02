@@ -41,6 +41,22 @@ pub enum RmiRoleV1 {
     Counterline,
 }
 
+/// Actor identity inside the frozen synthetic interaction history.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RmiHistoryActorV1 {
+    Partner,
+    Agent,
+}
+
+/// One prior interaction event included in the frozen pre-intervention state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiHistoryEventV1 {
+    pub event_id: String,
+    pub actor: RmiHistoryActorV1,
+    pub features: RmiMusicalFeaturesV1,
+}
+
 /// Symbolic features observable in one partner event or emitted by one agent
 /// action. Motif values are signed semitone intervals; rhythm is an eight-step
 /// onset/rest pattern; tempo is milli-BPM.
@@ -117,6 +133,9 @@ pub struct RmiAgentActionV1 {
 pub struct RmiInterventionPairV1 {
     pub trial_id: String,
     pub seed: u64,
+    /// Exact synthetic history used by both arms. The digest below is
+    /// recomputed from this canonical serialized history by the validator.
+    pub pre_intervention_history: Vec<RmiHistoryEventV1>,
     pub pre_intervention_state_sha256: String,
     pub target: RmiTargetFeatureV1,
     pub control_observation: RmiPartnerObservationV1,
@@ -152,8 +171,19 @@ pub fn validate_rmi_intervention_pair(
     if pair.trial_id.trim().is_empty() {
         issues.push(RmiValidationIssueV1::EmptyTrialId);
     }
-    if !is_lowercase_sha256(&pair.pre_intervention_state_sha256) {
-        issues.push(RmiValidationIssueV1::InvalidPreStateDigest);
+    let history_bytes = serde_json::to_vec(&pair.pre_intervention_history);
+    match history_bytes {
+        Ok(bytes) if is_lowercase_sha256(&pair.pre_intervention_state_sha256)
+            && sha256_hex(&bytes) == pair.pre_intervention_state_sha256 => {}
+        _ => issues.push(RmiValidationIssueV1::InvalidPreStateDigest),
+    }
+    for event in &pair.pre_intervention_history {
+        if event.event_id.trim().is_empty() {
+            issues.push(RmiValidationIssueV1::EmptySourceEventId {
+                arm: "pre_intervention_history".to_string(),
+            });
+        }
+        issues.extend(event.features.validation_issues("pre_intervention_history"));
     }
 
     for (arm, observation) in [
@@ -201,7 +231,12 @@ pub fn validate_rmi_intervention_pair(
 pub trait RmiPolicyV1 {
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
-    fn respond(&self, observation: &RmiPartnerObservationV1, seed: u64) -> RmiAgentActionV1;
+    fn respond(
+        &self,
+        history: &[RmiHistoryEventV1],
+        observation: &RmiPartnerObservationV1,
+        seed: u64,
+    ) -> RmiAgentActionV1;
 }
 
 /// Fixed response baseline: returns exactly the same action for every input.
@@ -221,7 +256,12 @@ impl RmiPolicyV1 for FixedResponsePolicyV1 {
         &self.version
     }
 
-    fn respond(&self, _observation: &RmiPartnerObservationV1, _seed: u64) -> RmiAgentActionV1 {
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        _observation: &RmiPartnerObservationV1,
+        _seed: u64,
+    ) -> RmiAgentActionV1 {
         self.response.clone()
     }
 }
@@ -244,7 +284,12 @@ impl RmiPolicyV1 for OneWayPromptPolicyV1 {
         &self.version
     }
 
-    fn respond(&self, _observation: &RmiPartnerObservationV1, _seed: u64) -> RmiAgentActionV1 {
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        _observation: &RmiPartnerObservationV1,
+        _seed: u64,
+    ) -> RmiAgentActionV1 {
         self.frozen_response.clone()
     }
 }
@@ -267,7 +312,12 @@ impl RmiPolicyV1 for YokedReplayPolicyV1 {
         &self.version
     }
 
-    fn respond(&self, _observation: &RmiPartnerObservationV1, _seed: u64) -> RmiAgentActionV1 {
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        _observation: &RmiPartnerObservationV1,
+        _seed: u64,
+    ) -> RmiAgentActionV1 {
         self.replayed_response.clone()
     }
 }
@@ -291,7 +341,12 @@ impl RmiPolicyV1 for ImitationOnlyPolicyV1 {
         &self.version
     }
 
-    fn respond(&self, observation: &RmiPartnerObservationV1, _seed: u64) -> RmiAgentActionV1 {
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        observation: &RmiPartnerObservationV1,
+        _seed: u64,
+    ) -> RmiAgentActionV1 {
         RmiAgentActionV1 {
             action_id: format!("{}:{}", self.id, observation.source_event_id),
             features: observation.features.clone(),
@@ -319,13 +374,19 @@ impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
         &self.version
     }
 
-    fn respond(&self, observation: &RmiPartnerObservationV1, _seed: u64) -> RmiAgentActionV1 {
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        observation: &RmiPartnerObservationV1,
+        _seed: u64,
+    ) -> RmiAgentActionV1 {
         let mut features = observation.features.clone();
         for interval in &mut features.motif_intervals {
-            *interval = interval.saturating_add(1);
+            *interval = interval.saturating_neg();
         }
         features.rhythm_onsets.rotate_left(1);
-        features.tempo_milli_bpm = features.tempo_milli_bpm.saturating_add(1_000);
+        // Reflection is a bijection over the admitted [30, 300] BPM range.
+        features.tempo_milli_bpm = 330_000 - features.tempo_milli_bpm;
         features.role = complementary_role(features.role);
         RmiAgentActionV1 {
             action_id: format!("{}:{}", self.id, observation.source_event_id),
@@ -442,8 +503,16 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         return Err(RmiEvaluationErrorV1::EmptyPolicyVersion);
     }
 
-    let control_action = policy.respond(&pair.control_observation, pair.seed);
-    let treatment_action = policy.respond(&pair.treatment_observation, pair.seed);
+    let control_action = policy.respond(
+        &pair.pre_intervention_history,
+        &pair.control_observation,
+        pair.seed,
+    );
+    let treatment_action = policy.respond(
+        &pair.pre_intervention_history,
+        &pair.treatment_observation,
+        pair.seed,
+    );
 
     for (arm, action) in [
         ("control", &control_action),
@@ -535,10 +604,17 @@ mod tests {
             RmiTargetFeatureV1::Tempo => treatment.tempo_milli_bpm += 10_000,
             RmiTargetFeatureV1::Role => treatment.role = RmiRoleV1::Accompaniment,
         }
+        let history = vec![RmiHistoryEventV1 {
+            event_id: "prior-event-0".into(),
+            actor: RmiHistoryActorV1::Partner,
+            features: base_features(),
+        }];
+        let history_bytes = serde_json::to_vec(&history).unwrap();
         RmiInterventionPairV1 {
             trial_id: format!("synthetic-{:?}", target),
             seed: 42,
-            pre_intervention_state_sha256: "a".repeat(64),
+            pre_intervention_history: history,
+            pre_intervention_state_sha256: sha256_hex(&history_bytes),
             target,
             control_observation: RmiPartnerObservationV1 {
                 source_event_id: "partner-event-1".into(),
@@ -719,6 +795,22 @@ mod tests {
         let first = evaluate_rmi_pair(&policy, &first_pair).unwrap();
         let second = evaluate_rmi_pair(&policy, &second_pair).unwrap();
         assert_ne!(first.payload_sha256, second.payload_sha256);
+    }
+
+    #[test]
+    fn changed_history_without_matching_digest_fails_closed() {
+        let mut pair = pair_for(RmiTargetFeatureV1::Motif);
+        pair.pre_intervention_history[0].features.tempo_milli_bpm += 1_000;
+        assert!(matches!(
+            evaluate_rmi_pair(
+                &SyntheticContingentPolicyV1 {
+                    id: "synthetic-contingent".into(),
+                    version: "1".into()
+                },
+                &pair
+            ),
+            Err(RmiEvaluationErrorV1::InvalidIntervention(_))
+        ));
     }
 
     #[test]
