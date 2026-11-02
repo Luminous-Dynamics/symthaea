@@ -72,7 +72,7 @@ pub struct CoDecDatasetRequestV1 {
     pub chat_template_sha256: String,
     /// Digest over the full dataset manifest, including content and item IDs.
     pub dataset_manifest_sha256: String,
-    pub target_item_set_sha256: String,
+    pub dataset_item_set_sha256: String,
     pub context_policy_id: String,
     pub context_policy_sha256: String,
     pub inference_backend_id: String,
@@ -117,6 +117,7 @@ pub struct CoDecDatasetReportV1 {
     pub tokenizer_sha256: String,
     pub chat_template_sha256: String,
     pub dataset_manifest_sha256: String,
+    pub dataset_item_set_sha256: String,
     pub target_item_set_sha256: String,
     pub context_policy_id: String,
     pub context_policy_sha256: String,
@@ -147,6 +148,7 @@ pub struct CoDecDatasetReportV1 {
 #[serde(deny_unknown_fields)]
 pub struct CoDecDatasetLabelledScoreV1 {
     pub dataset_id: String,
+    pub source_family_id: String,
     /// Ground truth from an independently verified training-data manifest or
     /// randomized training intervention, not a detector-derived label.
     pub known_training_exposure: bool,
@@ -158,9 +160,11 @@ pub struct CoDecDatasetLabelledScoreV1 {
 pub struct CoDecDatasetLevelAucReportV1 {
     pub schema: String,
     pub dataset_observation_count: u64,
+    pub source_family_count: u64,
     pub exposed_dataset_count: u64,
     pub unexposed_dataset_count: u64,
     pub dataset_level_auroc: f64,
+    pub dataset_level_auprc: f64,
     pub unit_of_analysis: String,
     pub independently_authenticated: bool,
     pub confirmatory_eligible: bool,
@@ -319,7 +323,7 @@ fn validate_request(request: &CoDecDatasetRequestV1) -> Result<(), String> {
         (&request.tokenizer_sha256, "tokenizer_sha256"),
         (&request.chat_template_sha256, "chat_template_sha256"),
         (&request.dataset_manifest_sha256, "dataset_manifest_sha256"),
-        (&request.target_item_set_sha256, "target_item_set_sha256"),
+        (&request.dataset_item_set_sha256, "dataset_item_set_sha256"),
         (&request.context_policy_sha256, "context_policy_sha256"),
         (&request.inference_receipt_sha256, "inference_receipt_sha256"),
     ] {
@@ -341,9 +345,9 @@ fn validate_request(request: &CoDecDatasetRequestV1) -> Result<(), String> {
     {
         return Err("dataset and target item counts are empty or exceed configured bounds".to_owned());
     }
-    let expected_item_set = compute_codec_item_set_sha256(&request.dataset_item_ids)?;
-    if expected_item_set != request.target_item_set_sha256 {
-        return Err("target item-set digest does not match the declared dataset item IDs".to_owned());
+    let expected_dataset_item_set = compute_codec_item_set_sha256(&request.dataset_item_ids)?;
+    if expected_dataset_item_set != request.dataset_item_set_sha256 {
+        return Err("dataset item-set digest does not match the declared dataset item IDs".to_owned());
     }
     let dataset_ids: BTreeSet<&str> = request.dataset_item_ids.iter().map(String::as_str).collect();
     let mut target_ids = BTreeSet::new();
@@ -469,6 +473,7 @@ pub fn score_codec_dataset(
         tokenizer_sha256: request.tokenizer_sha256.clone(),
         chat_template_sha256: request.chat_template_sha256.clone(),
         dataset_manifest_sha256: request.dataset_manifest_sha256.clone(),
+        dataset_item_set_sha256: request.dataset_item_set_sha256.clone(),
         target_item_set_sha256,
         context_policy_id: request.context_policy_id.clone(),
         context_policy_sha256: request.context_policy_sha256.clone(),
@@ -496,6 +501,77 @@ pub fn score_codec_dataset(
     })
 }
 
+fn dataset_level_metrics(
+    observations: &[CoDecDatasetLabelledScoreV1],
+) -> Result<(f64, f64), String> {
+    let positives = observations
+        .iter()
+        .filter(|observation| observation.known_training_exposure)
+        .count();
+    let negatives = observations.len() - positives;
+    if positives == 0 || negatives == 0 {
+        return Err("dataset-level metrics require exposed and unexposed datasets".to_owned());
+    }
+    let mut ascending = observations.to_vec();
+    ascending.sort_by(|left, right| left.codec_score_permille.total_cmp(&right.codec_score_permille));
+    let mut rank_sum = 0.0;
+    let mut index = 0;
+    while index < ascending.len() {
+        let mut end = index + 1;
+        while end < ascending.len()
+            && ascending[end].codec_score_permille == ascending[index].codec_score_permille
+        {
+            end += 1;
+        }
+        let average_rank = ((index + 1 + end) as f64) / 2.0;
+        let positive_ties = ascending[index..end]
+            .iter()
+            .filter(|observation| observation.known_training_exposure)
+            .count();
+        rank_sum += average_rank * positive_ties as f64;
+        index = end;
+    }
+    let p = positives as f64;
+    let n = negatives as f64;
+    let auroc = (rank_sum - p * (p + 1.0) / 2.0) / (p * n);
+
+    let mut descending = observations.to_vec();
+    descending.sort_by(|left, right| right.codec_score_permille.total_cmp(&left.codec_score_permille));
+    let mut true_positives = 0_u64;
+    let mut false_positives = 0_u64;
+    let mut previous_recall = 0.0;
+    let mut auprc = 0.0;
+    index = 0;
+    while index < descending.len() {
+        let mut end = index + 1;
+        while end < descending.len()
+            && descending[end].codec_score_permille == descending[index].codec_score_permille
+        {
+            end += 1;
+        }
+        for observation in &descending[index..end] {
+            if observation.known_training_exposure {
+                true_positives += 1;
+            } else {
+                false_positives += 1;
+            }
+        }
+        let recall = true_positives as f64 / p;
+        let precision = true_positives as f64 / (true_positives + false_positives) as f64;
+        auprc += (recall - previous_recall) * precision;
+        previous_recall = recall;
+        index = end;
+    }
+    if !auroc.is_finite()
+        || !auprc.is_finite()
+        || !(0.0..=1.0).contains(&auroc)
+        || !(0.0..=1.0).contains(&auprc)
+    {
+        return Err("dataset-level CoDeC AUROC/AUPRC is invalid".to_owned());
+    }
+    Ok((auroc, auprc))
+}
+
 /// Compute AUROC across independently labelled datasets. The unit of analysis
 /// is each dataset report, never an individual target item.
 pub fn codec_dataset_level_auroc(
@@ -507,6 +583,7 @@ pub fn codec_dataset_level_auroc(
     let mut ids = BTreeSet::new();
     for observation in observations {
         if !valid_id(&observation.dataset_id, 128)
+            || !valid_id(&observation.source_family_id, 128)
             || !ids.insert(observation.dataset_id.as_str())
             || !observation.codec_score_permille.is_finite()
             || !(0.0..=1_000.0).contains(&observation.codec_score_permille)
@@ -523,37 +600,20 @@ pub fn codec_dataset_level_auroc(
         return Err("dataset-level AUROC requires exposed and unexposed datasets".to_owned());
     }
 
-    let mut sorted = observations.to_vec();
-    sorted.sort_by(|left, right| left.codec_score_permille.total_cmp(&right.codec_score_permille));
-    let mut rank_sum = 0.0;
-    let mut index = 0;
-    while index < sorted.len() {
-        let mut end = index + 1;
-        while end < sorted.len()
-            && sorted[end].codec_score_permille == sorted[index].codec_score_permille
-        {
-            end += 1;
-        }
-        let average_rank = ((index + 1 + end) as f64) / 2.0;
-        let positive_ties = sorted[index..end]
-            .iter()
-            .filter(|observation| observation.known_training_exposure)
-            .count();
-        rank_sum += average_rank * positive_ties as f64;
-        index = end;
-    }
-    let p = positives as f64;
-    let n = negatives as f64;
-    let auroc = (rank_sum - p * (p + 1.0) / 2.0) / (p * n);
-    if !auroc.is_finite() || !(0.0..=1.0).contains(&auroc) {
-        return Err("dataset-level CoDeC AUROC is invalid".to_owned());
-    }
+    let (auroc, auprc) = dataset_level_metrics(observations)?;
+    let source_family_count = observations
+        .iter()
+        .map(|observation| observation.source_family_id.as_str())
+        .collect::<BTreeSet<_>>()
+        .len();
     Ok(CoDecDatasetLevelAucReportV1 {
         schema: CODEC_DATASET_AUC_SCHEMA.to_owned(),
         dataset_observation_count: observations.len() as u64,
+        source_family_count: source_family_count as u64,
         exposed_dataset_count: positives as u64,
         unexposed_dataset_count: negatives as u64,
         dataset_level_auroc: auroc,
+        dataset_level_auprc: auprc,
         unit_of_analysis: "independent_dataset".to_owned(),
         independently_authenticated: false,
         confirmatory_eligible: false,
@@ -602,7 +662,7 @@ mod tests {
             tokenizer_sha256: digest('c'),
             chat_template_sha256: digest('d'),
             dataset_manifest_sha256: digest('e'),
-            target_item_set_sha256: compute_codec_item_set_sha256(&ids).unwrap(),
+            dataset_item_set_sha256: compute_codec_item_set_sha256(&ids).unwrap(),
             context_policy_id: "random-single-context".to_owned(),
             context_policy_sha256: digest('f'),
             inference_backend_id: "fixture-backend".to_owned(),
@@ -683,21 +743,25 @@ mod tests {
         let rows = vec![
             CoDecDatasetLabelledScoreV1 {
                 dataset_id: "train-a".to_owned(),
+                source_family_id: "family-a".to_owned(),
                 known_training_exposure: true,
                 codec_score_permille: 900.0,
             },
             CoDecDatasetLabelledScoreV1 {
                 dataset_id: "train-b".to_owned(),
+                source_family_id: "family-b".to_owned(),
                 known_training_exposure: true,
                 codec_score_permille: 800.0,
             },
             CoDecDatasetLabelledScoreV1 {
                 dataset_id: "heldout-a".to_owned(),
+                source_family_id: "family-c".to_owned(),
                 known_training_exposure: false,
                 codec_score_permille: 200.0,
             },
             CoDecDatasetLabelledScoreV1 {
                 dataset_id: "heldout-b".to_owned(),
+                source_family_id: "family-d".to_owned(),
                 known_training_exposure: false,
                 codec_score_permille: 300.0,
             },
