@@ -1,7 +1,7 @@
 # Temporal distributional risk reference v0.1
 
 **Tracking:** NEURO-SILICON-015 / #9930  
-**Implementation:** \`research/temporal-intervention-audit/src/distributional.rs\`  
+**Implementation:** `research/temporal-intervention-audit/src/distributional.rs`  
 **Related:** temporal intervention audit #9881; family adapter #9932/#9929; randomized family inference #9465; controller convergence #9882.  
 **Status:** exact finite-support empirical comparator authored; no Rust build, statistical test, benchmark, or population-level dominance claim.
 
