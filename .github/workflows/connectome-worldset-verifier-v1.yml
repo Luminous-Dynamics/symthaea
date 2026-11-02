@@ -33,6 +33,10 @@ jobs:
           components: rustfmt, clippy
       - name: Formatting
         run: cargo fmt --manifest-path tools/connectome-worldset-verifier/Cargo.toml -- --check
+      - name: Validate Draft 2020-12 universe schema
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 -c 'import json, jsonschema; p="research/connectomics/connectome-worldset-universe-v0.1.schema.json"; s=json.load(open(p)); jsonschema.Draft202012Validator.check_schema(s)'
       - name: Tests
         run: cargo test --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked
       - name: Strict Clippy
