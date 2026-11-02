@@ -354,6 +354,7 @@ pub struct ParameterSelectionRegret {
 const MATRIX_SYMMETRY_TOLERANCE: f64 = 1.0e-10;
 
 /// Validate square finite matrix structure and numerical symmetry.
+#[allow(clippy::needless_range_loop)] // Explicit row/column indices preserve matrix and triangular-solve semantics.
 fn validate_symmetric_matrix(
     matrix: &[Vec<f64>],
     name: &str,
@@ -404,6 +405,7 @@ fn validate_symmetric_matrix(
     Ok(dimension)
 }
 /// Lower-triangular Cholesky factor L for A = L L^T.
+#[allow(clippy::needless_range_loop)] // Explicit row/column indices preserve matrix and triangular-solve semantics.
 fn cholesky(
     matrix: &[Vec<f64>],
     name: &str,
@@ -443,6 +445,7 @@ fn cholesky(
 }
 
 /// Solve L L^T x = b for an SPD matrix using forward/back substitution.
+#[allow(clippy::needless_range_loop)] // Explicit row/column indices preserve matrix and triangular-solve semantics.
 fn solve_cholesky(lower: &[Vec<f64>], rhs: &[f64]) -> Result<Vec<f64>, DesignError> {
     let dimension = lower.len();
     if rhs.len() != dimension {
@@ -473,6 +476,7 @@ fn solve_cholesky(lower: &[Vec<f64>], rhs: &[f64]) -> Result<Vec<f64>, DesignErr
     Ok(result)
 }
 
+#[allow(clippy::needless_range_loop)] // Explicit row/column indices preserve matrix and triangular-solve semantics.
 fn inverse_spd(lower: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, DesignError> {
     let dimension = lower.len();
     let mut inverse = vec![vec![0.0; dimension]; dimension];
@@ -512,7 +516,7 @@ fn log_determinant_from_cholesky(lower: &[Vec<f64>]) -> Result<f64, DesignError>
 }
 
 fn matrix_trace(matrix: &[Vec<f64>]) -> f64 {
-    (0..matrix.len()).map(|index| matrix[index][index]).sum()
+    matrix.iter().enumerate().map(|(index, row)| row[index]).sum()
 }
 
 fn validate_parameter_design(
@@ -577,6 +581,7 @@ fn validate_parameter_design(
 /// D-optimal information is 0.5 * log2(det(Sigma) / det(Sigma_post)) bits.
 /// A-optimal utility is trace(Sigma) - trace(Sigma_post). This is a local
 /// linear-Gaussian design calculation; it does not estimate J or R.
+#[allow(clippy::needless_range_loop)] // Explicit row/column indices preserve matrix and triangular-solve semantics.
 pub fn evaluate_parameter_design(
     prior: &ParameterPrior,
     design: &LinearGaussianDesign,
