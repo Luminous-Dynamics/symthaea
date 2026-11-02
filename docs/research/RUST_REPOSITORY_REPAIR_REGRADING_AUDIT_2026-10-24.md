@@ -1,15 +1,15 @@
 # Independent Fresh-Image Regrade Audit (2026-10-24)
 
 **Protocol ID:** `symthaea-rust-regrade-audit-v1`  
-**Status:** verifier implementation; actual primary/regrade runs remain required.
+**Status:** Design specification only on current `main` (checked 2026-11-02). The documented `tools/rust-repair-benchmark-harness/Cargo.toml` and named binary source were not found; commands below are intended interfaces only and are not currently runnable from `main`. See issue #10138.
 
 ## Purpose
 
 A passing score from the same mutable agent workspace and evaluator process is not a strong independent check. This stage compares the primary scored-run report with a separately generated regrade report using the same locked task manifest, candidate split, prediction artifact, immutable image IDs and per-task patches. The second grade must be produced by a new execution in a fresh container/workspace and its report retained independently.
 
-The binary `rust-repair-regrade-audit` does not execute Docker or tests. It validates the two existing `rust-repair-score-audit` JSON reports and produces an explicit parity/disagreement report.
+The intended `rust-repair-regrade-audit` stage would not execute Docker or tests; it would validate primary and fresh-regrade score reports and produce a parity/disagreement report. Its Cargo manifest and binary source are absent from current `main`, so no such executable or generated parity report is claimed here.
 
-## Required provenance
+## Intended provenance contract (implementation unavailable on current `main`)
 
 Supply both report file hashes from separate retained artifact receipts or an immutable artifact manifest. Computing the expected digest ad hoc from the same mutable file is not independent provenance.
 
@@ -30,7 +30,7 @@ cargo run --locked \
   --report-out build/rust-repair/fresh-regrade/parity-audit.json
 ```
 
-## Fail-closed checks
+## Intended fail-closed checks (not yet executable from current `main`)
 
 - Both input reports must be regular files whose bytes match their externally supplied SHA-256 values; they must be distinct files and distinct digests.
 - Both reports must identify protocol `symthaea-rust-repair`, format version 1, and the exact pinned task-manifest SHA-256. The same externally retained digest is checked against the exact locked manifest file bytes via `--task-manifest`.
@@ -41,7 +41,7 @@ cargo run --locked \
 - If both grades resolve a task, the evaluation-evidence hash must differ. Identical test-log hashes are permitted because deterministic tests can produce byte-identical output on independent executions; the execution-specific evidence still needs to differ. Reusing the same runtime receipt cannot be presented as an independent run.
 - The output names the relation for every task: `concordant_pass`, `concordant_fail`, `primary_only_pass`, `regrade_only_pass`, or an unresolved relation. Both directions of disagreement remain visible.
 
-## Metrics and interpretation
+## Intended metrics and interpretation
 
 The audit reports each grade's rate over the complete task denominator, a conservative double-verified pass rate, disagreement counts, possible primary false-positive fraction among primary passes, possible primary false-negative fraction among regrade passes, and unresolved coverage.
 
@@ -59,3 +59,6 @@ References:
 - [SWE-Bench Pro V2 leaderboard and methodology](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full)
 - [SWE-bench-Live trajectory verification policy](https://swe-bench-live.github.io/)
 - [Epoch AI review of Terminal-Bench 4.0.0 (2026-09-04)](https://epoch.ai/benchmarks/terminal-bench-4/review)
+
+
+**Implementation status reminder:** Treat the text and CLI block above as a design contract, not working repository tooling. Restore the missing Rust crate and exact-head tests or formally retire this interface before relying on it for benchmark results. No run or passing test is claimed.
