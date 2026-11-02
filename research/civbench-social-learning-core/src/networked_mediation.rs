@@ -266,7 +266,6 @@ pub struct NetworkedGenerationMetrics {
     pub mediated_acquisitions: usize,
     pub observations: usize,
     pub successful_acquisitions: usize,
-    pub individual_innovations: usize,
 }
 
 impl NetworkedGeneration {
@@ -325,7 +324,6 @@ impl NetworkedGeneration {
             mediated_acquisitions,
             observations,
             successful_acquisitions,
-            individual_innovations,
         }
     }
 }
