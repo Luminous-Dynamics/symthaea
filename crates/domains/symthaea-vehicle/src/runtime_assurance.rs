@@ -579,10 +579,26 @@ fn witness_for(observation: &VehicleRtaObservation) -> VehicleRtaWitness {
         advanced_controller_digest: observation.advanced_controller_digest.clone(),
         baseline_controller_digest: observation.baseline_controller_digest.clone(),
         baseline_independence_evidence_id: observation.baseline_independence_evidence_id.clone(),
-        observation_digest: serde_json::to_vec(observation)
-            .ok()
+        observation_digest: observation_is_fingerprintable(observation)
+            .then(|| serde_json::to_vec(observation))
+            .and_then(Result::ok)
             .map(|bytes| blake3::hash(&bytes).to_hex().to_string()),
     }
+}
+
+fn observation_is_fingerprintable(observation: &VehicleRtaObservation) -> bool {
+    let advanced = &observation.advanced_command;
+    let baseline = &observation.baseline_command;
+    observation.timestamp_s.is_finite()
+        && state_is_finite(&observation.state)
+        && advanced.steering.is_finite()
+        && advanced.throttle.is_finite()
+        && advanced.brake.is_finite()
+        && baseline.steering.is_finite()
+        && baseline.throttle.is_finite()
+        && baseline.brake.is_finite()
+        && observation.envelope_margin.is_finite()
+        && observation.controllability_margin.is_finite()
 }
 
 fn controller_digest_is_valid(value: &str) -> bool {
