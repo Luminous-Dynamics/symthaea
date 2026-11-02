@@ -363,3 +363,28 @@ This isolates only the concentration term at one family row and matched 99% conf
 The vector empirical-Bernstein comparator may exploit only dependence actually observed under the sampling design. Multiple decision/guardrail functionals scored on the same independent experimental unit within a policy/model arm form an observed bounded random vector; a valid vector confidence set may account for coordinate dependence.
 
 Different policy arms generally reveal different potential outcomes in a real randomized experiment. Do not invent cross-policy covariance or paired potential-outcome coupling. Use per-policy vector confidence sets plus simultaneous coverage across the frozen policy family, unless a simulator, randomization design or identified estimator genuinely supports paired cross-policy contrasts. State the Banach norm and confidence-set geometry explicitly because the optimizer's support function depends on them.
+
+
+## 18. Compose all null-side confidence failures before alpha spending
+
+When transport bounds or state-conditional confidence sets are added, their failure probabilities must be included in the same good event required by the unconditional null Type-I proof.
+
+Let the required null-side events include, as applicable:
+- calibration-radius / functional-confidence coverage;
+- calibration-to-confirmation transport coverage;
+- transition-row confidence-set coverage;
+- any other probabilistic event required to bound the confirmatory null path law.
+
+Define the joint event as their intersection. A conservative union bound is:
+
+`delta_null_total <= sum(delta_k)`
+
+for all required null-side confidence events. Use the total in the conditional alpha calculation:
+
+`alpha_cond = (alpha - delta_null_total) / (1 - delta_null_total)`
+
+and require `delta_null_total < alpha`. Do not spend only the calibration delta while leaving transport/transition confidence failure unaccounted for.
+
+The event used for this calculation must be independent of the confirmatory stream, or the method needs a separate joint/sequential proof. If the transport estimator consumes confirmatory outcomes, the independent-split derivation does not apply automatically.
+
+Keep alternative-performance confidence failure and guardrail false-safe confidence failure as separately named budgets because they support different claims. If a top-level authorization claim composes several gates, state exactly which failure events govern that claim and how they combine; never relabel guardrail or alternative failure as Type-I error.
