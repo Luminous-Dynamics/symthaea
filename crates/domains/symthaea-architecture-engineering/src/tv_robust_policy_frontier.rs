@@ -561,6 +561,15 @@ mod tests {
         assert!((0.030 - TOLERANCE..=0.035 + TOLERANCE).contains(&null_b));
         assert!(report.frontier.alternatives.iter().all(|row| row.rejection_power >= 0.0));
         assert!(report.worst_case_unconditional_type_i_upper_bound <= 0.05 + TOLERANCE);
+        assert_eq!(report.frontier.support_size, 2);
+        let weights = report.frontier.policy_weights.iter()
+            .map(|row| (row.policy_id.as_str(), row.probability))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        assert!((weights["policy-a"] - 0.6).abs() < 1e-8);
+        assert!((weights["policy-b"] - 0.4).abs() < 1e-8);
+        assert!((report.frontier.worst_case_decision_utility - 6.7).abs() < 1e-8);
+        assert!((report.frontier.worst_case_rejection_power - 0.7).abs() < 1e-8);
+        assert!((report.worst_case_unconditional_type_i_upper_bound - 0.03442).abs() < 1e-8);
         verify_tv_robust_policy_frontier_report(&plan, &uncertainty, &report).unwrap();
     }
 
