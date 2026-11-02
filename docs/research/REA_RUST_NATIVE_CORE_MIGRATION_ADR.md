@@ -309,3 +309,19 @@ No change is proposed to the upstream REA repository in this work item. Maintain
 ## Claim ceiling
 
 This ADR and benchmark manifest define the Rust-native migration strategy. No general REA Rust port, canonical Evidence Rust verifier, Rust MCP server/client, APK/IPA Rust parser, provider replacement or performance result is implemented or claimed by this document.
+
+
+## 11. Direct native API first; MCP is an adapter
+
+For Symthaea's own process and mobile embeddings, call the Rust library through a typed in-process API. Do not route every native analysis request through a local MCP server or serialize the same large Evidence payload through JSON-RPC.
+
+Expose the same core through thin adapters:
+- **in-process Rust API** for Symthaea cognition and other Rust services;
+- **C ABI / Swift bridge** for iOS application integration, with narrow ownership/lifecycle rules;
+- **Android JNI or Rust system-service boundary** only where platform integration requires it;
+- **CLI** for deterministic automation and offline evidence inspection;
+- **MCP** for external coding agents and other MCP clients.
+
+The adapters must call the same core contracts and share the same known-answer corpus. They may differ in transport and delivery, but not in Evidence identity, operation semantics, authority or claim ceilings.
+
+MCP is not an authorization mechanism. The direct API also enforces capability/effect policy; using Rust internally must not bypass the read-only gateway or independent qualification requirements.
