@@ -553,6 +553,109 @@ The recorded output is
 committed runner is
 \`benchmarks/projective_rank_horizon_transfer.py\`.
 
+## Persistent SCORE-style overshoot refund primitive
+
+This is a separate alpha-wealth accounting experiment, not a change to the
+source-tagged evidence-capital ledger. It is motivated by SCORE (Kuang, Gang
+and Xia, ICML 2026), whose one-shot online procedures refund the overshoot
+\((\alpha e-1)_+\) and whose SCORE+ retroactive variant uses conditional
+positive quadrant dependence (CPQD). The repeated-evidence extension must
+not silently inherit a one-e-value-per-arrival theorem or the CPQD-specific
+SCORE+ result.
+
+Let \(V_{i,t}\) be an already-valid, nonnegative, adapted, pathwise
+nondecreasing e-process under the null, normalized with \(V_{i,0}=1\), and
+assume its conditional terminal budget at activation satisfies
+\[
+\mathbb E[V_{i,\infty}\mid\mathcal F_{i,0}]\le1.
+\]
+Fix a predictable rational test level \(a_i\in(0,1)\) before observing the
+process. Define
+\[
+O_{i,t}=\min\{(a_iV_{i,t}-1)_+,a_i\},\qquad
+C_{i,t}=a_iV_{i,t}-O_{i,t}.
+\]
+The exact piecewise form of the cost is
+\[
+C_{i,t}=
+\begin{cases}
+a_iV_{i,t},&a_iV_{i,t}<1,\\
+1,&1\le a_iV_{i,t}\le1+a_i,\\
+a_iV_{i,t}-a_i,&a_iV_{i,t}>1+a_i.
+\end{cases}
+\]
+Thus \(O_{i,t}\) and \(C_{i,t}\) are both nonnegative and pathwise
+nondecreasing, \(0\le O_{i,t}\le a_i\), and
+\[
+\mathbf1\{a_iV_{i,t}\ge1\}\le C_{i,t}\le a_iV_{i,t}.
+\]
+Under the stated conditional e-process budget,
+\[
+\mathbb E[C_{i,\infty}\mid\mathcal F_{i,0}]\le a_i.
+\]
+
+The refund itself has a sharper conditional bound. For \(0\le u<a_i\),
+\[
+\Pr(O_{i,\infty}>u\mid\mathcal F_{i,0})
+\le
+\Pr\!\left(V_{i,\infty}>\frac{1+u}{a_i}\mid\mathcal F_{i,0}\right)
+\le\frac{a_i}{1+u}.
+\]
+Integrating the tail,
+\[
+\mathbb E[O_{i,\infty}\mid\mathcal F_{i,0}]
+\le a_i\log(1+a_i)
+\le a_i^2.
+\]
+This is a conditional expected refund bound for one null process; it does
+not establish that the refund can be spent without limit or that an entire
+online FDR procedure is valid.
+
+### Exactly-once fixed-point implementation
+
+The Rust reference stores the refund as the exact numerator
+\[
+R_{i,t}=
+\min\!\left\{
+(a_{i,\mathrm{num}}V_{i,t,\mathrm{ticks}}
+-a_{i,\mathrm{den}}P_E)_+,\,
+a_{i,\mathrm{num}}P_E
+\right\}
+\]
+over denominator \(a_{i,\mathrm{den}}P_E\), where \(P_E=10^6\).
+The update receipt contains:
+- the newly observed monotone evidence value;
+- the cumulative capped refund numerator;
+- the newly released increment \(R_{i,t}-R_{i,t-1}\);
+- the effective cost numerator \(a_{i,\mathrm{num}}V_{i,t,\mathrm{ticks}}-R_{i,t}\);
+- the exact rejection-boundary bit.
+
+The state rejects evidence rollback and round rollback. Updates are staged and
+committed atomically. A separate verifier recomputes every field from the
+policy, previous state and new evidence, and rejects repeated or forged
+refund increments. It does not call the writer transition logic.
+
+### Critical theorem still open
+
+The algebra above only says a persistent test process has a bounded cumulative
+overshoot account and a cost that upper-bounds its rejection indicator. It is
+not yet an online FDR algorithm. In particular, \(C_{i,t}\) increases as old
+evidence accumulates. A future spending policy must reserve for that
+continuing increase and must not spend the same refund twice. Each
+\(\Delta O_{i,t}\) becomes available only after observation t and may fund
+only later predictable tests. The required global alpha-wealth/FDP estimator
+must remain valid at every stopping time under the stated dependence
+conditions.
+
+Do not merge the alpha-refund units with the weighted evidence-capital units
+in the compound donation ledger. They are different accounting systems until
+a joint theorem explicitly connects them. The candidate direction is to use
+the process refund as a second, source-tagged alpha-wealth ledger, with its own
+independent verifier, before attempting composition with #9894.
+
+The writer and verifier unit tests are authored but not compiled or executed
+in this environment. No production, FDR, SupFDR, or SOTA claim is made.
+
 ## 6. Prior art and software baselines
 
 The benchmark must keep guarantee classes separate.
