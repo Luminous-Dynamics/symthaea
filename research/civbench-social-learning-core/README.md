@@ -35,6 +35,21 @@ Run:
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin networked-mediation-sweep > networked-mediation-sweep.csv
 ```
 
+## Czaplicka et al. 2025 source-faithful cultural mediation port
+
+The separate `src/czaplicka_2025.rs` module is a Rust semantic port of the pinned author C implementation `aga-cz/Mutual-benefits-of-SL-and-RS/modelQinn.c` (blob `8555ec4ad8bd7eec0605bcda28565fbfe2645957`). It preserves the source model's Erdős–Rényi graph, level-indexed global best-payoff archive, finite effort budget, innovation/social/recommendation costs, sequential within-step updates, death-birth reset, neighbour-payoff selection and best-trait recommendation. It adds explicit trait lineage/adoption telemetry and preserves the source's odd prefix-max metrics under legacy names alongside true maxima.
+
+This is a deterministic semantic port, not a bit-for-bit reproduction: the C source seeds platform `rand()` from wall-clock time; Rust uses fixed SplitMix64 seeds. The source parameter X is allocated but unused in the C update rules. The reference path preserves source semantics where practical and explicitly documents edge-case and RNG differences.
+
+The `czaplicka-2025-sweep` binary has three modes:
+- default quick smoke sweep;
+- `--paper-grid`: N=100, T=20N, Q=200, 20 ER densities × 11 recommendation shares, reference global-best policy only;
+- `--extension-grid`: smaller declared sensitivity grid comparing the reference with an exposure/adoption-count-aware UCB-style recommender.
+
+The UCB-style recommender is a new CivBench intervention, not part of the authors' model. It uses a bonus for promising but less-adopted traits and must be evaluated on a Pareto frontier of payoff, complexity, unique traits and lineage concentration. It is not assumed to improve culture just because it increases diversity.
+
+See [CZAPLICKA_2025_REFERENCE_PORT_PROTOCOL_V0_1.md](CZAPLICKA_2025_REFERENCE_PORT_PROTOCOL_V0_1.md) for exact source identifiers, update semantics, discrepancies and reproduction gates. The separate `src/networked_mediation.rs` ring-plus-shortcut model remains a different synthetic mechanism experiment; do not pool its results with this reference model.
+
 ## Iterated content drift and cultural attractors
 
 The separate `src/iterated_transmission.rs` module models repeated transmission of four normalized content attributes: toxicity, positivity, difficulty and length. A channel step applies a declared attribute-specific bias toward a configurable attractor plus noise, scaled by an open-endedness parameter. The evaluator reports signed/absolute drift by attribute, final distance to each attractor, initial/final pairwise distance and a convergence index.
