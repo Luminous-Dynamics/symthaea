@@ -124,9 +124,12 @@ Recorded run:
 - 250 deterministic traces;
 - 16 candidate IDs;
 - 40 rounds per trace;
-- 132,838 immutable events independently replayed;
-- five tamper controls rejected;
-- donor caps, own-increment caps, prefix budgets, score monotonicity/nonnegativity, per-token conservation and global escrow conservation checked after every transition.
+- 195,760 immutable events independently replayed;
+- 7,203 unassigned-reserve events, 14,936 assignments and 29,621 credits;
+- six tamper controls rejected, including an injected reserve attempt immediately after an incoming credit;
+- donor caps, own-increment caps, prefix budgets, score monotonicity at each committed look, nonnegativity, per-token conservation and global escrow conservation checked by an independent event replay.
+
+The replay maintains prefix balances by suffix updates and aggregate escrow totals incrementally. It does not call the writer transition code.
 
 The result is an exact Python accounting screen only. It does not validate a Rust implementation, statistical assumptions, source authenticity, or FDR/SupFDR.
 
