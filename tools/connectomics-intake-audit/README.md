@@ -62,6 +62,8 @@ Every `input_files[].path` is relative to `--root`. Absolute paths, parent-direc
 
 ## ConnectomeBench2 V2 metadata lineage and split audit
 
+The metadata audit JSON report is now **schema version 2**. Its strict Draft 2020-12 schema is `docs/neuroscience/CONNECTOMEBENCH2_V2_DATASET_AUDIT_REPORT_V2.schema.json`; the scoped GitHub workflow meta-validates this schema before running the full Rust test suite.
+
 The `connectome-dataset-audit` binary audits the metadata-only sidecars before training or scoring. It consumes JSONL exported from the three V2 Parquet sidecars, so no image payloads are read and no Python runtime is added to the Rust toolchain.
 
 From the ConnectomeBench2 V2 dataset root, export only the identity, labels, route, mask, modality, and metadata columns with DuckDB:
