@@ -577,7 +577,7 @@ pub fn analyze_two_policy_mixture(
         worst_case_rejection_power: best.worst_power,
         worst_case_decision_utility: best.worst_utility,
         maximum_expected_evaluator_cost: best.maximum_cost,
-        remaining_alpha_budget: plan.significance_level - best.null_size,
+        remaining_alpha_budget: plan.significance_level - best.worst_null_size,
         alternatives: best.alternatives,
         report_sha256,
     })
@@ -612,13 +612,15 @@ mod tests {
 
     fn receipt(
         policy_id: &str,
-        null_size: f64,
+        null_models: [(&str, f64); 2],
         rows: [(&str, f64, f64, f64); 2],
     ) -> DeterministicPolicyReceipt {
         DeterministicPolicyReceipt {
             policy_id: policy_id.into(),
             utility_contract_sha256: UTILITY_HASH.into(),
-            null_size,
+            null_models: null_models.into_iter().map(|(model_id, null_size)| {
+                PolicyNullModelReceipt { model_id: model_id.into(), null_size }
+            }).collect(),
             alternatives: rows.into_iter().map(|(model_id, power, cost, utility)| {
                 PolicyAlternativeReceipt {
                     model_id: model_id.into(),
@@ -633,7 +635,7 @@ mod tests {
     fn crossing_fixture() -> TwoPolicyMixturePlan {
         let policy_a = receipt(
             "middle",
-            0.035,
+            [("null-a", 0.035), ("null-b", 0.02)],
             [
                 ("alt-a", 0.66, 3.0, 5.62),
                 ("alt-b", 0.54, 3.0, 4.18),
@@ -641,7 +643,7 @@ mod tests {
         );
         let policy_b = receipt(
             "deep",
-            0.0225,
+            [("null-a", 0.0225), ("null-b", 0.03)],
             [
                 ("alt-a", 0.576, 3.7, 4.542),
                 ("alt-b", 0.615, 3.3, 5.05),
@@ -664,7 +666,9 @@ mod tests {
         assert!(report.worst_case_decision_utility > deterministic_best);
         assert!((report.policy_a_probability - 0.508 / 1.948).abs() < 1e-12);
         assert!((report.worst_case_decision_utility - 4.823).abs() < 1e-3);
-        assert!(report.mixed_null_size <= 0.05);
+        assert!((report.worst_case_null_size - 0.027392197125256674).abs() < 1e-12);
+        assert_eq!(report.null_model_sizes.len(), 2);
+        assert!(report.worst_case_null_size <= 0.05);
         assert!(report.maximum_expected_evaluator_cost <= 3.6);
         assert!(report.mixture_entropy_nats > 0.0);
         verify_two_policy_mixture_report(&plan, &report).unwrap();
@@ -681,6 +685,14 @@ mod tests {
         let report = analyze_two_policy_mixture(&cost_cap).unwrap();
         assert!(report.maximum_expected_evaluator_cost <= 3.2 + 1e-12);
         assert!(report.policy_a_probability > 0.7);
+    }
+
+    #[test]
+    fn incompatible_composite_null_size_constraints_have_no_feasible_mixture() {
+        let mut plan = crossing_fixture();
+        // Null A requires q <= 0.28, while null B requires q >= 0.40 at alpha=0.026.
+        plan.significance_level = 0.026;
+        assert!(analyze_two_policy_mixture(&plan).is_err());
     }
 
     #[test]
@@ -710,7 +722,9 @@ mod tests {
         let mut no_cross = crossing_fixture();
         no_cross.policy_b.alternatives[0].decision_utility = 6.0;
         no_cross.policy_b.alternatives[1].decision_utility = 6.0;
-        no_cross.policy_b.null_size = 0.01;
+        for null_model in &mut no_cross.policy_b.null_models {
+            null_model.null_size = 0.01;
+        }
         no_cross.maximum_expected_cost = None;
         let report = analyze_two_policy_mixture(&no_cross).unwrap();
         assert_eq!(report.policy_b_probability, 1.0);
