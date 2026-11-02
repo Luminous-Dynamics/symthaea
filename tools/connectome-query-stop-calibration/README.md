@@ -74,7 +74,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-query-stop-calibration/Cargo.toml
 ```
 
-Eighteen Rust unit tests are authored for the exact order-statistic rank, insufficient calibration, finite upper bounds, unstable/wide uncertainty, group overlap, source-volume and independence-cluster separation, duplicate IDs, invalid alpha/horizon/tolerance/ratios, empty calibration, deterministic order and evidence digests.
+Nineteen Rust unit tests are authored for the exact order-statistic rank, insufficient calibration, finite upper bounds, unstable/wide uncertainty, group overlap, source-volume and independence-cluster separation, duplicate IDs, invalid alpha/horizon/tolerance/ratios, empty calibration, deterministic order and evidence digests, calibration-trajectory manifest provenance and report-field propagation.
 
 They have **not** been compiled or executed in the current authoring environment.
 
