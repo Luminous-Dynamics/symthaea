@@ -9,6 +9,7 @@
 //! separate Reward Network task environment; neither claims to model human
 //! culture generally.
 
+pub mod cultural_evolution;
 pub mod reward_network;
 
 use core::fmt;
