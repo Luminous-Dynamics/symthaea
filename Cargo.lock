@@ -18488,6 +18488,10 @@ name = "symthaea-complex"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-complexity-lab"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-consciousness-equation"
 version = "0.1.0"
 dependencies = [
