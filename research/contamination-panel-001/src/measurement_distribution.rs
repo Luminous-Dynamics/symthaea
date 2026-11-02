@@ -863,7 +863,10 @@ pub fn analyze_measurement_distribution(
             (_, Some(receipt)) => require_digest(receipt, "external_egress_receipt_sha256")?,
             (_, None) => return Err("external calls require a destination/egress evidence receipt".to_owned()),
         }
-        independent_units.insert(observation.independent_unit_id.clone());
+        independent_units.insert((
+            observation.model_id.clone(),
+            observation.independent_unit_id.clone(),
+        ));
         let key = ObservationKey {
             model_id: observation.model_id.clone(),
             run_id: observation.run_id.clone(),
@@ -1085,8 +1088,6 @@ pub fn analyze_measurement_distribution(
         }
     }
 
-    let task_families: BTreeSet<String> =
-        bundle.instance_manifest.instances.iter().map(|item| item.task_family.clone()).collect();
     let model_families: BTreeSet<String> =
         bundle.models.iter().map(|model| model.model_family_id.clone()).collect();
     let source_domains: BTreeSet<String> = bundle.instance_manifest.instances
