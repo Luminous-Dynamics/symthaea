@@ -213,6 +213,111 @@ impl SeriesRlc {
     }
 }
 
+/// A validated passive, lumped, parallel-RLC resonator.
+///
+/// The resistor is connected in parallel with the ideal inductor and
+/// capacitor. The model assumes linear, lumped components and sinusoidal
+/// steady state. It does not include inductor winding loss, capacitor ESR,
+/// radiation, distributed effects or frequency-dependent material behavior.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParallelRlc {
+    resistance_ohm: f64,
+    inductance_henry: f64,
+    capacitance_farads: f64,
+}
+
+impl ParallelRlc {
+    /// Construct a validated passive parallel-RLC resonator.
+    pub fn new(
+        resistance_ohm: f64,
+        inductance_henry: f64,
+        capacitance_farads: f64,
+    ) -> Result<Self, ModelError> {
+        require_positive_finite(resistance_ohm, "resistance_ohm")?;
+        require_positive_finite(inductance_henry, "inductance_henry")?;
+        require_positive_finite(capacitance_farads, "capacitance_farads")?;
+
+        let model = Self {
+            resistance_ohm,
+            inductance_henry,
+            capacitance_farads,
+        };
+        let metrics = model.metrics_unchecked();
+        require_positive_finite(
+            metrics.resonant_frequency_hz,
+            "resonant_frequency_hz",
+        )
+        .map_err(|_| ModelError::NonRepresentable("resonant_frequency_hz"))?;
+        require_positive_finite(metrics.quality_factor, "quality_factor")
+            .map_err(|_| ModelError::NonRepresentable("quality_factor"))?;
+        require_positive_finite(metrics.bandwidth_hz, "bandwidth_hz")
+            .map_err(|_| ModelError::NonRepresentable("bandwidth_hz"))?;
+        Ok(model)
+    }
+
+    /// Calculate natural resonance, parallel quality factor and ideal
+    /// half-power bandwidth.
+    ///
+    /// Q = R * sqrt(C / L), and bandwidth = 1 / (2 pi R C).
+    pub fn metrics(self) -> ResonanceMetrics {
+        self.metrics_unchecked()
+    }
+
+    fn metrics_unchecked(self) -> ResonanceMetrics {
+        let omega_0 =
+            (1.0 / self.inductance_henry.sqrt()) / self.capacitance_farads.sqrt();
+        let resonant_frequency_hz = omega_0 / TAU;
+        let quality_factor = self.resistance_ohm
+            * (self.capacitance_farads.sqrt() / self.inductance_henry.sqrt());
+        let bandwidth_hz = (1.0 / self.resistance_ohm / self.capacitance_farads) / TAU;
+        ResonanceMetrics {
+            resonant_frequency_hz,
+            quality_factor,
+            bandwidth_hz,
+        }
+    }
+
+    /// Calculate steady-state impedance at a positive frequency.
+    ///
+    /// The admittance is Y = 1/R + j(omega C - 1/(omega L)); impedance is 1/Y.
+    /// Scaling by the admittance magnitude avoids squaring large or small
+    /// admittance components.
+    pub fn impedance_at_hz(self, frequency_hz: f64) -> Result<ComplexImpedance, ModelError> {
+        require_positive_finite(frequency_hz, "frequency_hz")?;
+        let omega = TAU * frequency_hz;
+        require_positive_finite(omega, "angular_frequency_rad_s")
+            .map_err(|_| ModelError::NonRepresentable("angular_frequency_rad_s"))?;
+
+        let conductance = 1.0 / self.resistance_ohm;
+        let capacitive_susceptance = omega * self.capacitance_farads;
+        let inductive_susceptance = 1.0 / (omega * self.inductance_henry);
+        let susceptance = capacitive_susceptance - inductive_susceptance;
+        if !conductance.is_finite()
+            || conductance <= 0.0
+            || !capacitive_susceptance.is_finite()
+            || !inductive_susceptance.is_finite()
+            || !susceptance.is_finite()
+        {
+            return Err(ModelError::NonRepresentable("admittance"));
+        }
+
+        let admittance_magnitude = conductance.hypot(susceptance);
+        if !admittance_magnitude.is_finite() || admittance_magnitude <= 0.0 {
+            return Err(ModelError::NonRepresentable("admittance_magnitude"));
+        }
+        let real_ohm = (conductance / admittance_magnitude) / admittance_magnitude;
+        let imaginary_ohm = (-susceptance / admittance_magnitude) / admittance_magnitude;
+        if !real_ohm.is_finite() || !imaginary_ohm.is_finite() {
+            return Err(ModelError::NonRepresentable("impedance"));
+        }
+
+        Ok(ComplexImpedance {
+            real_ohm,
+            imaginary_ohm,
+        })
+    }
+}
+
 /// Two series-RLC resonators coupled through mutual inductance.
 ///
 /// The coupled-mode calculation is lossless (R is not used to determine the
@@ -364,6 +469,76 @@ mod tests {
 
     fn fixture() -> SeriesRlc {
         SeriesRlc::new(50.0, 1e-3, 1e-6).expect("valid series-RLC fixture")
+    }
+
+    #[test]
+    fn parallel_rlc_known_answer_metrics() {
+        let resonator = ParallelRlc::new(1000.0, 10e-3, 1e-6)
+            .expect("valid parallel-RLC fixture");
+        let metrics = resonator.metrics();
+        assert!(
+            (metrics.resonant_frequency_hz - 1591.5494309189535).abs() < 1e-9,
+            "f0={}",
+            metrics.resonant_frequency_hz
+        );
+        assert!((metrics.quality_factor - 10.0).abs() < 1e-12);
+        assert!(
+            (metrics.bandwidth_hz - 159.15494309189535).abs() < 1e-9,
+            "BW={}",
+            metrics.bandwidth_hz
+        );
+    }
+
+    #[test]
+    fn parallel_impedance_is_resistive_at_resonance() {
+        let resonator = ParallelRlc::new(1000.0, 10e-3, 1e-6)
+            .expect("valid parallel-RLC fixture");
+        let f0 = resonator.metrics().resonant_frequency_hz;
+        let impedance = resonator.impedance_at_hz(f0).expect("finite impedance");
+
+        assert!(impedance.imaginary_ohm.abs() < 1e-9);
+        assert!((impedance.real_ohm - 1000.0).abs() < 1e-9);
+        assert!((impedance.magnitude_ohm() - 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn parallel_half_power_bandwidth_matches_inverse_two_pi_rc() {
+        let resonator = ParallelRlc::new(1000.0, 10e-3, 1e-6)
+            .expect("valid parallel-RLC fixture");
+        let r = 1000.0_f64;
+        let l = 10e-3_f64;
+        let c = 1e-6_f64;
+        let conductance = 1.0 / r;
+        let root = (conductance * conductance + 4.0 * c / l).sqrt();
+        let omega_low = (-conductance + root) / (2.0 * c);
+        let omega_high = (conductance + root) / (2.0 * c);
+        let z_low = resonator
+            .impedance_at_hz(omega_low / TAU)
+            .expect("lower half-power point");
+        let z_high = resonator
+            .impedance_at_hz(omega_high / TAU)
+            .expect("upper half-power point");
+        let target = r / 2.0_f64.sqrt();
+
+        assert!((z_low.magnitude_ohm() - target).abs() < 1e-8);
+        assert!((z_high.magnitude_ohm() - target).abs() < 1e-8);
+        assert!(
+            ((omega_high - omega_low) / TAU - resonator.metrics().bandwidth_hz).abs() < 1e-9
+        );
+    }
+
+    #[test]
+    fn parallel_resonator_rejects_invalid_parameters_and_frequency() {
+        assert!(matches!(
+            ParallelRlc::new(0.0, 10e-3, 1e-6),
+            Err(ModelError::NonPositive("resistance_ohm"))
+        ));
+        let resonator =
+            ParallelRlc::new(1000.0, 10e-3, 1e-6).expect("valid parallel-RLC fixture");
+        assert!(matches!(
+            resonator.impedance_at_hz(f64::NAN),
+            Err(ModelError::NonFinite("frequency_hz"))
+        ));
     }
 
     #[test]
