@@ -1269,6 +1269,13 @@ pub struct LinearizationReport {
     pub claim_ceiling: String,
 }
 
+struct LinearizationContext<'a> {
+    trace: &'a Trace,
+    predecessors: &'a [u64],
+    all_mask: u64,
+    max_states: usize,
+}
+
 #[derive(Default)]
 struct LinearizationSearch {
     explored_states: usize,
@@ -1362,7 +1369,7 @@ fn topological_reference_order(
         let mut ready: Vec<usize> = (0..count)
             .filter(|index| {
                 let bit = 1u64 << index;
-                done & bit == 0 && predecessors[*index] & !done == 0
+                done & bit == 0 && context.predecessors[*index] & !done == 0
             })
             .collect();
         ready.sort_by_key(|index| trace.operations[*index].op_id.as_str());
@@ -1487,22 +1494,20 @@ fn final_state_matches(trace: &Trace, state: &ModelState) -> bool {
 }
 
 fn search_linearizations(
-    trace: &Trace,
-    predecessors: &[u64],
-    all_mask: u64,
+    context: &LinearizationContext<'_>,
     done: u64,
     state: &ModelState,
     order: &mut Vec<usize>,
-    max_states: usize,
     search: &mut LinearizationSearch,
 ) -> bool {
-    if search.explored_states >= max_states {
+    let trace = context.trace;
+    if search.explored_states >= context.max_states {
         search.exhausted = true;
         return false;
     }
     search.explored_states += 1;
 
-    if done == all_mask {
+    if done == context.all_mask {
         if final_state_matches(trace, state) {
             search.solution = Some(order.iter().map(|index| trace.operations[*index].op_id.clone()).collect());
             return true;
@@ -1523,7 +1528,7 @@ fn search_linearizations(
     ready.sort_by_key(|index| trace.operations[*index].op_id.as_str());
 
     for index in ready {
-        if search.explored_states >= max_states {
+        if search.explored_states >= context.max_states {
             search.exhausted = true;
             return false;
         }
@@ -1543,13 +1548,10 @@ fn search_linearizations(
 
         order.push(index);
         let found = search_linearizations(
-            trace,
-            predecessors,
-            all_mask,
+            context,
             done | (1u64 << index),
             &next_state,
             order,
-            max_states,
             search,
         );
         order.pop();
@@ -1622,14 +1624,17 @@ pub fn check_linearizable_history(trace: &Trace, max_states: usize) -> Lineariza
     let mut search = LinearizationSearch::default();
     let mut order = Vec::with_capacity(count);
     let initial = initial_model_state(trace);
-    let found = search_linearizations(
+    let context = LinearizationContext {
         trace,
-        &predecessors,
+        predecessors: &predecessors,
         all_mask,
+        max_states,
+    };
+    let found = search_linearizations(
+        &context,
         0,
         &initial,
         &mut order,
-        max_states,
         &mut search,
     );
 
@@ -1962,6 +1967,8 @@ mod tests {
         op_b.expected_result.receipt_acceptance_revision = Some("rev-1".to_string());
         op_b.expected_result.current_authority_revision = Some("rev-1".to_string());
 
+        trace.operations.iter_mut().find(|x| x.op_id == "op-a-exact-retry").unwrap()
+            .expected_result.receipt_acceptance_revision = Some("rev-2".to_string());
         trace.final_observation.accepted_receipts.iter_mut()
             .find(|receipt| receipt.receipt_id == "receipt-A").unwrap()
             .receipt_acceptance_revision = "rev-2".to_string();
