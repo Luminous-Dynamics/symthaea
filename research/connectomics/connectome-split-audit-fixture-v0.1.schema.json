@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-split-audit-fixture-v0.1.schema.json",
+  "title": "Synthetic connectome split leakage audit fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "synthetic_only",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "input",
+          "expected"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema_version",
+              "policy",
+              "operations"
+            ],
+            "properties": {
+              "schema_version": {
+                "const": "0.1"
+              },
+              "policy": {
+                "type": "object"
+              },
+              "operations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "operation_count",
+              "unique_sample_count",
+              "view_instance_count",
+              "overlaps"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "GroupDisjoint",
+                  "LeakageDetected"
+                ]
+              },
+              "operation_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unique_sample_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "view_instance_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "overlaps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "group_key",
+                    "group_value",
+                    "splits"
+                  ],
+                  "properties": {
+                    "group_key": {
+                      "enum": [
+                        "SourceArchive",
+                        "SourceVolume",
+                        "SourceOperation",
+                        "SpatialCube",
+                        "Neuron",
+                        "Animal",
+                        "Session",
+                        "Species",
+                        "Workflow"
+                      ]
+                    },
+                    "group_value": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "splits": {
+                      "type": "array",
+                      "minItems": 2,
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "Train",
+                          "Validation",
+                          "Test",
+                          "Adaptation",
+                          "Calibration"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "expected_error": {
+            "enum": [
+              "SampleAppearsInMultipleSplits",
+              "MissingGroupKey",
+              "TargetLeakingView",
+              "DuplicateOperationForTask"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
