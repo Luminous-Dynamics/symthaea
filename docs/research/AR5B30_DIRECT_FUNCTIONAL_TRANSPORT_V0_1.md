@@ -75,7 +75,7 @@ This is a direct confidence-set transport result for a frozen finite family. It 
 
 The request binds the common finite support digest and exact category order; a sorted, unique roster of stable function IDs; each function's declared finite range; its exact per-category values; both sample count streams and their source artifact digests; calibration and target design identities; family failure probability; IID complete-path declarations; independent calibration/target sample declaration; reference-sample independence from confirmation; and a pre-outcome-only target reference sample declaration.
 
-The functional-contract digest is recomputed from the support digest and sorted function roster. A function added, removed or modified after the contract is frozen is rejected. The report digest binds the counts and all source fields. Digests bind bytes; they do not authenticate the upstream data producer or prove that the asserted sampling design was followed.
+The functional-contract digest is recomputed from the support digest and sorted function roster. A function added, removed or modified after the contract is frozen is rejected. The implementation caps the support-by-functional value matrix at 10,000,000 cells to keep the bounded reference path finite. The report digest binds the counts and all source fields. Digests bind bytes; they do not authenticate the upstream data producer or prove that the asserted sampling design was followed.
 
 ### 2.2 Per-functional report
 
@@ -152,6 +152,20 @@ Observed:
 - mean full-TV radius: approximately 0.39577;
 - corresponding normalized bounded-function full-TV shift interval width: approximately 0.79154;
 - direct/full-TV interval-width ratio: approximately 0.0951.
+
+For orientation, the leading confidence-radius terms at equal sample size (n=m), unit functional range, and fixed family size are:
+[
+r_{mathrm{TV}}approx 2sqrt{rac{Kln2+ln(2/delta)}{2n}},
+qquad
+r_{mathrm{direct}}approx 2sqrt{rac{ln(4d/delta)}{2n}}.
+]
+Their worst-case sample-size ratio for a fixed target radius is approximately
+[
+rac{n_{mathrm{direct}}}{n_{mathrm{TV}}}
+approx
+rac{ln(4d/delta)}{Kln2+ln(2/delta)}.
+]
+For (K=512), (d=3), and (delta=0.01), this expression is about 0.0197 (roughly 50.8-fold in the idealized concentration term). This is a bound-scaling comparison, not an empirical end-to-end sample-saving result; it ignores observed shift, functional range heterogeneity, calibration error and the need to establish that the roster is complete.
 
 This is a formula-level simulation result, not a Rust test or proof. It uses a known synthetic distribution and a fixed three-function family. It does not imply a 90% improvement in other workloads. The observed finite-run 100% coverage is not proof of exact nominal coverage.
 
