@@ -236,6 +236,7 @@ jobs:
               ("pass without image digest", lambda p: p["execution"].update({"image_digest": None})),
               ("pass with unrestricted network", lambda p: p["execution"].update({"network_policy": "unrestricted_not_qualifying"})),
               ("pass after safety violation", lambda p: p["result"].update({"safety_violation": True})),
+              ("pass without required check evidence digest", lambda p: p["checks"][0].update({"evidence_sha256": None})),
               ("pass when a required check row is skipped", lambda p: p["checks"][0].update({"status": "skipped"})),
               ("forged required-pass counter", lambda p: p["result"].update({"required_pass_count": 0})),
               ("duplicate check identity", lambda p: p["checks"].append(copy.deepcopy(p["checks"][0]))),
@@ -268,7 +269,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=18"
+              "schemas=3 negative_controls=20"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
