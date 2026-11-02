@@ -854,6 +854,67 @@ mod tests {
     }
 
     #[test]
+    fn replay_from_canonical_pair_ledger_matches_direct_fsd_state() {
+        use crate::temporal_intervention_family::{
+            append_temporal_intervention_batch,
+            create_temporal_intervention_evidence_ledger,
+        };
+
+        let family = fsd_family();
+        let temporal_family = family.temporal_family.clone();
+        let contrast_id = "pareto-vs-greedy";
+        let axis = TemporalInterventionAxis::WrongBelief;
+        let mut evidence = create_temporal_intervention_evidence_ledger(temporal_family).unwrap();
+
+        let pairs = [
+            pair(1, 0, 100),
+            pair(2, 1, 10),
+            pair(3, 10, 1),
+            pair(4, 0, 100),
+        ];
+        append_temporal_intervention_batch(
+            &mut evidence, contrast_id, axis, &pairs[..2],
+        ).unwrap();
+        append_temporal_intervention_batch(
+            &mut evidence, contrast_id, axis, &pairs[2..],
+        ).unwrap();
+
+        let replayed = replay_first_order_dominance_from_evidence_ledger(
+            &family, &evidence, contrast_id, axis, 10_000, 100,
+        ).unwrap();
+
+        let mut direct = FirstOrderDominanceState::new(
+            &family, contrast_id, axis, 10_000, 100,
+        ).unwrap();
+        for (index, pair) in pairs.iter().enumerate() {
+            direct.observe(index as u64 + 1, pair).unwrap();
+        }
+        assert_eq!(replayed, direct.report());
+    }
+
+    #[test]
+    fn replay_rejects_tampered_pair_exposure_binding() {
+        use crate::temporal_intervention_family::{
+            append_temporal_intervention_batch,
+            create_temporal_intervention_evidence_ledger,
+        };
+
+        let family = fsd_family();
+        let temporal_family = family.temporal_family.clone();
+        let contrast_id = "pareto-vs-greedy";
+        let axis = TemporalInterventionAxis::WrongBelief;
+        let mut evidence = create_temporal_intervention_evidence_ledger(temporal_family).unwrap();
+        append_temporal_intervention_batch(
+            &mut evidence, contrast_id, axis, &[pair(1, 0, 100)],
+        ).unwrap();
+
+        evidence.pair_bindings[0].pair_outcomes[0].treatment_exposure_us = 100;
+        assert!(replay_first_order_dominance_from_evidence_ledger(
+            &family, &evidence, contrast_id, axis, 10_000, 100,
+        ).is_err());
+    }
+
+    #[test]
     fn sequential_look_gap_does_not_advance_evidence() {
         let family = fsd_family();
         let mut state = FirstOrderDominanceState::new(
