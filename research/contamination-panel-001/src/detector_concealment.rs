@@ -388,6 +388,7 @@ pub fn analyze_detector_concealment(study:&DetectorConcealmentStudyV1)->Result<D
     }
 
     let mut calibration=BTreeMap::<ScoreKey,Vec<f64>>::new();
+    let mut calibration_row_ids=BTreeSet::<(ScoreKey,String)>::new();
     let mut calibration_ids=BTreeMap::<(String,String),BTreeSet<String>>::new();
     for row in &study.calibration_scores{
         let pair=pairs.get(&row.replicate_id).ok_or_else(||"unknown calibration replicate".to_owned())?;
@@ -395,8 +396,11 @@ pub fn analyze_detector_concealment(study:&DetectorConcealmentStudyV1)->Result<D
             ||row.checkpoint_sha256!=checkpoint(pair,row.model_arm,row.post_concealment)||!row.score.is_finite()
             ||!valid_id(&row.item_id,128)||row.manifest_sha256!=study.calibration_manifest_sha256{
             return Err("calibration identity/checkpoint/score/manifest mismatch".to_owned());}
-        calibration.entry(ScoreKey{replicate_id:row.replicate_id.clone(),model_arm:row.model_arm,model_id:row.model_id.clone(),detector_id:row.detector_id.clone(),post:row.post_concealment})
-            .or_default().push(row.score);
+        let key=ScoreKey{replicate_id:row.replicate_id.clone(),model_arm:row.model_arm,model_id:row.model_id.clone(),detector_id:row.detector_id.clone(),post:row.post_concealment};
+        if !calibration_row_ids.insert((key.clone(),row.item_id.clone())) {
+            return Err("duplicate calibration score for one model/arm/detector/stage/item".to_owned());
+        }
+        calibration.entry(key).or_default().push(row.score);
         calibration_ids.entry((row.replicate_id.clone(),row.detector_id.clone())).or_default().insert(row.item_id.clone());
     }
     let mut thresholds=BTreeMap::<(String,ModelArmV1,String,String,bool,u16),(f64,u64)>::new();
@@ -410,6 +414,7 @@ pub fn analyze_detector_concealment(study:&DetectorConcealmentStudyV1)->Result<D
     }
 
     let mut tests=BTreeMap::<ScoreKey,BTreeMap<EvaluationCohortV1,Vec<&DetectorTestScoreV1>>>::new();
+    let mut test_row_ids=BTreeSet::<(ScoreKey,EvaluationCohortV1,String)>::new();
     let mut test_item_sets=BTreeMap::<(String,String,bool,ModelArmV1),BTreeMap<EvaluationCohortV1,BTreeSet<String>>>::new();
     for row in &study.detector_test_scores{
         let pair=pairs.get(&row.replicate_id).ok_or_else(||"unknown detector test replicate".to_owned())?;
@@ -419,8 +424,11 @@ pub fn analyze_detector_concealment(study:&DetectorConcealmentStudyV1)->Result<D
             return Err("detector test identity/checkpoint/score/manifest mismatch".to_owned());}
         if calibration_ids.get(&(row.replicate_id.clone(),row.detector_id.clone())).is_some_and(|ids|ids.contains(&row.item_id)){
             return Err("calibration and test item IDs overlap".to_owned());}
-        tests.entry(ScoreKey{replicate_id:row.replicate_id.clone(),model_arm:row.model_arm,model_id:row.model_id.clone(),detector_id:row.detector_id.clone(),post:row.post_concealment})
-            .or_default().entry(row.cohort).or_default().push(row);
+        let key=ScoreKey{replicate_id:row.replicate_id.clone(),model_arm:row.model_arm,model_id:row.model_id.clone(),detector_id:row.detector_id.clone(),post:row.post_concealment};
+        if !test_row_ids.insert((key.clone(),row.cohort,row.item_id.clone())) {
+            return Err("duplicate detector test score for one model/arm/detector/stage/cohort/item".to_owned());
+        }
+        tests.entry(key).or_default().entry(row.cohort).or_default().push(row);
         test_item_sets.entry((row.replicate_id.clone(),row.detector_id.clone(),row.post_concealment,row.model_arm))
             .or_default().entry(row.cohort).or_default().insert(row.item_id.clone());
     }
@@ -600,6 +608,107 @@ mod tests{
         let threshold=calibrated_threshold(&[0.1,0.1,0.1,0.2,0.2,0.2,0.3,0.3,0.3,0.3],&method(true),100).unwrap();
         let false_positives=[0.1,0.1,0.1,0.2,0.2,0.2,0.3,0.3,0.3,0.3].iter().filter(|x|classify(**x,threshold,&method(true))).count();
         assert!(false_positives<=1);
+    }
+
+    fn test_pair(index: usize) -> ConcealmentModelPairV1 {
+        let chars = ['1','2','3','4','5','6','7','8','9','a','b','c','d','e'];
+        let d = |offset: usize| std::iter::repeat_n(chars[(index + offset) % chars.len()],64).collect::<String>();
+        ConcealmentModelPairV1 {
+            replicate_id: format!("rep-{index}"),
+            stage_kind: ConcealmentStageKindV1::Grpo,
+            base_checkpoint_sha256:d(0),
+            treatment_model_id:format!("treatment-{index}"),
+            placebo_model_id:format!("placebo-{index}"),
+            exposure_assignment_sha256:d(1),
+            placebo_assignment_sha256:d(2),
+            pre_treatment_checkpoint_sha256:d(3),
+            pre_placebo_checkpoint_sha256:d(4),
+            post_treatment_checkpoint_sha256:d(5),
+            post_placebo_checkpoint_sha256:d(6),
+            exposure_training_receipt_sha256:d(7),
+            placebo_training_receipt_sha256:d(8),
+            concealment_training_receipt_sha256:d(9),
+            concealment_config_sha256:d(10),
+            checkpoint_freeze_receipt_sha256:d(11),
+        }
+    }
+
+    fn fixture_study() -> DetectorConcealmentStudyV1 {
+        let pairs=vec![test_pair(0),test_pair(1)];
+        let method=method(true);
+        let mut calibration_scores=Vec::new();
+        let mut detector_test_scores=Vec::new();
+        let mut fresh_behavior_scores=Vec::new();
+        for pair in &pairs {
+            for arm in [ModelArmV1::ExposureTreatment,ModelArmV1::MatchedPlacebo] {
+                let model=model_id(pair,arm).to_owned();
+                for post in [false,true] {
+                    let checkpoint=checkpoint(pair,arm,post).to_owned();
+                    for (index,score) in [0.1,0.2,0.3,0.4].iter().enumerate() {
+                        calibration_scores.push(CalibrationScoreV1{
+                            replicate_id:pair.replicate_id.clone(),model_arm:arm,model_id:model.clone(),
+                            detector_id:method.detector_id.clone(),post_concealment:post,
+                            item_id:format!("cal-{index}"),score:*score,checkpoint_sha256:checkpoint.clone(),
+                            manifest_sha256:"a".repeat(64),
+                        });
+                    }
+                    for (index,item) in ["q1","q2","q3","q4"].iter().enumerate() {
+                        let cohort=if index<2 {EvaluationCohortV1::TreatmentAssignedSourceFamily} else {EvaluationCohortV1::HeldoutCleanControl};
+                        let score=match (arm,post,index<2) {
+                            (ModelArmV1::ExposureTreatment,false,true)=>0.9,
+                            (ModelArmV1::ExposureTreatment,true,true)=>0.2,
+                            _=>0.1 + index as f64*0.05,
+                        };
+                        detector_test_scores.push(DetectorTestScoreV1{
+                            replicate_id:pair.replicate_id.clone(),model_arm:arm,model_id:model.clone(),
+                            detector_id:method.detector_id.clone(),post_concealment:post,
+                            item_id:(*item).to_owned(),cohort,score,checkpoint_sha256:checkpoint.clone(),
+                            manifest_sha256:"b".repeat(64),
+                        });
+                    }
+                    for item in ["fresh-1","fresh-2"] {
+                        let score=if arm==ModelArmV1::ExposureTreatment{800}else{500};
+                        fresh_behavior_scores.push(FreshBehaviorScoreV1{
+                            replicate_id:pair.replicate_id.clone(),model_arm:arm,model_id:model.clone(),
+                            post_concealment:post,item_id:item.to_owned(),task_family:"math".to_owned(),
+                            score_permille:score,checkpoint_sha256:checkpoint.clone(),manifest_sha256:"c".repeat(64),
+                        });
+                    }
+                }
+            }
+        }
+        DetectorConcealmentStudyV1{
+            schema:DETECTOR_CONCEALMENT_STUDY_SCHEMA.to_owned(),study_id:"concealment-fixture".to_owned(),
+            benchmark_id:"fresh-reasoning".to_owned(),benchmark_version:"v1".to_owned(),
+            base_benchmark_manifest_sha256:"d".repeat(64),calibration_manifest_sha256:"a".repeat(64),
+            detector_test_manifest_sha256:"b".repeat(64),fresh_behavior_manifest_sha256:"c".repeat(64),
+            target_fpr_permille:vec![100],minimum_replicates:2,minimum_calibration_negatives:4,
+            minimum_test_negatives:2,minimum_behavior_advantage_permille:100,
+            detector_methods:vec![method],model_pairs:pairs,calibration_scores,detector_test_scores,fresh_behavior_scores,
+        }
+    }
+
+    #[test]
+    fn full_study_detects_tpr_concealment_only_when_behavioral_advantage_remains() {
+        let report=analyze_detector_concealment(&fixture_study()).unwrap();
+        assert_eq!(report.independent_model_pair_count,2);
+        let frozen=report.detector_aggregates.iter()
+            .find(|row|row.threshold_policy==ThresholdPolicyV1::FrozenPreConcealment).unwrap();
+        assert_eq!(frozen.pre_treatment_member_tpr.as_ref().unwrap().mean,1_000.0);
+        assert_eq!(frozen.post_treatment_member_tpr.as_ref().unwrap().mean,0.0);
+        assert!(frozen.pre_to_post_tpr_change.as_ref().unwrap().upper_95<0.0);
+        let post=report.behavioral_retention.iter().find(|row|row.post_concealment).unwrap();
+        assert_eq!(post.treatment_minus_placebo_advantage_permille.mean,300.0);
+        assert_eq!(report.supported_concealment_claims.len(),2);
+        assert!(report.supported_concealment_claims.iter().all(|claim|claim.concealment_event_supported));
+        assert!(!report.confirmatory_eligible);
+    }
+
+    #[test]
+    fn post_stage_recalibration_is_reported_separately_from_frozen_threshold() {
+        let report=analyze_detector_concealment(&fixture_study()).unwrap();
+        let policies:BTreeSet<ThresholdPolicyV1>=report.detector_aggregates.iter().map(|r|r.threshold_policy).collect();
+        assert_eq!(policies.len(),2);
     }
 
     #[test]
