@@ -30,6 +30,8 @@ pub struct KnowledgeItem {
     pub uncertainty: f64,
     /// Cost to transmit/learn, in abstract time units.
     pub learning_cost: f64,
+    /// Intrinsic difficulty, separate from time/resource cost.
+    pub difficulty: f64,
     /// Evaluator-only probability the item is valid in its declared scope.
     pub validity: f64,
     /// Evaluator-only probability it transfers to a held-out context.
@@ -47,6 +49,7 @@ impl KnowledgeItem {
             ("evidence_reliability", self.evidence_reliability),
             ("uncertainty", self.uncertainty),
             ("learning_cost", self.learning_cost),
+            ("difficulty", self.difficulty),
             ("validity", self.validity),
             ("transferability", self.transferability),
         ] {
@@ -60,6 +63,7 @@ impl KnowledgeItem {
         for (name, value) in [
             ("evidence_reliability", self.evidence_reliability),
             ("uncertainty", self.uncertainty),
+            ("difficulty", self.difficulty),
             ("validity", self.validity),
             ("transferability", self.transferability),
         ] {
@@ -121,7 +125,7 @@ pub struct TeachingConfig {
     pub acquisition_base_probability: f64,
     pub integration_probability: f64,
     pub retention_probability: f64,
-    pub individual_discovery_probability_per_cost: f64,
+    pub individual_discovery_base_probability: f64,
     pub task_family_mismatch_penalty: f64,
 }
 
@@ -134,7 +138,7 @@ impl Default for TeachingConfig {
             acquisition_base_probability: 0.9,
             integration_probability: 0.85,
             retention_probability: 0.9,
-            individual_discovery_probability_per_cost: 0.12,
+            individual_discovery_base_probability: 0.12,
             task_family_mismatch_penalty: 0.0,
         }
     }
@@ -147,7 +151,7 @@ impl TeachingConfig {
             ("acquisition_base_probability", self.acquisition_base_probability),
             ("integration_probability", self.integration_probability),
             ("retention_probability", self.retention_probability),
-            ("individual_discovery_probability_per_cost", self.individual_discovery_probability_per_cost),
+            ("individual_discovery_base_probability", self.individual_discovery_base_probability),
             ("task_family_mismatch_penalty", self.task_family_mismatch_penalty),
         ] {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
@@ -400,8 +404,7 @@ fn evaluate_one(
             } else {
                 config.task_family_mismatch_penalty
             };
-            let learnability = (1.0 - 0.6 * item.learning_cost / (item.learning_cost + 4.0))
-                .clamp(0.1, 1.0);
+            let learnability = (1.0 - 0.8 * item.difficulty).clamp(0.1, 1.0);
             let acquisition_probability = (
                 config.acquisition_base_probability
                     * item.evidence_reliability
@@ -415,8 +418,8 @@ fn evaluate_one(
         LearningMode::IndividualOnly => {
             outcome.learning_cost_spent = item.learning_cost;
             let discovery_probability = (
-                config.individual_discovery_probability_per_cost
-                    * item.learning_cost
+                config.individual_discovery_base_probability
+                    * (1.0 - 0.8 * item.difficulty)
                     * (1.0 - item.uncertainty)
             ).clamp(0.0, 1.0);
             outcome.acquired = rng.bernoulli(discovery_probability);
@@ -549,25 +552,25 @@ mod tests {
                 item_id: 1, lineage_id: 10, task_family: "navigation".into(),
                 true_benefit: 8.0, declared_benefit: 9.0,
                 evidence_reliability: 0.9, uncertainty: 0.1,
-                learning_cost: 2.0, validity: 0.95, transferability: 0.8,
+                learning_cost: 2.0, difficulty: 0.10, validity: 0.95, transferability: 0.8,
             },
             KnowledgeItem {
                 item_id: 2, lineage_id: 10, task_family: "navigation".into(),
                 true_benefit: 2.0, declared_benefit: 10.0,
                 evidence_reliability: 0.25, uncertainty: 0.7,
-                learning_cost: 2.0, validity: 0.4, transferability: 0.3,
+                learning_cost: 2.0, difficulty: 0.80, validity: 0.4, transferability: 0.3,
             },
             KnowledgeItem {
                 item_id: 3, lineage_id: 20, task_family: "navigation".into(),
                 true_benefit: 6.0, declared_benefit: 7.0,
                 evidence_reliability: 0.95, uncertainty: 0.05,
-                learning_cost: 3.0, validity: 0.98, transferability: 0.9,
+                learning_cost: 3.0, difficulty: 0.20, validity: 0.98, transferability: 0.9,
             },
             KnowledgeItem {
                 item_id: 4, lineage_id: 30, task_family: "ecology".into(),
                 true_benefit: 5.0, declared_benefit: 8.0,
                 evidence_reliability: 0.8, uncertainty: 0.2,
-                learning_cost: 4.0, validity: 0.9, transferability: 0.7,
+                learning_cost: 4.0, difficulty: 0.40, validity: 0.9, transferability: 0.7,
             },
         ]
     }
@@ -668,7 +671,7 @@ mod tests {
         let config = TeachingConfig {
             bandwidth_budget: 5.0,
             individual_learning_budget: 5.0,
-            individual_discovery_probability_per_cost: 1.0,
+            individual_discovery_base_probability: 1.0,
             integration_probability: 1.0,
             retention_probability: 1.0,
             ..TeachingConfig::default()
