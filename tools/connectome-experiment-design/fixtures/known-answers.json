@@ -199,5 +199,92 @@
     "expected_rank_by_eig": "within_group_identity",
     "expected_rank_by_evsi": "decision_relevant_group",
     "expected_evsi_regret_if_within_group_selected": 0.3
+  },
+  "parameter_identification_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "model": "local linear-Gaussian observation model",
+    "prior_covariance": [
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "observation_noise_covariance": "identity",
+    "candidates": [
+      {
+        "id": "concentrated",
+        "sensitivities": [
+          [
+            10,
+            0
+          ]
+        ],
+        "expected_fisher_information": [
+          [
+            100,
+            0
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "expected_posterior_covariance": [
+          [
+            0.009900990099009901,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "expected_d_optimal_information_bits": 3.3291057413758973,
+        "expected_a_optimal_trace_reduction": 0.9900990099009901
+      },
+      {
+        "id": "balanced",
+        "sensitivities": [
+          [
+            2,
+            0
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "expected_fisher_information": [
+          [
+            4,
+            0
+          ],
+          [
+            0,
+            4
+          ]
+        ],
+        "expected_posterior_covariance": [
+          [
+            0.2,
+            0
+          ],
+          [
+            0,
+            0.2
+          ]
+        ],
+        "expected_d_optimal_information_bits": 2.321928094887362,
+        "expected_a_optimal_trace_reduction": 1.6
+      }
+    ],
+    "expected_first_by_d_optimal": "concentrated",
+    "expected_first_by_a_optimal": "balanced",
+    "notes": "Closed-form local Gaussian fixture. Candidate sensitivities and noise are stipulated, not estimated from biological observations."
   }
 }
