@@ -919,6 +919,38 @@ mod tests {
         assert_eq!(procedural.accuracy_permille, Some(1_000));
     }
 
+
+    #[test]
+    fn confounded_campaign_matches_frozen_known_answer() {
+        let fixture: serde_json::Value = serde_json::from_str(
+            include_str!("../../../research/spectra-001/fixtures/corpus-known-answer-v0.1.json")
+        ).expect("known-answer fixture JSON");
+        let seed = u64::from_str_radix(
+            fixture["scenarios"][2]["seed_hex"].as_str().expect("confounded seed").trim_start_matches("0x"),
+            16
+        ).expect("valid confounded seed");
+        let campaign = generate_campaign_v1(
+            config(), seed, CampaignWorldV1::Confounded, None
+        ).expect("confounded campaign");
+        assert_eq!(
+            top_rank_accuracy_permille_v1(&campaign.public, &campaign.evaluator_truth).unwrap(),
+            fixture["scenarios"][2]["expected"]["top_rank_accuracy_permille"].as_u64().unwrap() as u16
+        );
+        let model = fit_red_team_v1(&campaign.public).unwrap();
+        let predictions = predict_red_team_v1(&model, &campaign.public).unwrap();
+        let report = score_red_team_v1(
+            &campaign.public, &campaign.evaluator_truth, &predictions,
+            RED_TEAM_THRESHOLD_PERMILLE, RED_TEAM_MINIMUM_PREDICTIONS
+        ).unwrap();
+        let scores: Vec<Option<u16>> = report.channel_scores.iter()
+            .map(|row| row.accuracy_permille).collect();
+        let expected: Vec<Option<u16>> = fixture["scenarios"][2]["expected"]["channel_accuracies_permille"]
+            .as_array().unwrap().iter()
+            .map(|value| value.as_u64().map(|n| n as u16)).collect();
+        assert_eq!(scores, expected);
+        assert_eq!(report.detected_modalities, vec![LeakageModalityV1::Procedural]);
+    }
+
     #[test]
     fn invalid_world_leakage_pairs_are_rejected() {
         assert_eq!(
