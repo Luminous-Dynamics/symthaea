@@ -290,13 +290,14 @@ fn validate_config(config: PlannerConfig) -> Result<(), PlannerError> {
         config.cost_weights.risk,
         config.minimum_information_gain_bits,
     ];
-    if values.iter().any(|value| !value.is_finite() || *value < 0.0)
+    if values
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
         || config.max_time_seconds <= 0.0
         || config.max_energy_joules <= 0.0
         || config.max_risk <= 0.0
         || config.max_risk > 1.0
-        || config.cost_weights.time + config.cost_weights.energy + config.cost_weights.risk
-            <= 0.0
+        || config.cost_weights.time + config.cost_weights.energy + config.cost_weights.risk <= 0.0
     {
         return Err(PlannerError::new(
             PlannerErrorKind::InvalidPlannerConfig,
@@ -317,7 +318,10 @@ fn validate_evidence_catalog<'a>(
                 format!("invalid REA Evidence ID: {}", record.evidence_id),
             ));
         }
-        if catalog.insert(record.evidence_id.as_str(), record).is_some() {
+        if catalog
+            .insert(record.evidence_id.as_str(), record)
+            .is_some()
+        {
             return Err(PlannerError::new(
                 PlannerErrorKind::DuplicateEvidenceId,
                 format!("duplicate Evidence ID: {}", record.evidence_id),
@@ -334,7 +338,10 @@ fn validate_evidence_catalog<'a>(
             if !seen.insert(parent) {
                 return Err(PlannerError::new(
                     PlannerErrorKind::DanglingEvidenceReference,
-                    format!("duplicate parent Evidence ID {parent} in {}", record.evidence_id),
+                    format!(
+                        "duplicate parent Evidence ID {parent} in {}",
+                        record.evidence_id
+                    ),
                 ));
             }
         }
@@ -398,12 +405,8 @@ fn evidence_has_independent_root(
             } else {
                 let mut rooted_parent = false;
                 for parent in &record.parent_evidence_ids {
-                    rooted_parent |= evidence_has_independent_root(
-                        parent,
-                        catalog,
-                        visiting,
-                        memo,
-                    )?;
+                    rooted_parent |=
+                        evidence_has_independent_root(parent, catalog, visiting, memo)?;
                 }
                 rooted_parent
             }
@@ -481,9 +484,7 @@ fn validate_hypotheses<'a>(
                 format!("empty or duplicate hypothesis ID: {}", hypothesis.id),
             ));
         }
-        if !probability_valid(hypothesis.prior_probability)
-            || hypothesis.prior_probability <= 0.0
-        {
+        if !probability_valid(hypothesis.prior_probability) || hypothesis.prior_probability <= 0.0 {
             return Err(PlannerError::new(
                 PlannerErrorKind::InvalidHypothesisDistribution,
                 format!("hypothesis {} must have a prior in (0, 1]", hypothesis.id),
@@ -492,7 +493,10 @@ fn validate_hypotheses<'a>(
         if hypothesis.supporting_evidence_ids.is_empty() {
             return Err(PlannerError::new(
                 PlannerErrorKind::UngroundedHypothesis,
-                format!("hypothesis {} has no supporting Evidence references", hypothesis.id),
+                format!(
+                    "hypothesis {} has no supporting Evidence references",
+                    hypothesis.id
+                ),
             ));
         }
 
@@ -505,7 +509,10 @@ fn validate_hypotheses<'a>(
             if !catalog.contains_key(id.as_str()) {
                 return Err(PlannerError::new(
                     PlannerErrorKind::DanglingEvidenceReference,
-                    format!("hypothesis {} references missing Evidence {id}", hypothesis.id),
+                    format!(
+                        "hypothesis {} references missing Evidence {id}",
+                        hypothesis.id
+                    ),
                 ));
             }
         }
@@ -555,10 +562,7 @@ fn validate_hypotheses<'a>(
     ))
 }
 
-fn rejected(
-    experiment: &ExperimentProposal,
-    reason: RejectionReason,
-) -> RejectedExperiment {
+fn rejected(experiment: &ExperimentProposal, reason: RejectionReason) -> RejectedExperiment {
     RejectedExperiment {
         experiment_id: experiment.id.clone(),
         reasons: vec![reason],
@@ -629,10 +633,7 @@ fn validate_experiment(
             return Err(RejectionReason::InvalidLikelihoods);
         }
     }
-    if hypothesis_ids
-        .iter()
-        .any(|id| !rows.contains_key(id))
-    {
+    if hypothesis_ids.iter().any(|id| !rows.contains_key(id)) {
         return Err(RejectionReason::InvalidLikelihoods);
     }
 
@@ -660,10 +661,7 @@ fn evaluate_experiment(
     for (outcome_index, outcome) in experiment.outcomes.iter().enumerate() {
         let outcome_probability: f64 = hypothesis_ids
             .iter()
-            .map(|id| {
-                priors[id]
-                    * rows[id].outcome_probabilities[outcome_index]
-            })
+            .map(|id| priors[id] * rows[id].outcome_probabilities[outcome_index])
             .sum();
 
         let posterior: Vec<(String, f64)> = hypothesis_ids
@@ -680,8 +678,7 @@ fn evaluate_experiment(
                 )
             })
             .collect();
-        let posterior_entropy =
-            entropy_bits(posterior.iter().map(|(_, probability)| *probability));
+        let posterior_entropy = entropy_bits(posterior.iter().map(|(_, probability)| *probability));
         expected_posterior_entropy += outcome_probability * posterior_entropy;
         predicted_outcomes.push(PredictedOutcome {
             outcome: outcome.clone(),
@@ -691,9 +688,7 @@ fn evaluate_experiment(
     }
 
     let raw_information_gain = prior_entropy - expected_posterior_entropy;
-    let information_gain = if raw_information_gain < 0.0
-        && raw_information_gain > -1.0e-10
-    {
+    let information_gain = if raw_information_gain < 0.0 && raw_information_gain > -1.0e-10 {
         0.0
     } else {
         raw_information_gain.max(0.0)
@@ -730,12 +725,8 @@ pub fn plan_next_experiment(
 ) -> Result<InvestigationPlan, PlannerError> {
     validate_config(config)?;
     let catalog = validate_evidence_catalog(evidence)?;
-    let (
-        priors,
-        grounded_hypothesis_ids,
-        support_evidence_ids,
-        independent_root_evidence_ids,
-    ) = match validate_hypotheses(hypotheses, &catalog) {
+    let (priors, grounded_hypothesis_ids, support_evidence_ids, independent_root_evidence_ids) =
+        match validate_hypotheses(hypotheses, &catalog) {
             Ok(result) => result,
             Err(error) if error.kind == PlannerErrorKind::UngroundedHypothesis => {
                 return Ok(InvestigationPlan {
@@ -751,8 +742,7 @@ pub fn plan_next_experiment(
             Err(error) => return Err(error),
         };
 
-    let prior_entropy =
-        entropy_bits(priors.values().copied().collect::<Vec<_>>().into_iter());
+    let prior_entropy = entropy_bits(priors.values().copied().collect::<Vec<_>>().into_iter());
     let mut seen_experiments = HashSet::new();
     for experiment in experiments {
         if experiment.id.trim().is_empty() || !seen_experiments.insert(experiment.id.as_str()) {
@@ -785,15 +775,8 @@ pub fn plan_next_experiment(
             continue;
         }
 
-        let candidate = evaluate_experiment(
-            experiment,
-            &priors,
-            config,
-            &support_evidence_ids,
-        );
-        if candidate.expected_information_gain_bits
-            <= config.minimum_information_gain_bits
-        {
+        let candidate = evaluate_experiment(experiment, &priors, config, &support_evidence_ids);
+        if candidate.expected_information_gain_bits <= config.minimum_information_gain_bits {
             rejected_experiments.push(rejected(
                 experiment,
                 RejectionReason::NoPredictedInformationGain,
@@ -907,12 +890,7 @@ pub fn measure_observed_information_gain(
                 ),
             ));
         }
-        collect_independent_roots(
-            id,
-            &catalog,
-            &mut independent_root_ids,
-            &mut root_visited,
-        )?;
+        collect_independent_roots(id, &catalog, &mut independent_root_ids, &mut root_visited)?;
     }
 
     let prior_entropy = entropy_bits(prior_map.values().copied());
@@ -1025,7 +1003,11 @@ mod tests {
 
     #[test]
     fn model_generated_and_synthetic_evidence_never_ground_hypotheses() {
-        for origin in [EvidenceOrigin::ModelGenerated, EvidenceOrigin::Synthetic, EvidenceOrigin::ExternalReference] {
+        for origin in [
+            EvidenceOrigin::ModelGenerated,
+            EvidenceOrigin::Synthetic,
+            EvidenceOrigin::ExternalReference,
+        ] {
             let records = vec![EvidenceProvenance {
                 evidence_id: evidence_id('b'),
                 origin,
@@ -1143,13 +1125,9 @@ mod tests {
         over_risk.estimated_risk = 0.9;
         items.push(over_risk);
 
-        let plan = plan_next_experiment(
-            &evidence(),
-            &hypotheses(),
-            &items,
-            PlannerConfig::default(),
-        )
-        .unwrap();
+        let plan =
+            plan_next_experiment(&evidence(), &hypotheses(), &items, PlannerConfig::default())
+                .unwrap();
         assert!(plan.selected.is_none());
         assert_eq!(plan.rejected_experiments.len(), items.len());
         assert!(plan.ranked_experiments.is_empty());
@@ -1186,9 +1164,18 @@ mod tests {
         let mut experiment = discriminating_experiment("three-way");
         experiment.outcomes = vec!["x".to_owned(), "y".to_owned(), "z".to_owned()];
         experiment.likelihoods = vec![
-            LikelihoodRow { hypothesis_id: "a".to_owned(), outcome_probabilities: vec![0.8, 0.1, 0.1] },
-            LikelihoodRow { hypothesis_id: "b".to_owned(), outcome_probabilities: vec![0.1, 0.8, 0.1] },
-            LikelihoodRow { hypothesis_id: "c".to_owned(), outcome_probabilities: vec![0.1, 0.1, 0.8] },
+            LikelihoodRow {
+                hypothesis_id: "a".to_owned(),
+                outcome_probabilities: vec![0.8, 0.1, 0.1],
+            },
+            LikelihoodRow {
+                hypothesis_id: "b".to_owned(),
+                outcome_probabilities: vec![0.1, 0.8, 0.1],
+            },
+            LikelihoodRow {
+                hypothesis_id: "c".to_owned(),
+                outcome_probabilities: vec![0.1, 0.1, 0.8],
+            },
         ];
         let plan = plan_next_experiment(
             &records,
@@ -1254,20 +1241,28 @@ mod tests {
     #[test]
     fn observed_information_gain_requires_independent_evidence() {
         let prior = vec![
-            Probability { hypothesis_id: "cause-a".to_owned(), probability: 0.5 },
-            Probability { hypothesis_id: "cause-b".to_owned(), probability: 0.5 },
+            Probability {
+                hypothesis_id: "cause-a".to_owned(),
+                probability: 0.5,
+            },
+            Probability {
+                hypothesis_id: "cause-b".to_owned(),
+                probability: 0.5,
+            },
         ];
         let posterior = vec![
-            Probability { hypothesis_id: "cause-a".to_owned(), probability: 0.9 },
-            Probability { hypothesis_id: "cause-b".to_owned(), probability: 0.1 },
+            Probability {
+                hypothesis_id: "cause-a".to_owned(),
+                probability: 0.9,
+            },
+            Probability {
+                hypothesis_id: "cause-b".to_owned(),
+                probability: 0.1,
+            },
         ];
-        let measured = measure_observed_information_gain(
-            &evidence(),
-            &prior,
-            &posterior,
-            &[evidence_id('a')],
-        )
-        .unwrap();
+        let measured =
+            measure_observed_information_gain(&evidence(), &prior, &posterior, &[evidence_id('a')])
+                .unwrap();
         assert!((measured.observed_entropy_reduction_bits - 0.5310044064107188).abs() < 1.0e-12);
         assert!(!measured.evidence_provenance_authenticated);
 
@@ -1277,14 +1272,9 @@ mod tests {
             parent_evidence_ids: vec![],
         }];
         assert_eq!(
-            measure_observed_information_gain(
-                &generated,
-                &prior,
-                &posterior,
-                &[evidence_id('c')],
-            )
-            .unwrap_err()
-            .kind,
+            measure_observed_information_gain(&generated, &prior, &posterior, &[evidence_id('c')],)
+                .unwrap_err()
+                .kind,
             PlannerErrorKind::UnqualifiedObservationEvidence
         );
     }
