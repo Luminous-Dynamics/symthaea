@@ -1,0 +1,39 @@
+{
+  "flywire783": {
+    "sha256": "3002ef5fe9d10ab6f5da169e3c6dd21720cfbd2f5e4e46162b123bff2194db81",
+    "version": "FlyWire Codex v783 (2024) build, min_synapses 5",
+    "source": "flywire-codex",
+    "n": 139255,
+    "n_edges": 3732460,
+    "pinned_on": "2026-09-16"
+  },
+  "flywire783_shiu": {
+    "sha256": "fd8ac1e5f042df67b00873826fd2773b475870b40457298d20d0fbe8c86d35d4",
+    "version": "Shiu et al. 2024 Connectivity_783.parquet (philshiu/Drosophila_brain_model), no threshold, Shiu's signs, on the flywire783 neurons and annotations",
+    "source": "shiu2024",
+    "n": 139255,
+    "n_edges": 15091983,
+    "pinned_on": "2026-10-20"
+  },
+  "flywire783_ntfix": {
+    "sha256": "27dc0261253e90a01d385eaf2dde117eb7e9fe339522fbf70754e31b8c0dc0de",
+    "version": "FlyWire Codex v783 (2024) build, min_synapses 5, blank nt_type signed by connection-row majority (RFC D1)",
+    "source": "flywire-codex",
+    "n": 139255,
+    "n_edges": 3732460,
+    "pinned_on": "2026-10-21"
+  },
+  "malecns": {
+    "sha256": "c25b35ab6ecfbff5e6041943d0a8eb2b0d363e1694ee8eb35299778f8824a96a",
+    "version": "MaleCNS v1.0 (neuPrint male-cns:v1.0) build, min_synapses 5",
+    "source": "neuprint male-cns:v1.0",
+    "n": 176422,
+    "n_edges": 6287789,
+    "pinned_on": "2026-09-16"
+  },
+  "toy": {
+    "version": "2026-10-20-valence37",
+    "source": "flybench.toy.build_toy_connectome",
+    "pinned_on": "2026-09-16"
+  }
+}
