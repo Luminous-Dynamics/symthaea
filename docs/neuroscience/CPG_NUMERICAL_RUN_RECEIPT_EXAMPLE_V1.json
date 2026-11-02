@@ -65,7 +65,8 @@
       "applied": false,
       "realized_mean": 0,
       "realized_stddev": 0,
-      "sample_sha256": null
+      "sample_sha256": null,
+      "sample_count": 0
     },
     "weight_noise": {
       "requested_mean": 0,
@@ -73,7 +74,8 @@
       "applied": false,
       "realized_mean": 0,
       "realized_stddev": 0,
-      "sample_sha256": null
+      "sample_sha256": null,
+      "sample_count": 0
     }
   },
   "numerics": {
