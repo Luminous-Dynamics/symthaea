@@ -80,6 +80,7 @@ pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
+pub mod paired_rollout;
 pub mod plugin;
 pub mod reward;
 pub mod road;
@@ -98,6 +99,11 @@ pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
+pub use paired_rollout::{
+    MAX_PAIRED_ROLLOUT_STEPS, VEHICLE_PAIRED_ROLLOUT_SCHEMA, VehiclePairedRolloutConfig,
+    VehiclePairedRolloutError, VehiclePairedRolloutFrame, VehiclePairedRolloutResult,
+    VehicleTrajectoryMetrics, run_paired_lane_keep_rollout,
+};
 pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
 pub use road::{Road, RoadSegment};
 pub use scenario_discovery::{
