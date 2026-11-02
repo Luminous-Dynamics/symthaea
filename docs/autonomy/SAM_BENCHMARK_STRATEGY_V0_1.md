@@ -110,6 +110,23 @@ Random scenario generation is insufficient. Build a search process that delibera
 
 Include multi-fault cases: an occluded pedestrian plus stale localization; black ice plus brake degradation; roadworks plus contradictory map; emergency vehicle plus communication loss; camera saturation plus radar dropout; and a monitor or fallback fault.
 
+## 6. Current technical reference points
+
+NVIDIA's August 4, 2026 technical release reports the following vendor-evaluated results for Alpamayo 2 Super:
+- 6.4-second minADE6 of 0.911 m on 1,434 challenging samples from its Physical AI AV Dataset;
+- a 0.433 score on the Physical AI AV Reasoning Benchmark;
+- 79.2 LingoQA score;
+- AlpaSim score 1.50 ± 0.13 on 913 reconstructed scenes.
+
+These metrics are tied to NVIDIA's own dataset, task definitions and simulator. They are not directly comparable with CARLA Leaderboard, nuPlan or Waymo operational safety metrics. They should be treated as a high-value reproducibility target and a reference for designing a fair ablation, not as a universal SOTA threshold.
+
+The complete Alpamayo 2 Super release is a 34B reasoning VLA stack. Its associated ecosystem includes AlpaGym for closed-loop RL and Cosmos-Dreams for scenario generation. For Luminous, separate resource-matched tracks are essential: a compact / embedded track and a large-model / server track. Never compare an 8 GB embedded GPU controller against a multi-GPU 34B setup without reporting the hardware and inference budgets explicitly.
+
+References:
+- https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super
+- https://developer.nvidia.com/drive/downloads
+- https://nvidianews.nvidia.com/news/nvidia-alpamayo-2-super-robotaxis
+
 ## 6A. Operational safety evidence: a realistic comparator
 
 Waymo's public Safety Impact dashboard reports 271.3 million rider-only miles through June 2026 across five operating geographies, with location-adjusted human benchmark comparisons. The dashboard reports 0.67 injury-reported crashes per million rider-only miles versus 3.77 per million benchmark miles, and 0.01 serious-injury-or-worse crashes per million rider-only miles versus 0.21 per million benchmark miles. Waymo's September 24, 2026 publication describes these as 82% fewer injury-causing crashes and 95% fewer serious-injury-or-worse crashes than its human benchmarks.
