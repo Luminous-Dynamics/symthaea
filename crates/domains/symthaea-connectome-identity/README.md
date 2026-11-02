@@ -14,7 +14,7 @@ This crate validates that:
 - returned identity mappings are immutable through the public API;
 - duplicate, missing, extra, unknown or conflicting identities fail closed.
 
-It emits two SHA-256 commitments: a canonical identity commitment invariant to source ordering, and a source-binding commitment that binds the exact row, column and annotation order.
+It emits two separate SHA-256 commitments: a semantic canonical identity commitment over dataset/release/taxon/life-stage, mapping protocol, orientation and sorted stable IDs; and an exact source-binding commitment that additionally binds raw matrix/annotation payload digests and the original row, column and annotation order. Reordered exports can therefore retain the same semantic identity digest while producing a different source-binding digest.
 
 The source-artifact digest strings are computed by the intake layer. This crate checks digest syntax and binds the references; it does not fetch or authenticate source bytes or inspect matrix numerical values.
 
