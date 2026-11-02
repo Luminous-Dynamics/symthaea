@@ -109,6 +109,25 @@ pub struct LearnerProfile {
 }
 
 impl LearnerProfile {
+    fn validate(&self, items: &[KnowledgeItem]) -> Result<(), TeachingError> {
+        if self.task_family.trim().is_empty() {
+            return Err(TeachingError::EmptyLearnerTaskFamily);
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for (item_id, fit) in &self.context_fit_by_item {
+            if !seen.insert(*item_id) {
+                return Err(TeachingError::DuplicateContextFit { item_id: *item_id });
+            }
+            if !fit.is_finite() || !(0.0..=1.0).contains(fit) {
+                return Err(TeachingError::InvalidContextFit { item_id: *item_id });
+            }
+            if !items.iter().any(|item| item.item_id == *item_id) {
+                return Err(TeachingError::UnknownContextFitItem { item_id: *item_id });
+            }
+        }
+        Ok(())
+    }
+
     fn context_fit(&self, item_id: u64) -> f64 {
         self.context_fit_by_item.iter()
             .find(|(id, _)| *id == item_id)
@@ -181,6 +200,9 @@ pub enum TeachingError {
     InvalidNoveltyWeight,
     DuplicateItemId { item_id: u64 },
     EmptyLearnerTaskFamily,
+    DuplicateContextFit { item_id: u64 },
+    InvalidContextFit { item_id: u64 },
+    UnknownContextFitItem { item_id: u64 },
 }
 
 impl fmt::Display for TeachingError {
@@ -196,6 +218,9 @@ impl fmt::Display for TeachingError {
             Self::InvalidNoveltyWeight => write!(f, "novelty weight must be finite and in [0,1]"),
             Self::DuplicateItemId { item_id } => write!(f, "duplicate knowledge item id {item_id}"),
             Self::EmptyLearnerTaskFamily => write!(f, "learner task family must be non-empty"),
+            Self::DuplicateContextFit { item_id } => write!(f, "duplicate learner context-fit entry for item {item_id}"),
+            Self::InvalidContextFit { item_id } => write!(f, "learner context fit for item {item_id} must be finite and in [0,1]"),
+            Self::UnknownContextFitItem { item_id } => write!(f, "learner context fit references unknown item {item_id}"),
         }
     }
 }
@@ -296,6 +321,17 @@ fn score_item(
     }
 }
 
+fn validate_item_set(items: &[KnowledgeItem]) -> Result<(), TeachingError> {
+    let mut seen = std::collections::BTreeSet::new();
+    for item in items {
+        item.validate()?;
+        if !seen.insert(item.item_id) {
+            return Err(TeachingError::DuplicateItemId { item_id: item.item_id });
+        }
+    }
+    Ok(())
+}
+
 /// Select an ordered packet that fits the teacher's bandwidth. The policy
 /// only reads declared metadata; evaluator-only true benefit/validity are
 /// intentionally excluded from this function.
@@ -306,23 +342,14 @@ pub fn select_teaching_packet(
     bandwidth_budget: f64,
     seed: u64,
 ) -> Result<Vec<usize>, TeachingError> {
-    if learner.task_family.trim().is_empty() {
-        return Err(TeachingError::EmptyLearnerTaskFamily);
-    }
+    learner.validate(items)?;
+    validate_item_set(items)?;
     if !bandwidth_budget.is_finite() || bandwidth_budget < 0.0 {
         return Err(TeachingError::InvalidBudget);
     }
     if let TeachingPolicy::DiversityAware { novelty_weight } = policy {
         if !novelty_weight.is_finite() || !(0.0..=1.0).contains(&novelty_weight) {
             return Err(TeachingError::InvalidNoveltyWeight);
-        }
-    }
-
-    let mut seen = std::collections::BTreeSet::new();
-    for item in items {
-        item.validate()?;
-        if !seen.insert(item.item_id) {
-            return Err(TeachingError::DuplicateItemId { item_id: item.item_id });
         }
     }
 
@@ -457,9 +484,8 @@ pub fn run_teaching_episode(
     seed: u64,
 ) -> Result<TeachingEpisode, TeachingError> {
     config.validate()?;
-    if learner.task_family.trim().is_empty() {
-        return Err(TeachingError::EmptyLearnerTaskFamily);
-    }
+    learner.validate(items)?;
+    validate_item_set(items)?;
     let budget = match mode {
         LearningMode::Social { .. } => config.bandwidth_budget,
         LearningMode::IndividualOnly => config.individual_learning_budget,
@@ -697,6 +723,35 @@ mod tests {
         assert!(episode.items.iter().all(|item| !item.selected_for_transmission));
         assert_eq!(episode.observed_count, 0);
         assert!(episode.total_learning_cost <= config.individual_learning_budget);
+    }
+
+    #[test]
+    fn individual_only_path_rejects_duplicate_ids_and_invalid_context_fit() {
+        let mut duplicate = items();
+        duplicate[1].item_id = duplicate[0].item_id;
+        assert_eq!(
+            run_teaching_episode(
+                &duplicate,
+                &learner(),
+                LearningMode::IndividualOnly,
+                TeachingConfig::default(),
+                1,
+            ),
+            Err(TeachingError::DuplicateItemId { item_id: duplicate[0].item_id })
+        );
+
+        let mut invalid_learner = learner();
+        invalid_learner.context_fit_by_item[0].1 = f64::NAN;
+        assert_eq!(
+            run_teaching_episode(
+                &items(),
+                &invalid_learner,
+                LearningMode::IndividualOnly,
+                TeachingConfig::default(),
+                1,
+            ),
+            Err(TeachingError::InvalidContextFit { item_id: invalid_learner.context_fit_by_item[0].0 })
+        );
     }
 
     #[test]
