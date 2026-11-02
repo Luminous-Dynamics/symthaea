@@ -180,6 +180,8 @@ pub struct RankedExperiment {
     pub utility: f64,
     pub predicted_outcomes: Vec<PredictedOutcome>,
     pub support_evidence_ids: Vec<String>,
+    /// Terminal independent observations supporting those records.
+    pub independent_root_evidence_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -242,6 +244,7 @@ pub struct MeasuredInformationGain {
     /// May be negative when the caller-supplied posterior has greater entropy.
     pub observed_entropy_reduction_bits: f64,
     pub observation_evidence_ids: Vec<String>,
+    pub independent_root_evidence_ids: Vec<String>,
     pub evidence_provenance_authenticated: bool,
 }
 
@@ -415,18 +418,59 @@ fn evidence_has_independent_root(
     Ok(result)
 }
 
+fn collect_independent_roots(
+    id: &str,
+    catalog: &HashMap<&str, &EvidenceProvenance>,
+    roots: &mut BTreeSet<String>,
+    visited: &mut HashSet<String>,
+) -> Result<(), PlannerError> {
+    if !visited.insert(id.to_owned()) {
+        return Ok(());
+    }
+    let record = catalog.get(id).ok_or_else(|| {
+        PlannerError::new(
+            PlannerErrorKind::DanglingEvidenceReference,
+            format!("missing Evidence record {id}"),
+        )
+    })?;
+    match record.origin {
+        EvidenceOrigin::IndependentObservation => {
+            roots.insert(id.to_owned());
+        }
+        EvidenceOrigin::IndependentDerivation => {
+            for parent in &record.parent_evidence_ids {
+                collect_independent_roots(parent, catalog, roots, visited)?;
+            }
+        }
+        EvidenceOrigin::ModelGenerated
+        | EvidenceOrigin::Synthetic
+        | EvidenceOrigin::ExternalReference => {}
+    }
+    Ok(())
+}
+
 fn validate_hypotheses<'a>(
     hypotheses: &'a [Hypothesis],
     catalog: &HashMap<&str, &EvidenceProvenance>,
-) -> Result<(BTreeMap<&'a str, f64>, Vec<String>, Vec<String>), PlannerError> {
+) -> Result<
+    (
+        BTreeMap<&'a str, f64>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+    ),
+    PlannerError,
+> {
     if hypotheses.is_empty() {
-        return Ok((BTreeMap::new(), Vec::new(), Vec::new()));
+        return Ok((BTreeMap::new(), Vec::new(), Vec::new(), Vec::new()));
     }
 
     let mut priors = BTreeMap::new();
     let mut total = 0.0;
     let mut grounded_ids = Vec::with_capacity(hypotheses.len());
     let mut qualified_support_ids = BTreeSet::new();
+    let mut independent_root_ids = BTreeSet::new();
+    let mut root_visited = HashSet::new();
     let mut visiting = HashSet::new();
     let mut memo = HashMap::new();
 
@@ -472,6 +516,12 @@ fn validate_hypotheses<'a>(
             has_independent_root |= independently_rooted;
             if independently_rooted {
                 qualified_support_ids.insert(id.clone());
+                collect_independent_roots(
+                    id,
+                    catalog,
+                    &mut independent_root_ids,
+                    &mut root_visited,
+                )?;
             }
         }
         if !has_independent_root {
@@ -497,7 +547,12 @@ fn validate_hypotheses<'a>(
     }
 
     grounded_ids.sort();
-    Ok((priors, grounded_ids, qualified_support_ids.into_iter().collect()))
+    Ok((
+        priors,
+        grounded_ids,
+        qualified_support_ids.into_iter().collect(),
+        independent_root_ids.into_iter().collect(),
+    ))
 }
 
 fn rejected(
@@ -589,6 +644,7 @@ fn evaluate_experiment(
     priors: &BTreeMap<&str, f64>,
     config: PlannerConfig,
     support_evidence_ids: &[String],
+    independent_root_evidence_ids: &[String],
 ) -> RankedExperiment {
     let hypothesis_ids: Vec<&str> = priors.keys().copied().collect();
     let prior_entropy = entropy_bits(priors.values().copied().collect::<Vec<_>>().into_iter());
@@ -657,6 +713,7 @@ fn evaluate_experiment(
         utility,
         predicted_outcomes,
         support_evidence_ids: support_evidence_ids.to_vec(),
+        independent_root_evidence_ids: independent_root_evidence_ids.to_vec(),
     }
 }
 
@@ -673,8 +730,12 @@ pub fn plan_next_experiment(
 ) -> Result<InvestigationPlan, PlannerError> {
     validate_config(config)?;
     let catalog = validate_evidence_catalog(evidence)?;
-    let (priors, grounded_hypothesis_ids, support_evidence_ids) =
-        match validate_hypotheses(hypotheses, &catalog) {
+    let (
+        priors,
+        grounded_hypothesis_ids,
+        support_evidence_ids,
+        independent_root_evidence_ids,
+    ) = match validate_hypotheses(hypotheses, &catalog) {
             Ok(result) => result,
             Err(error) if error.kind == PlannerErrorKind::UngroundedHypothesis => {
                 return Ok(InvestigationPlan {
@@ -833,6 +894,8 @@ pub fn measure_observed_information_gain(
 
     let mut visiting = HashSet::new();
     let mut memo = HashMap::new();
+    let mut independent_root_ids = BTreeSet::new();
+    let mut root_visited = HashSet::new();
     for id in observation_evidence_ids {
         if !catalog.contains_key(id.as_str())
             || !evidence_has_independent_root(id, &catalog, &mut visiting, &mut memo)?
@@ -844,6 +907,12 @@ pub fn measure_observed_information_gain(
                 ),
             ));
         }
+        collect_independent_roots(
+            id,
+            &catalog,
+            &mut independent_root_ids,
+            &mut root_visited,
+        )?;
     }
 
     let prior_entropy = entropy_bits(prior_map.values().copied());
@@ -853,6 +922,7 @@ pub fn measure_observed_information_gain(
         posterior_entropy_bits: posterior_entropy,
         observed_entropy_reduction_bits: prior_entropy - posterior_entropy,
         observation_evidence_ids: observation_evidence_ids.to_vec(),
+        independent_root_evidence_ids: independent_root_ids.into_iter().collect(),
         evidence_provenance_authenticated: false,
     })
 }
