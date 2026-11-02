@@ -48,6 +48,31 @@ fn verify_display_only_mutation(
     );
 }
 
+fn verify_semantic_preserving_mutation(
+    directory: &Path,
+    file: &str,
+    expected_id: &str,
+    expected_raw_sha256: &str,
+) {
+    let bytes = fixture_file(directory, file);
+    assert_eq!(sha256_hex(&bytes), expected_raw_sha256);
+    let verified = verify_evidence_json(&bytes)
+        .unwrap_or_else(|error| panic!("semantics-preserving mutation was rejected: {error}"));
+    assert_eq!(verified.evidence_id, expected_id);
+}
+
+fn verify_stricter_importer_case(directory: &Path, fixture: &Value) {
+    assert_eq!(fixture["upstream_object_parse_accepted"], Value::Bool(true));
+    let bytes = fixture_file(directory, fixture["file"].as_str().unwrap());
+    assert_eq!(
+        sha256_hex(&bytes),
+        fixture["raw_file_sha256"].as_str().unwrap()
+    );
+    let error = verify_evidence_json(&bytes)
+        .expect_err("isolated UTF-16 surrogate must be an explicit raw-import rejection");
+    assert_eq!(error.kind, EvidenceErrorKind::InvalidJson);
+}
+
 fn verify_negative_control(
     directory: &Path,
     fixture: &Value,
@@ -105,10 +130,10 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         "v22.23.4",
         "the upstream producer runtime must match the pinned CI runtime"
     );
-    assert_eq!(
-        manifest["producer"]["npm_version"],
-        "11.16.0"
-    );
+    assert_eq!(manifest["producer"]["npm_version"], "11.16.0");
+    assert_eq!(manifest["producer"]["package_version"], "6.8.0");
+    assert_eq!(receipt["producer"], manifest["producer"]);
+    assert_eq!(receipt["generator"], manifest["generator"]);
 
     let fixtures = manifest["fixtures"]
         .as_array()
@@ -192,14 +217,35 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         );
     }
 
+    let key_order_mutations = manifest["key_order_mutations"]
+        .as_array()
+        .expect("key-order mutation array");
+    assert_eq!(key_order_mutations.len(), fixtures.len());
+    for mutation in key_order_mutations {
+        verify_semantic_preserving_mutation(
+            &directory,
+            mutation["file"].as_str().unwrap(),
+            mutation["expected_evidence_id"].as_str().unwrap(),
+            mutation["raw_file_sha256"].as_str().unwrap(),
+        );
+    }
+
     let negative_controls = manifest["negative_controls"]
         .as_array()
         .expect("negative controls array");
     assert!(
-        negative_controls.len() >= 4,
+        negative_controls.len() >= 6,
         "upstream rejected negative-control corpus is required"
     );
     for negative in negative_controls {
         verify_negative_control(&directory, negative);
+    }
+
+    let stricter_importer_cases = manifest["stricter_importer_cases"]
+        .as_array()
+        .expect("stricter importer case array");
+    assert_eq!(stricter_importer_cases.len(), 1);
+    for stricter in stricter_importer_cases {
+        verify_stricter_importer_case(&directory, stricter);
     }
 }
