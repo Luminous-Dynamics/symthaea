@@ -672,3 +672,120 @@ The analyzer revalidates the base causal study, transfer-study identity and per-
 
 The bounds are conservative partial-identification intervals under the binary per-item treatment-effect definition. They do not repair wrong labels among accepted candidates, prove reviewers are independent, authenticate evaluator custody, identify why examples were disputed, eliminate global model interference, or prove transfer outside the registered benchmark. A wide interval is an honest statement that the evidence is insufficient—not a failure to be concealed.
 
+## Detector fragility and contamination-signal concealment (SCI-DETECTOR-FRAGILITY-001)
+
+Tracking: Issue #9956 — https://github.com/Luminous-Dynamics/symthaea/issues/9956
+
+### Motivation
+
+The ICLR 2026 study “On the Fragility of Benchmark Contamination Detection in Reasoning Models” reports a lifecycle failure: SFT contamination can be detectable before RL, but additional GRPO on clean data can reduce detector AUROC while benchmark performance inflation remains. The paper reports 7.14 percentage points of average pass@1 inflation across six benchmarks after clean GRPO. Its final CoT SFT contamination stage on advanced LRMs also pushes several detector results toward chance.
+
+Paper: https://proceedings.iclr.cc/paper_files/paper/2026/hash/a3860475ddbfb8c644c43f0dcd266b66-Abstract-Conference.html
+
+These are paper-reported results in the authors' setup, not universal laws or Symthaea results. This module makes the concealment hypothesis independently testable.
+
+### Paradigm shift
+
+A detector is not lifecycle-robust merely because it separates members and non-members immediately after exposure. We must test whether the detector remains informative after training transformations that preserve performance uplift.
+
+The benchmark measures two separate effects:
+1. Detector-signal retention: how much pre-intervention member/non-member separability remains.
+2. Member-performance-inflation retention: how much of the contaminated model's performance advantage over a matched clean-control model remains.
+
+The concealment gap is the difference between those retention measures. It is a descriptive failure-mode diagnostic, not a standalone ranking or proof of intent.
+
+### Ten checkpoint stages
+
+Every independent training replicate contains all ten checkpoint stages, with the same candidate IDs, calibration/test assignment and randomized member labels:
+
+- sft_clean and sft_contaminated;
+- sft_clean_then_grpo_clean and sft_contaminated_then_grpo_clean;
+- sft_clean_then_raft and sft_contaminated_then_raft;
+- sft_clean_then_raft_plus_plus and sft_contaminated_then_raft_plus_plus;
+- advanced_lrm_clean and advanced_lrm_cot_contaminated.
+
+The three paired transitions separate clean-GRPO concealment from plain rejection sampling and importance-sampling/clipping controls. The last pair tests final-stage CoT SFT contamination on an already advanced reasoning model. Reward-only RL contamination remains distinct in the broader randomized study and must not be conflated with SFT contamination.
+
+Matched treatment/control arms must have identical optimizer-step budgets and objective-config digests. Every checkpoint binds its parent checkpoint, training receipt, training configuration, objective configuration and training-data manifest. Checkpoint lineage is checked against the registered stage graph.
+
+### Detector metrics
+
+The same detector definitions and score directions are applied to all checkpoints. Every item must carry one finite score from every detector; missing scores are not silently dropped.
+
+- Rank-based AUROC and grouped-threshold AUPRC on the held-out test split.
+- Each detector threshold is selected using calibration non-members only.
+- The selected threshold is evaluated on untouched test members/non-members at the preregistered fixed FPR.
+- The report includes test TPR/FPR and Wilson 95% intervals, not just ROC interpolation.
+- Detector specification SHA-256 digests bind score semantics across stages and training-pair replicates.
+
+The default low-FPR design uses a 1% target (target_fpr_permille=10) and minimums of 300 calibration non-members, 300 held-out test non-members and 100 held-out test members. These are minimum resolution floors, not a power guarantee. Wilson intervals are used in v1; they are not exact Clopper-Pearson intervals.
+
+### Derived measures
+
+For detector AUROC before/after a concealment intervention:
+
+    detector_signal_retention = 1000 * (AUC_after - 0.5) / (AUC_before - 0.5)
+
+This is undefined when pre-intervention AUC is at or below 0.5. Negative or above-1000 values are not clipped because they may indicate signal reversal or increased separability.
+
+For member performance relative to matched clean controls:
+
+    inflation_before = member_accuracy(contaminated_pre) - member_accuracy(clean_pre)
+    inflation_after  = member_accuracy(contaminated_post) - member_accuracy(clean_post)
+    inflation_retention = 1000 * inflation_after / inflation_before
+
+Inflation retention is undefined when pre-intervention uplift is not positive.
+
+The derived diagnostic is:
+
+    concealment_gap = inflation_retention - detector_signal_retention
+
+A large positive gap indicates that performance inflation persists while a detector's discriminative signal degrades. Always report AUROC, fixed-FPR rates, performance uplift and both retention components separately. Do not interpret the gap alone.
+
+### Independent uncertainty
+
+The independent model-pair training replicate is the uncertainty unit. Questions, detector calls, generated responses and repeated scoring are nested. v1 computes Student-t 95% intervals across independent model-pair retention/inflation observations and marks them unadjusted across detectors, interventions and domains. Confirmatory studies need preregistered power simulation and a multiplicity plan.
+
+### Rust implementation and CLI
+
+The module src/fragility.rs implements:
+- strict ten-stage, four-comparison design;
+- checkpoint lineage and paired-objective checks;
+- detector-ID, score-direction and detector-spec digest binding;
+- exact item-ID, randomized member-label and calibration/test split matching across stages and model pairs;
+- rank/tie-corrected AUROC, grouped-threshold average precision, calibration-selected thresholds and held-out Wilson intervals;
+- member performance uplift, non-member generalization delta, detector-signal retention, inflation retention and concealment gap;
+- per-pair reports and cross-pair Student-t aggregate intervals;
+- explicit unadjusted, unauthenticated and non-confirmatory claim boundaries.
+
+CLI:
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-detector-fragility detector-fragility-study.json detector-fragility-report.json
+
+The CLI uses a bounded 512 MiB streaming read. Schemas are in schema/detector-fragility-study.schema.json and schema/detector-fragility-report.schema.json; the frozen stage/estimand registry is fixtures/detector-fragility-protocol.v1.json.
+
+### Industry comparison
+
+Inspect AI provides reusable model/task/solver/scorer execution, custom scoring and clustered metrics. EleutherAI lm-evaluation-harness provides a broad standard task runner and n-gram decontamination utilities. Symthaea should adapt to those runners instead of rebuilding generic execution layers.
+
+The contribution here is the benchmark-specific experimental layer: randomized exposure, paired training checkpoints, concealment interventions, calibration/test separation, performance-uplift retention and claim boundaries. This complements existing execution engines rather than replacing them.
+
+References:
+- Inspect scoring and clustered metrics: https://inspect.aisi.org.uk/scoring.html
+- lm-evaluation-harness decontamination: https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/decontamination.md
+
+### Qualification targets (not achieved results)
+
+- At least 20 independent paired training replicates for a multi-family confirmatory study, with final count power-selected from pair-level variance.
+- At least 300 independent calibration and test non-members per preregistered 1%-FPR stratum as an initial floor; increase for nonzero false positives, multiplicity and domain heterogeneity.
+- 100% of the ten stage checkpoints per pair with valid parentage and receipts.
+- 100% identical item, split, membership, detector ID/spec/direction contracts across stages and paired replicates.
+- Zero missing detector scores or silent evaluation-item exclusions.
+- Report every detector before and after every concealment intervention on mathematics, science, coding, general QA, logic, tool use and multimodal tasks.
+- No pooled-only conclusion when model-family or domain-specific results disagree.
+
+### Claim ceiling
+
+The analyzer measures detectability after declared training interventions. It does not prove that a checkpoint never saw data during pretraining, authenticate a training receipt or prove a trainer consumed the declared corpus, infer developer intent, or establish universal detector failure. Wilson intervals are not exact binomial intervals. No multiplicity-adjusted confirmatory claim or SOTA superiority claim is emitted in v1.
+
