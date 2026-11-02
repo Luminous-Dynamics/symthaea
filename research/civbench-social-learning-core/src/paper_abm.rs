@@ -3,23 +3,18 @@
 
 #![forbid(unsafe_code)]
 
-//! Reference implementation of the published Reward Network III paper's
-//! *separate exploratory agent-based model*.
+//! Simplified strategy-adoption reference model for CivBench sensitivity tests.
 //!
-//! This module is intentionally distinct from:
-//! - the five-generation/eight-player human experiment;
-//! - the Reward Network graph task engine;
-//! - the simplified `cultural_evolution` reference model.
+//! This model is deliberately **not** the Reward Network III paper's archived
+//! exploratory ABM. It uses a compact strategy abstraction and source-informed
+//! parameters to test broad discovery/transmission mechanisms. The archived
+//! notebook semantic port lives in reward_network_abm_reference.rs and must be
+//! used for paper-aligned experiments.
 //!
-//! Reported paper settings: 50 replications, 20 generations, 20 agents per
-//! generation, and five machine agents in the seed generation. The model uses
-//! abstract optimal/myopic/null strategies, not the 12-node task itself.
-//!
-//! This is a paper-described reference implementation, not a claim of exact
-//! reproduction of the archived supplementary implementation. The exact
-//! parameter grids, candidate sampling and update details must be checked
-//! against Zenodo v2.0 and its supplementary information before reporting a
-//! reproduction result.
+//! Keeping this module separate is intentional: this simpler model has useful
+//! counterfactual controls (e.g. explicit acquisition/integration/corruption)
+//! that are not part of the archived notebook implementation. Never compare
+//! its outputs as though they were author ABM reproduction results.
 
 use core::fmt;
 
