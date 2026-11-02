@@ -361,6 +361,8 @@ pub struct AlgebraCapabilities {
     pub exact_scalar_embedding: bool,
     pub final_coefficients_nonnegative: bool,
     pub coefficient_bound_proven: bool,
+    /// The local objective factors have an exact additive score embedding.
+    pub local_scalarization_verified: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -369,6 +371,42 @@ pub enum ExactAlgorithm {
     SharedMeasurementInterpolation,
     SignedNetworkSum,
     CarryFreeScalarization,
+}
+
+/// The semantic answer requested by a caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutputContract {
+    Feasibility,
+    ExactCount,
+    WeightedPartitionFunction,
+    OptimumWithMultiplicity,
+    FixedLexicographicOptimumWithMultiplicity,
+    FullObjectiveProfile,
+    ParetoFrontierWithMultiplicity,
+}
+
+/// Default coefficient algebra selected for an output contract. The final
+/// algorithm choice is still constrained by the algebra compatibility gate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SuggestedAlgebra {
+    Boolean,
+    NaturalCount,
+    CommutativeQAlgebra,
+    MaxCount,
+    WeightProfile,
+    ParetoCount,
+}
+
+pub fn suggested_algebra(contract: OutputContract) -> SuggestedAlgebra {
+    match contract {
+        OutputContract::Feasibility => SuggestedAlgebra::Boolean,
+        OutputContract::ExactCount => SuggestedAlgebra::NaturalCount,
+        OutputContract::WeightedPartitionFunction => SuggestedAlgebra::CommutativeQAlgebra,
+        OutputContract::OptimumWithMultiplicity => SuggestedAlgebra::MaxCount,
+        OutputContract::FixedLexicographicOptimumWithMultiplicity => SuggestedAlgebra::MaxCount,
+        OutputContract::FullObjectiveProfile => SuggestedAlgebra::WeightProfile,
+        OutputContract::ParetoFrontierWithMultiplicity => SuggestedAlgebra::ParetoCount,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -380,6 +418,7 @@ pub enum CompatibilityError {
     ExactScalarEmbeddingRequired,
     NonnegativeFinalCoefficientsRequired,
     ProvenCoefficientBoundRequired,
+    LocalScalarizationNotVerified,
 }
 
 impl fmt::Display for CompatibilityError {
@@ -392,6 +431,7 @@ impl fmt::Display for CompatibilityError {
             Self::ExactScalarEmbeddingRequired => write!(f, "algorithm requires an exact ordered scalar embedding"),
             Self::NonnegativeFinalCoefficientsRequired => write!(f, "algorithm requires nonnegative final profile coefficients"),
             Self::ProvenCoefficientBoundRequired => write!(f, "algorithm requires a proved coefficient upper bound"),
+            Self::LocalScalarizationNotVerified => write!(f, "algorithm requires a verified factor-to-scalar homomorphism"),
         }
     }
 }
@@ -416,6 +456,9 @@ pub fn check_algorithm_compatibility(
             Ok(())
         }
         ExactAlgorithm::SharedMeasurementInterpolation => {
+            if !algebra.semiring_operations {
+                return Err(CompatibilityError::SemiringRequired);
+            }
             if !algebra.commutative_multiplication {
                 return Err(CompatibilityError::CommutativeMultiplicationRequired);
             }
@@ -428,6 +471,9 @@ pub fn check_algorithm_compatibility(
             Ok(())
         }
         ExactAlgorithm::SignedNetworkSum => {
+            if !algebra.semiring_operations {
+                return Err(CompatibilityError::SemiringRequired);
+            }
             if !algebra.commutative_multiplication {
                 return Err(CompatibilityError::CommutativeMultiplicationRequired);
             }
@@ -445,6 +491,9 @@ pub fn check_algorithm_compatibility(
             }
             if !algebra.coefficient_bound_proven {
                 return Err(CompatibilityError::ProvenCoefficientBoundRequired);
+            }
+            if !algebra.local_scalarization_verified {
+                return Err(CompatibilityError::LocalScalarizationNotVerified);
             }
             Ok(())
         }
@@ -582,6 +631,15 @@ mod tests {
 
 
     #[test]
+    fn output_contract_selects_an_algebra_with_the_same_semantics() {
+        assert_eq!(suggested_algebra(OutputContract::Feasibility), SuggestedAlgebra::Boolean);
+        assert_eq!(suggested_algebra(OutputContract::ExactCount), SuggestedAlgebra::NaturalCount);
+        assert_eq!(suggested_algebra(OutputContract::OptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
+        assert_eq!(suggested_algebra(OutputContract::FullObjectiveProfile), SuggestedAlgebra::WeightProfile);
+        assert_eq!(suggested_algebra(OutputContract::ParetoFrontierWithMultiplicity), SuggestedAlgebra::ParetoCount);
+    }
+
+    #[test]
     fn planner_rejects_interpolation_over_max_count_but_allows_variable_elimination() {
         let max_count = AlgebraCapabilities {
             semiring_operations: true,
@@ -591,6 +649,7 @@ mod tests {
             exact_scalar_embedding: false,
             final_coefficients_nonnegative: false,
             coefficient_bound_proven: false,
+            local_scalarization_verified: false,
         };
         assert_eq!(
             check_algorithm_compatibility(ExactAlgorithm::BucketVariableElimination, max_count),
@@ -616,6 +675,7 @@ mod tests {
             exact_scalar_embedding: true,
             final_coefficients_nonnegative: true,
             coefficient_bound_proven: true,
+            local_scalarization_verified: true,
         };
         assert_eq!(
             check_algorithm_compatibility(ExactAlgorithm::SignedNetworkSum, integer_profile_ring),
