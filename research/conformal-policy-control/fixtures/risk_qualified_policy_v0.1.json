@@ -102,6 +102,10 @@
     {
       "numerator": 10,
       "denominator": 1
+    },
+    {
+      "numerator": 40,
+      "denominator": 1
     }
   ],
   "calibration_samples": [
