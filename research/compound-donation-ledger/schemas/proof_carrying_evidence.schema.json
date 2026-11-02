@@ -11,6 +11,15 @@
       "type": "array",
       "prefixItems": [
         { "type": "integer", "minimum": 1 },
+        { "type": "integer", "minimum": 1 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "probabilityPair": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "minimum": 1 },
         { "type": "integer", "minimum": 2 }
       ],
       "minItems": 2,
@@ -21,8 +30,8 @@
       "required": ["id", "p0", "p1", "arrival_round"],
       "properties": {
         "id": { "type": "integer", "minimum": 0 },
-        "p0": { "$ref": "#/$defs/rationalPair" },
-        "p1": { "$ref": "#/$defs/rationalPair" },
+        "p0": { "$ref": "#/$defs/probabilityPair" },
+        "p1": { "$ref": "#/$defs/probabilityPair" },
         "arrival_round": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
