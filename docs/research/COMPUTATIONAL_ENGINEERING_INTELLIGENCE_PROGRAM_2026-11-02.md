@@ -499,3 +499,14 @@ Sources:
 - [SWE-Bench Pro V2 leaderboard and September 22 methodology](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), accessed 2026-11-02.
 - [SWE-rebench leaderboard](https://swe-rebench.com/), selected dashboard window 2026-05-15 through 2026-07-01, accessed 2026-11-02.
 - [SWE-rebench V2 dataset collection](https://huggingface.co/collections/nebius/swe-rebench-v2), viewer updated 2026-10-01.
+
+
+## 16. Repository-twin benchmark commitment
+
+The CEB catalog now includes design-only task **CEB-REPO-001** in the `repository_intelligence` lane. This closes a measurement gap: the repository twin is a core architectural differentiator, but it must be evaluated independently of patch-generation success.
+
+The task requires a typed multi-crate Rust graph, exact source/provenance spans, separation of syntax-derived from compiler-resolved facts, change-impact prediction, and comparison of incremental invalidation against full rebuild after a deterministic edit sequence. The initial fixture is static-only and must not execute repository build scripts or tests.
+
+Proposed targets (not achieved): syntax node/edge precision and recall ≥0.95; supported compiler-resolved relationship precision and recall ≥0.90; change-impact recall ≥0.95 and precision ≥0.80; zero stale facts after a completed invalidation cycle; zero cases where syntax-only facts are labelled compiler-resolved. The gold-set and fixture design are tracked by [issue #10173](https://github.com/Luminous-Dynamics/symthaea/issues/10173).
+
+The CEB catalog now contains ten design-only tasks. The receipt workflow is authored but not run; all schema and task artifacts remain unqualified. The CEB branch is [draft PR #10115](https://github.com/Luminous-Dynamics/symthaea/pull/10115).
