@@ -661,10 +661,21 @@ fn validate_observation_envelope(
     }
 
     for operation in &observation.observed_operations {
-        let events = events_by_operation
+        let mut events = events_by_operation
             .get(&operation.op_id)
             .cloned()
             .unwrap_or_default();
+        events.sort_by_key(|event| event.runner_sequence);
+        for event in &events {
+            if event.monotonic_ns < operation.invoked_at_ns
+                || operation.completed_at_ns.is_some_and(|completed| event.monotonic_ns > completed)
+            {
+                errors.push(format!(
+                    "event {} falls outside operation {} interval",
+                    event.event_id, operation.op_id
+                ));
+            }
+        }
         let invocations: Vec<_> = events
             .iter()
             .filter(|event| event.phase == "invoke")
@@ -768,6 +779,24 @@ fn validate_observation_envelope(
                         ));
                     }
                 }
+
+                let phase_positions = |phase: &str| {
+                    transaction_events
+                        .iter()
+                        .position(|event| event.phase == phase)
+                };
+                let begin_position = phase_positions("transaction_begin");
+                let read_position = phase_positions("read_state");
+                let decision_position = phase_positions("decision");
+                if !matches!(
+                    (begin_position, read_position, decision_position),
+                    (Some(begin), Some(read), Some(decision)) if begin < read && read < decision
+                ) {
+                    errors.push(format!(
+                        "{} transaction phases must be ordered begin < read_state < decision",
+                        operation.op_id
+                    ));
+                }
                 let commits = transaction_events
                     .iter()
                     .filter(|event| event.phase == "commit")
@@ -779,6 +808,20 @@ fn validate_observation_envelope(
                 if commits > 1 || aborts.len() > 1 || (commits > 0 && !aborts.is_empty()) {
                     errors.push(format!(
                         "{} has conflicting or repeated commit/abort terminal events",
+                        operation.op_id
+                    ));
+                }
+
+                let commit_position = phase_positions("commit");
+                let abort_position = transaction_events
+                    .iter()
+                    .position(|event| event.phase == "abort");
+                let terminal_position = commit_position.or(abort_position);
+                if terminal_position.is_some_and(|terminal| {
+                    decision_position.is_none_or(|decision| terminal <= decision)
+                }) {
+                    errors.push(format!(
+                        "{} terminal commit/abort must follow its read and decision",
                         operation.op_id
                     ));
                 }
@@ -800,26 +843,27 @@ fn validate_observation_envelope(
                             operation.op_id
                         ));
                     }
-                    if operation.kind == "advance" {
-                        for required in ["write_source", "write_log", "write_receipt"] {
-                            if !transaction_events
-                                .iter()
-                                .any(|event| event.phase == required)
-                            {
-                                errors.push(format!(
-                                    "{} is missing atomic write phase {}",
-                                    operation.op_id, required
-                                ));
-                            }
+                    let required_writes: &[&str] = if operation.kind == "advance" {
+                        &["write_source", "write_log", "write_receipt"]
+                    } else {
+                        &["write_policy"]
+                    };
+                    for required in required_writes {
+                        let Some(position) = phase_positions(required) else {
+                            errors.push(format!(
+                                "{} is missing atomic write phase {}",
+                                operation.op_id, required
+                            ));
+                            continue;
+                        };
+                        if decision_position.is_none_or(|decision| position <= decision)
+                            || commit_position.is_none_or(|commit| position >= commit)
+                        {
+                            errors.push(format!(
+                                "{} write phase {} must follow decision and precede commit",
+                                operation.op_id, required
+                            ));
                         }
-                    } else if !transaction_events
-                        .iter()
-                        .any(|event| event.phase == "write_policy")
-                    {
-                        errors.push(format!(
-                            "{} is missing write_policy event",
-                            operation.op_id
-                        ));
                     }
                 }
             }
