@@ -1033,7 +1033,7 @@ fn validate_observation_envelope(
     }
 }
 
-fn observation_to_trace(observation: &ObservationEnvelope) -> Trace {
+fn observation_to_trace(observation: &ObservationEnvelope, reference_trace: &Trace) -> Trace {
     let operations = observation
         .observed_operations
         .iter()
@@ -1096,7 +1096,7 @@ fn observation_to_trace(observation: &ObservationEnvelope) -> Trace {
         witness_observations: observation.witness_observations.clone(),
         final_observation: observation.final_observation.clone(),
         invariant_expectations: Vec::new(),
-        fixture_digest_catalog: Vec::new(),
+        fixture_digest_catalog: reference_trace.fixture_digest_catalog.clone(),
         negative_controls: Vec::new(),
     }
 }
@@ -1106,6 +1106,7 @@ fn observation_to_trace(observation: &ObservationEnvelope) -> Trace {
 /// fault application and retry attempts are checked before any history search is attempted.
 pub fn verify_backend_observation(
     observation_bytes: &[u8],
+    reference_trace_bytes: &[u8],
     expected_reference_trace_sha256: &str,
     search_config: &HistorySearchConfig,
 ) -> ObservationReport {
@@ -1139,6 +1140,54 @@ pub fn verify_backend_observation(
             parsed.runner_clock_windows.len(),
             parsed.observed_faults.len(),
             errors,
+        );
+    }
+
+    let actual_reference_trace_sha256 = sha256_prefixed_bytes(reference_trace_bytes);
+    if actual_reference_trace_sha256 != expected_reference_trace_sha256 {
+        return invalid_observation_report(
+            trace_id,
+            parsed.reference_trace_sha256.clone(),
+            raw_sha256,
+            parsed.observed_operations.len(),
+            parsed.raw_events.len(),
+            parsed.runner_clock_windows.len(),
+            parsed.observed_faults.len(),
+            vec![format!(
+                "caller reference-trace bytes digest mismatch: expected {}, got {}",
+                expected_reference_trace_sha256, actual_reference_trace_sha256
+            )],
+        );
+    }
+    let reference_trace: Trace = match serde_json::from_slice(reference_trace_bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            return invalid_observation_report(
+                trace_id,
+                parsed.reference_trace_sha256.clone(),
+                raw_sha256,
+                parsed.observed_operations.len(),
+                parsed.raw_events.len(),
+                parsed.runner_clock_windows.len(),
+                parsed.observed_faults.len(),
+                vec![format!("caller reference trace failed strict parsing: {error}")],
+            );
+        }
+    };
+    let reference_report = verify_reference(&reference_trace, reference_trace_bytes);
+    if reference_report.status != "pass" {
+        return invalid_observation_report(
+            trace_id,
+            parsed.reference_trace_sha256.clone(),
+            raw_sha256,
+            parsed.observed_operations.len(),
+            parsed.raw_events.len(),
+            parsed.runner_clock_windows.len(),
+            parsed.observed_faults.len(),
+            vec![format!(
+                "caller-pinned reference trace is not a passing reference: {:?}",
+                reference_report.counterexamples
+            )],
         );
     }
 
@@ -1198,7 +1247,7 @@ pub fn verify_backend_observation(
         return report;
     }
 
-    let trace = observation_to_trace(&parsed);
+    let trace = observation_to_trace(&parsed, &reference_trace);
     let search = verify_observed_history(&trace, search_config);
     report.status = search.status.clone();
     report.counterexamples = search.counterexamples.clone();
