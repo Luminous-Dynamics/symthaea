@@ -66,6 +66,14 @@ pub enum MachinePlacement {
     UniformRandom,
 }
 
+/// Whether machine agents are available only in generation zero or in every
+/// generation. The paper's supplementary robustness analysis compares both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MachineAvailability {
+    SeedGenerationOnly,
+    AllGenerations,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Agent {
     pub kind: AgentKind,
@@ -155,8 +163,13 @@ impl Generation {
 pub struct Config {
     pub generations: usize,
     pub population_size: usize,
+    /// Machine count in generation zero; for AllGenerations this is the
+    /// machine count in every generation.
     pub machine_count_generation_zero: usize,
+    /// Position-selection rule for machine agents within a generation.
     pub machine_placement: MachinePlacement,
+    /// Temporal availability treatment for machine agents.
+    pub machine_availability: MachineAvailability,
 
     /// Number of individual-learning trials allocated to human agents.
     pub human_exploration_capacity: u32,
@@ -196,6 +209,7 @@ impl Default for Config {
             population_size: PAPER_ABM_POPULATION_SIZE,
             machine_count_generation_zero: PAPER_ABM_MACHINE_COUNT,
             machine_placement: MachinePlacement::ClusteredPrefix,
+            machine_availability: MachineAvailability::SeedGenerationOnly,
             human_exploration_capacity: PAPER_ABM_HUMAN_EXPLORATION_CAPACITY,
             machine_exploration_capacity: 1_000,
             human_optimality_bias: PAPER_ABM_HUMAN_OPTIMALITY_BIAS,
@@ -462,28 +476,43 @@ fn integrate(individual: Strategy, social: Option<Strategy>) -> Strategy {
     }
 }
 
+fn create_machine_mask(
+    population_size: usize,
+    machine_count: usize,
+    placement: MachinePlacement,
+    rng: &mut Rng,
+) -> Vec<bool> {
+    let mut mask = vec![false; population_size];
+    match placement {
+        MachinePlacement::ClusteredPrefix => {
+            mask.iter_mut().take(machine_count).for_each(|slot| *slot = true);
+        }
+        MachinePlacement::UniformRandom => {
+            let mut indices: Vec<usize> = (0..population_size).collect();
+            for index in 0..machine_count {
+                let selected = index + rng.index(indices.len() - index);
+                indices.swap(index, selected);
+            }
+            for index in indices.into_iter().take(machine_count) {
+                mask[index] = true;
+            }
+        }
+    }
+    mask
+}
+
 /// Run one generational ABM replication with a deterministic seed.
 pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
     config.validate()?;
     let mut rng = Rng::new(seed);
     let mut generations = Vec::with_capacity(config.generations);
 
-    let mut machine_mask = vec![false; config.population_size];
-    let mut machine_indices: Vec<usize> = (0..config.population_size).collect();
-    match config.machine_placement {
-        MachinePlacement::ClusteredPrefix => {
-            machine_mask.iter_mut().take(config.machine_count_generation_zero).for_each(|slot| *slot = true);
-        }
-        MachinePlacement::UniformRandom => {
-            for index in 0..config.machine_count_generation_zero {
-                let selected = index + rng.index(machine_indices.len() - index);
-                machine_indices.swap(index, selected);
-            }
-            for index in machine_indices.into_iter().take(config.machine_count_generation_zero) {
-                machine_mask[index] = true;
-            }
-        }
-    }
+    let machine_mask = create_machine_mask(
+        config.population_size,
+        config.machine_count_generation_zero,
+        config.machine_placement,
+        &mut rng,
+    );
 
     let mut seed_population = Vec::with_capacity(config.population_size);
     for index in 0..config.population_size {
@@ -515,11 +544,35 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
     for generation_index in 1..config.generations {
         let previous = &generations[generation_index - 1].agents;
         let mut agents = Vec::with_capacity(config.population_size);
+        let generation_machine_mask = match config.machine_availability {
+            MachineAvailability::SeedGenerationOnly => vec![false; config.population_size],
+            MachineAvailability::AllGenerations => create_machine_mask(
+                config.population_size,
+                config.machine_count_generation_zero,
+                config.machine_placement,
+                &mut rng,
+            ),
+        };
 
-        for _ in 0..config.population_size {
+        for agent_index in 0..config.population_size {
+            let kind = if generation_machine_mask[agent_index] {
+                AgentKind::Machine
+            } else {
+                AgentKind::Human
+            };
+            let (capacity, bias) = match kind {
+                AgentKind::Machine => (
+                    config.machine_exploration_capacity,
+                    config.machine_optimality_bias,
+                ),
+                AgentKind::Human => (
+                    config.human_exploration_capacity,
+                    config.human_optimality_bias,
+                ),
+            };
             let individual_strategy = discover_strategy(
-                config.human_exploration_capacity,
-                config.human_optimality_bias,
+                capacity,
+                bias,
                 config,
                 &mut rng,
             );
@@ -544,7 +597,7 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
                 && previous[teacher_index].machine_originated_strategy;
 
             agents.push(Agent {
-                kind: AgentKind::Human,
+                kind,
                 individual_strategy,
                 social_strategy,
                 integrated_strategy,
@@ -688,6 +741,47 @@ mod tests {
     fn optimal_strategy_dominates_myopic_when_both_are_available() {
         assert_eq!(integrate(Strategy::Optimal, Some(Strategy::Myopic)), Strategy::Optimal);
         assert_eq!(integrate(Strategy::Myopic, Some(Strategy::Optimal)), Strategy::Optimal);
+    }
+
+    #[test]
+    fn machine_availability_can_be_first_generation_only_or_every_generation() {
+        let seed_only = Config {
+            machine_availability: MachineAvailability::SeedGenerationOnly,
+            ..Config::default()
+        };
+        let seed_run = simulate(seed_only, 10).unwrap();
+        assert_eq!(
+            seed_run.generations[0].agents.iter()
+                .filter(|agent| agent.kind == AgentKind::Machine).count(),
+            PAPER_ABM_MACHINE_COUNT
+        );
+        assert!(seed_run.generations.iter().skip(1).all(|generation| {
+            generation.agents.iter().all(|agent| agent.kind == AgentKind::Human)
+        }));
+
+        let all_generations = Config {
+            machine_availability: MachineAvailability::AllGenerations,
+            ..Config::default()
+        };
+        let all_run = simulate(all_generations, 10).unwrap();
+        assert!(all_run.generations.iter().all(|generation| {
+            generation.agents.iter()
+                .filter(|agent| agent.kind == AgentKind::Machine).count()
+                == PAPER_ABM_MACHINE_COUNT
+        }));
+    }
+
+    #[test]
+    fn zero_machine_count_remains_a_human_only_control() {
+        let config = Config {
+            machine_count_generation_zero: 0,
+            machine_availability: MachineAvailability::AllGenerations,
+            ..Config::default()
+        };
+        let run = simulate(config, 11).unwrap();
+        assert!(run.generations.iter().all(|generation| {
+            generation.agents.iter().all(|agent| agent.kind == AgentKind::Human)
+        }));
     }
 
     #[test]
