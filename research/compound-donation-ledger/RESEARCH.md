@@ -248,6 +248,103 @@ mass remains at most one. A finite prefix only covers a finite threshold
 range; thresholds beyond its largest grid point are unsupported until the
 prior is extended under a precommitted horizon-independent rule.
 
+### e-BH rank-geometric staircase
+
+For a fixed finite family size \(m\) and target level \(\alpha=a/b\), define the
+geometric rank grid
+\[
+\mathcal R_m=\{1,2,4,\ldots,2^{\lfloor\log_2m\rfloor}\}\cup\{m\},
+\qquad Q=|\mathcal R_m|.
+\]
+Give each grid point the fixed prior mass
+\[
+\pi_r=\frac{\lfloor P/Q\rfloor}{P},\qquad P=10^9,
+\]
+leaving any quantization remainder unspent. For each grid rank r, let
+\[
+h_r=\frac{m}{\alpha r},\qquad
+H_r=\lceil P_E h_r\rceil,\qquad
+K_r=\left\lceil\frac{H_r}{\pi_r}\right\rceil,
+\]
+where \(P_E=10^6\) is the evidence fixed-point scale. The staircase
+\[
+A_m(x)=\sum_{r\in\mathcal R_m}\pi_rK_r\,\mathbf1\{x\ge K_r\}
+\]
+is valid by the same Ville budget proof as any other fixed staircase prior.
+The implementation computes the ceilings from integer numerators and
+denominators, so every supported grid rank has a single term whose
+fixed-point contribution is at least its weighted e-BH boundary \(H_r\).
+
+For any actual e-BH rejection rank \(k\), choose the largest power of two
+\(r\le k\), unless \(k=m\) is the separately included terminal rank. Then
+\(k/2<r\le k\), and therefore \(h_r<2h_k\). Since
+\(Q=O(\log m)\) and \(\pi_r\) is within a fixed-point rounding factor of
+\(1/Q\), the raw supremum threshold supporting rank k is bounded by
+\[
+K_r/P_E
+\le
+\frac{2Q}{1-Q/P}\,h_k+O(P_E^{-1}).
+\]
+Thus the raw-evidence penalty relative to the e-BH boundary is
+\(O(\log m)\), while the square-root adjuster requires raw supremum
+\((h_k+1)^2\). This is a family-size-aware, decision-targeted construction.
+The formula follows from the staircase/Ville argument; it is not a claim of
+a new general e-process or FDR theorem.
+
+**Important horizon condition:** this calibrator is for a fixed precommitted
+family size m (or a precommitted finite envelope \(m_{\max}\)). Recomputing a
+different rank prior at every growing active-family size can change old
+calibrated scores and break projectivity. For random arrivals inside a fixed
+candidate universe, use the fixed envelope and retain the same calibrator;
+this may be conservative when the active roster is much smaller. A countably
+unbounded family requires a separate universal prior or fixed mixture over
+predeclared family-size designs.
+
+The Rust reference adds the e_bh_rank_geometric(m, alpha_numerator,
+alpha_denominator) constructor. It uses O(log m) prior points, exact rational
+ceiling arithmetic, merges coincident integer thresholds, and precomputes
+prefix numerators so evaluation is O(log log m) (binary search over O(log m)
+points). The independent verifier continues to use a linear scan.
+
+### Exploratory rank-calibration experiment
+
+Fixed seed 20261102; 3,000 independent Monte Carlo streams per cell;
+m=100; T=100; alpha=0.05; null observations Bernoulli(0.5); alternative
+observations Bernoulli(0.75); per-round likelihood-ratio factor is
+\(1.5\) on a success and \(0.5\) on a failure. The same LR process is used
+for every hypothesis, so each null coordinate is a test martingale.
+Compared three time-monotone calibrators: square-root, the 25-point universal
+dyadic prior, and the e-BH rank-geometric prior. At every round, ordinary
+e-BH is applied to the calibrated values. SupFDR is the Monte Carlo mean of
+the per-stream maximum FDP across all 100 rounds; power is the terminal
+fraction of alternatives rejected. A second run uses balanced negative
+dependence among null coordinates: each round has a random subset with an
+exactly randomized floor/ceiling number of successes so every null coordinate
+still has conditional success probability 0.5 given the preceding global
+history.
+
+| Null dependence | Alternative fraction | Square-root power | Dyadic power | Rank-geometric power | Rank-geometric SupFDR | Rank-geometric P(any false) |
+|---|---:|---:|---:|---:|---:|---:|
+| Independent | 5% | 58.73% | 70.42% | 90.44% | 0.843% | 3.37% |
+| Independent | 20% | 82.93% | 84.16% | 95.48% | 0.898% | 11.13% |
+| Independent | 50% | 91.52% | 89.23% | 96.62% | 0.552% | 14.47% |
+| Balanced negative | 0% | 0% | 0% | 0% | 0.333% | 0.33% |
+| Balanced negative | 5% | 58.42% | 70.25% | 90.48% | 0.627% | 2.67% |
+| Balanced negative | 20% | 82.54% | 83.81% | 95.55% | 0.948% | 11.53% |
+| Balanced negative | 50% | 91.63% | 89.35% | 96.65% | 0.553% | 15.17% |
+
+These cells suggest a potentially large power gain for the rank-aligned prior
+in this fixed-family Bernoulli likelihood-ratio model. They do not establish
+superiority: the design is specialized to m=100 and alpha=0.05, there are only
+3,000 streams per cell, the alternatives are homogeneous and strong/moderate,
+and the dependence experiment covers one balanced negative-dependence
+construction rather than arbitrary copulas. SupFDR is a mean of a bounded
+per-stream maximum-FDP variable; the one-sided 95% Hoeffding half-width at
+n=3,000 is 0.02235. P(any false) is a separate Bernoulli/FWER diagnostic,
+not the FDR estimand. These results are exploratory and require frozen
+confirmatory seeds, heterogeneous and switching alternatives, positive and
+negative dependence, and family-size/alpha transfer tests.
+
 ## 6. Prior art and software baselines
 
 The benchmark must keep guarantee classes separate.
