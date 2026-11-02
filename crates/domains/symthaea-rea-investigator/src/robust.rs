@@ -672,6 +672,46 @@ mod tests {
     }
 
     #[test]
+    fn one_hypothesis_abstains_with_empty_ranked_results_and_valid_mass() {
+        let only = vec![Hypothesis {
+            id: "cause-a".to_owned(),
+            prior_probability: 1.0,
+            supporting_evidence_ids: vec![evidence_id('a')],
+            contradicting_evidence_ids: Vec::new(),
+        }];
+        let proposal = proposal("probe");
+        let scenario = LikelihoodModelScenario {
+            scenario_id: "nominal".to_owned(),
+            scenario_probability: 1.0,
+            experiments: vec![ScenarioExperimentLikelihood {
+                experiment_id: "probe".to_owned(),
+                likelihoods: vec![LikelihoodRow {
+                    hypothesis_id: "cause-a".to_owned(),
+                    outcome_probabilities: vec![0.5, 0.5],
+                }],
+            }],
+        };
+
+        let plan = plan_next_experiment_robust(
+            &evidence(),
+            &only,
+            &[proposal],
+            &[scenario],
+            RobustPlannerConfig::default(),
+        )
+        .unwrap();
+
+        assert!(plan.selected.is_none());
+        assert!(plan.ranked_experiments.is_empty());
+        assert!(plan.rejected_experiments.is_empty());
+        assert_eq!(
+            plan.abstention,
+            Some(RobustAbstentionReason::NoCompetingHypotheses)
+        );
+        assert_eq!(plan.scenario_ids, vec!["nominal"]);
+    }
+
+    #[test]
     fn robust_policy_reports_expected_worst_case_and_lower_tail_eig() {
         let scenarios = vec![
             LikelihoodModelScenario {
