@@ -22,7 +22,10 @@
     "target_is_disjoint_from_calibration",
     "target_observed_max_drift_ratio",
     "target_current_uncertainty_width_ratio",
-    "calibration_trajectories"
+    "calibration_trajectories",
+    "exchangeability_assessment_sha256",
+    "target_exchangeability_supported",
+    "target_independence_cluster_id"
   ],
   "$defs": {
     "id": {
@@ -131,6 +134,12 @@
       "items": {
         "$ref": "#/$defs/trajectory"
       }
+    },
+    "exchangeability_assessment_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "target_exchangeability_supported": {
+      "type": "boolean"
     }
   }
 }
