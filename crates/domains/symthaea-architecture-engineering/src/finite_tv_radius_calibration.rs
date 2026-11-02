@@ -872,16 +872,22 @@ mod tests {
         ).unwrap()
     }
 
-    fn sample(policy_id: &str, data_hash: &str) -> FiniteTvPathSample {
+    fn sample(
+        policy_id: &str,
+        data_hash: &str,
+        rejection_probability: f64,
+        evaluator_cost: f64,
+        decision_utility: f64,
+    ) -> FiniteTvPathSample {
         FiniteTvPathSample {
             policy_id: policy_id.into(),
             path_support_sha256: SUPPORT_HASH.into(),
             calibration_data_sha256: data_hash.into(),
             observed_path_counts: vec![5_000, 5_000],
             nominal_path_probabilities: vec![0.5, 0.5],
-            path_rejection_probabilities: vec![0.0, 0.0],
-            path_evaluator_costs: vec![0.0, 0.0],
-            path_decision_utilities: vec![0.0, 0.0],
+            path_rejection_probabilities: vec![rejection_probability; 2],
+            path_evaluator_costs: vec![evaluator_cost; 2],
+            path_decision_utilities: vec![decision_utility; 2],
         }
     }
 
@@ -896,24 +902,36 @@ mod tests {
             vec![
                 FiniteTvNullModelCalibration {
                     model_id: "null-a".into(),
-                    policy_samples: vec![sample("policy-a", DATA_HASH_A), sample("policy-b", DATA_HASH_B)],
+                    policy_samples: vec![
+                        sample("policy-a", DATA_HASH_A, 0.005, 0.0, 0.0),
+                        sample("policy-b", DATA_HASH_B, 0.010, 0.0, 0.0),
+                    ],
                 },
                 FiniteTvNullModelCalibration {
                     model_id: "null-b".into(),
-                    policy_samples: vec![sample("policy-a", DATA_HASH_A), sample("policy-b", DATA_HASH_B)],
+                    policy_samples: vec![
+                        sample("policy-a", DATA_HASH_A, 0.008, 0.0, 0.0),
+                        sample("policy-b", DATA_HASH_B, 0.015, 0.0, 0.0),
+                    ],
                 },
             ],
             vec![
                 FiniteTvAlternativeModelCalibration {
                     model_id: "alt-a".into(),
-                    policy_samples: vec![sample("policy-a", DATA_HASH_A), sample("policy-b", DATA_HASH_B)],
+                    policy_samples: vec![
+                        sample("policy-a", DATA_HASH_A, 0.8, 4.0, 8.0),
+                        sample("policy-b", DATA_HASH_B, 0.6, 2.0, 6.0),
+                    ],
                     utility_lower_bound: 0.0,
                     utility_upper_bound: 10.0,
                     evaluator_cost_upper_bound: 10.0,
                 },
                 FiniteTvAlternativeModelCalibration {
                     model_id: "alt-b".into(),
-                    policy_samples: vec![sample("policy-a", DATA_HASH_A), sample("policy-b", DATA_HASH_B)],
+                    policy_samples: vec![
+                        sample("policy-a", DATA_HASH_A, 0.7, 6.0, 6.0),
+                        sample("policy-b", DATA_HASH_B, 0.9, 8.0, 9.0),
+                    ],
                     utility_lower_bound: 0.0,
                     utility_upper_bound: 10.0,
                     evaluator_cost_upper_bound: 10.0,
