@@ -113,3 +113,10 @@ These tests are authored, not run. No Rust compile, formatting, Clippy, unit-tes
 Spotify Confidence reports a 42% rollback rate after global and local guardrail metrics detect regressions. It describes global metrics required on every experiment and local, feature/surface-specific metrics. Spotify emphasizes defining inferiority thresholds before running the experiment and distinguishing the decision to test from the decision to ship. These are vendor-reported operational practices, not universal standards or independently audited benchmark rates.
 
 Source: Spotify Confidence, 3 August 2026, *42% of Spotify experiments get rolled back. That's the point.* https://confidence.spotify.com/blog/42-percent-rolled-back
+
+
+## 9. Joint confidence receipt binding
+
+The request now carries one `simultaneous_coverage_receipt_sha256` in addition to each row's source receipt digest. This receipt is intended to bind the complete policy × requirement confidence family, its calibration method, split identity, predeclared family and failure probability. The verifier checks digest shape and includes it in the deterministic report identity; it does not independently verify the upstream statistical derivation or artifact authenticity.
+
+Randomized policy evidence must satisfy the declared assignment design. The caller's no-cross-unit-interference and sampling-unit declarations remain assumptions. The exact independent experimental unit (e.g. cluster, experiment replication, or another justified unit) is separately specified by the upstream sampling-unit contract.
