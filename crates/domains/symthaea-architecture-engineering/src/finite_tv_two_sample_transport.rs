@@ -83,6 +83,9 @@ pub struct FiniteTvTwoSampleTransportRequest {
     pub iid_target_complete_path_draws: bool,
     /// Required by this v1 independent-split protocol.
     pub independent_calibration_target_samples: bool,
+    /// Both reference samples must be disjoint from the confirmatory stream.
+    /// This is a contract declaration, not authenticated by this module.
+    pub reference_samples_independent_of_confirmatory_stream: bool,
     /// Target counts must be pre-outcome covariates/path categories, not confirmatory outcomes.
     pub target_sample_pre_outcome_only: bool,
 }
@@ -101,6 +104,7 @@ impl FiniteTvTwoSampleTransportRequest {
         iid_calibration_complete_path_draws: bool,
         iid_target_complete_path_draws: bool,
         independent_calibration_target_samples: bool,
+        reference_samples_independent_of_confirmatory_stream: bool,
         target_sample_pre_outcome_only: bool,
     ) -> Result<Self, FiniteTvTransportError> {
         let request = Self {
@@ -117,6 +121,7 @@ impl FiniteTvTwoSampleTransportRequest {
             iid_calibration_complete_path_draws,
             iid_target_complete_path_draws,
             independent_calibration_target_samples,
+            reference_samples_independent_of_confirmatory_stream,
             target_sample_pre_outcome_only,
         };
         request.validate()?;
@@ -192,6 +197,12 @@ impl FiniteTvTwoSampleTransportRequest {
                 "v1 requires independently sampled calibration and target reference streams",
             ));
         }
+        if !self.reference_samples_independent_of_confirmatory_stream {
+            return Err(FiniteTvTransportError::new(
+                "request.reference_samples_independent_of_confirmatory_stream",
+                "calibration and target reference samples must be independent of the confirmatory stream for the v1 alpha-composition guarantee",
+            ));
+        }
         if !self.target_sample_pre_outcome_only {
             return Err(FiniteTvTransportError::new(
                 "request.target_sample_pre_outcome_only",
@@ -235,6 +246,8 @@ pub struct FiniteTvTwoSampleTransportReport {
     pub target_concentration_slack: f64,
     pub calibration_failure_probability: f64,
     pub target_failure_probability: f64,
+    pub independent_calibration_target_samples: bool,
+    pub reference_samples_independent_of_confirmatory_stream: bool,
     /// Union-bound failure probability for the two-sample TV transport event.
     pub transport_failure_probability: f64,
     /// min(1, empirical TV + calibration slack + target slack).
@@ -263,6 +276,8 @@ struct ReportPayload<'a> {
     target_concentration_slack: f64,
     calibration_failure_probability: f64,
     target_failure_probability: f64,
+    independent_calibration_target_samples: bool,
+    reference_samples_independent_of_confirmatory_stream: bool,
     transport_failure_probability: f64,
     total_variation_radius: f64,
     status: FiniteTvTransportStatus,
@@ -445,6 +460,9 @@ pub fn calibrate_finite_tv_two_sample_transport(
         target_concentration_slack,
         calibration_failure_probability: request.calibration_failure_probability,
         target_failure_probability: request.target_failure_probability,
+        independent_calibration_target_samples: request.independent_calibration_target_samples,
+        reference_samples_independent_of_confirmatory_stream: request
+            .reference_samples_independent_of_confirmatory_stream,
         transport_failure_probability,
         total_variation_radius,
         status,
@@ -575,6 +593,9 @@ fn report_digest(report: &FiniteTvTwoSampleTransportReport) -> Result<String, Fi
         target_concentration_slack: report.target_concentration_slack,
         calibration_failure_probability: report.calibration_failure_probability,
         target_failure_probability: report.target_failure_probability,
+        independent_calibration_target_samples: report.independent_calibration_target_samples,
+        reference_samples_independent_of_confirmatory_stream: report
+            .reference_samples_independent_of_confirmatory_stream,
         transport_failure_probability: report.transport_failure_probability,
         total_variation_radius: report.total_variation_radius,
         status: report.status,
@@ -625,6 +646,7 @@ mod tests {
             sample(target_counts, TARGET_DATA_HASH),
             0.005,
             0.005,
+            true,
             true,
             true,
             true,
