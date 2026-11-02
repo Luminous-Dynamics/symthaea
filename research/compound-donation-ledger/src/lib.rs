@@ -1123,6 +1123,62 @@ mod tests {
     }
 
     #[test]
+    fn weighted_rank_geometric_covers_every_rank_for_nonuniform_weight() {
+        let m = 73_u64;
+        let weight_num = 3_u64;
+        let weight_den = 1_000_u64;
+        let alpha_num = 1_u64;
+        let alpha_den = 20_u64;
+        let adjuster = StaircaseAdjuster::weighted_e_bh_rank_geometric(
+            m, weight_num, weight_den, alpha_num, alpha_den
+        ).unwrap();
+
+        let mut ranks = Vec::new();
+        let mut rank = 1_u64;
+        loop {
+            if rank > m { break; }
+            ranks.push(rank);
+            match rank.checked_mul(2) {
+                Some(next) if next <= m => rank = next,
+                _ => break,
+            }
+        }
+        if ranks.last().copied() != Some(m) { ranks.push(m); }
+        let q = ranks.len() as u128;
+        let prior_mass = PRIOR_MASS_SCALE / q;
+
+        for k in 1..=m {
+            let grid_rank = 1_u64 << (63 - (k.leading_zeros() as u64));
+            let target_num = (alpha_den as u128)
+                * (weight_den as u128)
+                * EVIDENCE_ONE;
+            let target_den = (alpha_num as u128)
+                * (grid_rank as u128)
+                * (weight_num as u128);
+            let target = (target_num + target_den - 1) / target_den;
+            let raw_num = target * PRIOR_MASS_SCALE;
+            let raw = (raw_num + prior_mass - 1) / prior_mass;
+            assert!(
+                adjuster.value_at(raw).unwrap() >= target,
+                "rank {k} failed at geometric grid rank {grid_rank}"
+            );
+
+            let actual_num = (alpha_den as u128)
+                * (weight_den as u128)
+                * EVIDENCE_ONE;
+            let actual_den = (alpha_num as u128)
+                * (k as u128)
+                * (weight_num as u128);
+            let actual = (actual_num + actual_den - 1) / actual_den;
+            let overhead_bound = (2 * q * PRIOR_MASS_SCALE) / (PRIOR_MASS_SCALE - q);
+            assert!(
+                raw <= overhead_bound * actual + EVIDENCE_ONE,
+                "rank {k} exceeded geometric overhead"
+            );
+        }
+    }
+
+    #[test]
     fn weighted_rank_geometric_rejects_invalid_weights() {
         assert_eq!(
             StaircaseAdjuster::weighted_e_bh_rank_geometric(100, 0, 100, 1, 20),
