@@ -1,0 +1,65 @@
+# Same-state shadow comparison v0.1
+
+**Status:** implemented proposal-comparison primitive; no closed-loop performance result  
+**Code:** `symthaea_vehicle::shadow_evaluation`  
+**Baseline:** existing `pd_cruise_baseline_with_road` teacher in `types.rs`
+
+## Purpose
+
+The current training loop blends a PD teacher command into the HDC-LTC proposal while training the HDC-LTC controller against PD targets. Evaluating the trained model inside that curriculum is not a fair frozen-controller comparison.
+
+This module creates a separate *same-observation* comparison primitive. Given a frozen advanced command and one exact `VehicleState`, it recomputes the existing PD road-baseline command from that same state and records both proposals.
+
+It does not advance either controller, mutate the state, step the simulator, select an actuator command or establish a safety result.
+
+## Exact comparison contract
+
+Every input frame binds:
+
+- scenario candidate ID;
+- contiguous frame index and strictly increasing simulation timestamp;
+- complete finite 20-channel state and timestamp;
+- road heading and non-negative target speed;
+- advanced-controller 64-hex identity and advanced proposal;
+- internal PD road-baseline policy identity and its deterministic profile digest.
+
+The output binds:
+- the same scenario ID, frame index, timestamp and state digest;
+- both controller identities;
+- the exact advanced and baseline commands;
+- per-actuator absolute deltas and L1 delta;
+- whether each command simultaneously requests meaningful throttle and brake.
+
+The advanced controller digest is caller-supplied. The baseline digest binds the versioned policy ID and fixed gain bit patterns. Neither field authenticates executable bytes, source origin or build provenance. The state digest binds the serialized state representation in this Rust implementation; it is not a cross-language canonical format.
+
+## Why reuse the existing PD baseline?
+
+The current vehicle project already contains a road-relative PD controller used as the imitation/training teacher. Creating a second PD or Stanley implementation before measuring the existing one would make the first comparison harder to interpret.
+
+The PD teacher is therefore the first reference baseline. It is not claimed to be industry-best, independently safety-qualified, or architecturally independent from the training setup. Future comparison tracks should add:
+- an independently implemented Stanley/Pure-Pursuit path tracker;
+- a documented constrained MPC controller with fixed horizon, model, solver budget and infeasibility semantics;
+- frozen HDC-LTC without RTA;
+- the same frozen HDC-LTC with RTA applied in shadow mode.
+
+## What the report measures
+
+The report preserves all per-frame records and summarizes:
+- mean absolute difference for steering, throttle and brake;
+- maximum per-axis command difference;
+- p50/p95/p99 L1 proposal disagreement;
+- simultaneous throttle/brake overlap counts for each proposal.
+
+These values describe controller-output divergence only. High disagreement does not establish that either controller is wrong. Low disagreement does not establish safety or task performance. There are no collision, route-completion, constraint-satisfaction, comfort or energy claims in this module.
+
+## Missing closed-loop step
+
+Same-state command comparison is not yet a paired trajectory benchmark. A proper closed-loop paired test needs two independent simulator instances initialized from the same exact state/configuration, identical exogenous disturbance schedules, frozen controller instances, and independently retained trajectories. Each branch must then evolve on its own state; the second controller must not be fed the first controller's trajectory.
+
+That work must compose the vehicle-dynamics owner #6247 and Symtropy's execution/replay owner #3387 / #1172. In particular, the current vehicle bicycle simulator does not contain pedestrian actors or the sensor/occlusion semantics of the new intersection candidate contract. Do not report the intersection candidate generator as evaluated against pedestrians until Symtropy executes those actors and observables with explicit capability/unsupported outcomes.
+
+## Acceptance and claim ceiling
+
+Unit tests cover identity validation, input rejection, temporal ordering, same-state PD proposals, retained trace and disagreement distribution. They are authored only until the exact PR head is compiled/formatted/tested in a Rust-capable environment.
+
+A passing test would establish only that the proposal-comparison primitive records the named same-state inputs and outputs. It does not establish controller superiority, closed-loop behavior, dynamics credibility, collision avoidability, safety, roadworthiness, legal compliance or SAE Level 4/5 capability.
