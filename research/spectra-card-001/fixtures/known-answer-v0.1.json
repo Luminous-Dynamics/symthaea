@@ -9,43 +9,128 @@
   "scenarios": [
     {
       "world": "null",
-      "seed_hex": "0x0000000000001000"
+      "seed_hex": "0x0000000000001000",
+      "expected": {
+        "trial_count": 1024,
+        "participant_count": 32,
+        "enclosure_context_effect_permille": -15.625,
+        "electrical_increment_effect_permille": 117.1875,
+        "active_minus_sham_mean_period_index": 0.03515625,
+        "design_diagnostic": "counterbalanced",
+        "condition_mean_accuracy_permille": [
+          468.75,
+          453.125,
+          562.5,
+          445.3125
+        ]
+      }
     },
     {
       "world": "enclosure_context_only",
-      "seed_hex": "0x0000000000001001"
+      "seed_hex": "0x0000000000001001",
+      "expected": {
+        "trial_count": 1024,
+        "participant_count": 32,
+        "enclosure_context_effect_permille": 144.53125,
+        "electrical_increment_effect_permille": -66.40625,
+        "active_minus_sham_mean_period_index": 0.0234375,
+        "design_diagnostic": "counterbalanced",
+        "condition_mean_accuracy_permille": [
+          476.5625,
+          621.09375,
+          640.625,
+          707.03125
+        ]
+      }
     },
     {
       "world": "electrical_increment_only",
-      "seed_hex": "0x0000000000001002"
+      "seed_hex": "0x0000000000001002",
+      "expected": {
+        "trial_count": 1024,
+        "participant_count": 32,
+        "enclosure_context_effect_permille": -78.125,
+        "electrical_increment_effect_permille": 160.15625,
+        "active_minus_sham_mean_period_index": -0.12890625,
+        "design_diagnostic": "counterbalanced",
+        "condition_mean_accuracy_permille": [
+          546.875,
+          468.75,
+          652.34375,
+          492.1875
+        ]
+      }
     },
     {
       "world": "both_effects",
-      "seed_hex": "0x0000000000001003"
+      "seed_hex": "0x0000000000001003",
+      "expected": {
+        "trial_count": 1024,
+        "participant_count": 32,
+        "enclosure_context_effect_permille": 105.46875,
+        "electrical_increment_effect_permille": 54.6875,
+        "active_minus_sham_mean_period_index": 0.0546875,
+        "design_diagnostic": "counterbalanced",
+        "condition_mean_accuracy_permille": [
+          519.53125,
+          625,
+          730.46875,
+          675.78125
+        ]
+      }
     },
     {
       "world": "practice_only",
-      "seed_hex": "0x0000000000001004"
+      "seed_hex": "0x0000000000001004",
+      "expected": {
+        "trial_count": 1024,
+        "participant_count": 32,
+        "enclosure_context_effect_permille": -7.8125,
+        "electrical_increment_effect_permille": -15.625,
+        "active_minus_sham_mean_period_index": -0.10546875,
+        "design_diagnostic": "counterbalanced",
+        "condition_mean_accuracy_permille": [
+          632.8125,
+          625,
+          644.53125,
+          660.15625
+        ]
+      }
     },
     {
       "world": "order_confounded",
-      "seed_hex": "0x0000000000001005"
+      "seed_hex": "0x0000000000001005",
+      "expected": {
+        "trial_count": 1024,
+        "participant_count": 32,
+        "enclosure_context_effect_permille": 183.59375,
+        "electrical_increment_effect_permille": 113.28125,
+        "active_minus_sham_mean_period_index": 1,
+        "design_diagnostic": "condition_order_confounded",
+        "condition_mean_accuracy_permille": [
+          457.03125,
+          640.625,
+          812.5,
+          699.21875
+        ]
+      }
     }
+  ],
+  "condition_order": [
+    "outside_reference",
+    "inside_unenergized",
+    "inside_active",
+    "inside_sham"
   ],
   "estimands": [
     {
       "name": "enclosure_context_effect",
-      "formula": "inside_unenergized - outside_reference"
+      "formula": "InsideUnenergized - OutsideReference"
     },
     {
       "name": "electrical_increment_effect",
-      "formula": "inside_active - inside_sham"
+      "formula": "InsideActive - InsideSham"
     }
   ],
-  "notes": [
-    "Four target cards per participant-cycle: exactly two red and two black, shuffled.",
-    "All four conditions occur once per participant-cycle.",
-    "Active and sham are abstract simulator labels only.",
-    "Descriptive contrasts are not confirmatory inference."
-  ]
+  "note": "These are deterministic synthetic finite-campaign outputs, not inferential claims, effect-size priors or expected human performance."
 }
