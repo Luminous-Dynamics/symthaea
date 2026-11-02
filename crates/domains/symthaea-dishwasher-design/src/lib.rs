@@ -82,6 +82,13 @@ pub mod energy {
             return Err("heater_power_w must be positive when heat is required");
         };
 
+        if !sensible_heat_kwh.is_finite()
+            || !heater_electricity_kwh.is_finite()
+            || !ideal_heat_up_seconds.is_finite()
+        {
+            return Err("derived thermal result overflowed the supported numeric range");
+        }
+
         Ok(ThermalEstimate {
             sensible_heat_kwh,
             heater_electricity_kwh,
@@ -202,6 +209,13 @@ pub mod cycle {
             + pump_energy_kwh
             + controls_energy_kwh
             + a.drying_energy_kwh;
+
+        if !pump_energy_kwh.is_finite()
+            || !controls_energy_kwh.is_finite()
+            || !total_electricity_kwh.is_finite()
+        {
+            return Err("derived cycle energy overflowed the supported numeric range");
+        }
 
         Ok(CycleBudget {
             thermal,
@@ -333,16 +347,26 @@ pub mod hydraulics {
             point.dynamic_viscosity_pa_s,
         );
         let hydraulic_power_w = point.pressure_drop_pa * point.volumetric_flow_m3_s;
+        let dynamic_pressure_pa =
+            0.5 * point.fluid_density_kg_m3 * exit_velocity_m_s.powi(2);
+        let estimated_electrical_pump_power_w = hydraulic_power_w / point.pump_efficiency;
+
+        if !exit_velocity_m_s.is_finite()
+            || !re.is_finite()
+            || !dynamic_pressure_pa.is_finite()
+            || !hydraulic_power_w.is_finite()
+            || !estimated_electrical_pump_power_w.is_finite()
+        {
+            return Err("derived nozzle result overflowed the supported numeric range");
+        }
 
         Ok(NozzleEstimate {
             exit_velocity_m_s,
             reynolds_number: re,
             flow_regime: flow_regime(re),
-            dynamic_pressure_pa: 0.5
-                * point.fluid_density_kg_m3
-                * exit_velocity_m_s.powi(2),
+            dynamic_pressure_pa,
             hydraulic_power_w,
-            estimated_electrical_pump_power_w: hydraulic_power_w / point.pump_efficiency,
+            estimated_electrical_pump_power_w,
         })
     }
 
@@ -434,12 +458,15 @@ pub mod pareto {
     ) -> Vec<&'a CandidateMetrics> {
         candidates
             .iter()
-            .filter(|candidate| valid(**candidate))
-            .filter(|candidate| {
-                !candidates.iter().any(|other| {
-                    other.id != candidate.id && dominates(*other, **candidate, tolerance)
+            .enumerate()
+            .filter(|(_, candidate)| valid(**candidate))
+            .filter(|(candidate_index, candidate)| {
+                !candidates.iter().enumerate().any(|(other_index, other)| {
+                    other_index != *candidate_index
+                        && dominates(*other, **candidate, tolerance)
                 })
             })
+            .map(|(_, candidate)| candidate)
             .collect()
     }
 
@@ -477,6 +504,29 @@ pub mod pareto {
             assert!(front.iter().any(|candidate| candidate.id == "baseline"));
             assert!(front.iter().any(|candidate| candidate.id == "faster"));
             assert!(!front.iter().any(|candidate| candidate.id == "dominated"));
+        }
+
+        #[test]
+        fn duplicate_ids_do_not_hide_dominance() {
+            let candidates = [
+                CandidateMetrics {
+                    id: "same-id",
+                    residual_soil_fraction: 0.1,
+                    energy_kwh: 0.5,
+                    fresh_water_l: 5.0,
+                    cycle_duration_s: 600.0,
+                },
+                CandidateMetrics {
+                    id: "same-id",
+                    residual_soil_fraction: 0.2,
+                    energy_kwh: 0.6,
+                    fresh_water_l: 6.0,
+                    cycle_duration_s: 700.0,
+                },
+            ];
+            let front = pareto_front(&candidates, 0.0);
+            assert_eq!(front.len(), 1);
+            assert_eq!(front[0].residual_soil_fraction, 0.1);
         }
 
         #[test]
