@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-rea-artifact-reader"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "../../crates/domains/symthaea-rea-artifact-reader/src/lib.rs"
