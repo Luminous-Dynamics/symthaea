@@ -2,11 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use symthaea_rea_compat::mobile_tool_effects::{
+    DerivedToolAnnotations, MOBILE_TOOL_EFFECTS, ToolEffects, annotations_from_effects,
+};
 use symthaea_rea_compat::{
     EvidenceErrorKind, analysis_profile_digest, sha256_hex, verify_evidence_json,
-};
-use symthaea_rea_compat::mobile_tool_effects::{
-    MOBILE_TOOL_EFFECTS, ToolEffects, DerivedToolAnnotations, annotations_from_effects,
 };
 
 fn fixture_file(directory: &Path, name: &str) -> Vec<u8> {
@@ -256,8 +256,7 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
         Some(MOBILE_TOOL_EFFECTS.len() as u64)
     );
     assert_eq!(
-        receipt["mobile_tool_effects"],
-        *effect_manifest,
+        receipt["mobile_tool_effects"], *effect_manifest,
         "corpus provenance receipt must bind the effect fixture"
     );
     let effect_filename = effect_manifest["file"].as_str().unwrap();
