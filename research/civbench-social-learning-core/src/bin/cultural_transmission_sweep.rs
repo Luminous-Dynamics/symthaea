@@ -114,6 +114,7 @@ fn main() {
         let mut acquisition_rate = Vec::new();
         let mut optimal_acquisition_rate = Vec::new();
         let mut integration_rate = Vec::new();
+        let mut optimal_integration_rate = Vec::new();
         let mut top_teacher_rate = Vec::new();
 
         for _ in 0..5 {
@@ -123,6 +124,7 @@ fn main() {
             acquisition_rate.push(OnlineStats::default());
             optimal_acquisition_rate.push(OnlineStats::default());
             integration_rate.push(OnlineStats::default());
+            optimal_integration_rate.push(OnlineStats::default());
             top_teacher_rate.push(OnlineStats::default());
         }
 
@@ -154,6 +156,9 @@ fn main() {
                 }
                 if let Some(value) = metrics.integration_rate_given_acquisition {
                     integration_rate[generation].push(value);
+                }
+                if let Some(value) = metrics.optimal_integration_rate_given_observation {
+                    optimal_integration_rate[generation].push(value);
                 }
                 if let Some(value) = metrics.top_teacher_selection_rate {
                     top_teacher_rate[generation].push(value);
