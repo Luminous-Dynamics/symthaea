@@ -140,8 +140,13 @@ pub struct SimulationResult {
     pub quick_cell_cycles: usize,
     pub full_load_cycles: usize,
     pub deadline_misses: usize,
+    /// Time from arrival until service starts.
     pub mean_wait_s: f64,
     pub p95_wait_s: u64,
+    /// End-to-end time from arrival until the item is released clean/rinsed.
+    pub mean_latency_s: f64,
+    pub p95_latency_s: u64,
+    /// Elapsed time from the first job arrival until the last completion.
     pub makespan_s: u64,
 }
 
@@ -519,12 +524,33 @@ pub fn simulate(
         waits[index]
     };
 
+    let mut latencies: Vec<u64> = completions
+        .iter()
+        .map(|completion| completion.finished_s.saturating_sub(completion.arrival_s))
+        .collect();
+    latencies.sort_unstable();
+    let mean_latency_s = if latencies.is_empty() {
+        0.0
+    } else {
+        latencies.iter().map(|value| *value as f64).sum::<f64>() / latencies.len() as f64
+    };
+    let p95_latency_s = if latencies.is_empty() {
+        0
+    } else {
+        let index = ((latencies.len() as f64 * 0.95).ceil() as usize)
+            .saturating_sub(1)
+            .min(latencies.len() - 1);
+        latencies[index]
+    };
+
     let deadline_misses = completions.iter().filter(|completion| completion.deadline_missed).count();
+    let workload_start_s = ordered.first().map_or(0, |job| job.arrival_s);
     let makespan_s = completions
         .iter()
         .map(|completion| completion.finished_s)
         .max()
-        .unwrap_or(0);
+        .unwrap_or(workload_start_s)
+        .saturating_sub(workload_start_s);
     let quick_cell_cycles = operations.iter().filter(|op| op.mode == ModeKind::QuickCell).count();
     let full_load_cycles = operations.iter().filter(|op| op.mode == ModeKind::FullLoad).count();
 
@@ -539,6 +565,8 @@ pub fn simulate(
         deadline_misses,
         mean_wait_s,
         p95_wait_s,
+        mean_latency_s,
+        p95_latency_s,
         makespan_s,
     })
 }
