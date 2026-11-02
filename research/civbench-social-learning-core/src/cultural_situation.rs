@@ -280,11 +280,11 @@ impl CalibrationSums {
         self.bin_positive_rate[bin] += target;
         self.bin_count[bin] += 1;
 
-        match (prediction.prediction, prediction.human_label) {
-            (Some(true), Some(true)) => self.tp += 1,
-            (Some(true), Some(false)) => self.fp += 1,
-            (Some(false), Some(false)) => self.tn += 1,
-            (Some(false), Some(true)) => self.fn_ += 1,
+        match (prediction.prediction, label) {
+            (Some(true), true) => self.tp += 1,
+            (Some(true), false) => self.fp += 1,
+            (Some(false), false) => self.tn += 1,
+            (Some(false), true) => self.fn_ += 1,
             (None, _) => {}
         }
     }
