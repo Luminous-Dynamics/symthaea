@@ -7,10 +7,11 @@
 
 use std::error::Error;
 use std::fmt;
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 
 use super::digest::CanonicalHasher;
 
+const MAX_LINE_BYTES: usize = 4_096;
 const NOMINAL_SAMPLE_PERIOD_NS: i128 = 20_000_000;
 const GAP_THRESHOLD_NS: i128 = NOMINAL_SAMPLE_PERIOD_NS * 3 / 2;
 
@@ -111,6 +112,31 @@ pub struct HarthStreamSummary {
     pub has_export_index_column: bool,
     /// Digest of normalized parsed rows, not the original CSV bytes.
     pub normalized_rows_sha256: [u8; 32],
+}
+
+fn read_bounded_line<R: BufRead>(
+    reader: &mut R,
+    buffer: &mut String,
+    line_number: u64,
+) -> Result<bool, HarthCsvError> {
+    buffer.clear();
+    let bytes_read = {
+        let mut limited = reader.take((MAX_LINE_BYTES + 1) as u64);
+        limited.read_line(buffer).map_err(|error| {
+            HarthCsvError::new(line_number, "io", error.to_string())
+        })?
+    };
+    if bytes_read == 0 {
+        return Ok(false);
+    }
+    if bytes_read > MAX_LINE_BYTES {
+        return Err(HarthCsvError::new(
+            line_number,
+            "csv",
+            format!("record exceeds the {MAX_LINE_BYTES}-byte input-line limit"),
+        ));
+    }
+    Ok(true)
 }
 
 fn parse_csv_record(line: &str, line_number: u64) -> Result<Vec<String>, HarthCsvError> {
@@ -365,10 +391,7 @@ where
 
     let mut line_buffer = String::new();
     let mut line_number = 1_u64;
-    if reader.read_line(&mut line_buffer).map_err(|error| {
-        HarthCsvError::new(line_number, "io", error.to_string())
-    })? == 0
-    {
+    if !read_bounded_line(&mut reader, &mut line_buffer, line_number)? {
         return Err(HarthCsvError::new(1, "header", "recording is empty"));
     }
 
@@ -415,14 +438,11 @@ where
     hasher.bytes(&source_family_sha256);
 
     loop {
-        line_buffer.clear();
-        let bytes_read = reader.read_line(&mut line_buffer).map_err(|error| {
-            HarthCsvError::new(line_number.saturating_add(1), "io", error.to_string())
-        })?;
-        if bytes_read == 0 {
+        let next_line_number = line_number.saturating_add(1);
+        if !read_bounded_line(&mut reader, &mut line_buffer, next_line_number)? {
             break;
         }
-        line_number = line_number.saturating_add(1);
+        line_number = next_line_number;
         let fields = parse_csv_record(&line_buffer, line_number)?;
         if fields.len() != expected_len {
             return Err(HarthCsvError::new(
@@ -599,6 +619,19 @@ mod tests {
         let (summary, rows) = parse(input).unwrap();
         assert_eq!(summary.row_count, 2);
         assert_eq!(rows[1].activity, HarthActivity::Sitting);
+    }
+
+    #[test]
+    fn oversized_input_line_is_rejected_before_unbounded_allocation() {
+        let oversized = format!(
+            "{}{}{}\n",
+            header(),
+            " ".repeat(MAX_LINE_BYTES + 10),
+            ""
+        );
+        let error = parse(&oversized).unwrap_err();
+        assert_eq!(error.field, "csv");
+        assert!(error.message.contains("input-line limit"));
     }
 
     #[test]
