@@ -28,7 +28,9 @@
     "universal_connectome_completeness_claimed",
     "all_future_edits_certified",
     "exchangeability_assessment_sha256",
-    "target_exchangeability_supported"
+    "target_exchangeability_supported",
+    "calibration_trajectory_manifest_sha256",
+    "materiality_threshold"
   ],
   "$defs": {
     "sha": {
@@ -133,6 +135,13 @@
     },
     "target_exchangeability_supported": {
       "type": "boolean"
+    },
+    "calibration_trajectory_manifest_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "materiality_threshold": {
+      "type": "number",
+      "exclusiveMinimum": 0
     }
   }
 }
