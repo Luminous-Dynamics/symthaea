@@ -1259,6 +1259,124 @@ mod tests {
     }
 
     #[test]
+    fn split_task_route_and_split_name_must_match_operation() {
+        let mut value = envelope();
+        let mut receipt = split_receipt(SplitAuditOutcome::GroupDisjoint);
+        receipt.split = DataSplit::Train;
+        value.split_audit = Some(receipt);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::OperationMismatch {
+                stage: "split audit",
+                field: "split"
+            })
+        );
+    }
+
+    #[test]
+    fn acquired_view_task_route_must_match_operation() {
+        let mut value = through_split_and_prediction();
+        let mut receipt = view_receipt();
+        if let ViewDecisionOutcome::Acquired { task_route, .. } = &mut receipt.outcome {
+            *task_route = TaskRoute::FalseSplitCorrection;
+        }
+        value.view_decision = Some(receipt);
+        assert_eq!(audit_workflow(&value), Err(EnvelopeError::ViewTaskMismatch));
+    }
+
+    #[test]
+    fn view_cost_units_must_match_and_cost_profile_must_be_pinned() {
+        let mut value = through_split_and_prediction();
+        let mut receipt = view_receipt();
+        if let ViewDecisionOutcome::Acquired {
+            acquisition_cost_units,
+            ..
+        } = &mut receipt.outcome
+        {
+            *acquisition_cost_units = "milliseconds".to_owned();
+        }
+        value.view_decision = Some(receipt);
+        assert_eq!(audit_workflow(&value), Err(EnvelopeError::ViewCostUnitMismatch));
+
+        let mut value = through_split_and_prediction();
+        let mut receipt = view_receipt();
+        receipt.acquisition_cost_profile_sha256 = "bad".to_owned();
+        value.view_decision = Some(receipt);
+        assert!(matches!(
+            audit_workflow(&value),
+            Err(EnvelopeError::InvalidSha256 {
+                kind: "view acquisition cost profile",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn review_receipt_must_bind_exact_operation_identity() {
+        let mut value = through_split_and_prediction();
+        value.view_decision = Some(view_receipt());
+        let mut review = review_receipt();
+        review.operation_id = "other-operation".to_owned();
+        value.review = Some(review);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::OperationMismatch {
+                stage: "review",
+                field: "operation identity"
+            })
+        );
+    }
+
+    #[test]
+    fn committed_edit_must_bind_exact_base_snapshot_and_operation() {
+        let mut value = through_review();
+        let mut edit = edit_receipt();
+        edit.base_snapshot_sha256 = SHA_A.to_owned();
+        value.edit_transaction = Some(edit);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::EditBaseSnapshotMismatch)
+        );
+
+        let mut value = through_review();
+        let mut edit = edit_receipt();
+        edit.operation_binding_sha256 = "bad".to_owned();
+        value.edit_transaction = Some(edit);
+        assert!(matches!(
+            audit_workflow(&value),
+            Err(EnvelopeError::InvalidSha256 {
+                kind: "edit operation binding",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn query_source_volume_must_match_operation() {
+        let mut value = through_edit();
+        let mut query = query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        );
+        query.source_volume_id = "other-volume".to_owned();
+        value.query_stability = Some(query);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QuerySourceVolumeMismatch)
+        );
+    }
+
+    #[test]
+    fn duplicate_neuron_roots_are_rejected_before_any_stage_is_considered() {
+        let mut value = envelope();
+        value.operation.neuron_root_ids.push("root-1".to_owned());
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::DuplicateNeuronRoot("root-1".to_owned()))
+        );
+    }
+
+    #[test]
     fn committed_edit_without_query_audit_remains_pending() {
         let report = audit_workflow(&through_edit()).unwrap();
         assert_eq!(report.status, WorkflowStatus::QueryAuditPending);
