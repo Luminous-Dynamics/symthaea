@@ -209,7 +209,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let decision_changed = mip_changed || cause_changed || effect_changed;
                     let elapsed_ns = started.elapsed().as_nanos();
                     println!(
-                        "{},{},{:.8},m{}_row{},{},{},{:.8},{:.8},{},{},{},{},{:?},{},{},{},{},{},{},{},{},{},{},{},{:.17},{:.17},{},{},{},{},{},{},{},{},{},EXACT_LOCAL_PERTURBATION",
+                        "{},{},{:.8},m{}_row{},{},{},{:.8},{:.8},{},{},{},{},{:?},{},{},{},{},{},{},{},{},{},{},{},{},{:.17},{:.17},{},{},{},{},{},{},{},{},{},EXACT_LOCAL_PERTURBATION",
                         ALGORITHM_ID,
                         FORMALISM,
                         anchor_theta,
