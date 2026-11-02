@@ -69,6 +69,15 @@ pub struct DetectorOperatingBounds {
     pub specificity: ValueBounds,
 }
 
+/// Confusion-matrix counts from a detector validation set with known reference labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BinaryDetectorValidationCounts {
+    pub true_positive: u64,
+    pub false_negative: u64,
+    pub true_negative: u64,
+    pub false_positive: u64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StudyInput {
     pub protocol_id: String,
@@ -187,6 +196,8 @@ pub enum EvalError {
     InvalidProbability(&'static str),
     InfeasibleDetectorCalibration,
     InvalidProbabilityInterval(&'static str),
+    InvalidBinomialCounts,
+    InvalidZScore,
     NumericOverflow,
 }
 
@@ -207,6 +218,8 @@ impl fmt::Display for EvalError {
             Self::InvalidProbability(x) => write!(f, "{x} must be finite and in [0,1]"),
             Self::InfeasibleDetectorCalibration => write!(f, "observed detector-positive rate is incompatible with all declared sensitivity/specificity values"),
             Self::InvalidProbabilityInterval(x) => write!(f, "{x} interval must be finite, ordered, and within [0,1]"),
+            Self::InvalidBinomialCounts => write!(f, "detector validation counts must have non-zero positive and negative reference denominators without overflow"),
+            Self::InvalidZScore => write!(f, "Wilson z score must be finite and greater than zero"),
             Self::NumericOverflow => write!(f, "numeric overflow while computing bounds"),
         }
     }
@@ -263,6 +276,70 @@ fn intersect_linear_leq(lower: &mut f64, upper: &mut f64, coefficient: f64, rhs:
 
 // Joint source-target response identification is separate from the two marginal detector inversions.\n
 /// Validate a closed probability interval.
+
+/// Two-sided Wilson score interval for a binomial proportion.
+///
+/// This interval assumes independent Bernoulli validation units. For repeated trials
+/// clustered within animal/session, use a cluster-aware calibration procedure and pass
+/// its resulting operating-characteristic ranges to the other APIs instead.
+pub fn wilson_interval(
+    successes: u64,
+    trials: u64,
+    z_score: f64,
+) -> Result<NumericInterval, EvalError> {
+    if !z_score.is_finite() || z_score <= 0.0 {
+        return Err(EvalError::InvalidZScore);
+    }
+    if trials == 0 || successes > trials {
+        return Err(EvalError::InvalidBinomialCounts);
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = z_score * z_score;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let variance_term = p * (1.0 - p) / n + z2 / (4.0 * n * n);
+    if !z2.is_finite()
+        || !denominator.is_finite()
+        || !center.is_finite()
+        || !variance_term.is_finite()
+        || variance_term < 0.0
+    {
+        return Err(EvalError::NumericOverflow);
+    }
+    let half_width = z_score * variance_term.sqrt() / denominator;
+    let lower = (center - half_width).max(0.0);
+    let upper = (center + half_width).min(1.0);
+    if !half_width.is_finite() || !lower.is_finite() || !upper.is_finite() || lower > upper {
+        return Err(EvalError::NumericOverflow);
+    }
+    Ok(NumericInterval { lower, upper })
+}
+
+/// Derive independent-binomial sensitivity and specificity intervals from a
+/// labelled detector validation table. Reference-positive and reference-negative
+/// denominators must both be non-zero.
+pub fn detector_operating_bounds_from_counts(
+    counts: BinaryDetectorValidationCounts,
+    z_score: f64,
+) -> Result<DetectorOperatingBounds, EvalError> {
+    let positive_trials = counts.true_positive
+        .checked_add(counts.false_negative)
+        .ok_or(EvalError::InvalidBinomialCounts)?;
+    let negative_trials = counts.true_negative
+        .checked_add(counts.false_positive)
+        .ok_or(EvalError::InvalidBinomialCounts)?;
+    if positive_trials == 0 || negative_trials == 0 {
+        return Err(EvalError::InvalidBinomialCounts);
+    }
+    let sensitivity = wilson_interval(counts.true_positive, positive_trials, z_score)?;
+    let specificity = wilson_interval(counts.true_negative, negative_trials, z_score)?;
+    Ok(DetectorOperatingBounds {
+        sensitivity: ValueBounds { lower: sensitivity.lower, upper: sensitivity.upper },
+        specificity: ValueBounds { lower: specificity.lower, upper: specificity.upper },
+    })
+}
+
 fn validate_probability_interval(
     interval: NumericInterval,
     field: &'static str,
@@ -639,6 +716,78 @@ mod tests {
             NumericInterval { lower: 0.3, upper: 0.7 },
         );
         assert_eq!(result.unwrap_err(), EvalError::InvalidProbabilityInterval("source_prevalence"));
+    }
+
+    #[test]
+    fn wilson_interval_matches_known_answer_for_fifty_of_one_hundred() {
+        let interval = wilson_interval(50, 100, 1.959_963_984_540_054).unwrap();
+        close(interval.lower, 0.403_831_530_365_995_6);
+        close(interval.upper, 0.596_168_469_634_004_4);
+    }
+
+    #[test]
+    fn wilson_interval_handles_zero_and_all_success_boundaries() {
+        let zero = wilson_interval(0, 10, 1.959_963_984_540_054).unwrap();
+        close(zero.lower, 0.0);
+        close(zero.upper, 0.277_532_799_862_889_2);
+        let all = wilson_interval(10, 10, 1.959_963_984_540_054).unwrap();
+        close(all.lower, 0.722_467_200_137_110_7);
+        close(all.upper, 1.0);
+    }
+
+    #[test]
+    fn detector_validation_counts_produce_sensitivity_and_specificity_ranges() {
+        let bounds = detector_operating_bounds_from_counts(
+            BinaryDetectorValidationCounts {
+                true_positive: 90,
+                false_negative: 10,
+                true_negative: 95,
+                false_positive: 5,
+            },
+            1.959_963_984_540_054,
+        ).unwrap();
+        close(bounds.sensitivity.lower, 0.825_634_338_495_086_5);
+        close(bounds.sensitivity.upper, 0.944_770_862_939_324_9);
+        close(bounds.specificity.lower, 0.888_249_530_768_080_8);
+        close(bounds.specificity.upper, 0.978_456_320_845_631_9);
+    }
+
+    #[test]
+    fn larger_validation_sets_narrow_wilson_intervals_at_same_rate() {
+        let small = wilson_interval(45, 50, 1.959_963_984_540_054).unwrap();
+        let large = wilson_interval(450, 500, 1.959_963_984_540_054).unwrap();
+        assert!(large.upper - large.lower < small.upper - small.lower);
+    }
+
+    #[test]
+    fn wilson_intervals_reject_invalid_counts_and_z_scores() {
+        assert_eq!(wilson_interval(0, 0, 1.96).unwrap_err(), EvalError::InvalidBinomialCounts);
+        assert_eq!(wilson_interval(11, 10, 1.96).unwrap_err(), EvalError::InvalidBinomialCounts);
+        assert_eq!(wilson_interval(5, 10, 0.0).unwrap_err(), EvalError::InvalidZScore);
+        assert_eq!(wilson_interval(5, 10, f64::NAN).unwrap_err(), EvalError::InvalidZScore);
+        assert_eq!(
+            detector_operating_bounds_from_counts(
+                BinaryDetectorValidationCounts {
+                    true_positive: 0, false_negative: 0, true_negative: 10, false_positive: 0,
+                },
+                1.96,
+            ).unwrap_err(),
+            EvalError::InvalidBinomialCounts
+        );
+    }
+
+    #[test]
+    fn count_calibrated_detector_bounds_compose_with_prevalence_inversion() {
+        let operating = detector_operating_bounds_from_counts(
+            BinaryDetectorValidationCounts {
+                true_positive: 90, false_negative: 10,
+                true_negative: 95, false_positive: 5,
+            },
+            1.959_963_984_540_054,
+        ).unwrap();
+        let prevalence = latent_prevalence_bounds(0.6, operating).unwrap();
+        assert!(prevalence.lower >= 0.0 && prevalence.upper <= 1.0);
+        assert!(prevalence.lower <= prevalence.upper);
     }
 
     #[test]

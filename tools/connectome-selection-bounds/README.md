@@ -132,3 +132,16 @@ The function accepts intervals, so it composes directly with separate source and
 The joint-response layer also has strict contracts:
 - `schemas/joint-response-input.schema.json` defines source/target marginal-prevalence intervals.
 - `schemas/joint-response-fixture.schema.json` validates the input/expected wrapper for `fixtures/joint-response-known-answer.json`.
+
+
+## Building detector ranges from validation counts
+
+`wilson_interval(successes, trials, z)` computes a two-sided Wilson score interval. `detector_operating_bounds_from_counts` applies it to:
+- sensitivity = TP / (TP + FN)
+- specificity = TN / (TN + FP)
+
+The reference-positive and reference-negative denominators must both be non-zero; invalid counts and invalid z-scores fail closed. The result can be passed directly to `latent_prevalence_bounds`.
+
+**Statistical qualification:** the Wilson interval assumes independent Bernoulli validation units. It is suitable only when the validation sampling unit and design support that assumption. Repeated trials nested within animal/session are not independent simply because they are separate rows. For clustered calibration, use animal/session-level resampling or another design-appropriate method and pass the resulting sensitivity/specificity ranges into the prevalence inversion. The crate does not automatically infer clustering or turn a trial-level Wilson interval into a cluster-robust interval.
+
+A synthetic validation fixture uses TP=90, FN=10, TN=95, FP=5 at z=1.9599639845. It produces sensitivity [0.825634, 0.944771] and specificity [0.888250, 0.978456]. These counts are illustrative, not empirical detector performance.
