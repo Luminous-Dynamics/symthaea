@@ -333,6 +333,37 @@ mod tests {
     }
 
     #[test]
+    fn accepts_zero_rank_certificate_for_zero_i_minus_m0() {
+        // M0 = I, hence I-M0 = 0 = (n x 0) * (0 x n).
+        let m0 = matrix(2, 2, &[1, 0, 0, 1], 1);
+        let left = matrix(2, 0, &[], 1);
+        let right = matrix(0, 2, &[], 1);
+        assert!(verify_identity_minus_rank_factorization(&m0, &left, &right).unwrap());
+    }
+
+    #[test]
+    fn rejects_overflow_while_forming_identity_minus_m0() {
+        let m0 = matrix(1, 1, &[i128::MIN], 1);
+        let left = matrix(1, 1, &[0], 1);
+        let right = matrix(1, 1, &[0], 1);
+        assert!(matches!(
+            verify_identity_minus_rank_factorization(&m0, &left, &right),
+            Err(MatrixCertificateError::ArithmeticOverflow {
+                operation: "forming I - M0",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_matrix_data_length_mismatch() {
+        assert!(matches!(
+            RationalMatrix::new(2, 2, vec![1, 0, 0], 1),
+            Err(MatrixCertificateError::DataLengthMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn rejects_nonpositive_matrix_denominator() {
         assert!(matches!(
             RationalMatrix::new(1, 1, vec![0], 0),
