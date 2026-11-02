@@ -4,6 +4,7 @@ use contamination_panel_bench::{
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
+    policy_rigidity_controls::{PolicyRigidityControlsRequestV1, analyze_policy_rigidity_controls},
     ftd::{
         FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
         empirical_reference_p_values, ftd_weighted_cauchy_bh,
@@ -385,6 +386,32 @@ fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
         report.disputed_pair_count,
         report.insufficient_evidence_pair_count
     );
+    Ok(())
+}
+
+fn analyze_policy_rigidity_controls_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-policy-rigidity-controls <policy-rigidity-controls-request.json> <policy-rigidity-controls-report.json>"
+                .into(),
+        );
+    }
+    const MAX_POLICY_RIGIDITY_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_POLICY_RIGIDITY_REQUEST_BYTES)?;
+    let request: PolicyRigidityControlsRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = analyze_policy_rigidity_controls(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "groups={} evaluation_units={} flagged={} no_flag={} abstained={} method={} confirmatory_eligible={}",
+        report.group_summaries.len(),
+        report.evaluation_unit_count,
+        report.flagged_count,
+        report.no_flag_count,
+        report.abstained_count,
+        report.multiple_testing_method,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
     Ok(())
 }
 
