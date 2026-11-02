@@ -36,9 +36,12 @@ a synthetic software condition, not an instruction for a real field source.
 - OrderConfounded: a deliberately fixed condition order makes a practice trend
   mimic a condition effect. The evaluator flags the schedule as confounded.
 
-Each participant/cycle receives all four conditions, in randomized order
-except for the deliberate order-confound world. The four card targets are
-balanced two red/two black within each cycle and then shuffled.
+Each participant/cycle receives all four conditions exactly once, in randomized
+order except for the deliberate order-confound world. The evaluator rejects
+missing/duplicate conditions, repeated period positions, invalid session/cycle
+identity and inside/outside context labels inconsistent with the blinded code.
+The four card targets are balanced two red/two black within each cycle and then
+shuffled.
 
 ## Candidate/evaluator separation
 
