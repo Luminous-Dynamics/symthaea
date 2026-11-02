@@ -14,6 +14,7 @@ use std::sync::Arc;
 pub struct DreamingService {
     scaffolder: EvolutionaryScaffolder,
     trainer: CompilerGroundedTrainer,
+    proposal_pool: Arc<Mutex<TrainingDataset>>,
     dream_pool: Arc<Mutex<TrainingDataset>>,
 }
 
@@ -22,27 +23,32 @@ impl DreamingService {
         Self {
             scaffolder: EvolutionaryScaffolder::default(),
             trainer: CompilerGroundedTrainer::default(),
+            proposal_pool: Arc::new(Mutex::new(TrainingDataset::default())),
             dream_pool: Arc::new(Mutex::new(TrainingDataset::default())),
         }
     }
 
     /// Perform a single "dream cycle": mutate existing knowledge and verify.
     pub fn dream_cycle(&self, baseline_pairs: &[TrainingPair]) {
-        let mut pool = self.dream_pool.lock();
-
         for pair in baseline_pairs {
             if let Some(mutated) = self.scaffolder.scaffold_pair(pair) {
                 // Verify the dream with the compiler
                 let result = self.trainer.train_step("dream", &mutated.target_text);
                 if result.converged {
-                    println!("🌙 Internalized new dream: reward={:.2}", result.reward);
-                    pool.push(mutated);
+                    println!("Staged syntax-accepted proposal; independent task verification is required: reward={:.2}", result.reward);
+                    self.proposal_pool.lock().push(mutated);
                 }
             }
         }
     }
 
-    /// Get the current pool of internalized dreams for distillation.
+    /// Get syntax-accepted proposals awaiting an independent task-level oracle.
+    pub fn proposed_dreams(&self) -> TrainingDataset {
+        self.proposal_pool.lock().clone()
+    }
+
+    /// Get only independently task-verified dreams for distillation.
+    /// The built-in dreaming path has no semantic task verifier yet, so this remains empty.
     pub fn internalized_dreams(&self) -> TrainingDataset {
         self.dream_pool.lock().clone()
     }
