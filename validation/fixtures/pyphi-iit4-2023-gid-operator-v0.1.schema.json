@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/fixtures/pyphi-iit4-2023-gid-operator-v0.1.schema.json",
+  "title": "Pinned PyPhi IIT 4.0 (2023) Pointwise GID Operator Corpus v0.1",
+  "description": "Operator-level reference vectors for PyPhi generalized intrinsic difference. Does not qualify causal partitions or end-to-end IIT system search.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "qualification_scope",
+    "consciousness_inference_permitted",
+    "provenance",
+    "cases",
+    "summary",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pyphi-iit4-2023-gid-operator-v0.1"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "qualification_scope": {
+      "const": "pinned_pyphi_gid_operator_reference_only"
+    },
+    "consciousness_inference_permitted": {
+      "const": false
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "python_version",
+        "formalism",
+        "wheel_sha256",
+        "source_commit",
+        "operation_id",
+        "implementation_semantics"
+      ],
+      "properties": {
+        "distribution": {
+          "const": "pyphi"
+        },
+        "version": {
+          "const": "2.0.0rc4"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formalism": {
+          "const": "IIT_4_0_2023"
+        },
+        "wheel_sha256": {
+          "const": "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+        },
+        "source_commit": {
+          "const": "134a8f31b49db512322465ed3ba5da7194d362fd"
+        },
+        "operation_id": {
+          "const": "pyphi.measures.distribution.generalized_intrinsic_difference"
+        },
+        "implementation_semantics": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "formalism",
+          "operation_id",
+          "input_sha256",
+          "request_sha256",
+          "forward",
+          "partitioned_forward",
+          "selectivity",
+          "gid_vector",
+          "state_values",
+          "expected_signs"
+        ],
+        "properties": {
+          "case_id": {
+            "enum": [
+              "mixed-sign-ratios",
+              "one-sided-and-both-zero-support",
+              "equal-repertoires",
+              "rare-but-representable",
+              "nonuniform-weighting"
+            ]
+          },
+          "formalism": {
+            "const": "IIT_4_0_2023"
+          },
+          "operation_id": {
+            "const": "pyphi.measures.distribution.generalized_intrinsic_difference"
+          },
+          "input_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "request_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "forward": {
+            "$ref": "#/$defs/probabilityVector"
+          },
+          "partitioned_forward": {
+            "$ref": "#/$defs/probabilityVector"
+          },
+          "selectivity": {
+            "$ref": "#/$defs/probabilityVector"
+          },
+          "gid_vector": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "state_values": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "number"
+            }
+          },
+          "expected_signs": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "negative",
+                "zero",
+                "positive"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_case_count",
+        "computed_case_count",
+        "expected_state_count",
+        "computed_state_count",
+        "all_state_queries_match_vector"
+      ],
+      "properties": {
+        "expected_case_count": {
+          "const": 5
+        },
+        "computed_case_count": {
+          "const": 5
+        },
+        "expected_state_count": {
+          "const": 18
+        },
+        "computed_state_count": {
+          "const": 18
+        },
+        "all_state_queries_match_vector": {
+          "const": true
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "probabilityVector": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,430 @@
+name: Phi Cross-Language Digest Contract
+
+on:
+  push:
+    branches:
+      - research/phi-qualification-v0-1-20261028
+  pull_request:
+    paths:
+      - "validation/iit_digest_contract.py"
+      - "validation/generate_pyphi_reference_fixtures.py"
+      - "validation/test_iit_digest_contract.py"
+      - "validation/test_phi_reference_fixture_manifest.py"
+      - "validation/test_pyphi_reference_runner_contract.py"
+      - "validation/generate_pyphi_primitive_corpus.py"
+      - "validation/test_pyphi_primitive_corpus_contract.py"
+      - "validation/fixtures/pyphi-iit4-2023-primitive-corpus-v0.1.schema.json"
+      - "validation/generate_pyphi_macro_mapping_corpus.py"
+      - "validation/test_pyphi_macro_mapping_corpus_contract.py"
+      - "validation/fixtures/pyphi-macro-mapping-corpus-v0.1.schema.json"
+      - "validation/generate_pyphi_gid_operator_corpus.py"
+      - "validation/test_pyphi_gid_operator_corpus_contract.py"
+      - "validation/fixtures/pyphi-iit4-2023-gid-operator-v0.1.schema.json"
+      - "validation/generate_pyphi_landscape_reference.py"
+      - "validation/test_pyphi_landscape_reference_contract.py"
+      - "validation/compare_iit4_landscape_reference.py"
+      - "validation/test_compare_iit4_landscape_reference.py"
+      - "validation/generate_pyphi_iit4_2026_landscape_reference.py"
+      - "validation/test_pyphi_iit4_2026_landscape_contract.py"
+      - "validation/generate_pyphi_iit4_dual_formalism_positive_anchor.py"
+      - "validation/test_pyphi_iit4_dual_formalism_positive_anchor.py"
+      - "validation/generate_pyphi_iit4_2026_cap_binding_fixture.py"
+      - "validation/test_pyphi_iit4_2026_cap_binding_fixture_contract.py"
+      - "validation/fixtures/pyphi-iit4-2026-cap-binding-positive-control-v0.1.schema.json"
+      - "validation/fixtures/pyphi-iit4-2023-landscape-reference-v0.1.schema.json"
+      - "validation/fixtures/pyphi-iit4-2026-landscape-reference-v0.1.schema.json"
+      - "validation/fixtures/pyphi-iit4-dual-formalism-positive-anchor-v0.1.schema.json"
+      - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
+      - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
+      - ".github/workflows/phi-digest-contract.yml"
+
+permissions:
+  contents: read
+
+env:
+  # PRs test the exact contributor head, not GitHub's synthetic merge commit.
+  TESTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  digest-contract:
+    name: Verify Rust/Python digest golden vectors
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TESTED_SOURCE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.17"
+
+      - name: Run dependency-free contract and fixture tests
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract validation.test_compare_iit4_landscape_reference validation.test_pyphi_iit4_2026_landscape_contract validation.test_pyphi_iit4_dual_formalism_positive_anchor validation.test_pyphi_iit4_2026_cap_binding_fixture_contract -v
+
+  pyphi-reference:
+    name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
+    needs: digest-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TESTED_SOURCE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.17"
+
+      - name: Prepare commit-bound evidence directory
+        shell: bash
+        run: mkdir -p target/pyphi-reference
+
+      - name: Install pinned numerical dependencies
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check \
+            -r validation/requirements-pyphi-iit4-reference.txt
+
+      - name: Download and verify the exact PyPhi wheel
+        shell: bash
+        run: |
+          python -m pip download --disable-pip-version-check --no-deps \
+            --only-binary=:all: --dest target/pyphi-reference \
+            "pyphi==2.0.0rc4"
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          wheels = list(Path("target/pyphi-reference").glob("pyphi-2.0.0rc4-*.whl"))
+          assert len(wheels) == 1, f"expected one PyPhi wheel, found {wheels}"
+          expected = "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          actual = hashlib.sha256(wheels[0].read_bytes()).hexdigest()
+          assert actual == expected, f"PyPhi wheel SHA-256 mismatch: {actual}"
+          print(f"PASS: {wheels[0].name} SHA-256 {actual}")
+          PY
+          python -m pip install --disable-pip-version-check --no-deps \
+            target/pyphi-reference/pyphi-2.0.0rc4-py3-none-any.whl
+          python -m pip check
+
+      - name: Capture Python and PyPhi environment
+        shell: bash
+        run: |
+          {
+            echo "tested_source_sha=$(git rev-parse HEAD)"
+            echo "github_event_sha=${GITHUB_SHA}"
+            echo "pull_request_head_sha=${PULL_REQUEST_HEAD_SHA}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo
+            python --version
+            python -m pip show pyphi
+            echo
+            python -m pip freeze
+          } > target/pyphi-reference/environment.txt
+
+      - name: Execute published IIT 4.0 (2023) reference anchors
+        shell: bash
+        run: |
+          set -o pipefail
+          python validation/generate_pyphi_reference_fixtures.py \
+            --output target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json
+
+      - name: Verify the generated reference artifact is fully qualified
+        shell: bash
+        run: |
+          python -c 'import json, pathlib; p=pathlib.Path("target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json"); d=json.loads(p.read_text()); assert d["status"] == "PASS", d["status"]; assert d["summary"]["passed_anchor_count"] == 6 and d["summary"]["failed_anchor_count"] == 0, d["summary"]; assert d["provenance"]["version"] == "2.0.0rc4"; assert d["provenance"]["formalism"] == "IIT_4_0_2023"; assert d["provenance"]["pyphi_wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"; print("PASS: six pinned PyPhi anchors; verified wheel; upstream reference smoke test only")'
+
+      - name: Generate primitive repertoire and forward-cause corpus
+        shell: bash
+        run: |
+          python validation/generate_pyphi_primitive_corpus.py \
+            --output target/pyphi-reference/PYPHI_IIT4_2023_PRIMITIVES.json
+
+      - name: Verify the generated primitive corpus is complete and bound to the same model
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_IIT4_2023_PRIMITIVES.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS", data["status"]
+          assert data["schema_version"] == "pyphi-iit4-2023-primitive-corpus-v0.1"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["formalism"] == "IIT_4_0_2023"
+          assert data["provenance"]["pyphi_wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          assert data["provenance"]["model_sha256"] == "6d67ba617b5d2ccbba711cb44f4753286a45ae6ded16fc1a544a77dc8e931ac1"
+          assert data["provenance"]["evaluation_sha256"] == "1442d185bc5d2c23e3c6fc92e94f21d1c492cbe41a451cebd1d51fa36e862744"
+          assert data["summary"]["computed_case_count"] == 12
+          assert data["summary"]["computed_operation_count"] == 36
+          operation_names = ("cause_repertoire", "effect_repertoire", "forward_cause_likelihood")
+          for case in data["cases"]:
+              assert case["state"] == [0, 1, 1]
+              assert case["candidate_system"] == case["purview"]
+              assert all(unit in case["candidate_system"] for unit in case["mechanism"])
+              for name in operation_names:
+                  result = case["primitives"][name]
+                  size = 1
+                  for dim in result["shape"]:
+                      size *= dim
+                  assert size == len(result["values"]), (case["case_id"], name, result["shape"])
+                  assert len(result["request_sha256"]) == 64
+                  assert len(result["vector_sha256"]) == 64
+          print("PASS: 12 primitive cases / 36 vectors; same pinned model, state, formalism and wheel")
+          PY
+
+      - name: Generate PyPhi macro mapping-family reference corpus
+        shell: bash
+        run: |
+          python validation/generate_pyphi_macro_mapping_corpus.py \
+            --output target/pyphi-reference/PYPHI_MACRO_MAPPING_REFERENCE.json
+
+      - name: Verify macro mapping corpus completeness and digest bindings
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, struct
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_MACRO_MAPPING_REFERENCE.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-macro-mapping-corpus-v0.1"
+          assert data["qualification_scope"] == "pinned_pyphi_macro_mapping_reference_only"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          assert data["summary"]["computed_case_count"] == 6
+          assert data["summary"]["total_mapping_entries"] == 112
+          for case in data["cases"]:
+              assert case["mapping_entries"] == len(case["mapping"])
+              assert case["mapping"] != case["canonical_mapping"] or not case["complement_flipped"]
+              background = case["background_apportionment"]
+              assert background == sorted(set(background))
+              assert set(background).isdisjoint(case["constituents"])
+              expected = 1 << (len(case["constituents"]) * case["update_grain"])
+              assert expected == len(case["mapping"])
+              encoded = bytearray(b"SYMTHAEA-IIT-MACRO-MAPPING\0v0.1\0")
+              encoded.extend(struct.pack("<Q", len(case["constituents"])))
+              for unit in case["constituents"]:
+                  encoded.extend(struct.pack("<Q", unit))
+              encoded.extend(struct.pack("<Q", case["update_grain"]))
+              encoded.extend(struct.pack("<Q", len(case["canonical_mapping"])))
+              encoded.extend(bytes(case["canonical_mapping"]))
+              assert hashlib.sha256(encoded).hexdigest() == case["mapping_sha256"]
+              spec = bytearray(b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.2\0")
+              spec.extend(case["mapping_sha256"].encode("ascii"))
+              spec.extend(bytes([int(case["complement_flipped"])]))
+              spec.extend(struct.pack("<Q", len(case["background_apportionment"])))
+              for unit in case["background_apportionment"]:
+                  spec.extend(struct.pack("<Q", unit))
+              assert hashlib.sha256(spec).hexdigest() == case["spec_sha256"]
+          assert any(case["background_apportionment"] for case in data["cases"])
+          assert next(case for case in data["cases"] if case["case_id"] == "coarse-2-on-count-2")["background_apportionment"] == [3]
+          print("PASS: six macro mapping cases / 112 truth-table entries; pinned PyPhi wheel; background apportionment bound")
+          PY
+
+      - name: Generate pinned PyPhi pointwise GID operator corpus
+        shell: bash
+        run: |
+          python validation/generate_pyphi_gid_operator_corpus.py \
+            --output target/pyphi-reference/PYPHI_IIT4_2023_GID_OPERATOR.json
+
+      - name: Verify pointwise GID operator corpus and provenance
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_IIT4_2023_GID_OPERATOR.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-2023-gid-operator-v0.1"
+          assert data["qualification_scope"] == "pinned_pyphi_gid_operator_reference_only"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["formalism"] == "IIT_4_0_2023"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          assert data["summary"]["computed_case_count"] == 5
+          assert data["summary"]["computed_state_count"] == 18
+          for case in data["cases"]:
+              assert len(case["forward"]) == len(case["partitioned_forward"]) == len(case["selectivity"])
+              assert len(case["gid_vector"]) == len(case["state_values"]) == len(case["expected_signs"])
+              for actual, selected in zip(case["gid_vector"], case["state_values"]):
+                  assert math.isclose(actual, selected, rel_tol=0.0, abs_tol=1e-14)
+          print("PASS: five pinned PyPhi GID operator cases / 18 state values")
+          PY
+
+      - name: Generate pinned PyPhi IIT 4.0 (2023) landscape reference
+        shell: bash
+        run: |
+          python validation/generate_pyphi_landscape_reference.py \
+            --output target/pyphi-reference/PYPHI_IIT4_2023_LANDSCAPE.json
+
+      - name: Verify landscape reference points and shared canonical identities
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_IIT4_2023_LANDSCAPE.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-2023-landscape-reference-v0.1"
+          assert data["qualification_scope"] == "pinned_pyphi_iit4_2023_parameter_landscape_reference_only"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["formalism"] == "IIT_4_0_2023"
+          assert data["provenance"]["quantity_id"] == "iit4_system_phi_s"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          expected = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80]
+          points = data["points"]
+          assert len(points) == 13
+          assert data["skipped_points"] == []
+          assert [p["theta"] for p in points] == expected
+          assert len({p["model_sha256"] for p in points}) == 13
+          assert len({p["analysis_request_sha256"] for p in points}) == 13
+          assert all(p["qualification"] == "EXACT_SAMPLE_ONLY" for p in points)
+          assert all(len(p["model_sha256"]) == 64 and len(p["evaluation_sha256"]) == 64 and len(p["analysis_request_sha256"]) == 64 for p in points)
+          assert all(p["mip_cut_sha256"] and len(p["mip_cut_sha256"]) == 64 for p in points)
+          assert all(isinstance(p["mip_cut_removed_edges"], list) for p in points)
+          assert all(p["mip_tie_count"] == len(p["mip_tie_cut_sha256s"]) == len(p["mip_tie_cut_removed_edges"]) for p in points)
+          assert all(p["mip_cut_sha256"] in p["mip_tie_cut_sha256s"] for p in points)
+          assert all(len(set(p["mip_tie_cut_sha256s"])) == p["mip_tie_count"] for p in points)
+          assert all(p["mip_default_resolved_tie_count"] == 1 for p in points)
+          assert all(p["mip_default_resolved_cut_sha256s"] == [p["mip_cut_sha256"]] for p in points)
+          assert all(len(p["mip_tie_lex_key_hexes"]) == p["mip_tie_count"] for p in points)
+          assert all(p["numeric_tie_contains_default_representative"] for p in points)
+          assert all(p["state_pair_tie_count"] >= 1 for p in points)
+          assert all(isinstance(p["lex_resolution_matches_numeric_ties"], bool) for p in points)
+          assert all(len(p["minimum_numeric_tie_lex_key_hex"]) > 0 for p in points)
+          partition_counts = [len(p["partition_scores"]) for p in points]
+          assert len(set(partition_counts)) == 1 and partition_counts[0] == data["summary"]["partition_count_per_point"]
+          assert data["summary"]["partition_score_row_count"] == sum(partition_counts)
+          for point in points:
+              cut_hashes = [score["cut_sha256"] for score in point["partition_scores"]]
+              assert len(cut_hashes) == len(set(cut_hashes))
+              assert all(len(score["lex_key_hex"]) > 0 for score in point["partition_scores"])
+              assert point["mip_cut_sha256"] in cut_hashes
+              assert set(point["mip_tie_cut_sha256s"]).issubset(set(cut_hashes))
+              assert all(math.isfinite(score["signed_phi"]) and math.isfinite(score["normalized_phi"]) for score in point["partition_scores"])
+          assert all(b["qualification"] == "GRID_RESOLUTION_SWITCH_BRACKET_NOT_CERTIFIED" for b in data["grid_resolution_boundaries"])
+          print("PASS: 13 pinned PyPhi landscape samples; all partition score vectors and MIP tie families captured; grid brackets remain uncertified")
+          PY
+
+      - name: Generate paired PyPhi IIT 4.0 (2026) intrinsic-information landscape
+        shell: bash
+        run: |
+          python validation/generate_pyphi_iit4_2026_landscape_reference.py \
+            --reference-2023 target/pyphi-reference/PYPHI_IIT4_2023_LANDSCAPE.json \
+            --output target/pyphi-reference/PYPHI_IIT4_2026_LANDSCAPE.json
+
+      - name: Verify paired IIT4-2026 intrinsic-information landscape
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_IIT4_2026_LANDSCAPE.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-2026-landscape-reference-v0.1"
+          assert data["provenance"]["formalism"] == "IIT_4_0_2026"
+          assert data["provenance"]["paired_formalism"] == "IIT_4_0_2023"
+          assert data["provenance"]["system_phi_measure"] == "INTRINSIC_INFORMATION"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          points = data["points"]
+          assert len(points) == 13 and data["skipped_points"] == []
+          assert len({p["model_sha256"] for p in points}) == 13
+          assert all(p["model_sha256"] == p["paired_2023_model_sha256"] for p in points)
+          assert all(p["evaluation_sha256"] == p["paired_2023_evaluation_sha256"] for p in points)
+          assert all(p["phi_2026"] <= p["phi_2023"] + 1e-10 for p in points)
+          assert all(p["phi_2026"] <= p["intrinsic_information"] + 1e-10 for p in points)
+          assert all(math.isfinite(p["delta_phi_2023_minus_2026"]) and p["delta_phi_2023_minus_2026"] >= -1e-10 for p in points)
+          assert all(p["qualification"] == "EXACT_SAMPLE_ONLY" for p in points)
+          assert data["summary"]["computed_point_count"] == 13
+          print("PASS: 13 paired IIT4-2026 points; same TPM/evaluation identities; phi2026 <= phi2023 and ii(s)")
+          PY
+
+      - name: Run positive-phi Fig. 1A dual-formalism fixed-state conformance
+        shell: bash
+        run: |
+          python validation/generate_pyphi_iit4_dual_formalism_positive_anchor.py \
+            --anchor target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json \
+            --output target/pyphi-reference/PYPHI_IIT4_DUAL_FORMALISM_POSITIVE_ANCHOR.json
+
+      - name: Verify positive-phi dual-formalism fixed-state invariants
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("target/pyphi-reference/PYPHI_IIT4_DUAL_FORMALISM_POSITIVE_ANCHOR.json").read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-dual-formalism-positive-anchor-v0.1"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          fixed = data["fixed_state_comparison"]
+          assert fixed["same_specified_state"] is True
+          assert fixed["mip_unchanged"] is True
+          assert fixed["iit4_2023"]["phi_s"] > 0.0
+          assert fixed["iit4_2026"]["phi_s"] <= fixed["iit4_2023"]["phi_s"] + 1e-10
+          assert fixed["iit4_2026"]["phi_s"] <= fixed["iit4_2026"]["intrinsic_information"] + 1e-10
+          fixed_ii_operands = fixed["iit4_2026"]
+          assert abs(fixed_ii_operands["intrinsic_information"] - min(
+              fixed_ii_operands["cause_intrinsic_specification"],
+              fixed_ii_operands["effect_intrinsic_specification"],
+              fixed_ii_operands["intrinsic_differentiation"]["cause"],
+              fixed_ii_operands["intrinsic_differentiation"]["effect"],
+          )) <= 1e-10
+          full = data["full_search"]
+          assert full["iit4_2023"]["phi_s"] > 0.0
+          assert full["iit4_2026"]["phi_s"] <= full["iit4_2023"]["phi_s"] + 1e-10
+          assert all(data["invariants"].values())
+          print("PASS: positive-phi Fig. 1A; fixed-state MIP unchanged; IIT4-2026 phi bounded by IIT4-2023 and ii(s)")
+          PY
+
+      - name: Search deterministic family for an IIT4-2026 cap-binding positive control
+        shell: bash
+        run: |
+          python validation/generate_pyphi_iit4_2026_cap_binding_fixture.py \
+            --max-seeds 128 \
+            --output target/pyphi-reference/PYPHI_IIT4_2026_CAP_BINDING_POSITIVE_CONTROL.json
+
+      - name: Verify cap-binding positive control and exact fixed-state MIP replay
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("target/pyphi-reference/PYPHI_IIT4_2026_CAP_BINDING_POSITIVE_CONTROL.json").read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-2026-cap-binding-positive-control-v0.1"
+          assert data["provenance"]["formalism_2023"] == "IIT_4_0_2023"
+          assert data["provenance"]["formalism_2026"] == "IIT_4_0_2026"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          fixture = data["selected_fixture"]
+          assert fixture is not None
+          assert fixture["cap_binding"] and fixture["mip_unchanged"]
+          assert fixture["iit4_2023"]["phi_s"] > fixture["iit4_2026"]["phi_s"]
+          assert abs(fixture["iit4_2026"]["phi_s"] - fixture["iit4_2026"]["intrinsic_information"]) <= 1e-10
+          assert fixture["iit4_2026"]["intrinsic_information"] < min(fixture["iit4_2026"]["cause_phi"], fixture["iit4_2026"]["effect_phi"]) - 1e-10
+          assert fixture["iit4_2023"]["mip_cut_sha256"] == fixture["iit4_2026"]["mip_cut_sha256"]
+          assert fixture["model_sha256"] and len(fixture["model_sha256"]) == 64
+          assert fixture["evaluation_sha256"] and len(fixture["evaluation_sha256"]) == 64
+          assert fixture["analysis_request_sha256_iit4_2023"] != fixture["analysis_request_sha256_iit4_2026"]
+          assert data["summary"]["attempted_seed_count"] <= 128
+          print(f"PASS: cap-binding fixture seed={fixture['seed']} phi23={fixture['iit4_2023']['phi_s']:.12g} phi26={fixture['iit4_2026']['phi_s']:.12g} ii={fixture['iit4_2026']['intrinsic_information']:.12g}")
+          PY
+
+      - name: Upload pinned PyPhi reference evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: pyphi-iit4-2023-reference-${{ env.TESTED_SOURCE_SHA }}
+          path: target/pyphi-reference/
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 6

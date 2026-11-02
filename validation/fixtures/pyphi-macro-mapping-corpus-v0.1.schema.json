@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/fixtures/pyphi-macro-mapping-corpus-v0.1.schema.json",
+  "title": "Pinned PyPhi macro mapping corpus v0.1",
+  "description": "Wheel-pinned PyPhi mapping-family truth tables; not a macro TPM or IIT result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "qualification_scope",
+    "macro_framework",
+    "formalism_scope",
+    "consciousness_inference_permitted",
+    "provenance",
+    "cases",
+    "summary",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pyphi-macro-mapping-corpus-v0.1"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "qualification_scope": {
+      "const": "pinned_pyphi_macro_mapping_reference_only"
+    },
+    "macro_framework": {
+      "const": "Marshall_et_al_2026_intrinsic_units"
+    },
+    "formalism_scope": {
+      "const": "mapping_only_no_phi_or_macro_tpm_claim"
+    },
+    "consciousness_inference_permitted": {
+      "const": false
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "python_version",
+        "wheel_sha256",
+        "source_commit",
+        "mapping_order"
+      ],
+      "properties": {
+        "distribution": {
+          "const": "pyphi"
+        },
+        "version": {
+          "const": "2.0.0rc4"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wheel_sha256": {
+          "const": "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+        },
+        "source_commit": {
+          "const": "134a8f31b49db512322465ed3ba5da7194d362fd"
+        },
+        "mapping_order": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "family",
+          "constituents",
+          "update_grain",
+          "mapping",
+          "canonical_mapping",
+          "complement_flipped",
+          "mapping_sha256",
+          "spec_sha256",
+          "mapping_entries",
+          "sequence_state_bits",
+          "background_apportionment"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "enum": [
+              "coarse_grain",
+              "blackbox"
+            ]
+          },
+          "constituents": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "uniqueItems": true
+          },
+          "update_grain": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2
+          },
+          "on_counts": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "uniqueItems": true
+          },
+          "output_constituents": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "mapping": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 64,
+            "items": {
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          "canonical_mapping": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 64,
+            "items": {
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          "complement_flipped": {
+            "type": "boolean"
+          },
+          "mapping_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "spec_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "mapping_entries": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 64
+          },
+          "sequence_state_bits": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 6
+          },
+          "background_apportionment": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "uniqueItems": true
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "family": {
+                  "const": "coarse_grain"
+                }
+              },
+              "required": [
+                "family"
+              ]
+            },
+            "then": {
+              "required": [
+                "on_counts"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "family": {
+                  "const": "blackbox"
+                }
+              },
+              "required": [
+                "family"
+              ]
+            },
+            "then": {
+              "required": [
+                "output_constituents"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_case_count",
+        "computed_case_count",
+        "total_mapping_entries",
+        "families"
+      ],
+      "properties": {
+        "expected_case_count": {
+          "const": 6
+        },
+        "computed_case_count": {
+          "const": 6
+        },
+        "total_mapping_entries": {
+          "const": 112
+        },
+        "families": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "coarse_grain",
+            "blackbox"
+          ],
+          "properties": {
+            "coarse_grain": {
+              "const": 3
+            },
+            "blackbox": {
+              "const": 3
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,56 +1,60 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Integrated Information Theory (IIT) - Revolutionary Improvement #2
+//! HDC integration proxy (IIT-inspired; historical API name retained).
 //!
-//! Implementation of Integrated Information (Φ) for quantitative consciousness measurement
-//! in hyperdimensional computing space, based on Tononi's IIT 3.0.
+//! This module computes an HDC-specific similarity/partition-based integration proxy.
+//! It does not, by itself, implement formal IIT 3.0 or IIT 4.0: it does not evaluate
+//! a complete state-indexed transition probability model and the formal cause/effect
+//! repertoire machinery required by those formalisms. Treat `phi` as a legacy field
+//! name for this estimator's output, not as a formal IIT quantity or a measure of
+//! phenomenal experience.
 //!
-//! # Revolutionary Properties
+//! # Scope and limitations
 //!
-//! - **Quantitative consciousness**: Φ value measures integration
-//! - **Real-time computation**: BinaryHV makes Φ practical (<1ms with binary vectors)
-//! - **Compositional**: Works with any HDC system structure
-//! - **Information-theoretic**: Rigorous mathematical foundation
-//! - **Experimentally validated**: Correlates with conscious states in neuroscience
+//! - **Proxy**: the result depends on the HDC representation, similarity conversion,
+//!   partition routine, and implementation profile.
+//! - **Operational use**: a caller may evaluate the proxy as an engineering feature,
+//!   but must validate task utility independently.
+//! - **No consciousness classification**: a scalar value or threshold is not evidence
+//!   that a system is conscious, unconscious, asleep, or anesthetized.
+//! - **No formal IIT claim**: use a pinned, profile-matched reference suite for any
+//!   comparison with IIT.
 //!
-//! # Scientific Basis
+//! # Theory context
+//!
+//! IIT 3.0 is a motivating reference for the proxy's terminology; the following
+//! citations do not demonstrate formal implementation or empirical validation.
 //!
 //! **Integrated Information Theory (IIT 3.0)**
 //! - Tononi et al. (2016) - "Integrated information theory: from consciousness to its physical substrate"
 //! - Oizumi et al. (2014) - "From the Phenomenology to the Mechanisms of Consciousness"
 //!
-//! ## Core Axioms of IIT
+//! ## IIT concepts that inspired the proxy (not a formal implementation)
 //!
-//! 1. **Intrinsic existence**: System exists for itself
-//! 2. **Composition**: Consciousness has structure
-//! 3. **Information**: Consciousness is specific
-//! 4. **Integration**: Consciousness is unified
-//! 5. **Exclusion**: Consciousness has borders
+//! IIT's notions of information and integration motivate some design choices here.
+//! Listing these concepts does not mean the module implements the formal IIT axioms,
+//! exclusion search, or a complete cause/effect structure.
 //!
-//! ## Φ Calculation (Simplified for HDC)
+//! ## Legacy proxy sketch
 //!
-//! ```text
-//! Φ = EI(System) - ΣEI(Parts)
+//! The estimator compares a pairwise-information aggregate for the vector set with
+//! information retained within a candidate partition. This is an HDC statistical
+//! proxy, not formal IIT Φ. A positive value means only that this estimator reports
+//! a difference under its chosen representation and partition procedure; zero is
+//! not a classification of an unconscious system.
 //!
-//! Where:
-//! - EI(System) = Effective Information of whole system
-//! - EI(Parts) = Sum of information in partitioned parts
-//! - Φ > 0 indicates integration (consciousness)
-//! - Φ = 0 indicates no integration (unconscious)
-//! ```
+//! ## HDC proxy details (not a formal IIT adaptation claim)
 //!
-//! ## HDC-Adapted IIT
+//! A formal IIT calculation requires an explicit causal substrate and version-specific
+//! transition/repertoire and partition operations.
 //!
-//! Traditional IIT uses:
-//! - Discrete states (binary neurons)
-//! - Transition probability matrices
-//! - Minimum information partition (MIP)
+//! This HDC proxy instead uses:
+//! - Hypervector representations;
+//! - Similarity-derived information estimates;
+//! - The partition routine implemented by this module.
 //!
-//! Our HDC adaptation uses:
-//! - Hypervector states (continuous in space, but binary in BinaryHV)
-//! - Similarity-based partitioning
-//! - Efficient approximations for real-time computation
+//! Its correspondence to a particular IIT version must be measured, not assumed.
 //!
 //! # Examples
 //!
@@ -60,7 +64,7 @@
 //! // Create Φ calculator
 //! let mut phi = IntegratedInformation::new();
 //!
-//! // Define a system state (e.g., current consciousness state)
+//! // Define an example set of HDC representations (not a causal model)
 //! let state = vec![
 //!     BinaryHV::random(1), // Sensory input
 //!     BinaryHV::random(2), // Working memory
@@ -68,14 +72,12 @@
 //!     BinaryHV::random(4), // Motor planning
 //! ];
 //!
-//! // Compute Φ
-//! let phi_value = phi.compute_phi(&state);
-//! println!("Integrated Information: Φ = {:.3}", phi_value);
+//! // Compute the HDC integration proxy
+//! let integration_proxy = phi.compute_phi(&state);
+//! println!("HDC integration proxy = {:.3}", integration_proxy);
 //!
-//! // Φ > 0.5 suggests integrated, conscious-like processing
-//! if phi_value > 0.5 {
-//!     println!("System exhibits high integration (consciousness-like)");
-//! }
+//! // Any operational threshold must be calibrated against a named task and baseline;
+//! // this example intentionally makes no consciousness classification.
 //! ```
 
 use super::binary_hv::BinaryHV;
@@ -109,28 +111,24 @@ fn similarity_to_mutual_information(similarity: f64) -> f64 {
     1.0 - binary_entropy(s)
 }
 
-/// Integrated Information calculator for HDC systems
+/// HDC similarity/partition-based integration proxy.
 ///
-/// Computes Φ (phi) - a measure of integrated information that quantifies
-/// the degree to which a system is "more than the sum of its parts."
+/// This legacy API returns an estimator-specific score derived from HDC vectors.
+/// It does not compute formal IIT Φ or establish a relationship with biological
+/// consciousness states. Treat thresholds as uncalibrated until prospective task
+/// evaluation demonstrates their utility.
 ///
-/// High Φ correlates with conscious states in biological systems.
-/// Low Φ correlates with unconscious states (sleep, anesthesia, etc.).
+/// # Interpretation
 ///
-/// # IIT Axioms Implemented
-///
-/// - **Integration**: System cannot be partitioned without information loss
-/// - **Information**: System constrains possibilities (has specific state)
-/// - **Composition**: Φ is computed over mechanisms and their interactions
+/// The output depends on representation, similarity-to-information conversion,
+/// partition search, and sample/discretization assumptions. It must be reported
+/// with an estimator identity and must not be silently substituted for a formal
+/// IIT result, epistemic confidence, permission, or action authority.
 ///
 /// # Performance
 ///
-/// With BinaryHV:
-/// - 4-component system: ~10 μs (debug), ~1 μs (release)
-/// - 8-component system: ~40 μs (debug), ~4 μs (release)
-/// - 16-component system: ~160 μs (debug), ~16 μs (release)
-///
-/// This makes real-time consciousness monitoring practical!
+/// Historical timing comments are not a reproducible benchmark until accompanied
+/// by a pinned commit, command, build mode, hardware details, and raw measurements.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct IntegratedInformation {
     /// History of Φ values over time
@@ -196,18 +194,19 @@ struct PartitionResult {
     phi_partition: f64,
 }
 
-/// Consciousness state classification based on Φ
+/// Legacy score-band labels based on the HDC integration proxy; not scientific
+/// classifications of consciousness or validated states such as sleep/anesthesia.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConsciousnessState {
-    /// Φ < 0.1 - Minimal integration (unconscious-like)
+    /// Legacy proxy band below 0.1; not an unconsciousness label.
     Minimal,
-    /// 0.1 ≤ Φ < 0.3 - Low integration (drowsy-like)
+    /// Legacy proxy band [0.1, 0.3); not a drowsiness label.
     Low,
-    /// 0.3 ≤ Φ < 0.5 - Moderate integration (aware-like)
+    /// Legacy proxy band [0.3, 0.5); not an awareness label.
     Moderate,
-    /// 0.5 ≤ Φ < 0.7 - High integration (conscious-like)
+    /// Legacy proxy band [0.5, 0.7); not a consciousness label.
     High,
-    /// Φ ≥ 0.7 - Very high integration (peak consciousness)
+    /// Legacy proxy band at or above 0.7; not a peak-consciousness label.
     VeryHigh,
 }
 
@@ -245,16 +244,17 @@ impl IntegratedInformation {
         }
     }
 
-    /// Compute detailed Φ components based on IIT theory
+    /// Compute the legacy `PhiComponents` feature bundle.
     ///
-    /// Returns PhiComponents with 7 measurements:
-    /// 1. **Integration** - Core Φ value (minimum info partition loss)
-    /// 2. **Binding** - How strongly components bind (MIP info loss)
-    /// 3. **Workspace** - Global workspace information (total system info)
-    /// 4. **Attention** - Selective integration (component distinctiveness)
-    /// 5. **Recursion** - Self-referential processing (temporal continuity)
-    /// 6. **Efficacy** - Processing efficiency (normalized Φ)
-    /// 7. **Knowledge** - Accumulated information (historical Φ average)
+    /// These are estimator-derived engineering features, not seven formally
+    /// validated IIT/GWT/HOT quantities:
+    /// 1. partition-proxy score;
+    /// 2. partition information-loss proxy;
+    /// 3. size-normalized information proxy (not GWT workspace access);
+    /// 4. component-distinctiveness proxy;
+    /// 5. recent score stability (not recurrence or self-reference);
+    /// 6. size-normalized score (not general processing efficacy);
+    /// 7. historical score average (not accumulated knowledge).
     fn compute_phi_components(
         &self,
         phi: f64,
@@ -262,19 +262,16 @@ impl IntegratedInformation {
         system_info: f64,
         mip_info: f64,
     ) -> PhiComponents {
-        // 1. Integration: Core Φ value (information lost by minimum partition)
+        // 1. Legacy partition-proxy output.
         let integration = phi;
 
-        // 2. Binding: Strength of component binding (how much info lost by best partition)
-        // Higher values = components are more tightly bound together
+        // 2. Partition information-loss proxy. This is not a causal binding measurement.
         let binding = (system_info - mip_info).max(0.0);
 
-        // 3. Workspace: Global workspace information content
-        // Total distinctiveness of integrated state
+        // 3. Size-normalized information proxy; not a Global Workspace Theory measure.
         let workspace = system_info / (components.len() as f64).sqrt();
 
-        // 4. Attention: Selective integration (component distinctiveness)
-        // Measure how distinct each component is from the bundled state
+        // 4. Component-distinctiveness proxy relative to the bundled representation.
         let system_state = self.bundle_components(components);
         let mut distinctiveness_sum = 0.0;
         for component in components {
@@ -283,8 +280,7 @@ impl IntegratedInformation {
         }
         let attention = distinctiveness_sum / components.len() as f64;
 
-        // 5. Recursion: Self-referential processing (temporal continuity)
-        // Compare current Φ to recent history to measure stable processing
+        // 5. Recent score stability. Variance of a scalar is not recurrence or self-reference.
         let recursion = if self.phi_history.len() >= 2 {
             let recent_phi: Vec<f64> = self
                 .phi_history
@@ -294,26 +290,24 @@ impl IntegratedInformation {
                 .map(|m| m.phi)
                 .collect();
 
-            // Temporal continuity = 1 - variance (stable = high recursion)
+            // Low variance maps to a larger stability feature; this is not a recursion estimate.
             let mean = recent_phi.iter().sum::<f64>() / recent_phi.len() as f64;
             let variance: f64 = recent_phi.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
                 / recent_phi.len() as f64;
 
             (1.0 - variance.sqrt()).max(0.0)
         } else {
-            0.5 // Default moderate recursion for first measurements
+            0.5 // Historical default for insufficient score history, not a recursion estimate
         };
 
-        // 6. Efficacy: How effectively the system processes information
-        // Ratio of integration to component count (efficiency)
+        // 6. Size-normalized score; this is not a validated processing-efficiency measure.
         let efficacy = if components.len() > 1 {
             phi / (components.len() as f64).ln()
         } else {
             0.0
         };
 
-        // 7. Knowledge: Accumulated information over time
-        // Average Φ across history (learning/memory trace)
+        // 7. Historical score average; this does not measure learned knowledge.
         let knowledge = if !self.phi_history.is_empty() {
             self.phi_history.iter().map(|m| m.phi).sum::<f64>() / self.phi_history.len() as f64
         } else {
@@ -331,21 +325,18 @@ impl IntegratedInformation {
         }
     }
 
-    /// Compute Φ (integrated information) for a system state
+    /// Compute the legacy HDC integration proxy for a set of binary hypervectors.
     ///
-    /// This is the core IIT calculation. We compute:
-    /// 1. Total information in the system
-    /// 2. Information in all possible partitions
-    /// 3. Φ = minimum information loss across partitions
+    /// This estimator derives a scalar from its information and partition routines;
+    /// it does not compute formal IIT Φ, and its output thresholds have no validated
+    /// correspondence to consciousness, sleep, anesthesia, or awareness.
     ///
     /// # Arguments
-    /// * `components` - System components as hypervectors
+    /// * `components` - HDC component representations, not an explicit causal TPM
     ///
     /// # Returns
-    /// Φ value (0.0 to 1.0+)
-    /// - Φ = 0: No integration (unconscious)
-    /// - Φ > 0.3: Moderate integration
-    /// - Φ > 0.5: High integration (consciousness-like)
+    /// Estimator-specific nonnegative score. Interpret only under the exact estimator
+    /// profile and task for which prospective utility has been demonstrated.
     ///
     /// # Example
     /// ```ignore
@@ -974,14 +965,12 @@ impl IntegratedInformation {
         (mip, min_info)
     }
 
-    /// Classify consciousness state based on Φ value
+    /// Map a legacy proxy score into historical score bands.
     ///
-    /// Based on empirical correlations from neuroscience:
-    /// - Φ < 0.1: Unconscious (deep sleep, anesthesia)
-    /// - 0.1-0.3: Low consciousness (drowsy)
-    /// - 0.3-0.5: Moderate (normal waking)
-    /// - 0.5-0.7: High (focused attention)
-    /// - Φ ≥ 0.7: Very high (peak states, meditation)
+    /// This method and its enum name are retained for API compatibility only. The
+    /// thresholds are not validated against neuroscience and must not be interpreted
+    /// as labels for unconsciousness, sleep, anesthesia, waking awareness, or meditation.
+    /// New code should consume the underlying proxy score with explicit estimator identity.
     pub fn classify_state(&self, phi: f64) -> ConsciousnessState {
         if phi < 0.1 {
             ConsciousnessState::Minimal
@@ -1115,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consciousness_classification() {
+    fn test_legacy_score_band_classification() {
         let phi_calc = IntegratedInformation::new();
 
         assert_eq!(phi_calc.classify_state(0.05), ConsciousnessState::Minimal);

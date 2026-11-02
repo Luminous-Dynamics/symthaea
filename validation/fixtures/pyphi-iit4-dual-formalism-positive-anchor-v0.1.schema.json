@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/fixtures/pyphi-iit4-dual-formalism-positive-anchor-v0.1.schema.json",
+  "title": "PyPhi IIT4 Positive-Phi Dual-Formalism Fixed-State Conformance v0.1",
+  "description": "A positive-phi published Fig. 1A anchor evaluated under IIT4-2023 and IIT4-2026, including a fixed-state comparison that isolates the intrinsic-information requirement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "qualification_scope",
+    "consciousness_inference_permitted",
+    "provenance",
+    "full_search",
+    "fixed_state_comparison",
+    "invariants",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pyphi-iit4-dual-formalism-positive-anchor-v0.1"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "qualification_scope": {
+      "const": "pinned_pyphi_positive_phi_fixed_state_dual_formalism_conformance"
+    },
+    "consciousness_inference_permitted": {
+      "const": false
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "python_version",
+        "source_commit",
+        "wheel_sha256",
+        "source_anchor",
+        "source_anchor_schema",
+        "canonical_model_sha256",
+        "canonical_evaluation_sha256",
+        "analysis_request_sha256_iit4_2023",
+        "analysis_request_sha256_iit4_2026",
+        "current_state",
+        "candidate_system",
+        "quantity_id",
+        "fixed_state_semantics"
+      ],
+      "properties": {
+        "distribution": {
+          "const": "pyphi"
+        },
+        "version": {
+          "const": "2.0.0rc4"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_commit": {
+          "const": "134a8f31b49db512322465ed3ba5da7194d362fd"
+        },
+        "wheel_sha256": {
+          "const": "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+        },
+        "source_anchor": {
+          "const": "PyPhi IIT 4.0 (2023) Fig. 1A"
+        },
+        "source_anchor_schema": {
+          "const": "pyphi-reference-run-v0.1"
+        },
+        "canonical_model_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "canonical_evaluation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analysis_request_sha256_iit4_2023": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analysis_request_sha256_iit4_2026": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "current_state": {
+          "const": [
+            0,
+            1,
+            1
+          ]
+        },
+        "candidate_system": {
+          "const": [
+            0,
+            1,
+            2
+          ]
+        },
+        "quantity_id": {
+          "const": "iit4_system_phi_s"
+        },
+        "fixed_state_semantics": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "full_search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formalism_2023",
+        "formalism_2026",
+        "iit4_2023",
+        "iit4_2026",
+        "state_selection_changed",
+        "phi_reduction_2023_minus_2026"
+      ],
+      "properties": {
+        "formalism_2023": {
+          "const": "IIT_4_0_2023"
+        },
+        "formalism_2026": {
+          "const": "IIT_4_0_2026"
+        },
+        "iit4_2023": {
+          "$ref": "#/$defs/siaSummary"
+        },
+        "iit4_2026": {
+          "$ref": "#/$defs/siaSummary"
+        },
+        "state_selection_changed": {
+          "type": "boolean"
+        },
+        "phi_reduction_2023_minus_2026": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "fixed_state_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_specified_state",
+        "formalism_2023",
+        "formalism_2026",
+        "iit4_2023",
+        "iit4_2026",
+        "mip_unchanged",
+        "intrinsic_information_cap_binding",
+        "phi_reduction_2023_minus_2026"
+      ],
+      "properties": {
+        "same_specified_state": {
+          "const": true
+        },
+        "formalism_2023": {
+          "const": "IIT_4_0_2023"
+        },
+        "formalism_2026": {
+          "const": "IIT_4_0_2026"
+        },
+        "iit4_2023": {
+          "$ref": "#/$defs/siaSummary"
+        },
+        "iit4_2026": {
+          "$ref": "#/$defs/siaSummary"
+        },
+        "mip_unchanged": {
+          "const": true
+        },
+        "intrinsic_information_cap_binding": {
+          "type": "boolean"
+        },
+        "phi_reduction_2023_minus_2026": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_model_identical",
+        "fixed_state_identical",
+        "phi_2026_not_above_phi_2023",
+        "phi_2026_not_above_intrinsic_information",
+        "fixed_state_mip_unchanged",
+        "positive_2023_anchor"
+      ],
+      "properties": {
+        "canonical_model_identical": {
+          "const": true
+        },
+        "fixed_state_identical": {
+          "const": true
+        },
+        "phi_2026_not_above_phi_2023": {
+          "const": true
+        },
+        "phi_2026_not_above_intrinsic_information": {
+          "const": true
+        },
+        "fixed_state_mip_unchanged": {
+          "const": true
+        },
+        "positive_2023_anchor": {
+          "const": true
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "siaSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phi_s",
+        "signed_phi_s",
+        "normalized_phi_s",
+        "signed_normalized_phi_s",
+        "cause_phi",
+        "cause_signed_phi",
+        "effect_phi",
+        "effect_signed_phi",
+        "intrinsic_information",
+        "cause_intrinsic_specification",
+        "effect_intrinsic_specification",
+        "intrinsic_differentiation",
+        "cause_state",
+        "effect_state",
+        "mip_cut_sha256",
+        "mip_cut_removed_edges",
+        "mip_lex_key_hex",
+        "partition_margin",
+        "cause_state_margin",
+        "effect_state_margin",
+        "effectively_tied",
+        "ties_count"
+      ],
+      "properties": {
+        "phi_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "signed_phi_s": {
+          "type": "number"
+        },
+        "normalized_phi_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "signed_normalized_phi_s": {
+          "type": "number"
+        },
+        "cause_phi": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cause_signed_phi": {
+          "type": "number"
+        },
+        "effect_phi": {
+          "type": "number",
+          "minimum": 0
+        },
+        "effect_signed_phi": {
+          "type": "number"
+        },
+        "intrinsic_information": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cause_intrinsic_specification": {
+          "type": "number",
+          "minimum": 0
+        },
+        "effect_intrinsic_specification": {
+          "type": "number",
+          "minimum": 0
+        },
+        "intrinsic_differentiation": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "cause_state": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          }
+        },
+        "effect_state": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          }
+        },
+        "mip_cut_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mip_cut_removed_edges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            }
+          }
+        },
+        "mip_lex_key_hex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$"
+        },
+        "partition_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cause_state_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "effect_state_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "effectively_tied": {
+          "type": "boolean"
+        },
+        "ties_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

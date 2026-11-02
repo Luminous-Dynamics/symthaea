@@ -1,0 +1,248 @@
+{
+  "schema_version": "phi-qualification-cases-v0.1",
+  "status": "case_catalogue_only_not_evaluated",
+  "protocol": "docs/research/PHI_QUALIFICATION_V0_1.md",
+  "cases": [
+    {
+      "id": "independent-units-2",
+      "family": "disconnected_independent",
+      "construction": "Two binary units with conditionally independent transitions and no cross-unit causal edges.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "explicit_state_indexed_transition_model",
+        "independent_noise",
+        "fixed_state"
+      ],
+      "assertions": [
+        "reference_known_answer",
+        "no_silent_fallback",
+        "exactness_status_correct"
+      ],
+      "claim_ceiling": "No consciousness inference; use to test false-positive integration."
+    },
+    {
+      "id": "feedforward-chain-4",
+      "family": "feedforward",
+      "construction": "Four binary units in a directed feed-forward chain; no feedback edge.",
+      "minimum_units": 4,
+      "model_requirements": [
+        "explicit_direction",
+        "explicit_transition_probabilities",
+        "fixed_state"
+      ],
+      "assertions": [
+        "separate_reachability_from_formal_iit",
+        "report_partition_search"
+      ],
+      "claim_ceiling": "Topology/proxy result only unless a formal reference computation passes."
+    },
+    {
+      "id": "recurrent-ring-4",
+      "family": "recurrent_ring",
+      "construction": "Four binary units in a recurrent directed ring with frozen transition probabilities.",
+      "minimum_units": 4,
+      "model_requirements": [
+        "explicit_state_indexed_transition_model",
+        "fixed_noise",
+        "fixed_time_grain"
+      ],
+      "assertions": [
+        "reference_comparison",
+        "unit_relabeling_invariance",
+        "deterministic_replay"
+      ],
+      "claim_ceiling": "No universal ranking expectation across different metrics."
+    },
+    {
+      "id": "modular-cross-coupling-sweep",
+      "family": "modular_coupling",
+      "construction": "Two recurrent modules with a declared sweep of cross-module coupling from absent to nonzero.",
+      "minimum_units": 4,
+      "model_requirements": [
+        "frozen_sweep_values",
+        "paired_seeds",
+        "unchanged_boundary"
+      ],
+      "assertions": [
+        "report_full_curve",
+        "report_rank_reversals",
+        "no_selective_reporting"
+      ],
+      "claim_ceiling": "Expected direction must be preregistered separately per metric."
+    },
+    {
+      "id": "common-driver-vs-direct-edge",
+      "family": "causal_confound",
+      "construction": "Paired models designed to produce similar observational association but different interventional structure.",
+      "minimum_units": 3,
+      "model_requirements": [
+        "observationally_matched_pair",
+        "distinct_intervention_semantics",
+        "model_digests"
+      ],
+      "assertions": [
+        "do_not_equate_correlation_with_causation",
+        "report_intervention_based_reference"
+      ],
+      "claim_ceiling": "An observational proxy cannot claim causal integration from this case alone."
+    },
+    {
+      "id": "bridge-edge-deletion",
+      "family": "intervention_perturbation",
+      "construction": "A connected modular model before and after deletion of a specified bridge edge.",
+      "minimum_units": 4,
+      "model_requirements": [
+        "pre_and_post_model_digests",
+        "specified_intervention",
+        "same_evaluation_state"
+      ],
+      "assertions": [
+        "intervention_recorded",
+        "no_unlogged_topology_mutation",
+        "metric_specific_expected_direction"
+      ],
+      "claim_ceiling": "Do not assume all measures have the same response to an edge deletion."
+    },
+    {
+      "id": "causal-unit-permutation",
+      "family": "representation_invariance",
+      "construction": "The same transition model with unit labels permuted consistently in all states and transition tables.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "permutation_manifest",
+        "semantics_preserved"
+      ],
+      "assertions": [
+        "result_invariant_within_declared_tolerance"
+      ],
+      "claim_ceiling": "Invariant only for metrics whose specification is label-independent."
+    },
+    {
+      "id": "hypervector-coordinate-permutation",
+      "family": "representation_invariance",
+      "construction": "The same hypervectors after a common permutation of coordinate indices.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "fixed_permutation_seed",
+        "identical_coordinate_permutation_for_all_vectors"
+      ],
+      "assertions": [
+        "representation_invariance_if_claimed",
+        "build_and_seed_recorded"
+      ],
+      "claim_ceiling": "Does not test causal IIT unless a causal model is independently supplied."
+    },
+    {
+      "id": "duplicate-unit-pressure",
+      "family": "redundancy_and_scale",
+      "construction": "Compare a base system with a declared duplicated or near-duplicate unit; preserve the original system as a paired case.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "base_and_variant_digests",
+        "duplicate_operation_declared"
+      ],
+      "assertions": [
+        "report_size_and_redundancy",
+        "separate_score_from_task_utility"
+      ],
+      "claim_ceiling": "No assumed universal direction for formal IIT quantities."
+    },
+    {
+      "id": "noise-and-sample-sweep",
+      "family": "estimator_calibration",
+      "construction": "Fixed underlying model measured over preregistered noise levels and sample counts.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "frozen_grid",
+        "paired_seeds",
+        "reference_value_where_available"
+      ],
+      "assertions": [
+        "error_vs_sample_size",
+        "bias_and_variance_reported",
+        "interval_coverage_if_claimed"
+      ],
+      "claim_ceiling": "A point estimate without uncertainty is not a calibration result."
+    },
+    {
+      "id": "boundary-spectator-unit",
+      "family": "boundary_sensitivity",
+      "construction": "Evaluate a subsystem and a declared boundary expansion with a causally independent spectator unit.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "explicit_boundary_variants",
+        "spectator_transition_model"
+      ],
+      "assertions": [
+        "boundary_reported",
+        "exclusion_search_status_reported"
+      ],
+      "claim_ceiling": "Do not conceal boundary sensitivity or claim exclusion was searched if it was not."
+    },
+    {
+      "id": "time-grain-coarsening",
+      "family": "temporal_grain",
+      "construction": "Compare explicitly constructed micro-step and grouped-step transition models over the same underlying process.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "micro_and_macro_transition_models",
+        "declared_grouping_window"
+      ],
+      "assertions": [
+        "grain_identity_reported",
+        "only_like_for_like_comparison"
+      ],
+      "claim_ceiling": "Different grains denote different models; raw values are not automatically comparable."
+    },
+    {
+      "id": "observationally-matched-model-mismatch",
+      "family": "model_misspecification",
+      "construction": "Paired models fit the same observational summaries but differ on at least one intervention.",
+      "minimum_units": 3,
+      "model_requirements": [
+        "frozen_observational_match_tolerance",
+        "intervention_witness",
+        "model_digests"
+      ],
+      "assertions": [
+        "flag_model_assumption",
+        "no_causal_claim_from_observational_fit"
+      ],
+      "claim_ceiling": "Association-only fit does not validate a causal transition model."
+    },
+    {
+      "id": "invalid-transition-model",
+      "family": "invalid_input",
+      "construction": "Remove or corrupt a required transition-model field, introduce a non-finite value, or mismatch unit/state dimensions.",
+      "minimum_units": 2,
+      "model_requirements": [
+        "one_fault_per_fixture",
+        "expected_error_code"
+      ],
+      "assertions": [
+        "fail_closed",
+        "unscorable_not_zero",
+        "no_fallback_substitution"
+      ],
+      "claim_ceiling": "Invalid inputs must not pass qualification."
+    },
+    {
+      "id": "task-utility-negative-control",
+      "family": "cognitive_utility",
+      "construction": "Paired held-out cognitive tasks where increased proxy values can be unrelated or adverse to task success.",
+      "minimum_units": 0,
+      "model_requirements": [
+        "fixed_task_split",
+        "compute_matched_baselines",
+        "shuffle_control",
+        "preregistered_utility_gate"
+      ],
+      "assertions": [
+        "paired_task_analysis",
+        "report_failures_and_abstentions",
+        "no_consciousness_inference"
+      ],
+      "claim_ceiling": "Operational value is a task claim, not a consciousness claim."
+    }
+  ]
+}

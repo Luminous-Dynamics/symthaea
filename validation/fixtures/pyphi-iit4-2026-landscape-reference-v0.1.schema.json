@@ -1,0 +1,453 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/fixtures/pyphi-iit4-2026-landscape-reference-v0.1.schema.json",
+  "title": "Paired PyPhi IIT 4.0 (2026) Intrinsic-Information Landscape Reference v0.1",
+  "description": "Thirteen exact IIT4-2026 landscape points paired to identical canonical TPMs and IIT4-2023 reference results. Records the Eq. 23 intrinsic-information cap and cross-formalism selection changes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "qualification_scope",
+    "consciousness_inference_permitted",
+    "provenance",
+    "points",
+    "skipped_points",
+    "summary",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pyphi-iit4-2026-landscape-reference-v0.1"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "qualification_scope": {
+      "const": "pinned_pyphi_iit4_2026_intrinsic_information_landscape_reference_only"
+    },
+    "consciousness_inference_permitted": {
+      "const": false
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version",
+        "python_version",
+        "formalism",
+        "paired_formalism",
+        "quantity_id",
+        "wheel_sha256",
+        "source_commit",
+        "candidate_system",
+        "state",
+        "parameter_name",
+        "grid",
+        "system_phi_measure",
+        "equation",
+        "comparison_invariant",
+        "grid_semantics"
+      ],
+      "properties": {
+        "distribution": {
+          "const": "pyphi"
+        },
+        "version": {
+          "const": "2.0.0rc4"
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formalism": {
+          "const": "IIT_4_0_2026"
+        },
+        "paired_formalism": {
+          "const": "IIT_4_0_2023"
+        },
+        "quantity_id": {
+          "const": "iit4_system_phi_s"
+        },
+        "wheel_sha256": {
+          "const": "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+        },
+        "source_commit": {
+          "const": "134a8f31b49db512322465ed3ba5da7194d362fd"
+        },
+        "candidate_system": {
+          "const": [
+            0,
+            1,
+            2
+          ]
+        },
+        "state": {
+          "const": [
+            1,
+            0,
+            1
+          ]
+        },
+        "parameter_name": {
+          "const": "target0_parent_state_3_probability"
+        },
+        "grid": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "system_phi_measure": {
+          "const": "INTRINSIC_INFORMATION"
+        },
+        "equation": {
+          "const": "phi_s_2026 = min(phi_c, phi_e, ii(s))"
+        },
+        "comparison_invariant": {
+          "const": "phi_s_2026 <= phi_s_2023 at every identical model/state search"
+        },
+        "grid_semantics": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "points": {
+      "type": "array",
+      "minItems": 13,
+      "maxItems": 13,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "point_index",
+          "theta",
+          "tpm",
+          "connectivity",
+          "model_sha256",
+          "evaluation_sha256",
+          "analysis_request_sha256",
+          "paired_2023_model_sha256",
+          "paired_2023_evaluation_sha256",
+          "phi_2023",
+          "signed_phi_2023",
+          "phi_2026",
+          "signed_phi_2026",
+          "normalized_phi_2026",
+          "signed_normalized_phi_2026",
+          "intrinsic_information",
+          "cause_phi",
+          "cause_signed_phi",
+          "effect_phi",
+          "effect_signed_phi",
+          "intrinsic_differentiation",
+          "cause_state",
+          "effect_state",
+          "partition",
+          "mip_cut_sha256",
+          "mip_cut_removed_edges",
+          "mip_lex_key_hex",
+          "partition_margin",
+          "cause_state_margin",
+          "effect_state_margin",
+          "effectively_tied",
+          "regime",
+          "delta_phi_2023_minus_2026",
+          "intrinsic_cap_binding",
+          "selected_state_matches_2023",
+          "qualification"
+        ],
+        "properties": {
+          "point_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12
+          },
+          "theta": {
+            "type": "number"
+          },
+          "tpm": {
+            "type": "array",
+            "minItems": 8,
+            "maxItems": 8,
+            "items": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "connectivity": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "model_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evaluation_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "analysis_request_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "paired_2023_model_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "paired_2023_evaluation_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "phi_2023": {
+            "type": "number",
+            "minimum": 0
+          },
+          "signed_phi_2023": {
+            "type": "number"
+          },
+          "phi_2026": {
+            "type": "number",
+            "minimum": 0
+          },
+          "signed_phi_2026": {
+            "type": "number"
+          },
+          "normalized_phi_2026": {
+            "type": "number",
+            "minimum": 0
+          },
+          "signed_normalized_phi_2026": {
+            "type": "number"
+          },
+          "intrinsic_information": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cause_phi": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cause_signed_phi": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "effect_phi": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "effect_signed_phi": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "intrinsic_differentiation": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "cause_state": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          "effect_state": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          "partition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mip_cut_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "mip_cut_removed_edges": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              }
+            }
+          },
+          "mip_lex_key_hex": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(?:[0-9a-f]{2})+$"
+          },
+          "partition_margin": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cause_state_margin": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "effect_state_margin": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "effectively_tied": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "regime": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12
+          },
+          "delta_phi_2023_minus_2026": {
+            "type": "number",
+            "minimum": 0
+          },
+          "intrinsic_cap_binding": {
+            "type": "boolean"
+          },
+          "selected_state_matches_2023": {
+            "type": "boolean"
+          },
+          "qualification": {
+            "const": "EXACT_SAMPLE_ONLY"
+          }
+        }
+      }
+    },
+    "skipped_points": {
+      "const": []
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_point_count",
+        "computed_point_count",
+        "distinct_model_digest_count",
+        "all_points_complete",
+        "intrinsic_cap_binding_count",
+        "state_selection_change_count",
+        "mean_phi_reduction",
+        "max_phi_reduction"
+      ],
+      "properties": {
+        "expected_point_count": {
+          "const": 13
+        },
+        "computed_point_count": {
+          "const": 13
+        },
+        "distinct_model_digest_count": {
+          "const": 13
+        },
+        "all_points_complete": {
+          "const": true
+        },
+        "intrinsic_cap_binding_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 13
+        },
+        "state_selection_change_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 13
+        },
+        "mean_phi_reduction": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_phi_reduction": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
