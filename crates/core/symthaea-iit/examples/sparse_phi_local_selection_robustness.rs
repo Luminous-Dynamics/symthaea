@@ -184,12 +184,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             return Err(format!("baseline theta={anchor_theta} was incomplete").into());
         }
 
-        for mechanism_index in 0..3 {
-            for row_index in 0..4 {
+        for (mechanism_index, mechanism_table) in BASE_TABLES.iter().enumerate() {
+            for (row_index, table_probability) in mechanism_table.iter().enumerate() {
                 let base_probability = if mechanism_index == 0 && row_index == 3 {
                     anchor_theta
                 } else {
-                    BASE_TABLES[mechanism_index][row_index]
+                    *table_probability
                 };
                 for delta in DELTAS {
                     let started = Instant::now();
