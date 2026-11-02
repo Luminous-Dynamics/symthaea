@@ -20,13 +20,12 @@ from pathlib import PurePosixPath
 from typing import Any
 
 EXPECTED_MD5 = "55fbf9a0ffbc2f605da1792226471711"
-EXPECTED_SIZE = 28_279_082
 MAX_JSON_INSPECT_BYTES = 5 * 1024 * 1024
 MAX_HEADERS = 256
 
 
 def digest_file(path: str) -> dict[str, Any]:
-    md5 = hashlib.md5()
+    md5 = hashlib.md5(usedforsecurity=False)
     sha256 = hashlib.sha256()
     size = 0
     with open(path, "rb") as source:
@@ -94,10 +93,6 @@ def main() -> int:
         raise SystemExit(
             f"MD5 mismatch: expected {EXPECTED_MD5}, got {file_digest['md5']}"
         )
-    if file_digest["size_bytes"] != EXPECTED_SIZE:
-        raise SystemExit(
-            f"size mismatch: expected {EXPECTED_SIZE}, got {file_digest['size_bytes']}"
-        )
 
     with zipfile.ZipFile(args.archive) as archive:
         infos = [info for info in archive.infolist() if not info.is_dir()]
@@ -129,8 +124,6 @@ def main() -> int:
                 "compressed_size_bytes": info.compress_size,
             }
             suffix = PurePosixPath(info.filename).suffix.lower()
-            lower_path = info.filename.lower()
-
             if suffix in {".csv", ".tsv"}:
                 headers = csv_header(archive, info)
                 if headers is not None:
