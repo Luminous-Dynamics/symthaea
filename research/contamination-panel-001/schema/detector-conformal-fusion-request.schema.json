@@ -9,6 +9,10 @@
     "study_id",
     "benchmark_id",
     "benchmark_version",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "prompt_harness_sha256",
+    "runtime_environment_sha256",
     "calibration_protocol_sha256",
     "detector_registry_sha256",
     "target_alpha_permille",
@@ -103,6 +107,7 @@
         "additionalProperties": false,
         "required": [
           "calibration_unit_id",
+          "source_cluster_sha256",
           "task_family",
           "model_regime",
           "features"
@@ -157,6 +162,10 @@
                 }
               }
             }
+          },
+          "source_cluster_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
@@ -170,6 +179,7 @@
         "additionalProperties": false,
         "required": [
           "calibration_unit_id",
+          "source_cluster_sha256",
           "task_family",
           "model_regime",
           "features"
@@ -224,6 +234,10 @@
                 }
               }
             }
+          },
+          "source_cluster_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
@@ -237,6 +251,7 @@
         "additionalProperties": false,
         "required": [
           "evaluation_unit_id",
+          "source_cluster_sha256",
           "task_family",
           "model_regime",
           "features",
@@ -298,9 +313,29 @@
               "boolean",
               "null"
             ]
+          },
+          "source_cluster_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "runtime_environment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
