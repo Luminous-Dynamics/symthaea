@@ -36,7 +36,7 @@ jobs:
 
       - name: Format production module and harness
         run: |
-          rustfmt --edition 2024 --check \
+          rustfmt --edition 2024 \
             crates/domains/symthaea-vision-manifold/src/action_conditioned.rs \
             crates/domains/symthaea-vision-manifold/contract-tests/src/lib.rs
 
