@@ -208,7 +208,7 @@ def run_cell(
             "probability_any_false": float(any_false[name].mean()),
         }
 
-    ranks = [rank for rank, _mass in rank_geometric_points(family_size, alpha)]
+    raw_thresholds = [threshold for threshold, _mass in rank_geometric_points(family_size, alpha)]
     return {
         "metadata": {
             "family_size": family_size,
@@ -220,7 +220,7 @@ def run_cell(
             "alternative_fraction": alternative_fraction,
             "seed": seed,
             "dependence": dependence,
-            "rank_grid_raw_thresholds": ranks,
+            "rank_grid_raw_thresholds": raw_thresholds,
             "numpy_version": np.__version__,
             "claim_class": "exploratory_simulation_only",
         },
