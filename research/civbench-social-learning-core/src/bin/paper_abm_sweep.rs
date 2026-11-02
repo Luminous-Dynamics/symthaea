@@ -1,13 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Source-informed, 50-replication sensitivity suite for the 20-generation
-//! Reward Network III exploratory ABM.
+//! 50-replication sensitivity suite for CivBench's compact strategy-adoption
+//! reference model.
 //!
-//! This separates (a) discovery capacity/bias, (b) machine availability and
-//! social persistence, and (c) population/machine-prevalence robustness.
-//! It is parameter-aligned with the published supplementary ranges, but it
-//! is not an exact replay of the authors' parameter grid or RNG streams.
+//! This is an exploratory ablation model, not the archived Reward Network III
+//! notebook ABM. Use reward_network_abm_reference_sweep for the notebook-aligned
+//! semantic port and the archived parameter families.
 
 use civbench_social_learning_core::paper_abm::{
     simulate, Config, MachineAvailability, MachinePlacement, PAPER_ABM_REPLICATIONS,
