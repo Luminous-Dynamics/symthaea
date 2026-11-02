@@ -458,4 +458,19 @@ mod tests {
         assert!(plan.selected_operation_ids.is_empty());
         assert_eq!(plan.deferred_operation_ids, vec!["zero"]);
     }
+    #[test]
+    fn input_row_permutation_does_not_change_plan_or_cost_receipt() {
+        let first = vec![
+            candidate("a", 0.333333333333, 3.0, 0.91, 37),
+            candidate("b", 0.777777777777, 2.0, 0.83, 41),
+            candidate("c", 0.111111111111, 9.0, 0.75, 19),
+        ];
+        let second = vec![first[2].clone(), first[0].clone(), first[1].clone()];
+
+        let first_plan = plan_reviews(&first, ReviewBudget { seconds: 60 }).unwrap();
+        let second_plan = plan_reviews(&second, ReviewBudget { seconds: 60 }).unwrap();
+
+        assert_eq!(first_plan, second_plan);
+    }
+
 }
