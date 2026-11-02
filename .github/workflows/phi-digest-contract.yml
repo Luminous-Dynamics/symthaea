@@ -24,7 +24,10 @@ on:
       - "validation/test_pyphi_landscape_reference_contract.py"
       - "validation/compare_iit4_landscape_reference.py"
       - "validation/test_compare_iit4_landscape_reference.py"
+      - "validation/generate_pyphi_iit4_2026_landscape_reference.py"
+      - "validation/test_pyphi_iit4_2026_landscape_contract.py"
       - "validation/fixtures/pyphi-iit4-2023-landscape-reference-v0.1.schema.json"
+      - "validation/fixtures/pyphi-iit4-2026-landscape-reference-v0.1.schema.json"
       - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
       - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
       - ".github/workflows/phi-digest-contract.yml"
@@ -54,7 +57,7 @@ jobs:
           python-version: "3.13.17"
 
       - name: Run dependency-free contract and fixture tests
-        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract validation.test_compare_iit4_landscape_reference -v
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract validation.test_compare_iit4_landscape_reference validation.test_pyphi_iit4_2026_landscape_contract -v
 
   pyphi-reference:
     name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
@@ -302,6 +305,40 @@ jobs:
               assert all(math.isfinite(score["signed_phi"]) and math.isfinite(score["normalized_phi"]) for score in point["partition_scores"])
           assert all(b["qualification"] == "GRID_RESOLUTION_SWITCH_BRACKET_NOT_CERTIFIED" for b in data["grid_resolution_boundaries"])
           print("PASS: 13 pinned PyPhi landscape samples; all partition score vectors and MIP tie families captured; grid brackets remain uncertified")
+          PY
+
+      - name: Generate paired PyPhi IIT 4.0 (2026) intrinsic-information landscape
+        shell: bash
+        run: |
+          python validation/generate_pyphi_iit4_2026_landscape_reference.py \
+            --reference-2023 target/pyphi-reference/PYPHI_IIT4_2023_LANDSCAPE.json \
+            --output target/pyphi-reference/PYPHI_IIT4_2026_LANDSCAPE.json
+
+      - name: Verify paired IIT4-2026 intrinsic-information landscape
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          path = Path("target/pyphi-reference/PYPHI_IIT4_2026_LANDSCAPE.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-2026-landscape-reference-v0.1"
+          assert data["provenance"]["formalism"] == "IIT_4_0_2026"
+          assert data["provenance"]["paired_formalism"] == "IIT_4_0_2023"
+          assert data["provenance"]["system_phi_measure"] == "INTRINSIC_INFORMATION"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          points = data["points"]
+          assert len(points) == 13 and data["skipped_points"] == []
+          assert len({p["model_sha256"] for p in points}) == 13
+          assert all(p["model_sha256"] == p["paired_2023_model_sha256"] for p in points)
+          assert all(p["evaluation_sha256"] == p["paired_2023_evaluation_sha256"] for p in points)
+          assert all(p["phi_2026"] <= p["phi_2023"] + 1e-10 for p in points)
+          assert all(p["phi_2026"] <= p["intrinsic_information"] + 1e-10 for p in points)
+          assert all(math.isfinite(p["delta_phi_2023_minus_2026"]) and p["delta_phi_2023_minus_2026"] >= -1e-10 for p in points)
+          assert all(p["qualification"] == "EXACT_SAMPLE_ONLY" for p in points)
+          assert data["summary"]["computed_point_count"] == 13
+          print("PASS: 13 paired IIT4-2026 points; same TPM/evaluation identities; phi2026 <= phi2023 and ii(s)")
           PY
 
       - name: Upload pinned PyPhi reference evidence
