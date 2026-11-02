@@ -32,8 +32,10 @@ use crate::temporal_intervention_family::{
     TemporalInterventionFamily,
     TemporalInterventionLedgerError,
     TemporalInterventionPairOutcome,
+    TemporalInterventionEvidenceLedger,
     temporal_intervention_stream_id,
     verify_temporal_intervention_family,
+    verify_temporal_intervention_evidence_ledger,
 };
 
 const SUPPORT_DOMAIN: &[u8] = b"symthaea.temporal-fsd-support-profile.v0.1\0";
@@ -515,6 +517,68 @@ impl FirstOrderDominanceState {
             }).collect(),
         }
     }
+}
+
+
+/// Reconstruct an FSD report from the canonical temporal intervention evidence ledger.
+///
+/// The generic temporal ledger is the source of truth for ordered pair outcomes,
+/// assignment receipts, context/source-family bindings and cumulative look history.
+/// This function verifies the entire ledger, checks that its contrast family matches
+/// the frozen finite-support family, then deterministically replays the selected
+/// contrast/axis stream. No second persistent FSD history is needed.
+pub fn replay_first_order_dominance_from_evidence_ledger(
+    family: &TemporalStochasticDominanceFamily,
+    evidence_ledger: &TemporalInterventionEvidenceLedger,
+    contrast_id: &str,
+    axis: TemporalInterventionAxis,
+    clip_c_ppm: u32,
+    maximum_pairs: u64,
+) -> Result<FirstOrderDominanceReport, TemporalStochasticDominanceError> {
+    verify_temporal_stochastic_dominance_family(family)?;
+    verify_temporal_intervention_evidence_ledger(evidence_ledger)
+        .map_err(TemporalStochasticDominanceError::from_temporal)?;
+    if evidence_ledger.family != family.temporal_family {
+        return Err(TemporalStochasticDominanceError::new(
+            "evidence_ledger.family",
+            "temporal evidence ledger family does not match the stochastic-dominance family",
+        ));
+    }
+
+    let stream_id = temporal_intervention_stream_id(
+        &family.temporal_family, contrast_id, axis,
+    ).map_err(TemporalStochasticDominanceError::from_temporal)?;
+
+    let mut bindings: Vec<_> = evidence_ledger.pair_bindings.iter()
+        .filter(|binding| binding.stream_id == stream_id)
+        .collect();
+    bindings.sort_by_key(|binding| binding.look_index);
+    if bindings.windows(2).any(|pair| pair[0].look_index + 1 != pair[1].look_index) {
+        return Err(TemporalStochasticDominanceError::new(
+            "pair_bindings.look_index",
+            "selected stream look sequence is not contiguous",
+        ));
+    }
+
+    let mut state = FirstOrderDominanceState::new(
+        family, contrast_id, axis, clip_c_ppm, maximum_pairs,
+    )?;
+    let mut sequence = 0_u64;
+    for binding in bindings {
+        if binding.contrast_id != contrast_id || binding.axis != axis {
+            return Err(TemporalStochasticDominanceError::new(
+                "pair_bindings.identity",
+                "selected stream binding has a mismatched contrast or axis",
+            ));
+        }
+        for pair in &binding.pair_outcomes {
+            sequence = sequence.checked_add(1).ok_or_else(|| {
+                TemporalStochasticDominanceError::new("sequence", "pair sequence overflow")
+            })?;
+            state.observe(sequence, pair)?;
+        }
+    }
+    Ok(state.report())
 }
 
 fn validate_pair(
