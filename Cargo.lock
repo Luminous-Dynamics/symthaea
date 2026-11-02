@@ -19779,6 +19779,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-rea-investigator"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-ros-bridge"
 version = "0.1.0"
 dependencies = [
@@ -19800,10 +19804,6 @@ dependencies = [
  "tracing",
  "trajectory_msgs",
 ]
-
-[[package]]
-name = "symthaea-rea-investigator"
-version = "0.1.0"
 
 [[package]]
 name = "symthaea-runtime"
