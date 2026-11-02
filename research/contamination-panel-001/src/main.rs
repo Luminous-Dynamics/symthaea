@@ -4,7 +4,6 @@ use contamination_panel_bench::{
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
-    policy_rigidity_controls::{PolicyRigidityControlsRequestV1, analyze_policy_rigidity_controls},
     ftd::{
         FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
         empirical_reference_p_values, ftd_weighted_cauchy_bh,
@@ -14,6 +13,7 @@ use contamination_panel_bench::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
         randomize_intervention,
     },
+    policy_rigidity_controls::{PolicyRigidityControlsRequestV1, analyze_policy_rigidity_controls},
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
