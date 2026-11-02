@@ -30,7 +30,7 @@ The monitor receives both commands and evidence through an explicit observation 
 - Observation timestamps must be finite, non-negative and strictly increasing. Excessive gaps and stale/future state timestamps trigger a finding.
 - Estimator, real-time, actuator, model-applicability, envelope-margin and controllability-margin gates are explicit.
 - Disagreement between advanced and baseline commands is a monitor finding.
-- A baseline command is selectable only when it is well-formed and the caller explicitly declares its profile admissible.
+- A baseline command is selectable only when it is well-formed, its profile is explicitly declared admissible, and separate caller-supplied health declarations cover baseline inputs, baseline controller, baseline execution path, monitor timing and the shared actuator path. If any are unavailable, the result is `NoAdmissibleFallback` with no selected command.
 - If the fallback is unavailable or malformed, the monitor returns `NoAdmissibleFallback` and `selected_command = None`.
 - Any monitor finding immediately selects the admissible baseline; a clean dwell and a bounded linear transition are required before advanced authority is restored.
 - Each decision retains a compact witness, exact profile ID, a BLAKE3 digest of the deterministic `serde_json` serialization of the v0.1 monitor configuration, mode and findings. This digest distinguishes configuration changes but is neither a signature nor a canonical cross-language encoding.
