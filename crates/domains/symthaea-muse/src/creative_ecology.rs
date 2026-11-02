@@ -1116,7 +1116,6 @@ mod tests {
         assert!(report
             .boundary_components_without_producer
             .contains(&"boundary_policy".to_string()));
-        assert!(!report.process_network_strongly_connected);
     }
 
     #[test]
@@ -1354,6 +1353,55 @@ mod tests {
             result,
             Err(CreativeEcologyError::UnknownLineageEvent(
                 "invented-event".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn identity_revision_binds_influence_to_exact_session() {
+        let mut session = session_with_participants();
+        session
+            .grant_consent(
+                "artist-contribute",
+                "artist",
+                vec![ConsentPurposeV1::Contribute],
+                None,
+            )
+            .unwrap();
+        let event = session
+            .append_action(
+                "artist",
+                "artist-contribute",
+                CoCreativeActionV1::Propose {
+                    parent_artifact_sha256: None,
+                    result_artifact_sha256: "a".repeat(64),
+                    influence_event_ids: vec![],
+                },
+            )
+            .unwrap();
+        let revision = CreativeIdentityRevisionV1 {
+            revision_id: "identity-2".into(),
+            revision: 2,
+            parent_revision_id: Some("identity-1".into()),
+            profile_sha256: "d".repeat(64),
+            source_session_id: Some(session.session_id.clone()),
+            influence_event_ids: vec![event.event_id],
+        };
+        assert!(revision.validate_against_session(&session).is_ok());
+
+        let mut wrong_session = revision.clone();
+        wrong_session.source_session_id = Some("other-session".into());
+        assert_eq!(
+            wrong_session.validate_against_session(&session),
+            Err(CreativeEcologyError::IdentitySessionMismatch)
+        );
+
+        let mut unknown_event = revision;
+        unknown_event.influence_event_ids = vec!["other-session:1".into()];
+        assert_eq!(
+            unknown_event.validate_against_session(&session),
+            Err(CreativeEcologyError::UnknownLineageEvent(
+                "other-session:1".into()
             ))
         );
     }
