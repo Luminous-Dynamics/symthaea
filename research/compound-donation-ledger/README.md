@@ -11,15 +11,16 @@ The crate implements two bounded pieces:
 1. A fixed-point, append-only donation ledger. Each donor automatically
    reserves a precommitted fraction of its **own new adjusted-evidence
    increments**. Incoming donations cannot be re-donated. Reservations become
-   source-tagged escrow tokens; tokens can be credited once (or split without
-   exceeding the original amount) only to the donor's precommitted recipient
-   slot, once that recipient is active and has positive weight.
+   source-tagged escrow tokens; each token records its precommitted destination
+   ID and can be credited once (or split without exceeding the original
+   amount) only to that destination after it is active and has positive weight.
 2. A finite staircase calibrator. It evaluates the threshold-budget function
    A_pi(x) = sum_j pi_j K_j 1{x >= K_j} using integer arithmetic and a
    precommitted prior-mass budget. It also supplies a finite prefix of the
    universal dyadic prior pi_j = 1/(j(j+1)), K_j = 2^j, and an
-   e-BH rank-geometric constructor for a fixed family-size envelope and
-   rational alpha, including candidate-specific rational weights.
+   e-BH rank-geometric constructors: a family-size-specialized version and
+   a horizon-independent candidate-weighted rank prior that works across
+   family-size growth without changing earlier candidates' calibrators.
 
 The ledger receives already-calibrated, nondecreasing evidence values. It does
 not compute likelihood ratios, test martingales, e-processes, null models,
@@ -114,3 +115,22 @@ This is not production code and does not compute evidence processes from real
 data. It is an exploratory simulation harness; frozen confirmatory manifests,
 held-out seeds, broader dependence and alternative families are required
 before performance claims.
+
+## Horizon-independent rank calibration
+
+The `StaircaseAdjuster::projective_weighted_e_bh_rank_prior` constructor is
+independent of the active family size. For a fixed candidate weight
+`weight_numerator / weight_denominator` and rational alpha, it places prior
+mass `1 / ((j + 1)(j + 2))` at the dyadic rank `2^j`. The masses telescope
+to one. The 64-point u64 implementation covers every possible finite rank;
+the remaining prior tail is unspent. The candidate's weight must be fixed as
+part of the global summable weight sequence, not renormalized when the active
+roster grows. See RESEARCH.md for the validity proof and O((log k)^2)
+rank-threshold overhead.
+
+The fixed-family `weighted_e_bh_rank_geometric` constructor can be more
+powerful when the family size is genuinely known in advance, because it
+spends more prior mass on that finite rank range. Do not recalculate that
+constructor as the active family grows. Use the projective constructor when
+horizon extension is a requirement.
+
