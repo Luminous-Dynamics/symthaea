@@ -7,6 +7,9 @@
 
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
 pub const ACTION_CONDITIONED_FORECAST_SCHEMA_VERSION: u32 = 1;
 
 /// The declared source of pairing across action-conditioned forecast draws.
@@ -14,7 +17,8 @@ pub const ACTION_CONDITIONED_FORECAST_SCHEMA_VERSION: u32 = 1;
 /// This declaration is metadata, not proof that a producer actually used the
 /// same latent/noise draw. A future adapter receipt must retain and verify the
 /// source draw tape or model-side sample provenance independently.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ActionDrawCoupling {
     SharedPosteriorAndWorldNoise,
     PairedExogenousDisturbance,
@@ -22,7 +26,7 @@ pub enum ActionDrawCoupling {
 }
 
 /// One candidate action in the frozen, canonical action manifest.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionDescriptor {
     pub action_id: u64,
     /// Canonical serialized action payload, including units and action-space version.
@@ -46,6 +50,7 @@ pub struct ObservedVisualBelief<'a> {
 pub struct ActionForecastRequest<'a> {
     pub observed: ObservedVisualBelief<'a>,
     pub action_manifest_sha256: &'a str,
+    pub joint_draw_manifest_sha256: &'a str,
     pub model_sha256: &'a str,
     pub horizon_seconds: f64,
     pub target_frame_sequence: u64,
@@ -59,6 +64,7 @@ impl ActionForecastRequest<'_> {
     pub fn validate(&self) -> Result<(), String> {
         validate_sha256("history_sha256", self.observed.history_sha256)?;
         validate_sha256("action_manifest_sha256", self.action_manifest_sha256)?;
+        validate_sha256("joint_draw_manifest_sha256", self.joint_draw_manifest_sha256)?;
         validate_sha256("model_sha256", self.model_sha256)?;
         validate_vector("observed belief", self.observed.belief)?;
         if !self.observed.captured_at_seconds.is_finite()
@@ -94,6 +100,10 @@ impl ActionForecastRequest<'_> {
                 return Err(format!("duplicate action ID {}", action.action_id));
             }
         }
+        let action_digest = compute_action_manifest_sha256(self.actions)?;
+        if action_digest != self.action_manifest_sha256 {
+            return Err("action manifest digest does not match canonical action descriptors".into());
+        }
         if self.joint_draw_ids.len() < 2 {
             return Err("a joint action bank requires at least two joint draws".into());
         }
@@ -103,12 +113,16 @@ impl ActionForecastRequest<'_> {
                 return Err(format!("duplicate joint draw ID {draw_id}"));
             }
         }
+        let draw_digest = compute_joint_draw_manifest_sha256(self.joint_draw_ids, self.coupling)?;
+        if draw_digest != self.joint_draw_manifest_sha256 {
+            return Err("joint draw manifest digest does not match draw IDs and coupling".into());
+        }
         Ok(())
     }
 }
 
 /// One predicted visual belief for one action and one joint draw.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionForecastSample {
     pub action_id: u64,
     pub joint_draw_id: u64,
@@ -119,12 +133,14 @@ pub struct ActionForecastSample {
 }
 
 /// Output of the predictor for a single immutable history and action set.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionForecastBank {
     pub schema_version: u32,
     pub history_sha256: String,
     pub action_manifest_sha256: String,
+    pub joint_draw_manifest_sha256: String,
     pub model_sha256: String,
+    pub bank_sha256: String,
     pub source_frame_sequence: u64,
     pub issued_at_seconds: f64,
     pub horizon_seconds: f64,
@@ -149,7 +165,9 @@ impl ActionForecastBank {
         }
         validate_sha256("history_sha256", &self.history_sha256)?;
         validate_sha256("action_manifest_sha256", &self.action_manifest_sha256)?;
+        validate_sha256("joint_draw_manifest_sha256", &self.joint_draw_manifest_sha256)?;
         validate_sha256("model_sha256", &self.model_sha256)?;
+        validate_sha256("bank_sha256", &self.bank_sha256)?;
         validate_vector("persistence belief", &self.persistence_belief)?;
         if !self.issued_at_seconds.is_finite() || self.issued_at_seconds < 0.0 {
             return Err("issued_at_seconds must be finite and non-negative".into());
@@ -215,6 +233,14 @@ impl ActionForecastBank {
             }
             validate_vector("predicted belief", &sample.predicted_belief)?;
         }
+        let expected_draw_digest =
+            compute_joint_draw_manifest_sha256(&self.joint_draw_ids, self.coupling)?;
+        if expected_draw_digest != self.joint_draw_manifest_sha256 {
+            return Err("joint draw manifest digest mismatch".into());
+        }
+        if compute_action_forecast_bank_sha256(self) != self.bank_sha256 {
+            return Err("action forecast bank content digest mismatch".into());
+        }
         Ok(())
     }
 
@@ -235,6 +261,9 @@ impl ActionForecastBank {
         if self.action_manifest_sha256 != request.action_manifest_sha256 {
             return Err("producer changed the action-manifest identity".into());
         }
+        if self.joint_draw_manifest_sha256 != request.joint_draw_manifest_sha256 {
+            return Err("producer changed the joint-draw manifest identity".into());
+        }
         if self.model_sha256 != request.model_sha256 {
             return Err("producer changed the model/checkpoint identity".into());
         }
@@ -247,12 +276,15 @@ impl ActionForecastBank {
         if self.coupling != request.coupling {
             return Err("producer changed the declared draw coupling".into());
         }
-        let requested_actions: Vec<u64> = request.actions.iter().map(|item| item.action_id).collect();
-        if self.action_ids != requested_actions {
-            return Err("producer changed candidate action identities or order".into());
+        let requested_actions: HashSet<u64> = request.actions.iter().map(|item| item.action_id).collect();
+        let returned_actions: HashSet<u64> = self.action_ids.iter().copied().collect();
+        if returned_actions != requested_actions {
+            return Err("producer changed candidate action identities".into());
         }
-        if self.joint_draw_ids != request.joint_draw_ids {
-            return Err("producer changed joint draw identities or order".into());
+        let requested_draws: HashSet<u64> = request.joint_draw_ids.iter().copied().collect();
+        let returned_draws: HashSet<u64> = self.joint_draw_ids.iter().copied().collect();
+        if returned_draws != requested_draws {
+            return Err("producer changed joint draw identities".into());
         }
         if self.persistence_belief.len() != request.observed.belief.len()
             || self
@@ -302,14 +334,15 @@ pub struct BranchVisualObservation<'a> {
 }
 
 /// Why a pending forecast could not be scored at its exact target.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ForecastExpiryReason {
     TargetFrameSkipped,
     ObservationArrivedTooLate,
 }
 
 /// Score of one forecast against its exact later branch observation.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionVisualForecastScore {
     pub history_sha256: String,
     pub action_manifest_sha256: String,
@@ -329,7 +362,8 @@ pub struct ActionVisualForecastScore {
     pub relative_skill: Option<f64>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status", content = "score", rename_all = "snake_case")]
 pub enum ForecastObservationResult {
     Unmatched,
     NotDue,
@@ -515,6 +549,111 @@ impl ActionConditionedForecastEvaluator {
     }
 }
 
+fn append_len_prefixed(bytes: &mut Vec<u8>, value: &[u8]) {
+    bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(value);
+}
+
+fn append_u64s(bytes: &mut Vec<u8>, values: &[u64]) {
+    bytes.extend_from_slice(&(values.len() as u64).to_le_bytes());
+    for value in values {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+}
+
+fn coupling_tag(coupling: ActionDrawCoupling) -> u8 {
+    match coupling {
+        ActionDrawCoupling::SharedPosteriorAndWorldNoise => 0,
+        ActionDrawCoupling::PairedExogenousDisturbance => 1,
+        ActionDrawCoupling::DeterministicSharedLatent => 2,
+    }
+}
+
+fn digest_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Content hash of action IDs and canonical descriptors, independent of row order.
+pub fn compute_action_manifest_sha256(actions: &[ActionDescriptor]) -> Result<String, String> {
+    if actions.len() < 2 {
+        return Err("an action manifest requires at least two actions".into());
+    }
+    let mut ordered: Vec<&ActionDescriptor> = actions.iter().collect();
+    ordered.sort_by_key(|action| action.action_id);
+    let mut bytes = b"cmaq-018-vision-action-manifest-v0.1\0".to_vec();
+    bytes.extend_from_slice(&(ordered.len() as u64).to_le_bytes());
+    for action in ordered {
+        if action.canonical_descriptor.trim().is_empty() {
+            return Err(format!("action {} has an empty canonical descriptor", action.action_id));
+        }
+        bytes.extend_from_slice(&action.action_id.to_le_bytes());
+        append_len_prefixed(&mut bytes, action.canonical_descriptor.as_bytes());
+    }
+    Ok(digest_hex(&bytes))
+}
+
+/// Content hash of the common draw identities and the declared coupling policy.
+pub fn compute_joint_draw_manifest_sha256(
+    draw_ids: &[u64],
+    coupling: ActionDrawCoupling,
+) -> Result<String, String> {
+    if draw_ids.len() < 2 {
+        return Err("a joint draw manifest requires at least two draw IDs".into());
+    }
+    let mut ordered = draw_ids.to_vec();
+    ordered.sort_unstable();
+    if ordered.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("joint draw manifest contains duplicate IDs".into());
+    }
+    let mut bytes = b"cmaq-018-vision-joint-draw-manifest-v0.1\0".to_vec();
+    bytes.push(coupling_tag(coupling));
+    append_u64s(&mut bytes, &ordered);
+    Ok(digest_hex(&bytes))
+}
+
+/// Canonical content hash of the exact action-conditioned predicted belief bank.
+///
+/// Action/draw identities and samples are sorted by their semantic keys, so a
+/// harmless row permutation does not change the digest. Exact f32 bit patterns,
+/// branch IDs, baseline belief and all provenance identities are bound.
+pub fn compute_action_forecast_bank_sha256(bank: &ActionForecastBank) -> String {
+    let mut bytes = b"cmaq-018-vision-action-forecast-bank-v0.1\0".to_vec();
+    append_len_prefixed(&mut bytes, bank.history_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, bank.action_manifest_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, bank.joint_draw_manifest_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, bank.model_sha256.as_bytes());
+    bytes.extend_from_slice(&bank.source_frame_sequence.to_le_bytes());
+    bytes.extend_from_slice(&bank.issued_at_seconds.to_bits().to_le_bytes());
+    bytes.extend_from_slice(&bank.horizon_seconds.to_bits().to_le_bytes());
+    bytes.extend_from_slice(&bank.target_frame_sequence.to_le_bytes());
+    bytes.extend_from_slice(&bank.target_time_seconds.to_bits().to_le_bytes());
+    bytes.push(coupling_tag(bank.coupling));
+    let mut action_ids = bank.action_ids.clone();
+    action_ids.sort_unstable();
+    append_u64s(&mut bytes, &action_ids);
+    let mut draw_ids = bank.joint_draw_ids.clone();
+    draw_ids.sort_unstable();
+    append_u64s(&mut bytes, &draw_ids);
+    bytes.extend_from_slice(&(bank.persistence_belief.len() as u64).to_le_bytes());
+    for value in &bank.persistence_belief {
+        bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+    }
+    let mut samples: Vec<&ActionForecastSample> = bank.samples.iter().collect();
+    samples.sort_by_key(|sample| (sample.action_id, sample.joint_draw_id));
+    bytes.extend_from_slice(&(samples.len() as u64).to_le_bytes());
+    for sample in samples {
+        bytes.extend_from_slice(&sample.action_id.to_le_bytes());
+        bytes.extend_from_slice(&sample.joint_draw_id.to_le_bytes());
+        append_len_prefixed(&mut bytes, sample.branch_id.as_bytes());
+        bytes.extend_from_slice(&(sample.predicted_belief.len() as u64).to_le_bytes());
+        for value in &sample.predicted_belief {
+            bytes.extend_from_slice(&value.to_bits().to_le_bytes());
+        }
+    }
+    digest_hex(&bytes)
+}
+
 fn validate_sha256(field: &str, digest: &str) -> Result<(), String> {
     if digest.len() != 64
         || !digest
@@ -581,7 +720,8 @@ mod tests {
                 captured_at_seconds: 1.0,
                 belief: &BELIEF,
             },
-            action_manifest_sha256: ACTIONS,
+            action_manifest_sha256: compute_action_manifest_sha256(actions).unwrap().leak(),
+            joint_draw_manifest_sha256: compute_joint_draw_manifest_sha256(&DRAWS, ActionDrawCoupling::PairedExogenousDisturbance).unwrap().leak(),
             model_sha256: MODEL,
             horizon_seconds: 0.5,
             target_frame_sequence: 45,
@@ -596,8 +736,15 @@ mod tests {
         ActionForecastBank {
             schema_version: ACTION_CONDITIONED_FORECAST_SCHEMA_VERSION,
             history_sha256: HISTORY.into(),
-            action_manifest_sha256: ACTIONS.into(),
+            action_manifest_sha256: compute_action_manifest_sha256(&[
+                ActionDescriptor { action_id: 17, canonical_descriptor: "move:left".into() },
+                ActionDescriptor { action_id: 9, canonical_descriptor: "move:right".into() },
+            ]).unwrap(),
+            joint_draw_manifest_sha256: compute_joint_draw_manifest_sha256(
+                &[100, 101], ActionDrawCoupling::PairedExogenousDisturbance
+            ).unwrap(),
             model_sha256: MODEL.into(),
+            bank_sha256: String::new(),
             source_frame_sequence: 40,
             issued_at_seconds: 1.0,
             horizon_seconds: 0.5,
@@ -613,7 +760,9 @@ mod tests {
                 ActionForecastSample { action_id: 9, joint_draw_id: 100, branch_id: "b9-100".into(), predicted_belief: vec![0.0, 1.0, 0.0] },
                 ActionForecastSample { action_id: 9, joint_draw_id: 101, branch_id: "b9-101".into(), predicted_belief: vec![0.0, 1.0, 0.0] },
             ],
-        }
+        };
+        bank.bank_sha256 = compute_action_forecast_bank_sha256(&bank);
+        bank
     }
 
     fn observation<'a>(
@@ -687,6 +836,7 @@ mod tests {
 
         let mut tampered = bank();
         tampered.action_manifest_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
+        tampered.bank_sha256 = compute_action_forecast_bank_sha256(&tampered);
         assert!(tampered.validate_for_request(&request).is_err());
     }
 
