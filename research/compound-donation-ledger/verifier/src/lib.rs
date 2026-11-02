@@ -1121,6 +1121,42 @@ mod tests {
 
 
     #[test]
+    fn independent_verifier_accepts_overshoot_policy_with_disabled_destination() {
+        let policy = vec![
+            CandidateSpec {
+                id: 10,
+                weight: 500_000_000,
+                destination_id: None,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+            CandidateSpec {
+                id: 20,
+                weight: 500_000_000,
+                destination_id: None,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+        ];
+        let receipt = vec![
+            AuditEvent::Activated { round: 0, candidate_id: 10 },
+            AuditEvent::EvidenceUpdated {
+                round: 1,
+                candidate_id: 10,
+                new_value: 100 * EVIDENCE_ONE,
+            },
+        ];
+        let verified = verify_receipt_with_policy(
+            &policy,
+            DonationReservePolicy::CappedOvershoot,
+            &receipt,
+            None,
+        ).unwrap();
+        assert_eq!(verified.candidates[0].outgoing, 0);
+        assert!(verified.escrow.is_empty());
+    }
+
+    #[test]
     fn independent_verifier_replays_capped_overshoot_donation_policy() {
         let policy = vec![
             CandidateSpec {
