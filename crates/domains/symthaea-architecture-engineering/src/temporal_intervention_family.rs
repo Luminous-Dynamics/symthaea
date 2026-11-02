@@ -864,7 +864,7 @@ mod tests {
         ).unwrap();
 
         let mut pair_tamper = ledger.clone();
-        pair_tamper.pair_bindings[0].pair_outcomes[0].benefit_us = -10;
+        pair_tamper.pair_bindings[0].pair_outcomes[0].control_exposure_us = 0;
         assert!(verify_temporal_intervention_evidence_ledger(&pair_tamper).is_err());
 
         let mut ledger_tamper = ledger;
