@@ -249,7 +249,7 @@ struct PairDigestPayloadV1<'a> {
     right_text: &'a str,
 }
 
-fn hash_domain(domain: &[u8], payload: &[u8]) -> String {
+pub(crate) fn hash_domain(domain: &[u8], payload: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(HASH_DOMAIN);
     hasher.update((domain.len() as u64).to_be_bytes());
@@ -1364,3 +1364,4 @@ pub mod adjudication_attrition;
 pub mod causal_analysis;
 pub mod exposure_transfer;
 pub mod training_receipt;
+pub mod fragility;
