@@ -110,6 +110,9 @@ pub struct HarthLosoAggregate {
     pub total_test_samples: u64,
     /// Arithmetic mean of the 22 participant macro-F1 values (not pooled frames).
     pub mean_subject_macro_f1_ppm: u32,
+    /// Descriptive standard error across the 22 participant-fold macro-F1 values.
+    /// Paired candidate-vs-baseline inference must still use fold-matched deltas.
+    pub standard_error_subject_macro_f1_ppm: u32,
     pub worst_subject_macro_f1_ppm: u32,
 }
 
@@ -314,6 +317,7 @@ fn compute_aggregate(
 ) -> Result<HarthLosoAggregate, HarthLosoError> {
     let mut total_samples = 0_u64;
     let mut score_sum = 0_u128;
+    let mut subject_scores = Vec::with_capacity(folds.len());
     let mut worst_score = u32::MAX;
 
     for (fold_index, fold) in folds.iter().enumerate() {
@@ -330,6 +334,7 @@ fn compute_aggregate(
         score_sum = score_sum.checked_add(u128::from(metrics.macro_f1_ppm)).ok_or_else(|| {
             HarthLosoError::new("aggregate.mean_subject_macro_f1_ppm", "score sum overflow")
         })?;
+        subject_scores.push(f64::from(metrics.macro_f1_ppm));
         worst_score = worst_score.min(metrics.macro_f1_ppm);
     }
 
@@ -337,11 +342,23 @@ fn compute_aggregate(
         HarthLosoError::new("aggregate.subject_fold_count", "fold count overflow")
     })?;
     let mean_score = ((score_sum + u128::from(fold_count / 2)) / u128::from(fold_count)) as u32;
+    let mean_f64 = subject_scores.iter().sum::<f64>() / subject_scores.len() as f64;
+    let squared_deviation_sum = subject_scores
+        .iter()
+        .map(|score| {
+            let difference = *score - mean_f64;
+            difference * difference
+        })
+        .sum::<f64>();
+    let sample_variance = squared_deviation_sum / (subject_scores.len() - 1) as f64;
+    let standard_error = (sample_variance / subject_scores.len() as f64).sqrt().round()
+        .clamp(0.0, f64::from(u32::MAX)) as u32;
 
     Ok(HarthLosoAggregate {
         subject_fold_count: fold_count,
         total_test_samples: total_samples,
         mean_subject_macro_f1_ppm: mean_score,
+        standard_error_subject_macro_f1_ppm: standard_error,
         worst_subject_macro_f1_ppm: worst_score,
     })
 }
@@ -373,6 +390,7 @@ fn receipt_digest(receipt: &HarthLosoReceipt) -> [u8; 32] {
     hash.u32(receipt.aggregate.subject_fold_count);
     hash.u64(receipt.aggregate.total_test_samples);
     hash.u32(receipt.aggregate.mean_subject_macro_f1_ppm);
+    hash.u32(receipt.aggregate.standard_error_subject_macro_f1_ppm);
     hash.u32(receipt.aggregate.worst_subject_macro_f1_ppm);
     hash.finish()
 }
