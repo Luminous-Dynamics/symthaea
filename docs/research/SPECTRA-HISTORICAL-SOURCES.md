@@ -114,13 +114,13 @@ A searchable passage describes an early copper-screen cage, a receiver/sender se
 
 - The article discusses television dramatizations of Peter Hurkos and Puharich's testing at the Round Table Foundation in Glen Cove, Maine.
 - It describes a Faraday-cage arrangement with a wire-mesh outer enclosure and an inner wooden compartment in which the subject sat alone.
-- It reports that the outer enclosure was charged by a Van de Graaff generator; the article gives 25,000 V as the charge applied in the described demonstration and notes the generator could produce 400,000 V.
+- It reports that the outer enclosure was energized/charged using a Van de Graaff generator. The article's own wording is "25,000 volts of electrical current" and it says the generator could produce 400,000 V; the phrase "volts of electrical current" is dimensionally imprecise, and no calibrated voltage/current waveform, source impedance, field strength or exposure record is given.
 - It says Puharich asked Hurkos to identify objects on a desk outside the cage and attributes claimed accuracy of 80%, sometimes up to 95%, to Puharich.
 - The author explicitly criticizes the television dramatization and questions whether the program's version of events is factual, fictional or mixed. The article is therefore especially valuable as a contemporary account that warns against treating a TV reenactment as an experimental record.
 
 ### What it does not establish
 
-- No raw trial series, target list, randomization, response sheets, scoring method, independent scorer records, instrument calibration, field measurements or full safety documentation are supplied.
+- No raw trial series, target list, randomization, response sheets, scoring method, independent scorer records, instrument calibration, field measurements or full safety documentation are supplied. The article does not establish how objects were selected, whether the receiver was blind to all target metadata, how many independent trials were run, or how the percentages were calculated.
 - The percentages are claims attributed to Puharich, not an independently reconstructed result.
 - The article's account concerns Hurkos and object identification, not the same described protocol as Garrett's Zener-card sender–receiver task or the memoir's randomized cage-charge discrimination task.
 - Do not reproduce the historical high-voltage arrangement. It is not a modern experimental recipe and is outside SPECTRA's initial safe scope.
