@@ -295,7 +295,13 @@ fn build_guardrail_constraints(
             coefficients[index] = 1.0; // q_i <= 0, combined with q_i >= 0
             constraints.push(FrontierAdditionalLinearConstraint {
                 constraint_id: format!("EXCLUDE_POLICY:{}", policy.policy_id),
-                coefficients,
+                policy_coefficients: request.frontier_plan.policies.iter()
+                    .zip(coefficients)
+                    .map(|(policy, coefficient)| super::policy_frontier_lp::FrontierPolicyCoefficient {
+                        policy_id: policy.policy_id.clone(),
+                        coefficient,
+                    })
+                    .collect(),
                 upper_bound: 0.0,
             });
         }
@@ -323,7 +329,13 @@ fn build_guardrail_constraints(
         };
         constraints.push(FrontierAdditionalLinearConstraint {
             constraint_id: format!("GUARDRAIL:{suffix}:{}", requirement.requirement_id),
-            coefficients,
+            policy_coefficients: request.frontier_plan.policies.iter()
+                .zip(coefficients)
+                .map(|(policy, coefficient)| super::policy_frontier_lp::FrontierPolicyCoefficient {
+                    policy_id: policy.policy_id.clone(),
+                    coefficient,
+                })
+                .collect(),
             upper_bound,
         });
     }
