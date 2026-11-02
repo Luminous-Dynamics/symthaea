@@ -83,7 +83,7 @@ fn validate_identity(h: &StructuralHypothesisInput) -> Result<(), EvalError> {
         return Err(EvalError::InvalidStructuralEntityId("target_entity_id"));
     }
     let digest = h.evidence_manifest_sha256.as_bytes();
-    if digest.len() != 64 || !digest.iter().all(u8::is_ascii_hexdigit) {
+    if digest.len() != 64 || !digest.iter().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(EvalError::InvalidEvidenceManifestDigest(
             h.evidence_manifest_sha256.clone(),
         ));
@@ -275,7 +275,7 @@ mod tests {
             excluded,
         ]).unwrap();
         assert_eq!(report.admissible_hypothesis_count, 1);
-        assert_eq!(report.excluded_hypothesis_ids, vec!["rejected"]);
+        assert_eq!(report.excluded_hypothesis_ids, vec!["rejected".to_string()]);
         assert_eq!(report.hypotheses[0].hypothesis_id, "accepted");
     }
 
