@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compute-risk-simultaneous-ucb/run-receipt-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "code_commit",
+    "fixture_sha256",
+    "candidate_grid_sha256",
+    "calibration_trajectory_sha256",
+    "candidate_count",
+    "calibration_trajectory_count",
+    "selected_candidate_id",
+    "report",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compute_risk_simultaneous_ucb_run_receipt.v0.1"
+    },
+    "status": {
+      "const": "synthetic_joint_grid_reference_not_a_model_or_distribution_shift_claim"
+    },
+    "code_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_grid_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_trajectory_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "calibration_trajectory_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "selected_candidate_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "report": {
+      "type": "object"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
