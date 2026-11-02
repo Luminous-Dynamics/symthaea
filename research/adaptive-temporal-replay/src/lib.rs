@@ -741,6 +741,39 @@ impl AciState {
     }
 }
 
+/// Maximum absolute deviation between target miscoverage and empirical
+/// miscoverage over every contiguous window of the requested size.
+/// Returns None when fewer than window_steps observations are available.
+/// The result is rounded to integer PPM with ties away from zero.
+pub fn worst_case_local_coverage_error_ppm(
+    miscoverage: &[bool],
+    target_alpha_ppm: i64,
+    window_steps: usize,
+) -> Result<Option<i64>, ReplayError> {
+    if !(1..SCALE_PPM).contains(&target_alpha_ppm) {
+        return Err(invalid("local-coverage target alpha must be in (0,1)"));
+    }
+    if window_steps == 0 {
+        return Err(invalid("local-coverage window must be positive"));
+    }
+    if miscoverage.len() < window_steps {
+        return Ok(None);
+    }
+    let mut count = miscoverage[..window_steps].iter().filter(|x| **x).count() as i128;
+    let mut maximum_numerator = (count * i128::from(SCALE_PPM)
+        - i128::from(target_alpha_ppm) * window_steps as i128).abs();
+    for index in window_steps..miscoverage.len() {
+        if miscoverage[index - window_steps] { count -= 1; }
+        if miscoverage[index] { count += 1; }
+        let numerator = (count * i128::from(SCALE_PPM)
+            - i128::from(target_alpha_ppm) * window_steps as i128).abs();
+        maximum_numerator = maximum_numerator.max(numerator);
+    }
+    let rounded = div_round_away_from_zero(maximum_numerator, window_steps as i128)?;
+    let result = i64::try_from(rounded).map_err(|_| invalid("local-coverage error exceeds i64"))?;
+    Ok(Some(result))
+}
+
 /// Split-conformal order statistic. None means the finite-sample order
 /// statistic exceeds the observed sample; callers must not silently use max.
 pub fn finite_sample_radius(scores: &[i64], alpha_ppm: i64) -> Result<Option<i64>, ReplayError> {
@@ -932,6 +965,20 @@ mod tests {
         ledger.verify().unwrap();
     }
     fn digest(byte: u8) -> [u8; 32] { [byte; 32] }
+
+    #[test]
+    fn local_coverage_error_matches_all_contiguous_windows() {
+        let errors = [true, false, false, true];
+        assert_eq!(worst_case_local_coverage_error_ppm(&errors, 250_000, 2).unwrap(), Some(250_000));
+        assert_eq!(worst_case_local_coverage_error_ppm(&errors, 250_000, 4).unwrap(), Some(250_000));
+    }
+
+    #[test]
+    fn local_coverage_error_handles_insufficient_and_invalid_windows() {
+        assert_eq!(worst_case_local_coverage_error_ppm(&[true, false], 100_000, 3).unwrap(), None);
+        assert!(worst_case_local_coverage_error_ppm(&[true], 100_000, 0).is_err());
+        assert!(worst_case_local_coverage_error_ppm(&[true], 1_000_000, 1).is_err());
+    }
 
     #[test]
     fn delayed_aci_tau_one_matches_scalar_aci_without_boundary_clipping() {
