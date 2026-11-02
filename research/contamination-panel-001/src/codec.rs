@@ -45,6 +45,7 @@ pub struct CoDecContextEvaluationV1 {
     pub context_item_ids: Vec<String>,
     /// SHA-256 over the canonical sorted context item-ID list.
     pub context_item_set_sha256: String,
+    pub target_token_sequence_sha256: String,
     /// Average target-token log-probabilities after prepending these contexts.
     /// The target sequence must be byte/token aligned with the baseline.
     pub target_token_logprobs: Vec<f64>,
@@ -57,6 +58,7 @@ pub struct CoDecTargetInputV1 {
     pub target_token_count: u64,
     /// Digest of the exact target token-ID sequence, not only its source text.
     pub target_token_sequence_sha256: String,
+    pub baseline_target_token_sequence_sha256: String,
     /// One log-probability per target token, without any context examples.
     pub baseline_target_token_logprobs: Vec<f64>,
     pub context_evaluations: Vec<CoDecContextEvaluationV1>,
@@ -367,6 +369,13 @@ fn validate_request(request: &CoDecDatasetRequestV1) -> Result<(), String> {
             return Err("target item IDs must be unique and contained in the candidate dataset".to_owned());
         }
         require_digest(&target.target_token_sequence_sha256, "target_token_sequence_sha256")?;
+        require_digest(
+            &target.baseline_target_token_sequence_sha256,
+            "baseline_target_token_sequence_sha256",
+        )?;
+        if target.baseline_target_token_sequence_sha256 != target.target_token_sequence_sha256 {
+            return Err("baseline target token sequence digest differs from the target token sequence".to_owned());
+        }
         validate_logprobs(
             &target.baseline_target_token_logprobs,
             target.target_token_count,
@@ -400,6 +409,13 @@ fn validate_request(request: &CoDecDatasetRequestV1) -> Result<(), String> {
             require_digest(&evaluation.context_item_set_sha256, "context_item_set_sha256")?;
             if evaluation.context_item_set_sha256 != expected_context_digest {
                 return Err("context item-set digest mismatch".to_owned());
+            }
+            require_digest(
+                &evaluation.target_token_sequence_sha256,
+                "context target_token_sequence_sha256",
+            )?;
+            if evaluation.target_token_sequence_sha256 != target.target_token_sequence_sha256 {
+                return Err("baseline and context evaluations must score the exact same target token sequence".to_owned());
             }
             validate_logprobs(
                 &evaluation.target_token_logprobs,
@@ -649,10 +665,12 @@ mod tests {
             item_id: id.to_owned(),
             target_token_count: 3,
             target_token_sequence_sha256: digest('a'),
+            baseline_target_token_sequence_sha256: digest('a'),
             baseline_target_token_logprobs: target_logprobs,
             context_evaluations: vec![CoDecContextEvaluationV1 {
                 context_seed: seed,
                 context_item_set_sha256: compute_codec_context_item_set_sha256(&contexts).unwrap(),
+                target_token_sequence_sha256: digest('a'),
                 context_item_ids: contexts,
                 target_token_logprobs: context_logprobs,
             }],
@@ -719,6 +737,16 @@ mod tests {
         let report = score_codec_dataset(&request).unwrap();
         assert_eq!(report.negative_delta_count, 0);
         assert_eq!(report.codec_score_permille, 0.0);
+    }
+
+    #[test]
+    fn baseline_and_context_token_sequence_digests_must_match() {
+        let mut request = fixture();
+        request.targets[0].context_evaluations[0].target_token_sequence_sha256 = digest('z');
+        assert!(score_codec_dataset(&request).is_err());
+        request = fixture();
+        request.targets[0].baseline_target_token_sequence_sha256 = digest('z');
+        assert!(score_codec_dataset(&request).is_err());
     }
 
     #[test]
