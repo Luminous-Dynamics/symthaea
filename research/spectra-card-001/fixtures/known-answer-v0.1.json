@@ -1,0 +1,51 @@
+{
+  "schema": "symthaea.spectra_card.known_answer.v0.1",
+  "claim_ceiling": "synthetic_descriptive_only",
+  "config": {
+    "campaign_instance_id": 600000701,
+    "participant_count": 32,
+    "cycles_per_participant": 8
+  },
+  "scenarios": [
+    {
+      "world": "null",
+      "seed_hex": "0x0000000000001000"
+    },
+    {
+      "world": "enclosure_context_only",
+      "seed_hex": "0x0000000000001001"
+    },
+    {
+      "world": "electrical_increment_only",
+      "seed_hex": "0x0000000000001002"
+    },
+    {
+      "world": "both_effects",
+      "seed_hex": "0x0000000000001003"
+    },
+    {
+      "world": "practice_only",
+      "seed_hex": "0x0000000000001004"
+    },
+    {
+      "world": "order_confounded",
+      "seed_hex": "0x0000000000001005"
+    }
+  ],
+  "estimands": [
+    {
+      "name": "enclosure_context_effect",
+      "formula": "inside_unenergized - outside_reference"
+    },
+    {
+      "name": "electrical_increment_effect",
+      "formula": "inside_active - inside_sham"
+    }
+  ],
+  "notes": [
+    "Four target cards per participant-cycle: exactly two red and two black, shuffled.",
+    "All four conditions occur once per participant-cycle.",
+    "Active and sham are abstract simulator labels only.",
+    "Descriptive contrasts are not confirmatory inference."
+  ]
+}
