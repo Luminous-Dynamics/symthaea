@@ -695,7 +695,7 @@ mod tests {
 
     fn config() -> CampaignConfigV1 {
         CampaignConfigV1 {
-            campaign_instance_id: 0x5350_4543_5452_4131,
+            campaign_instance_id: 600_000_001,
             calibration_trials: 512,
             evaluation_trials: 512,
             candidate_count: 4,
@@ -956,6 +956,17 @@ mod tests {
             .map(|value| value.as_u64().map(|n| n as u16)).collect();
         assert_eq!(scores, expected);
         assert_eq!(report.detected_modalities, vec![LeakageModalityV1::Procedural]);
+    }
+
+
+    #[test]
+    fn zero_campaign_instance_id_is_rejected() {
+        let mut invalid = config();
+        invalid.campaign_instance_id = 0;
+        assert_eq!(
+            generate_campaign_v1(invalid, 1, CampaignWorldV1::Null, None),
+            Err(CorpusErrorV1::InvalidCampaignId)
+        );
     }
 
     #[test]
