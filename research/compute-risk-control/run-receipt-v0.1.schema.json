@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compute-risk-control/run-receipt-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "source_commit",
+    "fixture_sha256",
+    "validation_panel_sha256",
+    "candidate_grid_sha256",
+    "report",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compute_risk_joint_receipt.v0.1"
+    },
+    "status": {
+      "const": "synthetic_stratified_panel_diagnostic_not_a_confidence_claim"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "validation_panel_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_grid_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report": {
+      "type": "object",
+      "required": [
+        "schema",
+        "design",
+        "confidence_claim_eligible_under_declared_design",
+        "simultaneous_claim_count",
+        "confidence_delta_ppm",
+        "risk_upper_budget_ppm",
+        "risk_lower_budget_ppm",
+        "correction_ppm",
+        "sample_count",
+        "candidate_grid_sha256",
+        "validation_panel_sha256",
+        "candidate_evaluations",
+        "selected_candidate_id",
+        "selection_status",
+        "formal_theorem_verified",
+        "claim_ceiling",
+        "report_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.compute_risk_joint_report.v0.1"
+        },
+        "design": {
+          "enum": [
+            "iid_held_out_tasks_declared",
+            "synthetic_fixed_panel"
+          ]
+        },
+        "confidence_claim_eligible_under_declared_design": {
+          "type": "boolean"
+        },
+        "simultaneous_claim_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "confidence_delta_ppm": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        },
+        "risk_upper_budget_ppm": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "risk_lower_budget_ppm": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "correction_ppm": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_grid_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "validation_panel_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "candidate_evaluations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object"
+          }
+        },
+        "selected_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection_status": {
+          "enum": [
+            "feasible_candidate_found_on_validation_panel",
+            "no_candidate_meets_both_risk_budgets"
+          ]
+        },
+        "formal_theorem_verified": {
+          "const": false
+        },
+        "claim_ceiling": {
+          "type": "string"
+        },
+        "report_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
