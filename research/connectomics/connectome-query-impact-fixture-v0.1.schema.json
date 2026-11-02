@@ -32,7 +32,7 @@
             "minLength": 1
           },
           "input": {
-            "$ref": "connectome-query-impact-input-v0.1.schema.json"
+            "type": "object"
           },
           "expected_report": {
             "$ref": "connectome-query-impact-report-v0.1.schema.json"
@@ -65,7 +65,8 @@
               "EmptyExpectedWorldSet",
               "DuplicateExpectedWorldId",
               "ExpectedWorldSetMismatch",
-              "WorldSetCoverageNotVerified"
+              "WorldSetCoverageNotVerified",
+              "PairedWorldCoverageBindingMismatch"
             ]
           }
         },
