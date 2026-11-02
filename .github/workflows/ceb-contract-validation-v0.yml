@@ -151,11 +151,11 @@ jobs:
           if statement["predicate"]["execution"]["runner_profile"] != "simulation":
               raise SystemExit("design-only statement example must not claim isolation")
 
-          # Build a structurally valid passing pristine-regrade statement, then
-          # mutate one invariant at a time. This checks relationships that JSON
-          # Schema alone cannot express (for example, counters vs. check rows).
-          valid_pass = copy.deepcopy(statement)
-          predicate = valid_pass["predicate"]
+          # A primary execution can truthfully pass on its own. That receipt
+          # is not final acceptance: the pair verifier must later require a
+          # matching pristine-regrade receipt from an independent run.
+          valid_primary_pass = copy.deepcopy(statement)
+          predicate = valid_primary_pass["predicate"]
           predicate["checks"][0].update({"status": "pass", "evidence_sha256": "9" * 64})
           predicate["result"].update({
               "verdict": "pass",
@@ -168,17 +168,27 @@ jobs:
               "protocol_violation": False
           })
           predicate["execution"].update({
-              "stage": "pristine_regrade",
+              "stage": "primary",
               "runner_profile": "isolated_microvm",
               "image_digest": "sha256:" + "f" * 64,
               "network_policy": "disabled",
-              "regrade_of_receipt_sha256": "a" * 64
+              "regrade_of_receipt_sha256": None
           })
           predicate["grader"].update({
               "trust_domain": "separate_host_control_plane",
               "candidate_access": "read_only"
           })
-          validate_statement(valid_pass)
+          validate_statement(valid_primary_pass)
+
+          # The corresponding pristine-regrade statement must bind the primary
+          # receipt digest and remain a distinct run.
+          valid_regrade_pass = copy.deepcopy(valid_primary_pass)
+          valid_regrade_pass["predicate"]["execution"].update({
+              "run_id": "independent-regrade-run-0002",
+              "stage": "pristine_regrade",
+              "regrade_of_receipt_sha256": "a" * 64
+          })
+          validate_statement(valid_regrade_pass)
 
           def expect_statement_reject(mutant, label):
               try:
@@ -188,17 +198,18 @@ jobs:
               raise SystemExit(f"receipt semantic negative control unexpectedly passed: {label}")
 
           for label, mutate in [
-              ("pass in primary stage", lambda p: p["execution"].update({"stage": "primary"})),
+              ("regrade without parent receipt", lambda p: p["execution"].update({"stage": "pristine_regrade", "regrade_of_receipt_sha256": None})),
               ("pass on simulation runner", lambda p: p["execution"].update({"runner_profile": "simulation"})),
-              ("pass without regrade link", lambda p: p["execution"].update({"regrade_of_receipt_sha256": None})),
+              ("pass without image digest", lambda p: p["execution"].update({"image_digest": None})),
+              ("pass with unrestricted network", lambda p: p["execution"].update({"network_policy": "unrestricted_not_qualifying"})),
               ("pass after safety violation", lambda p: p["result"].update({"safety_violation": True})),
               ("pass when a required check row is skipped", lambda p: p["checks"][0].update({"status": "skipped"})),
               ("forged required-pass counter", lambda p: p["result"].update({"required_pass_count": 0})),
               ("duplicate check identity", lambda p: p["checks"].append(copy.deepcopy(p["checks"][0]))),
               ("candidate subject digest mismatch", lambda p: p["subject"][0]["digest"].update({"sha256": "8" * 64})),
           ]:
-              mutant = copy.deepcopy(valid_pass)
-              mutate(mutant["predicate"] if label not in {"candidate subject digest mismatch"} else mutant)
+              mutant = copy.deepcopy(valid_primary_pass)
+              mutate(mutant["predicate"] if label != "candidate subject digest mismatch" else mutant)
               expect_statement_reject(mutant, label)
 
           envelope = {
@@ -214,7 +225,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=12"
+              "schemas=3 negative_controls=13"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
