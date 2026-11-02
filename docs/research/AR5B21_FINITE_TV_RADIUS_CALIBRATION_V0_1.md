@@ -156,7 +156,21 @@ For a binary complete-path support with \(K=2\), \(n=10{,}000\), empirical distr
 - At nominal \(\alpha=0.05\), conditional alpha is approximately 0.0404040404.
 - With the largest nominal null size 0.015, the largest robust null size is approximately 0.0342064558, leaving the robust LP feasible.
 
-These values were independently checked with direct high-precision arithmetic. They are analytical fixture values, not coverage simulations or observed experiment results.
+These values were independently checked with direct high-precision arithmetic. They are analytical fixture values, not observed experiment results.
+
+### Independent formula-level coverage sanity simulation
+
+I also evaluated the mathematical radius formula independently with NumPy 2.3.5, seed 20261102, and 50,000 multinomial replications per case. The true path distribution was known to the simulator and used only to score coverage.
+
+| K | n | delta | nominal distribution | true distribution | observed coverage | mean radius | 95th-percentile radius |
+|---:|---:|---:|---|---|---:|---:|---:|
+| 2 | 1,000 | 0.01 | (0.5, 0.5) | (0.55, 0.45) | 100.000% | 0.1047 | 0.1307 |
+| 4 | 2,000 | 0.01 | (0.25, 0.25, 0.25, 0.25) | (0.4, 0.3, 0.2, 0.1) | 99.996% | 0.2429 | 0.2599 |
+| 8 | 5,000 | 0.005 | uniform | (0.30, 0.20, 0.15, 0.10, 0.10, 0.07, 0.05, 0.03) | 100.000% | 0.3080 | 0.3189 |
+
+Exact 95% binomial intervals for observed coverage were approximately [99.9926%, 100%], [99.9856%, 99.9995%], and [99.9926%, 100%], respectively. These are finite simulation checks for three selected distributions, not a proof of the concentration inequality or comprehensive calibration validation. They execute the formula in Python/NumPy, **not the Rust module**.
+
+The radius width shows the conservatism cost: at K=8 and n=5,000, the mean radius is already about 0.308. This supports the architectural decision to keep complete-path calibration as a small exact reference and move to state-conditional calibration for larger horizons.
 
 ## 6. Scaling limitation is fundamental
 
