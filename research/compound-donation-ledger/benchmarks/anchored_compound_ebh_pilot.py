@@ -224,30 +224,30 @@ def simulate_stream(
         null_active = tuple(scenario["null"][i] for i in active_ids)
 
         full_scores = [
-            full_weights[i] * F(row.get(i, 0), SCALE)
-            for i in range(n)
+            full_weights[i] * F(row[i], SCALE)
+            for i in active_ids
         ]
-        full_reject = weighted_compound_ebh(full_scores, F(1, 10))
+        full_reject_local = weighted_compound_ebh(full_scores, F(1, 10))
+        full_reject = tuple(active_ids[j] for j in full_reject_local)
         fdp, power, has_false = fdp_and_power(
-            full_reject, tuple(range(n)), scenario["null"], total_alternatives
+            full_reject, active_ids, scenario["null"], total_alternatives
         )
         fdp_paths["finite_envelope_baseline_e_bh"].append(fdp)
         power_paths["finite_envelope_baseline_e_bh"].append(power)
         any_false["finite_envelope_baseline_e_bh"] |= has_false
 
         finite_anchor_start = time.perf_counter()
-        finite_anchor = anchored_rejections(
+        finite_anchor_local = anchored_rejections(
             full_scores, F(1, 10), finite_delta
         )
         finite_anchor_seconds = time.perf_counter() - finite_anchor_start
-        if not set(full_reject).issubset(finite_anchor):
+        if not set(full_reject_local).issubset(finite_anchor_local):
             raise AssertionError("finite-envelope anchor lost a baseline discovery")
-        if any(i not in active_ids for i in finite_anchor):
-            raise AssertionError("finite-envelope anchor selected a dormant candidate")
-        if closure_deficit(full_scores, F(1, 10), finite_anchor) > F(1, 10) * finite_delta:
+        if closure_deficit(full_scores, F(1, 10), finite_anchor_local) > F(1, 10) * finite_delta:
             raise AssertionError("finite-envelope anchor violates closure")
+        finite_anchor = tuple(active_ids[j] for j in finite_anchor_local)
         fdp, power, has_false = fdp_and_power(
-            finite_anchor, tuple(range(n)), scenario["null"], total_alternatives
+            finite_anchor, active_ids, scenario["null"], total_alternatives
         )
         fdp_paths["finite_envelope_anchored"].append(fdp)
         power_paths["finite_envelope_anchored"].append(power)
@@ -261,8 +261,8 @@ def simulate_stream(
         for delta in deltas:
             weights = weight_vectors[delta]
             scores = [
-                weights[i] * F(row.get(i, 0), SCALE)
-                for i in range(n)
+                weights[i] * F(row[i], SCALE)
+                for i in active_ids
             ]
             base_local = weighted_compound_ebh(scores, F(1, 10))
             anchored_start = time.perf_counter()
@@ -274,10 +274,8 @@ def simulate_stream(
             if closure_deficit(scores, F(1, 10), anchored_local) > F(1, 10) * delta:
                 raise AssertionError("anchored output violates the exact closure deficit")
 
-            base_reject = tuple(base_local)
-            anchor_reject = tuple(anchored_local)
-            if any(i not in active_ids for i in anchor_reject):
-                raise AssertionError("global-slack anchor selected a dormant candidate")
+            base_reject = tuple(active_ids[j] for j in base_local)
+            anchor_reject = tuple(active_ids[j] for j in anchored_local)
 
             fdp, power, has_false = fdp_and_power(
                 base_reject, active_ids, scenario["null"], total_alternatives
