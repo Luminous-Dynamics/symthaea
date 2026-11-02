@@ -703,7 +703,6 @@ mod tests {
     use super::*;
 
     const HISTORY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const ACTIONS: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const MODEL: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     fn request() -> ActionForecastRequest<'static> {
@@ -733,7 +732,7 @@ mod tests {
     }
 
     fn bank() -> ActionForecastBank {
-        ActionForecastBank {
+        let mut bank = ActionForecastBank {
             schema_version: ACTION_CONDITIONED_FORECAST_SCHEMA_VERSION,
             history_sha256: HISTORY.into(),
             action_manifest_sha256: compute_action_manifest_sha256(&[
@@ -773,9 +772,15 @@ mod tests {
         captured_at_seconds: f64,
         belief: &'a [f32],
     ) -> BranchVisualObservation<'a> {
+        let action_manifest_sha256 = Box::leak(
+            compute_action_manifest_sha256(&[
+                ActionDescriptor { action_id: 17, canonical_descriptor: "move:left".into() },
+                ActionDescriptor { action_id: 9, canonical_descriptor: "move:right".into() },
+            ]).unwrap().into_boxed_str()
+        );
         BranchVisualObservation {
             history_sha256: HISTORY,
-            action_manifest_sha256: ACTIONS,
+            action_manifest_sha256,
             action_id,
             joint_draw_id: draw_id,
             branch_id,
@@ -838,6 +843,50 @@ mod tests {
         tampered.action_manifest_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
         tampered.bank_sha256 = compute_action_forecast_bank_sha256(&tampered);
         assert!(tampered.validate_for_request(&request).is_err());
+    }
+
+    #[test]
+    fn action_and_draw_manifest_hashes_ignore_input_row_order() {
+        let original = [
+            ActionDescriptor { action_id: 17, canonical_descriptor: "move:left".into() },
+            ActionDescriptor { action_id: 9, canonical_descriptor: "move:right".into() },
+        ];
+        let reversed = [
+            original[1].clone(),
+            original[0].clone(),
+        ];
+        assert_eq!(
+            compute_action_manifest_sha256(&original).unwrap(),
+            compute_action_manifest_sha256(&reversed).unwrap()
+        );
+        assert_eq!(
+            compute_joint_draw_manifest_sha256(
+                &[100, 101], ActionDrawCoupling::PairedExogenousDisturbance
+            ).unwrap(),
+            compute_joint_draw_manifest_sha256(
+                &[101, 100], ActionDrawCoupling::PairedExogenousDisturbance
+            ).unwrap()
+        );
+    }
+
+    #[test]
+    fn forecast_bank_digest_binds_predictions_but_not_row_order() {
+        let original = bank();
+        let mut permuted = bank();
+        permuted.action_ids.swap(0, 1);
+        permuted.samples.swap(0, 3);
+        permuted.samples.swap(1, 2);
+        assert_eq!(
+            compute_action_forecast_bank_sha256(&original),
+            compute_action_forecast_bank_sha256(&permuted)
+        );
+        let mut tampered = original;
+        tampered.samples[0].predicted_belief[0] = 0.25;
+        assert_ne!(
+            compute_action_forecast_bank_sha256(&tampered),
+            tampered.bank_sha256
+        );
+        assert!(tampered.validate().is_err());
     }
 
     #[test]
