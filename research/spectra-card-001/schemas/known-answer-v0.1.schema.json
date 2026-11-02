@@ -1,0 +1,23 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.io/schemas/spectra-card-known-answer-v0.1.schema.json",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema","claim_ceiling","config","scenarios","estimands","notes"],
+  "properties":{
+    "schema":{"const":"symthaea.spectra_card.known_answer.v0.1"},
+    "claim_ceiling":{"const":"synthetic_descriptive_only"},
+    "config":{
+      "type":"object","additionalProperties":false,
+      "required":["campaign_instance_id","participant_count","cycles_per_participant"],
+      "properties":{
+        "campaign_instance_id":{"type":"integer","minimum":1},
+        "participant_count":{"type":"integer","minimum":8,"maximum":256},
+        "cycles_per_participant":{"type":"integer","minimum":4,"maximum":64}
+      }
+    },
+    "scenarios":{"type":"array","minItems":6,"maxItems":6},
+    "estimands":{"type":"array","minItems":2,"maxItems":2},
+    "notes":{"type":"array","minItems":1,"items":{"type":"string"}}
+  }
+}
