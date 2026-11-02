@@ -300,7 +300,11 @@ fn validate_string_array(value: &Value, context: &str, nonempty: bool) -> Result
         return Err(schema_error(format!("{context} must not be empty")));
     }
     for (index, item) in array.iter().enumerate() {
-        nonempty_string(item, &format!("{context}[{index}]"))?;
+        if nonempty {
+            nonempty_string(item, &format!("{context}[{index}]"))?;
+        } else if item.as_str().is_none() {
+            return Err(schema_error(format!("{context}[{index}] must be a string")));
+        }
     }
     Ok(())
 }
@@ -891,6 +895,26 @@ mod tests {
         let new_id = compute_evidence_id(&evidence).unwrap();
         evidence["evidence_id"] = json!(new_id);
         assert!(verify_evidence_value(&evidence).is_ok());
+    }
+
+    #[test]
+    fn accepts_empty_top_level_limitation_but_requires_nonempty_coverage_diagnostics() {
+        let mut evidence = golden();
+        evidence["limitations"] = json!([""]);
+        let new_id = compute_evidence_id(&evidence).unwrap();
+        evidence["evidence_id"] = json!(new_id);
+        assert!(verify_evidence_value(&evidence).is_ok());
+
+        evidence["relationship_coverage"] = json!({
+            "status": "complete",
+            "diagnostics": [""]
+        });
+        let new_id = compute_evidence_id(&evidence).unwrap();
+        evidence["evidence_id"] = json!(new_id);
+        assert_eq!(
+            validate_evidence_schema(&evidence).unwrap_err().kind,
+            EvidenceErrorKind::SchemaViolation
+        );
     }
 
     #[test]
