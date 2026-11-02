@@ -18,6 +18,7 @@ const ZIP64_EOCD_SIGNATURE: u32 = 0x0606_4b50;
 const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4b50;
 const LOCAL_HEADER_SIGNATURE: u32 = 0x0403_4b50;
 const CENTRAL_DIGITAL_SIGNATURE: u32 = 0x0505_4b50;
+const DATA_DESCRIPTOR_SIGNATURE: u32 = 0x0807_4b50;
 const EOCD_FIXED_BYTES: usize = 22;
 const EOCD_MAX_COMMENT_BYTES: usize = u16::MAX as usize;
 const ZIP64_LOCATOR_BYTES: u64 = 20;
@@ -141,7 +142,7 @@ pub struct ArtifactEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeaderConsistency {
-    VerifiedForEveryListedOccurrence,
+    LocalAndCentralHeaderCheckedFieldsAgree,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -274,7 +275,7 @@ impl ZipArtifactReader {
                 limitations: coverage_limitations,
             },
             duplicate_raw_names_present,
-            header_consistency: HeaderConsistency::VerifiedForEveryListedOccurrence,
+            header_consistency: HeaderConsistency::LocalAndCentralHeaderCheckedFieldsAgree,
             regions: ArchiveRegions {
                 leading_bytes: preflight.archive_start,
                 central_directory_offset: preflight.central_directory_offset,
@@ -514,7 +515,6 @@ fn parse_end_record_candidate(
                 "central directory extends before the beginning of the file",
             ));
         }
-        let directory_offset = directory_end - directory_bytes;
         (
             total_entries as u64,
             directory_bytes,
@@ -1225,7 +1225,7 @@ fn classify_path(path: &str) -> PathDisposition {
     if path.starts_with('/') || path.starts_with('\\') || windows_drive {
         return PathDisposition::Absolute;
     }
-    if path.split('/').any(|part| part == "..") {
+    if path.split(['/', '\\']).any(|part| part == "..") {
         return PathDisposition::ParentTraversal;
     }
     PathDisposition::Relative
@@ -1337,13 +1337,26 @@ mod tests {
             push_u16(&mut bytes, entry.method);
             push_u16(&mut bytes, 0);
             push_u16(&mut bytes, 0);
-            push_u32(&mut bytes, checksum);
-            push_u32(&mut bytes, entry.data.len() as u32);
-            push_u32(&mut bytes, entry.data.len() as u32);
+            let uses_descriptor = entry.flags & DATA_DESCRIPTOR_FLAG != 0;
+            push_u32(&mut bytes, if uses_descriptor { 0 } else { checksum });
+            push_u32(
+                &mut bytes,
+                if uses_descriptor { 0 } else { entry.data.len() as u32 },
+            );
+            push_u32(
+                &mut bytes,
+                if uses_descriptor { 0 } else { entry.data.len() as u32 },
+            );
             push_u16(&mut bytes, entry.name.len() as u16);
             push_u16(&mut bytes, 0);
             bytes.extend_from_slice(entry.name);
             bytes.extend_from_slice(entry.data);
+            if uses_descriptor {
+                push_u32(&mut bytes, DATA_DESCRIPTOR_SIGNATURE);
+                push_u32(&mut bytes, checksum);
+                push_u32(&mut bytes, entry.data.len() as u32);
+                push_u32(&mut bytes, entry.data.len() as u32);
+            }
         }
         let central_offset = bytes.len() as u32;
         for (entry, local_offset) in entries.iter().zip(local_offsets.iter()) {
@@ -1513,6 +1526,73 @@ mod tests {
         ));
         let error = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap_err();
         assert_eq!(error.kind, ReaderErrorKind::AmbiguousEndRecord);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn data_descriptor_entries_are_marked_without_treating_local_zeroes_as_final() {
+        let path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"descriptor.bin",
+                data: b"payload",
+                flags: DATA_DESCRIPTOR_FLAG,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let entry = &reader.inventory().entries[0];
+        assert!(entry.uses_data_descriptor);
+        assert_eq!(entry.declared_crc32, crc32(b"payload"));
+        assert_eq!(entry.declared_uncompressed_size, 7);
+        assert!(entry.limitations.iter().any(|item| item.contains("data descriptor")));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn classifies_backslash_parent_traversal_on_unix_hosts() {
+        let path = write_temp(&single_entry(b"..\\escape.txt", b"payload"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        assert_eq!(
+            reader.inventory().entries[0].path_disposition,
+            PathDisposition::ParentTraversal
+        );
+        assert_eq!(
+            reader.inventory().entries[0].decoded_name.as_deref(),
+            Some("..\\escape.txt")
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn enforces_entry_count_and_aggregate_declared_expansion_budgets() {
+        let bytes = build_zip(
+            &[TestEntry {
+                name: b"asset",
+                data: b"payload",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        );
+        let path = write_temp(&bytes);
+        let mut limits = ReaderLimits::default();
+        limits.max_entries = 0;
+        assert_eq!(
+            ZipArtifactReader::open(&path, limits).unwrap_err().kind,
+            ReaderErrorKind::LimitExceeded
+        );
+        fs::remove_file(&path).unwrap();
+
+        let path = write_temp(&bytes);
+        let mut limits = ReaderLimits::default();
+        limits.max_total_declared_uncompressed_bytes = 1;
+        assert_eq!(
+            ZipArtifactReader::open(&path, limits).unwrap_err().kind,
+            ReaderErrorKind::LimitExceeded
+        );
         fs::remove_file(path).unwrap();
     }
 
