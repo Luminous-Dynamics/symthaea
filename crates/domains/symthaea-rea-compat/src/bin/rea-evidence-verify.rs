@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn json_success_output_does_not_disclose_local_paths_or_result_payloads() {
         let fixture: Value =
-            serde_json::from_str(include_str!("../tests/fixtures/rea-evidence-v1.json"))
+            serde_json::from_str(include_str!("../../tests/fixtures/rea-evidence-v1.json"))
                 .unwrap();
         let evidence = symthaea_rea_compat::verify_evidence_value(&fixture).unwrap();
         let rendered = success_json(&evidence, 123).to_string();
