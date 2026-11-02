@@ -180,6 +180,7 @@ pub struct MeasurementProtocolV1 {
 pub struct MeasurementInstanceV1 {
     pub item_id: String,
     pub task_family: String,
+    pub source_domain_id: String,
     pub source_cluster_id: String,
     pub source_lineage_sha256: String,
 }
@@ -252,6 +253,7 @@ pub struct MeasurementRunBundleV1 {
 pub struct DistributionProfileCellV1 {
     pub model_id: String,
     pub model_family_id: String,
+    pub task_family: String,
     pub axis_id: String,
     pub condition_id: String,
     pub expected_count: u64,
@@ -280,6 +282,7 @@ pub struct DistributionProfileCellV1 {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RankStabilityV1 {
+    pub task_family: String,
     pub axis_id: String,
     pub condition_id: String,
     pub model_count: u64,
@@ -310,6 +313,8 @@ pub struct MeasurementDistributionReportV1 {
     pub measurement_paradigm: String,
     pub model_count: u64,
     pub model_family_count: u64,
+    pub task_family_count: u64,
+    pub source_domain_count: u64,
     pub run_count: u64,
     pub independent_unit_kind: IndependentUnitKindV1,
     pub independent_unit_count: u64,
@@ -339,6 +344,7 @@ struct ObservationKey {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct ProfileKey {
     model_id: String,
+    task_family: String,
     axis_id: String,
     condition_id: String,
 }
@@ -718,6 +724,7 @@ pub fn analyze_measurement_distribution(
     for item in &bundle.instance_manifest.instances {
         if !valid_id(&item.item_id, 128)
             || !valid_id(&item.task_family, 64)
+            || !valid_id(&item.source_domain_id, 128)
             || !valid_id(&item.source_cluster_id, 128)
             || instances.insert(item.item_id.clone(), item).is_some()
         {
@@ -869,6 +876,7 @@ pub fn analyze_measurement_distribution(
         }
         let profile_key = ProfileKey {
             model_id: observation.model_id.clone(),
+            task_family: observation.task_family.clone(),
             axis_id: observation.axis_id.clone(),
             condition_id: observation.condition_id.clone(),
         };
@@ -905,8 +913,12 @@ pub fn analyze_measurement_distribution(
         let axis = axes
             .get(key.axis_id.as_str())
             .ok_or_else(|| "profile axis disappeared".to_owned())?;
-        let expected = (runs_by_model.get(&key.model_id).copied().unwrap_or(0)
-            * instances.len() as u64) as u64;
+        let family_instance_count = instances
+            .values()
+            .filter(|item| item.task_family == key.task_family)
+            .count() as u64;
+        let expected = runs_by_model.get(&key.model_id).copied().unwrap_or(0)
+            * family_instance_count;
         let scored: Vec<&MeasurementObservationV1> =
             observations.iter().copied().filter(|row| row.score.is_some()).collect();
         let scores: Vec<f64> = scored.iter().filter_map(|row| row.score).collect();
@@ -980,6 +992,7 @@ pub fn analyze_measurement_distribution(
         let cell = DistributionProfileCellV1 {
             model_id: key.model_id.clone(),
             model_family_id: models.get(&key.model_id).unwrap().model_family_id.clone(),
+            task_family: key.task_family.clone(),
             axis_id: key.axis_id.clone(),
             condition_id: key.condition_id.clone(),
             expected_count: expected,
@@ -1010,58 +1023,65 @@ pub fn analyze_measurement_distribution(
 
     let mut rank_stability = Vec::new();
     let mut any_rank_not_estimable = false;
-    for axis in &protocol.axes {
-        if axis.auxiliary_only {
-            continue;
-        }
-        let conditions = conditions_by_axis
-            .get(&axis.axis_id)
-            .ok_or_else(|| "rank-stability condition set missing".to_owned())?;
-        for condition_id in conditions {
-            if condition_id == &axis.baseline_condition_id {
+    let task_families: BTreeSet<String> =
+        bundle.instance_manifest.instances.iter().map(|item| item.task_family.clone()).collect();
+    for task_family in &task_families {
+        for axis in &protocol.axes {
+            if axis.auxiliary_only {
                 continue;
             }
-            let mut baseline_scores = Vec::new();
-            let mut condition_scores = Vec::new();
-            for model in &bundle.models {
-                let baseline_key = ProfileKey {
-                    model_id: model.model_id.clone(),
-                    axis_id: axis.axis_id.clone(),
-                    condition_id: axis.baseline_condition_id.clone(),
+            let conditions = conditions_by_axis
+                .get(&axis.axis_id)
+                .ok_or_else(|| "rank-stability condition set missing".to_owned())?;
+            for condition_id in conditions {
+                if condition_id == &axis.baseline_condition_id {
+                    continue;
+                }
+                let mut baseline_scores = Vec::new();
+                let mut condition_scores = Vec::new();
+                for model in &bundle.models {
+                    let baseline_key = ProfileKey {
+                        model_id: model.model_id.clone(),
+                        task_family: task_family.clone(),
+                        axis_id: axis.axis_id.clone(),
+                        condition_id: axis.baseline_condition_id.clone(),
+                    };
+                    let condition_key = ProfileKey {
+                        model_id: model.model_id.clone(),
+                        task_family: task_family.clone(),
+                        axis_id: axis.axis_id.clone(),
+                        condition_id: condition_id.clone(),
+                    };
+                    if let (Some(base), Some(condition)) =
+                        (cell_lookup.get(&baseline_key), cell_lookup.get(&condition_key))
+                        && let (Some(base_score), Some(condition_score)) =
+                            (base.mean_score, condition.mean_score)
+                    {
+                        let direction = if protocol.evaluation.higher_is_better { 1.0 } else { -1.0 };
+                        baseline_scores.push(base_score * direction);
+                        condition_scores.push(condition_score * direction);
+                    }
+                }
+                let tau = if baseline_scores.len() >= protocol.reporting.minimum_models_for_rank_stability as usize {
+                    kendall_tau_b(&baseline_scores, &condition_scores)
+                } else {
+                    None
                 };
-                let condition_key = ProfileKey {
-                    model_id: model.model_id.clone(),
+                let status = if tau.is_some() {
+                    "estimated"
+                } else {
+                    any_rank_not_estimable = true;
+                    "non_estimable_insufficient_models_or_rank_variation"
+                };
+                rank_stability.push(RankStabilityV1 {
+                    task_family: task_family.clone(),
                     axis_id: axis.axis_id.clone(),
                     condition_id: condition_id.clone(),
-                };
-                if let (Some(base), Some(condition)) =
-                    (cell_lookup.get(&baseline_key), cell_lookup.get(&condition_key))
-                    && let (Some(base_score), Some(condition_score)) =
-                        (base.mean_score, condition.mean_score)
-                {
-                    let direction = if protocol.evaluation.higher_is_better { 1.0 } else { -1.0 };
-                    baseline_scores.push(base_score * direction);
-                    condition_scores.push(condition_score * direction);
-                }
+                    model_count: baseline_scores.len() as u64,
+                    kendall_tau_b: tau,
+                    status: status.to_owned(),
+                });
             }
-            let tau = if baseline_scores.len() >= protocol.reporting.minimum_models_for_rank_stability as usize {
-                kendall_tau_b(&baseline_scores, &condition_scores)
-            } else {
-                None
-            };
-            let status = if tau.is_some() {
-                "estimated"
-            } else {
-                any_rank_not_estimable = true;
-                "non_estimable_insufficient_models_or_rank_variation"
-            };
-            rank_stability.push(RankStabilityV1 {
-                axis_id: axis.axis_id.clone(),
-                condition_id: condition_id.clone(),
-                model_count: baseline_scores.len() as u64,
-                kendall_tau_b: tau,
-                status: status.to_owned(),
-            });
         }
     }
 
@@ -1069,6 +1089,8 @@ pub fn analyze_measurement_distribution(
         bundle.instance_manifest.instances.iter().map(|item| item.task_family.clone()).collect();
     let model_families: BTreeSet<String> =
         bundle.models.iter().map(|model| model.model_family_id.clone()).collect();
+    let source_domains: BTreeSet<String> = bundle.instance_manifest.instances
+        .iter().map(|item| item.source_domain_id.clone()).collect();
     let minimum_model_count_met = models.len() >= protocol.evaluation.minimum_model_count as usize;
     let minimum_runs_met = bundle.models.iter().all(|model| {
         runs_by_model.get(&model.model_id).copied().unwrap_or(0)
@@ -1096,9 +1118,9 @@ pub fn analyze_measurement_distribution(
     let scope_population_met = match protocol.construct.claim_scope {
         ClaimScopeV1::FixedConfiguration => true,
         ClaimScopeV1::TaskFamily => !task_families.is_empty(),
-        ClaimScopeV1::CrossDomain => task_families.len() >= 2,
+        ClaimScopeV1::CrossDomain => task_families.len() >= 2 && source_domains.len() >= 2,
         ClaimScopeV1::ModelFamily => model_families.len() >= 2,
-        ClaimScopeV1::DeploymentDistribution => task_families.len() >= 2 && model_families.len() >= 2,
+        ClaimScopeV1::DeploymentDistribution => task_families.len() >= 2 && source_domains.len() >= 2 && model_families.len() >= 2,
     };
     let rank_met = !protocol.reporting.require_rank_stability
         || (!rank_stability.is_empty()
@@ -1160,6 +1182,8 @@ pub fn analyze_measurement_distribution(
         measurement_paradigm: measurement_paradigm.to_owned(),
         model_count: models.len() as u64,
         model_family_count: model_families.len() as u64,
+        task_family_count: task_families.len() as u64,
+        source_domain_count: source_domains.len() as u64,
         run_count: bundle.runs.len() as u64,
         independent_unit_kind: protocol.evaluation.independent_unit_kind,
         independent_unit_count,
@@ -1219,12 +1243,14 @@ mod tests {
                 MeasurementInstanceV1 {
                     item_id: "item-1".to_owned(),
                     task_family: "math".to_owned(),
+                    source_domain_id: "source-a".to_owned(),
                     source_cluster_id: "cluster-1".to_owned(),
                     source_lineage_sha256: digest('6'),
                 },
                 MeasurementInstanceV1 {
                     item_id: "item-2".to_owned(),
                     task_family: "math".to_owned(),
+                    source_domain_id: "source-b".to_owned(),
                     source_cluster_id: "cluster-2".to_owned(),
                     source_lineage_sha256: digest('7'),
                 },
