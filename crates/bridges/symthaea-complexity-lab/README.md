@@ -189,3 +189,12 @@ capability declarations. The initial planner guard distinguishes:
 These are fail-closed category checks, not proofs that a caller's claimed
 algebra laws hold. Noncommutative coefficient products are not supported by
 this factor-elimination engine.
+
+
+The reference folder also contains `semiring_law_oracle.py` and
+`semiring_law_results.json`. The standard-library oracle performs 256
+deterministic algebra-law cases each for MaxCount, ParetoCount, and the
+truncated bivariate polynomial ring (768/768 total), checking identity,
+associativity, commutativity and distributivity. It tests the mathematical
+reference operations only; it does not execute the Rust code or replace Lean
+formalization.
