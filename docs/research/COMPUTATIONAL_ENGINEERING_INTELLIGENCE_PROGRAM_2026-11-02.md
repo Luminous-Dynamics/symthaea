@@ -405,6 +405,8 @@ That is the standard to build toward: not a coding chatbot with a large memory, 
 - Deng et al., [SWE-Bench Pro: Can AI Agents Solve Long-Horizon Software Engineering Tasks?](https://proceedings.mlr.press/v306/deng26f.html), ICML 2026.
 - Scale Labs, [SWE-Bench Pro V2 evaluation update](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2), 2026-09-22.
 - Badertdinov et al., [SWE-rebench: An Automated Pipeline for Task Collection and Decontaminated Evaluation of Software Engineering Agents](https://proceedings.neurips.cc/paper_files/paper/2025/hash/21bec6ace947b1b58967b945c8ac0f10-Abstract-Datasets_and_Benchmarks_Track.html), NeurIPS 2025.
-- [Terminal-Bench 4.0 official site and leaderboard](https://www.tbench.ai/), accessed 2026-11-02.
+- [SWE-rebench V2 collection](https://huggingface.co/collections/nebius/swe-rebench-v2), viewer updated 2026-10-01; leaderboard time-window details accessed 2026-11-02.
+- [Terminal-Bench 4.0 official site and benchmark specification](https://www.tbench.ai/?version=4.0), accessed 2026-11-02.
+- [Vals AI, Terminal-Bench 4.0 independent leaderboard and methodology](https://vals-ai.com/benchmarks/terminal-bench-4), updated 2026-10-29.
 - [Epoch AI Terminal-Bench 2.0 methodology and model-agent scoring](https://epoch.ai/benchmarks/terminal-bench), accessed 2026-11-02.
 - [CRUST-bench](https://crust-bench.github.io/), C-to-Rust translation benchmark.
