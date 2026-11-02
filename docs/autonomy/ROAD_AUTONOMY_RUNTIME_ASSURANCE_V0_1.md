@@ -33,7 +33,7 @@ The monitor receives both commands and evidence through an explicit observation 
 - A baseline command is selectable only when it is well-formed and the caller explicitly declares its profile admissible.
 - If the fallback is unavailable or malformed, the monitor returns `NoAdmissibleFallback` and `selected_command = None`.
 - Any monitor finding immediately selects the admissible baseline; a clean dwell and a bounded linear transition are required before advanced authority is restored.
-- The decision retains a compact witness, exact profile ID, mode and findings.
+- Each decision retains a compact witness, exact profile ID, a BLAKE3 digest of the deterministic `serde_json` serialization of the v0.1 monitor configuration, mode and findings. This digest distinguishes configuration changes but is neither a signature nor a canonical cross-language encoding.
 
 The baseline-admissibility boolean is only a caller assertion. It is not authenticated evidence, and this module does not prove that the baseline is dynamically safe. A no-command result is not an emergency-stop maneuver; any future physical system needs a separately engineered and qualified local fail-safe path.
 
@@ -45,7 +45,7 @@ The baseline-admissibility boolean is only a caller assertion. It is not authent
 4. The transition is a command-space interpolation, not a verified bumpless transfer for a real vehicle.
 5. Time is represented as floating-point seconds in the simulation. A deployed real-time implementation must define clock source, resolution, rollover, synchronization, deadline behavior and restart semantics.
 6. The monitor's own process failure, memory corruption, shared-sensor common cause, power loss and command-path faults are not covered by this module.
-7. Serialization does not authenticate the producer or the evidence. Content identity, source authenticity and trusted measurement are separate future obligations.
+7. The profile digest identifies the serialized monitor configuration only. It does not bind the executable, vehicle configuration, sensor calibration, learned model, baseline implementation, source evidence or runtime measurement. Serialization does not authenticate the producer or the evidence. Content identity, source authenticity and trusted measurement are separate obligations.
 
 ## Benchmark protocol
 
@@ -83,7 +83,7 @@ Do not aggregate safety-critical failures into an average reward. Preserve denom
 - Zero positive-control failures: a valid baseline/advanced pair must remain operable, preventing “reject everything” from passing.
 - Immediate selection of an admissible baseline in the same monitor evaluation when a finding is present.
 - No re-entry before the configured clean dwell completes; any fault during transition returns to baseline.
-- Every decision binds the exact profile and contains the observed inputs / reasons required for replay.
+- Every decision binds the profile ID and monitor-configuration digest and contains the observed inputs / reasons required for replay.
 - No unexplained non-finite output and no stale approval reuse after profile/configuration change.
 - Performance is reported as a Pareto frontier across safety, completion, comfort, energy, compute and intervention rate. No single weighted pass score.
 
