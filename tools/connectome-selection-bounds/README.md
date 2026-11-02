@@ -202,6 +202,12 @@ For every admissible hypothesis, the library computes its Fréchet joint-respons
 
 If any admissible structural hypothesis allows the source prevalence to be zero, the global target-given-source set is returned as not estimable. The implementation does not discard that alternative just because a conditional denominator is unavailable.
 
+Machine-readable structural-hypothesis contracts:
+- `schemas/structural-hypothesis-input.schema.json` defines the admissible alternative set and evidence digests.
+- `schemas/structural-hypothesis-output.schema.json` defines the per-hypothesis report and disconnected identified-set union.
+- `schemas/structural-hypothesis-fixture.schema.json` validates `fixtures/structural-hypothesis-disconnected-known-answer.json`.
+
+
 The report preserves the hypothesis IDs, entity mappings, evidence digests, marginal intervals, per-hypothesis outputs, excluded hypothesis IDs, and the explicit flag that no probability weights were applied. It validates all alternatives (including excluded records) and rejects duplicate IDs, malformed digests, invalid intervals and an empty admissible set.
 
 Synthetic known answer:
