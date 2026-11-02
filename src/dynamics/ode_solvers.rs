@@ -639,13 +639,6 @@ impl OdeSolverEngine {
         t_span: (f64, f64),
         limits: OdeSolveLimits,
     ) -> Result<OdeResult, OdeSolveFailure> {
-        let empty_result = || OdeResult {
-            states: Vec::new(),
-            times: Vec::new(),
-            step_sizes: Vec::new(),
-            error_estimates: Vec::new(),
-            num_rejections: 0,
-        };
         let fail = |kind,
                     current_time,
                     attempted_steps,
