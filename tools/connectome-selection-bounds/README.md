@@ -109,3 +109,21 @@ Analytic tests cover q=0.6 with Se in [0.8,0.9] and Sp in [0.9,0.95] (latent pre
 - `schemas/detector-prevalence-fixture.schema.json` validates the wrapper for `fixtures/detector-prevalence-known-answer.json`.
 
 The known-answer fixtures separate input from expected output; the expected values are never accepted as part of the strict evaluator input object.
+
+
+## Joint source/target response prevalence
+
+`joint_response_prevalence_bounds(source, target)` uses the sharp Fréchet-Hoeffding bounds when only source and target marginal prevalence intervals are available:
+
+    P(source AND target) in
+    [max(0, lower_source + lower_target - 1), min(upper_source, upper_target)]
+
+This is an **identified interval over all couplings**, not a point estimate. It makes no independence assumption. Multiplying marginal response rates is unjustified unless a separately validated conditional-independence or dependence model supports it.
+
+Known-answer examples:
+- Point marginals 0.8 and 0.6 -> joint interval [0.4, 0.6], while the independence product 0.48 is merely one possible value.
+- Marginals [0.7,0.8] and [0.6,0.9] -> [0.3,0.8].
+- Marginals [0.2,0.4] and [0.3,0.5] -> [0,0.4].
+- One completely unknown marginal [0,1] and another [0.4,0.7] -> [0,0.7].
+
+The function accepts intervals, so it composes directly with separate source and target outputs from `latent_prevalence_bounds`. It does not recover the dependence structure. A joint-response model needs paired calibration observations, joint latent-state measurements, or explicitly defended structural assumptions.

@@ -186,6 +186,7 @@ pub enum EvalError {
     SelectionStatusMismatch(String),
     InvalidProbability(&'static str),
     InfeasibleDetectorCalibration,
+    InvalidProbabilityInterval(&'static str),
     NumericOverflow,
 }
 
@@ -205,6 +206,7 @@ impl fmt::Display for EvalError {
             Self::SelectionStatusMismatch(x) => write!(f, "combined selection status does not match source/target response states for {x}"),
             Self::InvalidProbability(x) => write!(f, "{x} must be finite and in [0,1]"),
             Self::InfeasibleDetectorCalibration => write!(f, "observed detector-positive rate is incompatible with all declared sensitivity/specificity values"),
+            Self::InvalidProbabilityInterval(x) => write!(f, "{x} interval must be finite, ordered, and within [0,1]"),
             Self::NumericOverflow => write!(f, "numeric overflow while computing bounds"),
         }
     }
@@ -257,6 +259,48 @@ fn intersect_linear_leq(lower: &mut f64, upper: &mut f64, coefficient: f64, rhs:
         return false;
     }
     *lower <= *upper
+}
+
+// Joint source-target response identification is separate from the two marginal detector inversions.\n
+/// Validate a closed probability interval.
+fn validate_probability_interval(
+    interval: NumericInterval,
+    field: &'static str,
+) -> Result<(), EvalError> {
+    if !interval.lower.is_finite()
+        || !interval.upper.is_finite()
+        || interval.lower < 0.0
+        || interval.upper > 1.0
+        || interval.lower > interval.upper
+    {
+        return Err(EvalError::InvalidProbabilityInterval(field));
+    }
+    Ok(())
+}
+
+/// Sharp Fréchet-Hoeffding bounds on the joint occurrence of two binary events.
+///
+/// Given only marginal prevalence intervals S in [s_L,s_U] and T in [t_L,t_U],
+/// the joint prevalence P(S ∩ T) is bounded by:
+///
+///     [max(0, s_L + t_L - 1), min(s_U, t_U)].
+///
+/// This is sharp over all couplings compatible with the marginal intervals. It makes
+/// no independence assumption. In particular, the product of marginal rates is only
+/// one possible coupling and is not a justified joint-response estimate without an
+/// independently defended factorization model.
+pub fn joint_response_prevalence_bounds(
+    source: NumericInterval,
+    target: NumericInterval,
+) -> Result<NumericInterval, EvalError> {
+    validate_probability_interval(source, "source_prevalence")?;
+    validate_probability_interval(target, "target_prevalence")?;
+    let lower = (source.lower + target.lower - 1.0).max(0.0);
+    let upper = source.upper.min(target.upper);
+    if !lower.is_finite() || !upper.is_finite() || lower > upper {
+        return Err(EvalError::NumericOverflow);
+    }
+    Ok(NumericInterval { lower, upper })
 }
 
 /// Partially identify latent binary response prevalence from an observed detector-positive
@@ -526,6 +570,76 @@ mod tests {
         }
     }
     fn close(a: f64, b: f64) { assert!((a-b).abs() < 1e-12, "actual={a}, expected={b}"); }
+
+    #[test]
+    fn joint_response_uses_sharp_frechet_bounds_not_independence() {
+        let joint = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.8, upper: 0.8 },
+            NumericInterval { lower: 0.6, upper: 0.6 },
+        ).unwrap();
+        close(joint.lower, 0.4);
+        close(joint.upper, 0.6);
+        // Independence would give 0.48, only one possible value inside these bounds.
+        assert!(0.48 >= joint.lower && 0.48 <= joint.upper);
+    }
+
+    #[test]
+    fn uncertain_marginal_intervals_produce_sharp_joint_bounds() {
+        let joint = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.7, upper: 0.8 },
+            NumericInterval { lower: 0.6, upper: 0.9 },
+        ).unwrap();
+        close(joint.lower, 0.3);
+        close(joint.upper, 0.8);
+    }
+
+    #[test]
+    fn low_marginals_allow_zero_joint_prevalence() {
+        let joint = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.2, upper: 0.4 },
+            NumericInterval { lower: 0.3, upper: 0.5 },
+        ).unwrap();
+        close(joint.lower, 0.0);
+        close(joint.upper, 0.4);
+    }
+
+    #[test]
+    fn one_uninformative_marginal_does_not_add_false_information() {
+        let joint = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.0, upper: 1.0 },
+            NumericInterval { lower: 0.4, upper: 0.7 },
+        ).unwrap();
+        close(joint.lower, 0.0);
+        close(joint.upper, 0.7);
+    }
+
+    #[test]
+    fn wider_marginal_uncertainty_cannot_narrow_joint_bounds() {
+        let narrow = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.7, upper: 0.8 },
+            NumericInterval { lower: 0.6, upper: 0.9 },
+        ).unwrap();
+        let wide = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.5, upper: 0.9 },
+            NumericInterval { lower: 0.4, upper: 1.0 },
+        ).unwrap();
+        assert!(wide.lower <= narrow.lower);
+        assert!(wide.upper >= narrow.upper);
+    }
+
+    #[test]
+    fn malformed_marginal_prevalence_intervals_fail_closed() {
+        let result = joint_response_prevalence_bounds(
+            NumericInterval { lower: -0.1, upper: 0.5 },
+            NumericInterval { lower: 0.3, upper: 0.7 },
+        );
+        assert_eq!(result.unwrap_err(), EvalError::InvalidProbabilityInterval("source_prevalence"));
+        let result = joint_response_prevalence_bounds(
+            NumericInterval { lower: 0.6, upper: 0.5 },
+            NumericInterval { lower: 0.3, upper: 0.7 },
+        );
+        assert_eq!(result.unwrap_err(), EvalError::InvalidProbabilityInterval("source_prevalence"));
+    }
 
     #[test]
     fn detector_calibration_bounds_match_analytic_known_answer() {
