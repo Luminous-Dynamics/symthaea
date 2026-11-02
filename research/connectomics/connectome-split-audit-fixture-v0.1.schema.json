@@ -24,8 +24,7 @@
         "additionalProperties": false,
         "required": [
           "case_id",
-          "input",
-          "expected"
+          "input"
         ],
         "properties": {
           "case_id": {
@@ -140,7 +139,29 @@
               "DuplicateOperationForTask"
             ]
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "expected"
+            ],
+            "not": {
+              "required": [
+                "expected_error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "expected_error"
+            ],
+            "not": {
+              "required": [
+                "expected"
+              ]
+            }
+          }
+        ]
       }
     }
   }
