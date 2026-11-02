@@ -8,8 +8,8 @@
   "generator_contract": {
     "id": "splitmix64-uniform-residual-v1",
     "prng": "SplitMix64",
-    "distribution_transform": "u=(next_u64+0.5)/2^64; symmetric residual z=2u-1; residual_milli=location_milli+round(scale_milli*z); all rounding ties away from zero",
-    "covariate_stream": "independent SplitMix64 stream with a separate committed seed; x=2u-1",
+    "distribution_transform": "u32=next_u32(); signed_ppm=floor(2000000*u32/(2^32-1))-1000000; use z_ppm=signed_ppm for residual innovations",
+    "covariate_stream": "independent SplitMix64 substream with its own committed seed tag; x_ppm uses the identical integer u32-to-signed-PPM mapping; no floating-point conversion",
     "residual_equation": "ordinary residual = location_milli + round_away(scale_milli*z_ppm/1000000) + round_away(covariate_slope_milli*x_ppm/1000000); on a tail event replace the scale*z term with +/- tail_scale_milli",
     "seed_policy": "every scenario x seed is an independent stream; commit seed list before evaluation; no test-seed selection",
     "candidate_visibility": "outcome labels only become visible at feedback_available_step; later revisions only after revision_available_step",
