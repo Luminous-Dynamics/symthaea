@@ -55,6 +55,427 @@ fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, Valid
     Ok(value)
 }
 
+fn require_keys(
+    value: &Value,
+    required: &[&str],
+    optional: &[&str],
+    context: &str,
+) -> Result<(), ValidationError> {
+    let object = value.as_object().ok_or_else(|| error(format!("{context} must be an object")))?;
+    for key in required {
+        if !object.contains_key(*key) {
+            return Err(error(format!("{context}.{key} is required")));
+        }
+    }
+    for key in object.keys() {
+        if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
+            return Err(error(format!("{context} contains unknown field '{key}'")));
+        }
+    }
+    Ok(())
+}
+
+fn enum_string<'a>(
+    value: &'a Value,
+    choices: &[&str],
+    context: &str,
+) -> Result<&'a str, ValidationError> {
+    let value = string(value, context)?;
+    if !choices.contains(&value) {
+        return Err(error(format!("{context} has unsupported value '{value}'")));
+    }
+    Ok(value)
+}
+
+fn validate_measurement(value: &Value, context: &str) -> Result<(), ValidationError> {
+    let status = enum_string(
+        required(value, "status", context)?,
+        &["measured", "unavailable", "not_applicable"],
+        &format!("{context}.status"),
+    )?;
+    if status == "measured" {
+        require_keys(value, &["status", "value", "unit"], &[], context)?;
+        let measurement = required(value, "value", context)?.as_f64()
+            .ok_or_else(|| error(format!("{context}.value must be numeric")))?;
+        if !measurement.is_finite() || measurement < 0.0 {
+            return Err(error(format!("{context}.value must be finite and non-negative")));
+        }
+        nonempty_string(required(value, "unit", context)?, &format!("{context}.unit"))?;
+    } else {
+        require_keys(value, &["status", "reason"], &[], context)?;
+        nonempty_string(required(value, "reason", context)?, &format!("{context}.reason"))?;
+    }
+    Ok(())
+}
+
+fn validate_budget_cap(value: &Value, context: &str) -> Result<(), ValidationError> {
+    let status = enum_string(
+        required(value, "status", context)?,
+        &["bounded", "unbounded", "not_applicable"],
+        &format!("{context}.status"),
+    )?;
+    if status == "bounded" {
+        require_keys(value, &["status", "maximum", "unit"], &[], context)?;
+        let maximum = required(value, "maximum", context)?.as_f64()
+            .ok_or_else(|| error(format!("{context}.maximum must be numeric")))?;
+        if !maximum.is_finite() || maximum < 0.0 {
+            return Err(error(format!("{context}.maximum must be finite and non-negative")));
+        }
+        nonempty_string(required(value, "unit", context)?, &format!("{context}.unit"))?;
+    } else {
+        require_keys(value, &["status", "reason"], &[], context)?;
+        nonempty_string(required(value, "reason", context)?, &format!("{context}.reason"))?;
+    }
+    Ok(())
+}
+
+fn validate_structure(receipt: &Value) -> Result<(), ValidationError> {
+    require_exact_keys(
+        receipt,
+        &[
+            "schema", "run_id", "created_at", "run_kind", "benchmark", "system",
+            "environment", "budget_caps", "actual_resources", "task_accounting",
+            "task_outcomes", "excluded_tasks", "official_score", "derived_metrics",
+            "comparison", "provenance", "integrity", "claim_ceiling",
+        ],
+        "receipt",
+    )?;
+    nonempty_string(required(receipt, "run_id", "receipt")?, "run_id")?;
+    nonempty_string(required(receipt, "created_at", "receipt")?, "created_at")?;
+    enum_string(
+        required(receipt, "run_kind", "receipt")?,
+        &["synthetic_fixture", "internal_holdout", "public_benchmark", "private_challenge", "production_evaluation"],
+        "run_kind",
+    )?;
+
+    let benchmark = required(receipt, "benchmark", "receipt")?;
+    require_keys(
+        benchmark,
+        &[
+            "benchmark_id", "version", "revision", "access_class",
+            "dataset_manifest_sha256", "eligible_task_set_sha256", "split_id",
+            "scoring_protocol_id", "scoring_protocol_version",
+        ],
+        &["licence_or_access_terms", "official_documentation_uri"],
+        "benchmark",
+    )?;
+    for key in ["benchmark_id", "version", "split_id", "scoring_protocol_id", "scoring_protocol_version"] {
+        nonempty_string(required(benchmark, key, "benchmark")?, &format!("benchmark.{key}"))?;
+    }
+    enum_string(
+        required(benchmark, "access_class", "benchmark")?,
+        &["internal", "public", "authorized_private", "restricted", "synthetic"],
+        "benchmark.access_class",
+    )?;
+    for key in ["dataset_manifest_sha256", "eligible_task_set_sha256"] {
+        valid_sha256(required(benchmark, key, "benchmark")?, &format!("benchmark.{key}"))?;
+    }
+
+    let system = required(receipt, "system", "receipt")?;
+    require_keys(
+        system,
+        &[
+            "arm_id", "arm_kind", "system_id", "system_version", "source_revision",
+            "configuration_sha256", "prompt_or_policy_sha256", "model", "tools",
+        ],
+        &["adapter_revision"],
+        "system",
+    )?;
+    for key in ["arm_id", "system_id", "system_version"] {
+        nonempty_string(required(system, key, "system")?, &format!("system.{key}"))?;
+    }
+    enum_string(
+        required(system, "arm_kind", "system")?,
+        &["rea_only", "symthaea_only", "rea_plus_symthaea", "specialist_tool", "specialist_stack", "human_expert", "other"],
+        "system.arm_kind",
+    )?;
+    for key in ["configuration_sha256", "prompt_or_policy_sha256"] {
+        valid_sha256(required(system, key, "system")?, &format!("system.{key}"))?;
+    }
+    let model = required(system, "model", "system")?;
+    if !model.is_null() {
+        require_exact_keys(model, &["provider", "model_id", "model_version", "configuration_sha256"], "system.model")?;
+        for key in ["provider", "model_id", "model_version"] {
+            nonempty_string(required(model, key, "system.model")?, &format!("system.model.{key}"))?;
+        }
+        valid_sha256(required(model, "configuration_sha256", "system.model")?, "system.model.configuration_sha256")?;
+    }
+    let tools = required(system, "tools", "system")?.as_array()
+        .ok_or_else(|| error("system.tools must be an array"))?;
+    let mut tool_ids = HashSet::new();
+    for (index, tool) in tools.iter().enumerate() {
+        let context = format!("system.tools[{index}]");
+        require_exact_keys(tool, &["tool_id", "version", "executable_sha256", "configuration_sha256"], &context)?;
+        let id = nonempty_string(required(tool, "tool_id", &context)?, &format!("{context}.tool_id"))?;
+        if !tool_ids.insert(id.to_owned()) {
+            return Err(error(format!("duplicate tool ID in system catalog: {id}")));
+        }
+        nonempty_string(required(tool, "version", &context)?, &format!("{context}.version"))?;
+        for key in ["executable_sha256", "configuration_sha256"] {
+            valid_sha256(required(tool, key, &context)?, &format!("{context}.{key}"))?;
+        }
+    }
+
+    let environment = required(receipt, "environment", "receipt")?;
+    require_exact_keys(
+        environment,
+        &["host_os", "host_architecture", "runtime", "container_image_sha256", "network_policy", "instrumentation", "target_cohort", "hardware"],
+        "environment",
+    )?;
+    for key in ["host_os", "host_architecture", "runtime", "target_cohort"] {
+        nonempty_string(required(environment, key, "environment")?, &format!("environment.{key}"))?;
+    }
+    enum_string(
+        required(environment, "network_policy", "environment")?,
+        &["disabled", "allowlisted", "benchmark_defined", "unrestricted", "unknown"],
+        "environment.network_policy",
+    )?;
+    let instrumentation = required(environment, "instrumentation", "environment")?
+        .as_array().ok_or_else(|| error("environment.instrumentation must be an array"))?;
+    for (index, item) in instrumentation.iter().enumerate() {
+        nonempty_string(item, &format!("environment.instrumentation[{index}]"))?;
+    }
+    let container_digest = required(environment, "container_image_sha256", "environment")?;
+    if !container_digest.is_null() {
+        valid_sha256(container_digest, "environment.container_image_sha256")?;
+    }
+    let hardware = required(environment, "hardware", "environment")?;
+    if !hardware.is_null() {
+        require_exact_keys(hardware, &["cpu", "gpu", "memory_bytes", "device_class"], "environment.hardware")?;
+        if let Some(memory) = hardware.get("memory_bytes").filter(|v| !v.is_null()) {
+            count(memory, "environment.hardware.memory_bytes")?;
+        }
+    }
+
+    const RESOURCE_KEYS: [&str; 10] = [
+        "wall_time_ms", "cpu_time_ms", "gpu_time_ms", "peak_rss_bytes",
+        "model_calls", "input_tokens", "output_tokens", "tool_calls",
+        "cost_microusd", "energy_microjoules",
+    ];
+    let budget_caps = required(receipt, "budget_caps", "receipt")?;
+    require_exact_keys(budget_caps, &RESOURCE_KEYS, "budget_caps")?;
+    for key in RESOURCE_KEYS {
+        validate_budget_cap(required(budget_caps, key, "budget_caps")?, &format!("budget_caps.{key}"))?;
+    }
+    let actual_resources = required(receipt, "actual_resources", "receipt")?;
+    require_exact_keys(actual_resources, &RESOURCE_KEYS, "actual_resources")?;
+    for key in RESOURCE_KEYS {
+        validate_measurement(required(actual_resources, key, "actual_resources")?, &format!("actual_resources.{key}"))?;
+    }
+
+    let accounting = required(receipt, "task_accounting", "receipt")?;
+    require_exact_keys(
+        accounting,
+        &[
+            "universe", "eligible", "excluded", "attempted", "not_attempted",
+            "in_progress", "completed", "graded", "terminal_dispositions",
+        ],
+        "task_accounting",
+    )?;
+    let terminal = required(accounting, "terminal_dispositions", "task_accounting")?;
+    require_exact_keys(
+        terminal,
+        &["passed", "failed", "refused", "abstained", "unsupported", "timed_out", "tool_failed", "ungraded"],
+        "terminal_dispositions",
+    )?;
+    for key in [
+        "universe", "eligible", "excluded", "attempted", "not_attempted",
+        "in_progress", "completed", "graded",
+    ] {
+        count_at(accounting, key, "task_accounting")?;
+    }
+    for key in TERMINAL {
+        count_at(terminal, key, "terminal_dispositions")?;
+    }
+
+    let outcomes = required(receipt, "task_outcomes", "receipt")?.as_array()
+        .ok_or_else(|| error("task_outcomes must be an array"))?;
+    for (index, row) in outcomes.iter().enumerate() {
+        let context = format!("task_outcomes[{index}]");
+        require_exact_keys(
+            row,
+            &["task_id", "input_sha256", "disposition", "attempted", "graded", "grade", "reason_code", "grader_result_sha256", "evidence_ids", "resources"],
+            &context,
+        )?;
+        nonempty_string(required(row, "task_id", &context)?, &format!("{context}.task_id"))?;
+        valid_sha256(required(row, "input_sha256", &context)?, &format!("{context}.input_sha256"))?;
+        enum_string(
+            required(row, "disposition", &context)?,
+            &["passed", "failed", "refused", "abstained", "unsupported", "timed_out", "tool_failed", "ungraded", "not_attempted", "in_progress"],
+            &format!("{context}.disposition"),
+        )?;
+        for key in ["attempted", "graded"] {
+            if required(row, key, &context)?.as_bool().is_none() {
+                return Err(error(format!("{context}.{key} must be boolean")));
+            }
+        }
+        let grade = required(row, "grade", &context)?;
+        if !grade.is_null() && grade.as_f64().is_none() {
+            return Err(error(format!("{context}.grade must be numeric or null")));
+        }
+        let reason = required(row, "reason_code", &context)?;
+        if !reason.is_null() && reason.as_str().is_none() {
+            return Err(error(format!("{context}.reason_code must be string or null")));
+        }
+        let grader = required(row, "grader_result_sha256", &context)?;
+        if !grader.is_null() {
+            valid_sha256(grader, &format!("{context}.grader_result_sha256"))?;
+        }
+        let evidence_ids = required(row, "evidence_ids", &context)?.as_array()
+            .ok_or_else(|| error(format!("{context}.evidence_ids must be an array")))?;
+        let mut evidence_set = HashSet::new();
+        for evidence_id in evidence_ids {
+            let id = string(evidence_id, &format!("{context}.evidence_ids[]"))?;
+            if id.len() != 67 || !id.starts_with("ev_") || !id[3..].bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+                return Err(error(format!("{context} has invalid Evidence ID")));
+            }
+            if !evidence_set.insert(id.to_owned()) {
+                return Err(error(format!("{context} has duplicate Evidence ID")));
+            }
+        }
+        let resources = required(row, "resources", &context)?;
+        require_exact_keys(resources, &["wall_time_ms", "model_calls", "input_tokens", "output_tokens", "tool_calls", "cost_microusd"], &format!("{context}.resources"))?;
+        for key in ["wall_time_ms", "model_calls", "input_tokens", "output_tokens", "tool_calls", "cost_microusd"] {
+            validate_measurement(required(resources, key, &format!("{context}.resources"))?, &format!("{context}.resources.{key}"))?;
+        }
+    }
+
+    let excluded = required(receipt, "excluded_tasks", "receipt")?.as_array()
+        .ok_or_else(|| error("excluded_tasks must be an array"))?;
+    for (index, row) in excluded.iter().enumerate() {
+        let context = format!("excluded_tasks[{index}]");
+        require_exact_keys(row, &["task_id", "input_sha256", "reason_code", "predeclared", "approval_reference"], &context)?;
+        nonempty_string(required(row, "task_id", &context)?, &format!("{context}.task_id"))?;
+        valid_sha256(required(row, "input_sha256", &context)?, &format!("{context}.input_sha256"))?;
+        nonempty_string(required(row, "reason_code", &context)?, &format!("{context}.reason_code"))?;
+        if required(row, "predeclared", &context)?.as_bool().is_none() {
+            return Err(error(format!("{context}.predeclared must be boolean")));
+        }
+        let approval = required(row, "approval_reference", &context)?;
+        if !approval.is_null() && approval.as_str().is_none() {
+            return Err(error(format!("{context}.approval_reference must be string or null")));
+        }
+    }
+
+    let official = required(receipt, "official_score", "receipt")?;
+    let status = enum_string(
+        required(official, "status", "official_score")?,
+        &["not_applicable", "reported_by_official_grader", "unavailable"],
+        "official_score.status",
+    )?;
+    match status {
+        "reported_by_official_grader" => {
+            require_exact_keys(official, &["status", "metric_id", "formula_version", "value", "unit", "numerator", "denominator", "grader_result_sha256"], "official_score")?;
+            nonempty_string(required(official, "metric_id", "official_score")?, "official_score.metric_id")?;
+            nonempty_string(required(official, "formula_version", "official_score")?, "official_score.formula_version")?;
+            if required(official, "value", "official_score")?.as_f64().is_none() {
+                return Err(error("official_score.value must be numeric"));
+            }
+            nonempty_string(required(official, "unit", "official_score")?, "official_score.unit")?;
+            for key in ["numerator", "denominator"] {
+                let value = required(official, key, "official_score")?;
+                if !value.is_null() && value.as_f64().is_none() {
+                    return Err(error(format!("official_score.{key} must be numeric or null")));
+                }
+            }
+            valid_sha256(required(official, "grader_result_sha256", "official_score")?, "official_score.grader_result_sha256")?;
+        }
+        "not_applicable" | "unavailable" => {
+            require_exact_keys(official, &["status", "reason"], "official_score")?;
+            nonempty_string(required(official, "reason", "official_score")?, "official_score.reason")?;
+        }
+        _ => unreachable!(),
+    }
+
+    let metrics = required(receipt, "derived_metrics", "receipt")?.as_array()
+        .ok_or_else(|| error("derived_metrics must be an array"))?;
+    for (index, metric) in metrics.iter().enumerate() {
+        let context = format!("derived_metrics[{index}]");
+        require_exact_keys(metric, &["metric_id", "classification", "formula", "value", "numerator", "denominator", "zero_denominator_reason"], &context)?;
+        nonempty_string(required(metric, "metric_id", &context)?, &format!("{context}.metric_id"))?;
+        if required(metric, "classification", &context)? != "derived_non_official" {
+            return Err(error(format!("{context}.classification must be derived_non_official")));
+        }
+        nonempty_string(required(metric, "formula", &context)?, &format!("{context}.formula"))?;
+        for key in ["value", "numerator", "denominator"] {
+            let value = required(metric, key, &context)?;
+            if !value.is_null() && value.as_f64().is_none() {
+                return Err(error(format!("{context}.{key} must be numeric or null")));
+            }
+        }
+        let reason = required(metric, "zero_denominator_reason", &context)?;
+        if !reason.is_null() && reason.as_str().is_none() {
+            return Err(error(format!("{context}.zero_denominator_reason must be string or null")));
+        }
+    }
+
+    let comparison = required(receipt, "comparison", "receipt")?;
+    require_exact_keys(comparison, &["comparison_group_id", "matched", "comparable", "eligible_task_set_sha256", "budget_protocol_sha256", "matched_arm_ids", "non_comparability_reasons"], "comparison")?;
+    nonempty_string(required(comparison, "comparison_group_id", "comparison")?, "comparison.comparison_group_id")?;
+    for key in ["matched", "comparable"] {
+        if required(comparison, key, "comparison")?.as_bool().is_none() {
+            return Err(error(format!("comparison.{key} must be boolean")));
+        }
+    }
+    for key in ["eligible_task_set_sha256", "budget_protocol_sha256"] {
+        valid_sha256(required(comparison, key, "comparison")?, &format!("comparison.{key}"))?;
+    }
+    let arms = required(comparison, "matched_arm_ids", "comparison")?.as_array()
+        .ok_or_else(|| error("comparison.matched_arm_ids must be an array"))?;
+    for (index, arm) in arms.iter().enumerate() {
+        nonempty_string(arm, &format!("comparison.matched_arm_ids[{index}]"))?;
+    }
+    let reasons = required(comparison, "non_comparability_reasons", "comparison")?.as_array()
+        .ok_or_else(|| error("comparison.non_comparability_reasons must be an array"))?;
+    for (index, reason) in reasons.iter().enumerate() {
+        nonempty_string(reason, &format!("comparison.non_comparability_reasons[{index}]"))?;
+    }
+
+    let provenance = required(receipt, "provenance", "receipt")?;
+    require_keys(
+        provenance,
+        &["runner_id", "runner_revision", "grader_id", "grader_version", "grader_sha256", "result_artifact_sha256", "reproduction_recipe_sha256"],
+        &["preregistration_uri", "notes"],
+        "provenance",
+    )?;
+    for key in ["runner_id", "grader_id", "grader_version"] {
+        nonempty_string(required(provenance, key, "provenance")?, &format!("provenance.{key}"))?;
+    }
+    for key in ["grader_sha256", "result_artifact_sha256", "reproduction_recipe_sha256"] {
+        valid_sha256(required(provenance, key, "provenance")?, &format!("provenance.{key}"))?;
+    }
+    if let Some(notes) = provenance.get("notes") {
+        let notes = notes.as_array().ok_or_else(|| error("provenance.notes must be an array"))?;
+        for (index, note) in notes.iter().enumerate() {
+            if note.as_str().is_none() {
+                return Err(error(format!("provenance.notes[{index}] must be a string")));
+            }
+        }
+    }
+
+    let integrity = required(receipt, "integrity", "receipt")?;
+    require_keys(integrity, &["canonicalization", "payload_sha256_excludes_integrity"], &["signature"], "integrity")?;
+    if required(integrity, "canonicalization", "integrity")? != "RFC8785-JCS" {
+        return Err(error("unsupported receipt canonicalization"));
+    }
+    valid_sha256(required(integrity, "payload_sha256_excludes_integrity", "integrity")?, "integrity.payload_sha256_excludes_integrity")?;
+    if let Some(signature) = integrity.get("signature").filter(|v| !v.is_null()) {
+        require_exact_keys(signature, &["algorithm", "key_id", "signature_base64"], "integrity.signature")?;
+        nonempty_string(required(signature, "algorithm", "integrity.signature")?, "integrity.signature.algorithm")?;
+        nonempty_string(required(signature, "key_id", "integrity.signature")?, "integrity.signature.key_id")?;
+        nonempty_string(required(signature, "signature_base64", "integrity.signature")?, "integrity.signature.signature_base64")?;
+    }
+
+    let ceiling = required(receipt, "claim_ceiling", "receipt")?;
+    require_exact_keys(ceiling, &["synthetic_fixture", "official_score_is_official", "grader_independence_verified", "system_superiority_established"], "claim_ceiling")?;
+    for key in ["synthetic_fixture", "official_score_is_official", "grader_independence_verified", "system_superiority_established"] {
+        if required(ceiling, key, "claim_ceiling")?.as_bool().is_none() {
+            return Err(error(format!("claim_ceiling.{key} must be boolean")));
+        }
+    }
+    Ok(())
+}
+
 fn count(value: &Value, context: &str) -> Result<u64, ValidationError> {
     value.as_u64().ok_or_else(|| error(format!("{context} must be a non-negative integer")))
 }
@@ -459,6 +880,7 @@ fn validate_comparison(receipt: &Value) -> Result<(), ValidationError> {
 }
 
 fn validate_receipt(value: &Value) -> Result<Value, ValidationError> {
+    validate_structure(value)?;
     if required(value, "schema", "receipt")? != "luminous.benchmark-run-receipt.v1" {
         return Err(error("unsupported benchmark receipt schema"));
     }
