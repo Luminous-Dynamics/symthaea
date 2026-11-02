@@ -62,7 +62,15 @@
     "overlap_audit_sha256": null,
     "status": "not_qualified",
     "grouping_keys": [],
-    "leakage_notes": "No partition has been materialized or audited."
+    "leakage_notes": "No partition has been materialized or audited.",
+    "unit_tokenization": {
+      "algorithm": "HMAC-SHA256",
+      "key_commitment_sha256": null,
+      "canonicalization_version": "UNIT-TOKEN-V1"
+    },
+    "train_unit_tokens": [],
+    "validation_unit_tokens": [],
+    "test_unit_tokens": []
   },
   "hypothesis_set": [
     {
