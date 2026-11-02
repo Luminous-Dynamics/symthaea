@@ -9,8 +9,7 @@
 //! randomization integrity, target-law equality, or absence of interference.
 
 use super::policy_frontier_lp::{
-    analyze_policy_frontier, FrontierAlternativeReceipt, FrontierNullReceipt,
-    PolicyFrontierError, PolicyFrontierPlan, PolicyFrontierReport,
+    analyze_policy_frontier, PolicyFrontierError, PolicyFrontierPlan, PolicyFrontierReport,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1111,12 +1110,12 @@ mod tests {
         super::super::policy_frontier_lp::FrontierPolicyReceipt {
             policy_id: id.into(),
             utility_contract_sha256: UTILITY_HASH.into(),
-            null_models: vec![FrontierNullReceipt {
+            null_models: vec![super::super::policy_frontier_lp::FrontierNullReceipt {
                 model_id: "null-a".into(),
                 null_size,
             }],
             alternatives: vec![
-                FrontierAlternativeReceipt {
+                super::super::policy_frontier_lp::FrontierAlternativeReceipt {
                     model_id: "alt-a".into(),
                     rejection_power: alt_a.0,
                     expected_evaluator_cost: alt_a.1,
