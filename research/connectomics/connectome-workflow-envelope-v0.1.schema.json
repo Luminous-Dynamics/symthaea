@@ -1,0 +1,755 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-workflow-envelope-v0.1.schema.json",
+  "title": "Connectome proofreading workflow evidence envelope v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "envelope_id",
+    "dataset",
+    "operation",
+    "base_graph_snapshot_sha256",
+    "stages"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sample_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "task": {
+      "enum": [
+        "FalseSplitCorrection",
+        "FalseMergeIdentification",
+        "SplitMaskGeneration"
+      ]
+    },
+    "split": {
+      "enum": [
+        "Train",
+        "Validation",
+        "Test",
+        "Adaptation",
+        "Calibration"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revision",
+        "revision_commit_sha",
+        "card_sha256",
+        "shard_manifest_sha256",
+        "operation_manifest_sha256",
+        "license_review_sha256",
+        "license_approved"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "$ref": "#/$defs/id"
+        },
+        "revision_commit_sha": {
+          "$ref": "#/$defs/commit"
+        },
+        "card_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "shard_manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "license_review_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "license_approved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "split",
+        "source_archive_id",
+        "source_volume_id",
+        "source_operation_id",
+        "spatial_cube_id",
+        "neuron_root_ids",
+        "animal_id",
+        "session_id",
+        "species",
+        "workflow_id"
+      ],
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "source_archive_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_volume_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "spatial_cube_id": {
+          "$ref": "#/$defs/id"
+        },
+        "neuron_root_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "animal_id": {
+          "$ref": "#/$defs/id"
+        },
+        "session_id": {
+          "$ref": "#/$defs/id"
+        },
+        "species": {
+          "$ref": "#/$defs/id"
+        },
+        "workflow_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "split_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "split",
+        "policy_sha256",
+        "input_manifest_sha256",
+        "operation_assignment_sha256",
+        "report_sha256",
+        "outcome"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "split": {
+          "$ref": "#/$defs/split"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "input_manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_assignment_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "outcome": {
+          "enum": [
+            "GroupDisjoint",
+            "LeakageDetected"
+          ]
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "model_checkpoint_sha256",
+        "inference_config_sha256",
+        "calibration_profile_sha256",
+        "prediction_artifact_sha256",
+        "error_probability",
+        "calibrated"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "model_checkpoint_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "inference_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "calibration_profile_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "prediction_artifact_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "error_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "calibrated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "view_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "operation_id",
+        "task_route",
+        "policy_sha256",
+        "scenario_set_sha256",
+        "loss_matrix_sha256",
+        "acquisition_cost_profile_sha256",
+        "loss_unit_id",
+        "outcome"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "scenario_set_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "loss_matrix_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "acquisition_cost_profile_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "loss_unit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "view_id",
+                "view_kind",
+                "sample_hash",
+                "task_route",
+                "artifact_sha256",
+                "acquisition_cost_units"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "Acquired"
+                },
+                "view_id": {
+                  "$ref": "#/$defs/id"
+                },
+                "view_kind": {
+                  "enum": [
+                    "EmXy",
+                    "EmXz",
+                    "EmYz",
+                    "EmBest",
+                    "GeometrySingle",
+                    "GeometryDual",
+                    "Other"
+                  ]
+                },
+                "sample_hash": {
+                  "$ref": "#/$defs/sample_hash"
+                },
+                "task_route": {
+                  "$ref": "#/$defs/task"
+                },
+                "artifact_sha256": {
+                  "$ref": "#/$defs/sha"
+                },
+                "acquisition_cost_units": {
+                  "$ref": "#/$defs/id"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "reason"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "Stopped"
+                },
+                "reason": {
+                  "$ref": "#/$defs/id"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task_route": {
+                "const": "FalseMergeIdentification"
+              },
+              "outcome": {
+                "properties": {
+                  "kind": {
+                    "const": "Acquired"
+                  },
+                  "view_kind": {
+                    "const": "EmBest"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "view_kind"
+                ]
+              }
+            },
+            "required": [
+              "task_route",
+              "outcome"
+            ]
+          },
+          "then": false
+        }
+      ]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "policy_run_sha256",
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "allocation",
+        "reviewer_id",
+        "disposition",
+        "review_seconds"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "policy_run_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "allocation": {
+          "enum": [
+            "Selected",
+            "Deferred"
+          ]
+        },
+        "reviewer_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "disposition": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "Approved",
+            "Rejected",
+            null
+          ]
+        },
+        "review_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "allocation": {
+                "const": "Deferred"
+              }
+            },
+            "required": [
+              "allocation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reviewer_id": {
+                "type": "null"
+              },
+              "disposition": {
+                "type": "null"
+              },
+              "review_seconds": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "Approved",
+                  "Rejected"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reviewer_id": {
+                "$ref": "#/$defs/id"
+              },
+              "review_seconds": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "event_stream_sha256",
+        "transaction_id",
+        "operation_binding_sha256",
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "base_snapshot_sha256",
+        "resulting_snapshot_sha256",
+        "verification_artifact_sha256",
+        "verification_passed",
+        "annotation_propagation_sha256",
+        "annotation_propagation_verified",
+        "outcome"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "event_stream_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/id"
+        },
+        "operation_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sample_hash": {
+          "$ref": "#/$defs/sample_hash"
+        },
+        "task_route": {
+          "$ref": "#/$defs/task"
+        },
+        "base_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "resulting_snapshot_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verification_artifact_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "verification_passed": {
+          "type": "boolean"
+        },
+        "annotation_propagation_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "annotation_propagation_verified": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "enum": [
+            "Committed",
+            "Rejected",
+            "Quarantined"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "Committed"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "resulting_snapshot_sha256": {
+                "$ref": "#/$defs/sha"
+              },
+              "verification_passed": {
+                "const": true
+              },
+              "annotation_propagation_verified": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "report_sha256",
+        "query_id",
+        "query_definition_sha256",
+        "analysis_code_sha256",
+        "uncertainty_set_sha256",
+        "source_volume_id",
+        "first_graph_snapshot_sha256",
+        "latest_graph_snapshot_sha256",
+        "outcome",
+        "future_stability_certified",
+        "universal_connectome_completeness_claimed"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "analysis_code_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "uncertainty_set_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_volume_id": {
+          "$ref": "#/$defs/id"
+        },
+        "first_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "latest_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "outcome": {
+          "enum": [
+            "InsufficientHistory",
+            "StableOverObservedWindow",
+            "UnstableOverObservedWindow"
+          ]
+        },
+        "future_stability_certified": {
+          "const": false
+        },
+        "universal_connectome_completeness_claimed": {
+          "const": false
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "envelope_id": {
+      "$ref": "#/$defs/id"
+    },
+    "dataset": {
+      "$ref": "#/$defs/dataset"
+    },
+    "operation": {
+      "$ref": "#/$defs/operation"
+    },
+    "base_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_audit",
+        "prediction",
+        "view_decision",
+        "review",
+        "edit_transaction",
+        "query_stability"
+      ],
+      "properties": {
+        "split_audit": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/split_receipt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prediction": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/prediction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "view_decision": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/view_decision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/review"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "edit_transaction": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/edit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query_stability": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/query"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
