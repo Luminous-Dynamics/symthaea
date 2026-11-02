@@ -1202,6 +1202,8 @@ pub fn aggregate_witness_read(
     let selected = highest.ok_or_else(|| "anti_rollback_unknown: no certified head selected".to_string())?;
     response_digests.sort();
     signer_keys.sort();
+    let mut checkpoint_signer_keys = selected.accepted_key_ids.clone();
+    checkpoint_signer_keys.sort();
     let response_set = serde_json_canonicalizer::to_vec(&response_digests)
         .map_err(|error| format!("cannot canonicalize witness response set: {error}"))?;
 
@@ -1220,7 +1222,7 @@ pub fn aggregate_witness_read(
         policy_digest: selected.payload.policy_digest.clone(),
         read_quorum: trust.read_quorum,
         response_member_key_ids: signer_keys,
-        checkpoint_signer_key_ids: selected.accepted_key_ids.clone(),
+        checkpoint_signer_key_ids: checkpoint_signer_keys,
         response_set_sha256: sha256_prefixed(&response_set),
         checkpoint_envelope_sha256: selected.envelope_sha256.clone(),
         trust_store_sha256: actual_trust_digest,
