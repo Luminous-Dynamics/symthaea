@@ -2,7 +2,7 @@
 
 **Tracking:** NEURO-SILICON-011 / #9561  
 **Related:** NEURO-SILICON-010 / #9557, #9872; joint temporal controller #9666; higher-order interaction evaluator #9876  
-**Implementation:** \`research/temporal-intervention-audit\`  
+**Implementation:** `research/temporal-intervention-audit`  
 **Status:** Rust research code and tests authored; no Rust build, test, CI or benchmark execution claimed.
 
 ## 1. Why this work is distinct
