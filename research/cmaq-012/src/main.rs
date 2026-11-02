@@ -1747,7 +1747,7 @@ mod tests {
     fn receipt_byte_tampering_is_rejected_even_when_tsv_digest_is_unchanged() {
         let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
         let (root, enriched) = artifact_fixture(&input);
-        let receipt_digest = first_row.split('\t').nth(20).unwrap();
+        let first_row = enriched.lines().nth(1).unwrap();
         let receipt_digest = first_row.split('\t').nth(20).unwrap();
         let path = root.join("receipts").join(format!("{receipt_digest}.json"));
         let mut bytes = fs::read(&path).unwrap();
@@ -1803,7 +1803,7 @@ mod tests {
         fs::rename(&real_receipts_dir, &receipts_dir).unwrap();
 
         let first_row = enriched.lines().nth(1).unwrap();
-        let receipt_digest = first_row.split('\\t').nth(20).unwrap();
+        let receipt_digest = first_row.split('\t').nth(20).unwrap();
         let receipt_path = receipts_dir.join(format!("{receipt_digest}.json"));
         let receipt_target = root.join("receipt-target.json");
         fs::rename(&receipt_path, &receipt_target).unwrap();
