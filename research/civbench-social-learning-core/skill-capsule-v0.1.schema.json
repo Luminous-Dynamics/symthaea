@@ -1,0 +1,716 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.luminousdynamics.org/civbench/proof-carrying-cultural-skill-capsule/0.1",
+  "title": "Proof-Carrying Cultural Skill Capsule v0.1",
+  "description": "Typed, versioned skill payload layered over existing evidence and run contracts. Structural validity is not scientific validity or execution authorization.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "capsule_id",
+    "capsule_version",
+    "content_digest",
+    "status",
+    "scope",
+    "contract",
+    "policy",
+    "provenance",
+    "lineage",
+    "evidence",
+    "assurance",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "capsule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "capsule_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"
+    },
+    "content_digest": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "canonicalization",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha-256"
+        },
+        "canonicalization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "structurally_valid",
+        "independently_tested",
+        "qualified",
+        "deprecated",
+        "revoked"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "task_family_ids",
+        "environment_versions",
+        "input_schema",
+        "action_schema",
+        "supported_contexts",
+        "excluded_contexts"
+      ],
+      "properties": {
+        "task_family_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "environment_versions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "input_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "supported_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contextConstraint"
+          }
+        },
+        "excluded_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contextConstraint"
+          }
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contract": {
+      "type": "object",
+      "required": [
+        "preconditions",
+        "allowed_actions",
+        "postconditions",
+        "invariants",
+        "resource_limits",
+        "termination"
+      ],
+      "properties": {
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "allowed_actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "forbidden_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "postconditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "resource_limits": {
+          "type": "object",
+          "required": [
+            "max_steps",
+            "max_memory_bytes",
+            "max_wall_time_ms"
+          ],
+          "properties": {
+            "max_steps": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_memory_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_wall_time_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_energy_joules": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "termination": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure_modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "representation",
+        "artifact_digest",
+        "runtime_id",
+        "version",
+        "determinism",
+        "seed_semantics",
+        "dependencies"
+      ],
+      "properties": {
+        "representation": {
+          "enum": [
+            "declarative_policy_ir",
+            "sandboxed_wasm",
+            "bounded_bytecode"
+          ]
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^sha-256:[a-f0-9]{64}$"
+        },
+        "runtime_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "determinism": {
+          "enum": [
+            "deterministic",
+            "stochastic_seeded",
+            "stochastic_unseeded"
+          ]
+        },
+        "seed_semantics": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "version",
+              "digest"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha-256:[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "memory_bound_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "semantic_retrieval": {
+          "type": "object",
+          "required": [
+            "model_id",
+            "embedding_digest",
+            "authority"
+          ],
+          "properties": {
+            "model_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "embedding_digest": {
+              "type": "string",
+              "pattern": "^sha-256:[a-f0-9]{64}$"
+            },
+            "authority": {
+              "const": "retrieval_only_non_authoritative"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "creator_identity_ref",
+        "publisher_key_ref",
+        "signature_ref",
+        "license_id",
+        "source_refs"
+      ],
+      "properties": {
+        "creator_identity_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher_key_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "consent_restrictions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authorship_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "lineage": {
+      "type": "object",
+      "required": [
+        "parents",
+        "transformations"
+      ],
+      "properties": {
+        "parents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "capsule_id",
+              "capsule_version",
+              "content_digest"
+            ],
+            "properties": {
+              "capsule_id": {
+                "type": "string"
+              },
+              "capsule_version": {
+                "type": "string"
+              },
+              "content_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "transformations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "operation",
+              "actor_ref",
+              "timestamp",
+              "input_digest",
+              "output_digest"
+            ],
+            "properties": {
+              "operation": {
+                "type": "string"
+              },
+              "actor_ref": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "input_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "output_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "receipts",
+        "known_failures",
+        "uncertainty_notes"
+      ],
+      "properties": {
+        "receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceReceipt"
+          }
+        },
+        "known_failures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "uncertainty_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "calibration_summary": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "assurance": {
+      "type": "object",
+      "required": [
+        "qualification_scope",
+        "independent_verifier_refs",
+        "authorization_status"
+      ],
+      "properties": {
+        "qualification_scope": {
+          "enum": [
+            "none",
+            "local_smoke",
+            "task_family",
+            "held_out_contexts",
+            "cross_domain"
+          ]
+        },
+        "independent_verifier_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authorization_status": {
+          "enum": [
+            "not_authorized",
+            "local_trial_only",
+            "scoped_execution_authorized",
+            "revoked"
+          ]
+        },
+        "revocation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expiry": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "dispute_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "contextConstraint": {
+      "type": "object",
+      "required": [
+        "field",
+        "operator",
+        "value"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "enum": [
+            "eq",
+            "neq",
+            "in",
+            "not_in",
+            "gte",
+            "lte",
+            "range"
+          ]
+        },
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+    "predicate": {
+      "type": "object",
+      "required": [
+        "predicate_id",
+        "description",
+        "expression_ref"
+      ],
+      "properties": {
+        "predicate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expression_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "informational",
+            "warning",
+            "error",
+            "critical"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "action_id",
+        "description",
+        "parameters_schema"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_class": {
+          "enum": [
+            "low",
+            "moderate",
+            "high",
+            "critical"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidenceReceipt": {
+      "type": "object",
+      "required": [
+        "receipt_ref",
+        "task_id",
+        "benchmark_version",
+        "policy_digest",
+        "input_digest",
+        "split_id",
+        "replication_count",
+        "seed_set_digest",
+        "baseline_refs",
+        "metrics",
+        "verifier_ref",
+        "output_digest"
+      ],
+      "properties": {
+        "receipt_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^sha-256:[a-f0-9]{64}$"
+        },
+        "input_digest": {
+          "type": "string",
+          "pattern": "^sha-256:[a-f0-9]{64}$"
+        },
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "replication_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed_set_digest": {
+          "type": "string",
+          "pattern": "^sha-256:[a-f0-9]{64}$"
+        },
+        "baseline_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "value",
+              "unit"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "uncertainty": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "verifier_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_digest": {
+          "type": "string",
+          "pattern": "^sha-256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
