@@ -145,6 +145,34 @@ pub fn verify_overshoot_refund_transition(
     Ok(())
 }
 
+
+/// Replays a complete refund receipt sequence from the normalized V_0 = 1
+/// state and returns the final cumulative refund numerator.
+pub fn verify_overshoot_refund_sequence(
+    alpha_numerator: u64,
+    alpha_denominator: u64,
+    receipts: &[OvershootRefundReceipt],
+) -> Result<u128, VerifyError> {
+    let mut previous_round = None;
+    let mut previous_evidence = EVIDENCE_ONE;
+    let mut previous_refund = 0_u128;
+
+    for receipt in receipts {
+        verify_overshoot_refund_transition(
+            alpha_numerator,
+            alpha_denominator,
+            previous_round,
+            previous_evidence,
+            previous_refund,
+            receipt,
+        )?;
+        previous_round = Some(receipt.round);
+        previous_evidence = receipt.evidence_value;
+        previous_refund = receipt.cumulative_refund_numerator;
+    }
+    Ok(previous_refund)
+}
+
 /// Independently verifies a finite staircase calibrator using a linear scan.
 ///
 /// This verifier deliberately does not call StaircaseAdjuster::new or
@@ -509,6 +537,52 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn independent_verifier_replays_complete_refund_sequence_exactly_once() {
+        let receipts = vec![
+            OvershootRefundReceipt {
+                round: 1,
+                evidence_value: 19 * EVIDENCE_ONE,
+                refund_increment_numerator: 0,
+                cumulative_refund_numerator: 0,
+                effective_cost_numerator: 19 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: false,
+            },
+            OvershootRefundReceipt {
+                round: 2,
+                evidence_value: 21 * EVIDENCE_ONE,
+                refund_increment_numerator: EVIDENCE_ONE,
+                cumulative_refund_numerator: EVIDENCE_ONE,
+                effective_cost_numerator: 20 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: true,
+            },
+            OvershootRefundReceipt {
+                round: 3,
+                evidence_value: 30 * EVIDENCE_ONE,
+                refund_increment_numerator: 0,
+                cumulative_refund_numerator: EVIDENCE_ONE,
+                effective_cost_numerator: 29 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: true,
+            },
+        ];
+        assert_eq!(
+            verify_overshoot_refund_sequence(1, 20, &receipts),
+            Ok(EVIDENCE_ONE)
+        );
+
+        let mut tampered = receipts.clone();
+        tampered[2].refund_increment_numerator = EVIDENCE_ONE;
+        tampered[2].cumulative_refund_numerator = 2 * EVIDENCE_ONE;
+        assert_eq!(
+            verify_overshoot_refund_sequence(1, 20, &tampered),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+    }
 
     #[test]
     fn independent_verifier_accepts_hand_authored_process_refund() {
