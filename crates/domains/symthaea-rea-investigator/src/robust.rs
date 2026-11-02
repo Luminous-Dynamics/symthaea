@@ -8,9 +8,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::{
-    AbstentionReason as PointAbstentionReason, Authorization, CostWeights, EvidenceProvenance,
-    Hypothesis, LikelihoodRow, PlannerConfig, PlannerError, PlannerErrorKind,
-    PredictedOutcome, RejectionReason, TargetImpact, evaluate_experiment,
+    Authorization, EvidenceProvenance, Hypothesis, LikelihoodRow, PlannerConfig, PlannerError,
+    PlannerErrorKind, PredictedOutcome, RejectionReason, TargetImpact, evaluate_experiment,
     validate_config, validate_evidence_catalog, validate_experiment, validate_hypotheses,
 };
 
@@ -97,6 +96,15 @@ pub struct RobustRankedExperiment {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RobustRejectionReason {
+    AuthorizationUnknown,
+    NotAuthorized,
+    Irreversible,
+    Destructive,
+    TargetImpactExceeded,
+    TimeBudgetExceeded,
+    EnergyBudgetExceeded,
+    RiskBudgetExceeded,
+    InvalidOutcomeSpace,
     NoRobustInformationGain,
     RankingUnstable,
 }
@@ -345,7 +353,11 @@ pub fn plan_next_experiment_robust(
             abstention: Some(RobustAbstentionReason::NoCompetingHypotheses),
             prior_entropy_bits,
             grounded_hypothesis_ids: grounded_ids,
-            scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+            scenario_ids: {
+            let mut ids: Vec<String> = scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect();
+            ids.sort();
+            ids
+        },
             claim_ceiling: RobustClaimCeiling::default(),
         });
     }
@@ -397,16 +409,17 @@ pub fn plan_next_experiment_robust(
         if let Some(reason) = rejection {
             // A metadata/budget policy rejection applies to every scenario.
             let mapped = match reason {
-                RejectionReason::AuthorizationUnknown
-                | RejectionReason::NotAuthorized
-                | RejectionReason::Irreversible
-                | RejectionReason::Destructive
-                | RejectionReason::TargetImpactExceeded
-                | RejectionReason::TimeBudgetExceeded
-                | RejectionReason::EnergyBudgetExceeded
-                | RejectionReason::RiskBudgetExceeded
-                | RejectionReason::InvalidOutcomeSpace => RobustRejectionReason::NoRobustInformationGain,
-                RejectionReason::InvalidLikelihoods | RejectionReason::NoPredictedInformationGain => {
+                RejectionReason::AuthorizationUnknown => RobustRejectionReason::AuthorizationUnknown,
+                RejectionReason::NotAuthorized => RobustRejectionReason::NotAuthorized,
+                RejectionReason::Irreversible => RobustRejectionReason::Irreversible,
+                RejectionReason::Destructive => RobustRejectionReason::Destructive,
+                RejectionReason::TargetImpactExceeded => RobustRejectionReason::TargetImpactExceeded,
+                RejectionReason::TimeBudgetExceeded => RobustRejectionReason::TimeBudgetExceeded,
+                RejectionReason::EnergyBudgetExceeded => RobustRejectionReason::EnergyBudgetExceeded,
+                RejectionReason::RiskBudgetExceeded => RobustRejectionReason::RiskBudgetExceeded,
+                RejectionReason::InvalidOutcomeSpace
+                | RejectionReason::InvalidLikelihoods
+                | RejectionReason::NoPredictedInformationGain => {
                     RobustRejectionReason::NoRobustInformationGain
                 }
             };
@@ -518,10 +531,21 @@ pub fn plan_next_experiment_robust(
     });
     rejected_experiments.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
 
+    for candidate in &mut ranked_experiments {
+        candidate.scenario_results.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    }
     let selected = ranked_experiments
         .iter()
         .find(|candidate| candidate.top1_rank_stability >= config.minimum_top1_stability)
         .cloned();
+    for candidate in &ranked_experiments {
+        if candidate.top1_rank_stability < config.minimum_top1_stability {
+            rejected_experiments.push(RobustRejectedExperiment {
+                experiment_id: candidate.experiment_id.clone(),
+                reason: RobustRejectionReason::RankingUnstable,
+            });
+        }
+    }
     let abstention = match &selected {
         Some(_) => None,
         None if ranked_experiments.iter().any(|candidate| {
@@ -537,17 +561,9 @@ pub fn plan_next_experiment_robust(
         None => Some(RobustAbstentionReason::NoEligibleExperiment),
     };
 
-    if selected.is_none() {
-        for candidate in &ranked_experiments {
-            if candidate.top1_rank_stability < config.minimum_top1_stability {
-                rejected_experiments.push(RobustRejectedExperiment {
-                    experiment_id: candidate.experiment_id.clone(),
-                    reason: RobustRejectionReason::RankingUnstable,
-                });
-            }
-        }
-        rejected_experiments.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
-    }
+    rejected_experiments.sort_by(|left, right| {
+        left.experiment_id.cmp(&right.experiment_id)
+    });
 
     Ok(RobustInvestigationPlan {
         selected,
