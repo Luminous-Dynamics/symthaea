@@ -167,7 +167,11 @@ fn validate_sha256(value: &Value, context: &str) -> Result<(), EvidenceError> {
     Ok(())
 }
 
-fn validate_prefixed_digest(value: &Value, prefix: &str, context: &str) -> Result<(), EvidenceError> {
+fn validate_prefixed_digest(
+    value: &Value,
+    prefix: &str,
+    context: &str,
+) -> Result<(), EvidenceError> {
     let value = value.as_str()
         .ok_or_else(|| schema_error(format!("{context} must be a string")))?;
     let Some(digest) = value.strip_prefix(prefix) else {
@@ -181,7 +185,11 @@ fn validate_prefixed_digest(value: &Value, prefix: &str, context: &str) -> Resul
     Ok(())
 }
 
-fn validate_provider(value: &Value, context: &str, nullable_version: bool) -> Result<(), EvidenceError> {
+fn validate_provider(
+    value: &Value,
+    context: &str,
+    nullable_version: bool,
+) -> Result<(), EvidenceError> {
     let map = object(value, context)?;
     strict_keys(map, &["id", "name", "version"], &[], context)?;
     nonempty_string(field(map, "id", context)?, &format!("{context}.id"))?;
@@ -221,7 +229,9 @@ fn validate_subject(value: &Value) -> Result<(), EvidenceError> {
     if !architecture.is_null() {
         let architecture = nonempty_string(architecture, "subject.architecture")?;
         if !ARCHITECTURES.contains(&architecture) {
-            return Err(schema_error(format!("subject.architecture '{architecture}' is unsupported")));
+            return Err(schema_error(format!(
+                "subject.architecture '{architecture}' is unsupported"
+            )));
         }
         if format == "gamecube-dol" && architecture != "powerpc" {
             return Err(schema_error("gamecube-dol subjects must declare powerpc architecture"));
@@ -293,7 +303,11 @@ fn validate_environment(value: &Value) -> Result<(), EvidenceError> {
     Ok(())
 }
 
-fn validate_string_array(value: &Value, context: &str, nonempty: bool) -> Result<(), EvidenceError> {
+fn validate_string_array(
+    value: &Value,
+    context: &str,
+    nonempty: bool,
+) -> Result<(), EvidenceError> {
     let array = value.as_array()
         .ok_or_else(|| schema_error(format!("{context} must be an array")))?;
     if nonempty && array.is_empty() {
@@ -339,7 +353,12 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
             strict_keys(map, &["status"], &["diagnostics"], context)?;
         }
         "partial" => {
-            strict_keys(map, &["status", "limitations"], &["limited_directions", "diagnostics"], context)?;
+            strict_keys(
+                map,
+                &["status", "limitations"],
+                &["limited_directions", "diagnostics"],
+                context,
+            )?;
             validate_string_array(
                 field(map, "limitations", context)?,
                 "relationship_coverage.limitations",
@@ -347,7 +366,12 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
             )?;
         }
         "unknown" => {
-            strict_keys(map, &["status", "reason"], &["limited_directions", "diagnostics"], context)?;
+            strict_keys(
+                map,
+                &["status", "reason"],
+                &["limited_directions", "diagnostics"],
+                context,
+            )?;
             nonempty_string(field(map, "reason", context)?, "relationship_coverage.reason")?;
         }
         other => {
@@ -393,13 +417,17 @@ fn validate_location(value: &Value, index: usize) -> Result<(), EvidenceError> {
         }
         "file-offset" => {
             if field(map, "offset", &context)?.as_u64().is_none() {
-                return Err(schema_error(format!("{context}.offset must be a non-negative integer")));
+                return Err(schema_error(format!(
+                    "{context}.offset must be a non-negative integer"
+                )));
             }
         }
         "file-offset-range" => {
             for key in ["start", "end"] {
                 if field(map, key, &context)?.as_u64().is_none() {
-                    return Err(schema_error(format!("{context}.{key} must be a non-negative integer")));
+                    return Err(schema_error(format!(
+                        "{context}.{key} must be a non-negative integer"
+                    )));
                 }
             }
         }
@@ -417,7 +445,11 @@ pub fn validate_evidence_schema(value: &Value) -> Result<(), EvidenceError> {
     let map = object(value, context)?;
     strict_keys(map, EVIDENCE_REQUIRED_KEYS, EVIDENCE_OPTIONAL_KEYS, context)?;
 
-    validate_prefixed_digest(field(map, "evidence_id", context)?, EVIDENCE_ID_PREFIX, "evidence_id")?;
+    validate_prefixed_digest(
+        field(map, "evidence_id", context)?,
+        EVIDENCE_ID_PREFIX,
+        "evidence_id",
+    )?;
     validate_subject(field(map, "subject", context)?)?;
 
     let provider = field(map, "provider", context)?;
