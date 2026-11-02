@@ -1,0 +1,65 @@
+{
+  "schema": "symthaea.compute_risk_joint_grid",
+  "version": "0.1.0",
+  "status": "synthetic_fixed_panel_not_iid_no_confidence_claim",
+  "signal_id": "confidence_v1",
+  "task_count": 256,
+  "budget_tokens": 8000,
+  "seed": 20261102,
+  "risk_upper_budget_ppm": 230000,
+  "risk_lower_budget_ppm": 230000,
+  "confidence_delta_ppm": 100000,
+  "candidates": [
+    {
+      "candidate_id": "a_fast_aggressive",
+      "signal_id": "confidence_v1",
+      "upper_threshold_ppm": 820000,
+      "lower_floor_ppm": 100000,
+      "lower_slope_ppm_per_token": 800,
+      "lower_shift_fraction_ppm": 700000
+    },
+    {
+      "candidate_id": "b_joint_balanced",
+      "signal_id": "confidence_v1",
+      "upper_threshold_ppm": 900000,
+      "lower_floor_ppm": 100000,
+      "lower_slope_ppm_per_token": 500,
+      "lower_shift_fraction_ppm": 800000
+    },
+    {
+      "candidate_id": "c_late_conservative",
+      "signal_id": "confidence_v1",
+      "upper_threshold_ppm": 960000,
+      "lower_floor_ppm": 20000,
+      "lower_slope_ppm_per_token": 400,
+      "lower_shift_fraction_ppm": 850000
+    },
+    {
+      "candidate_id": "d_full_budget",
+      "signal_id": "confidence_v1",
+      "upper_threshold_ppm": 990000,
+      "lower_floor_ppm": 0,
+      "lower_slope_ppm_per_token": 1000,
+      "lower_shift_fraction_ppm": 1000000
+    }
+  ],
+  "generator_id": "stratified-eight-regime-confidence-trajectory-v1",
+  "scenario_ids": [
+    "early_solved",
+    "quickly_solved",
+    "delayed_solved",
+    "never_solved_low",
+    "overconfident_wrong",
+    "low_confidence_solved",
+    "oscillatory_delayed",
+    "never_solved_medium"
+  ],
+  "research_reference": {
+    "paper_or_spec_url": "https://proceedings.mlr.press/v306/wang26hd.html",
+    "source_repository_url": "https://github.com/xidulu/reasoning_risk_control",
+    "source_revision": "6551e3000dcda3d76491f30cc687d64618807c5b",
+    "source_readiness": "preliminary_reference_paper_is_authoritative_code_not_used",
+    "audit_note": "The paper is the algorithmic source. The pinned repository README calls its contents preliminary, says full code/assets will be released soon, contains no LICENSE in the inspected tree, and has an unfinished lower-threshold helper. This implementation is independent Rust research code, not copied from that repository or claimed as a reproduction."
+  },
+  "risk_output_error_budget_ppm": 350000
+}

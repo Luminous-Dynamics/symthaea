@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compute-risk-control/run-receipt-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "source_commit",
+    "fixture_sha256",
+    "validation_panel_sha256",
+    "candidate_grid_sha256",
+    "report",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compute_risk_joint_receipt.v0.1"
+    },
+    "status": {
+      "const": "synthetic_stratified_panel_diagnostic_not_a_confidence_claim"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "validation_panel_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_grid_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report": {
+      "type": "object",
+      "required": [
+        "schema",
+        "design",
+        "confidence_claim_eligible_under_declared_design",
+        "simultaneous_claim_count",
+        "confidence_delta_ppm",
+        "risk_upper_budget_ppm",
+        "risk_lower_budget_ppm",
+        "risk_output_error_budget_ppm",
+        "correction_ppm",
+        "sample_count",
+        "candidate_grid_sha256",
+        "validation_panel_sha256",
+        "candidate_evaluations",
+        "selected_candidate_id",
+        "selection_status",
+        "formal_theorem_verified",
+        "claim_ceiling",
+        "report_sha256",
+        "confidence_failure_allocation"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.compute_risk_joint_report.v0.1"
+        },
+        "design": {
+          "enum": [
+            "iid_held_out_tasks_declared",
+            "synthetic_fixed_panel"
+          ]
+        },
+        "confidence_claim_eligible_under_declared_design": {
+          "type": "boolean"
+        },
+        "simultaneous_claim_count": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "confidence_delta_ppm": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        },
+        "risk_upper_budget_ppm": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "risk_lower_budget_ppm": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "correction_ppm": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_grid_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "validation_panel_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "candidate_evaluations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "candidate_id",
+              "upper_loss_sum_ppm",
+              "lower_loss_sum_ppm",
+              "emitted_answer_error_sum_ppm",
+              "sample_count",
+              "upper_mean_loss_ceil_ppm",
+              "lower_mean_loss_ceil_ppm",
+              "emitted_answer_error_mean_ceil_ppm",
+              "emitted_answer_error_ucb_ppm",
+              "simultaneous_ucb_correction_ppm",
+              "upper_risk_ucb_ppm",
+              "lower_risk_ucb_ppm",
+              "mean_tokens_used_ppm",
+              "meets_all_three_risk_budgets",
+              "task_loss_receipt_sha256",
+              "mean_upper_efficiency_loss_ppm",
+              "mean_lower_efficiency_loss_ppm"
+            ],
+            "properties": {
+              "candidate_id": {
+                "type": "string"
+              },
+              "upper_loss_sum_ppm": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lower_loss_sum_ppm": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "emitted_answer_error_sum_ppm": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "upper_mean_loss_ceil_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "lower_mean_loss_ceil_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "emitted_answer_error_mean_ceil_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "emitted_answer_error_ucb_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "simultaneous_ucb_correction_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "upper_risk_ucb_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "lower_risk_ucb_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "mean_tokens_used_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "meets_all_three_risk_budgets": {
+                "type": "boolean"
+              },
+              "task_loss_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "mean_upper_efficiency_loss_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "mean_lower_efficiency_loss_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            }
+          }
+        },
+        "selected_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection_status": {
+          "enum": [
+            "feasible_candidate_found_on_validation_panel",
+            "no_candidate_meets_all_risk_budgets"
+          ]
+        },
+        "formal_theorem_verified": {
+          "const": false
+        },
+        "claim_ceiling": {
+          "type": "string"
+        },
+        "report_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "risk_output_error_budget_ppm": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "confidence_failure_allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator_ppm",
+            "denominator"
+          ],
+          "properties": {
+            "numerator_ppm": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 3
+            }
+          }
+        }
+      }
+    }
+  }
+}

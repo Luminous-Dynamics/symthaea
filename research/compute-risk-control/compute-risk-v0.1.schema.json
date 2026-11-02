@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compute-risk-control/compute-risk-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "status",
+    "signal_id",
+    "task_count",
+    "budget_tokens",
+    "seed",
+    "risk_upper_budget_ppm",
+    "risk_lower_budget_ppm",
+    "risk_output_error_budget_ppm",
+    "confidence_delta_ppm",
+    "candidates",
+    "generator_id",
+    "scenario_ids",
+    "research_reference"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compute_risk_joint_grid"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "synthetic_fixed_panel_not_iid_no_confidence_claim"
+    },
+    "signal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "budget_tokens": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "risk_upper_budget_ppm": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "risk_lower_budget_ppm": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "confidence_delta_ppm": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999999
+    },
+    "generator_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "signal_id",
+          "upper_threshold_ppm",
+          "lower_floor_ppm",
+          "lower_slope_ppm_per_token",
+          "lower_shift_fraction_ppm"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signal_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "upper_threshold_ppm": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "lower_floor_ppm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999999
+          },
+          "lower_slope_ppm_per_token": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "lower_shift_fraction_ppm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        }
+      }
+    },
+    "research_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paper_or_spec_url",
+        "source_repository_url",
+        "source_revision",
+        "source_readiness",
+        "audit_note"
+      ],
+      "properties": {
+        "paper_or_spec_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_repository_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_readiness": {
+          "const": "preliminary_reference_paper_is_authoritative_code_not_used"
+        },
+        "audit_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "risk_output_error_budget_ppm": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    }
+  }
+}
