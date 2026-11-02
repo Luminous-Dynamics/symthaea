@@ -1875,6 +1875,10 @@ mod tests {
         let missing = format!("{}\n{}\n",lines[0],lines[1]);
         assert!(parse_and_pair(&missing).unwrap_err().contains("expected D0,D1,W1,W2,W3"));
         let duplicate = format!("{}\n{}\n{}\n",lines[0],lines[1],lines[1]);
+        // A duplicate row must carry a distinct receipt digest so the
+        // duplicate-arm guard, rather than the earlier receipt-reuse guard,
+        // is the first failure.
+        let duplicate = alter_row_field(&duplicate,2,20,&test_digest(999));
         assert!(parse_and_pair(&duplicate).unwrap_err().contains("duplicate arm row"));
     }
     #[test]
