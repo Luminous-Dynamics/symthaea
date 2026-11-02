@@ -39,4 +39,8 @@ path = "src/bin/branching_culture_sweep.rs"
 name = "paper-abm-sweep"
 path = "src/bin/paper_abm_sweep.rs"
 
+[[bin]]
+name = "czaplicka-2025-sweep"
+path = "src/bin/czaplicka_2025_sweep.rs"
+
 [dependencies]
