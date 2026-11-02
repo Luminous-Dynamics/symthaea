@@ -1,6 +1,6 @@
 # Reward Network III: CivBench protocol v0.1
 
-**Status:** literature-grounded protocol; raw archive not yet ingested or hashed. No reproduction claim.
+**Status:** Zenodo v2.0 archive downloaded and verified; archived ABM notebook source extracted and hashed; original LFS data/model payloads not yet hydrated. No participant-data reanalysis or bit-for-bit RNG reproduction is claimed.
 
 ## Source
 
@@ -41,13 +41,65 @@ This is intentionally labelled **zero-shot rule transfer**, not learned-agent ge
 
 ## Separate exploratory agent-based model (ABM)
 
-The paper's exploratory ABM is a different experimental layer from the human population study above. The Methods and Supplementary Note 5 specify `M=50` replications, `G=20` generations and `N_gen=20` agents per generation. The heterogeneous seed condition uses `N_m=5` machines. Humans have `k_h=10` individual exploration trials and `q_h=0.01) bias toward optimal exploration; the per-trial rates are `d_myo=0.5` and manipulated `d_opt`. Machine exploration capacity is `K_m ∈ {10, 1,000, 100,000}` and machine optimality bias `q_m ∈ {0.01, 0.5}`. The supplement varies social transmission `lambda` through learnability `1-lambda`, teacher-selection temperature `tau ∈ {0.1, 0.2, 0.4}`, demonstration-reward noise `epsilon ∈ {0.1, 0.2, 0.4}`, machine availability (none, seed generation only, every generation), seed machine count `N_m ∈ [1,5]`, and population size `N_total ∈ [20,100]`. Successful agents provide `K_demo=10` demonstrations. Each demonstration adds `R_opt=1` for optimal, `R_myo=0.5` for myopic, plus independent noise; the summed noise has distribution `epsilon_eff ~ Normal(0, epsilon^2*K_demo)`. Discovery uses `k_opt ~ Binomial(k,q_opt)`, `k_myo=k-k_opt`; optimal is prioritized if both strategies are discovered. Social transmission is Bernoulli with probability `lambda`; integration is `max(s_ind,s_social)`. The main text identifies `lambda=0.9` as a high-learnability case.
+The archived Zenodo v2.0 source includes the paper's actual notebook, `abm/abm.ipynb`. The source archive was downloaded by the hosted inventory workflow and passed the published MD5, computed SHA-256 and ZIP integrity checks:
 
-The branch's `src/paper_abm.rs` uses the exact terminal categorical probabilities implied by the Binomial allocation and independent per-trial discovery rates. This is distribution-equivalent for final strategy state, while avoiding up to 100,000 explicit trial draws; it does not reproduce the authors' exact random-number stream. The supplement says learners sample `k` candidate teachers from the preceding generation but the extracted description does not state the numeric `k`. CivBench exposes this unknown as an explicit sensitivity parameter (1/5/10/20), not an author-reported value. Machine-placement labels in the Rust model (clustered prefix/uniform random) are also explicit CivBench scenarios; the source's broader placement treatments are preserved as separate no-machine/seed-only/all-generation availability conditions.
+- Archive size: 28,279,082 bytes.
+- Published MD5: `55fbf9a0ffbc2f605da1792226471711`.
+- Computed archive SHA-256: `a479efeb0024ce92be9952f9791b5c764fff82fbaa93e154e2cc3c31a66b7b36`.
+- Archived notebook source SHA-256 (the extracted cell source and markdown headings, without output cells): `49040b229968a5bbfa736d23b2d6fb687fadc9ae404a2225211fba636cba6999`.
 
-The `paper-abm-sweep` binary runs 50 fixed-seed replications per condition across 167 conditions in four families: (A) machine discovery capacity/bias and representative log-spaced `d_opt`; (B) no/seed-only/all-generation machine availability crossed with `lambda`, `tau` and `epsilon`; (C) `N_m=1..5`, `N_total=20..100` and two declared placement schemes; (D) teacher candidate-set size 1/5/10/20 crossed with the published `tau` values. It reports total, human-only and machine-only optimal prevalence separately, machine-origin lineage among humans, reward and transmission rates, and 95% simulation-replicate confidence half-widths. This is a source-informed sensitivity suite, not a byte-for-byte reproduction of the full author grid or the original RNG stream.
+The notebook is the ABM source of truth for this port. The separate `abm/model.py` helper has materially different function signatures/transition rules, including a visible call arity mismatch; it must not be substituted for the self-contained model in the notebook when reproducing the published figures.
 
-Do not use the human experiment's 30 populations × five generations × eight positions as the ABM configuration. Conversely, do not present ABM trajectories as human participant results. Exact candidate sampling, full parameter grid, random-number implementation and author-code equivalence require Zenodo v2.0 and supplementary-source verification before reproduction is claimed.
+### Archived state transitions
+
+Each agent has a strategy state:
+- `-1`: random/no discovered strategy;
+- `0`: myopic strategy;
+- `1`: optimal strategy.
+
+For an agent with exploration budget (K_{ind}) and optimality bias (q_{opt}):
+1. (k_{opt} \sim \operatorname{Binomial}(K_{ind},q_{opt})), and (k_{myo}=K_{ind}-k_{opt}).
+2. (p_{opt}=1-(1-d_{opt})^{k_{opt}}); (p_{myo}=1-(1-d_{myo})^{k_{myo}}).
+3. A single uniform draw chooses optimal if (u<p_{opt}), otherwise myopic if (u<p_{opt}+(1-p_{opt})p_{myo}), else random. Optimal therefore has priority when both outcomes are discoverable.
+
+For each generation after the seed generation:
+1. Each learner samples (n_{teacher}) distinct candidates from the previous generation.
+2. It chooses one candidate stochastically from a softmax over the candidate demonstration rewards, with temperature (	au). The candidate with the highest reward is more likely, but is not deterministically selected.
+3. The selected teacher's previous strategy is socially acquired with probability (lambda).
+4. The notebook maps failed social acquisition to state (0) (myopic). The integrated state is (max(s_{ind},s_{social})).
+
+The exact archived code semantics matter: failed social learning can turn a random individual strategy (-1) into the myopic baseline (0). The Rust reference retains this behavior as `ArchivedMyopicZero`. It also offers `PreserveIndividual` as a clearly marked counterfactual ablation; never mix its results into the archived-reference baseline.
+
+Demonstration reward is (K_{demo} R_{opt}) for an optimal strategy, (K_{demo}R_{myo}) for myopic, and zero for random, plus Gaussian noise with standard deviation (epsilon\sqrt{K_{demo}}). The notebook uses (R_{opt}=1), (R_{myo}=0.5), and (epsilon=0.1) in its central settings. These noisy rewards determine subsequent teacher choice.
+
+The Rust module `src/reward_network_abm_reference.rs` implements these transitions with a deterministic SplitMix/Box-Muller RNG. It preserves distributions and transition semantics, but is not bit-for-bit compatible with NumPy's random stream. Additional fields for independent/social origin and machine ancestry are evaluation telemetry; they do not alter the strategy transition.
+
+### Parameter families in the archived notebook
+
+The extracted notebook defines (R=50) simulation replications, (G=20) generations, and normally (N_{gen}=20) agents. It uses (N_{gen}=100) for population-robustness conditions. Candidate-set size is explicitly (n_{teacher}=10) in the notebook cells.
+
+| Notebook cell/family | Parameters and treatments |
+|---|---|
+| Human-only discovery (cell 4) | (K_{demo}=10); (K_h=10^1\ldots10^4) (10 log-spaced values); (q_h=2^{-8}\ldots2^{-1}) (8 values); (d_{opt}=10^0\ldots10^{-6}) (10 values); (d_{myo}=0.5); (lambda=0.9); (	au=0.1); no machines |
+| Seed machine discoverability (cell 7) | (K_{demo}=1); 20 agents, 5 seed machines; (K_h=10), (K_m\in\{10,1000,100000\}); (q_h=0.01), (q_m\in\{0.01,0.5\}); 10 (d_{opt}) values; 10 (lambda\in[0,0.5]) values; (	au=0.1) |
+| Teacher selection temperature (cell 9) | Human-only, seed-only machines and all-generation machines; (K_m=10000), (q_m=0.5); 10 (d_{opt}) values; 10 (lambda) values; (	au\in\{0.1,0.2,0.4\}) |
+| Demonstration reward noise (cell 11) | Same three availability conditions; (epsilon\in\{0.1,0.2,0.4\}); 10 (d_{opt}) and 10 (lambda) values |
+| Population robustness (cell 13) | ((N_{gen},N_m)\in\{(20,5),(20,1),(100,5),(100,1)\}); human-only, seed-only-machine and all-generation-machine conditions; (K_h=10), (K_m=10000), (q_h=0.01), (q_m=0.5); 10 (d_{opt}) and 10 (lambda) values |
+
+Machine availability is encoded as:
+- `human`: no machines;
+- `human-machine`: first (N_m) agents are machines in generation zero only;
+- `human-machine-all`: first (N_m) positions are machines in every generation.
+
+### Rust port and sweep boundary
+
+The new module is `src/reward_network_abm_reference.rs`; its runner is `reward-network-abm-reference-sweep`. Its profiles mirror the notebook cells: `human_only_discovery`, `machine_seed_discoverability`, `teacher_temperature`, `demonstration_noise`, `population_robustness`, and `all`. The default `quick` profile is a small smoke test, not a paper run.
+
+The port records human and machine optimal prevalence separately, independent discovery, social-optimal acquisition, social-only optimal integration, machine-lineage prevalence among humans, mean teacher reward and social-learning success. Lineage is an additional CivBench metric; the notebook itself uses strategy state and reward arrays without a lineage identifier.
+
+The earlier `src/paper_abm.rs` and `simplified-strategy-abm-sweep` remain as a compact strategy-adoption counterfactual model. They are not the archived notebook port and must not be reported as paper ABM reproduction.
+
+The ZIP contains 306 files and 42 Git LFS pointer files. The inventory workflow records the expected LFS SHA-256 OIDs and declared object sizes, but those payloads are **not** the same as hydrated data. Processed move tables, player/strategy tables, raw sessions, original network sets and model weights still require targeted hydration and object digest verification before reanalysis. No participant-level rows have been exported into this repository.
 
 ## Baseline ladder
 
