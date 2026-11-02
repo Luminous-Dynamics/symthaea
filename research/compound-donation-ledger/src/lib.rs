@@ -835,6 +835,85 @@ impl StaircaseAdjuster {
         )
     }
 
+    /// Builds a fixed-universe hybrid rank prior with an explicit tail floor.
+    ///
+    /// This is the equal mixture of the telescoping rank prior
+    /// 1/((j+1)(j+2)) and a uniform prior over the 64 dyadic ranks that cover
+    /// every u64 rejection rank. Its per-rank mass is at least 1/128, so the
+    /// raw-threshold overhead is at most 256 times the weighted e-BH boundary
+    /// (plus fixed-point rounding), uniformly over every u64 rank.
+    ///
+    /// The uniform half is specific to the finite u64 rank envelope. The
+    /// telescoping half preserves extra power at early ranks. This is a
+    /// horizon-independent candidate calibrator: it does not take active
+    /// family size as input.
+    pub fn projective_weighted_e_bh_rank_prior_hybrid_u64(
+        weight_numerator: u64,
+        weight_denominator: u64,
+        alpha_numerator: u64,
+        alpha_denominator: u64,
+    ) -> Result<Self, LedgerError> {
+        if weight_numerator == 0
+            || weight_denominator == 0
+            || weight_numerator > weight_denominator
+            || alpha_numerator == 0
+            || alpha_denominator == 0
+            || alpha_numerator >= alpha_denominator
+        {
+            return Err(LedgerError::InvalidThresholdGrid);
+        }
+
+        let mut merged = BTreeMap::<u128, u128>::new();
+        for exponent in 0..=63 {
+            let index = exponent as u128 + 1;
+            let telescoping_denominator = index
+                .checked_mul(index + 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let prior_mass = PRIOR_MASS_SCALE / (2 * telescoping_denominator)
+                + PRIOR_MASS_SCALE / 128;
+
+            let rank = 1_u64
+                .checked_shl(exponent)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let target_numerator = (alpha_denominator as u128)
+                .checked_mul(weight_denominator as u128)
+                .and_then(|value| value.checked_mul(EVIDENCE_ONE))
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let target_denominator = (alpha_numerator as u128)
+                .checked_mul(rank as u128)
+                .and_then(|value| value.checked_mul(weight_numerator as u128))
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let target_ticks = target_numerator
+                .checked_add(target_denominator - 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?
+                / target_denominator;
+
+            let raw_numerator = target_ticks
+                .checked_mul(PRIOR_MASS_SCALE)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let raw_threshold = (raw_numerator
+                .checked_add(prior_mass - 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?
+                / prior_mass)
+                .max(EVIDENCE_ONE);
+
+            let entry = merged.entry(raw_threshold).or_insert(0);
+            *entry = entry
+                .checked_add(prior_mass)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+        }
+
+        Self::new(
+            merged
+                .into_iter()
+                .map(|(threshold, prior_mass)| ThresholdMass {
+                    threshold,
+                    prior_mass,
+                })
+                .collect(),
+        )
+    }
+
     /// Builds a finite prefix of a horizon-independent dyadic prior.
     ///
     /// The ideal infinite prior is pi_j = 1 / (j * (j + 1)) at K_j = 2^j,
@@ -1309,6 +1388,43 @@ mod tests {
                 "rank {k} exceeds projective rank prior overhead"
             );
         }
+    }
+
+    #[test]
+    fn hybrid_projective_rank_prior_covers_every_u64_rank() {
+        let adjuster = StaircaseAdjuster::projective_weighted_e_bh_rank_prior_hybrid_u64(
+            3, 1_000, 1, 20
+        ).unwrap();
+        let total_mass: u128 = adjuster.points().iter().map(|point| point.prior_mass).sum();
+        assert!(total_mass <= PRIOR_MASS_SCALE);
+
+        for exponent in 0..=63 {
+            let rank = 1_u64 << exponent;
+            let denominator = (exponent as u128 + 1) * (exponent as u128 + 2);
+            let mass = PRIOR_MASS_SCALE / (2 * denominator)
+                + PRIOR_MASS_SCALE / 128;
+            let target_num = 20_u128 * 1_000_u128 * EVIDENCE_ONE;
+            let target_den = rank as u128 * 3_u128;
+            let target = (target_num + target_den - 1) / target_den;
+            let raw_num = target * PRIOR_MASS_SCALE;
+            let raw = ((raw_num + mass - 1) / mass).max(EVIDENCE_ONE);
+            assert!(
+                adjuster.value_at(raw).unwrap() >= target,
+                "dyadic rank {rank} did not meet its weighted boundary"
+            );
+        }
+
+        let max_rank = u64::MAX;
+        let exponent = 63_u32;
+        let rank = 1_u64 << exponent;
+        let denom = 64_u128 * 65_u128;
+        let mass = PRIOR_MASS_SCALE / (2 * denom) + PRIOR_MASS_SCALE / 128;
+        let target_num = 20_u128 * 1_000_u128 * EVIDENCE_ONE;
+        let target_den = rank as u128 * 3_u128;
+        let target = (target_num + target_den - 1) / target_den;
+        let raw = ((target * PRIOR_MASS_SCALE + mass - 1) / mass).max(EVIDENCE_ONE);
+        assert!(adjuster.value_at(raw).unwrap() >= target);
+        assert!(max_rank >= rank);
     }
 
     #[test]
