@@ -726,7 +726,7 @@ pub fn analyze_measurement_distribution(
     let expected_observation_count = bundle
         .runs
         .len()
-        .and_then(|value| value.checked_mul(bundle.instance_manifest.instances.len()))
+        .checked_mul(bundle.instance_manifest.instances.len())
         .and_then(|value| value.checked_mul(conditions_by_axis.values().map(BTreeSet::len).sum()))
         .ok_or_else(|| "expected observation count overflows".to_owned())?;
     if expected_observation_count != bundle.observations.len() {
@@ -741,12 +741,11 @@ pub fn analyze_measurement_distribution(
     let mut profile_observations =
         BTreeMap::<ProfileKey, Vec<&MeasurementObservationV1>>::new();
     let mut independent_units = BTreeSet::<String>::new();
-    let mut families = BTreeSet::<String>::new();
 
     for observation in &bundle.observations {
-        let model = models
-            .get(&observation.model_id)
-            .ok_or_else(|| "observation references an unknown model".to_owned())?;
+        if !models.contains_key(&observation.model_id) {
+            return Err("observation references an unknown model".to_owned());
+        }
         let run = runs
             .get(&(observation.model_id.clone(), observation.run_id.clone()))
             .ok_or_else(|| "observation references an unknown model run".to_owned())?;
@@ -842,7 +841,6 @@ pub fn analyze_measurement_distribution(
             condition_id: observation.condition_id.clone(),
         };
         profile_observations.entry(profile_key).or_default().push(observation);
-        let _ = model;
     }
 
     for model_id in models.keys() {
