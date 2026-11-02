@@ -153,6 +153,8 @@ impl BicycleModelSimulator {
             self.front_friction_scale,
             self.rear_friction_scale,
             self.initial_speed,
+            self.external_force[0],
+            self.external_force[1],
         ] {
             hasher.update(&value.to_bits().to_le_bytes());
         }
