@@ -101,20 +101,44 @@ The separate `src/cultural_evolution.rs` module is a parameterized reference ABM
 
 It follows the broad mechanism sequence described in the 2026 Reward Network III paper but is **not** a reproduction of the authors' ABM. The published supplementary parameters and archived implementation must be ingested before claiming replication. Tests cover fixed-seed reproducibility, perfect transmission, empty-teacher and no-transmission controls, observation without acquisition, acquisition without integration, corruption, and the distinction between individual discovery and social acquisition.
 
-## Paper-shaped exploratory ABM
+## Simplified strategy-adoption ablation model
 
-The separate `src/paper_abm.rs` models the paper's **exploratory agent-based simulation**, not the human experiment and not the task-level DQN. Its reference population has 20 generations and 20 agents per generation; heterogeneous conditions seed five machine agents in generation zero. Human settings use 10 exploration trials and optimality bias 0.01; myopic discovery rate is 0.5. It also represents ten demonstrations, optimal/myopic demonstration rewards of 1/0.5, and reward noise with standard deviation `epsilon * sqrt(K_demo)`.
-
-Discovery is sampled from the exact terminal-outcome distribution implied by independent per-trial choices: each trial attempts optimal with probability `q` (otherwise myopic) and succeeds at its strategy's per-trial discovery rate; when both strategies are discovered, optimal takes priority. This closed form avoids simulating up to 100,000 RNG steps per machine agent while preserving the terminal distribution under that model. The exact authors' random draw ordering and any supplementary implementation details still require Zenodo v2.0 review.
-
-Not every ABM parameter is specified in the article's main text. In particular, V0's five-teacher candidate count, default `d_opt=0.001`, default machine capacity, `tau`, and the two placement treatments are sensitivity-design choices, not claimed author defaults. The paper-shaped sweep varies these explicitly where appropriate.
-
-The `paper-abm-sweep` binary runs 50 fixed-seed replications per condition across 167 source-informed CivBench conditions in four families: discovery capacity/bias; machine availability crossed with social transmission, selection temperature and reward noise; robustness to machine count (1–5), population size (20–100) and declared placement schemes; and teacher candidate-set size (1/5/10/20). It reports total, human-only and machine-only optimal prevalence, machine-originated prevalence among humans, myopic/null prevalence, reward and transmission rates, plus 95% simulation-replicate confidence half-widths. The supplementary specifies the capacities, biases, tau/epsilon values and availability/prevalence treatments; the numeric teacher sample size remains unreported in the extracted description and is therefore varied as a CivBench sensitivity. The sweep is source-informed, not an exact reproduction of the author's RNG stream or every source condition.
+The separate `src/paper_abm.rs` module is a compact, controllable strategy-adoption model. It is useful for testing causal mechanisms such as acquisition, integration, corruption and ancestry, but it is **not** a reproduction or semantic port of the Reward Network III archived exploratory ABM. Its sweep is now named `simplified-strategy-abm-sweep` to prevent this distinction being lost.
 
 Run:
 ```sh
-cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin paper-abm-sweep > paper-abm-sweep.csv
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin simplified-strategy-abm-sweep > simplified-strategy-abm-sweep.csv
 ```
+
+## Archived Reward Network III exploratory ABM
+
+The separate `src/reward_network_abm_reference.rs` module is the source-informed semantic port of the archived Zenodo v2.0 notebook `abm/abm.ipynb` (not the older `abm/model.py` helper). The notebook source snapshot SHA-256 is `49040b229968a5bbfa736d23b2d6fb687fadc9ae404a2225211fba636cba6999`; the enclosing archive SHA-256 is `a479efeb0024ce92be9952f9791b5c764fff82fbaa93e154e2cc3c31a66b7b36`.
+
+The port preserves the notebook's actual transition structure:
+- Strategy states: random (-1), myopic (0), optimal (1).
+- Individual exploration: `k_opt ~ Binomial(K_ind, q_opt)`, with the remainder allocated to myopic attempts; per-trial discoverability is converted to cumulative discovery probability, with optimal discovery taking priority if both are found.
+- Demonstration rewards: optimal=1, myopic=0.5, random=0; reward noise has standard deviation `epsilon * sqrt(K_demo)`.
+- Teacher choice: sample `n_teacher` distinct candidates from the previous generation, then select stochastically using a softmax over their prior demonstration rewards with temperature `tau`.
+- Social learning: transmit the selected teacher's previous strategy with probability `lambda`; the archived notebook maps failure to strategy 0 (myopic).
+- Integration: `max(individual_strategy, social_strategy)`.
+- Machine placement: none, first-generation seed only, or the first machine slots in every generation.
+
+The port uses a deterministic Rust RNG, so it preserves the transition distributions and semantics but is **not NumPy bit-stream compatible**. The failed-social-learning fallback is retained exactly as the archive's reference treatment; a separate preserve-individual fallback is exposed as a counterfactual ablation. We also track individual discovery, social acquisition, integration and machine ancestry separately; these extra attribution fields do not change the state transition.
+
+The archived notebook's main parameter families are represented by the sweep profiles:
+- `human_only_discovery`: 50 replications; 20 agents × 20 generations; (K_h) log-spaced 10–10,000, (q_h=2^{-8}ldots2^{-1}), (d_{opt}=10^0ldots10^{-6}), (d_{myo}=0.5), (lambda=0.9), (K_{demo}=10).
+- `machine_seed_discoverability`: (K_m in {10,1000,100000}), (q_m in {0.01,0.5}), ten (d_{opt}) values and ten (lambda) values.
+- `teacher_temperature`: human / seed-machine / all-generation-machine conditions, (	au in {0.1,0.2,0.4}).
+- `demonstration_noise`: (epsilon in {0.1,0.2,0.4}).
+- `population_robustness`: population sizes 20/100 and machine counts 1/5.
+
+A default smoke profile runs four small conditions with ten replications. Use `--profile all` for the full archived parameter families and `--replications 50` to match the paper's replication count (the full grid is computationally large). Example:
+```sh
+cargo run --release --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin reward-network-abm-reference-sweep -- --profile quick
+cargo run --release --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin reward-network-abm-reference-sweep -- --profile all --replications 50 > reward-network-abm-reference.csv
+```
+
+**Reproduction boundary:** this is a deterministic semantic port of the archived notebook's model equations and experimental parameter families, not a bit-for-bit replay of NumPy RNG streams or proof that all author notebook outputs have been reproduced. The old `abm/model.py` helper in the same archive is materially different and has an apparent call-signature mismatch; do not substitute it for the self-contained notebook code. Original LFS network/model payloads and paper analysis still require hydration, verification and independent reruns.
 
 ## Cross-cultural situation and verifier evaluation
 
@@ -139,12 +163,13 @@ cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-transmission-sweep > cultural-transmission-sweep.csv
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-frontier-sweep > cultural-frontier-sweep.csv
-cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin paper-abm-sweep > paper-abm-sweep.csv
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin simplified-strategy-abm-sweep > simplified-strategy-abm-sweep.csv
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin reward-network-abm-reference-sweep -- --profile quick
 ```
 
 The example binary prints a small chain-network adoption trace.
 
-## Paper ABM sensitivity sweep
+## Simplified strategy-adoption sensitivity sweep
 
 The `paper-abm-sweep` binary targets the article's separate 20-generation/20-agent exploratory ABM and runs 50 replications per condition. It reports 167 source-informed conditions in four families: (A) discovery capacity/bias and representative log-spaced optimal discoverability; (B) no/seed-only/all-generation machine availability crossed with social transmission, selection temperature and demonstration noise; (C) machine count 1–5, population size 20–100 and clustered/uniform-random placement; and (D) teacher candidate count 1/5/10/20 crossed with published temperature values. It reports overall, human-only and machine-only optimal prevalence separately; human machine-origin lineage; myopic/null prevalence; reward and social transmission; and 95% replicate confidence half-widths. The supplementary specifies machine capacities 10/1,000/100,000, biases 0.01/0.5, tau and epsilon values 0.1/0.2/0.4, and availability/prevalence conditions. It does not report the numeric candidate-set size in the extracted description. This suite is a source-informed sensitivity design, not an exact reproduction of the authors' full parameter grid or random stream.
 
