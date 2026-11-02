@@ -102,6 +102,6 @@ The data are a frozen high-rate recording used as an emulated sensor source. Thi
 
 ## Authored tests and execution status
 
-Nine synthetic tests are authored for deterministic replay, modality privacy under back-only selection, sleep/stale measurements, explicit abstention accounting, invalid labels/action bounds, participant row identity, transition metrics, timestamp-gap retention and result tamper detection.
+Twelve synthetic tests are authored for deterministic replay, modality privacy under back-only selection, sleep/stale measurements, explicit abstention accounting, invalid labels/action bounds, participant row identity, transition metrics, timestamp-gap retention and result tamper detection.
 
 **Execution status:** the Rust module and tests have not been compiled or run in this environment. No dataset archive has been acquired or scored here; no accuracy, energy, battery-life or SOTA result is claimed.
