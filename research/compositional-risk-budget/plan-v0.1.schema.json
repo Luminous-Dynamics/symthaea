@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compositional-risk-budget/risk-plan-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "family_id",
+    "target_population_sha256",
+    "execution_scope_sha256",
+    "subject_sha256",
+    "certification_experiment_sha256",
+    "operational_alpha_budget_ppb",
+    "statistical_delta_budget_ppb",
+    "groups",
+    "contracts",
+    "plan_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.risk_budget_plan"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_population_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "execution_scope_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "subject_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "certification_experiment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operational_alpha_budget_ppb": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000
+    },
+    "statistical_delta_budget_ppb": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/contract"
+      }
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64})?$"
+    }
+  },
+  "$defs": {
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "mode",
+        "action_support_sha256",
+        "action_ids"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "marginal_union_bound",
+            "complete_action_partition",
+            "no_formal_credit"
+          ]
+        },
+        "action_support_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "event_family_id",
+        "group_id",
+        "guarantee_kind",
+        "operational_alpha_ppb",
+        "statistical_delta_ppb",
+        "target_population_sha256",
+        "execution_scope_sha256",
+        "subject_sha256",
+        "certification_experiment_sha256",
+        "calibration_data_sha256",
+        "assumptions_sha256",
+        "method_id",
+        "method_version",
+        "paper_or_spec_url",
+        "source_revision",
+        "filtration_sha256",
+        "action_id",
+        "action_support_sha256",
+        "source_receipt_sha256",
+        "source_repository_url"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "guarantee_kind": {
+          "enum": [
+            "marginal_finite_sample",
+            "action_conditional",
+            "sequential_anytime",
+            "compute_stopping",
+            "empirical_only",
+            "unsupported"
+          ]
+        },
+        "operational_alpha_ppb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "statistical_delta_ppb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "target_population_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "execution_scope_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "subject_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "certification_experiment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "calibration_data_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "assumptions_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paper_or_spec_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "filtration_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "action_support_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_repository_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  }
+}

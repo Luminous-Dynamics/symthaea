@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compositional-risk-budget/run-receipt-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "code_commit",
+    "fixture_sha256",
+    "plan_sha256",
+    "ledger_sha256",
+    "contract_count",
+    "evidence_receipt_count",
+    "report",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compositional_risk_run_receipt.v0.1"
+    },
+    "status": {
+      "const": "synthetic_topology_only_component_guarantees_unverified"
+    },
+    "code_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ledger_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "contract_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evidence_receipt_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report": {
+      "type": "object",
+      "required": [
+        "schema",
+        "status",
+        "formal_system_guarantee_claimed",
+        "operational_alpha_bound_ppb",
+        "operational_alpha_budget_ppb",
+        "statistical_delta_sum_ppb",
+        "statistical_delta_budget_ppb",
+        "groups",
+        "plan_sha256",
+        "ledger_sha256",
+        "report_sha256",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.risk_composition_report"
+        },
+        "status": {
+          "enum": [
+            "arithmetic_valid_components_unverified",
+            "unsupported_component_prevents_full_composition",
+            "operational_budget_exceeded",
+            "statistical_confidence_budget_exceeded",
+            "both_budgets_exceeded"
+          ]
+        },
+        "formal_system_guarantee_claimed": {
+          "const": false
+        },
+        "operational_alpha_bound_ppb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "operational_alpha_budget_ppb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "statistical_delta_sum_ppb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "statistical_delta_budget_ppb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "group_id",
+              "mode",
+              "operational_alpha_bound_ppb",
+              "action_bounds",
+              "claim_ids"
+            ],
+            "properties": {
+              "group_id": {
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "marginal_union_bound",
+                  "complete_action_partition",
+                  "no_formal_credit"
+                ]
+              },
+              "operational_alpha_bound_ppb": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "action_bounds": {
+                "type": "array"
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "plan_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "ledger_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "report_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "claim_ceiling": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
