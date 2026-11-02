@@ -2,7 +2,7 @@
 
 Standalone Rust research reference for simultaneous calibration of reasoning-stop wrong-answer risk, premature-abandon risk, and emitted-answer error. Tracking: #10052.
 
-Design and theorem boundary: COMPUTE_RISK_JOINT_GRID_V0_1.md.
+Design and theorem boundary: COMPUTE_RISK_JOINT_GRID_V0_1.md. Report verification checks the 3G family count, exact allocation, all UCBs, all risk-feasibility flags, and the minimum-compute selected candidate.
 
 ## Run
 
