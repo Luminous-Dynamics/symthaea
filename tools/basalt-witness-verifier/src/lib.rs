@@ -988,6 +988,24 @@ pub fn verify_challenge_bound_head(
     Ok(verified.accepted_key_ids)
 }
 
+
+pub fn verify_challenge_bound_head_with_witness_set(
+    envelope: &[u8],
+    challenge_nonce: &[u8; 32],
+    witness_set: &VerifiedWitnessSet,
+    chain: &VerifiedCheckpointChain,
+) -> Result<Vec<String>, String> {
+    let trust_bytes = serde_json::to_vec(&witness_set.trust_store)
+        .map_err(|error| format!("cannot serialize verified witness trust set: {error}"))?;
+    verify_challenge_bound_head(
+        envelope,
+        &trust_bytes,
+        &sha256_prefixed(&trust_bytes),
+        challenge_nonce,
+        chain,
+    )
+}
+
 pub fn assess_restored_store(
     observed: &RestoreObservation,
     witnessed_head: &CheckpointPayload,
