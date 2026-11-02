@@ -560,8 +560,13 @@ pub fn verify_head_read_quorum(
     let mut response_rejections = Vec::<String>::new();
 
     macro_rules! reject_response {
-        ($status:expr, $message:expr) => {{
-            response_rejections.push(format!("response {index} {}: {}", $status, $message));
+        ($response_index:expr, $status:expr, $message:expr) => {{
+            response_rejections.push(format!(
+                "response {} {}: {}",
+                $response_index,
+                $status,
+                $message
+            ));
             continue;
         }};
     }
@@ -576,14 +581,14 @@ pub fn verify_head_read_quorum(
         ) {
             Ok(value) => value,
             Err(error) => {
-                reject_response!("rejected_witness_response", format!("response {index} failed authentication: {error}"));
+                reject_response!(index, "rejected_witness_response", format!("response {index} failed authentication: {error}"));
             }
         };
         let response_payload: WitnessHeadResponse =
             match serde_json::from_value(response.json.clone()) {
                 Ok(value) => value,
                 Err(error) => {
-                    reject_response!("rejected_witness_response", format!("response {index} payload shape invalid: {error}"));
+                    reject_response!(index, "rejected_witness_response", format!("response {index} payload shape invalid: {error}"));
                 }
             };
         if response_payload.record_type != "basalt.authority.witness-head-response"
@@ -596,7 +601,7 @@ pub fn verify_head_read_quorum(
             || response_payload.witness_set_version != trust.witness_set_version.to_string()
             || response_payload.trust_root_version != trust.trust_root_version.to_string()
         {
-            reject_response!("rejected_witness_response", format!(
+            reject_response!(index, "rejected_witness_response", format!(
                     "response {index} is not bound to the expected nonce/authority/witness set"
                 ));
         }
@@ -604,19 +609,19 @@ pub fn verify_head_read_quorum(
             &response_payload.head_authority_revision,
             "head_authority_revision",
         ) {
-            reject_response!("rejected_witness_response", error);
+            reject_response!(index, "rejected_witness_response", error);
         }
         if let Err(error) = parse_canonical_u64(&response_payload.head_sequence, "head_sequence") {
-            reject_response!("rejected_witness_response", error);
+            reject_response!(index, "rejected_witness_response", error);
         }
         if !is_prefixed_sha256(&response_payload.head_checkpoint_digest)
             || !is_prefixed_sha256(&response_payload.head_state_digest)
             || !is_prefixed_sha256(&response_payload.head_policy_digest)
         {
-            reject_response!("rejected_witness_response", format!("response {index} contains a malformed digest"));
+            reject_response!(index, "rejected_witness_response", format!("response {index} contains a malformed digest"));
         }
         let Some(member_key_id) = response.accepted_key_ids.first().cloned() else {
-            reject_response!("rejected_witness_response", format!("response {index} has no authenticated member key"));
+            reject_response!(index, "rejected_witness_response", format!("response {index} has no authenticated member key"));
         };
 
         if let Some(previous_digest) = reported_heads.get(&member_key_id) {
@@ -643,24 +648,24 @@ pub fn verify_head_read_quorum(
         ) {
             Ok(value) => value,
             Err(error) => {
-                reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint certificate failed: {error}"));
+                reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint certificate failed: {error}"));
             }
         };
         let checkpoint_payload: WitnessCheckpoint =
             match serde_json::from_value(checkpoint.json.clone()) {
                 Ok(value) => value,
                 Err(error) => {
-                    reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint payload shape invalid: {error}"));
+                    reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint payload shape invalid: {error}"));
                 }
             };
         if checkpoint_payload.state_schema != "basalt.authority-state.v1" {
-            reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint uses an unsupported state schema"));
+            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint uses an unsupported state schema"));
         }
         let checkpoint_sequence =
             match parse_canonical_u64(&checkpoint_payload.sequence, "checkpoint sequence") {
                 Ok(value) => value,
                 Err(error) => {
-                    reject_response!("rejected_checkpoint_certificate", error);
+                    reject_response!(index, "rejected_checkpoint_certificate", error);
                 }
             };
         if parse_canonical_u64(
@@ -682,7 +687,7 @@ pub fn verify_head_read_quorum(
                 .as_deref()
                 .is_some_and(|value| !is_prefixed_sha256(value))
         {
-            reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint contains malformed revision/digest fields"));
+            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint contains malformed revision/digest fields"));
         }
         if checkpoint_payload.record_type != "basalt.authority.witness-checkpoint"
             || checkpoint_payload.schema_version != 1
@@ -697,11 +702,11 @@ pub fn verify_head_read_quorum(
             || checkpoint_payload.state_digest != response_payload.head_state_digest
             || checkpoint_payload.policy_digest != response_payload.head_policy_digest
         {
-            reject_response!("rejected_checkpoint_certificate", format!("response {index} fields disagree with its write-quorum checkpoint"));
+            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} fields disagree with its write-quorum checkpoint"));
         }
         let computed_checkpoint_digest = checkpoint_digest_from_payload(&checkpoint.payload);
         if computed_checkpoint_digest != response_payload.head_checkpoint_digest {
-            reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint digest does not bind canonical payload"));
+            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint digest does not bind canonical payload"));
         }
 
         if let Some(existing_digest) = certified_by_sequence.get(&checkpoint_sequence) {
