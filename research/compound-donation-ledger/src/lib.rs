@@ -583,6 +583,33 @@ impl StaircaseAdjuster {
         Ok(Self { points })
     }
 
+    /// Builds a finite prefix of a horizon-independent dyadic prior.
+    ///
+    /// The ideal infinite prior is pi_j = 1 / (j * (j + 1)) at K_j = 2^j,
+    /// j >= 1. Its total mass is exactly one by telescoping. Each stored mass
+    /// is rounded down in fixed-point units, so every finite prefix remains
+    /// valid. Exponents are capped at 64 to keep u128 products bounded.
+    pub fn dyadic_universal(max_exponent: u32) -> Result<Self, LedgerError> {
+        if max_exponent == 0 || max_exponent > 64 {
+            return Err(LedgerError::InvalidThresholdGrid);
+        }
+        let mut points = Vec::with_capacity(max_exponent as usize);
+        for exponent in 1..=max_exponent {
+            let denominator = (exponent as u128)
+                .checked_mul(exponent as u128 + 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let prior_mass = PRIOR_MASS_SCALE / denominator;
+            let threshold = EVIDENCE_ONE
+                .checked_shl(exponent)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            points.push(ThresholdMass {
+                threshold,
+                prior_mass,
+            });
+        }
+        Self::new(points)
+    }
+
     /// Evaluates the staircase calibrator at a running-supremum value.
     ///
     /// The exact result is rounded down to evidence ticks. This cannot increase
@@ -889,6 +916,25 @@ mod tests {
         );
         assert_eq!(adjuster.value_at(100 * EVIDENCE_ONE - 1).unwrap(), 2 * EVIDENCE_ONE);
         assert_eq!(adjuster.value_at(EVIDENCE_ONE).unwrap(), 0);
+    }
+
+    #[test]
+    fn dyadic_universal_prior_is_budgeted_and_monotone() {
+        let adjuster = StaircaseAdjuster::dyadic_universal(24).unwrap();
+        let total_mass: u128 = adjuster.points().iter().map(|point| point.prior_mass).sum();
+        assert!(total_mass <= PRIOR_MASS_SCALE);
+        assert_eq!(adjuster.points().len(), 24);
+        assert_eq!(
+            adjuster.value_at(2 * EVIDENCE_ONE).unwrap(),
+            EVIDENCE_ONE
+        );
+        let before = adjuster.value_at(8 * EVIDENCE_ONE - 1).unwrap();
+        let after = adjuster.value_at(8 * EVIDENCE_ONE).unwrap();
+        assert!(after >= before);
+        assert_eq!(
+            StaircaseAdjuster::dyadic_universal(65),
+            Err(LedgerError::InvalidThresholdGrid)
+        );
     }
 
     #[test]
