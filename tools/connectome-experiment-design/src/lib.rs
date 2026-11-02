@@ -362,6 +362,9 @@ fn validate_symmetric_matrix(
     if dimension == 0 {
         return Err(DesignError::EmptyParameterSet);
     }
+
+    // Validate the full shape before indexing the transpose. This prevents a
+    // malformed/ragged JSON- or caller-built matrix from panicking.
     for (row_index, row) in matrix.iter().enumerate() {
         if row.len() != dimension {
             return Err(DesignError::MatrixDimensionMismatch {
@@ -381,28 +384,25 @@ fn validate_symmetric_matrix(
                     value,
                 });
             }
-            let transpose = matrix[column_index][row_index];
-            if !transpose.is_finite() {
-                return Err(DesignError::InvalidMatrixValue {
-                    matrix: name.to_owned(),
-                    row: column_index,
-                    column: row_index,
-                    value: transpose,
-                });
-            }
+        }
+    }
+
+    for row in 0..dimension {
+        for column in 0..row {
+            let value = matrix[row][column];
+            let transpose = matrix[column][row];
             let scale = value.abs().max(transpose.abs()).max(1.0);
             if (value - transpose).abs() > MATRIX_SYMMETRY_TOLERANCE * scale {
                 return Err(DesignError::NonSymmetricMatrix {
                     matrix: name.to_owned(),
-                    row: row_index,
-                    column: column_index,
+                    row,
+                    column,
                 });
             }
         }
     }
     Ok(dimension)
 }
-
 /// Lower-triangular Cholesky factor L for A = L L^T.
 fn cholesky(
     matrix: &[Vec<f64>],
@@ -1520,6 +1520,18 @@ mod tests {
         assert!(matches!(
             evaluate_parameter_design(&prior, &singular_noise),
             Err(DesignError::MatrixNotPositiveDefinite { .. })
+        ));
+    }
+
+    #[test]
+    fn ragged_covariance_is_rejected_without_panicking() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0, 0.0], vec![1.0]],
+        };
+        let design = scalar_parameter_design("candidate", 1.0, 1.0, 1.0);
+        assert!(matches!(
+            evaluate_parameter_design(&prior, &design),
+            Err(DesignError::MatrixDimensionMismatch { .. })
         ));
     }
 
