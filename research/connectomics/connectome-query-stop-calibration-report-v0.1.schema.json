@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-query-stop-calibration-report-v0.1.schema.json",
+  "title": "Query-specific future proofreading drift calibration report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "profile_id",
+    "calibration_profile_sha256",
+    "group_disjointness_report_sha256",
+    "query_id",
+    "query_definition_sha256",
+    "analysis_code_sha256",
+    "metric_id",
+    "unit_id",
+    "calibration_stratum_id",
+    "future_horizon_edits",
+    "alpha",
+    "target_source_volume_id",
+    "calibration_trajectory_count",
+    "order_statistic_rank",
+    "residual_quantile_ratio",
+    "target_observed_max_drift_ratio",
+    "target_current_uncertainty_width_ratio",
+    "projected_future_drift_upper_ratio",
+    "status",
+    "universal_connectome_completeness_claimed",
+    "all_future_edits_certified"
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "properties": {
+    "report_version": {
+      "const": "0.1"
+    },
+    "profile_id": {
+      "$ref": "#/$defs/id"
+    },
+    "calibration_profile_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "group_disjointness_report_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "query_id": {
+      "$ref": "#/$defs/id"
+    },
+    "query_definition_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "analysis_code_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "metric_id": {
+      "$ref": "#/$defs/id"
+    },
+    "unit_id": {
+      "$ref": "#/$defs/id"
+    },
+    "calibration_stratum_id": {
+      "$ref": "#/$defs/id"
+    },
+    "future_horizon_edits": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "target_source_volume_id": {
+      "$ref": "#/$defs/id"
+    },
+    "calibration_trajectory_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "order_statistic_rank": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "residual_quantile_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "target_observed_max_drift_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "target_current_uncertainty_width_ratio": {
+      "type": "number",
+      "minimum": 0
+    },
+    "projected_future_drift_upper_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "status": {
+      "enum": [
+        "InsufficientCalibration",
+        "NotCalibratedGroupOverlap",
+        "ProjectedStableWithinHorizon",
+        "ProjectedUnstableWithinHorizon"
+      ]
+    },
+    "universal_connectome_completeness_claimed": {
+      "const": false
+    },
+    "all_future_edits_certified": {
+      "const": false
+    }
+  }
+}
