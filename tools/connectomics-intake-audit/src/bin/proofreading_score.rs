@@ -1752,9 +1752,9 @@ fn ood_detection_metrics(
         ),
         frozen_threshold: threshold,
         false_ood_count: operating.map(|value| value.0),
-        false_ood_rate_on_in_domain: operating.map(|value| value.2),
+        false_ood_rate_on_in_domain: operating.and_then(|value| value.2),
         missed_ood_count: operating.map(|value| value.1),
-        held_out_domain_recall: operating.map(|value| value.3),
+        held_out_domain_recall: operating.and_then(|value| value.3),
     }
 }
 
