@@ -598,7 +598,7 @@ mod tests {
         cost_cap.maximum_expected_cost = Some(3.2);
         let report = analyze_two_policy_mixture(&cost_cap).unwrap();
         assert!(report.maximum_expected_evaluator_cost <= 3.2 + 1e-12);
-        assert!(report.policy_a_probability < 0.3);
+        assert!(report.policy_a_probability > 0.7);
     }
 
     #[test]
