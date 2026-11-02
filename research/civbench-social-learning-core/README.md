@@ -46,6 +46,7 @@ It follows the broad mechanism sequence described in the 2026 Reward Network III
 cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-transmission-sweep > cultural-transmission-sweep.csv
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-frontier-sweep > cultural-frontier-sweep.csv
 ```
 
 The example binary prints a small chain-network adoption trace.
@@ -53,6 +54,14 @@ The example binary prints a small chain-network adoption trace.
 ## Multi-seed cultural-transmission sweep
 
 The `cultural-transmission-sweep` binary runs 256 fixed seeds per condition and writes per-generation means and 95% normal-approximation confidence half-widths for independent optimal discovery, integrated optimal prevalence, demonstration observation, strategy acquisition, optimal-strategy acquisition, integration, optimal integration and top-teacher selection. Conditions compare uniform vs performance-softmax teachers, 0/5/20% transmission corruption and a no-social-transmission control. The two optimal-strategy metrics must remain separate: one measures individual discovery; the other measures the final integrated repertoire. The sweep is a sensitivity experiment over the simplified reference ABM, not published Reward Network III participant data or an exact replication of the authors' ABM. Configuration values and seeds must be frozen in any reported run receipt.
+
+The `cultural-frontier-sweep` binary runs 256 common seeds across a 3×3×3 grid:
+- optimal-strategy per-trial discovery probability: 0.0001 / 0.001 / 0.01;
+- social acquisition probability (learnability): 0.25 / 0.60 / 0.95;
+- demonstrable selective advantage: 0.00 / 0.25 / 0.50 above the fixed myopic reward signal of 0.5.
+
+It reports independent discovery, integrated prevalence and simulation-replicate confidence half-widths, social-only optimal acquisition/integration, top-teacher selection and the probability of optimal strategy appearing in every post-seed generation. This operationalizes the paper's discovery–learnability–advantage frontier in the simplified model; it does not estimate human parameters or reproduce the authors' ABM.
+
 
 ## Limitations
 
