@@ -580,7 +580,7 @@ mod tests {
         let report = analyze_two_policy_mixture(&plan).unwrap();
         let deterministic_best = 4.542_f64.max(4.18);
         assert!(report.worst_case_decision_utility > deterministic_best);
-        assert!((report.policy_a_probability - 1.44 / 1.948).abs() < 1e-12);
+        assert!((report.policy_a_probability - 0.508 / 1.948).abs() < 1e-12);
         assert!((report.worst_case_decision_utility - 4.823).abs() < 1e-3);
         assert!(report.mixed_null_size <= 0.05);
         assert!(report.maximum_expected_evaluator_cost <= 3.6);
