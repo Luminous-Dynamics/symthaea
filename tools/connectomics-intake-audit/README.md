@@ -36,6 +36,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
 The verifier derives species from source_archive exactly as the upstream split_archive function does, reconstructs operation-bank, junction-control and synapse-control keys, and rejects duplicate keys that would be overwritten by the upstream Python dictionary loader. It hashes all consumed split files with SHA-256. The 14 authored Rust tests are synthetic regression tests and have not been compiled or executed in the authoring environment.
 
 See docs/neuroscience/CONNECTOME_EXACT_SPLIT_REPLAY_AUDIT_V0.1.md for scope and limitations. This complements rather than replaces connectome_dataset_audit, which checks row identity, labels/routes/masks, operation-group and 50 µm cube separation, neuron-overlap warnings and modality cohorts.
+
 ## Query-specific stopping snapshot audit
 
 The `connectome-stopping-audit` binary validates a JSONL series against the initial versioned snapshot contract in `docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json`. It checks immutable dataset/query/profile identity, strictly increasing snapshot sequence, parent graph digest continuity, nondecreasing edit counts, operation-class totals, invariant names, query metric names/units, and digest formatting. It also emits a descriptive tail-range stability signal and walk-forward predictions for declared graph invariants and scientific-query metrics, comparing a fitted asymptotic curve with persistence and linear-trend baselines.
