@@ -175,3 +175,17 @@ malformed factor and elimination inputs, count overflow, empty factor systems,
 MaxCount tie aggregation, and Pareto-pruning compatibility under Minkowski
 addition. Rust compilation remains unverified in environments without
 Cargo/Rust.
+
+
+The semiring module also exposes `check_algorithm_compatibility` and
+capability declarations. The initial planner guard distinguishes:
+- bucket variable elimination: commutative semiring operations;
+- shared-measurement interpolation: commutative multiplication, additive
+  inverses and rational scalar multiplication (a commutative Q-algebra);
+- signed network sums: commutative multiplication and additive inverses;
+- carry-free scalarization: exact ordered scalar embedding, nonnegative final
+  coefficients and a proved coefficient bound.
+
+These are fail-closed category checks, not proofs that a caller's claimed
+algebra laws hold. Noncommutative coefficient products are not supported by
+this factor-elimination engine.
