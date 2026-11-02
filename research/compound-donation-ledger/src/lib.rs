@@ -1630,6 +1630,37 @@ mod tests {
     }
 
     #[test]
+    fn capped_overshoot_missing_destination_disables_reservation() {
+        let specs = vec![
+            CandidateSpec {
+                id: 10,
+                weight: 500_000_000,
+                destination_id: None,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+            CandidateSpec {
+                id: 20,
+                weight: 500_000_000,
+                destination_id: None,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+        ];
+        let mut ledger = DonationLedger::new_capped_overshoot(specs).unwrap();
+        ledger.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: 100 * EVIDENCE_ONE,
+        }).unwrap();
+        let snapshot = ledger.snapshot().unwrap();
+        assert_eq!(snapshot.candidates[0].outgoing, 0);
+        assert!(snapshot.escrow.is_empty());
+        ledger.validate_invariants().unwrap();
+    }
+
+    #[test]
     fn capped_overshoot_reserve_satisfies_donor_cap_and_own_increment() {
         let weight = 300_000_000_u128;
         let mut previous_value = 0_u128;
