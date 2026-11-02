@@ -1,0 +1,71 @@
+{
+  "benchmark": "prefix_batch_exact_credit_selection_pilot",
+  "scope": "Exploratory simulation only; not confirmatory FDR/SupFDR calibration or evidence of power superiority.",
+  "selector_theory": {
+    "problem": "Select the maximum number of recipients with frozen baseline minimum-e-BH-credit deficits under nested source-prefix capacities.",
+    "feasibility": "For every prefix j, cumulative selected deficit through j must not exceed total unassigned reserve from sources i<j.",
+    "algorithm": "Process destinations in ID order; max-heap by deficit; when prefix capacity is exceeded, evict the largest deficit. Ties evict the later destination ID.",
+    "complexity": "O(n log n) selection; O(total assignment fragments) source-first materialization.",
+    "claim_boundary": "Maximum cardinality for fixed independent deficits, not joint e-BH threshold synergy, global power, or true-discovery optimality."
+  },
+  "exact_rational_validation": {
+    "random_instances": 9000,
+    "candidate_universe_sizes": "1 through 9",
+    "oracle": "brute-force enumeration of all 2^n subsets",
+    "arithmetic": "fractions.Fraction exact",
+    "assertions": [
+      "selected cardinality equals brute-force optimum",
+      "all prefix constraints hold",
+      "source-first assignment exactly covers selected deficits",
+      "all source IDs are strictly below destination IDs"
+    ],
+    "result": "all 9000 instances passed in local exact-rational prototype; committed unittest file authored separately"
+  },
+  "statistical_pilot": {
+    "streams_per_cell": 20,
+    "hypotheses": 24,
+    "looks": 50,
+    "alpha": "1/10",
+    "weights": "gamma_i=1/[(i+1)(i+2)]",
+    "weight_mass": "24/25",
+    "null_lr_factors": "7/5 on success, 3/5 on failure; conditional mean one under p0=1/2",
+    "adjuster": "floor to 1e-6 grid of sqrt(running maximum LR)-1",
+    "dependence": ["independent", "shared-uniform", "balanced-negative"],
+    "methods": ["no donation", "fixed-next", "two-phase minimum-credit", "two-phase greedy saturation", "two-phase batch maximum-cardinality"],
+    "one_sided_95pct_hoeffding_halfwidth": 0.2736664153,
+    "simultaneous_correction": "none",
+    "results_terminal_power": {
+      "immediate_bridge": {
+        "independent": {"none": 0.921875, "fixed_next": 0.95, "minimum_credit": 0.925, "saturation": 0.921875, "batch_max": 0.921875},
+        "shared_uniform": {"none": 0.934375, "fixed_next": 0.96875, "minimum_credit": 0.934375, "saturation": 0.934375, "batch_max": 0.934375},
+        "balanced_negative": {"none": 0.921875, "fixed_next": 0.9375, "minimum_credit": 0.921875, "saturation": 0.921875, "batch_max": 0.921875}
+      },
+      "late_bridge": {
+        "independent": {"none": 0.915385, "fixed_next": 0.915385, "minimum_credit": 0.915385, "saturation": 0.915385, "batch_max": 0.915385},
+        "shared_uniform": {"none": 0.880769, "fixed_next": 0.880769, "minimum_credit": 0.880769, "saturation": 0.880769, "batch_max": 0.880769},
+        "balanced_negative": {"none": 0.903846, "fixed_next": 0.903846, "minimum_credit": 0.903846, "saturation": 0.903846, "batch_max": 0.903846}
+      },
+      "far_cluster": {
+        "all_three_dependence_modes": {"none": 0.166667, "fixed_next": 0.166667, "minimum_credit": 0.166667, "saturation": 0.166667, "batch_max": 0.166667}
+      },
+      "no_useful": {
+        "all_three_dependence_modes": {"none": 1.0, "fixed_next": 1.0, "minimum_credit": 1.0, "saturation": 1.0, "batch_max": 1.0}
+      },
+      "switching": {
+        "independent": {"all_methods": 0.061765},
+        "shared_uniform": {"all_methods": 0.058824},
+        "balanced_negative": {"all_methods": 0.061765}
+      }
+    },
+    "supfdr_point_estimates": "all zero in this 20-stream pilot; no calibration inference",
+    "execution_note": "The statistical table came from a separate local exact-Fraction simulator aligned with the committed policy model. The committed benchmark itself has not been run from a connected checkout."
+  },
+  "interpretation": [
+    "The batch heap selector matched brute-force cardinality optimum for the frozen-deficit allocation problem.",
+    "The batch policy did not improve terminal power over one-target minimum-credit in these cells.",
+    "Fixed-next remained better in the immediate-bridge design; the result is scenario-specific.",
+    "The late-bridge case did not show a two-phase advantage in this pilot.",
+    "The statistical sample size is far too small for meaningful error-rate or power claims."
+  ],
+  "claim_ceiling": "A deterministic prefix-selection result plus a small exploratory simulation. No SOTA, confirmatory validity, or statistical superiority claim."
+}
