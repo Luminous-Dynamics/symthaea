@@ -68,8 +68,13 @@ pub struct TransmissionAgent {
     /// the teacher had no strategy, not that the learner acquired nothing.
     pub teacher_strategy: Option<Strategy>,
     /// True if the learner observed/received the selected demonstration.
-    /// This can be true even if the teacher had no strategy to transmit.
     pub demonstration_observed: bool,
+    /// True if a non-empty teacher strategy was successfully acquired.
+    /// A successful acquisition may still be corrupted to Strategy::None.
+    pub strategy_acquisition_succeeded: bool,
+    /// True if the acquired strategy was integrated into the learner's
+    /// active repertoire rather than merely retained as an unintegrated trace.
+    pub strategy_integrated: bool,
     /// Whether selected teacher had the highest demo score among candidates.
     pub selected_top_teacher: Option<bool>,
     /// Score offered to future demonstrators.
@@ -94,10 +99,14 @@ pub struct GenerationMetrics {
     pub demonstration_observations: usize,
     pub social_knowledge_acquisitions: usize,
     pub social_optimal_acquisitions: usize,
+    pub social_integrations: usize,
+    pub social_optimal_integrations: usize,
     pub selected_top_teacher_count: usize,
     pub demonstration_observation_rate: Option<f64>,
     pub social_acquisition_rate_given_observation: Option<f64>,
     pub optimal_acquisition_rate_given_observation: Option<f64>,
+    pub integration_rate_given_acquisition: Option<f64>,
+    pub optimal_integration_rate_given_observation: Option<f64>,
     pub top_teacher_selection_rate: Option<f64>,
 }
 
@@ -114,9 +123,15 @@ impl PopulationGeneration {
         let demonstration_observations = self.agents.iter()
             .filter(|agent| agent.demonstration_observed).count();
         let social_knowledge_acquisitions = self.agents.iter()
-            .filter(|agent| agent.social_strategy.is_some()).count();
+            .filter(|agent| agent.strategy_acquisition_succeeded).count();
         let social_optimal_acquisitions = self.agents.iter()
-            .filter(|agent| agent.social_strategy == Some(Strategy::Optimal)).count();
+            .filter(|agent| agent.strategy_acquisition_succeeded
+                && agent.social_strategy == Some(Strategy::Optimal)).count();
+        let social_integrations = self.agents.iter()
+            .filter(|agent| agent.strategy_integrated).count();
+        let social_optimal_integrations = self.agents.iter()
+            .filter(|agent| agent.strategy_integrated
+                && agent.social_strategy == Some(Strategy::Optimal)).count();
         let selected_top_teacher_count = self.agents.iter()
             .filter(|agent| agent.selected_top_teacher == Some(true)).count();
         let teacher_selection_trials = self.agents.iter()
@@ -134,6 +149,8 @@ impl PopulationGeneration {
             demonstration_observations,
             social_knowledge_acquisitions,
             social_optimal_acquisitions,
+            social_integrations,
+            social_optimal_integrations,
             selected_top_teacher_count,
             demonstration_observation_rate: if self.index == 0 {
                 None
@@ -146,6 +163,14 @@ impl PopulationGeneration {
             ),
             optimal_acquisition_rate_given_observation: ratio(
                 social_optimal_acquisitions,
+                demonstration_observations,
+            ),
+            integration_rate_given_acquisition: ratio(
+                social_integrations,
+                social_knowledge_acquisitions,
+            ),
+            optimal_integration_rate_given_observation: ratio(
+                social_optimal_integrations,
                 demonstration_observations,
             ),
             top_teacher_selection_rate: ratio(
@@ -184,6 +209,12 @@ pub struct TransmissionConfig {
     pub myopic_discovery_probability_per_trial: f64,
     /// Probability that a learner observes/receives its selected demonstration.
     pub social_observation_probability: f64,
+    /// Probability of acquiring a strategy conditional on observing it.
+    pub social_strategy_acquisition_probability: f64,
+    /// Probability that the received strategy is corrupted/downgraded.
+    pub demonstration_corruption_probability: f64,
+    /// Probability that an acquired strategy is integrated into active use.
+    pub strategy_integration_probability: f64,
     pub teacher_candidate_count: usize,
     pub teacher_selection: TeacherSelectionRule,
     pub demonstration_count: u32,
@@ -206,6 +237,9 @@ impl Default for TransmissionConfig {
             optimal_discovery_probability_per_trial: 0.001,
             myopic_discovery_probability_per_trial: 0.5,
             social_observation_probability: 0.8,
+            social_strategy_acquisition_probability: 0.8,
+            demonstration_corruption_probability: 0.05,
+            strategy_integration_probability: 0.8,
             teacher_candidate_count: 5,
             teacher_selection: TeacherSelectionRule::PerformanceSoftmax {
                 temperature: 0.25,
@@ -292,6 +326,9 @@ impl TransmissionConfig {
             ("optimal discovery probability", self.optimal_discovery_probability_per_trial),
             ("myopic discovery probability", self.myopic_discovery_probability_per_trial),
             ("social observation probability", self.social_observation_probability),
+            ("social strategy acquisition probability", self.social_strategy_acquisition_probability),
+            ("demonstration corruption probability", self.demonstration_corruption_probability),
+            ("strategy integration probability", self.strategy_integration_probability),
         ] {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                 return Err(TransmissionError::InvalidProbability { name });
@@ -463,10 +500,26 @@ fn select_teacher(
     (selected, selected_score >= maximum)
 }
 
-fn integrate_strategy(individual: Strategy, social: Option<Strategy>) -> Strategy {
+fn integrate_strategy(
+    individual: Strategy,
+    social: Option<Strategy>,
+    integration_succeeded: bool,
+) -> Strategy {
+    if !integration_succeeded {
+        return individual;
+    }
     match social {
         Some(strategy) if strategy.rank() > individual.rank() => strategy,
         _ => individual,
+    }
+}
+
+/// One-step lossy transmission model. A corrupted optimal strategy becomes
+/// myopic; a corrupted myopic strategy loses its executable rule entirely.
+fn corrupt_strategy(strategy: Strategy) -> Strategy {
+    match strategy {
+        Strategy::Optimal => Strategy::Myopic,
+        Strategy::Myopic | Strategy::None => Strategy::None,
     }
 }
 
@@ -510,6 +563,8 @@ pub fn simulate_transmission(
             teacher_index: None,
             teacher_strategy: None,
             demonstration_observed: false,
+            strategy_acquisition_succeeded: false,
+            strategy_integrated: false,
             selected_top_teacher: None,
             demonstration_score: score,
         });
@@ -542,12 +597,26 @@ pub fn simulate_transmission(
             );
             let teacher_strategy = previous[teacher_index].integrated_strategy;
             let demonstration_observed = rng.bernoulli(config.social_observation_probability);
-            let social_strategy = if demonstration_observed && teacher_strategy != Strategy::None {
-                Some(teacher_strategy)
+            let strategy_acquisition_succeeded = demonstration_observed
+                && teacher_strategy != Strategy::None
+                && rng.bernoulli(config.social_strategy_acquisition_probability);
+            let social_strategy = if strategy_acquisition_succeeded {
+                let received = if rng.bernoulli(config.demonstration_corruption_probability) {
+                    corrupt_strategy(teacher_strategy)
+                } else {
+                    teacher_strategy
+                };
+                Some(received)
             } else {
                 None
             };
-            let integrated_strategy = integrate_strategy(individual_strategy, social_strategy);
+            let strategy_integrated = strategy_acquisition_succeeded
+                && rng.bernoulli(config.strategy_integration_probability);
+            let integrated_strategy = integrate_strategy(
+                individual_strategy,
+                social_strategy,
+                strategy_integrated,
+            );
             let score = demonstration_score(integrated_strategy, config, &mut rng);
             agents.push(TransmissionAgent {
                 kind: AgentKind::Human,
@@ -557,6 +626,8 @@ pub fn simulate_transmission(
                 teacher_index: Some(teacher_index),
                 teacher_strategy: Some(teacher_strategy),
                 demonstration_observed,
+                strategy_acquisition_succeeded,
+                strategy_integrated,
                 selected_top_teacher: Some(selected_top_teacher),
                 demonstration_score: score,
             });
@@ -587,6 +658,9 @@ mod tests {
             optimal_discovery_probability_per_trial: 1.0,
             myopic_discovery_probability_per_trial: 0.0,
             social_observation_probability: 1.0,
+            social_strategy_acquisition_probability: 1.0,
+            demonstration_corruption_probability: 0.0,
+            strategy_integration_probability: 1.0,
             teacher_candidate_count: 8,
             teacher_selection: TeacherSelectionRule::PerformanceSoftmax {
                 temperature: 0.01,
@@ -599,11 +673,11 @@ mod tests {
     #[test]
     fn optimal_strategy_dominates_myopic_when_both_are_acquired() {
         assert_eq!(
-            integrate_strategy(Strategy::Myopic, Some(Strategy::Optimal)),
+            integrate_strategy(Strategy::Myopic, Some(Strategy::Optimal), true),
             Strategy::Optimal
         );
         assert_eq!(
-            integrate_strategy(Strategy::Optimal, Some(Strategy::Myopic)),
+            integrate_strategy(Strategy::Optimal, Some(Strategy::Myopic), true),
             Strategy::Optimal
         );
     }
@@ -621,6 +695,8 @@ mod tests {
                 agent.integrated_strategy == Strategy::Optimal
                     && agent.social_strategy == Some(Strategy::Optimal)
                     && agent.demonstration_observed
+                    && agent.strategy_acquisition_succeeded
+                    && agent.strategy_integrated
             }));
             assert_eq!(generation.metrics().optimal_prevalence, 1.0);
             assert_eq!(generation.metrics().social_acquisition_rate_given_observation, Some(1.0));
@@ -640,6 +716,8 @@ mod tests {
                 teacher_index: Some(0),
                 teacher_strategy: Some(Strategy::None),
                 demonstration_observed: true,
+                strategy_acquisition_succeeded: false,
+                strategy_integrated: false,
                 selected_top_teacher: Some(true),
                 demonstration_score: 0.0,
             }],
@@ -665,6 +743,9 @@ mod tests {
             optimal_discovery_probability_per_trial: 0.0,
             myopic_discovery_probability_per_trial: 0.0,
             social_observation_probability: 0.0,
+            social_strategy_acquisition_probability: 1.0,
+            demonstration_corruption_probability: 0.0,
+            strategy_integration_probability: 1.0,
             teacher_candidate_count: 3,
             teacher_selection: TeacherSelectionRule::Uniform,
             demonstration_count: 10,
@@ -684,6 +765,49 @@ mod tests {
     }
 
     #[test]
+    fn acquisition_and_integration_are_separate_stages() {
+        assert_eq!(
+            integrate_strategy(Strategy::None, Some(Strategy::Optimal), false),
+            Strategy::None
+        );
+        assert_eq!(
+            integrate_strategy(Strategy::None, Some(Strategy::Optimal), true),
+            Strategy::Optimal
+        );
+    }
+
+    #[test]
+    fn corruption_downgrades_transmitted_strategy_without_rewriting_teacher_record() {
+        assert_eq!(corrupt_strategy(Strategy::Optimal), Strategy::Myopic);
+        assert_eq!(corrupt_strategy(Strategy::Myopic), Strategy::None);
+        assert_eq!(corrupt_strategy(Strategy::None), Strategy::None);
+    }
+
+    #[test]
+    fn observed_demonstration_can_fail_acquisition() {
+        let generation = PopulationGeneration {
+            index: 1,
+            agents: vec![TransmissionAgent {
+                kind: AgentKind::Human,
+                individual_strategy: Strategy::None,
+                social_strategy: None,
+                integrated_strategy: Strategy::None,
+                teacher_index: Some(0),
+                teacher_strategy: Some(Strategy::Optimal),
+                demonstration_observed: true,
+                strategy_acquisition_succeeded: false,
+                strategy_integrated: false,
+                selected_top_teacher: Some(true),
+                demonstration_score: 0.0,
+            }],
+        };
+        let metrics = generation.metrics();
+        assert_eq!(metrics.demonstration_observations, 1);
+        assert_eq!(metrics.social_knowledge_acquisitions, 0);
+        assert_eq!(metrics.social_acquisition_rate_given_observation, Some(0.0));
+    }
+
+    #[test]
     fn performance_softmax_selects_best_teacher_at_low_temperature() {
         let previous = vec![
             TransmissionAgent {
@@ -694,6 +818,8 @@ mod tests {
                 teacher_index: None,
                 teacher_strategy: None,
                 demonstration_observed: false,
+                strategy_acquisition_succeeded: false,
+                strategy_integrated: false,
                 selected_top_teacher: None,
                 demonstration_score: 0.0,
             },
@@ -705,6 +831,8 @@ mod tests {
                 teacher_index: None,
                 teacher_strategy: None,
                 demonstration_observed: false,
+                strategy_acquisition_succeeded: false,
+                strategy_integrated: false,
                 selected_top_teacher: None,
                 demonstration_score: 10.0,
             },
