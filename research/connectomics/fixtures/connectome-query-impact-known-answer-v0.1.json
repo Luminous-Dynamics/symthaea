@@ -1230,7 +1230,13 @@
               "source_volume_id": "volume-1",
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "candidate_id": "finite-complete",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1358,7 +1364,13 @@
               "source_volume_id": "volume-1",
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "candidate_id": "finite-missing",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1430,7 +1442,13 @@
               "source_volume_id": "volume-1",
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "candidate_id": "finite-unverified",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1503,7 +1521,13 @@
               "source_volume_id": "volume-1",
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "candidate_id": "finite-duplicate",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1569,7 +1593,13 @@
               "source_volume_id": "volume-1",
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "candidate_id": "finite-no-pairs",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1641,7 +1671,13 @@
               "source_volume_id": "volume-1",
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "candidate_id": "finite-invalid-digest",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1713,7 +1749,13 @@
               "expected_world_ids": [
                 "world-a"
               ],
-              "closure_verified": true
+              "closure_verified": true,
+              "candidate_id": "finite-query-binding",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1785,7 +1827,13 @@
               "expected_world_ids": [
                 "world-a"
               ],
-              "closure_verified": true
+              "closure_verified": true,
+              "candidate_id": "finite-threshold-binding",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1857,7 +1905,13 @@
               "expected_world_ids": [
                 "world-a"
               ],
-              "closure_verified": true
+              "closure_verified": true,
+              "candidate_id": "finite-snapshot-binding",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
             }
           }
         ]
@@ -1918,6 +1972,324 @@
               "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
               "candidate_patch_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": true,
+              "candidate_id": "finite-patch-binding",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds"
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedWorldCoverageBindingMismatch"
+    },
+    {
+      "case_id": "finite_world_wrong_sample_hash_rejected",
+      "input": {
+        "candidate_id": "wrong-sample",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-world-universe",
+              "candidate_id": "wrong-sample",
+              "operation_id": "operation-1",
+              "sample_hash": "fedcba9876543210fedcba9876543210",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds",
+              "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "metric_id": "pathway-metric",
+              "unit_id": "normalized-strength",
+              "decision_threshold": 0.5,
+              "materiality_threshold": 0.1,
+              "source_volume_id": "volume-1",
+              "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedWorldCoverageBindingMismatch"
+    },
+    {
+      "case_id": "finite_world_wrong_candidate_id_rejected",
+      "input": {
+        "candidate_id": "wrong-candidate",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-world-universe",
+              "candidate_id": "other-candidate",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds",
+              "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "metric_id": "pathway-metric",
+              "unit_id": "normalized-strength",
+              "decision_threshold": 0.5,
+              "materiality_threshold": 0.1,
+              "source_volume_id": "volume-1",
+              "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedWorldCoverageBindingMismatch"
+    },
+    {
+      "case_id": "finite_world_wrong_operation_id_rejected",
+      "input": {
+        "candidate_id": "wrong-operation",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-world-universe",
+              "candidate_id": "wrong-operation",
+              "operation_id": "other-operation",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "finite-worlds",
+              "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "metric_id": "pathway-metric",
+              "unit_id": "normalized-strength",
+              "decision_threshold": 0.5,
+              "materiality_threshold": 0.1,
+              "source_volume_id": "volume-1",
+              "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedWorldCoverageBindingMismatch"
+    },
+    {
+      "case_id": "finite_world_wrong_scenario_id_rejected",
+      "input": {
+        "candidate_id": "wrong-scenario",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-world-universe",
+              "candidate_id": "wrong-scenario",
+              "operation_id": "operation-1",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "query_id": "pathway",
+              "scenario_id": "other-scenario",
+              "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "metric_id": "pathway-metric",
+              "unit_id": "normalized-strength",
+              "decision_threshold": 0.5,
+              "materiality_threshold": 0.1,
+              "source_volume_id": "volume-1",
+              "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
               "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
