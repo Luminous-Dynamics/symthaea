@@ -39,7 +39,7 @@ The six acceleration values are expressed in g. The documented activity codes ar
 - Parses timezone-naive `YYYY-MM-DD HH:MM:SS[.fraction]` or `T` timestamps with up to nanosecond fractional precision. It rejects timezone suffixes and does not infer UTC or Johannesburg local time.
 - Requires strictly increasing timestamps within each source-family recording.
 - Requires finite numeric values for all six acceleration channels and one of the twelve documented labels.
-- Streams each `HarthRow` to a caller callback. The parser holds the current line and its fields, not a complete participant recording.
+- Streams each `HarthRow` to a caller callback. The parser holds at most one 4,096-byte input line and its fields, not a complete participant recording; oversized records fail closed.
 - Returns the row count, first/last timestamp, minimum/maximum sample interval, number of gaps, maximum gap, source-family digest and canonical normalized-row digest.
 
 The nominal sample period is 20 ms. A gap is counted when an observed adjacent-row interval exceeds 30 ms (1.5× nominal), and is reported—not interpolated, filled, or silently resampled. Other downstream definitions of missingness can use the retained row stream and interval data.
@@ -147,4 +147,4 @@ The first evidence report must publish all 22 subject-fold results, class-wise c
 
 ## Tests authored
 
-The test module covers canonical six-channel parsing, optional export-index continuity, quoted timestamps and CRLF, timestamp ordering and calendar validity, timezone rejection, gap accounting, non-finite sensor values, unknown labels, normalized digest replay and source-family binding, complete activity code coverage, and rejection of an unbound source-family identity.
+The test module covers canonical six-channel parsing, optional export-index continuity, quoted timestamps and CRLF, timestamp ordering and calendar validity, timezone rejection, gap accounting, non-finite sensor values, unknown labels, normalized digest replay and source-family binding, complete activity code coverage, rejection of an unbound source-family identity, and oversized-line rejection.
