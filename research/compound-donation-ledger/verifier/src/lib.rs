@@ -1121,6 +1121,94 @@ mod tests {
 
 
     #[test]
+    fn independent_verifier_confirms_capped_overshoot_horizon_extension() {
+        let make_spec = |id, weight, destination_id| CandidateSpec {
+            id,
+            weight,
+            destination_id,
+            reserve_rate_numerator: 0,
+            reserve_rate_denominator: 1,
+        };
+        let small = vec![
+            make_spec(10, 300_000_000, Some(20)),
+            make_spec(20, 300_000_000, Some(30)),
+        ];
+        let extended = vec![
+            make_spec(10, 300_000_000, Some(20)),
+            make_spec(20, 300_000_000, Some(30)),
+            make_spec(30, 200_000_000, Some(40)),
+        ];
+        let common_prefix = vec![
+            AuditEvent::Activated { round: 0, candidate_id: 10 },
+            AuditEvent::EvidenceUpdated {
+                round: 1,
+                candidate_id: 10,
+                new_value: 4 * EVIDENCE_ONE,
+            },
+            AuditEvent::Reserved {
+                round: 1,
+                token_id: 1,
+                donor_id: 10,
+                destination_id: 20,
+                amount: 200_000_000_000_000,
+            },
+            AuditEvent::Activated { round: 2, candidate_id: 20 },
+            AuditEvent::Credited {
+                round: 2,
+                token_id: 1,
+                recipient_id: 20,
+                amount: 200_000_000_000_000,
+            },
+            AuditEvent::EvidenceUpdated {
+                round: 3,
+                candidate_id: 20,
+                new_value: 4 * EVIDENCE_ONE,
+            },
+            AuditEvent::Reserved {
+                round: 3,
+                token_id: 2,
+                donor_id: 20,
+                destination_id: 30,
+                amount: 200_000_000_000_000,
+            },
+        ];
+
+        let small_result = verify_receipt_with_policy(
+            &small,
+            DonationReservePolicy::CappedOvershoot,
+            &common_prefix,
+            None,
+        ).unwrap();
+        let extended_result = verify_receipt_with_policy(
+            &extended,
+            DonationReservePolicy::CappedOvershoot,
+            &common_prefix,
+            None,
+        ).unwrap();
+
+        assert_eq!(
+            small_result.candidates,
+            extended_result.candidates[..2]
+        );
+        assert_eq!(
+            small_result.escrow,
+            extended_result.escrow
+        );
+        assert_eq!(
+            small_result.candidates[0].weighted_score,
+            0
+        );
+        assert_eq!(
+            small_result.candidates[1].incoming,
+            200_000_000_000_000
+        );
+        assert_eq!(
+            small_result.escrow[0].destination_id,
+            30
+        );
+    }
+
+    #[test]
     fn independent_verifier_accepts_overshoot_policy_with_disabled_destination() {
         let policy = vec![
             CandidateSpec {
