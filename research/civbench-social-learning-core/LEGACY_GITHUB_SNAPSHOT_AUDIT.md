@@ -5,7 +5,7 @@
 
 ## Why this audit exists
 
-The initial CivBench prototype mistakenly hard-coded a 12-node/30-edge graph, four level values (0–3), and a terminal reward at level 3 as if those were established properties of the published task. The paper supports the reward vocabulary, ten-move budget and three-loss route, but the older public GitHub experiment repository does not have that topology. This discrepancy is now represented explicitly in the generic Rust task engine.
+The 2026 paper explicitly specifies a 12-node/30-edge task network, hidden node levels 0–3, +400 rewards originating at level 3, and at least three negative-reward edges on every path from a level-0 node to level 3. The older public GitHub repository snapshot inspected below is a different, earlier implementation profile: 10 nodes, 20 directed edges, observed levels 0–4 and eight transitions. The profiles must remain distinct; the older snapshot does not override the published paper specification, and the paper specification does not prove the old snapshot is the final v2.0 archive.
 
 ## 2026 paper facts
 
@@ -18,7 +18,7 @@ Brinkmann et al., *Propagation and preservation of AI-discovered problem-solving
 - The main human experiment had 30 populations, five generations, eight positions per generation, with Human-Only and Human-Machine conditions.
 - The final paper identifies the exact code/data reproduction source as Zenodo v2.0: https://zenodo.org/records/18547122 (DOI 10.5281/zenodo.18547122).
 
-The article text does not justify the prototype's 12-node/30-edge/levels-0–3 topology assertion.
+The paper explicitly supports the 12-node/30-edge/levels-0–3 profile. This audit's purpose is not to dispute that published task definition; it is to prevent the older public GitHub snapshot's 10-node/20-edge/eight-transition implementation from being mistaken for the final archived v2.0 implementation.
 
 ## Older public GitHub snapshot inspected
 
@@ -98,12 +98,12 @@ The older `ExperimentSettings` defaults include three generations, 20 sessions p
 ## CivBench implementation correction
 
 The generic Rust `RewardNetwork` now:
-- no longer hard-codes a supposed published 12-node/30-edge shape;
-- supports source-specific shape validation via `validate_shape(expected_nodes, expected_edges)`;
+- keeps the published paper profile explicit as 12 nodes, 30 edges, levels 0–3, terminal level 3 and at least three negative-reward edges on every level-0-to-level-3 path;
+- exposes source-specific shape validation via `validate_shape(expected_nodes, expected_edges)`;
 - separates node-level range validation from graph construction;
 - validates a generic terminal-level/negative-edge contract with `validate_terminal_strategy(terminal_level, required_losses)`;
-- keeps the 10-move paper budget separate from the older 8-transition repository profile;
-- retains the 12-node/30-edge unit-test fixture as explicitly synthetic only.
+- keeps the paper's 10-move budget separate from the older GitHub snapshot's 8-transition profile;
+- retains clearly synthetic fixtures for both shapes, without treating either fixture as imported source data.
 
 The crate defines named `LEGACY_GITHUB_*` constants solely for the older snapshot. They are not the Zenodo v2.0 schema.
 
