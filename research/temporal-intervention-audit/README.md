@@ -77,4 +77,4 @@ From the repository root:
 cargo test --manifest-path research/temporal-intervention-audit/Cargo.toml
 \`\`\`
 
-Twelve test functions are authored in this draft. They have not been compiled or executed. No effect-size, p-value, SOTA or hardware claim is made.
+Fourteen test functions are authored in this draft. They have not been compiled or executed. No effect-size, p-value, SOTA or hardware claim is made.
