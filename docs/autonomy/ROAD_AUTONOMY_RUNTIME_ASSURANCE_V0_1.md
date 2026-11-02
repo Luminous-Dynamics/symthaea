@@ -33,9 +33,9 @@ The monitor receives both commands and evidence through an explicit observation 
 - A baseline command is selectable only when it is well-formed, its profile is explicitly declared admissible, and separate caller-supplied health declarations cover baseline inputs, baseline controller, baseline execution path, monitor timing and the shared actuator path. If any are unavailable, the result is `NoAdmissibleFallback` with no selected command.
 - If the fallback is unavailable or malformed, the monitor returns `NoAdmissibleFallback` and `selected_command = None`.
 - Any monitor finding immediately selects the admissible baseline; a clean dwell and a bounded linear transition are required before advanced authority is restored.
-- Each decision retains a compact witness, exact profile ID, a BLAKE3 digest of the deterministic `serde_json` serialization of the v0.1 monitor configuration, mode and findings. This digest distinguishes configuration changes but is neither a signature nor a canonical cross-language encoding.
+- Each decision retains a compact witness, exact profile ID, a BLAKE3 digest of the `serde_json` serialization of the monitor configuration, mode and findings. The witness also records 64-hex advanced/baseline controller identifiers, a non-empty baseline-independence evidence reference, and a BLAKE3 observation fingerprint when the full observation is serializable. These are identity/replay fields, not signatures or canonical cross-language encodings.
 
-The baseline-admissibility boolean is only a caller assertion. It is not authenticated evidence, and this module does not prove that the baseline is dynamically safe. A no-command result is not an emergency-stop maneuver; any future physical system needs a separately engineered and qualified local fail-safe path.
+The baseline-admissibility and health booleans remain caller assertions. The monitor now fails closed if controller digests are malformed or aliased, or if the baseline-independence evidence reference is absent. A non-empty reference is not verified, distinct hashes do not prove architectural independence, and this module still does not authenticate the controller binaries, source provenance, sensors or evidence. A no-command result is not an emergency-stop maneuver; any future physical system needs a separately engineered and qualified local fail-safe path.
 
 ## Assumptions and current limitations
 
@@ -46,6 +46,8 @@ The baseline-admissibility boolean is only a caller assertion. It is not authent
 5. Time is represented as floating-point seconds in the simulation. A deployed real-time implementation must define clock source, resolution, rollover, synchronization, deadline behavior and restart semantics.
 6. The monitor's own process failure, memory corruption, shared-sensor common cause, power loss and command-path faults are not covered by this module.
 7. The profile digest identifies the serialized monitor configuration only. It does not bind the executable, vehicle configuration, sensor calibration, learned model, baseline implementation, source evidence or runtime measurement. Serialization does not authenticate the producer or the evidence. Content identity, source authenticity and trusted measurement are separate obligations.
+8. Advanced and baseline controller digests are format-checked and required to differ; they are not recomputed from executable bytes. The baseline-independence evidence ID is required to be present but is not dereferenced or authenticated. The integration must independently bind each digest to measured artifacts and review shared sensors, clocks, memory, power, compiler/runtime, scheduler, actuator and failure-containment paths. A hash difference alone is not an independence proof.
+9. The observation fingerprint hashes the complete serde_json-serializable observation. It is absent when serialization rejects non-finite values. It supports same-version replay correlation; it is not an authenticated event receipt and should not be described as cross-language canonical identity.
 
 ## Benchmark protocol
 
@@ -99,7 +101,7 @@ Open-loop prediction, replay-based planning and reactive closed-loop simulation 
 
 1. Run exact-head formatting, focused crate tests and Clippy on a Rust-capable host; retain all diagnostics. Queued jobs are not passes.
 2. Add canonical scenario/decision serialization and a replay digest using the repository's existing evidence/provenance owner rather than creating a second ledger.
-3. Add monitor fault injection and mutation tests, including common-cause estimator/monitor corruption and missing baseline.
+3. Add monitor fault injection and mutation tests, including common-cause estimator/monitor corruption and missing baseline. Bind controller digests to independently measured artifacts and resolve the baseline-independence evidence reference before making any independence claim.
 4. Connect the selected command to the existing simulator harness only; add controller ablations and per-scenario measures.
 5. Extend #6256 with measured RTA overhead, intervention quality and held-out scenario transfer.
 6. Keep hardware work behind #6254's low-consequence physical qualification ladder and separate regulatory review.
