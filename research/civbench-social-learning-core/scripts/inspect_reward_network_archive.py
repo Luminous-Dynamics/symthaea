@@ -105,6 +105,45 @@ def read_lfs_pointer(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> dict[st
         raise ValueError(f"malformed Git LFS pointer at {info.filename}")
     return {"oid_sha256": oid.removeprefix("sha256:"), "declared_size_bytes": int(size)}
 
+MAX_SOURCE_TEXT_BYTES = 64 * 1024
+SOURCE_SNAPSHOT_ALLOWLIST = {
+    "README.md",
+    "abm/README.md",
+    "abm/model.py",
+    "algorithm/README.md",
+    "algorithm/params/seed_0.yml",
+    "algorithm/params/seed_1.yml",
+    "algorithm/params/seed_2.yml",
+    "algorithm/dqn/config_type.py",
+    "algorithm/dqn/dqn_exp.py",
+    "algorithm/dqn/dqn_agent.py",
+    "algorithm/dqn/environment_vect.py",
+    "analysis/README.md",
+    "data/README.md",
+    "statistics/README.md",
+    ".gitattributes",
+}
+
+def source_snapshot(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> dict[str, Any] | None:
+    parts = PurePosixPath(info.filename).parts
+    relative_path = "/".join(parts[1:])
+    if relative_path not in SOURCE_SNAPSHOT_ALLOWLIST:
+        return None
+    if info.file_size > MAX_SOURCE_TEXT_BYTES:
+        return {"path": info.filename, "inspection": "skipped_size_limit", "size_bytes": info.file_size}
+    try:
+        raw = archive.read(info)
+        if raw.startswith(b"version https://git-lfs.github.com/spec/v1"):
+            return None
+        return {
+            "path": info.filename,
+            "size_bytes": info.file_size,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "content": raw.decode("utf-8", errors="replace"),
+        }
+    except OSError:
+        return {"path": info.filename, "inspection": "unreadable_source_file"}
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--archive", required=True)
@@ -141,6 +180,7 @@ def main() -> int:
         json_schemas: list[dict[str, Any]] = []
         readmes: list[str] = []
         lfs_objects: list[dict[str, Any]] = []
+        research_sources: list[dict[str, Any]] = []
 
         for info in sorted(infos, key=lambda item: item.filename):
             entry = {
@@ -156,6 +196,10 @@ def main() -> int:
                 lfs_objects.append({"path": info.filename, **pointer})
             else:
                 entry["storage_kind"] = "archive_blob"
+
+            snapshot = source_snapshot(archive, info)
+            if snapshot is not None:
+                research_sources.append(snapshot)
 
             suffix = PurePosixPath(info.filename).suffix.lower()
             if pointer is None and suffix in {".csv", ".tsv"}:
@@ -211,12 +255,15 @@ def main() -> int:
             "json_shapes": json_schemas,
             "readme_headings": readmes,
             "git_lfs_pointer_count": len(lfs_objects),
+        "research_source_snapshot_count": len(research_sources),
             "git_lfs_objects": lfs_objects,
+            "research_source_snapshots": research_sources,
         },
         "limitations": [
             "This report inventories archive structure and field names; it is not a reproduction of the paper's analysis.",
             "CSV headers and JSON keys are metadata only; no participant or move-level row values are exported.",
             "Git LFS pointer files are identified by OID and declared size but are not hydrated by this inventory step; underlying LFS data rows are not inspected.",
+            "Research source snapshots include only an explicit allowlist of README, ABM, DQN and configuration source files; no participant-level raw or processed data files are included.",
             "Network orientation, tie-breaking, path legality and hidden-level constraints still require source-code review.",
             "The archive license and per-file data-use terms must be preserved from the source metadata before any redistribution.",
         ],
@@ -235,6 +282,7 @@ def main() -> int:
         f"- Files: {len(entries)}.",
         "- Raw participant/move rows exported: **no**.",
         f"- Git LFS pointer files: {len(lfs_objects)} (objects not hydrated by this inventory step).",
+        f"- Allowlisted paper/ABM/DQN source snapshots: {len(research_sources)}.",
         "",
         "## Top-level entries",
         "",
