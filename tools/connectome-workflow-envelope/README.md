@@ -85,13 +85,13 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-workflow-envelope/Cargo.toml
 ```
 
-Thirty-four unit tests are authored for pending/blocked statuses, operation/task/split consistency, uncalibrated predictions, view leakage and unit mismatch, stopped views, pending/deferred/rejected human review, verified commit, rejected/quarantined edit, snapshot continuity, query readiness, instability, missing history, source-volume mismatch, forbidden future/universal claims, malformed identities and digests, finite-horizon conformal rank, distinct group/exchangeability abstentions, snapshot binding and projection-status contradictions.
+Thirty-five unit tests are authored for pending/blocked statuses, operation/task/split consistency, uncalibrated predictions, view leakage and unit mismatch, stopped views, pending/deferred/rejected human review, verified commit, rejected/quarantined edit, snapshot continuity, query readiness, instability, missing history, source-volume mismatch, forbidden future/universal claims, malformed identities and digests, finite-horizon conformal rank, distinct group/exchangeability abstentions, snapshot binding and projection-status contradictions.
 
 They have **not** been compiled or executed in the current authoring environment.
 
 ## Finite-horizon stopping boundary
 
-The optional calibration receipt is separate from observed-window stability. It carries the frozen query/materiality context, group-disjointness and exchangeability assessment digests, unique source-volume/independence-cluster support, alpha, exact conformal rank, residual quantile, target observed drift, current uncertainty width and future edit horizon. The envelope checks rank and the arithmetic relation `projected upper = observed ratio + residual quantile` within numerical tolerance. A projected-stable status is allowed only when the observed query is stable and both current width and projected upper drift are <= 1. The report still hard-codes future stability certification to false.
+The optional calibration receipt is separate from observed-window stability. It carries the frozen query/materiality context, group-disjointness and exchangeability assessment digests, unique source-volume/independence-cluster support, alpha, exact conformal rank, residual quantile, target observed drift, current uncertainty width and future edit horizon. The envelope checks rank and the arithmetic relation `projected upper = observed ratio + residual quantile` within numerical tolerance. A projected-stable status is allowed only when the observed query is stable and both current width and projected upper drift are <= 1. The report still hard-codes future stability certification to false. A future-stop receipt is rejected unless the observed-window query status is already StableOverObservedWindow; it cannot override an unstable or insufficient-history result.
 
 ## Integration and performance benchmarks
 
