@@ -41,6 +41,7 @@ pub mod finite_stopping_continuation;
 pub mod power_optimal_continuation;
 pub mod robust_utility_continuation;
 pub mod two_policy_convexification;
+pub mod policy_frontier_lp;
 pub mod pareto_robust_decision;
 pub mod pareto_wasserstein_decision;
 pub mod correlated_noise_benchmark;
