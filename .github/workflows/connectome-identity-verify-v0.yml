@@ -3,6 +3,7 @@ name: Connectome Identity Verification
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-connectome-identity/**"
       - "research/connectome-identity-verify-v0/**"
@@ -19,6 +20,7 @@ concurrency:
 jobs:
   exact-source-tests:
     name: Isolated connectome identity contract tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
