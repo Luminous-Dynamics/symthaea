@@ -588,11 +588,12 @@
         "freshness_policy": "Design-only. Use a synthetic repository family for development and keep repository-family-disjoint holdout fixtures for qualification."
       },
       "notes": [
-        "Not executable: no synthetic repository fixture, pinned environment, reference graph or independent grader has been provisioned.",
-        "Gold labels must cover syntax entities, compiler-resolved semantics, call/trait relations, feature/target gates and tests separately.",
+        "A five-crate static synthetic workspace, fixture-declared gold graph and seven deterministic edit scenarios are committed under benchmarks/ceb/fixtures/repository-twin-synthetic-v0/.",
+        "The initial graph contains 32 nodes and 37 expected edges. Expected semantic edges are explicitly not compiler-verified; no independent compiler/rust-analyzer receipt exists.",
+        "The fixture has not been compiled or executed. Its source tree digest, pinned environment, reference grader and hidden labels are not provisioned; the task must remain design_only.",
+        "Gold labels separate syntax-declared facts, manifest-declared feature/target edges and expected semantic relationships.",
         "Evaluate retrieval and change-impact precision/recall independently; do not count inferred links as compiler-resolved truth.",
-        "Run a deterministic edit sequence to test incremental invalidation, stale-fact removal and graph snapshot provenance.",
-        "This task can be designed as a static-only parser/indexing evaluation that does not execute the fixture repository; any later compiler/build/test lane remains subject to issue #10064."
+        "The static-only fixture intake does not execute build scripts, tests or generated code. Any later execution lane remains subject to issue #10064."
       ]
     }
   ]
