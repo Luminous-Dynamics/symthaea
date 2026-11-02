@@ -654,5 +654,11 @@ mod tests {
         assert!(!trajectory_score_is_finite(f64::NAN, 2.0, 3.0, 4.0));
         assert!(!trajectory_score_is_finite(1.0, f64::INFINITY, 3.0, 4.0));
         assert!(!trajectory_score_is_finite(1.0, 2.0, f64::NEG_INFINITY, 4.0));
+
+        let telemetry = TrajectoryTelemetry::default();
+        assert!(!telemetry.has_best_rollout);
+        assert_eq!(telemetry.successful_ode_rollouts, 0);
+        assert_eq!(telemetry.failed_ode_rollouts, 0);
+        assert_eq!(telemetry.invalid_efe_rollouts, 0);
     }
 }
