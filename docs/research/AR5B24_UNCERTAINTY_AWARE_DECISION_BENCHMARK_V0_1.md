@@ -356,3 +356,10 @@ At `n = 5,000` and familywise `delta = 0.01`, compare one TV distribution row wi
 | 32,768 | 1.50724 (radius capped at 1) | 0.02448 | 0.02960 |
 
 This isolates only the concentration term at one family row and matched 99% confidence. The full Weissman radius adds empirical TV distance to the nominal path law, and the family allocation must expand to include every policy/model row. The calculation is not a coverage simulation or an end-to-end decision result.
+
+
+### Vector confidence and observed cross-policy dependence
+
+The vector empirical-Bernstein comparator may exploit only dependence actually observed under the sampling design. Multiple decision/guardrail functionals scored on the same independent experimental unit within a policy/model arm form an observed bounded random vector; a valid vector confidence set may account for coordinate dependence.
+
+Different policy arms generally reveal different potential outcomes in a real randomized experiment. Do not invent cross-policy covariance or paired potential-outcome coupling. Use per-policy vector confidence sets plus simultaneous coverage across the frozen policy family, unless a simulator, randomization design or identified estimator genuinely supports paired cross-policy contrasts. State the Banach norm and confidence-set geometry explicitly because the optimizer's support function depends on them.
