@@ -392,7 +392,7 @@ pub fn verify_witness_envelope(
     })
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct WitnessHeadResponse {
     pub record_type: String,
@@ -411,7 +411,7 @@ pub struct WitnessHeadResponse {
     pub head_policy_digest: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct WitnessCheckpoint {
     pub record_type: String,
