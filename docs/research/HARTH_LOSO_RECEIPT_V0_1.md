@@ -72,7 +72,7 @@ It computes the candidate-minus-baseline macro-F1 delta for each participant, th
 - mean paired subject delta;
 - standard error across the 22 paired deltas;
 - two-sided 95% paired Student-t interval with 21 degrees of freedom (pinned (t^*=2.0796), rounded outward);
-- counts of subjects improved, unchanged and worsened.
+- counts of subjects improved, unchanged and worsened, plus an exact two-sided binomial sign-test p-value over non-tied subjects. The exact numerator and denominator are retained; the ppm display rounds upward so a small nonzero p-value is not shown as zero.
 
 The comparison digest binds both input receipt digests and the per-subject deltas. Its validator recomputes the entire comparison. The interval applies to this fixed 22-subject benchmark sample and assumes independent subject-level fold deltas; do not treat overlapping windows as independent samples or use the marginal standard errors of two separate model receipts to claim a paired win.
 
@@ -90,6 +90,6 @@ The external papers' scores are reference values, not results reproduced by this
 
 ## Tests and status
 
-Fifteen synthetic tests cover label mapping, valid 22-fold receipt creation, 10-class dimensions, test/train leakage, duplicate held-out subjects, missing training subjects, invalid matrix shape/empty denominator, confusion-derived F1, receipt tamper detection, canonical sorting, paired subject deltas, paired protocol-mismatch rejection and paired receipt tamper detection.
+Sixteen synthetic tests cover label mapping, valid 22-fold receipt creation, 10-class dimensions, test/train leakage, duplicate held-out subjects, missing training subjects, invalid matrix shape/empty denominator, confusion-derived F1, receipt tamper detection, canonical sorting, paired subject deltas, paired protocol-mismatch rejection and paired receipt tamper detection, and exact sign-test behavior for unanimous wins and ties.
 
 **Execution status:** tests are authored but have not been compiled or run. No model, HARTH data archive or baseline has been executed. No accuracy or SOTA claim is made.
