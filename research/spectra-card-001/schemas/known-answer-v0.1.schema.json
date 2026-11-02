@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/spectra-card-known-answer-v0.1.schema.json",
+  "title": "SPECTRA card synthetic known answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "claim_ceiling",
+    "config",
+    "scenarios",
+    "condition_order",
+    "estimands",
+    "note"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.spectra_card.known_answer.v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_descriptive_only"
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaign_instance_id",
+        "participant_count",
+        "cycles_per_participant"
+      ],
+      "properties": {
+        "campaign_instance_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "participant_count": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 256
+        },
+        "cycles_per_participant": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 64
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world",
+          "seed_hex",
+          "expected"
+        ],
+        "properties": {
+          "world": {
+            "enum": [
+              "null",
+              "enclosure_context_only",
+              "electrical_increment_only",
+              "both_effects",
+              "practice_only",
+              "order_confounded"
+            ]
+          },
+          "seed_hex": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{16}$"
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "trial_count",
+              "participant_count",
+              "enclosure_context_effect_permille",
+              "electrical_increment_effect_permille",
+              "active_minus_sham_mean_period_index",
+              "design_diagnostic",
+              "condition_mean_accuracy_permille",
+              "condition_signal_detection_counts"
+            ],
+            "properties": {
+              "trial_count": {
+                "const": 1024
+              },
+              "participant_count": {
+                "const": 32
+              },
+              "enclosure_context_effect_permille": {
+                "type": "number"
+              },
+              "electrical_increment_effect_permille": {
+                "type": "number"
+              },
+              "active_minus_sham_mean_period_index": {
+                "type": "number"
+              },
+              "design_diagnostic": {
+                "enum": [
+                  "counterbalanced",
+                  "condition_order_confounded"
+                ]
+              },
+              "condition_mean_accuracy_permille": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                }
+              },
+              "condition_signal_detection_counts": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "hits",
+                    "misses",
+                    "false_alarms",
+                    "correct_rejections"
+                  ],
+                  "properties": {
+                    "hits": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "misses": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "false_alarms": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "correct_rejections": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "condition_order": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "outside_reference",
+          "inside_unenergized",
+          "inside_active",
+          "inside_sham"
+        ]
+      }
+    },
+    "estimands": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "formula"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "formula": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
