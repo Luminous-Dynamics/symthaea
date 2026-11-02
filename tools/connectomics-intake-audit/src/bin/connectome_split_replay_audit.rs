@@ -469,7 +469,7 @@ fn load_species_split_index(
             bytes: bytes.len() as u64,
             sha256: sha256(&bytes),
         });
-        let value: Value = match serde_json::from_slice(&bytes) {
+        let value: Value = match serde_json::from_slice::<Value>(&bytes) {
             Ok(value) if value.is_object() => value,
             Ok(_) => {
                 errors.push(Finding::global("split_file_invalid", format!("{species}/{filename} must be an object")));
