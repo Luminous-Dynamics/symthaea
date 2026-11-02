@@ -62,6 +62,7 @@ pub enum MediationError {
     PopulationTooSmall,
     ZeroGenerations,
     TooManySeedAgents { seeds: usize, population: usize },
+    ZeroSeedQuality,
     ZeroCandidateCount,
     CandidateCountTooLarge { candidates: usize, population: usize },
     InvalidProbability { name: &'static str },
@@ -78,6 +79,7 @@ impl fmt::Display for MediationError {
             Self::TooManySeedAgents { seeds, population } => {
                 write!(f, "{seeds} seed agents exceed population size {population}")
             }
+            Self::ZeroSeedQuality => write!(f, "initial_seed_quality must be positive when seed agents are configured"),
             Self::ZeroCandidateCount => write!(f, "recommender_candidate_count must be positive"),
             Self::CandidateCountTooLarge { candidates, population } => {
                 write!(f, "{candidates} recommender candidates exceed population size {population}")
@@ -104,6 +106,9 @@ impl NetworkedMediationConfig {
                 seeds: self.initial_seed_agents,
                 population: self.population_size,
             });
+        }
+        if self.initial_seed_agents > 0 && self.initial_seed_quality == 0 {
+            return Err(MediationError::ZeroSeedQuality);
         }
         if self.recommender_candidate_count == 0 {
             return Err(MediationError::ZeroCandidateCount);
@@ -287,7 +292,7 @@ impl NetworkedGeneration {
 
         let mut lineage_counts = BTreeMap::<u64, usize>::new();
         for agent in &self.agents {
-            if agent.lineage_id != 0 {
+            if agent.quality > 0 && agent.lineage_id != 0 {
                 *lineage_counts.entry(agent.lineage_id).or_default() += 1;
             }
         }
@@ -369,9 +374,6 @@ impl DeterministicRng {
         (-2.0 * u1.ln()).sqrt() * (core::f64::consts::TAU * u2).cos()
     }
 
-    fn index(&mut self, upper: usize) -> usize {
-        (self.next_u64() as usize) % upper
-    }
 }
 
 fn choose_softmax_candidate(
@@ -625,6 +627,36 @@ mod tests {
         ).unwrap();
         assert_eq!(clean.generations[1].metrics().mean_quality, 10.0);
         assert_eq!(corrupted.generations[1].metrics().mean_quality, 6.0);
+    }
+
+    #[test]
+    fn observation_is_not_counted_as_acquisition() {
+        let config = NetworkedMediationConfig {
+            acquisition_probability: 0.0,
+            ..spreading_config(1.0)
+        };
+        let run = simulate_networked_mediation(config, 31).unwrap();
+        let metrics = run.generations[1].metrics();
+        assert_eq!(metrics.observations, 8);
+        assert_eq!(metrics.successful_acquisitions, 0);
+        assert_eq!(metrics.mediated_acquisitions, 0);
+        assert_eq!(metrics.mediated_adoptions, 0);
+    }
+
+    #[test]
+    fn acquisition_is_not_counted_as_adoption_when_individual_skill_is_better() {
+        let config = NetworkedMediationConfig {
+            individual_innovation_probability: 1.0,
+            innovation_gain: 20,
+            ..spreading_config(1.0)
+        };
+        let run = simulate_networked_mediation(config, 37).unwrap();
+        let metrics = run.generations[1].metrics();
+        assert_eq!(metrics.successful_acquisitions, 8);
+        assert_eq!(metrics.mediated_acquisitions, 8);
+        assert_eq!(metrics.mediated_adoptions, 0);
+        assert_eq!(metrics.individual_innovations, 8);
+        assert_eq!(metrics.mean_quality, 20.0);
     }
 
     #[test]
