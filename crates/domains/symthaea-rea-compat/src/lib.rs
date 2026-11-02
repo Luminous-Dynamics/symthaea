@@ -18,6 +18,9 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fmt;
 
+/// REA EvidenceBundle and residual-unknown graph verification.
+pub mod bundle;
+
 pub const MAX_EVIDENCE_JSON_BYTES: usize = 64 * 1024 * 1024;
 pub const EVIDENCE_ID_PREFIX: &str = "ev_";
 
