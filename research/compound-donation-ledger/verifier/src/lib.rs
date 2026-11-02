@@ -9,7 +9,8 @@
 use std::collections::BTreeMap;
 
 use symthaea_compound_donation_ledger::{
-    AuditEvent, CandidateSpec, LedgerSnapshot, WEIGHT_SCALE, EVIDENCE_ONE,
+    AuditEvent, CandidateSpec, LedgerSnapshot, ThresholdMass, WEIGHT_SCALE,
+    EVIDENCE_ONE, PRIOR_MASS_SCALE,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,6 +31,9 @@ pub enum VerifyError {
     EscrowConservation,
     ReceiptMismatch,
     SnapshotMismatch,
+    InvalidStaircase,
+    StaircaseBudgetExceeded,
+    StaircaseValueMismatch,
 }
 
 impl std::fmt::Display for VerifyError {
@@ -81,6 +85,54 @@ pub struct VerifiedToken {
 pub struct VerifiedSnapshot {
     pub candidates: Vec<VerifiedCandidate>,
     pub escrow: Vec<VerifiedToken>,
+}
+
+
+/// Independently verifies a finite staircase calibrator using a linear scan.
+///
+/// This verifier deliberately does not call StaircaseAdjuster::new or
+/// StaircaseAdjuster::value_at. The caller supplies the precommitted sorted
+/// threshold/prior-mass rows, the running supremum, and the claimed fixed-point
+/// output. It checks strict threshold ordering, K_j >= 1, total prior mass <= 1,
+/// exact checked arithmetic, and exact downward-rounded output.
+pub fn verify_staircase_value(
+    points: &[ThresholdMass],
+    running_supremum: u128,
+    claimed_value: u128,
+) -> Result<u128, VerifyError> {
+    let mut total_mass = 0_u128;
+    let mut numerator = 0_u128;
+    let mut previous_threshold = None;
+
+    for point in points {
+        if point.threshold < EVIDENCE_ONE
+            || previous_threshold.is_some_and(|previous| point.threshold <= previous)
+        {
+            return Err(VerifyError::InvalidStaircase);
+        }
+        total_mass = total_mass
+            .checked_add(point.prior_mass)
+            .ok_or(VerifyError::Overflow)?;
+        if total_mass > PRIOR_MASS_SCALE {
+            return Err(VerifyError::StaircaseBudgetExceeded);
+        }
+
+        if point.threshold <= running_supremum {
+            let contribution = point.prior_mass
+                .checked_mul(point.threshold)
+                .ok_or(VerifyError::Overflow)?;
+            numerator = numerator
+                .checked_add(contribution)
+                .ok_or(VerifyError::Overflow)?;
+        }
+        previous_threshold = Some(point.threshold);
+    }
+
+    let exact_downward_value = numerator / PRIOR_MASS_SCALE;
+    if exact_downward_value != claimed_value {
+        return Err(VerifyError::StaircaseValueMismatch);
+    }
+    Ok(exact_downward_value)
 }
 
 pub fn verify_receipt(
@@ -397,6 +449,51 @@ mod tests {
                 destination_id: None,
             },
         ]
+    }
+
+
+    #[test]
+    fn independently_verifies_staircase_at_exact_inclusive_boundaries() {
+        let points = vec![
+            ThresholdMass { threshold: 2 * EVIDENCE_ONE, prior_mass: 100_000_000 },
+            ThresholdMass { threshold: 8 * EVIDENCE_ONE, prior_mass: 200_000_000 },
+            ThresholdMass { threshold: 32 * EVIDENCE_ONE, prior_mass: 300_000_000 },
+        ];
+        let expected = 2 * EVIDENCE_ONE;
+        assert_eq!(
+            verify_staircase_value(&points, 8 * EVIDENCE_ONE - 1, expected),
+            Ok(expected)
+        );
+        let at_boundary = 2 * EVIDENCE_ONE;
+        assert_eq!(
+            verify_staircase_value(&points, at_boundary, 200_000),
+            Ok(200_000)
+        );
+        assert_eq!(
+            verify_staircase_value(&points, at_boundary, expected),
+            Err(VerifyError::StaircaseValueMismatch)
+        );
+    }
+
+    #[test]
+    fn independently_rejects_unbudgeted_or_unsorted_staircase() {
+        let over_budget = vec![
+            ThresholdMass { threshold: EVIDENCE_ONE, prior_mass: 600_000_000 },
+            ThresholdMass { threshold: 2 * EVIDENCE_ONE, prior_mass: 500_000_000 },
+        ];
+        assert_eq!(
+            verify_staircase_value(&over_budget, 2 * EVIDENCE_ONE, 0),
+            Err(VerifyError::StaircaseBudgetExceeded)
+        );
+
+        let unsorted = vec![
+            ThresholdMass { threshold: 2 * EVIDENCE_ONE, prior_mass: 100_000_000 },
+            ThresholdMass { threshold: EVIDENCE_ONE, prior_mass: 100_000_000 },
+        ];
+        assert_eq!(
+            verify_staircase_value(&unsorted, 2 * EVIDENCE_ONE, 0),
+            Err(VerifyError::InvalidStaircase)
+        );
     }
 
     #[test]
