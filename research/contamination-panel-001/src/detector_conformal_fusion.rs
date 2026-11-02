@@ -1117,6 +1117,8 @@ pub fn calibrate_detector_panel(
                 false_negative_count: contaminated,
                 empirical_fpr_permille: None,
                 empirical_tpr_permille: if contaminated == 0 { None } else { Some(0.0) },
+                fpr_one_sided_95_upper_permille: None,
+                tpr_one_sided_95_lower_permille: None,
                 decision_coverage_permille: 0.0,
                 minimum_attainable_p_value: 1.0,
                 minimum_detector_rank_p_value: 1.0,
@@ -1148,6 +1150,8 @@ pub fn calibrate_detector_panel(
                     final_p_rank_numerator: None,
                     final_p_rank_denominator: None,
                     final_p_value: None,
+                    by_adjusted_p_value: None,
+                    by_family_size: None,
                     minimum_attainable_p_value: None,
                     decision: SelectiveDecisionV1::AbstainUnsupportedGroup,
                     ground_truth_contaminated: row.ground_truth_contaminated,
@@ -1171,8 +1175,13 @@ pub fn calibrate_detector_panel(
                 false_negative_count: contaminated,
                 empirical_fpr_permille: None,
                 empirical_tpr_permille: if contaminated == 0 { None } else { Some(0.0) },
+                fpr_one_sided_95_upper_permille: None,
+                tpr_one_sided_95_lower_permille: None,
                 decision_coverage_permille: 0.0,
                 minimum_attainable_p_value: 1.0,
+                minimum_detector_rank_p_value: 1.0
+                    / (calibration_a.scores.values().next().map_or(0, Vec::len) as f64 + 1.0),
+                pairwise_rank_correlations: pairwise_detector_spearman(rows, calibration_a),
                 target_alpha_permille: request.target_alpha_permille,
             });
             continue;
@@ -1289,6 +1298,16 @@ pub fn calibrate_detector_panel(
             // Abstained and no-flag positive units are both not detected.
             Some((contaminated - fn_count) as f64 * 1_000.0 / contaminated as f64)
         };
+        let fpr_one_sided_95_upper_permille = if clean == 0 {
+            None
+        } else {
+            Some(exact_binomial_upper_95(fp, clean)? * 1_000.0)
+        };
+        let tpr_one_sided_95_lower_permille = if contaminated == 0 {
+            None
+        } else {
+            Some(exact_binomial_lower_95(tp, contaminated)? * 1_000.0)
+        };
         group_summaries.push(ConformalGroupSummaryV1 {
             task_family: key.task_family.clone(),
             model_regime: key.model_regime.clone(),
@@ -1307,14 +1326,13 @@ pub fn calibrate_detector_panel(
             false_negative_count: fn_count,
             empirical_fpr_permille: fpr,
             empirical_tpr_permille: tpr,
+            fpr_one_sided_95_upper_permille,
+            tpr_one_sided_95_lower_permille,
             decision_coverage_permille: (flagged + no_flag) as f64 * 1_000.0 / rows.len() as f64,
             minimum_attainable_p_value: min_p,
             minimum_detector_rank_p_value: 1.0
                 / (calibration_a.scores.values().next().map_or(0, Vec::len) as f64 + 1.0),
-            pairwise_rank_correlations: pairwise_detector_spearman(
-                rows,
-                &calibration_a.detector_ids,
-            ),
+            pairwise_rank_correlations: pairwise_detector_spearman(rows, &calibration_a),
             target_alpha_permille: request.target_alpha_permille,
         });
     }
