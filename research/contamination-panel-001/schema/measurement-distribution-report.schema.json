@@ -1,0 +1,460 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/measurement-distribution-report-v1.json",
+  "title": "Measurement-as-Distribution robustness report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "benchmark_version",
+    "protocol_sha256",
+    "instance_manifest_sha256",
+    "run_bundle_sha256",
+    "claim_scope",
+    "measurement_paradigm",
+    "model_count",
+    "model_family_count",
+    "task_family_count",
+    "source_domain_count",
+    "run_count",
+    "independent_unit_kind",
+    "independent_unit_count",
+    "instance_count",
+    "observation_count",
+    "distributional_evidence_eligible",
+    "claim_scope_eligible",
+    "paired_delta_positive_is_better",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "rank_stability_status",
+    "profile_cells",
+    "rank_stability",
+    "model_summaries",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.measurement_distribution_report.v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "instance_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_bundle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_scope": {
+      "type": "string",
+      "enum": [
+        "fixed_configuration",
+        "task_family",
+        "cross_domain",
+        "model_family",
+        "deployment_distribution"
+      ]
+    },
+    "model_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "independent_unit_kind": {
+      "type": "string",
+      "enum": [
+        "model_pair_replicate",
+        "source_cluster",
+        "base_item",
+        "evaluation_run"
+      ]
+    },
+    "independent_unit_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "instance_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observation_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "distributional_evidence_eligible": {
+      "type": "boolean"
+    },
+    "claim_scope_eligible": {
+      "type": "boolean"
+    },
+    "rank_stability_status": {
+      "type": "string"
+    },
+    "profile_cells": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "model_family_id",
+          "task_family",
+          "axis_id",
+          "condition_id",
+          "expected_count",
+          "observation_count",
+          "scored_count",
+          "rejected_count",
+          "indeterminate_count",
+          "fallback_count",
+          "execution_failed_count",
+          "missing_count",
+          "coverage_permille",
+          "validation_acceptance_permille",
+          "mean_score",
+          "sample_standard_deviation",
+          "quantiles",
+          "paired_observation_count",
+          "paired_independent_unit_count",
+          "paired_delta_vs_baseline",
+          "paired_delta_status",
+          "mean_runtime_milliseconds",
+          "mean_input_tokens",
+          "mean_output_tokens",
+          "external_call_count"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "model_family_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "axis_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "condition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "expected_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observation_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scored_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rejected_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "indeterminate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fallback_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "execution_failed_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverage_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "validation_acceptance_permille": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "mean_score": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "sample_standard_deviation": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "quantiles": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5,
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "paired_observation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paired_independent_unit_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paired_delta_vs_baseline": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mean",
+                  "standard_deviation_across_replicates",
+                  "standard_error",
+                  "confidence_level_permille",
+                  "lower_95",
+                  "upper_95"
+                ],
+                "properties": {
+                  "mean": {
+                    "type": "number"
+                  },
+                  "standard_deviation_across_replicates": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "standard_error": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "confidence_level_permille": {
+                    "const": 950
+                  },
+                  "lower_95": {
+                    "type": "number"
+                  },
+                  "upper_95": {
+                    "type": "number"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paired_delta_status": {
+            "type": "string"
+          },
+          "mean_runtime_milliseconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_input_tokens": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_output_tokens": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "external_call_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          }
+        }
+      }
+    },
+    "rank_stability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_family",
+          "axis_id",
+          "condition_id",
+          "model_count",
+          "kendall_tau_b",
+          "status"
+        ],
+        "properties": {
+          "axis_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "condition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "model_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kendall_tau_b": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "status": {
+            "type": "string"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          }
+        }
+      }
+    },
+    "model_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "model_family_id",
+          "worst_axis_mean_delta",
+          "minimum_axis_coverage_permille",
+          "minimum_axis_acceptance_permille"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "model_family_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "worst_axis_mean_delta": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "minimum_axis_coverage_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "minimum_axis_acceptance_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "measurement_paradigm": {
+      "type": "string",
+      "enum": [
+        "measurement_as_instance_restricted",
+        "measurement_as_distribution"
+      ]
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "task_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_domain_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "paired_delta_positive_is_better": {
+      "const": true
+    }
+  }
+}

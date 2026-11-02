@@ -1,0 +1,417 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/measurement-distribution-protocol-v1.json",
+  "title": "Measurement-as-Distribution protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "benchmark_version",
+    "construct",
+    "generator",
+    "axes",
+    "evaluation",
+    "reporting"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.measurement_distribution_protocol.v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "construct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "construct_id",
+        "construct_version",
+        "target_description",
+        "operational_definition",
+        "invariants",
+        "permitted_nuisance_variation",
+        "prohibited_claims",
+        "instruction_following_is_target",
+        "claim_scope"
+      ],
+      "properties": {
+        "construct_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "construct_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "target_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operational_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invariants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "permitted_nuisance_variation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "prohibited_claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "instruction_following_is_target": {
+          "type": "boolean"
+        },
+        "claim_scope": {
+          "type": "string",
+          "enum": [
+            "fixed_configuration",
+            "task_family",
+            "cross_domain",
+            "model_family",
+            "deployment_distribution"
+          ]
+        }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generator_id",
+        "generator_version",
+        "generator_config_sha256",
+        "source_dataset_sha256",
+        "generated_manifest_sha256",
+        "seed_commitment_sha256",
+        "checkpoint_freeze_receipt_sha256",
+        "fresh_instances_after_checkpoint_freeze",
+        "generated_after_checkpoint_freeze"
+      ],
+      "properties": {
+        "generator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "generator_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "generator_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_dataset_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "generated_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seed_commitment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "checkpoint_freeze_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fresh_instances_after_checkpoint_freeze": {
+          "type": "boolean"
+        },
+        "generated_after_checkpoint_freeze": {
+          "type": "boolean"
+        }
+      }
+    },
+    "axes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "axis_id",
+          "kind",
+          "description",
+          "baseline_condition_id",
+          "auxiliary_only",
+          "families"
+        ],
+        "properties": {
+          "axis_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "surface_form",
+              "semantic",
+              "solution_recipe",
+              "difficulty",
+              "language",
+              "context",
+              "prompt",
+              "tool_environment",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_condition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "auxiliary_only": {
+            "type": "boolean"
+          },
+          "families": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "family_id",
+                "condition_id",
+                "transformer_sha256",
+                "invariance_claim",
+                "acceptance_rule",
+                "validator_kind",
+                "validation_protocol_sha256",
+                "minimum_acceptance_permille",
+                "fallback_condition_id"
+              ],
+              "properties": {
+                "family_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "condition_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "transformer_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "invariance_claim": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "acceptance_rule": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "validator_kind": {
+                  "type": "string",
+                  "enum": [
+                    "formal",
+                    "verifier",
+                    "human",
+                    "hybrid"
+                  ]
+                },
+                "validation_protocol_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "minimum_acceptance_permille": {
+                  "type": "integer",
+                  "minimum": 500,
+                  "maximum": 1000
+                },
+                "fallback_condition_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "harness_sha256",
+        "prompt_template_sha256",
+        "scorer_sha256",
+        "decoding_config_sha256",
+        "evaluator_sha256",
+        "metric_id",
+        "higher_is_better",
+        "independent_unit_kind",
+        "minimum_model_count",
+        "minimum_runs_per_model",
+        "minimum_independent_units_for_delta",
+        "resample_instances_across_runs",
+        "resample_perturbations_across_runs",
+        "resample_model_inference_across_runs"
+      ],
+      "properties": {
+        "harness_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "prompt_template_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scorer_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decoding_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evaluator_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "higher_is_better": {
+          "type": "boolean"
+        },
+        "independent_unit_kind": {
+          "type": "string",
+          "enum": [
+            "model_pair_replicate",
+            "source_cluster",
+            "base_item",
+            "evaluation_run"
+          ]
+        },
+        "minimum_model_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "minimum_runs_per_model": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "minimum_independent_units_for_delta": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 10000
+        },
+        "resample_instances_across_runs": {
+          "type": "boolean"
+        },
+        "resample_perturbations_across_runs": {
+          "type": "boolean"
+        },
+        "resample_model_inference_across_runs": {
+          "type": "boolean"
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_coverage_permille",
+        "minimum_acceptance_permille",
+        "quantiles_basis_points",
+        "require_rank_stability",
+        "minimum_models_for_rank_stability",
+        "multiple_comparison_policy"
+      ],
+      "properties": {
+        "minimum_coverage_permille": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "minimum_acceptance_permille": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "quantiles_basis_points": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "require_rank_stability": {
+          "type": "boolean"
+        },
+        "minimum_models_for_rank_stability": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 256
+        },
+        "multiple_comparison_policy": {
+          "const": "holm_when_tests_are_reported"
+        }
+      }
+    }
+  }
+}

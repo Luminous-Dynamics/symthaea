@@ -1363,4 +1363,5 @@ mod tests {
 pub mod adjudication_attrition;
 pub mod causal_analysis;
 pub mod exposure_transfer;
+pub mod measurement_distribution;
 pub mod training_receipt;
