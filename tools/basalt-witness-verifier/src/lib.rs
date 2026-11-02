@@ -554,8 +554,17 @@ pub fn verify_head_read_quorum(
     }
 
     let mut accepted = BTreeMap::<String, AcceptedWitnessHead>::new();
+    let mut reported_heads = BTreeMap::<String, String>::new();
     let mut certified_by_sequence = BTreeMap::<u64, String>::new();
     let mut response_entries = Vec::<(String, String, String)>::new();
+    let mut response_rejections = Vec::<String>::new();
+
+    macro_rules! reject_response {
+        ($status:expr, $message:expr) => {{
+            response_rejections.push(format!("response {index} {}: {}", $status, $message));
+            continue;
+        }};
+    }
 
     for (index, item) in evidence.iter().enumerate() {
         let response = match verify_witness_envelope(
@@ -567,22 +576,14 @@ pub fn verify_head_read_quorum(
         ) {
             Ok(value) => value,
             Err(error) => {
-                return rejected_head_report(
-                    "rejected_witness_response",
-                    format!("response {index} failed authentication: {error}"),
-                    quorum,
-                );
+                reject_response!("rejected_witness_response", format!("response {index} failed authentication: {error}"));
             }
         };
         let response_payload: WitnessHeadResponse =
             match serde_json::from_value(response.json.clone()) {
                 Ok(value) => value,
                 Err(error) => {
-                    return rejected_head_report(
-                        "rejected_witness_response",
-                        format!("response {index} payload shape invalid: {error}"),
-                        quorum,
-                    );
+                    reject_response!("rejected_witness_response", format!("response {index} payload shape invalid: {error}"));
                 }
             };
         if response_payload.record_type != "basalt.authority.witness-head-response"
@@ -595,40 +596,43 @@ pub fn verify_head_read_quorum(
             || response_payload.witness_set_version != trust.witness_set_version.to_string()
             || response_payload.trust_root_version != trust.trust_root_version.to_string()
         {
-            return rejected_head_report(
-                "rejected_witness_response",
-                format!(
+            reject_response!("rejected_witness_response", format!(
                     "response {index} is not bound to the expected nonce/authority/witness set"
-                ),
-                quorum,
-            );
+                ));
         }
         if let Err(error) = parse_canonical_u64(
             &response_payload.head_authority_revision,
             "head_authority_revision",
         ) {
-            return rejected_head_report("rejected_witness_response", error, quorum);
+            reject_response!("rejected_witness_response", error);
         }
         if let Err(error) = parse_canonical_u64(&response_payload.head_sequence, "head_sequence") {
-            return rejected_head_report("rejected_witness_response", error, quorum);
+            reject_response!("rejected_witness_response", error);
         }
         if !is_prefixed_sha256(&response_payload.head_checkpoint_digest)
             || !is_prefixed_sha256(&response_payload.head_state_digest)
             || !is_prefixed_sha256(&response_payload.head_policy_digest)
         {
-            return rejected_head_report(
-                "rejected_witness_response",
-                format!("response {index} contains a malformed digest"),
-                quorum,
-            );
+            reject_response!("rejected_witness_response", format!("response {index} contains a malformed digest"));
         }
         let Some(member_key_id) = response.accepted_key_ids.first().cloned() else {
-            return rejected_head_report(
-                "rejected_witness_response",
-                format!("response {index} has no authenticated member key"),
-                quorum,
-            );
+            reject_response!("rejected_witness_response", format!("response {index} has no authenticated member key"));
         };
+
+        if let Some(previous_digest) = reported_heads.get(&member_key_id) {
+            if previous_digest != &response_payload.head_checkpoint_digest {
+                return rejected_head_report(
+                    "rejected_witness_equivocation",
+                    format!("member {member_key_id} signed different heads for one challenge"),
+                    quorum,
+                );
+            }
+        } else {
+            reported_heads.insert(
+                member_key_id.clone(),
+                response_payload.head_checkpoint_digest.clone(),
+            );
+        }
 
         let checkpoint = match verify_witness_envelope(
             &item.checkpoint_envelope,
@@ -639,36 +643,24 @@ pub fn verify_head_read_quorum(
         ) {
             Ok(value) => value,
             Err(error) => {
-                return rejected_head_report(
-                    "rejected_checkpoint_certificate",
-                    format!("response {index} checkpoint certificate failed: {error}"),
-                    quorum,
-                );
+                reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint certificate failed: {error}"));
             }
         };
         let checkpoint_payload: WitnessCheckpoint =
             match serde_json::from_value(checkpoint.json.clone()) {
                 Ok(value) => value,
                 Err(error) => {
-                    return rejected_head_report(
-                        "rejected_checkpoint_certificate",
-                        format!("response {index} checkpoint payload shape invalid: {error}"),
-                        quorum,
-                    );
+                    reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint payload shape invalid: {error}"));
                 }
             };
         if checkpoint_payload.state_schema != "basalt.authority-state.v1" {
-            return rejected_head_report(
-                "rejected_checkpoint_certificate",
-                format!("response {index} checkpoint uses an unsupported state schema"),
-                quorum,
-            );
+            reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint uses an unsupported state schema"));
         }
         let checkpoint_sequence =
             match parse_canonical_u64(&checkpoint_payload.sequence, "checkpoint sequence") {
                 Ok(value) => value,
                 Err(error) => {
-                    return rejected_head_report("rejected_checkpoint_certificate", error, quorum);
+                    reject_response!("rejected_checkpoint_certificate", error);
                 }
             };
         if parse_canonical_u64(
@@ -690,11 +682,7 @@ pub fn verify_head_read_quorum(
                 .as_deref()
                 .is_some_and(|value| !is_prefixed_sha256(value))
         {
-            return rejected_head_report(
-                "rejected_checkpoint_certificate",
-                format!("response {index} checkpoint contains malformed revision/digest fields"),
-                quorum,
-            );
+            reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint contains malformed revision/digest fields"));
         }
         if checkpoint_payload.record_type != "basalt.authority.witness-checkpoint"
             || checkpoint_payload.schema_version != 1
@@ -709,19 +697,11 @@ pub fn verify_head_read_quorum(
             || checkpoint_payload.state_digest != response_payload.head_state_digest
             || checkpoint_payload.policy_digest != response_payload.head_policy_digest
         {
-            return rejected_head_report(
-                "rejected_checkpoint_certificate",
-                format!("response {index} fields disagree with its write-quorum checkpoint"),
-                quorum,
-            );
+            reject_response!("rejected_checkpoint_certificate", format!("response {index} fields disagree with its write-quorum checkpoint"));
         }
         let computed_checkpoint_digest = checkpoint_digest_from_payload(&checkpoint.payload);
         if computed_checkpoint_digest != response_payload.head_checkpoint_digest {
-            return rejected_head_report(
-                "rejected_checkpoint_certificate",
-                format!("response {index} checkpoint digest does not bind canonical payload"),
-                quorum,
-            );
+            reject_response!("rejected_checkpoint_certificate", format!("response {index} checkpoint digest does not bind canonical payload"));
         }
 
         if let Some(existing_digest) = certified_by_sequence.get(&checkpoint_sequence) {
@@ -738,14 +718,7 @@ pub fn verify_head_read_quorum(
             certified_by_sequence.insert(checkpoint_sequence, computed_checkpoint_digest.clone());
         }
 
-        if let Some(previous) = accepted.get(&member_key_id) {
-            if previous.response.head_checkpoint_digest != response_payload.head_checkpoint_digest {
-                return rejected_head_report(
-                    "rejected_witness_equivocation",
-                    format!("member {member_key_id} signed different heads for one challenge"),
-                    quorum,
-                );
-            }
+        if accepted.contains_key(&member_key_id) {
             // Exact duplicate responses from one member do not increase the quorum.
             continue;
         }
@@ -767,7 +740,7 @@ pub fn verify_head_read_quorum(
     }
 
     if accepted.len() < quorum {
-        return rejected_head_report(
+        let mut report = rejected_head_report(
             "anti_rollback_unknown",
             format!(
                 "{} distinct members authenticated; read quorum requires {quorum}",
@@ -775,6 +748,8 @@ pub fn verify_head_read_quorum(
             ),
             quorum,
         );
+        report.counterexamples.extend(response_rejections);
+        return report;
     }
 
     let Some((sequence, selected_digest)) = certified_by_sequence.iter().next_back() else {
@@ -824,8 +799,8 @@ pub fn verify_head_read_quorum(
         read_quorum: quorum,
         accepted_member_key_ids: accepted_keys,
         response_set_sha256: sha256_prefixed(&response_set_json),
-        counterexamples: Vec::new(),
-        claim_ceiling: "Selected the highest nonce-bound write-quorum-certified checkpoint reported by a distinct read quorum. Predecessor-chain-to-genesis, trust-root rotation, real member durability and physical anti-rollback are not verified.".to_string(),
+        counterexamples: response_rejections,
+        claim_ceiling: "Selected the highest nonce-bound write-quorum-certified checkpoint reported by a distinct read quorum. Invalid extra responses were excluded and recorded. Predecessor-chain-to-genesis, trust-root rotation, real member durability and physical anti-rollback are not verified.".to_string(),
     }
 }
 
