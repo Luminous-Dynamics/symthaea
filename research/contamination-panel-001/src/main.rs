@@ -13,6 +13,7 @@ use contamination_panel_bench::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
         randomize_intervention,
     },
+    self_critique::{SelfCritiqueScoringRequestV1, score_self_critique_request},
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
@@ -315,6 +316,32 @@ fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+fn score_self_critique_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench score-self-critique <scoring-request.json> <score-report.json>"
+                .into(),
+        );
+    }
+    const MAX_SELF_CRITIQUE_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_SELF_CRITIQUE_REQUEST_BYTES)?;
+    let request: SelfCritiqueScoringRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = score_self_critique_request(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "sample={} source={:?} score={:.6} initial_coverage={}‰ critique_coverage={}‰ authenticated={} confirmatory_eligible={}",
+        report.sample_id,
+        report.entropy_source,
+        report.contamination_score,
+        report.initial_entropy_coverage_permille,
+        report.critique_entropy_coverage_permille,
+        report.independently_authenticated,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -401,9 +428,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
+        Some("score-self-critique") => score_self_critique_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | score-self-critique | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

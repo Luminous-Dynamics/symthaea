@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/self-critique-scoring-request-v1.json",
+  "title": "Self-Critique scoring request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sample_id",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "chat_template_sha256",
+    "initial_prompt_sha256",
+    "critique_instruction_sha256",
+    "initial_response_sha256",
+    "critique_prompt_sha256",
+    "entropy_extractor_sha256",
+    "entropy_source",
+    "requested_top_k",
+    "vocabulary_size",
+    "initial_decode",
+    "critique_decode",
+    "initial_generated_token_count",
+    "critique_generated_token_count",
+    "initial_entropy_nats",
+    "critique_entropy_nats",
+    "initial_topk_probability_steps",
+    "critique_topk_probability_steps",
+    "initial_full_vocab_probability_steps",
+    "critique_full_vocab_probability_steps"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.self_critique_scoring_request.v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "chat_template_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "initial_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critique_instruction_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "initial_response_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critique_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entropy_extractor_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entropy_source": {
+      "type": "string",
+      "enum": [
+        "vllm_top_k_raw_partial",
+        "full_vocab_softmax_exact"
+      ]
+    },
+    "requested_top_k": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "vocabulary_size": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 1000000
+    },
+    "initial_decode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "greedy",
+        "temperature",
+        "max_new_tokens",
+        "generation_config_sha256"
+      ],
+      "properties": {
+        "greedy": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_new_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "generation_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "critique_decode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "greedy",
+        "temperature",
+        "max_new_tokens",
+        "generation_config_sha256"
+      ],
+      "properties": {
+        "greedy": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_new_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "generation_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "initial_generated_token_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "critique_generated_token_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "initial_entropy_nats": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32768,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "critique_entropy_nats": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32768,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "initial_topk_probability_steps": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32768,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10001,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "critique_topk_probability_steps": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32768,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10001,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "initial_full_vocab_probability_steps": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32768,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 1000000,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "critique_full_vocab_probability_steps": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32768,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 1000000,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "entropy_source": {
+            "const": "vllm_top_k_raw_partial"
+          }
+        },
+        "required": [
+          "entropy_source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "requested_top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "initial_topk_probability_steps": {
+            "type": "array",
+            "minItems": 1
+          },
+          "critique_topk_probability_steps": {
+            "type": "array",
+            "minItems": 1
+          },
+          "initial_full_vocab_probability_steps": {
+            "type": "null"
+          },
+          "critique_full_vocab_probability_steps": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "entropy_source": {
+            "const": "full_vocab_softmax_exact"
+          }
+        },
+        "required": [
+          "entropy_source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "requested_top_k": {
+            "type": "null"
+          },
+          "initial_topk_probability_steps": {
+            "type": "null"
+          },
+          "critique_topk_probability_steps": {
+            "type": "null"
+          },
+          "initial_full_vocab_probability_steps": {
+            "type": "array",
+            "minItems": 1
+          },
+          "critique_full_vocab_probability_steps": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

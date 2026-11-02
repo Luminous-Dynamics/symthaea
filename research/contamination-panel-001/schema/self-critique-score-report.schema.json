@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/self-critique-score-report-v1.json",
+  "title": "Self-Critique score report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "implementation_id",
+    "sample_id",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "chat_template_sha256",
+    "initial_prompt_sha256",
+    "critique_instruction_sha256",
+    "initial_response_sha256",
+    "critique_prompt_sha256",
+    "entropy_extractor_sha256",
+    "request_sha256",
+    "entropy_source",
+    "requested_top_k",
+    "vocabulary_size",
+    "initial_generation_config_sha256",
+    "critique_generation_config_sha256",
+    "initial_generated_token_count",
+    "critique_generated_token_count",
+    "initial_entropy_step_count",
+    "critique_entropy_step_count",
+    "initial_entropy_coverage_permille",
+    "critique_entropy_coverage_permille",
+    "initial_missing_entropy_steps",
+    "critique_missing_entropy_steps",
+    "initial_entropy_sequence_sha256",
+    "critique_entropy_sequence_sha256",
+    "initial_topk_diagnostics",
+    "critique_topk_diagnostics",
+    "padded_cosine_similarity",
+    "length_penalty",
+    "contamination_score",
+    "paper_faithful_score_formula",
+    "released_topk_entropy_reproduction",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.self_critique_score_report.v1"
+    },
+    "implementation_id": {
+      "const": "symthaea.self_critique.penalized_entropy_cosine.v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "chat_template_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "initial_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critique_instruction_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "initial_response_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critique_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entropy_extractor_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entropy_source": {
+      "type": "string",
+      "enum": [
+        "vllm_top_k_raw_partial",
+        "full_vocab_softmax_exact"
+      ]
+    },
+    "requested_top_k": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "vocabulary_size": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 2
+    },
+    "initial_generation_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critique_generation_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "initial_generated_token_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "critique_generated_token_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "initial_entropy_step_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32768
+    },
+    "critique_entropy_step_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32768
+    },
+    "initial_entropy_coverage_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "critique_entropy_coverage_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "initial_missing_entropy_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "critique_missing_entropy_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "initial_entropy_sequence_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critique_entropy_sequence_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "initial_topk_diagnostics": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observed_token_steps",
+            "mean_returned_probability_mass_permille",
+            "mean_unreturned_tail_mass_permille",
+            "mean_tail_entropy_lower_nats",
+            "mean_tail_entropy_upper_nats",
+            "mean_raw_returned_topk_entropy_nats"
+          ],
+          "properties": {
+            "observed_token_steps": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "mean_returned_probability_mass_permille": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "mean_unreturned_tail_mass_permille": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "mean_tail_entropy_lower_nats": {
+              "type": "number",
+              "minimum": 0
+            },
+            "mean_tail_entropy_upper_nats": {
+              "type": "number",
+              "minimum": 0
+            },
+            "mean_raw_returned_topk_entropy_nats": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "critique_topk_diagnostics": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observed_token_steps",
+            "mean_returned_probability_mass_permille",
+            "mean_unreturned_tail_mass_permille",
+            "mean_tail_entropy_lower_nats",
+            "mean_tail_entropy_upper_nats",
+            "mean_raw_returned_topk_entropy_nats"
+          ],
+          "properties": {
+            "observed_token_steps": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "mean_returned_probability_mass_permille": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "mean_unreturned_tail_mass_permille": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "mean_tail_entropy_lower_nats": {
+              "type": "number",
+              "minimum": 0
+            },
+            "mean_tail_entropy_upper_nats": {
+              "type": "number",
+              "minimum": 0
+            },
+            "mean_raw_returned_topk_entropy_nats": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "padded_cosine_similarity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "length_penalty": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "contamination_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "paper_faithful_score_formula": {
+      "const": true
+    },
+    "released_topk_entropy_reproduction": {
+      "type": "boolean"
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
