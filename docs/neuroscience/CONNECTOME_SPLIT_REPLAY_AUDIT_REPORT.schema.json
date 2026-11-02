@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-split-replay-audit-report-v0.1.schema.json",
+  "title": "ConnectomeBench2 exact source split replay audit report V0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "dataset_id",
+    "dataset_revision",
+    "dataset_revision_commit_sha",
+    "upstream_repo",
+    "upstream_commit",
+    "sidecar_jsonl_sha256",
+    "split_root_layout",
+    "species",
+    "sidecar_rows",
+    "matched_sidecar_rows",
+    "mismatched_sidecar_rows",
+    "missing_sidecar_keys",
+    "duplicate_manifest_keys",
+    "status",
+    "errors",
+    "warnings",
+    "scope_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "tool": {
+      "const": "connectome-split-replay-audit"
+    },
+    "dataset_id": {
+      "const": "jeffbbrown2/ConnectomeBench2"
+    },
+    "dataset_revision": {
+      "const": "v2"
+    },
+    "dataset_revision_commit_sha": {
+      "$ref": "#/$defs/sha1"
+    },
+    "upstream_repo": {
+      "type": "string",
+      "format": "uri"
+    },
+    "upstream_commit": {
+      "const": "5679b39aa2641d8d0afeed88b441e696f87a66df"
+    },
+    "sidecar_jsonl_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "split_root_layout": {
+      "const": "species/{train.json,val.json,test.json}; manifest.json optional"
+    },
+    "species": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "mouse",
+          "fly",
+          "human",
+          "zebrafish"
+        ]
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/speciesReplay"
+      }
+    },
+    "sidecar_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "matched_sidecar_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mismatched_sidecar_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missing_sidecar_keys": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "duplicate_manifest_keys": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "scope_note": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha1": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fileDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path",
+        "bytes",
+        "sha256"
+      ],
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "speciesReplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "species",
+        "manifest_file",
+        "split_manifest_sha256",
+        "split_files",
+        "source_key_counts",
+        "sidecar_row_counts",
+        "matched_sidecar_rows",
+        "mismatched_sidecar_rows",
+        "missing_sidecar_keys",
+        "duplicate_manifest_keys"
+      ],
+      "properties": {
+        "species": {
+          "enum": [
+            "mouse",
+            "fly",
+            "human",
+            "zebrafish"
+          ]
+        },
+        "manifest_file": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/fileDigest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "train",
+            "val",
+            "test"
+          ],
+          "properties": {
+            "train": {
+              "$ref": "#/$defs/fileDigest"
+            },
+            "val": {
+              "$ref": "#/$defs/fileDigest"
+            },
+            "test": {
+              "$ref": "#/$defs/fileDigest"
+            }
+          }
+        },
+        "source_key_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "sidecar_row_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "matched_sidecar_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mismatched_sidecar_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_sidecar_keys": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_manifest_keys": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "species",
+        "bank",
+        "key",
+        "sample_id",
+        "detail"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "species": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bank": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
