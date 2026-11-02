@@ -91,12 +91,14 @@ The full TV radius also includes the observed empirical TV distance to P0. The c
 The crate exports `functional_shift_benchmark`. The example emits a JSON report containing:
 
 - scenario, seed, sample sizes and confidence allocation;
+- exact nominal/target path probabilities, functional masks and one-sided directions;
 - exact nominal/target functional expectations;
 - omitted-function shift and true TV distance;
 - Hoeffding radius and Weissman slack;
 - simultaneous DFCE coverage count/rate and Wilson 95% interval;
 - mean empirical TV distance;
 - mean, median, 5th and 95th percentile sample-based TV radius;
+- explicit confidence-scope labels (declared functionals only versus complete categorical path law);
 - deterministic request/report SHA-256 identities.
 
 Example commands from the repository root:
