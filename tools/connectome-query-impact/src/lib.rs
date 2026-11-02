@@ -168,7 +168,6 @@ pub enum QueryImpactError {
     InvalidMaterialityThreshold { query_id: String },
     InvalidDecisionThreshold { query_id: String },
     DuplicateQueryScenario { query_id: String, scenario_id: String },
-    DuplicateScenarioSetEntry { query_id: String, scenario_id: String },
     QueryDefinitionMismatch { query_id: String },
     MetricIdentityMismatch { query_id: String },
     UnitMismatch { query_id: String },
@@ -246,7 +245,6 @@ struct QuerySignature {
 #[derive(Debug, Clone, PartialEq)]
 struct QueryAccumulator {
     signature: QuerySignature,
-    scenario_ids: BTreeSet<String>,
     scenarios: Vec<ScenarioImpact>,
 }
 
@@ -290,21 +288,10 @@ pub fn analyze_candidate(
             .entry(evaluation.query_id.clone())
             .or_insert_with(|| QueryAccumulator {
                 signature: signature.clone(),
-                scenario_ids: BTreeSet::new(),
                 scenarios: Vec::new(),
             });
 
         validate_signature_consistency(&evaluation.query_id, &accumulator.signature, &signature)?;
-
-        if !accumulator
-            .scenario_ids
-            .insert(evaluation.scenario_id.clone())
-        {
-            return Err(QueryImpactError::DuplicateScenarioSetEntry {
-                query_id: evaluation.query_id.clone(),
-                scenario_id: evaluation.scenario_id.clone(),
-            });
-        }
 
         accumulator
             .scenarios
