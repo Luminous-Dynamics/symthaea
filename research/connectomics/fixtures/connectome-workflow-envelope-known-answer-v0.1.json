@@ -2305,6 +2305,157 @@
       "expected_projected_future_drift_upper_ratio": null,
       "expected_projected_stop_horizon_edits": 100,
       "expected_error": "QueryStopSnapshotMismatch"
+    },
+    {
+      "case_id": "future_stop_receipt_cannot_override_observed_window_instability",
+      "envelope": {
+        "schema_version": "0.1",
+        "envelope_id": "env-projected_stable_within_100_edit_horizon",
+        "dataset": {
+          "repository": "jeffbbrown2/ConnectomeBench2",
+          "revision": "v2",
+          "revision_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+          "card_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "shard_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "operation_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "license_review_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "license_approved": true
+        },
+        "operation": {
+          "operation_id": "op-1",
+          "sample_hash": "0123456789abcdef0123456789abcdef",
+          "task_route": "FalseMergeIdentification",
+          "split": "Test",
+          "source_archive_id": "archive-human",
+          "source_volume_id": "volume-1",
+          "source_operation_id": "archive-human::source-op-1",
+          "spatial_cube_id": "volume-1::cube-50um-1",
+          "neuron_root_ids": [
+            "root-1",
+            "root-2"
+          ],
+          "animal_id": "animal-1",
+          "session_id": "session-1",
+          "species": "human",
+          "workflow_id": "workflow-v1"
+        },
+        "base_graph_snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "stages": {
+          "split_audit": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "operation_id": "op-1",
+            "sample_hash": "0123456789abcdef0123456789abcdef",
+            "task_route": "FalseMergeIdentification",
+            "split": "Test",
+            "policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "input_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operation_assignment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "outcome": "GroupDisjoint"
+          },
+          "prediction": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "operation_id": "op-1",
+            "sample_hash": "0123456789abcdef0123456789abcdef",
+            "task_route": "FalseMergeIdentification",
+            "model_checkpoint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "inference_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "calibration_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "prediction_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "error_probability": 0.92,
+            "calibrated": true
+          },
+          "view_decision": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "operation_id": "op-1",
+            "task_route": "FalseMergeIdentification",
+            "policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "scenario_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "loss_matrix_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "acquisition_cost_profile_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "loss_unit_id": "risk-units",
+            "outcome": {
+              "kind": "Acquired",
+              "view_id": "view-xy",
+              "view_kind": "EmXy",
+              "sample_hash": "0123456789abcdef0123456789abcdef",
+              "task_route": "FalseMergeIdentification",
+              "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "acquisition_cost_units": "risk-units"
+            }
+          },
+          "review": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "policy_run_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operation_id": "op-1",
+            "sample_hash": "0123456789abcdef0123456789abcdef",
+            "task_route": "FalseMergeIdentification",
+            "allocation": "Selected",
+            "reviewer_id": "reviewer-1",
+            "disposition": "Approved",
+            "review_seconds": 90
+          },
+          "edit_transaction": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "event_stream_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "transaction_id": "tx-1",
+            "operation_binding_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operation_id": "op-1",
+            "sample_hash": "0123456789abcdef0123456789abcdef",
+            "task_route": "FalseMergeIdentification",
+            "base_snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "resulting_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "verification_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "verification_passed": true,
+            "annotation_propagation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "annotation_propagation_verified": true,
+            "outcome": "Committed"
+          },
+          "query_stability": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "query_id": "pathway-1",
+            "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "analysis_code_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "uncertainty_set_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "source_volume_id": "volume-1",
+            "first_graph_snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "latest_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "outcome": "UnstableOverObservedWindow",
+            "future_stability_certified": false,
+            "universal_connectome_completeness_claimed": false
+          },
+          "query_stop_calibration": {
+            "receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "calibration_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "group_disjointness_report_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "exchangeability_assessment_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "query_id": "pathway-1",
+            "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "analysis_code_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "metric_id": "pathway-strength",
+            "unit_id": "normalized-strength",
+            "calibration_stratum_id": "human-volume-workflow-v1",
+            "source_volume_id": "volume-1",
+            "target_independence_cluster_id": "animal-1-session-1",
+            "first_graph_snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "latest_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "future_horizon_edits": 100,
+            "alpha": 0.05,
+            "calibration_trajectory_count": 19,
+            "order_statistic_rank": 19,
+            "residual_quantile_ratio": 0.1,
+            "observed_max_drift_ratio": 0.2,
+            "current_uncertainty_width_ratio": 0.3,
+            "projected_future_drift_upper_ratio": 0.3,
+            "group_disjoint": true,
+            "exchangeability_supported": true,
+            "outcome": "ProjectedStableWithinHorizon"
+          }
+        }
+      },
+      "expected_error": "QueryStopOutcomeContradiction"
     }
   ]
 }
