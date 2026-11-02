@@ -363,6 +363,9 @@ impl RmiPolicyV1 for ImitationOnlyPolicyV1 {
 pub struct SyntheticContingentPolicyV1 {
     pub id: String,
     pub version: String,
+    /// One feature this known positive control responds to. This is fixed
+    /// policy configuration, not an intervention label passed by the evaluator.
+    pub target: RmiTargetFeatureV1,
 }
 
 impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
@@ -381,13 +384,21 @@ impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
         _seed: u64,
     ) -> RmiAgentActionV1 {
         let mut features = observation.features.clone();
-        for interval in &mut features.motif_intervals {
-            *interval = interval.saturating_neg();
+        match self.target {
+            RmiTargetFeatureV1::Motif => {
+                for interval in &mut features.motif_intervals {
+                    *interval = interval.saturating_neg();
+                }
+            }
+            RmiTargetFeatureV1::Rhythm => features.rhythm_onsets.rotate_left(1),
+            RmiTargetFeatureV1::Tempo => {
+                // Reflection is a bijection over the admitted [30, 300] BPM range.
+                features.tempo_milli_bpm = 330_000 - features.tempo_milli_bpm;
+            }
+            RmiTargetFeatureV1::Role => {
+                features.role = complementary_role(features.role);
+            }
         }
-        features.rhythm_onsets.rotate_left(1);
-        // Reflection is a bijection over the admitted [30, 300] BPM range.
-        features.tempo_milli_bpm = 330_000 - features.tempo_milli_bpm;
-        features.role = complementary_role(features.role);
         RmiAgentActionV1 {
             action_id: format!("{}:{}", self.id, observation.source_event_id),
             features,
@@ -694,16 +705,17 @@ mod tests {
 
     #[test]
     fn synthetic_contingent_positive_control_detects_each_target_feature() {
-        let policy = SyntheticContingentPolicyV1 {
-            id: "synthetic-contingent".into(),
-            version: "1".into(),
-        };
         for target in [
             RmiTargetFeatureV1::Motif,
             RmiTargetFeatureV1::Rhythm,
             RmiTargetFeatureV1::Tempo,
             RmiTargetFeatureV1::Role,
         ] {
+            let policy = SyntheticContingentPolicyV1 {
+                id: "synthetic-contingent".into(),
+                version: "1".into(),
+                target,
+            };
             let result = evaluate_rmi_pair(&policy, &pair_for(target)).unwrap();
             assert!(
                 result.payload.targeted_input_sensitivity,
@@ -714,16 +726,17 @@ mod tests {
 
     #[test]
     fn synthetic_positive_control_changes_only_the_manipulated_output_dimension() {
-        let policy = SyntheticContingentPolicyV1 {
-            id: "synthetic-contingent".into(),
-            version: "1".into(),
-        };
         for target in [
             RmiTargetFeatureV1::Motif,
             RmiTargetFeatureV1::Rhythm,
             RmiTargetFeatureV1::Tempo,
             RmiTargetFeatureV1::Role,
         ] {
+            let policy = SyntheticContingentPolicyV1 {
+                id: "synthetic-contingent".into(),
+                version: "1".into(),
+                target,
+            };
             let result = evaluate_rmi_pair(&policy, &pair_for(target)).unwrap();
             assert!(result.payload.action_delta.targeted_feature_changed(target));
             assert_eq!(
@@ -774,6 +787,7 @@ mod tests {
         let policy = SyntheticContingentPolicyV1 {
             id: "synthetic-contingent".into(),
             version: "1".into(),
+            target: RmiTargetFeatureV1::Rhythm,
         };
         let pair = pair_for(RmiTargetFeatureV1::Rhythm);
         let first = evaluate_rmi_pair(&policy, &pair).unwrap();
@@ -788,6 +802,7 @@ mod tests {
         let policy = SyntheticContingentPolicyV1 {
             id: "synthetic-contingent".into(),
             version: "1".into(),
+            target: RmiTargetFeatureV1::Motif,
         };
         let first_pair = pair_for(RmiTargetFeatureV1::Motif);
         let mut second_pair = first_pair.clone();
@@ -805,7 +820,8 @@ mod tests {
             evaluate_rmi_pair(
                 &SyntheticContingentPolicyV1 {
                     id: "synthetic-contingent".into(),
-                    version: "1".into()
+                    version: "1".into(),
+                    target: RmiTargetFeatureV1::Motif
                 },
                 &pair
             ),
@@ -821,7 +837,8 @@ mod tests {
             evaluate_rmi_pair(
                 &SyntheticContingentPolicyV1 {
                     id: "synthetic-contingent".into(),
-                    version: "1".into()
+                    version: "1".into(),
+                    target: RmiTargetFeatureV1::Role
                 },
                 &pair
             ),
