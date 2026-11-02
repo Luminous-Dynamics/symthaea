@@ -689,6 +689,33 @@ mod tests {
     }
 
     #[test]
+    fn frechet_bounds_enclose_feasible_joint_tables_over_probability_grid() {
+        for source_step in 0..=10 {
+            for target_step in 0..=10 {
+                let source = source_step as f64 / 10.0;
+                let target = target_step as f64 / 10.0;
+                let bounds = joint_response_prevalence_bounds(
+                    NumericInterval { lower: source, upper: source },
+                    NumericInterval { lower: target, upper: target },
+                ).unwrap();
+                for joint_step in 0..=10 {
+                    let joint = bounds.lower + (bounds.upper - bounds.lower) * joint_step as f64 / 10.0;
+                    let source_only = source - joint;
+                    let target_only = target - joint;
+                    let neither = 1.0 - source - target + joint;
+                    assert!(joint >= -1e-12);
+                    assert!(source_only >= -1e-12);
+                    assert!(target_only >= -1e-12);
+                    assert!(neither >= -1e-12);
+                    close(joint + source_only + target_only + neither, 1.0);
+                    close(joint + source_only, source);
+                    close(joint + target_only, target);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn uncertain_marginal_intervals_produce_sharp_joint_bounds() {
         let joint = joint_response_prevalence_bounds(
             NumericInterval { lower: 0.7, upper: 0.8 },
