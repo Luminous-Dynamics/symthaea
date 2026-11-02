@@ -1,0 +1,14 @@
+[package]
+name = "mus-doe-audit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Fail-closed audit for MUS-DOE synthetic experiment-selection and split fixtures"
+
+[dependencies]
+jsonschema = { version = "=0.59.0", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+
+[workspace]

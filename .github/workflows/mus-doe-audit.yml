@@ -1,0 +1,52 @@
+name: MUS-DOE experiment split audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/mus-doe-audit/**"
+      - "schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json"
+      - "fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json"
+      - ".github/workflows/mus-doe-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/mus-doe-audit/**"
+      - "schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json"
+      - "fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json"
+      - ".github/workflows/mus-doe-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: MUS-DOE schema, leakage tests and fixture audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact PR head (or pushed commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/mus-doe-audit/Cargo.toml -- --check
+      - name: Run auditor unit tests
+        run: cargo test --manifest-path tools/mus-doe-audit/Cargo.toml
+      - name: Audit synthetic split corpus
+        run: |
+          mkdir -p artifacts/mus-doe
+          cargo run --manifest-path tools/mus-doe-audit/Cargo.toml --bin mus-doe-audit -- --schema schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json --corpus fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json > artifacts/mus-doe/split-audit.json
+      - name: Compare equal-budget synthetic selection policies
+        run: cargo run --manifest-path tools/mus-doe-audit/Cargo.toml --bin policy_tournament -- --seeds 100 --budget 11 > artifacts/mus-doe/policy-tournament.json
+      - name: Bind reports to the exact source head
+        run: |
+          git rev-parse HEAD > artifacts/mus-doe/commit.txt
+          sha256sum schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json tools/mus-doe-audit/Cargo.toml tools/mus-doe-audit/src/main.rs tools/mus-doe-audit/src/bin/policy_tournament.rs > artifacts/mus-doe/SHA256SUMS
+      - name: Upload synthetic DOE receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mus-doe-receipts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/mus-doe/
+          if-no-files-found: error
+          retention-days: 90

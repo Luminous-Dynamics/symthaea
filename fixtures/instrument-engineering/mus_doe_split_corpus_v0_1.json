@@ -1,0 +1,935 @@
+{
+  "manifest_version": "musical-instrument-experiment-design-corpus/0.1",
+  "workstream_id": "MUS-DOE-001",
+  "status": "SYNTHETIC_POLICY_FIXTURES_NOT_PHYSICAL_EVIDENCE",
+  "evidence_note": "All assignments and cases are synthetic identifiers designed to test split and selection policies. No acoustic data, physical measurements, fitted model, calibration result, or actual experiment recommendation is included.",
+  "partitions": [
+    "fit",
+    "calibration",
+    "locked_test"
+  ],
+  "available_group_axes": [
+    "physical_unit_id",
+    "build_batch_id",
+    "builder_id",
+    "environment_id",
+    "measurement_session_id",
+    "material_lot_id"
+  ],
+  "selection_policies": [
+    "fixed_grid",
+    "seeded_random",
+    "uncertainty_first",
+    "model_disagreement",
+    "cost_aware_information_gain",
+    "predicted_mean_exploitation"
+  ],
+  "cases": [
+    {
+      "case_id": "POS-001",
+      "case_type": "positive_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "build_batch_id",
+        "environment_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "fit-002",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "cal-001",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "cal-002",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "test-001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        },
+        {
+          "observation_id": "test-002",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "none"
+      ],
+      "expected_disposition": "VALID_SYNTHETIC_SPLIT",
+      "rationale": "Whole units, build batches and environments are isolated between fit, calibration and locked-test partitions; records remain synthetic."
+    },
+    {
+      "case_id": "NEG-001",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-101",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-101",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "seeded_random",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "physical_unit_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Different waveform/record IDs from the same physical unit cross from fit into locked test."
+    },
+    {
+      "case_id": "NEG-002",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "build_batch_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-201",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-201",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "model_disagreement",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "build_batch_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Different physical units from the same build batch cross fit and locked test."
+    },
+    {
+      "case_id": "NEG-003",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "fit-002",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "cal-001",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "cal-002",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "test-001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        },
+        {
+          "observation_id": "test-002",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "cost_aware_information_gain",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit",
+          "locked_test"
+        ],
+        "locked_test_outcomes_used": true,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "locked_test_outcome_used"
+      ],
+      "expected_disposition": "REJECT_TEST_CONTAMINATION",
+      "rationale": "The policy consumes locked-test outcomes when selecting the next experiment."
+    },
+    {
+      "case_id": "NEG-004",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "fit-002",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "cal-001",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "cal-002",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "test-001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        },
+        {
+          "observation_id": "test-002",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "uncertainty_first",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": false,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "inadmissible_experiment_selected"
+      ],
+      "expected_disposition": "REJECT_INADMISSIBLE_SELECTION",
+      "rationale": "The selected candidate violates a hard measurement/setup constraint and is not admissible."
+    },
+    {
+      "case_id": "NEG-005",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "fit-002",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "cal-001",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "cal-002",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "test-001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        },
+        {
+          "observation_id": "test-002",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "seeded_random",
+        "policy_version": "0.1.0",
+        "random_seed": null,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "random_seed_missing"
+      ],
+      "expected_disposition": "REJECT_NONDETERMINISTIC_REPLAY",
+      "rationale": "A seeded-random selection policy omits its declared random seed."
+    },
+    {
+      "case_id": "NEG-006",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "environment_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-601",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-601",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "environment_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Fit and locked test share the same environment group on an axis that was declared independent."
+    },
+    {
+      "case_id": "NEG-007",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "measurement_session_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-701",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-701",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-B"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "predicted_mean_exploitation",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "measurement_session_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Repeated captures from one measurement session cross fit and test despite different unit IDs."
+    },
+    {
+      "case_id": "NEG-008",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "fit-002",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "cal-001",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "cal-002",
+          "partition": "calibration",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        },
+        {
+          "observation_id": "test-001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        },
+        {
+          "observation_id": "test-002",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-C",
+            "build_batch_id": "batch-C",
+            "builder_id": "builder-C",
+            "environment_id": "room-C",
+            "measurement_session_id": "session-C",
+            "material_lot_id": "lot-C"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": true
+      },
+      "fault_modes": [
+        "posthoc_policy_change"
+      ],
+      "expected_disposition": "REJECT_POSTHOC_CHANGE",
+      "rationale": "Policy version or stopping rule is changed after inspecting outcomes without creating a new preregistered campaign."
+    },
+    {
+      "case_id": "NEG-009",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "builder_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-901",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-901",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-A",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "builder_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Different physical units cross fit and locked test but share the same builder on a declared independence axis, so builder generalization cannot be claimed."
+    },
+    {
+      "case_id": "NEG-010",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "material_lot_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-1001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-1001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-A"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "material_lot_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Different physical units share the same material lot across fit and locked test on a declared independence axis, so lot-generalization cannot be claimed."
+    }
+  ]
+}
