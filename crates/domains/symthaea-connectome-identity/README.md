@@ -22,4 +22,4 @@ No silent ID normalization/coercion, biological identity inference, missing-neur
 
 A valid identity join proves that the declared axes and annotations reconcile under the supplied source IDs and mapping protocol. It does not prove anatomical truth or function.
 
-All unit-test data are synthetic fixtures.
+All unit-test data are synthetic fixtures. The unit oracle includes exact-order, permuted-axis, digest-stability, malformed identity, unknown target and keep/remove conflict controls.
