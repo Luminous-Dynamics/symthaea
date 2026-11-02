@@ -1,10 +1,10 @@
 {
   "report_version": "0.1",
-  "query_id": "target-circuit-path-strength",
+  "query_id": "synthetic-target-path-strength",
   "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "analysis_code_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "uncertainty_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-  "source_volume_id": "volume-001",
+  "source_volume_id": "synthetic-volume-001",
   "first_checkpoint_id": "cp-1",
   "latest_checkpoint_id": "cp-2",
   "first_graph_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -15,34 +15,27 @@
   "first_edit_count": 10,
   "latest_edit_count": 20,
   "checkpoint_count": 2,
-  "status": "StableOverObservedWindow",
+  "status": "UnstableOverObservedWindow",
   "metrics": [
     {
       "metric_id": "global_motif_count",
       "unit_id": "count",
       "absolute_tolerance": 0.05,
       "latest_identified_set_hull": {
-        "lower": 10.01,
-        "upper": 10.03
+        "lower": 10,
+        "upper": 10.01
       },
-      "latest_identified_set_width": 0.02,
+      "latest_identified_set_width": 0.01,
       "latest_scenario_bounds": [
         {
           "scenario_id": "h1",
           "bounds": {
-            "lower": 10.01,
-            "upper": 10.02
-          }
-        },
-        {
-          "scenario_id": "h2",
-          "bounds": {
-            "lower": 10.01,
-            "upper": 10.03
+            "lower": 10,
+            "upper": 10.01
           }
         }
       ],
-      "worst_observed_temporal_drift_upper": 0.03,
+      "worst_observed_temporal_drift_upper": 0.01,
       "stable_over_observed_window": true
     },
     {
@@ -50,28 +43,21 @@
       "unit_id": "normalized_strength",
       "absolute_tolerance": 0.02,
       "latest_identified_set_hull": {
-        "lower": 0.705,
-        "upper": 0.72
+        "lower": 0.8,
+        "upper": 0.81
       },
-      "latest_identified_set_width": 0.015,
+      "latest_identified_set_width": 0.01,
       "latest_scenario_bounds": [
         {
           "scenario_id": "h1",
           "bounds": {
-            "lower": 0.705,
-            "upper": 0.715
-          }
-        },
-        {
-          "scenario_id": "h2",
-          "bounds": {
-            "lower": 0.71,
-            "upper": 0.72
+            "lower": 0.8,
+            "upper": 0.81
           }
         }
       ],
-      "worst_observed_temporal_drift_upper": 0.02,
-      "stable_over_observed_window": true
+      "worst_observed_temporal_drift_upper": 0.61,
+      "stable_over_observed_window": false
     }
   ],
   "future_stability_certified": false,
