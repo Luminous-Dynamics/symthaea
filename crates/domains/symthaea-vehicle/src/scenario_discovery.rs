@@ -463,6 +463,41 @@ mod tests {
     }
 
     #[test]
+    fn stratification_handles_unit_prime_and_non_power_of_two_budgets() {
+        let factors: [fn(&IntersectionScenarioCandidate) -> f64; 7] = [
+            |candidate| candidate.ego_initial_speed_mps,
+            |candidate| candidate.actor_crossing_start_s,
+            |candidate| candidate.occlusion_fraction,
+            |candidate| candidate.sensor_delay_s,
+            |candidate| candidate.sensor_dropout_duration_s,
+            |candidate| candidate.localization_lateral_bias_m,
+            |candidate| candidate.brake_actuation_delay_s,
+        ];
+        let bounds = [
+            EGO_SPEED_RANGE_MPS,
+            CROSSING_START_RANGE_S,
+            OCCLUSION_RANGE,
+            SENSOR_DELAY_RANGE_S,
+            SENSOR_DROPOUT_RANGE_S,
+            LOCALIZATION_BIAS_RANGE_M,
+            BRAKE_DELAY_RANGE_S,
+        ];
+        for budget in [1_u32, 2, 3, 7, 31, 127] {
+            let candidates = generate_stratified_intersection_candidates(0, budget).unwrap();
+            for (factor, range) in factors.iter().zip(bounds) {
+                let strata = candidates
+                    .iter()
+                    .map(|candidate| {
+                        let quantile = (factor(candidate) - range.0) / (range.1 - range.0);
+                        ((quantile * budget as f64).floor() as u32).min(budget - 1)
+                    })
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(strata.len(), budget as usize, "budget={budget}");
+            }
+        }
+    }
+
+    #[test]
     fn all_candidates_declare_synthetic_ranges_and_bounded_factors() {
         let candidates = generate_stratified_intersection_candidates(7, 256).unwrap();
         for candidate in candidates {
