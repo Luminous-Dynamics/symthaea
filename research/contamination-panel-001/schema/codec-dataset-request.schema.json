@@ -113,6 +113,7 @@
           "item_id",
           "target_token_count",
           "target_token_sequence_sha256",
+          "baseline_target_token_sequence_sha256",
           "baseline_target_token_logprobs",
           "context_evaluations"
         ],
@@ -152,6 +153,7 @@
                 "context_seed",
                 "context_item_ids",
                 "context_item_set_sha256",
+                "target_token_sequence_sha256",
                 "target_token_logprobs"
               ],
               "properties": {
@@ -183,9 +185,17 @@
                     "type": "number",
                     "maximum": 0
                   }
+                },
+                "target_token_sequence_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
                 }
               }
             }
+          },
+          "baseline_target_token_sequence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
