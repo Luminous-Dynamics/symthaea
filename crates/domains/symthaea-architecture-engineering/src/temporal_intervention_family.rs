@@ -285,7 +285,7 @@ pub fn append_temporal_intervention_batch(
     let contrast = next_ledger.family.contrasts
         .binary_search_by(|item| item.contrast_id.as_str().cmp(contrast_id))
         .ok()
-        .and_then(|index| ledger.family.contrasts.get(index))
+        .and_then(|index| next_ledger.family.contrasts.get(index))
         .ok_or_else(|| TemporalInterventionLedgerError::new(
             "contrast_id", format!("contrast {contrast_id:?} was not preregistered"),
         ))?;
