@@ -3,14 +3,14 @@
 
 #![forbid(unsafe_code)]
 
-use std::fmt;
-
 //! Synthetic multi-generation content-drift and cultural-attractor reference.
 //!
-//! The four normalized attributes are illustrative proxies for the dimensions
+//! The four normalized attributes are illustrative proxies for dimensions
 //! studied in Perez et al. (ICLR 2025): toxicity, positivity, difficulty and
 //! length. This is a controlled metric fixture, not an LLM or text-semantics
 //! implementation and not a reproduction of that paper's results.
+
+use std::fmt;
 
 pub const ATTRIBUTE_NAMES: [&str; 4] = [
     "toxicity",
