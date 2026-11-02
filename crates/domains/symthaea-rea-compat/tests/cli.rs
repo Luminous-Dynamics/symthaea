@@ -42,7 +42,10 @@ fn json_output_reports_distinct_semantic_and_raw_file_identities() {
     assert_ne!(document["raw_file_sha256"], document["semantic_sha256"]);
     assert_eq!(document["input_bytes"], bytes.len() as u64);
     assert_eq!(document["claim_ceiling"]["producer_authenticated"], false);
-    assert_eq!(document["claim_ceiling"]["observation_truth_verified"], false);
+    assert_eq!(
+        document["claim_ceiling"]["observation_truth_verified"],
+        false
+    );
 
     let rendered = String::from_utf8(output.stdout).unwrap();
     assert!(!rendered.contains("/tmp/sample.apk"));
@@ -63,16 +66,18 @@ fn text_and_json_outputs_report_the_same_evidence_id() {
     let text = String::from_utf8(text_output.stdout).unwrap();
     assert!(text.contains(json["evidence_id"].as_str().unwrap()));
     assert!(text.contains(json["semantic_sha256"].as_str().unwrap()));
-    assert!(text.contains(
-        json["raw_file_sha256"].as_str().unwrap()
-    ));
+    assert!(text.contains(json["raw_file_sha256"].as_str().unwrap()));
     assert!(text.contains("Producer authentication: not performed"));
 }
 
 #[test]
 fn duplicate_keys_and_trailing_json_are_rejected_with_stable_categories() {
     for (label, bytes, expected) in [
-        ("duplicate", br#"{"same":1,"same":2}"#.as_slice(), "invalid_json"),
+        (
+            "duplicate",
+            br#"{"same":1,"same":2}"#.as_slice(),
+            "invalid_json",
+        ),
         ("trailing", br#"{} {}"#.as_slice(), "invalid_json"),
     ] {
         let path = temporary_file(label, bytes);
@@ -91,7 +96,10 @@ fn tampered_semantic_identity_is_rejected_without_leaking_payload() {
     let bytes = fs::read(fixture_path()).unwrap();
     let mut evidence: Value = serde_json::from_slice(&bytes).unwrap();
     evidence["normalized_result"]["entries"][0]["size"] = Value::from(43);
-    let path = temporary_file("tampered", serde_json::to_string(&evidence).unwrap().as_bytes());
+    let path = temporary_file(
+        "tampered",
+        serde_json::to_string(&evidence).unwrap().as_bytes(),
+    );
 
     let output = binary().arg("--json").arg(&path).output().unwrap();
     let _ = fs::remove_file(&path);
@@ -100,7 +108,12 @@ fn tampered_semantic_identity_is_rejected_without_leaking_payload() {
     let document: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(document["status"], "rejected");
     assert_eq!(document["error"]["category"], "identity_mismatch");
-    assert!(!output.stdout.windows(b"classes.dex".len()).any(|window| window == b"classes.dex"));
+    assert!(
+        !output
+            .stdout
+            .windows(b"classes.dex".len())
+            .any(|window| window == b"classes.dex")
+    );
 }
 
 #[test]
