@@ -4,6 +4,10 @@ use contamination_panel_bench::{
     adjudication_attrition::{AdjudicationAttritionStudyV1, analyze_adjudication_attrition},
     audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    codec::{
+        CoDecDatasetLevelAucRequestV1, CoDecDatasetRequestV1, codec_dataset_level_auroc,
+        score_codec_dataset,
+    },
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
@@ -349,6 +353,59 @@ fn analyze_adjudication_attrition_cli(args: &[String]) -> Result<(), Box<dyn Err
     Ok(())
 }
 
+fn score_codec_dataset_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench score-codec-dataset <codec-dataset-request.json> <codec-dataset-report.json>"
+                .into(),
+        );
+    }
+    const MAX_CODEC_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_CODEC_REQUEST_BYTES)?;
+    let request: CoDecDatasetRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = score_codec_dataset(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "dataset={} targets={} negative_delta={} codec_score={}‰ seeds={} authenticated={} confirmatory_eligible={}",
+        report.dataset_id,
+        report.target_item_count,
+        report.negative_delta_count,
+        report.codec_score_permille,
+        report.context_seed_count_per_target,
+        report.independently_authenticated,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
+fn evaluate_codec_dataset_level_auc_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench evaluate-codec-dataset-auc <dataset-labelled-scores.json> <dataset-level-auc-report.json>"
+                .into(),
+        );
+    }
+    const MAX_CODEC_AUC_BYTES: u64 = 64 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_CODEC_AUC_BYTES)?;
+    let request: CoDecDatasetLevelAucRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = codec_dataset_level_auroc(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "datasets={} source_families={} exposed={} unexposed={} dataset_auc={:.6} dataset_auprc={:.6} authenticated={} confirmatory_eligible={}",
+        report.dataset_observation_count,
+        report.source_family_count,
+        report.exposed_dataset_count,
+        report.unexposed_dataset_count,
+        report.dataset_level_auroc,
+        report.dataset_level_auprc,
+        report.independently_authenticated,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -436,9 +493,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("analyze-adjudication-attrition") => analyze_adjudication_attrition_cli(&args),
+        Some("score-codec-dataset") => score_codec_dataset_cli(&args),
+        Some("evaluate-codec-dataset-auc") => evaluate_codec_dataset_level_auc_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | score-codec-dataset | evaluate-codec-dataset-auc | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

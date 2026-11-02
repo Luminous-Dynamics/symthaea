@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/codec-dataset-auc-request-v1.json",
+  "title": "CoDeC dataset-level AUROC request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "datasets"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.codec_dataset_level_auc_request.v1"
+    },
+    "datasets": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset_id",
+          "source_family_id",
+          "known_training_exposure",
+          "codec_score_permille"
+        ],
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "source_family_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "known_training_exposure": {
+            "type": "boolean"
+          },
+          "codec_score_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    }
+  }
+}

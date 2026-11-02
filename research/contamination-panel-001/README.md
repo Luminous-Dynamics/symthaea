@@ -672,3 +672,168 @@ The analyzer revalidates the base causal study, transfer-study identity and per-
 
 The bounds are conservative partial-identification intervals under the binary per-item treatment-effect definition. They do not repair wrong labels among accepted candidates, prove reviewers are independent, authenticate evaluator custody, identify why examples were disputed, eliminate global model interference, or prove transfer outside the registered benchmark. A wide interval is an honest statement that the evidence is insufficient—not a failure to be concealed.
 
+## CoDeC dataset-level context contamination scoring (SCI-CODEC-REPLICATION-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9961
+
+Paper: Detecting Data Contamination in LLMs via In-Context Learning, ICLR 2026:
+https://openreview.net/pdf?id=YlpaaYxx4t
+
+Official demo: https://github.com/NVIDIA-NeMo/Evaluator/blob/main/packages/nemo-evaluator/examples/notebooks/contamination_detection_demo.ipynb
+
+### Paper-faithful method
+
+For each target sequence x in candidate dataset D:
+1. Compute baseline mean log-likelihood over the consecutive target tokens.
+2. Sample n context examples from D excluding x, prepend them to the target, and compute mean log-likelihood for the exact same target token-ID sequence.
+3. Compute delta(x) = mean_logprob_in_context(x) - mean_logprob_baseline(x).
+4. The dataset score is the fraction of targets whose mean delta over the declared context seeds is strictly negative.
+
+The base method needs no generated output; it uses gray-box target-token probabilities and two forward passes per context evaluation. The paper describes one context example as the efficient base setup and a five-seed average of per-target delta for stronger statistical stability; larger context counts can improve separation but increase inference cost.
+
+### Essential comparison boundary
+
+The paper's 99.9% AUC is **dataset-level AUROC** over known training datasets versus unseen datasets, not per-item AUROC. It must not be compared directly to FTD/DVD/LaRA/Self-Critique item-level AUCs. This implementation therefore has two separate outputs:
+- one candidate dataset's negative-delta fraction and item-level diagnostics;
+- a separate dataset-level AUROC/AUPRC utility that accepts one score and one independent exposure label per dataset.
+
+The paper explicitly notes that high scores can also result from training on identical or closely related distributions, including synthetic/augmented data. CoDeC estimates distribution-level exposure/specialization; it does not prove exact benchmark-item membership.
+
+### Rust implementation
+
+The module src/codec.rs provides:
+- exact target-token alignment between baseline and in-context per-token logprob vectors;
+- strict exclusion of the target from its own context;
+- context item uniqueness and inclusion checks against the candidate dataset item universe;
+- canonical dataset-item and context-item set commitments;
+- single-seed efficiency, five-seed paper-robustness and preregistered multi-seed sensitivity modes;
+- per-target baseline/context mean log-probability, per-seed deltas, average delta and strict negative indicator;
+- dataset negative-delta fraction, item-level Wilson interval and delta-distribution summaries;
+- a separate dataset-level AUROC and AUPRC calculation with source-family counts;
+- declared model, tokenizer, chat template, dataset manifest, context policy, inference backend and receipt digests;
+- explicit unauthenticated/non-confirmatory claim boundary.
+
+The item-level Wilson interval is descriptive and assumes independent targets; common contexts/source clusters can violate that assumption. Dataset-level AUC uses datasets as the unit, but v1 does not yet perform a source-family cluster bootstrap. Source-family IDs are retained so that a cluster-aware inference extension can be added without pretending every dataset is independent.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      score-codec-dataset codec-dataset-request.json codec-dataset-report.json
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      evaluate-codec-dataset-auc dataset-labelled-scores.json dataset-level-auc-report.json
+
+Schemas:
+- schema/codec-dataset-request.schema.json
+- schema/codec-dataset-report.schema.json
+- schema/codec-dataset-auc-request.schema.json
+- schema/codec-dataset-auc-report.schema.json
+
+Hand-computable request fixture:
+- fixtures/codec-dataset-request.hand.v1.json
+
+### Paper-reported performance and limitations
+
+The paper reports 99.9% dataset-level AUC across its evaluated model/dataset pairs; baselines in its table include vanilla loss 75.7%, Min-K% 78.5% and Zlib ratio 89.6%. These values are paper-specific, not Symthaea results and not item-level detection performance. The paper reports as few as 100 target examples can provide stable scores in its setting, and variance below 1% at 1,000; we treat these as reproduction targets, not universal sample-size guarantees.
+
+The paper also documents degenerate/redundant and mixed-source datasets that can push CoDeC scores low or high independent of exact membership. The protocol therefore requires context relevance controls, unrelated-context controls, duplicate/redundancy tests, context-dose sensitivity and source-family reporting.
+
+### Qualification targets (not achieved results)
+
+- Exact target token-count and token-sequence alignment in 100% of baseline/context evaluations.
+- Zero target leakage into its own context and zero duplicate/unknown context IDs.
+- Fully reproducible context seeds and canonical context-item manifests.
+- Five-seed paper-robustness mode with a separate one-seed efficiency mode.
+- At least 100 target items per dataset for initial pilot; 1,000 where practical.
+- Multiple independently sampled datasets in both exposed/unexposed classes for dataset-level AUC; final dataset count power-selected and source-family stratified.
+- Report AUROC/AUPRC over datasets only, separate from item-level detector tables.
+- Measure same-domain, different-source, unrelated and token-matched random context controls.
+- Cost reporting for forward passes, target tokens, context tokens, logprob extraction, latency, memory and context selection.
+
+### Claim ceiling
+
+CoDeC measures how often same-dataset context decreases model confidence on target sequences. It does not prove exact item membership, distinguish pretraining from SFT/RL without intervention metadata, or separate memorization from related-distribution exposure without controls. No 99.9% result or SOTA superiority is assumed to generalize.
+
+## CoDeC dataset-level context contamination scoring (SCI-CODEC-REPLICATION-001)
+
+Tracking: Issue #9961 — https://github.com/Luminous-Dynamics/symthaea/issues/9961
+
+Paper: Detecting Data Contamination in LLMs via In-Context Learning, ICLR 2026:
+https://openreview.net/pdf?id=YlpaaYxx4t
+
+Official demo:
+https://github.com/NVIDIA-NeMo/Evaluator/blob/main/packages/nemo-evaluator/examples/notebooks/contamination_detection_demo.ipynb
+
+### Paper-faithful method
+
+For each target sequence x in candidate dataset D:
+1. Compute baseline mean log-likelihood over the consecutive target tokens.
+2. Sample n context examples from D excluding x, prepend them to the target, and compute mean log-likelihood for the exact same target token-ID sequence.
+3. Compute delta(x) = mean_logprob_in_context(x) - mean_logprob_baseline(x).
+4. The dataset score is the fraction of targets whose mean delta over the declared context seeds is strictly negative.
+
+The base method needs no generated output; it uses gray-box target-token probabilities and two forward passes per context evaluation. The paper describes one context example as the efficient base setup and a five-seed average of per-target delta for stronger statistical stability; larger context counts can improve separation but increase inference cost.
+
+### Essential comparison boundary
+
+The paper's 99.9% AUC is dataset-level AUROC over known training datasets versus unseen datasets, not per-item AUROC. It must not be compared directly to FTD/DVD/LaRA/Self-Critique item-level AUCs. This implementation therefore has two separate outputs:
+- one candidate dataset's negative-delta fraction and item-level diagnostics;
+- a separate dataset-level AUROC/AUPRC utility that accepts one score and one independent exposure label per dataset.
+
+The paper explicitly notes that high scores can also result from training on identical or closely related distributions, including synthetic/augmented data. CoDeC estimates distribution-level exposure/specialization; it does not prove exact benchmark-item membership.
+
+### Rust implementation
+
+The module src/codec.rs provides:
+- exact target-token alignment between baseline and in-context per-token logprob vectors, committed by explicit target-token sequence digests;
+- strict exclusion of the target from its own context;
+- context item uniqueness and inclusion checks against the candidate dataset item universe;
+- canonical dataset-item and context-item set commitments;
+- single-seed efficiency, five-seed paper-robustness and preregistered multi-seed sensitivity modes;
+- per-target baseline/context mean log-probability, per-seed deltas, average delta and strict negative indicator;
+- dataset negative-delta fraction, item-level Wilson interval and delta-distribution summaries;
+- a separate dataset-level AUROC and AUPRC calculation with source-family counts;
+- declared model, tokenizer, chat template, dataset manifest, context policy, inference backend and receipt digests;
+- explicit unauthenticated/non-confirmatory claim boundary.
+
+The item-level Wilson interval is descriptive and assumes independent targets; common contexts/source clusters can violate that assumption. Dataset-level AUROC/AUPRC are point estimates over datasets, with deterministic source-family cluster-bootstrap 95% percentile intervals (2,000 requested draws). Each draw samples whole source families with replacement. If fewer than 1,000 draws contain both exposed and unexposed datasets, intervals are withheld. The family IDs and bootstrap seed commitment are included in the report. This is still a descriptive cluster bootstrap, not a full model-by-domain hierarchical uncertainty model.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      score-codec-dataset codec-dataset-request.json codec-dataset-report.json
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      evaluate-codec-dataset-auc dataset-labelled-scores.json dataset-level-auc-report.json
+
+Schemas:
+- schema/codec-dataset-request.schema.json
+- schema/codec-dataset-report.schema.json
+- schema/codec-dataset-auc-request.schema.json
+- schema/codec-dataset-auc-report.schema.json
+
+Hand-computable request fixture:
+- fixtures/codec-dataset-request.hand.v1.json
+
+### Paper-reported performance and limitations
+
+The paper reports 99.9% dataset-level AUC across its evaluated model/dataset pairs; baselines in its table include vanilla loss 75.7%, Min-K% 78.5% and Zlib ratio 89.6%. These values are paper-specific, not Symthaea results and not item-level detection performance. The paper reports as few as 100 target examples can provide stable scores in its setting, and variance below 1% at 1,000; we treat these as reproduction targets, not universal sample-size guarantees.
+
+The paper also documents degenerate/redundant and mixed-source datasets that can push CoDeC scores low or high independent of exact membership. The protocol therefore requires context relevance controls, unrelated-context controls, duplicate/redundancy tests, context-dose sensitivity and source-family reporting.
+
+### Qualification targets (not achieved results)
+
+- Exact target token-count and token-sequence alignment in 100% of baseline/context evaluations.
+- Zero target leakage into its own context and zero duplicate/unknown context IDs.
+- Fully reproducible context seeds and canonical context-item manifests.
+- Five-seed paper-robustness mode with a separate one-seed efficiency mode.
+- At least 100 target items per dataset for initial pilot; 1,000 where practical.
+- Multiple independently sampled datasets in both exposed/unexposed classes for dataset-level AUC; final dataset count power-selected and source-family stratified.
+- Report AUROC/AUPRC over datasets only, separate from item-level detector tables.
+- Measure same-domain, different-source, unrelated and token-matched random context controls.
+- Cost reporting for forward passes, target tokens, context tokens, logprob extraction, latency, memory and context selection.
+
+### Claim ceiling
+
+CoDeC measures how often same-dataset context decreases model confidence on target sequences. It does not prove exact item membership, distinguish pretraining from SFT/RL without intervention metadata, or separate memorization from related-distribution exposure without controls. No 99.9% result or SOTA superiority is assumed to generalize.
+
