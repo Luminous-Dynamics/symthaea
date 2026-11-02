@@ -7,13 +7,11 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use super::{
-    EvidenceProvenance, Hypothesis, PlannerConfig, PlannerError, PlannerErrorKind,
-};
 use super::robust::{
-    LikelihoodModelScenario, RobustAbstentionReason, RobustPlannerConfig,
-    RobustRankingPolicy, RobustExperimentProposal, plan_next_experiment_robust,
+    LikelihoodModelScenario, RobustAbstentionReason, RobustExperimentProposal, RobustPlannerConfig,
+    RobustRankingPolicy, plan_next_experiment_robust,
 };
+use super::{EvidenceProvenance, Hypothesis, PlannerConfig, PlannerError, PlannerErrorKind};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HypothesisUtility {
@@ -255,9 +253,9 @@ fn validate_config(config: DecisionAwareConfig) -> Result<(), DecisionError> {
         || robust.lower_tail_probability <= 0.0
         || robust.lower_tail_probability > 1.0
         || config.max_policy_evaluations == 0
-        || config.maximum_worst_case_regret.is_some_and(|value| {
-            !value.is_finite() || value < 0.0
-        })
+        || config
+            .maximum_worst_case_regret
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
     {
         return Err(DecisionError::new(
             DecisionErrorKind::PlannerInput,
@@ -300,7 +298,9 @@ fn validate_decisions(
         for item in &decision.utilities {
             if !item.utility.is_finite()
                 || !hypothesis_ids.contains(&item.hypothesis_id.as_str())
-                || utilities.insert(item.hypothesis_id.clone(), item.utility).is_some()
+                || utilities
+                    .insert(item.hypothesis_id.clone(), item.utility)
+                    .is_some()
             {
                 return Err(DecisionError::new(
                     DecisionErrorKind::InvalidDecisionUtility,
@@ -311,10 +311,7 @@ fn validate_decisions(
                 ));
             }
         }
-        if hypothesis_ids
-            .iter()
-            .any(|id| !utilities.contains_key(*id))
-        {
+        if hypothesis_ids.iter().any(|id| !utilities.contains_key(*id)) {
             return Err(DecisionError::new(
                 DecisionErrorKind::InvalidDecisionUtility,
                 format!("decision {} omits a hypothesis utility", decision.id),
@@ -335,13 +332,10 @@ fn best_decision(
     for (decision, utilities) in decisions.iter().zip(utility_maps) {
         let expected_utility = distribution
             .iter()
-            .map(|(hypothesis_id, probability)| {
-                probability * utilities[hypothesis_id]
-            })
+            .map(|(hypothesis_id, probability)| probability * utilities[hypothesis_id])
             .sum::<f64>();
         if expected_utility > best_value
-            || (expected_utility == best_value
-                && (best_id.is_empty() || decision.id < best_id))
+            || (expected_utility == best_value && (best_id.is_empty() || decision.id < best_id))
         {
             best_id = decision.id.clone();
             best_value = expected_utility;
@@ -372,8 +366,7 @@ fn normalized_cost(
     estimated_risk: f64,
     config: PlannerConfig,
 ) -> f64 {
-    let weighted =
-        config.cost_weights.time * estimated_time / config.max_time_seconds
+    let weighted = config.cost_weights.time * estimated_time / config.max_time_seconds
         + config.cost_weights.energy * estimated_energy / config.max_energy_joules
         + config.cost_weights.risk * estimated_risk / config.max_risk;
     weighted.max(1.0e-12)
@@ -414,15 +407,12 @@ fn minimax_shared_policy(
             "outcome count exceeds exact minimax policy-search indexing",
         )
     })?;
-    let policy_count = decisions
-        .len()
-        .checked_pow(outcome_count)
-        .ok_or_else(|| {
-            DecisionError::new(
-                DecisionErrorKind::PolicySearchBudgetExceeded,
-                "minimax-regret policy count overflowed usize",
-            )
-        })?;
+    let policy_count = decisions.len().checked_pow(outcome_count).ok_or_else(|| {
+        DecisionError::new(
+            DecisionErrorKind::PolicySearchBudgetExceeded,
+            "minimax-regret policy count overflowed usize",
+        )
+    })?;
     if policy_count > max_policy_evaluations {
         return Err(DecisionError::new(
             DecisionErrorKind::PolicySearchBudgetExceeded,
@@ -471,9 +461,7 @@ fn minimax_shared_policy(
             }
 
             let mut expected_regret = 0.0;
-            for (outcome_index, predicted) in
-                scenario.predicted_outcomes.iter().enumerate()
-            {
+            for (outcome_index, predicted) in scenario.predicted_outcomes.iter().enumerate() {
                 let posterior: BTreeMap<String, f64> =
                     predicted.posterior.iter().cloned().collect();
                 if posterior.keys().ne(prior_distribution.keys()) {
@@ -483,8 +471,7 @@ fn minimax_shared_policy(
                     ));
                 }
 
-                let (_, optimal_utility) =
-                    best_decision(decisions, utility_maps, &posterior);
+                let (_, optimal_utility) = best_decision(decisions, utility_maps, &posterior);
                 let selected_index = selected_indices[outcome_index];
                 let selected_utility = posterior
                     .iter()
@@ -513,9 +500,7 @@ fn minimax_shared_policy(
                 outcomes
                     .iter()
                     .zip(&selected_indices)
-                    .map(|(outcome, index)| {
-                        (outcome.clone(), decisions[*index].id.clone())
-                    })
+                    .map(|(outcome, index)| (outcome.clone(), decisions[*index].id.clone()))
                     .collect(),
             );
         }
@@ -655,11 +640,7 @@ fn evaluate_candidate(
         let mut outcome_results = Vec::with_capacity(outcomes.len());
 
         for predicted in &scenario.predicted_outcomes {
-            let posterior: BTreeMap<String, f64> = predicted
-                .posterior
-                .iter()
-                .cloned()
-                .collect();
+            let posterior: BTreeMap<String, f64> = predicted.posterior.iter().cloned().collect();
             if posterior.keys().ne(prior_distribution.keys()) {
                 return Err(DecisionError::new(
                     DecisionErrorKind::InconsistentScenarioOutput,
@@ -677,9 +658,7 @@ fn evaluate_candidate(
                 .map(|(utilities, _)| {
                     posterior
                         .iter()
-                        .map(|(hypothesis_id, probability)| {
-                            probability * utilities[hypothesis_id]
-                        })
+                        .map(|(hypothesis_id, probability)| probability * utilities[hypothesis_id])
                         .sum::<f64>()
                 })
                 .ok_or_else(|| {
@@ -730,8 +709,7 @@ fn evaluate_candidate(
         .iter()
         .map(|(value, _)| *value)
         .fold(f64::INFINITY, f64::min);
-    let lower_tail_cvar_evsi =
-        lower_tail_cvar(&evsi_samples, config.robust.lower_tail_probability);
+    let lower_tail_cvar_evsi = lower_tail_cvar(&evsi_samples, config.robust.lower_tail_probability);
     let expected_shared_policy_regret = regret_samples
         .iter()
         .map(|(value, probability)| value * probability)
@@ -797,34 +775,29 @@ pub fn plan_next_experiment_decision_aware(
     decisions: &[TerminalDecision],
     config: DecisionAwareConfig,
 ) -> Result<DecisionAwarePlan, DecisionError> {
-    super::validate_config(config.robust.base)
-        .map_err(DecisionError::from_planner)?;
+    super::validate_config(config.robust.base).map_err(DecisionError::from_planner)?;
     validate_config(config)?;
 
-    let catalog = super::validate_evidence_catalog(evidence)
-        .map_err(DecisionError::from_planner)?;
-    let (
-        prior_map,
-        grounded_ids,
-        _qualified_support,
-        _independent_roots,
-    ) = match super::validate_hypotheses(hypotheses, &catalog) {
-        Ok(result) => result,
-        Err(error) if error.kind == PlannerErrorKind::UngroundedHypothesis => {
-            return Ok(DecisionAwarePlan {
-                selected: None,
-                ranked_experiments: Vec::new(),
-                rejected_experiments: Vec::new(),
-                abstention: Some(DecisionAbstentionReason::NoIndependentlyGroundedHypothesis),
-                baseline_optimal_decision_id: String::new(),
-                baseline_optimal_expected_utility: 0.0,
-                grounded_hypothesis_ids: Vec::new(),
-                scenario_ids: Vec::new(),
-                claim_ceiling: DecisionClaimCeiling::default(),
-            });
-        }
-        Err(error) => return Err(DecisionError::from_planner(error)),
-    };
+    let catalog =
+        super::validate_evidence_catalog(evidence).map_err(DecisionError::from_planner)?;
+    let (prior_map, grounded_ids, _qualified_support, _independent_roots) =
+        match super::validate_hypotheses(hypotheses, &catalog) {
+            Ok(result) => result,
+            Err(error) if error.kind == PlannerErrorKind::UngroundedHypothesis => {
+                return Ok(DecisionAwarePlan {
+                    selected: None,
+                    ranked_experiments: Vec::new(),
+                    rejected_experiments: Vec::new(),
+                    abstention: Some(DecisionAbstentionReason::NoIndependentlyGroundedHypothesis),
+                    baseline_optimal_decision_id: String::new(),
+                    baseline_optimal_expected_utility: 0.0,
+                    grounded_hypothesis_ids: Vec::new(),
+                    scenario_ids: Vec::new(),
+                    claim_ceiling: DecisionClaimCeiling::default(),
+                });
+            }
+            Err(error) => return Err(DecisionError::from_planner(error)),
+        };
 
     let hypothesis_ids: Vec<&str> = prior_map.keys().copied().collect();
     let utility_maps = validate_decisions(decisions, &hypothesis_ids)?;
@@ -856,14 +829,9 @@ pub fn plan_next_experiment_decision_aware(
     robust_config.minimum_top1_stability = 0.0;
     robust_config.ranking_policy = RobustRankingPolicy::ExpectedInformationGain;
     robust_config.base.minimum_information_gain_bits = 0.0;
-    let robust = plan_next_experiment_robust(
-        evidence,
-        hypotheses,
-        experiments,
-        scenarios,
-        robust_config,
-    )
-    .map_err(DecisionError::from_planner)?;
+    let robust =
+        plan_next_experiment_robust(evidence, hypotheses, experiments, scenarios, robust_config)
+            .map_err(DecisionError::from_planner)?;
 
     if robust.abstention == Some(RobustAbstentionReason::NoIndependentlyGroundedHypothesis) {
         return Ok(DecisionAwarePlan {
@@ -888,17 +856,39 @@ pub fn plan_next_experiment_decision_aware(
 
     for item in &robust.rejected_experiments {
         let reason = match item.reason {
-            super::robust::RobustRejectionReason::AuthorizationUnknown => DecisionRejectionReason::AuthorizationUnknown,
-            super::robust::RobustRejectionReason::NotAuthorized => DecisionRejectionReason::NotAuthorized,
-            super::robust::RobustRejectionReason::Irreversible => DecisionRejectionReason::Irreversible,
-            super::robust::RobustRejectionReason::Destructive => DecisionRejectionReason::Destructive,
-            super::robust::RobustRejectionReason::TargetImpactExceeded => DecisionRejectionReason::TargetImpactExceeded,
-            super::robust::RobustRejectionReason::TimeBudgetExceeded => DecisionRejectionReason::TimeBudgetExceeded,
-            super::robust::RobustRejectionReason::EnergyBudgetExceeded => DecisionRejectionReason::EnergyBudgetExceeded,
-            super::robust::RobustRejectionReason::RiskBudgetExceeded => DecisionRejectionReason::RiskBudgetExceeded,
-            super::robust::RobustRejectionReason::InvalidOutcomeSpace => DecisionRejectionReason::InvalidOutcomeSpace,
-            super::robust::RobustRejectionReason::NoRobustInformationGain => DecisionRejectionReason::NoPositiveEigCandidate,
-            super::robust::RobustRejectionReason::RankingUnstable => DecisionRejectionReason::DecisionUnstableAcrossScenarios,
+            super::robust::RobustRejectionReason::AuthorizationUnknown => {
+                DecisionRejectionReason::AuthorizationUnknown
+            }
+            super::robust::RobustRejectionReason::NotAuthorized => {
+                DecisionRejectionReason::NotAuthorized
+            }
+            super::robust::RobustRejectionReason::Irreversible => {
+                DecisionRejectionReason::Irreversible
+            }
+            super::robust::RobustRejectionReason::Destructive => {
+                DecisionRejectionReason::Destructive
+            }
+            super::robust::RobustRejectionReason::TargetImpactExceeded => {
+                DecisionRejectionReason::TargetImpactExceeded
+            }
+            super::robust::RobustRejectionReason::TimeBudgetExceeded => {
+                DecisionRejectionReason::TimeBudgetExceeded
+            }
+            super::robust::RobustRejectionReason::EnergyBudgetExceeded => {
+                DecisionRejectionReason::EnergyBudgetExceeded
+            }
+            super::robust::RobustRejectionReason::RiskBudgetExceeded => {
+                DecisionRejectionReason::RiskBudgetExceeded
+            }
+            super::robust::RobustRejectionReason::InvalidOutcomeSpace => {
+                DecisionRejectionReason::InvalidOutcomeSpace
+            }
+            super::robust::RobustRejectionReason::NoRobustInformationGain => {
+                DecisionRejectionReason::NoPositiveEigCandidate
+            }
+            super::robust::RobustRejectionReason::RankingUnstable => {
+                DecisionRejectionReason::DecisionUnstableAcrossScenarios
+            }
         };
         rejected.push(RejectedDecisionExperiment {
             experiment_id: item.experiment_id.clone(),
@@ -948,9 +938,10 @@ pub fn plan_next_experiment_decision_aware(
         if evaluated.result.decision_stability < config.minimum_decision_stability {
             reasons.push(DecisionRejectionReason::DecisionUnstableAcrossScenarios);
         }
-        if config.maximum_worst_case_regret.is_some_and(|limit| {
-            evaluated.worst_regret > limit
-        }) {
+        if config
+            .maximum_worst_case_regret
+            .is_some_and(|limit| evaluated.worst_regret > limit)
+        {
             reasons.push(DecisionRejectionReason::WorstCaseRegretExceeded);
         }
         if reasons.is_empty() {
@@ -973,7 +964,9 @@ pub fn plan_next_experiment_decision_aware(
         });
     } else {
         ranked.sort_by(|left, right| {
-            right.utility.total_cmp(&left.utility)
+            right
+                .utility
+                .total_cmp(&left.utility)
                 .then_with(|| right.selected_value.total_cmp(&left.selected_value))
                 .then_with(|| left.experiment_id.cmp(&right.experiment_id))
         });
@@ -984,24 +977,29 @@ pub fn plan_next_experiment_decision_aware(
     let abstention = if selected.is_some() {
         None
     } else if rejected.iter().any(|item| {
-        item.reasons.contains(&DecisionRejectionReason::DecisionUnstableAcrossScenarios)
+        item.reasons
+            .contains(&DecisionRejectionReason::DecisionUnstableAcrossScenarios)
     }) {
         Some(DecisionAbstentionReason::DecisionUnstableAcrossScenarios)
     } else if rejected.iter().any(|item| {
-        item.reasons.contains(&DecisionRejectionReason::WorstCaseRegretExceeded)
+        item.reasons
+            .contains(&DecisionRejectionReason::WorstCaseRegretExceeded)
     }) {
         Some(DecisionAbstentionReason::WorstCaseRegretExceeded)
     } else if rejected.iter().any(|item| {
-        item.reasons.contains(&DecisionRejectionReason::PolicySearchBudgetExceeded)
+        item.reasons
+            .contains(&DecisionRejectionReason::PolicySearchBudgetExceeded)
     }) {
         Some(DecisionAbstentionReason::PolicySearchBudgetExceeded)
     } else if !rejected.is_empty()
         && rejected.iter().all(|item| {
-            item.reasons.iter().all(|reason| matches!(
-                reason,
-                DecisionRejectionReason::NoPositiveEIGCandidate
-                    | DecisionRejectionReason::NoPositiveValueOfInformation
-            ))
+            item.reasons.iter().all(|reason| {
+                matches!(
+                    reason,
+                    DecisionRejectionReason::NoPositiveEIGCandidate
+                        | DecisionRejectionReason::NoPositiveValueOfInformation
+                )
+            })
         })
     {
         Some(DecisionAbstentionReason::NoPositiveValueOfInformation)
@@ -1109,15 +1107,27 @@ mod tests {
             TerminalDecision {
                 id: "remediate-a".to_owned(),
                 utilities: vec![
-                    HypothesisUtility { hypothesis_id: "cause-a".to_owned(), utility: 1.0 },
-                    HypothesisUtility { hypothesis_id: "cause-b".to_owned(), utility: 0.0 },
+                    HypothesisUtility {
+                        hypothesis_id: "cause-a".to_owned(),
+                        utility: 1.0,
+                    },
+                    HypothesisUtility {
+                        hypothesis_id: "cause-b".to_owned(),
+                        utility: 0.0,
+                    },
                 ],
             },
             TerminalDecision {
                 id: "remediate-b".to_owned(),
                 utilities: vec![
-                    HypothesisUtility { hypothesis_id: "cause-a".to_owned(), utility: 0.0 },
-                    HypothesisUtility { hypothesis_id: "cause-b".to_owned(), utility: 1.0 },
+                    HypothesisUtility {
+                        hypothesis_id: "cause-a".to_owned(),
+                        utility: 0.0,
+                    },
+                    HypothesisUtility {
+                        hypothesis_id: "cause-b".to_owned(),
+                        utility: 1.0,
+                    },
                 ],
             },
         ]
@@ -1153,17 +1163,35 @@ mod tests {
             TerminalDecision {
                 id: "safe-default".to_owned(),
                 utilities: vec![
-                    HypothesisUtility { hypothesis_id: "a".into(), utility: 1.0 },
-                    HypothesisUtility { hypothesis_id: "b".into(), utility: 1.0 },
-                    HypothesisUtility { hypothesis_id: "c".into(), utility: 0.0 },
+                    HypothesisUtility {
+                        hypothesis_id: "a".into(),
+                        utility: 1.0,
+                    },
+                    HypothesisUtility {
+                        hypothesis_id: "b".into(),
+                        utility: 1.0,
+                    },
+                    HypothesisUtility {
+                        hypothesis_id: "c".into(),
+                        utility: 0.0,
+                    },
                 ],
             },
             TerminalDecision {
                 id: "special-remediation".to_owned(),
                 utilities: vec![
-                    HypothesisUtility { hypothesis_id: "a".into(), utility: 0.0 },
-                    HypothesisUtility { hypothesis_id: "b".into(), utility: 0.0 },
-                    HypothesisUtility { hypothesis_id: "c".into(), utility: 1.0 },
+                    HypothesisUtility {
+                        hypothesis_id: "a".into(),
+                        utility: 0.0,
+                    },
+                    HypothesisUtility {
+                        hypothesis_id: "b".into(),
+                        utility: 0.0,
+                    },
+                    HypothesisUtility {
+                        hypothesis_id: "c".into(),
+                        utility: 1.0,
+                    },
                 ],
             },
         ];
@@ -1173,9 +1201,24 @@ mod tests {
             parent_evidence_ids: vec![],
         }];
         let hypotheses = vec![
-            Hypothesis { id: "a".into(), prior_probability: 0.25, supporting_evidence_ids: vec![ev_id('a')], contradicting_evidence_ids: vec![] },
-            Hypothesis { id: "b".into(), prior_probability: 0.25, supporting_evidence_ids: vec![ev_id('a')], contradicting_evidence_ids: vec![] },
-            Hypothesis { id: "c".into(), prior_probability: 0.5, supporting_evidence_ids: vec![ev_id('a')], contradicting_evidence_ids: vec![] },
+            Hypothesis {
+                id: "a".into(),
+                prior_probability: 0.25,
+                supporting_evidence_ids: vec![ev_id('a')],
+                contradicting_evidence_ids: vec![],
+            },
+            Hypothesis {
+                id: "b".into(),
+                prior_probability: 0.25,
+                supporting_evidence_ids: vec![ev_id('a')],
+                contradicting_evidence_ids: vec![],
+            },
+            Hypothesis {
+                id: "c".into(),
+                prior_probability: 0.5,
+                supporting_evidence_ids: vec![ev_id('a')],
+                contradicting_evidence_ids: vec![],
+            },
         ];
         let high_eig_no_action_change = RobustExperimentProposal {
             id: "diagnose-nuisance".into(),
@@ -1192,17 +1235,35 @@ mod tests {
         let high_matrix = ScenarioExperimentLikelihood {
             experiment_id: "diagnose-nuisance".into(),
             likelihoods: vec![
-                LikelihoodRow { hypothesis_id: "a".into(), outcome_probabilities: vec![0.99,0.01] },
-                LikelihoodRow { hypothesis_id: "b".into(), outcome_probabilities: vec![0.01,0.99] },
-                LikelihoodRow { hypothesis_id: "c".into(), outcome_probabilities: vec![0.50,0.50] },
+                LikelihoodRow {
+                    hypothesis_id: "a".into(),
+                    outcome_probabilities: vec![0.99, 0.01],
+                },
+                LikelihoodRow {
+                    hypothesis_id: "b".into(),
+                    outcome_probabilities: vec![0.01, 0.99],
+                },
+                LikelihoodRow {
+                    hypothesis_id: "c".into(),
+                    outcome_probabilities: vec![0.50, 0.50],
+                },
             ],
         };
         let low_matrix = ScenarioExperimentLikelihood {
             experiment_id: "identify-actionable-cause".into(),
             likelihoods: vec![
-                LikelihoodRow { hypothesis_id: "a".into(), outcome_probabilities: vec![0.8,0.2] },
-                LikelihoodRow { hypothesis_id: "b".into(), outcome_probabilities: vec![0.8,0.2] },
-                LikelihoodRow { hypothesis_id: "c".into(), outcome_probabilities: vec![0.2,0.8] },
+                LikelihoodRow {
+                    hypothesis_id: "a".into(),
+                    outcome_probabilities: vec![0.8, 0.2],
+                },
+                LikelihoodRow {
+                    hypothesis_id: "b".into(),
+                    outcome_probabilities: vec![0.8, 0.2],
+                },
+                LikelihoodRow {
+                    hypothesis_id: "c".into(),
+                    outcome_probabilities: vec![0.2, 0.8],
+                },
             ],
         };
         let scenario = LikelihoodModelScenario {
@@ -1213,16 +1274,30 @@ mod tests {
         let point = super::super::robust::plan_next_experiment_robust(
             &evidence,
             &hypotheses,
-            &[high_eig_no_action_change.clone(), lower_eig_action_change.clone()],
+            &[
+                high_eig_no_action_change.clone(),
+                lower_eig_action_change.clone(),
+            ],
             &[scenario.clone()],
             RobustPlannerConfig {
                 minimum_top1_stability: 0.0,
                 ranking_policy: super::super::robust::RobustRankingPolicy::ExpectedInformationGain,
                 ..RobustPlannerConfig::default()
             },
-        ).unwrap();
-        let high_eig = point.ranked_experiments.iter().find(|x| x.experiment_id == "diagnose-nuisance").unwrap().expected_information_gain_bits;
-        let low_eig = point.ranked_experiments.iter().find(|x| x.experiment_id == "identify-actionable-cause").unwrap().expected_information_gain_bits;
+        )
+        .unwrap();
+        let high_eig = point
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "diagnose-nuisance")
+            .unwrap()
+            .expected_information_gain_bits;
+        let low_eig = point
+            .ranked_experiments
+            .iter()
+            .find(|x| x.experiment_id == "identify-actionable-cause")
+            .unwrap()
+            .expected_information_gain_bits;
         assert!(high_eig > low_eig);
 
         let decision_plan = plan_next_experiment_decision_aware(
@@ -1235,8 +1310,12 @@ mod tests {
                 minimum_decision_stability: 0.0,
                 ..DecisionAwareConfig::default()
             },
-        ).unwrap();
-        assert_eq!(decision_plan.selected.unwrap().experiment_id, "identify-actionable-cause");
+        )
+        .unwrap();
+        assert_eq!(
+            decision_plan.selected.unwrap().experiment_id,
+            "identify-actionable-cause"
+        );
     }
 
     #[test]
@@ -1263,8 +1342,14 @@ mod tests {
         let decisions = vec![TerminalDecision {
             id: "always-default".into(),
             utilities: vec![
-                HypothesisUtility { hypothesis_id: "cause-a".into(), utility: 1.0 },
-                HypothesisUtility { hypothesis_id: "cause-b".into(), utility: 1.0 },
+                HypothesisUtility {
+                    hypothesis_id: "cause-a".into(),
+                    utility: 1.0,
+                },
+                HypothesisUtility {
+                    hypothesis_id: "cause-b".into(),
+                    utility: 1.0,
+                },
             ],
         }];
         let plan = plan_next_experiment_decision_aware(
@@ -1280,7 +1365,10 @@ mod tests {
         )
         .unwrap();
         assert!(plan.selected.is_none());
-        assert_eq!(plan.abstention, Some(DecisionAbstentionReason::NoPositiveValueOfInformation));
+        assert_eq!(
+            plan.abstention,
+            Some(DecisionAbstentionReason::NoPositiveValueOfInformation)
+        );
     }
 
     #[test]
@@ -1291,10 +1379,15 @@ mod tests {
             &evidence(),
             &hypotheses(),
             &[unsafe_probe],
-            &[scenario("nominal", 1.0, vec![matrix("unsafe-probe", 0.9, 0.1)])],
+            &[scenario(
+                "nominal",
+                1.0,
+                vec![matrix("unsafe-probe", 0.9, 0.1)],
+            )],
             &decisions(),
             DecisionAwareConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(plan.selected.is_none());
         assert_eq!(
             plan.abstention,
@@ -1329,7 +1422,11 @@ mod tests {
         .selected
         .unwrap();
         assert_eq!(
-            bayes.shared_policy.iter().map(|item| item.decision_id.as_str()).collect::<Vec<_>>(),
+            bayes
+                .shared_policy
+                .iter()
+                .map(|item| item.decision_id.as_str())
+                .collect::<Vec<_>>(),
             vec!["remediate-a", "remediate-b"]
         );
 
@@ -1348,7 +1445,11 @@ mod tests {
         .unwrap();
         let minimax = minimax_plan.selected.unwrap();
         assert_eq!(
-            minimax.shared_policy.iter().map(|item| item.decision_id.as_str()).collect::<Vec<_>>(),
+            minimax
+                .shared_policy
+                .iter()
+                .map(|item| item.decision_id.as_str())
+                .collect::<Vec<_>>(),
             vec!["remediate-a", "remediate-a"],
             "exact minimax regret uses deterministic lexical tie-breaking"
         );
@@ -1406,8 +1507,12 @@ mod tests {
                 maximum_worst_case_regret: Some(0.01),
                 ..DecisionAwareConfig::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
         assert!(plan.selected.is_none());
-        assert_eq!(plan.abstention, Some(DecisionAbstentionReason::WorstCaseRegretExceeded));
+        assert_eq!(
+            plan.abstention,
+            Some(DecisionAbstentionReason::WorstCaseRegretExceeded)
+        );
     }
 }
