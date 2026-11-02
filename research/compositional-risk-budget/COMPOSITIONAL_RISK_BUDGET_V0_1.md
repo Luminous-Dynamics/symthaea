@@ -74,7 +74,7 @@ Each frozen contract binds:
 - operational alpha and statistical delta allocations;
 - target population, full execution horizon, subject/policy and joint certification experiment digests;
 - calibration-data and assumptions digests;
-- method/version, source paper/specification URL and pinned source revision;
+- method/version, source paper/specification URL, source repository URL and pinned source revision;
 - sequential filtration digest, action ID and complete action-support digest where applicable;
 - optional upstream receipt digest.
 
@@ -94,7 +94,7 @@ Hashes detect mutation relative to the frozen bytes. They are not digital signat
 
 The bundled fixture has seven claim declarations across two groups: a marginal prediction/compute/temporal group and a two-action complete conditional partition. It treats the two compute-stopping failure events separately—wrong answer after early stopping and premature abandonment of a solvable task. It binds paper/source revisions for CPC, AC-RAC and Conformal Thinking, and includes an upstream anytime-ledger receipt reference.
 
-The fixture's evidence hashes are deterministic synthetic placeholders. The sample alpha/delta allocations demonstrate the ledger's arithmetic only. They are not measured risk values, verified theorem certificates, or evidence that any of the cited methods has been reproduced in Symthaea.
+The fixture's evidence hashes are deterministic synthetic placeholders. The sample alpha/delta allocations demonstrate the ledger's arithmetic only. They are not measured risk values, verified theorem certificates, or evidence that any of the cited methods has been reproduced in Symthaea. The Conformal Thinking source repository is explicitly preliminary and not used as a paper-matched reproduction; its commit pin is provenance metadata only.
 
 Expected arithmetic for the fixture:
 
