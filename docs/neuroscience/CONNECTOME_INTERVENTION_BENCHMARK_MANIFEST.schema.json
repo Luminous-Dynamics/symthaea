@@ -1473,7 +1473,9 @@
         "score",
         "ci_low",
         "ci_high",
-        "score_state"
+        "score_state",
+        "unit_tokens",
+        "unit_manifest_sha256"
       ],
       "properties": {
         "model_id": {
@@ -1518,8 +1520,44 @@
             "not_assessed",
             "incomplete"
           ]
+        },
+        "unit_tokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "unit_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "score_state": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "score_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "unit_tokens": {
+                "minItems": 2
+              },
+              "unit_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      ]
     },
     "pairedComparison": {
       "type": "object",
