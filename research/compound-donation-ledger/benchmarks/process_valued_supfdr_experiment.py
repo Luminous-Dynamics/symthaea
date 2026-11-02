@@ -264,11 +264,12 @@ def evaluate_method(
             z = gamma[None, :] * raw_path[:, t, :]
         else:
             if method != "no_donation":
+                old_reserve = previous_reserve.copy()
                 reserve = np.minimum(
                     np.maximum(gamma[None, :] * x - 1.0, 0.0),
                     gamma[None, :]
                 )
-                dreserve = np.maximum(reserve - previous_reserve, 0.0)
+                dreserve = np.maximum(reserve - old_reserve, 0.0)
                 for i in range(n):
                     k = n - i - 1
                     if adaptive:
@@ -334,7 +335,7 @@ def evaluate_method(
             increment_cap_error = max(
                 increment_cap_error,
                 float(np.max(np.maximum(
-                    (outgoing - (previous_reserve if t > 0 else 0.0))
+                    (outgoing - old_reserve)
                     - gamma[None, :] * dx, 0.0
                 )))
             )
@@ -421,6 +422,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             # Analytic null factor mean is exactly one for every coordinate.
             null_factor_mean = 0.5 * 1.4 + 0.5 * 0.6
             assert abs(null_factor_mean - 1.0) < 1e-15
+            null_ids = np.flatnonzero(scenario.is_null)
+            null_adjusted_means = (
+                x_path[:, :, null_ids].mean(axis=(0, 2)).tolist()
+                if len(null_ids) else []
+            )
             all_results.append({
                 "scenario": scenario.name,
                 "dependence": dependence,
@@ -432,6 +438,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "alternative_hypotheses": int((~scenario.is_null).sum()),
                 "gamma_mass": total_gamma,
                 "analytic_null_lr_factor_mean": null_factor_mean,
+                "empirical_null_adjusted_evidence_mean_terminal": (
+                    float(np.mean(x_path[:, -1, null_ids]))
+                    if len(null_ids) else None
+                ),
+                "empirical_max_look_null_adjusted_evidence_mean": (
+                    float(np.max(null_adjusted_means)) if null_adjusted_means else None
+                ),
                 "results": cell_rows,
             })
             stream_id += 1
