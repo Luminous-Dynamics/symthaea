@@ -53,6 +53,40 @@ The `--trust-store-sha256` digest must come from an independent provisioning/rel
 
 The trust-store shape is described in `benchmarks/basalt/schema/witness-verifier-trust-store.v1.schema.json`. The library independently performs key-identity, quorum and failure-domain checks; JSON Schema validation alone is not sufficient.
 
+## Challenge-bound read API
+
+The library exposes three staged calls:
+
+1. `verify_member_head_response(...)` authenticates one member's response under the exact pinned trust-store bytes and checks the expected incarnation and caller-supplied 32-byte Base64URL challenge nonce.
+2. `verify_write_checkpoint(...)` requires the configured write quorum, validates checkpoint identity and canonical counters/digests, and computes the domain-separated checkpoint digest.
+3. `aggregate_witness_read(...)` requires the read quorum of distinct active member keys, matches every response to a supplied write-certified checkpoint, rejects same-sequence certified forks, permits lagging heads and selects the highest certified sequence.
+
+The caller must generate and retain the challenge nonce using a cryptographically secure RNG; this crate validates nonce shape and binding but does not generate challenges. A head response from one member does not establish a commit. Every selected head must be backed by a write-quorum certificate.
+
+Example protocol pseudocode:
+
+```rust
+let nonce = secure_random_32_bytes_base64url();
+let responses = collect_member_responses(&nonce).await?;
+let verified_responses = responses.iter()
+    .map(|raw| verify_member_head_response(
+        raw, &trust_bytes, &trust_pin, &incarnation_id, &nonce
+    ))
+    .collect::<Result<Vec<_>, _>>()?;
+let certificates = collect_referenced_checkpoint_envelopes(&verified_responses).await?;
+let verified_checkpoints = certificates.iter()
+    .map(|raw| verify_write_checkpoint(
+        raw, &trust_bytes, &trust_pin, &incarnation_id
+    ))
+    .collect::<Result<Vec<_>, _>>()?;
+let selected = aggregate_witness_read(
+    &verified_responses, &verified_checkpoints, &trust_bytes,
+    &trust_pin, &incarnation_id, &nonce
+)?;
+```
+
+The pseudocode intentionally leaves network transport and nonce generation outside this verification crate.
+
 ## Tests authored
 
 - DSSE PAE matches a separately checked-in 144-byte vector.
@@ -68,6 +102,13 @@ The trust-store shape is described in `benchmarks/basalt/schema/witness-verifier
 - Duplicate public-key identity under a second member ID fails.
 - Duplicate administrative failure domain fails.
 - Incorrect out-of-band trust-store pin fails.
+- Three-of-four challenge-bound read with one lagging replica selects sequence five.
+- Two-of-four read is anti_rollback_unknown.
+- Repeating one member response does not increase read quorum.
+- Two different write-quorum-certified checkpoint digests at the same sequence are rejected as equivocation.
+- A response with a replayed/wrong nonce is rejected.
+- A head response without its write-quorum certificate is anti_rollback_unknown.
+- Malformed or padded Base64URL challenge nonce is rejected.
 
 These are authored tests. They are not described as passing until the exact-head Rust workflow reports success.
 
@@ -78,10 +119,10 @@ A `pass` means only that a canonical payload was authenticated by the configured
 - that trust-root signatures, dual-threshold root rotation, revocation history or witness-set metadata chains are valid;
 - that the signers are independent in actual operations (the verifier checks only unique declared administrative-domain labels);
 - that the witness service durably persists before signing;
-- that a committed checkpoint is fresh, latest or immune to replay/freeze;
-- that a challenge nonce was unpredictable or answered by a live quorum;
+- that the checkpoint predecessor chain is continuous back to pinned genesis (only supplied checkpoint certificates and their sequence/digest identities are checked);
+- that the supplied challenge nonce was generated unpredictably or that members durably read their current heads before responding;
 - that a witness quorum has not been compromised beyond the declared threshold;
 - that any database snapshot is fresh or reconstructible;
 - that power-loss durability, replication or backend qualification passed.
 
-The next implementation slice must verify the offline trust-root and witness-set metadata chain, then implement challenge-bound read quorum/head selection and checkpoint predecessor/sequence validation. The protocol is documented in `docs/research/BASALT_INDEPENDENT_WITNESS_PROTOCOL_2026-11-01.md`.
+The remaining protocol work includes verifying the offline trust-root and witness-set metadata chain, verifying predecessor-chain continuity back to pinned genesis, validating durable witness persist-before-sign behavior under crashes, and comparing the selected complete authority-state manifest with a restored database projection. The nonce generator/network transport are caller responsibilities. The protocol is documented in `docs/research/BASALT_INDEPENDENT_WITNESS_PROTOCOL_2026-11-01.md`.
