@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/compute-risk-simultaneous-ucb/fixture-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "status",
+    "paper_reference",
+    "upper_risk_budget_ppm",
+    "lower_risk_budget_ppm",
+    "statistical_delta_ppm",
+    "candidate_policies",
+    "calibration_trajectories",
+    "notes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compute_risk_simultaneous_ucb.v0.1"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "synthetic_joint_grid_reference_not_a_model_or_distribution_shift_claim"
+    },
+    "paper_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paper_url",
+        "author_code_url",
+        "author_code_commit",
+        "author_code_status",
+        "method_note"
+      ],
+      "properties": {
+        "paper_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "author_code_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "author_code_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "author_code_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "upper_risk_budget_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "lower_risk_budget_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "statistical_delta_ppm": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999999
+    },
+    "candidate_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "upper_threshold_ppm",
+          "lower_threshold_by_step_ppm"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "upper_threshold_ppm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "lower_threshold_by_step_ppm": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          }
+        }
+      }
+    },
+    "calibration_trajectories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trajectory_id",
+          "scenario_id",
+          "confidence_ppm",
+          "correct_by_step",
+          "cumulative_tokens"
+        ],
+        "properties": {
+          "trajectory_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence_ppm": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          },
+          "correct_by_step": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "cumulative_tokens": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
