@@ -224,7 +224,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         result.request_sha256,
                         result.complete,
                         result.status,
-                        result.phi_s,
+                        optional_float(result.phi_s),
                         optional_float(result.signed_phi),
                         optional_index(result.selected_index),
                         result.cause_state,
