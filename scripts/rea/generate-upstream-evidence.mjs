@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const [reaRootArgument, outputArgument] = process.argv.slice(2);
-if (!reaRootArgument || !outputArgument) {
+const [reaRootArgument, outputDirectoryArgument] = process.argv.slice(2);
+if (!reaRootArgument || !outputDirectoryArgument) {
   throw new Error(
-    "Usage: tsx generate-upstream-evidence.mjs <rea-repository-root> <output-json>",
+    "Usage: tsx generate-upstream-evidence.mjs <rea-repository-root> <output-directory>",
   );
 }
 
 const reaRoot = resolve(reaRootArgument);
-const outputPath = resolve(outputArgument);
+const outputDirectory = resolve(outputDirectoryArgument);
 const packageJson = JSON.parse(
   await readFile(resolve(reaRoot, "package.json"), "utf8"),
 );
 const packageBytes = await readFile(resolve(reaRoot, "package.json"));
-const generatorBytes = await readFile(fileURLToPath(import.meta.url));
+const generatorBytes = await readFile(new URL(import.meta.url));
 const sourceCommit = process.env.REA_REFERENCE_SHA;
 const npmVersion = process.env.REA_NPM_VERSION;
 
@@ -31,46 +31,336 @@ if (!npmVersion) {
 const importFromRea = async (relativePath) =>
   import(pathToFileURL(resolve(reaRoot, "src", relativePath)).href);
 
-const [{ createEvidence, withEvidenceCallerInputPath }, { createAnalysisProfile }] =
-  await Promise.all([
-    importFromRea("domain/evidence.ts"),
-    importFromRea("domain/analysisProfile.ts"),
-  ]);
-
-const provider = {
-  id: "rea.static",
-  name: "REA Static",
-  version: "1.2.3",
-};
-const targetPath = "/fixtures/sample.apk";
-const profile = createAnalysisProfile(provider, { mode: "static" });
-
-const evidence = createEvidence(
-  {
-    path: targetPath,
-    sha256: "a".repeat(64),
-    format: "apk",
-  },
-  provider,
-  {
-    operation: "inspect_artifact",
-    parameters: { depth: 1 },
-    result: {
-      entries: [{ path: "classes.dex", size: 42 }],
-      status: "complete",
-    },
-    analysisProfile: profile,
-    locations: [{ kind: "artifact-path", path: "classes.dex" }],
-  },
-);
-
-const withCallerPath = withEvidenceCallerInputPath(evidence, targetPath);
-const raw = JSON.stringify(withCallerPath, null, 2) + "\n";
-await writeFile(outputPath, raw, { flag: "wx", mode: 0o600 });
+const [
+  { createEvidence, withEvidenceCallerInputPath, parseEvidence },
+  { createAnalysisProfile },
+] = await Promise.all([
+  importFromRea("domain/evidence.ts"),
+  importFromRea("domain/analysisProfile.ts"),
+]);
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const receipt = {
-  schema: "luminous.rea-upstream-evidence-generator-receipt.v1",
+const provider = { id: "rea.static", name: "REA Static", version: "1.2.3" };
+const profile = createAnalysisProfile(provider, { mode: "static" });
+const environment = {
+  id: "fixture-linux",
+  platform: "linux",
+  architecture: "x86_64",
+  isolation: "process",
+};
+
+const cases = [
+  {
+    name: "apk-profile-complete",
+    target: {
+      path: "/fixtures/sample.apk",
+      sha256: "a".repeat(64),
+      format: "apk",
+    },
+    provider,
+    observation: {
+      operation: "inspect_artifact",
+      parameters: { depth: 1 },
+      result: {
+        entries: [{ path: "classes.dex", size: 42 }],
+        status: "complete",
+      },
+      analysisProfile: profile,
+      locations: [{ kind: "artifact-path", path: "classes.dex" }],
+    },
+    callerPath: "/fixtures/sample.apk",
+  },
+  {
+    name: "no-subject-null-provider-version",
+    target: undefined,
+    provider: { id: "rea.transient", name: "Transient Provider", version: null },
+    observation: {
+      operation: "observe",
+      parameters: {},
+      result: { observed: true, note: "no artifact subject" },
+      rawResult: { source: "external callback" },
+      confidence: "inferred",
+      authority: "analyst-inference",
+      subjectUnavailableReason: "No artifact was supplied",
+    },
+    callerPath: "/observations/transient.json",
+  },
+  {
+    name: "empty-provider-version-and-empty-target-path",
+    target: {
+      path: "",
+      sha256: "b".repeat(64),
+      format: "apk",
+    },
+    provider: { id: "rea.legacy", name: "Legacy Provider", version: "" },
+    observation: {
+      operation: "inspect_artifact",
+      parameters: {},
+      result: { entries: [], status: "complete" },
+    },
+    callerPath: "",
+  },
+  {
+    name: "partial-raw-binary",
+    target: {
+      path: "/fixtures/raw.bin",
+      sha256: "c".repeat(64),
+      format: "raw-binary",
+      architecture: "m68k",
+    },
+    provider,
+    observation: {
+      operation: "inspect",
+      parameters: { mode: "bounded" },
+      result: { regions: [{ offset: 0, length: 16 }] },
+      relationshipCoverage: {
+        status: "partial",
+        limitations: ["callee discovery unavailable"],
+        limited_directions: ["callees"],
+        diagnostics: ["one direction was intentionally not measured"],
+      },
+    },
+    callerPath: "/fixtures/raw.bin",
+  },
+  {
+    name: "unknown-ipa-coverage",
+    target: {
+      path: "/fixtures/companion.ipa",
+      sha256: "d".repeat(64),
+      format: "ipa",
+    },
+    provider,
+    observation: {
+      operation: "inspect_artifact",
+      parameters: {},
+      result: { entries: [], status: "partial" },
+      relationshipCoverage: {
+        status: "unknown",
+        reason: "provider cannot inspect runtime relationships",
+        limited_directions: ["callers", "callees"],
+      },
+    },
+    callerPath: "/fixtures/companion.ipa",
+  },
+  {
+    name: "locations-and-safe-offset-boundary",
+    target: {
+      path: "/fixtures/native.bin",
+      sha256: "e".repeat(64),
+      format: "mach-o",
+      architecture: "arm64",
+    },
+    provider,
+    observation: {
+      operation: "inspect_native",
+      parameters: {},
+      result: { facts: ["address", "path", "offset"] },
+      relationshipCoverage: {
+        status: "complete",
+        diagnostics: ["complete within the selected function scope"],
+      },
+      locations: [
+        { kind: "address", address: "0x1000" },
+        { kind: "address-range", start: "0x1000", end: "0x1010" },
+        { kind: "artifact-path", path: "Frameworks/Native.dylib" },
+        { kind: "file-offset", offset: Number.MAX_SAFE_INTEGER },
+        {
+          kind: "file-offset-range",
+          start: 0,
+          end: Number.MAX_SAFE_INTEGER,
+        },
+      ],
+    },
+    callerPath: "/fixtures/native.bin",
+  },
+  {
+    name: "ecmascript-numbers-and-unicode-keys",
+    target: {
+      path: "/fixtures/numbers.apk",
+      sha256: "f".repeat(64),
+      format: "apk",
+    },
+    provider,
+    observation: {
+      operation: "inspect_artifact",
+      parameters: { unicode: "é/e\u0301" },
+      result: {
+        "": "BMP private-use",
+        "𐀀": "supplementary-plane",
+        "composed-é": "é",
+        "decomposed-e": "e\u0301",
+        numbers: [
+          -0,
+          -0.0,
+          9007199254740993,
+          18446744073709551615,
+          1e23,
+          1e-7,
+        ],
+      },
+      analysisProfile: profile,
+      environment,
+      rawResult: { native_number_tokens: true },
+    },
+    callerPath: "/fixtures/numbers.apk",
+  },
+  {
+    name: "gamecube-format-architecture-binding",
+    target: {
+      path: "/fixtures/game.dol",
+      sha256: "1".repeat(64),
+      format: "gamecube-dol",
+      architecture: "powerpc",
+    },
+    provider,
+    observation: {
+      operation: "inspect_artifact",
+      parameters: {},
+      result: { executable: true, format: "gamecube-dol" },
+      confidence: "derived",
+      authority: "shipped-artifact",
+    },
+    callerPath: "/fixtures/game.dol",
+  },
+  {
+    name: "raw-6502-subject",
+    target: {
+      path: "/fixtures/boot.bin",
+      sha256: "2".repeat(64),
+      format: "raw-binary",
+      architecture: "6502",
+    },
+    provider,
+    observation: {
+      operation: "inspect_raw_binary",
+      parameters: { load_address: "0x8000" },
+      result: { entrypoint: "0x8000" },
+      rawResult: { selected_architecture: "6502" },
+    },
+    callerPath: "/fixtures/boot.bin",
+  },
+];
+
+await mkdir(outputDirectory, { recursive: false, mode: 0o700 });
+const fixtureRecords = [];
+
+for (const [index, item] of cases.entries()) {
+  const created = createEvidence(item.target, item.provider, item.observation);
+  const evidence = withEvidenceCallerInputPath(created, item.callerPath);
+  const raw = Buffer.from(JSON.stringify(evidence, null, 2) + "\n");
+  const file =
+    "case-" + String(index + 1).padStart(2, "0") + "-" + item.name + ".json";
+  await writeFile(resolve(outputDirectory, file), raw, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  fixtureRecords.push({
+    name: item.name,
+    file,
+    bytes: raw.length,
+    raw_file_sha256: digest(raw),
+    evidence_id: evidence.evidence_id,
+    analysis_profile_digest: evidence.analysis_profile?.digest ?? null,
+    subject_sha256: evidence.subject?.digest.sha256 ?? null,
+    relationship_coverage: evidence.relationship_coverage,
+  });
+}
+
+const displayOnlyMutations = [];
+for (const item of fixtureRecords) {
+  const source = JSON.parse(
+    await readFile(resolve(outputDirectory, item.file), "utf8"),
+  );
+  const displayOnly = structuredClone(source);
+  if (displayOnly.subject !== null) {
+    displayOnly.subject.name = "renamed-display-only.apk";
+    displayOnly.subject.local_path = "/relocated/display-only.apk";
+  }
+  displayOnly.caller_input_path = "/relocated/caller-display-only.json";
+  const displayBytes = Buffer.from(JSON.stringify(displayOnly, null, 2) + "\n");
+  const displayPath = item.file.replace(/\.json$/u, ".display-only.json");
+  await writeFile(resolve(outputDirectory, displayPath), displayBytes, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  displayOnlyMutations.push({
+    name: item.name,
+    file: displayPath,
+    bytes: displayBytes.length,
+    raw_file_sha256: digest(displayBytes),
+    expected_evidence_id: item.evidence_id,
+  });
+}
+
+const invalidCases = [];
+const invalidInputs = [
+  {
+    name: "stale-id-after-semantic-mutation",
+    mutate(evidence) {
+      evidence.predicate_type = evidence.predicate_type + ".tampered";
+    },
+    expected_error: "identity-mismatch",
+  },
+  {
+    name: "unknown-top-level-field",
+    mutate(evidence) {
+      evidence.unreviewed_field = true;
+    },
+    expected_error: "schema-violation",
+  },
+  {
+    name: "missing-required-coverage-field",
+    mutate(evidence) {
+      delete evidence.relationship_coverage;
+    },
+    expected_error: "schema-violation",
+  },
+  {
+    name: "analysis-profile-digest-substitution",
+    mutate(evidence) {
+      if (evidence.analysis_profile !== null) {
+        evidence.analysis_profile.digest = "0".repeat(64);
+      } else {
+        evidence.predicate_type = evidence.predicate_type + ".tampered";
+      }
+    },
+    expected_error: "identity-mismatch",
+  },
+];
+
+for (const invalid of invalidInputs) {
+  const source = JSON.parse(
+    await readFile(resolve(outputDirectory, fixtureRecords[0].file), "utf8"),
+  );
+  invalid.mutate(source);
+  let upstreamRejected = false;
+  try {
+    parseEvidence(source);
+  } catch {
+    upstreamRejected = true;
+  }
+  if (!upstreamRejected) {
+    throw new Error(
+      "Upstream REA unexpectedly accepted negative control " + invalid.name,
+    );
+  }
+  const raw = Buffer.from(JSON.stringify(source, null, 2) + "\n");
+  const file = "negative-" + invalid.name + ".json";
+  await writeFile(resolve(outputDirectory, file), raw, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  invalidCases.push({
+    name: invalid.name,
+    file,
+    bytes: raw.length,
+    raw_file_sha256: digest(raw),
+    expected_error: invalid.expected_error,
+  });
+}
+
+const manifest = {
+  schema: "luminous.rea-upstream-evidence-corpus.v1",
   producer: {
     repository: "https://github.com/morluto/rea",
     commit: sourceCommit,
@@ -85,18 +375,32 @@ const receipt = {
     script_sha256: digest(generatorBytes),
     command: "tsx scripts/rea/generate-upstream-evidence.mjs",
   },
-  output: {
-    path: outputPath,
-    bytes: Buffer.byteLength(raw),
-    raw_file_sha256: digest(Buffer.from(raw)),
-    evidence_id: withCallerPath.evidence_id,
-    analysis_profile_digest: withCallerPath.analysis_profile?.digest ?? null,
-  },
+  fixture_count: fixtureRecords.length,
+  fixtures: fixtureRecords,
+  display_only_mutations: displayOnlyMutations,
+  negative_controls: invalidCases,
 };
-const receiptPath = `${outputPath}.provenance.json`;
-await writeFile(receiptPath, JSON.stringify(receipt, null, 2) + "\n", {
+const manifestBytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
+await writeFile(resolve(outputDirectory, "manifest.json"), manifestBytes, {
   flag: "wx",
   mode: 0o600,
 });
+await writeFile(
+  resolve(outputDirectory, "manifest.provenance.json"),
+  JSON.stringify(
+    {
+      schema: "luminous.rea-upstream-evidence-corpus-receipt.v1",
+      manifest_sha256: digest(manifestBytes),
+      fixture_count: fixtureRecords.length,
+      display_only_mutation_count: displayOnlyMutations.length,
+      negative_control_count: invalidCases.length,
+      producer: manifest.producer,
+      generator: manifest.generator,
+    },
+    null,
+    2,
+  ) + "\n",
+  { flag: "wx", mode: 0o600 },
+);
 
-process.stdout.write(JSON.stringify(receipt, null, 2) + "\n");
+process.stdout.write(JSON.stringify(manifest, null, 2) + "\n");
