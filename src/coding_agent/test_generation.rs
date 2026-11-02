@@ -281,7 +281,7 @@ impl TestGenerator {
         let Some(segment) = path.path.segments.last() else {
             return false;
         };
-        if segment.ident != "Vec" {
+        if segment.ident.to_string() != "Vec" {
             return false;
         }
         let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
