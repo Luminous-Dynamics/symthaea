@@ -126,8 +126,10 @@ The `StaircaseAdjuster::projective_weighted_e_bh_rank_prior` constructor is
 independent of the active family size. For a fixed candidate weight
 `weight_numerator / weight_denominator` and rational alpha, it places prior
 mass `1 / ((j + 1)(j + 2))` at the dyadic rank `2^j`. The masses telescope
-to one. The 64-point u64 implementation covers every possible finite rank;
-the remaining prior tail is unspent. The candidate's weight must be fixed as
+to one. The 64-point telescoping implementation covers every possible finite rank;
+the remaining prior tail is unspent. A second hybrid constructor mixes half
+of this prior with a uniform half over the 64 u64 rank scales, giving a
+constant 256x worst-rank threshold overhead. The candidate's weight must be fixed as
 part of the global summable weight sequence, not renormalized when the active
 roster grows. See RESEARCH.md for the validity proof and O((log k)^2)
 rank-threshold overhead.
