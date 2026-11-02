@@ -12,7 +12,14 @@ use core::fmt;
 use std::collections::HashSet;
 
 pub const PUBLISHED_REWARD_VALUES: [i16; 5] = [-50, 0, 100, 200, 400];
-/// The 2026 paper specifies ten moves. Exact v2.0 graph shape is not hard-coded.
+/// Task structure explicitly specified by the 2026 paper.
+pub const PUBLISHED_NODE_COUNT: usize = 12;
+pub const PUBLISHED_EDGE_COUNT: usize = 30;
+pub const PUBLISHED_MIN_NODE_LEVEL: u8 = 0;
+pub const PUBLISHED_MAX_NODE_LEVEL: u8 = 3;
+pub const PUBLISHED_TERMINAL_LEVEL: u8 = 3;
+pub const PUBLISHED_REQUIRED_NEGATIVE_EDGES: usize = 3;
+/// The 2026 paper specifies ten moves through a reward network.
 pub const PUBLISHED_MOVE_BUDGET: usize = 10;
 
 /// Older public GitHub repository snapshot observations; not asserted to be
@@ -116,6 +123,22 @@ impl RewardNetwork {
             });
         }
         Ok(())
+    }
+
+    /// Validate this network against the task-level structure explicitly
+    /// described in the 2026 paper: 12 nodes, 30 edges, levels 0..=3,
+    /// +400 edges sourced only at level 3, and at least three negative edges
+    /// on every directed path from a level-0 node to level 3.
+    ///
+    /// Passing these structural checks does not prove that a network came
+    /// from the paper's experimental set or Zenodo v2.0 archive.
+    pub fn validate_published_profile(&self) -> Result<(), RewardNetworkError> {
+        self.validate_shape(PUBLISHED_NODE_COUNT, PUBLISHED_EDGE_COUNT)?;
+        self.validate_level_range(PUBLISHED_MAX_NODE_LEVEL)?;
+        self.validate_terminal_strategy(
+            PUBLISHED_TERMINAL_LEVEL,
+            PUBLISHED_REQUIRED_NEGATIVE_EDGES,
+        )
     }
 
     /// Validate a source-specific node-level bound.
@@ -390,9 +413,7 @@ mod tests {
     #[test]
     fn synthetic_fixture_obeys_its_declared_test_profile() {
         let n = synthetic_network();
-        assert!(n.validate_shape(12, 30).is_ok());
-        assert!(n.validate_level_range(3).is_ok());
-        assert!(n.validate_terminal_strategy(3, 3).is_ok());
+        assert!(n.validate_published_profile().is_ok());
         assert_eq!(n.evaluator_node_level(9), Some(3));
     }
     #[test]
@@ -424,6 +445,44 @@ mod tests {
         let n = synthetic_network();
         assert_eq!(play_episode(&n, RewardPolicy::Random { seed: 42 }, 10), play_episode(&n, RewardPolicy::Random { seed: 42 }, 10));
     }
+    #[test]
+    fn published_profile_rejects_wrong_shape_and_level_range() {
+        let n = synthetic_network();
+        assert_eq!(
+            n.validate_shape(PUBLISHED_NODE_COUNT, PUBLISHED_EDGE_COUNT),
+            Ok(())
+        );
+
+        let wrong_shape = RewardNetwork::new(
+            vec![0; 1],
+            vec![],
+            0,
+        ).unwrap();
+        assert_eq!(
+            wrong_shape.validate_published_profile(),
+            Err(RewardNetworkError::ShapeMismatch {
+                nodes: 1,
+                edges: 0,
+                expected_nodes: PUBLISHED_NODE_COUNT,
+                expected_edges: PUBLISHED_EDGE_COUNT,
+            })
+        );
+
+        let above_range = RewardNetwork::new(
+            vec![0, 4],
+            vec![],
+            0,
+        ).unwrap();
+        assert_eq!(
+            above_range.validate_level_range(PUBLISHED_MAX_NODE_LEVEL),
+            Err(RewardNetworkError::LevelOutOfRange {
+                node: 1,
+                level: 4,
+                max_level: PUBLISHED_MAX_NODE_LEVEL,
+            })
+        );
+    }
+
     #[test]
     fn task_constraint_rejects_shortcut_to_terminal_level() {
         let n = synthetic_network();
