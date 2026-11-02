@@ -89,7 +89,6 @@ class MinimumEBHCreditTests(unittest.TestCase):
                     )
                     if count == k - 1:
                         expected.append(k)
-                # Candidate-specific feasible ranks always exist.
                 self.assertTrue(expected)
                 self.assertTrue(
                     minimum_credit_to_enter_ebh(scores, candidate, alpha) >= 0
@@ -121,18 +120,20 @@ class MinimumEBHCreditTests(unittest.TestCase):
 
     def test_allocator_chooses_smallest_fundable_deficit(self):
         scores = [F(12), F(2), F(1), F(0)]
-        bank = [F(2), F(1), F(0), F(0)]
+        bank = [F(5), F(4), F(0), F(0)]
         result = choose_fundable_candidate(scores, bank, F(1, 10))
-        if result is not None:
-            destination, deficit, assignments, remaining = result
-            self.assertEqual(
-                sum((amount for _, amount in assignments), F(0)), deficit
-            )
-            self.assertLess(destination, len(scores))
-            self.assertTrue(all(source < destination for source, _ in assignments))
-            self.assertEqual(
-                sum(bank, F(0)) - sum(remaining, F(0)), deficit
-            )
+        self.assertIsNotNone(result, "the test fixture must contain a fundable recipient")
+        destination, deficit, assignments, remaining = result
+        self.assertEqual(destination, 1)
+        self.assertEqual(deficit, F(3))
+        self.assertEqual(
+            sum((amount for _, amount in assignments), F(0)), deficit
+        )
+        self.assertLess(destination, len(scores))
+        self.assertTrue(all(source < destination for source, _ in assignments))
+        self.assertEqual(
+            sum(bank, F(0)) - sum(remaining, F(0)), deficit
+        )
 
 
 if __name__ == "__main__":
