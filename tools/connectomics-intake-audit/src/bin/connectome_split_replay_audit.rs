@@ -323,7 +323,7 @@ fn parse_sidecar(bytes: &[u8], errors: &mut Vec<Finding>) -> Vec<ParsedRow> {
                 continue;
             }
         };
-        let metadata: Value = match serde_json::from_str(&row.metadata) {
+        let metadata: Value = match serde_json::from_str::<Value>(&row.metadata) {
             Ok(value) if value.is_object() => value,
             Ok(_) => {
                 errors.push(Finding::global("sidecar_metadata_not_object", format!("line {} metadata must be a JSON object", line_index + 1)));
@@ -382,6 +382,7 @@ fn load_species_split_index(
     root: &Path,
     species: &str,
     errors: &mut Vec<Finding>,
+    warnings: &mut Vec<Finding>,
 ) -> Option<LoadedSpecies> {
     if !SPECIES.contains(&species) {
         errors.push(Finding::global("unsupported_species", format!("{species:?} is not one of the four ConnectomeBench2 species")));
@@ -558,7 +559,7 @@ fn audit(
     dataset_revision_commit_sha: String,
 ) -> Report {
     let mut errors = Vec::new();
-    let mut warnings = Vec::new();
+    let mut warnings: Vec<Finding> = Vec::new();
     let rows = parse_sidecar(sidecar_bytes, &mut errors);
     if rows.is_empty() {
         errors.push(Finding::global("sidecar_empty", "no valid metadata-sidecar rows were parsed"));
@@ -577,7 +578,7 @@ fn audit(
     let mut total_missing = 0_u64;
     let mut total_duplicates = 0_u64;
     for species in species_names {
-        let Some(mut loaded) = load_species_split_index(&root, &species, &mut errors) else {
+        let Some(mut loaded) = load_species_split_index(&root, &species, &mut errors, &mut warnings) else {
             continue;
         };
         for row in rows.iter().filter(|row| row.species == species) {
