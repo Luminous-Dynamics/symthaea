@@ -365,7 +365,8 @@ impl SplitMix64 {
 
     fn unit_interval_open(&mut self) -> f64 {
         let mantissa = self.next_u64() >> 11;
-        (mantissa as f64 + 0.5) * (1.0 / 9_007_199_254_740_992.0)
+        ((mantissa as f64 + 0.5) * (1.0 / 9_007_199_254_740_992.0))
+            .min(1.0 - f64::EPSILON)
     }
 
     /// Exact bounded reduction using multiply-high and rejection sampling.
@@ -526,6 +527,21 @@ mod tests {
             balanced_report.signal_detection.hit_rate,
             liberal_report.signal_detection.hit_rate
         );
+    }
+
+    #[test]
+    fn auc_is_prevalence_invariant_while_ap_baseline_is_not() {
+        let model = GaussianSignalModel::new(1.0, 0.0).unwrap();
+        let balanced = simulate(model, design(600, 600)).unwrap();
+        let rare = simulate(model, design(600, 11_400)).unwrap();
+
+        let balanced_report = evaluate(&balanced.candidate, &balanced.evaluator).unwrap();
+        let rare_report = evaluate(&rare.candidate, &rare.evaluator).unwrap();
+
+        assert!((balanced_report.roc_auc - rare_report.roc_auc).abs() < 0.02);
+        assert!((balanced_report.random_ranking_ap_baseline - 0.5).abs() < 1e-12);
+        assert!((rare_report.random_ranking_ap_baseline - 0.05).abs() < 1e-12);
+        assert!(balanced_report.average_precision > rare_report.average_precision);
     }
 
     #[test]
