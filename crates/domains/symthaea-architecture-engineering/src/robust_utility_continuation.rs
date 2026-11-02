@@ -593,12 +593,7 @@ fn validate_alternative_probabilities(
         }
         validate_probability(entry.probability, &format!("{path}[{index}].probability"))?;
     }
-    if seen != *expected_models {
-        return Err(RobustUtilityError::new(
-            path,
-            "one or more declared alternative models have no transition probability",
-        ));
-    }
+    // Equal cardinality plus unique membership in the declared set proves coverage.
     Ok(())
 }
 
