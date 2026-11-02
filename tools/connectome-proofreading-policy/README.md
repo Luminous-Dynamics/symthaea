@@ -55,7 +55,7 @@ Run in an environment with Rust installed:
 cargo test --locked --manifest-path tools/connectome-proofreading-policy/Cargo.toml
 ```
 
-Eleven unit tests are authored, including the review-budget known answer, cost-sensitive ranking, review-resolution adjustment, deterministic tie-breaking, zero budget, non-fitting cases, a greedy-suboptimality counterexample and malformed-input rejection. They have **not** been compiled or executed in the current authoring environment.
+Twelve unit tests are authored, including the review-budget known answer, cost-sensitive ranking, review-resolution adjustment, deterministic tie-breaking, zero budget, non-fitting cases, a greedy-suboptimality counterexample and malformed-input rejection. They have **not** been compiled or executed in the current authoring environment.
 
 ## Next implementation steps
 
