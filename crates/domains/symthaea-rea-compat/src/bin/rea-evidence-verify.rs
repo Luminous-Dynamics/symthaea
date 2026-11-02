@@ -133,19 +133,15 @@ fn read_bounded<R: Read>(reader: R, max_bytes: usize) -> Result<Vec<u8>, CliErro
     if bytes.len() > max_bytes {
         return Err(CliError::Evidence(EvidenceError {
             kind: EvidenceErrorKind::InputTooLarge,
-            message: format!(
-                "Evidence JSON exceeds the {} byte input limit",
-                max_bytes
-            ),
+            message: format!("Evidence JSON exceeds the {} byte input limit", max_bytes),
         }));
     }
     Ok(bytes)
 }
 
 fn verify_path(path: &PathBuf) -> Result<(VerifiedEvidence, usize), CliError> {
-    let file = File::open(path).map_err(|error| {
-        CliError::Io(format!("cannot open Evidence input: {error}"))
-    })?;
+    let file = File::open(path)
+        .map_err(|error| CliError::Io(format!("cannot open Evidence input: {error}")))?;
     let bytes = read_bounded(file, MAX_EVIDENCE_JSON_BYTES)?;
     let byte_len = bytes.len();
     let verified = verify_evidence_json(&bytes).map_err(CliError::Evidence)?;
@@ -316,9 +312,7 @@ mod tests {
             }
         );
 
-        let literal_args = ["--", "--json"]
-            .into_iter()
-            .map(std::ffi::OsString::from);
+        let literal_args = ["--", "--json"].into_iter().map(std::ffi::OsString::from);
         assert_eq!(
             parse_arguments(literal_args).unwrap(),
             Arguments {
@@ -345,7 +339,12 @@ mod tests {
                 .unwrap();
         let evidence = symthaea_rea_compat::verify_evidence_value(&fixture).unwrap();
         let rendered = success_json(&evidence, 123).to_string();
-        for forbidden in ["/tmp/sample.apk", "classes.dex", "normalized_result", "raw_result"] {
+        for forbidden in [
+            "/tmp/sample.apk",
+            "classes.dex",
+            "normalized_result",
+            "raw_result",
+        ] {
             assert!(!rendered.contains(forbidden));
         }
         assert_eq!(
