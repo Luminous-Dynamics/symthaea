@@ -102,11 +102,11 @@ A radius of one is vacuous for normalized bounded-function expectation transport
 
 ### Functional adapter
 
-The function transport_bounded_expectation_interval verifies the transport report and expands a calibration confidence interval using the registered range width. It clips to the functional's valid support and rejects malformed, out-of-range, overflowing, or inverted values.
+The function transport_bounded_expectation_interval requires the caller to pass the expected functional-contract digest and the calibration-interval source digest. It rejects a contract mismatch or an unbound interval, verifies the transport report, and expands the calibration confidence interval using the registered range width. It clips to the functional's valid support and rejects malformed, out-of-range, overflowing, or inverted values.
 
 The output reports the transport failure probability only. It does not claim to include the calibration functional's failure budget; the caller must compose that separately.
 
-The helper compose_null_error_budget_after_transport provides that composition for a top-level null Type-I claim. It requires the upstream calibration event to be independent of confirmation, rejects any nonzero additional null-side event without the same declaration, adds all failure probabilities with a union bound, and derives conditional alpha as (alpha - delta_total) / (1 - delta_total). The total confidence-failure budget must be strictly below nominal alpha.
+The helper compose_null_error_budget_after_transport provides that composition for a top-level null Type-I claim. It requires the upstream calibration contract digest to match the transport's functional contract, requires the upstream calibration event to be independent of confirmation, rejects any nonzero additional null-side event without the same declaration, adds all failure probabilities with a union bound, and derives conditional alpha as (alpha - delta_total) / (1 - delta_total). The total confidence-failure budget must be strictly below nominal alpha.
 
 ## 3. Fail-closed assumptions and limits
 
@@ -136,7 +136,7 @@ Unsupported in v0.1:
 
 ## 4. Tests authored
 
-Twelve module tests are authored:
+Thirteen module tests are authored:
 
 1. Two-sample empirical TV plus both Weissman slacks.
 2. One-category exact zero TV radius.
@@ -149,7 +149,7 @@ Twelve module tests are authored:
 9. Non-IID calibration sample rejection.
 10. Overflowing functional-range rejection.
 11. Conditional-alpha budget composition and exact formula reconstruction.
-12. Confirmation-dependent evidence and over-budget alpha rejection (including calibration/target sample independence from confirmation).
+12. Confirmation-dependent evidence and over-budget alpha rejection (including calibration/target sample independence from confirmation). 13. Functional-contract mismatch and missing calibration-interval source receipt rejection.
 
 **Tests are authored, not run.** No cargo test, cargo check, rustfmt, Clippy, CI, or performance result is claimed.
 
