@@ -998,6 +998,57 @@ mod tests {
     }
 
     #[test]
+    fn local_stratum_guardrail_can_bind_while_global_guardrail_has_slack() {
+        let mut request = fixture();
+        for row in &mut request.guardrail_evidence.policy_bounds {
+            if row.requirement_id == "local-access-floor" {
+                if row.policy_id == "unsafe-high-utility" {
+                    row.lower_confidence_bound = Some(0.10);
+                    row.upper_confidence_bound = Some(0.20);
+                } else {
+                    row.lower_confidence_bound = Some(0.80);
+                    row.upper_confidence_bound = Some(0.90);
+                }
+            }
+        }
+        let report = analyze_guardrail_constrained_frontier(&request).unwrap();
+        let weights = report.selected_policy_weights.iter()
+            .map(|row| (row.policy_id.as_str(), row.probability))
+            .collect::<BTreeMap<_, _>>();
+        assert!((weights["unsafe-high-utility"] - (1.0 / 7.0)).abs() < 1e-8);
+        let local = report.guardrail_results.iter()
+            .find(|row| row.requirement.requirement_id == "local-access-floor")
+            .unwrap();
+        assert!((local.mixture_lower_confidence_bound - 0.70).abs() < 1e-8);
+        assert!(local.active_at_tolerance);
+        let global = report.guardrail_results.iter()
+            .find(|row| row.requirement.requirement_id == "global-crash-rate")
+            .unwrap();
+        assert!(global.signed_slack > 0.0);
+        assert!(!global.active_at_tolerance);
+        verify_guardrail_constrained_frontier_report(&request, &report).unwrap();
+    }
+
+    #[test]
+    fn infeasible_guardrail_polytope_fails_closed() {
+        let mut request = fixture();
+        for row in &mut request.guardrail_evidence.policy_bounds {
+            if row.requirement_id == "global-crash-rate" {
+                if row.policy_id == "unsafe-high-utility" {
+                    row.lower_confidence_bound = Some(0.07);
+                    row.upper_confidence_bound = Some(0.08);
+                } else {
+                    row.lower_confidence_bound = Some(0.08);
+                    row.upper_confidence_bound = Some(0.09);
+                }
+            }
+        }
+        let error = analyze_guardrail_constrained_frontier(&request)
+            .expect_err("a convex mixture of universally unsafe policies must be infeasible");
+        assert!(error.to_string().contains("no feasible randomized policy vertex"));
+    }
+
+    #[test]
     fn nonestimable_policy_is_excluded_and_cannot_receive_positive_mass() {
         let mut request = fixture();
         let row = request.guardrail_evidence.policy_bounds.iter_mut()
