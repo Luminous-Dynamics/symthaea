@@ -1552,6 +1552,7 @@ mod tests {
         );
         let mut changed = request.detector_specs.clone();
         changed[0].weight_permille = 400;
+        changed[1].weight_permille = 600;
         assert_ne!(
             compute_detector_registry_sha256(&changed).unwrap(),
             request.detector_registry_sha256
@@ -1562,8 +1563,7 @@ mod tests {
     fn detector_weights_must_be_fixed_and_sum_to_one_thousand() {
         let mut request = sample_request();
         request.detector_specs[0].weight_permille = 400;
-        request.detector_registry_sha256 =
-            compute_detector_registry_sha256(&request.detector_specs).unwrap();
+        assert!(compute_detector_registry_sha256(&request.detector_specs).is_err());
         assert!(calibrate_detector_panel(&request).is_err());
     }
 
