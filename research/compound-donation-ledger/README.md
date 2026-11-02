@@ -103,6 +103,9 @@ discovery separately. Example commands:
 ~~~sh
 python3 benchmarks/staircase_rank_geometric_exploratory.py --dependence independent
 python3 benchmarks/staircase_rank_geometric_exploratory.py --dependence balanced_negative_null
+
+# Fixed candidate weights across m=10,100,1000 prefixes
+python3 benchmarks/projective_rank_horizon_transfer.py
 ~~~
 
 
@@ -140,3 +143,11 @@ spends more prior mass on that finite rank range. Do not recalculate that
 constructor as the active family grows. Use the projective constructor when
 horizon extension is a requirement.
 
+
+The projective transfer runner uses a fixed global weight sequence
+`gamma_i = 1 / max_family_size` and does not renormalize shorter prefixes.
+Its recorded exploratory output is
+`benchmarks/projective_rank_horizon_transfer_2026-11-02.json`. That run used
+300 streams per cell, so its SupFDR point estimates have wide Monte Carlo
+uncertainty; the main value of the experiment is the power-transfer comparison
+under one horizon-coherent weight sequence.
