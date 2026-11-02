@@ -112,6 +112,13 @@ pub struct QueryStabilityReport {
     pub source_volume_id: String,
     pub first_checkpoint_id: String,
     pub latest_checkpoint_id: String,
+    /// Content-addressed graph snapshot bounds of the audited observation window.
+    pub first_graph_snapshot_sha256: String,
+    pub latest_graph_snapshot_sha256: String,
+    /// Provenance artifacts for the latest graph state and its uncertainty interpretation.
+    pub latest_edit_history_manifest_sha256: String,
+    pub graph_builder_config_sha256: String,
+    pub structural_uncertainty_manifest_sha256: String,
     pub first_edit_count: u64,
     pub latest_edit_count: u64,
     pub checkpoint_count: usize,
@@ -318,6 +325,11 @@ pub fn audit_query_stability(
         source_volume_id: input.source_volume_id.clone(),
         first_checkpoint_id: first.checkpoint_id.clone(),
         latest_checkpoint_id: latest.checkpoint_id.clone(),
+        first_graph_snapshot_sha256: first.graph_snapshot_sha256.clone(),
+        latest_graph_snapshot_sha256: latest.graph_snapshot_sha256.clone(),
+        latest_edit_history_manifest_sha256: latest.edit_history_manifest_sha256.clone(),
+        graph_builder_config_sha256: latest.graph_builder_config_sha256.clone(),
+        structural_uncertainty_manifest_sha256: latest.structural_uncertainty_manifest_sha256.clone(),
         first_edit_count: first.cumulative_edit_count,
         latest_edit_count: latest.cumulative_edit_count,
         checkpoint_count: input.checkpoints.len(),
@@ -670,6 +682,11 @@ mod tests {
         assert!(!report.future_stability_certified);
         assert!(!report.universal_connectome_completeness_claimed);
         assert_eq!(report.metrics.len(), 2);
+        assert_eq!(report.first_graph_snapshot_sha256, SHA_A);
+        assert_eq!(report.latest_graph_snapshot_sha256, SHA_B);
+        assert_eq!(report.latest_edit_history_manifest_sha256, SHA_C);
+        assert_eq!(report.graph_builder_config_sha256, SHA_D);
+        assert_eq!(report.structural_uncertainty_manifest_sha256, SHA_B);
         assert!(report.metrics.iter().all(|metric| metric.stable_over_observed_window));
     }
 
