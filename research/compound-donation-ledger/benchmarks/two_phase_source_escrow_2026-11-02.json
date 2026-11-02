@@ -1,45 +1,58 @@
 {
-  "scope": "Exact Fraction source-escrow accounting and independent event replay only; not statistical validity, power, Rust tests or production execution.",
-  "policy_digest": "sha256:two-phase-source-escrow-v1",
-  "parameters": {
-    "traces": 50,
-    "candidate_universe": 16,
+  "benchmark": "two_phase_source_escrow_independent_replay",
+  "scope": "Exact Fraction accounting/protocol replay only; not e-process validity, FDR/SupFDR, statistical power, Rust implementation, or source authenticity.",
+  "configuration": {
+    "traces": 250,
+    "hypotheses": 16,
     "rounds_per_trace": 40,
-    "weight_sequence": "gamma_i=1/[(i+1)(i+2)]",
-    "reserve": "D_i,t=min((gamma_i*X_i,t-1)_+,gamma_i)",
-    "arithmetic": "fractions.Fraction exact"
+    "gamma": "1/16 per candidate; total mass exactly 1",
+    "activation": "predictable blocks of four candidates, staggered every five rounds",
+    "assignment": "past-only allocation; each assignment occurs strictly after reserve creation; destination immutable",
+    "credit": "partial credit permitted only after recipient activation",
+    "arithmetic": "fractions.Fraction exact",
+    "policy_digest": "f1d6f650131bba0c62ec2299807f35b2d8958834b9eb86c78a24f3300d353fab"
   },
-  "deterministic_seed_schedule": "10075 + trace_index",
-  "observed": {
-    "events_replayed": 27376,
-    "negative_controls_rejected": 6,
-    "all_randomized_traces_passed": true,
-    "writer_vs_independent_replay_final_state_equal": true
+  "event_counts": {
+    "Activate": 4000,
+    "Assigned": 14936,
+    "Credited": 29621,
+    "Evidence": 130000,
+    "UnassignedReserved": 7203,
+    "LookCommit": 10000,
+    "total": 195760
   },
-  "checked_invariants": [
-    "source-only donor cap",
-    "reserve increment <= gamma_i * new evidence increment",
-    "forward-only destination",
-    "assignment only after reservation",
-    "assignment amount <= unassigned source balance",
-    "source-scoped token IDs",
-    "source-local assignment ordinals",
-    "immutable assignment destination",
-    "credit only after assignment and recipient activation",
-    "partial-credit conservation",
-    "per-token original = unassigned + assigned face",
-    "per-assignment face = remaining + credited",
-    "prefix budget after every event",
-    "nonnegative and nondecreasing weighted compound scores",
-    "global outgoing = incoming + all escrow"
-  ],
-  "negative_controls": [
-    "backwards destination",
-    "assignment overdraw",
-    "credit overdraw",
-    "credit destination tampering",
-    "duplicate assignment event",
-    "policy digest tampering"
-  ],
-  "claim_boundary": "This tests the ledger state machine. It does not prove the e-process assumptions, SupFDR, projectivity of adaptive routing, or statistical power."
+  "independent_replay": {
+    "base_traces_passed": 250,
+    "all_events_replayed": true,
+    "checks": [
+      "source-only reserve derived from own evidence",
+      "donor cap",
+      "own-increment cap",
+      "strictly forward destination",
+      "assignment only after source reserve",
+      "immutable destination",
+      "source-scoped token ordinal",
+      "source-scoped assignment ordinal",
+      "assignment does not exceed unassigned token balance",
+      "credit does not exceed assigned remaining balance",
+      "credit only after recipient activation",
+      "prefix budget after every event",
+      "nonnegative scores after every event",
+      "nondecreasing scores at each atomic LookCommit",
+      "per-token conservation",
+      "global unassigned + assigned + credited conservation",
+      "policy digest and event sequence integrity",
+      "incoming credit cannot fund a new reserve"
+    ]
+  },
+  "negative_controls": {
+    "policy_digest_tamper": "rejected",
+    "backward_destination": "rejected",
+    "overassignment": "rejected",
+    "duplicate_assignment_id": "rejected",
+    "credit_overdraw": "rejected",
+    "incoming_credit_cannot_fund_reserve": "rejected",
+    "all_rejected": true
+  },
+  "interpretation": "The replay validates the two-phase accounting state machine on deterministic exact-rational traces. It does not validate the statistical e-process assumptions or a production Rust implementation."
 }
