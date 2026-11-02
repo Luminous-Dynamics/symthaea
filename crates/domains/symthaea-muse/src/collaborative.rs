@@ -121,9 +121,6 @@ impl CollaborativeComposer {
 
         let mut state = MusicalState::default();
         state.harmony_activations = self.collective_harmonies;
-        // Disagreement is computed from the musical contributions themselves,
-        // not from a proxy labelled as consciousness.
-        state.arousal = self.compute_disagreement();
         state
     }
 
@@ -212,6 +209,14 @@ impl CollaborativeComposer {
     pub fn collective_harmonies(&self) -> &[f32; 8] {
         &self.collective_harmonies
     }
+
+    /// Measure disagreement between participants' harmony feature vectors.
+    ///
+    /// This is a descriptive feature-space statistic. It is not affective
+    /// arousal, social conflict, or an estimate of consciousness.
+    pub fn disagreement(&self) -> f32 {
+        self.compute_disagreement()
+    }
 }
 
 #[cfg(test)]
@@ -281,18 +286,25 @@ mod tests {
     }
 
     #[test]
-    fn disagreement_increases_arousal() {
+    fn disagreement_tracks_musical_contribution_vectors() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        // Very different Phi values = high disagreement
+        // Identical musical contributions have zero feature disagreement,
+        // regardless of different legacy Phi-like values.
         composer.contribute(make_contribution(1, 0.1, [0.5; 8]));
         composer.contribute(make_contribution(2, 0.9, [0.5; 8]));
-        let state = composer.blend();
+        assert_eq!(composer.disagreement(), 0.0);
 
+        let mut different = CollaborativeComposer::new(BlendStrategy::Mean);
+        different.contribute(make_contribution(1, 0.9, [0.1; 8]));
+        different.contribute(make_contribution(2, 0.1, [0.9; 8]));
         assert!(
-            state.arousal > 0.3,
-            "disagreement should increase arousal: {}",
-            state.arousal
+            different.disagreement() > 0.3,
+            "distinct music contributions should show feature disagreement"
         );
+
+        // The descriptive aggregate does not masquerade as affective arousal.
+        let state = different.blend();
+        assert_eq!(state.arousal, MusicalState::default().arousal);
     }
 
     #[test]
