@@ -1206,6 +1206,27 @@ mod tests {
     }
 
     #[test]
+    fn empty_paired_decision_world_set_is_rejected() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![]),
+        });
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedDecisionWorldsEmpty { .. })
+        ));
+    }
+
+    #[test]
     fn paired_decision_worlds_require_a_pre_registered_threshold() {
         let mut item = evaluation(
             "pathway",
