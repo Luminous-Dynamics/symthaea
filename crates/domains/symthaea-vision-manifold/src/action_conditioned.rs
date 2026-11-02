@@ -1131,6 +1131,9 @@ mod tests {
 
         let mut second_bank = bank();
         second_bank.history_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
+        for sample in &mut second_bank.samples {
+            sample.branch_id = format!("second-{}", sample.branch_id);
+        }
         second_bank.bank_sha256 = compute_action_forecast_bank_sha256(&second_bank);
         let second_request = ActionForecastRequest {
             observed: ObservedVisualBelief {
