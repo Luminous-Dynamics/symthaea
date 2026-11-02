@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "status": "synthetic_finite_support_reference_not_a_formal_guarantee",
   "scenario_id": "nonmonotone_action_risk_rare_catastrophe",
-  "risk_budget_ppm": 100000,
+  "risk_budget_ppm": 105000,
   "cvar_alpha_ppm": 50000,
   "worst_case_loss_ppm": 1000000,
   "action_support": [
@@ -75,6 +75,14 @@
     ]
   },
   "beta_grid": [
+    {
+      "numerator": 1,
+      "denominator": 16
+    },
+    {
+      "numerator": 1,
+      "denominator": 8
+    },
     {
       "numerator": 1,
       "denominator": 4
