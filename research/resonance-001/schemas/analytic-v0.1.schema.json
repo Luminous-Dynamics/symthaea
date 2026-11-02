@@ -9,7 +9,8 @@
     "claim_ceiling",
     "series_rlc",
     "parallel_rlc",
-    "coupled_identical_resonators"
+    "coupled_identical_resonators",
+    "driven_lossy_coupled_loops"
   ],
   "properties": {
     "schema": {
@@ -59,6 +60,127 @@
         },
         "expected": {
           "type": "object"
+        }
+      }
+    },
+    "driven_lossy_coupled_loops": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_resistance_ohm",
+        "primary_inductance_h",
+        "primary_capacitance_f",
+        "secondary_resistance_ohm",
+        "secondary_inductance_h",
+        "secondary_capacitance_f",
+        "coupling_coefficient",
+        "secondary_winding_polarity",
+        "frequency_hz",
+        "expected"
+      ],
+      "properties": {
+        "primary_resistance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "primary_inductance_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "primary_capacitance_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "secondary_resistance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "secondary_inductance_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "secondary_capacitance_f": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "coupling_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "secondary_winding_polarity": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mutual_inductance_h",
+            "primary_input_impedance_ohm",
+            "secondary_current_per_volt_a_per_v",
+            "secondary_resistor_voltage_per_volt",
+            "secondary_resistor_power_w_per_v2"
+          ],
+          "properties": {
+            "mutual_inductance_h": {
+              "type": "number"
+            },
+            "primary_input_impedance_ohm": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "secondary_current_per_volt_a_per_v": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "secondary_resistor_voltage_per_volt": {
+              "type": "object",
+              "required": [
+                "real",
+                "imaginary"
+              ],
+              "properties": {
+                "real": {
+                  "type": "number"
+                },
+                "imaginary": {
+                  "type": "number"
+                }
+              }
+            },
+            "secondary_resistor_power_w_per_v2": {
+              "type": "number"
+            }
+          }
         }
       }
     }
