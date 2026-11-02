@@ -603,6 +603,28 @@ mod tests {
         assert_eq!(finite_sample_radius(&[8,1,7,2,6,3,5,4,9], 100_000).unwrap(), Some(9));
     }
     #[test]
+    fn zero_and_full_tail_probabilities_are_exact() {
+        let mut rng = SplitMix64::new(123);
+        assert!(!(0..64).any(|_| tail_event(&mut rng, 0)));
+        assert!((0..64).all(|_| tail_event(&mut rng, 1_000_000)));
+    }
+    #[test]
+    fn fixture_rejects_float_transform_or_stream_contract_drift() {
+        let altered = REGISTRY_JSON.replace(
+            "u32=next_u32(); signed_ppm=floor(2000000*u32/(2^32-1))-1000000; use z_ppm=signed_ppm for residual innovations",
+            "u=(next_u64+0.5)/2^64",
+        );
+        assert!(load_registry(&altered).is_err());
+    }
+    #[test]
+    fn revision_schedule_cannot_backdate_initial_label_before_feedback() {
+        let (_, mut scenarios) = load_builtin_registry().unwrap();
+        let spec = scenarios.iter_mut().find(|s| s.id == "superseded_outcome_feedback").unwrap();
+        spec.label_revisions[0].initial_available_step = 3005;
+        assert!(generate_outcomes(spec, 83).is_err());
+    }
+
+    #[test]
     fn complete_replay_builds_verified_bitemporal_ledger() {
         let (_, scenarios) = load_builtin_registry().unwrap();
         let spec = scenarios.iter().find(|s| s.id == "superseded_outcome_feedback").unwrap();
