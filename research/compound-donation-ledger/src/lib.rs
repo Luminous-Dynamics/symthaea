@@ -561,6 +561,8 @@ pub struct ThresholdMass {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StaircaseAdjuster {
     points: Vec<ThresholdMass>,
+    /// Prefix sums of prior_mass * threshold, in exact numerator units.
+    prefix_numerators: Vec<u128>,
 }
 
 impl StaircaseAdjuster {
@@ -582,7 +584,22 @@ impl StaircaseAdjuster {
         if total_mass > PRIOR_MASS_SCALE {
             return Err(LedgerError::InvalidWeightBudget);
         }
-        Ok(Self { points })
+        let mut prefix_numerators = Vec::with_capacity(points.len());
+        let mut cumulative = 0_u128;
+        for point in &points {
+            let contribution = point
+                .prior_mass
+                .checked_mul(point.threshold)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            cumulative = cumulative
+                .checked_add(contribution)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            prefix_numerators.push(cumulative);
+        }
+        Ok(Self {
+            points,
+            prefix_numerators,
+        })
     }
 
     /// Builds an equal-prior geometric grid over the e-BH rejection ranks.
@@ -706,17 +723,11 @@ impl StaircaseAdjuster {
     /// The exact result is rounded down to evidence ticks. This cannot increase
     /// calibrated evidence and avoids floating-point threshold ambiguity.
     pub fn value_at(&self, running_supremum: u128) -> Result<u128, LedgerError> {
-        let mut numerator = 0_u128;
-        for point in self.points.iter().take_while(|point| point.threshold <= running_supremum) {
-            let contribution = point
-                .prior_mass
-                .checked_mul(point.threshold)
-                .ok_or(LedgerError::ArithmeticOverflow)?;
-            numerator = numerator
-                .checked_add(contribution)
-                .ok_or(LedgerError::ArithmeticOverflow)?;
+        let count = self.points.partition_point(|point| point.threshold <= running_supremum);
+        if count == 0 {
+            return Ok(0);
         }
-        Ok(numerator / PRIOR_MASS_SCALE)
+        Ok(self.prefix_numerators[count - 1] / PRIOR_MASS_SCALE)
     }
 
     pub fn points(&self) -> &[ThresholdMass] {
@@ -1008,6 +1019,22 @@ mod tests {
         );
         assert_eq!(adjuster.value_at(100 * EVIDENCE_ONE - 1).unwrap(), 2 * EVIDENCE_ONE);
         assert_eq!(adjuster.value_at(EVIDENCE_ONE).unwrap(), 0);
+    }
+
+    #[test]
+    fn staircase_binary_query_matches_linear_exact_reference() {
+        let adjuster = StaircaseAdjuster::new(vec![
+            ThresholdMass { threshold: 2 * EVIDENCE_ONE, prior_mass: 100_000_000 },
+            ThresholdMass { threshold: 8 * EVIDENCE_ONE, prior_mass: 200_000_000 },
+            ThresholdMass { threshold: 32 * EVIDENCE_ONE, prior_mass: 300_000_000 },
+        ]).unwrap();
+        for x in (0..=40_u128).map(|value| value * EVIDENCE_ONE / 2) {
+            let numerator: u128 = adjuster.points().iter()
+                .filter(|point| point.threshold <= x)
+                .map(|point| point.prior_mass * point.threshold)
+                .sum();
+            assert_eq!(adjuster.value_at(x).unwrap(), numerator / PRIOR_MASS_SCALE);
+        }
     }
 
     #[test]
