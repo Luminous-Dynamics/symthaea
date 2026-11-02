@@ -74,6 +74,24 @@ pub struct PairedEffectBounds {
     pub decision_worlds: Option<Vec<PairedDecisionWorld>>,
 }
 
+/// Independent closure receipt for a declared finite universe of admissible paired worlds.
+/// All digest references and the closure_verified assertion must be checked by the ingestion
+/// adapter against the actual immutable artifacts and pinned verifier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PairedWorldSetCoverage {
+    pub universe_id: String,
+    pub universe_manifest_sha256: String,
+    pub admissibility_policy_sha256: String,
+    pub enumeration_input_sha256: String,
+    pub enumerator_sha256: String,
+    pub expected_world_manifest_sha256: String,
+    pub closure_proof_sha256: String,
+    pub verifier_sha256: String,
+    pub verification_receipt_sha256: String,
+    pub expected_world_ids: Vec<String>,
+    pub closure_verified: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct QueryScenarioEvaluation {
     pub query_id: String,
@@ -92,6 +110,9 @@ pub struct QueryScenarioEvaluation {
     /// Optional paired-world interval. If present, it must be contained by the rectangular
     /// outer bound and have independently verifiable evidence.
     pub paired_effect: Option<PairedEffectBounds>,
+    /// Optional independent closure receipt. Without it, paired results are scoped only to the
+    /// supplied paired-world set, never to the entire declared structural universe.
+    pub paired_world_set_coverage: Option<PairedWorldSetCoverage>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +156,19 @@ pub enum EffectMethod {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionFlipScope {
+    NotApplicable,
+    /// The Cartesian product of marginal before/after intervals, not a paired latent-world set.
+    MarginalRectangularProduct,
+    /// Only the paired worlds supplied in the input; no completeness claim.
+    SuppliedPairedWorldSet,
+    /// Exact finite universe named by a separately verified closure receipt.
+    DeclaredFiniteUniverse,
+    /// Different scenarios in the same query use different scopes.
+    Mixed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecisionFlipMethod {
     NotConfigured,
     MarginalIntervalOuterBound,
@@ -157,6 +191,7 @@ pub struct ScenarioImpact {
     pub after_edit_decision: DecisionClass,
     pub decision_flip: DecisionFlipStatus,
     pub decision_flip_method: DecisionFlipMethod,
+    pub decision_flip_scope: DecisionFlipScope,
     pub paired_decision_world_count: usize,
     pub materiality_exceeded_possible: bool,
     pub materiality_exceeded_guaranteed: bool,
@@ -176,6 +211,7 @@ pub struct QueryImpactSummary {
     pub materiality_exceeded_possible: bool,
     pub materiality_exceeded_guaranteed: bool,
     pub aggregate_decision_flip: DecisionFlipStatus,
+    pub aggregate_decision_flip_scope: DecisionFlipScope,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -216,6 +252,11 @@ pub enum QueryImpactError {
     DuplicatePairedDecisionWorld { query_id: String, scenario_id: String, world_id: String },
     PairedDecisionValueOutsideMarginal { query_id: String, scenario_id: String, world_id: String },
     PairedDecisionDifferenceOutsideEffect { query_id: String, scenario_id: String, world_id: String },
+    PairedWorldCoverageRequiresDecisionWorlds { query_id: String, scenario_id: String },
+    EmptyExpectedWorldSet { query_id: String, scenario_id: String },
+    DuplicateExpectedWorldId { query_id: String, scenario_id: String, world_id: String },
+    ExpectedWorldSetMismatch { query_id: String, scenario_id: String },
+    WorldSetCoverageNotVerified { query_id: String, scenario_id: String },
     NoQueryScenarios,
 }
 
@@ -285,6 +326,21 @@ impl fmt::Display for QueryImpactError {
             }
             Self::PairedDecisionDifferenceOutsideEffect { query_id, scenario_id, world_id } => {
                 write!(f, "query {query_id} scenario {scenario_id} paired world {world_id} lies outside the paired effect interval")
+            }
+            Self::PairedWorldCoverageRequiresDecisionWorlds { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} supplied a world-set closure receipt without paired decision worlds")
+            }
+            Self::EmptyExpectedWorldSet { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} declared an empty finite world universe")
+            }
+            Self::DuplicateExpectedWorldId { query_id, scenario_id, world_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} repeats expected world ID {world_id}")
+            }
+            Self::ExpectedWorldSetMismatch { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} evaluated world IDs do not exactly match the declared universe")
+            }
+            Self::WorldSetCoverageNotVerified { query_id, scenario_id } => {
+                write!(f, "query {query_id} scenario {scenario_id} world-set closure receipt is not independently verified")
             }
             Self::NoQueryScenarios => write!(f, "candidate has no query scenario evaluations"),
         }
@@ -418,6 +474,9 @@ pub fn analyze_candidate(
             materiality_exceeded_possible,
             materiality_exceeded_guaranteed,
             aggregate_decision_flip,
+            aggregate_decision_flip_scope: aggregate_flip_scope(
+                accumulator.scenarios.iter().map(|scenario| scenario.decision_flip_scope),
+            ),
         });
     }
 
@@ -482,6 +541,7 @@ fn analyze_scenario(
         decision_flip,
         decision_flip_method,
         paired_decision_world_count,
+        decision_flip_scope,
     ) = match evaluation.decision_threshold {
         None => {
             if evaluation
@@ -501,6 +561,7 @@ fn analyze_scenario(
                 DecisionFlipStatus::NotConfigured,
                 DecisionFlipMethod::NotConfigured,
                 0,
+                DecisionFlipScope::NotApplicable,
             )
         }
         Some(threshold) => {
@@ -525,12 +586,18 @@ fn analyze_scenario(
                 } else {
                     DecisionFlipStatus::Possible
                 };
+                let scope = if evaluation.paired_world_set_coverage.is_some() {
+                    DecisionFlipScope::DeclaredFiniteUniverse
+                } else {
+                    DecisionFlipScope::SuppliedPairedWorldSet
+                };
                 (
                     baseline,
                     after,
                     flip,
                     DecisionFlipMethod::PairedSharedWorlds,
                     worlds.len(),
+                    scope,
                 )
             } else {
                 (
@@ -543,6 +610,7 @@ fn analyze_scenario(
                     ),
                     DecisionFlipMethod::MarginalIntervalOuterBound,
                     0,
+                    DecisionFlipScope::MarginalRectangularProduct,
                 )
             }
         }
@@ -605,6 +673,20 @@ fn classify_flip(
         DecisionFlipStatus::Possible
     } else {
         DecisionFlipStatus::Impossible
+    }
+}
+
+fn aggregate_flip_scope(
+    scopes: impl Iterator<Item = DecisionFlipScope>,
+) -> DecisionFlipScope {
+    let mut iter = scopes;
+    let Some(first) = iter.next() else {
+        return DecisionFlipScope::NotApplicable;
+    };
+    if iter.all(|scope| scope == first) {
+        first
+    } else {
+        DecisionFlipScope::Mixed
     }
 }
 
@@ -693,6 +775,69 @@ fn validate_evaluation(
         evaluation.hypothetical_after_edit.lower,
         evaluation.hypothetical_after_edit.upper,
     )?;
+    if let Some(coverage) = &evaluation.paired_world_set_coverage {
+        if !coverage.closure_verified {
+            return Err(QueryImpactError::WorldSetCoverageNotVerified {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+            });
+        }
+        if evaluation
+            .paired_effect
+            .as_ref()
+            .and_then(|paired| paired.decision_worlds.as_ref())
+            .is_none()
+        {
+            return Err(QueryImpactError::PairedWorldCoverageRequiresDecisionWorlds {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+            });
+        }
+        validate_id("paired world universe", &coverage.universe_id)?;
+        for (kind, digest) in [
+            ("world universe manifest", &coverage.universe_manifest_sha256),
+            ("world admissibility policy", &coverage.admissibility_policy_sha256),
+            ("world enumeration input", &coverage.enumeration_input_sha256),
+            ("world enumerator", &coverage.enumerator_sha256),
+            ("expected world manifest", &coverage.expected_world_manifest_sha256),
+            ("world closure proof", &coverage.closure_proof_sha256),
+            ("world coverage verifier", &coverage.verifier_sha256),
+            ("world coverage verification receipt", &coverage.verification_receipt_sha256),
+        ] {
+            validate_sha(kind, digest)?;
+        }
+        if coverage.expected_world_ids.is_empty() {
+            return Err(QueryImpactError::EmptyExpectedWorldSet {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+            });
+        }
+        let mut expected_ids = BTreeSet::new();
+        for world_id in &coverage.expected_world_ids {
+            validate_id("expected paired world", world_id)?;
+            if !expected_ids.insert(world_id.clone()) {
+                return Err(QueryImpactError::DuplicateExpectedWorldId {
+                    query_id: evaluation.query_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                    world_id: world_id.clone(),
+                });
+            }
+        }
+        let actual_ids: BTreeSet<String> = evaluation
+            .paired_effect
+            .as_ref()
+            .and_then(|paired| paired.decision_worlds.as_ref())
+            .expect("paired decision worlds checked above")
+            .iter()
+            .map(|world| world.world_id.clone())
+            .collect();
+        if actual_ids != expected_ids {
+            return Err(QueryImpactError::ExpectedWorldSetMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+            });
+        }
+    }
     if let Some(paired) = &evaluation.paired_effect {
         validate_sha("paired effect evidence", &paired.evidence_sha256)?;
         validate_interval(
@@ -882,6 +1027,7 @@ mod tests {
             baseline: before,
             hypothetical_after_edit: after,
             paired_effect: None,
+            paired_world_set_coverage: None,
         }
     }
 
