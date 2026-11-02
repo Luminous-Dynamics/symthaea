@@ -196,6 +196,30 @@ fn build_conditions() -> Vec<Condition> {
         }
     }
 
+    // D. Teacher candidate-set-size robustness. The supplement says each
+    // learner samples k teachers but does not report k in the extracted
+    // description. This explicitly exposes the unknown instead of assuming
+    // the human experiment's five-candidate interface applies to the ABM.
+    for teacher_candidate_count in [1_usize, 5, 10, 20] {
+        for teacher_temperature in [0.1_f64, 0.2, 0.4] {
+            conditions.push(Condition {
+                family: "teacher_candidate_size",
+                name: format!("teacher_k{teacher_candidate_count}_tau{teacher_temperature:.1}"),
+                population_size: 20,
+                generations: 20,
+                availability: AvailabilityLabel::SeedGenerationOnly,
+                placement: MachinePlacement::ClusteredPrefix,
+                machine_capacity: 100_000,
+                machine_bias: 0.5,
+                optimal_discovery_rate: 1e-4,
+                teacher_candidate_count,
+                transmission_probability: 0.9,
+                teacher_temperature,
+                reward_noise_epsilon: 0.2,
+            });
+        }
+    }
+
     conditions
 }
 
