@@ -3,33 +3,82 @@
   "$id": "https://luminousdynamics.io/schemas/spectra-corpus-known-answer-v0.1.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "generator_version", "claim_ceiling", "campaign_config", "scenarios", "leakage_scenarios", "adversarial"],
+  "required": [
+    "schema",
+    "generator_version",
+    "claim_ceiling",
+    "campaign_config",
+    "scenarios",
+    "leakage_scenarios",
+    "adversarial"
+  ],
   "properties": {
-    "schema": {"const": "symthaea.spectra.corpus_known_answer.v0.1"},
-    "generator_version": {"const": "splitmix64-fy-reject-v0.1"},
-    "claim_ceiling": {"const": "synthetic_only"},
+    "schema": {
+      "const": "symthaea.spectra.corpus_known_answer.v0.1"
+    },
+    "generator_version": {
+      "const": "splitmix64-fy-reject-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_only"
+    },
     "campaign_config": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["calibration_trials", "evaluation_trials", "candidate_count", "signal_hit_rate_permille"],
+      "required": [
+        "calibration_trials",
+        "evaluation_trials",
+        "candidate_count",
+        "signal_hit_rate_permille"
+      ],
       "properties": {
-        "calibration_trials": {"const": 512},
-        "evaluation_trials": {"const": 512},
-        "candidate_count": {"const": 4},
-        "signal_hit_rate_permille": {"const": 400}
+        "calibration_trials": {
+          "const": 512
+        },
+        "evaluation_trials": {
+          "const": 512
+        },
+        "candidate_count": {
+          "const": 4
+        },
+        "signal_hit_rate_permille": {
+          "const": 400
+        }
       }
     },
-    "scenarios": {"type": "array", "minItems": 2, "maxItems": 2},
-    "leakage_scenarios": {"type": "array", "minItems": 9, "maxItems": 9},
+    "scenarios": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "leakage_scenarios": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9
+    },
     "adversarial": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["world", "seed_hex", "expected_valid_evaluation_trials", "expected_invalid_evaluation_trials"],
+      "required": [
+        "world",
+        "seed_hex",
+        "expected_valid_evaluation_trials",
+        "expected_invalid_evaluation_trials"
+      ],
       "properties": {
-        "world": {"const": "adversarial_mutation"},
-        "seed_hex": {"type": "string", "pattern": "^0x[0-9a-f]{16}$"},
-        "expected_valid_evaluation_trials": {"const": 0},
-        "expected_invalid_evaluation_trials": {"const": 512}
+        "world": {
+          "const": "adversarial_mutation"
+        },
+        "seed_hex": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{16}$"
+        },
+        "expected_valid_evaluation_trials": {
+          "const": 0
+        },
+        "expected_invalid_evaluation_trials": {
+          "const": 512
+        }
       }
     }
   }
