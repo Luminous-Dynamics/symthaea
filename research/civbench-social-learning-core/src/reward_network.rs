@@ -281,6 +281,52 @@ pub fn full_information_oracle(network: &RewardNetwork, move_budget: usize) -> i
     best(network, network.start_node, move_budget, &mut memo)
 }
 
+/// One zero-shot policy evaluation on a named source profile.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TransferProfileResult {
+    pub profile_id: String,
+    pub policy_reward: i32,
+    pub oracle_reward: i32,
+    pub regret: i32,
+    /// Policy reward divided by the full-information oracle reward.
+    /// None when oracle reward is zero or negative.
+    pub oracle_fraction: Option<f64>,
+    pub invalid_moves: usize,
+}
+
+/// Evaluate the same frozen policy on multiple graph profiles without
+/// refitting it. This is a zero-shot rule-transfer harness; it is not a
+/// claim about learned Symthaea representations or human skill transfer.
+pub fn evaluate_zero_shot_transfer(
+    profiles: &[(&str, &RewardNetwork, usize)],
+    policy: RewardPolicy,
+) -> Vec<TransferProfileResult> {
+    profiles.iter().map(|(profile_id, network, move_budget)| {
+        let episode = play_episode(network, policy, *move_budget);
+        let oracle_reward = full_information_oracle(network, *move_budget);
+        let invalid_moves = episode.moves.iter().filter(|movement| {
+            network.outgoing_edge_indices(movement.from)
+                .map(|indices| !indices.iter().any(|&index| {
+                    let edge = network.edges[index];
+                    edge.to == movement.to && edge.reward == movement.reward
+                }))
+                .unwrap_or(true)
+        }).count();
+        TransferProfileResult {
+            profile_id: (*profile_id).to_string(),
+            policy_reward: episode.total_reward,
+            oracle_reward,
+            regret: oracle_reward - episode.total_reward,
+            oracle_fraction: if oracle_reward > 0 {
+                Some(episode.total_reward as f64 / oracle_reward as f64)
+            } else {
+                None
+            },
+            invalid_moves,
+        }
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,6 +468,39 @@ mod tests {
             full_information_oracle(&synthetic_legacy_profile_network(), LEGACY_GITHUB_MOVE_BUDGET),
             1_650
         );
+    }
+
+    #[test]
+    fn loss_seeking_rule_transfers_zero_shot_across_different_synthetic_profiles() {
+        let paper_incentive = synthetic_network();
+        let legacy_profile = synthetic_legacy_profile_network();
+        let profiles = [
+            ("synthetic-ten-move-incentive", &paper_incentive, PUBLISHED_MOVE_BUDGET),
+            ("synthetic-legacy-eight-transition", &legacy_profile, LEGACY_GITHUB_MOVE_BUDGET),
+        ];
+        let results = evaluate_zero_shot_transfer(&profiles, RewardPolicy::LossSeeking);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].policy_reward, 2_650);
+        assert_eq!(results[0].oracle_reward, 2_650);
+        assert_eq!(results[0].regret, 0);
+        assert_eq!(results[1].policy_reward, 1_650);
+        assert_eq!(results[1].oracle_reward, 1_650);
+        assert_eq!(results[1].regret, 0);
+        assert!(results.iter().all(|result| result.invalid_moves == 0));
+    }
+
+    #[test]
+    fn transfer_harness_exposes_myopic_regret_on_both_profiles() {
+        let paper_incentive = synthetic_network();
+        let legacy_profile = synthetic_legacy_profile_network();
+        let profiles = [
+            ("synthetic-ten-move-incentive", &paper_incentive, PUBLISHED_MOVE_BUDGET),
+            ("synthetic-legacy-eight-transition", &legacy_profile, LEGACY_GITHUB_MOVE_BUDGET),
+        ];
+        let results = evaluate_zero_shot_transfer(&profiles, RewardPolicy::ImmediateGreedy);
+        assert_eq!(results[0].regret, 650);
+        assert_eq!(results[1].regret, 850);
+        assert!(results.iter().all(|result| result.invalid_moves == 0));
     }
 
     #[test]
