@@ -6,8 +6,10 @@
 **Research anchors:**
 - Chick, Forster & Pertile (2017), *A Bayesian Decision Theoretic Model of Sequential Experimentation with Delayed Response*, JRSSB 79(5), 1439–1462: https://doi.org/10.1111/rssb.12225
 - Johari et al. (2021), *Always Valid Inference: Continuous Monitoring of A/B Tests*, Operations Research 70(3), 1806–1821: https://doi.org/10.1287/opre.2021.2135
-- Spotify Engineering, *Choosing a Sequential Testing Framework*: https://engineering.atspotify.com/2023/3/choosing-sequential-testing-framework-comparisons-and-discussions
+- Spotify Engineering, *Choosing a Sequential Testing Framework* (updated 12 May 2026): https://confidence.spotify.com/blog/sequential-testing-comparison
 - Spotify Confidence, *Accurate Sample Size for Always-Valid Inference* (14 July 2026): https://confidence.spotify.com/blog/accurate-sample-size-always-valid
+
+Spotify's July 2026 report is a useful current industry benchmark: its corrected sample-size multiplier reduced required N by 8–20% in its simulation grid (14% at common alpha=0.05 / 80%-power WSKR settings) and delivered a median 9.5% saving across 713 metrics from 283 real experiments. It also reports empirical power within approximately three percentage points of target over its simulation grid. Treat these as Spotify's own reported results, not independent verification. Our benchmark should compare against this regime-specific production baseline with identical power, alpha, sample horizon, and cost accounting.
 
 ## 1. Research shift: optimize robust decision utility, not power alone
 
