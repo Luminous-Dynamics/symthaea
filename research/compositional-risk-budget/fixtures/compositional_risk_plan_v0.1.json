@@ -46,7 +46,8 @@
       "paper_or_spec_url": "https://proceedings.mlr.press/v306/zhu26z.html",
       "source_revision": "df7194a6fa7b283108b96672833e3f85ecc25835",
       "filtration_sha256": null,
-      "source_receipt_sha256": null
+      "source_receipt_sha256": null,
+      "source_repository_url": "https://github.com/Telvc/AC-RAC"
     },
     {
       "claim_id": "action-1-unsafe",
@@ -68,7 +69,8 @@
       "paper_or_spec_url": "https://proceedings.mlr.press/v306/zhu26z.html",
       "source_revision": "df7194a6fa7b283108b96672833e3f85ecc25835",
       "filtration_sha256": null,
-      "source_receipt_sha256": null
+      "source_receipt_sha256": null,
+      "source_repository_url": "https://github.com/Telvc/AC-RAC"
     },
     {
       "claim_id": "compute-false-positive-stop",
@@ -90,7 +92,8 @@
       "paper_or_spec_url": "https://proceedings.mlr.press/v306/wang26hd.html",
       "source_revision": "6551e3000dcda3d76491f30cc687d64618807c5b",
       "filtration_sha256": null,
-      "source_receipt_sha256": null
+      "source_receipt_sha256": null,
+      "source_repository_url": "https://github.com/xidulu/reasoning_risk_control"
     },
     {
       "claim_id": "compute-premature-stop",
@@ -112,7 +115,8 @@
       "paper_or_spec_url": "https://proceedings.mlr.press/v306/wang26hd.html",
       "source_revision": "6551e3000dcda3d76491f30cc687d64618807c5b",
       "filtration_sha256": null,
-      "source_receipt_sha256": null
+      "source_receipt_sha256": null,
+      "source_repository_url": "https://github.com/xidulu/reasoning_risk_control"
     },
     {
       "claim_id": "prediction-miscoverage",
@@ -134,7 +138,8 @@
       "paper_or_spec_url": "https://proceedings.mlr.press/v306/prinster26a.html",
       "source_revision": "83ba982e14480f5e986cf7776de87a9b7e3d4245",
       "filtration_sha256": null,
-      "source_receipt_sha256": null
+      "source_receipt_sha256": null,
+      "source_repository_url": "https://github.com/samuelstanton/conformal-policy-control"
     },
     {
       "claim_id": "temporal-dominance",
@@ -156,7 +161,8 @@
       "paper_or_spec_url": "https://github.com/Luminous-Dynamics/symthaea/issues/9930",
       "source_revision": "0f25965acf64562415543cdfb432bcf3e2bf8161",
       "filtration_sha256": null,
-      "source_receipt_sha256": null
+      "source_receipt_sha256": null,
+      "source_repository_url": "https://github.com/Luminous-Dynamics/symthaea"
     },
     {
       "claim_id": "temporal-online-risk",
@@ -178,7 +184,8 @@
       "paper_or_spec_url": "https://github.com/Luminous-Dynamics/symthaea/pull/9465",
       "source_revision": "fda1f513f7477c577e2efe2a8b1fcde94ece194c",
       "filtration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "source_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "source_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_repository_url": "https://github.com/Luminous-Dynamics/symthaea"
     }
   ],
   "plan_sha256": ""
