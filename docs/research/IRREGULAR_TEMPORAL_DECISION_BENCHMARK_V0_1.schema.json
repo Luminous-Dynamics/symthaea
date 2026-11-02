@@ -237,7 +237,8 @@
               "source_audit_authored_not_executed",
               "registered_not_downloaded_or_run",
               "registered_not_reproduced",
-              "external_reference_only"
+              "external_reference_only",
+              "methodology_reference_only"
             ]
           }
         }
