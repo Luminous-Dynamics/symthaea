@@ -788,6 +788,10 @@ mod tests {
         let created = transitions[0];
         let resolved = transitions[1];
         assert!(created.definition.is_some());
+        assert!(
+            created.source_evidence.len() >= 2,
+            "the opening motif identity must remain bound even before a return is found"
+        );
         assert_eq!(created.definition, resolved.definition);
         assert_eq!(created.source_evidence, resolved.source_evidence);
         if resolved.to == super::AssertedObligationState::Fulfilled {
