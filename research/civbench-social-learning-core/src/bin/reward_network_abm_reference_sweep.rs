@@ -390,30 +390,40 @@ fn emit_case(case_index: usize, case: &Case, replications: usize, base_seed: u64
     }
 
     for (generation, stats) in generations.iter().enumerate() {
-        println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            case.profile,
-            case_index,
-            replications,
-            generation,
-            case.condition_name(),
-            case.generations,
-            case.population_size,
-            case.machine_count,
-            case.human_exploration_trials,
-            case.machine_exploration_trials,
-            case.human_optimality_bias,
-            case.machine_optimality_bias,
-            case.optimal_discovery_probability,
-            case.myopic_discovery_probability,
-            case.teacher_candidate_count,
-            case.teacher_temperature,
-            case.social_learning_probability,
-            case.demonstration_count,
-            case.demonstration_noise_epsilon,
+        let fields = [
+            case.profile.to_owned(),
+            case_index.to_string(),
+            replications.to_string(),
+            generation.to_string(),
+            case.condition_name().to_owned(),
+            case.generations.to_string(),
+            case.population_size.to_string(),
+            case.machine_count.to_string(),
+            case.human_exploration_trials.to_string(),
+            case.machine_exploration_trials.to_string(),
+            format!("{:.8}", case.human_optimality_bias),
+            format!("{:.8}", case.machine_optimality_bias),
+            format!("{:.8}", case.optimal_discovery_probability),
+            format!("{:.8}", case.myopic_discovery_probability),
+            case.teacher_candidate_count.to_string(),
+            format!("{:.6}", case.teacher_temperature),
+            format!("{:.6}", case.social_learning_probability),
+            case.demonstration_count.to_string(),
+            format!("{:.6}", case.demonstration_noise_epsilon),
             fmt(stats.human_optimal.mean()),
             fmt(stats.human_optimal.ci95_half_width()),
-        );
+            fmt(stats.machine_optimal.mean()),
+            fmt(stats.machine_optimal.ci95_half_width()),
+            fmt(stats.human_individual_optimal_discovery_rate.mean()),
+            fmt(stats.human_social_optimal_acquisition_rate.mean()),
+            fmt(stats.human_social_only_optimal_integration_rate.mean()),
+            fmt(stats.human_machine_lineage_optimal_prevalence.mean()),
+            fmt(stats.human_myopic_prevalence.mean()),
+            fmt(stats.human_random_prevalence.mean()),
+            fmt(stats.mean_demonstration_reward.mean()),
+            fmt(stats.social_learning_rate_observed.mean()),
+        ];
+        println!("{}", fields.join(","));
     }
 }
 
@@ -423,7 +433,7 @@ fn main() {
     let replications = replications_override.unwrap_or(if profile == "quick" { 10 } else { 50 });
 
     println!(
-        "profile,case_index,replications,generation,condition,generations,population_size,machine_count,k_human,k_machine,q_human,q_machine,d_opt,d_myopic,n_teacher,tau,lambda,k_demo,epsilon,human_optimal_prevalence_mean,human_optimal_prevalence_ci95"
+        "profile,case_index,replications,generation,condition,generations,population_size,machine_count,k_human,k_machine,q_human,q_machine,d_opt,d_myopic,n_teacher,tau,lambda,k_demo,epsilon,human_optimal_mean,human_optimal_ci95,machine_optimal_mean,machine_optimal_ci95,human_individual_optimal_rate,human_social_optimal_acquisition_rate,human_social_only_optimal_integration_rate,human_machine_lineage_optimal_prevalence,human_myopic_prevalence,human_random_prevalence,mean_demonstration_reward,social_learning_success_rate"
     );
     for (index, case) in cases.iter().enumerate() {
         emit_case(index, case, replications, seed);
@@ -441,6 +451,15 @@ mod tests {
         assert_eq!(temperature_cases().len(), 3 * 10 * 10 * 3);
         assert_eq!(reward_noise_cases().len(), 3 * 10 * 10 * 3);
         assert_eq!(population_robustness_cases().len(), 4 * 3 * 10 * 10);
+    }
+
+    #[test]
+    fn all_profile_contains_all_five_notebook_parameter_families() {
+        assert_eq!(
+            cases_for_profile("all").len(),
+            (10 * 8 * 10) + (3 * 2 * 10 * 10) + (3 * 10 * 10 * 3)
+                + (3 * 10 * 10 * 3) + (4 * 3 * 10 * 10)
+        );
     }
 
     #[test]
