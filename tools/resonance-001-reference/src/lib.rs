@@ -29,6 +29,45 @@ pub struct ComplexValueV1 {
 impl ComplexValueV1 {
     pub fn magnitude(self) -> f64 { self.real.hypot(self.imaginary) }
     pub fn phase_rad(self) -> f64 { self.imaginary.atan2(self.real) }
+
+    pub fn add(self, other: Self) -> Self {
+        Self {
+            real: self.real + other.real,
+            imaginary: self.imaginary + other.imaginary,
+        }
+    }
+
+    pub fn multiply(self, other: Self) -> Self {
+        Self {
+            real: self.real * other.real - self.imaginary * other.imaginary,
+            imaginary: self.real * other.imaginary + self.imaginary * other.real,
+        }
+    }
+
+    pub fn scale(self, factor: f64) -> Self {
+        Self {
+            real: self.real * factor,
+            imaginary: self.imaginary * factor,
+        }
+    }
+
+    pub fn divide(self, other: Self) -> Result<Self, ModelErrorV1> {
+        let denominator = other.real.mul_add(other.real, other.imaginary * other.imaginary);
+        if denominator == 0.0 {
+            return Err(ModelErrorV1::ZeroComplexDenominator);
+        }
+        if !denominator.is_finite() {
+            return Err(ModelErrorV1::NonFiniteParameter);
+        }
+        let result = Self {
+            real: (self.real * other.real + self.imaginary * other.imaginary) / denominator,
+            imaginary: (self.imaginary * other.real - self.real * other.imaginary) / denominator,
+        };
+        if !result.real.is_finite() || !result.imaginary.is_finite() {
+            return Err(ModelErrorV1::NonFiniteParameter);
+        }
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -57,6 +96,33 @@ pub struct CoupledModeSummaryV1 {
     pub upper_mode_frequency_hz: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DrivenCoupledSeriesRlcV1 {
+    pub primary_resistance_ohm: f64,
+    pub primary_inductance_h: f64,
+    pub primary_capacitance_f: f64,
+    pub secondary_resistance_ohm: f64,
+    pub secondary_inductance_h: f64,
+    pub secondary_capacitance_f: f64,
+    /// Coupling magnitude in [0, 1).
+    pub coupling_coefficient: f64,
+    /// Dot-convention sign: +1 or -1. Magnitude is kept separate.
+    pub secondary_winding_polarity: i8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DrivenCoupledResponseV1 {
+    pub frequency_hz: f64,
+    pub mutual_inductance_h: f64,
+    pub primary_input_impedance_ohm: ComplexValueV1,
+    /// Secondary loop current divided by primary source voltage, in A/V.
+    pub secondary_current_per_volt_a_per_v: ComplexValueV1,
+    /// Voltage across the secondary series resistance divided by source voltage.
+    pub secondary_resistor_voltage_per_volt: ComplexValueV1,
+    /// Secondary resistor dissipation divided by primary source voltage squared.
+    pub secondary_resistor_power_w_per_v2: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelErrorV1 {
     NonFiniteParameter,
@@ -65,6 +131,8 @@ pub enum ModelErrorV1 {
     NonPositiveCapacitance,
     NonPositiveFrequency,
     InvalidCouplingCoefficient,
+    InvalidCouplingPolarity,
+    ZeroComplexDenominator,
 }
 
 fn validate_rlc(r: f64, l: f64, c: f64) -> Result<(), ModelErrorV1> {
@@ -128,6 +196,107 @@ impl ParallelRlcV1 {
         let b = omega * self.capacitance_f - 1.0 / (omega * self.inductance_h);
         let denominator = g.mul_add(g, b * b);
         Ok(ComplexValueV1 { real: g / denominator, imaginary: -b / denominator })
+    }
+}
+
+impl DrivenCoupledSeriesRlcV1 {
+    fn validate(self) -> Result<(), ModelErrorV1> {
+        validate_rlc(
+            self.primary_resistance_ohm,
+            self.primary_inductance_h,
+            self.primary_capacitance_f,
+        )?;
+        validate_rlc(
+            self.secondary_resistance_ohm,
+            self.secondary_inductance_h,
+            self.secondary_capacitance_f,
+        )?;
+        if !self.coupling_coefficient.is_finite() {
+            return Err(ModelErrorV1::NonFiniteParameter);
+        }
+        if !(0.0..1.0).contains(&self.coupling_coefficient) {
+            return Err(ModelErrorV1::InvalidCouplingCoefficient);
+        }
+        if self.secondary_winding_polarity != 1 && self.secondary_winding_polarity != -1 {
+            return Err(ModelErrorV1::InvalidCouplingPolarity);
+        }
+        Ok(())
+    }
+
+    /// Solve the sinusoidal steady-state response of two series RLC loops
+    /// coupled by ideal mutual inductance. The primary loop is driven by a
+    /// voltage source; the secondary loop is closed and has no independent
+    /// source. Both loop resistances include all declared series damping/load.
+    ///
+    /// Z1 = R1 + j(omega L1 - 1/(omega C1))
+    /// Z2 = R2 + j(omega L2 - 1/(omega C2))
+    /// M = polarity * k * sqrt(L1 L2)
+    /// Zin = Z1 + (omega M)^2 / Z2
+    /// I2/V1 = -j omega M / (Z1 Z2 + (omega M)^2)
+    ///
+    /// Assumptions: linear lumped components, sinusoidal steady state, constant
+    /// parameters, ideal mutual inductance and no distributed or radiative effects.
+    pub fn response_at(
+        self,
+        frequency_hz: f64,
+    ) -> Result<DrivenCoupledResponseV1, ModelErrorV1> {
+        self.validate()?;
+        validate_frequency(frequency_hz)?;
+        let omega = TAU * frequency_hz;
+        if !omega.is_finite() {
+            return Err(ModelErrorV1::NonFiniteParameter);
+        }
+
+        let mutual_inductance = self.secondary_winding_polarity as f64
+            * self.coupling_coefficient
+            * (self.primary_inductance_h * self.secondary_inductance_h).sqrt();
+        let omega_m = omega * mutual_inductance;
+
+        let z1 = ComplexValueV1 {
+            real: self.primary_resistance_ohm,
+            imaginary: omega * self.primary_inductance_h
+                - 1.0 / (omega * self.primary_capacitance_f),
+        };
+        let z2 = ComplexValueV1 {
+            real: self.secondary_resistance_ohm,
+            imaginary: omega * self.secondary_inductance_h
+                - 1.0 / (omega * self.secondary_capacitance_f),
+        };
+
+        let reflected_impedance = ComplexValueV1 {
+            real: omega_m * omega_m,
+            imaginary: 0.0,
+        }.divide(z2)?;
+        let input_impedance = z1.add(reflected_impedance);
+
+        let transfer_denominator = z1.multiply(z2).add(ComplexValueV1 {
+            real: omega_m * omega_m,
+            imaginary: 0.0,
+        });
+        let secondary_current_per_volt = ComplexValueV1 {
+            real: 0.0,
+            imaginary: -omega_m,
+        }.divide(transfer_denominator)?;
+        let secondary_resistor_voltage_per_volt =
+            secondary_current_per_volt.scale(self.secondary_resistance_ohm);
+        let secondary_resistor_power_per_v2 =
+            secondary_current_per_volt.magnitude().powi(2) * self.secondary_resistance_ohm;
+
+        if !input_impedance.real.is_finite()
+            || !input_impedance.imaginary.is_finite()
+            || !secondary_resistor_power_per_v2.is_finite()
+        {
+            return Err(ModelErrorV1::NonFiniteParameter);
+        }
+
+        Ok(DrivenCoupledResponseV1 {
+            frequency_hz,
+            mutual_inductance_h: mutual_inductance,
+            primary_input_impedance_ohm: input_impedance,
+            secondary_current_per_volt_a_per_v: secondary_current_per_volt,
+            secondary_resistor_voltage_per_volt,
+            secondary_resistor_power_w_per_v2: secondary_resistor_power_per_v2,
+        })
     }
 }
 
@@ -207,6 +376,67 @@ mod tests {
         let z = m.impedance_at(s.frequency_hz).unwrap();
         close(z.real, 1_000.0);
         close(z.imaginary, 0.0);
+    }
+
+    #[test]
+    fn driven_lossy_coupled_loops_match_resonant_known_answer() {
+        let model = DrivenCoupledSeriesRlcV1 {
+            primary_resistance_ohm: 10.0,
+            primary_inductance_h: 0.01,
+            primary_capacitance_f: 1.0e-6,
+            secondary_resistance_ohm: 20.0,
+            secondary_inductance_h: 0.01,
+            secondary_capacitance_f: 1.0e-6,
+            coupling_coefficient: 0.1,
+            secondary_winding_polarity: 1,
+        };
+        let response = model.response_at(1_591.5494309189535).unwrap();
+        close(response.mutual_inductance_h, 0.001);
+        close(response.primary_input_impedance_ohm.real, 15.0);
+        close(response.primary_input_impedance_ohm.imaginary, 0.0);
+        close(response.secondary_current_per_volt_a_per_v.real, 0.0);
+        close(response.secondary_current_per_volt_a_per_v.imaginary, -1.0 / 30.0);
+        close(response.secondary_resistor_voltage_per_volt.real, 0.0);
+        close(response.secondary_resistor_voltage_per_volt.imaginary, -2.0 / 3.0);
+        close(response.secondary_resistor_power_w_per_v2, 1.0 / 45.0);
+    }
+
+    #[test]
+    fn reversing_secondary_dot_polarity_reverses_transfer_phase_not_input_impedance() {
+        let mut model = DrivenCoupledSeriesRlcV1 {
+            primary_resistance_ohm: 10.0,
+            primary_inductance_h: 0.01,
+            primary_capacitance_f: 1.0e-6,
+            secondary_resistance_ohm: 20.0,
+            secondary_inductance_h: 0.01,
+            secondary_capacitance_f: 1.0e-6,
+            coupling_coefficient: 0.1,
+            secondary_winding_polarity: 1,
+        };
+        let positive = model.response_at(1_591.5494309189535).unwrap();
+        model.secondary_winding_polarity = -1;
+        let negative = model.response_at(1_591.5494309189535).unwrap();
+        close(positive.primary_input_impedance_ohm.real, negative.primary_input_impedance_ohm.real);
+        close(positive.primary_input_impedance_ohm.imaginary, negative.primary_input_impedance_ohm.imaginary);
+        close(positive.secondary_current_per_volt_a_per_v.imaginary, -negative.secondary_current_per_volt_a_per_v.imaginary);
+        close(positive.secondary_resistor_power_w_per_v2, negative.secondary_resistor_power_w_per_v2);
+    }
+
+    #[test]
+    fn driven_coupled_loops_reject_invalid_polarity_and_zero_frequency() {
+        let model = DrivenCoupledSeriesRlcV1 {
+            primary_resistance_ohm: 10.0,
+            primary_inductance_h: 0.01,
+            primary_capacitance_f: 1.0e-6,
+            secondary_resistance_ohm: 20.0,
+            secondary_inductance_h: 0.01,
+            secondary_capacitance_f: 1.0e-6,
+            coupling_coefficient: 0.1,
+            secondary_winding_polarity: 0,
+        };
+        assert_eq!(model.response_at(1_000.0), Err(ModelErrorV1::InvalidCouplingPolarity));
+        let valid = DrivenCoupledSeriesRlcV1 { secondary_winding_polarity: 1, ..model };
+        assert_eq!(valid.response_at(0.0), Err(ModelErrorV1::NonPositiveFrequency));
     }
 
     #[test]
