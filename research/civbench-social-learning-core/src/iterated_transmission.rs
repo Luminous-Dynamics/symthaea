@@ -3,6 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+use std::fmt;
+
 //! Synthetic multi-generation content-drift and cultural-attractor reference.
 //!
 //! The four normalized attributes are illustrative proxies for the dimensions
