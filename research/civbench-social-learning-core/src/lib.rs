@@ -10,6 +10,7 @@
 //! culture generally.
 
 pub mod cultural_evolution;
+pub mod paper_abm;
 pub mod iterated_transmission;
 pub mod networked_mediation;
 pub mod reward_network;
