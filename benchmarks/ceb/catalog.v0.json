@@ -589,7 +589,7 @@
       },
       "notes": [
         "A five-crate static synthetic workspace, fixture-declared gold graph and seven deterministic edit scenarios are committed under benchmarks/ceb/fixtures/repository-twin-synthetic-v0/.",
-        "The initial graph contains 32 nodes and 37 expected edges. Expected semantic edges are explicitly not compiler-verified; no independent compiler/rust-analyzer receipt exists.",
+        "The initial graph contains 32 nodes and 37 expected edges, with a verified one-line source declaration anchor for every node. Expected semantic edges are explicitly not compiler-verified; no independent compiler/rust-analyzer receipt exists.",
         "The fixture has not been compiled or executed. Its source tree digest, pinned environment, reference grader and hidden labels are not provisioned; the task must remain design_only.",
         "Gold labels separate syntax-declared facts, manifest-declared feature/target edges and expected semantic relationships.",
         "Evaluate retrieval and change-impact precision/recall independently; do not count inferred links as compiler-resolved truth.",
