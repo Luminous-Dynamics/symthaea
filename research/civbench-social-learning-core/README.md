@@ -109,6 +109,14 @@ The module keeps norm violation separate (lower is better) and exposes Pareto do
 
 This is **not** the official LiveCultureBench runner or a reproduction. Its official repository currently contains only a README saying its data download link is still to be updated. The official environment, prompt/code/data schema, verifier definitions, calibration split and human annotations must be pinned before an adapter or comparative result is claimed. See [LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md](LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md).
 
+## LiveCultureBench adapter layer (ACL 2026)
+
+Pham et al.'s LiveCultureBench evaluates agents in a simulated town on goal completion, norm violation, profile faithfulness, contextual awareness, coherence and verifier reliability. The official upstream repository currently has only a placeholder README indicating that the data download link is still to be added. CivBench therefore does not claim to run or reproduce LiveCultureBench yet.
+
+The separate `src/cultural_situation.rs` module provides adapter-neutral, explicit-context aggregation; per-context verifier Brier score, log loss, ECE, confusion metrics, human-audit coverage and abstention; and Pareto comparison that minimizes norm violations while maximizing the other four dimensions. It does not infer cultural identity from sensitive traits and does not collapse task success and norm safety into one score.
+
+Protocol: [LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md](LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md). Upstream ingestion, exact reproduction and human-audited verifier validation are tracked in [issue #10038](https://github.com/Luminous-Dynamics/symthaea/issues/10038).
+
 ## Run
 
 ```sh
@@ -123,7 +131,7 @@ The example binary prints a small chain-network adoption trace.
 
 ## Paper ABM sensitivity sweep
 
-The `paper-abm-sweep` binary targets the article's separate 20-generation/20-agent exploratory ABM and runs 50 replications per condition. It reports a 649-condition CivBench grid: one no-machine control plus machine placement (clustered/random), machine capacity (1k/10k/100k), machine optimality bias (0.01/0.25/0.5), optimal discoverability (0.0001/0.001/0.01), social transmission (0.3/0.6/0.9), teacher-selection temperature (0.1/0.5), and demonstration reward noise (0.1/0.5). It reports per-generation prevalence, machine-origin lineage prevalence, demonstration reward and social transmission. The machine-placement options and grid are research extensions; they are not asserted to be the authors' exact supplementary grid. The model's unreported teacher-candidate count and selected defaults remain explicit V0 assumptions.
+The `paper-abm-sweep` binary targets the article's separate 20-generation/20-agent exploratory ABM and runs 50 replications per condition. It reports a 1,945-condition CivBench grid: one no-machine control plus 1,944 combinations across machine placement (clustered/random), machine capacity (1k/10k/100k), machine optimality bias (0.01/0.25/0.5), optimal discoverability (0.0001/0.001/0.01), teacher-candidate sample count (5/10/20), social transmission (0.3/0.6/0.9), teacher-selection temperature (0.1/0.5), and demonstration reward noise (0.1/0.5). It reports per-generation prevalence, machine-origin lineage prevalence, demonstration reward and social transmission. The machine-placement, candidate-count, and grid choices are CivBench sensitivity extensions; they are not asserted to be the authors' exact supplementary grid. The model's unreported candidate count and selected defaults remain explicit V0 assumptions.
 
 ## Multi-seed cultural-transmission sweep
 
