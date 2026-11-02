@@ -1661,6 +1661,57 @@ mod tests {
     }
 
     #[test]
+    fn missing_required_nullable_observation_field_is_rejected() {
+        let (observation, _, reference_pin) = valid_observation();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&serde_json::to_vec(&observation).unwrap()).unwrap();
+        value["observed_operations"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("outcome");
+        let report = verify_backend_observation(
+            &serde_json::to_vec(&value).unwrap(),
+            &reference_pin,
+            &config(),
+        );
+        assert_eq!(report.status, "invalid_evidence");
+        assert!(report.counterexamples.iter().any(|error| error.contains("outcome")));
+    }
+
+    #[test]
+    fn missing_nullable_transaction_id_property_is_rejected() {
+        let (observation, _, reference_pin) = valid_observation();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&serde_json::to_vec(&observation).unwrap()).unwrap();
+        value["raw_events"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("transaction_id");
+        let report = verify_backend_observation(
+            &serde_json::to_vec(&value).unwrap(),
+            &reference_pin,
+            &config(),
+        );
+        assert_eq!(report.status, "invalid_evidence");
+        assert!(report.counterexamples.iter().any(|error| error.contains("transaction_id")));
+    }
+
+    #[test]
+    fn explicit_null_for_non_nullable_optional_digest_is_rejected() {
+        let (observation, _, reference_pin) = valid_observation();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&serde_json::to_vec(&observation).unwrap()).unwrap();
+        value["raw_events"][1]["payload_sha256"] = serde_json::Value::Null;
+        let report = verify_backend_observation(
+            &serde_json::to_vec(&value).unwrap(),
+            &reference_pin,
+            &config(),
+        );
+        assert_eq!(report.status, "invalid_evidence");
+        assert!(report.counterexamples.iter().any(|error| error.contains("payload_sha256")));
+    }
+
+    #[test]
     fn strict_deserialization_rejects_unknown_fields() {
         let (observation, _, reference_pin) = valid_observation();
         let mut value: serde_json::Value =
