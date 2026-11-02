@@ -22,6 +22,32 @@
           453.125,
           562.5,
           445.3125
+        ],
+        "condition_signal_detection_counts": [
+          {
+            "hits": 60,
+            "misses": 69,
+            "false_alarms": 67,
+            "correct_rejections": 60
+          },
+          {
+            "hits": 59,
+            "misses": 66,
+            "false_alarms": 74,
+            "correct_rejections": 57
+          },
+          {
+            "hits": 78,
+            "misses": 53,
+            "false_alarms": 59,
+            "correct_rejections": 66
+          },
+          {
+            "hits": 61,
+            "misses": 66,
+            "false_alarms": 76,
+            "correct_rejections": 53
+          }
         ]
       }
     },
@@ -40,6 +66,32 @@
           621.09375,
           640.625,
           707.03125
+        ],
+        "condition_signal_detection_counts": [
+          {
+            "hits": 59,
+            "misses": 53,
+            "false_alarms": 81,
+            "correct_rejections": 63
+          },
+          {
+            "hits": 76,
+            "misses": 38,
+            "false_alarms": 59,
+            "correct_rejections": 83
+          },
+          {
+            "hits": 86,
+            "misses": 49,
+            "false_alarms": 43,
+            "correct_rejections": 78
+          },
+          {
+            "hits": 106,
+            "misses": 45,
+            "false_alarms": 30,
+            "correct_rejections": 75
+          }
         ]
       }
     },
@@ -58,6 +110,32 @@
           468.75,
           652.34375,
           492.1875
+        ],
+        "condition_signal_detection_counts": [
+          {
+            "hits": 69,
+            "misses": 54,
+            "false_alarms": 62,
+            "correct_rejections": 71
+          },
+          {
+            "hits": 58,
+            "misses": 73,
+            "false_alarms": 63,
+            "correct_rejections": 62
+          },
+          {
+            "hits": 89,
+            "misses": 45,
+            "false_alarms": 44,
+            "correct_rejections": 78
+          },
+          {
+            "hits": 65,
+            "misses": 59,
+            "false_alarms": 71,
+            "correct_rejections": 61
+          }
         ]
       }
     },
@@ -76,6 +154,32 @@
           625,
           730.46875,
           675.78125
+        ],
+        "condition_signal_detection_counts": [
+          {
+            "hits": 61,
+            "misses": 59,
+            "false_alarms": 64,
+            "correct_rejections": 72
+          },
+          {
+            "hits": 85,
+            "misses": 53,
+            "false_alarms": 43,
+            "correct_rejections": 75
+          },
+          {
+            "hits": 96,
+            "misses": 40,
+            "false_alarms": 29,
+            "correct_rejections": 91
+          },
+          {
+            "hits": 85,
+            "misses": 33,
+            "false_alarms": 50,
+            "correct_rejections": 88
+          }
         ]
       }
     },
@@ -94,6 +198,32 @@
           625,
           644.53125,
           660.15625
+        ],
+        "condition_signal_detection_counts": [
+          {
+            "hits": 74,
+            "misses": 47,
+            "false_alarms": 47,
+            "correct_rejections": 88
+          },
+          {
+            "hits": 76,
+            "misses": 47,
+            "false_alarms": 49,
+            "correct_rejections": 84
+          },
+          {
+            "hits": 85,
+            "misses": 43,
+            "false_alarms": 48,
+            "correct_rejections": 80
+          },
+          {
+            "hits": 94,
+            "misses": 46,
+            "false_alarms": 41,
+            "correct_rejections": 75
+          }
         ]
       }
     },
@@ -112,6 +242,32 @@
           640.625,
           812.5,
           699.21875
+        ],
+        "condition_signal_detection_counts": [
+          {
+            "hits": 52,
+            "misses": 59,
+            "false_alarms": 80,
+            "correct_rejections": 65
+          },
+          {
+            "hits": 77,
+            "misses": 51,
+            "false_alarms": 41,
+            "correct_rejections": 87
+          },
+          {
+            "hits": 111,
+            "misses": 24,
+            "false_alarms": 24,
+            "correct_rejections": 97
+          },
+          {
+            "hits": 92,
+            "misses": 46,
+            "false_alarms": 31,
+            "correct_rejections": 87
+          }
         ]
       }
     }
