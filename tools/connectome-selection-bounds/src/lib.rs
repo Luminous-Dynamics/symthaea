@@ -61,6 +61,14 @@ pub struct StudyArm {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ValueBounds { pub lower: f64, pub upper: f64 }
 
+/// Externally calibrated operating-characteristic ranges for one binary response detector.
+/// These are treated as deterministic admissible ranges, not statistical confidence intervals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetectorOperatingBounds {
+    pub sensitivity: ValueBounds,
+    pub specificity: ValueBounds,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StudyInput {
     pub protocol_id: String,
@@ -176,6 +184,8 @@ pub enum EvalError {
     ValueOutsideBounds { unit_id: String, field: &'static str },
     KernelValueForNonSelectedUnit(String),
     SelectionStatusMismatch(String),
+    InvalidProbability(&'static str),
+    InfeasibleDetectorCalibration,
     NumericOverflow,
 }
 
@@ -193,6 +203,8 @@ impl fmt::Display for EvalError {
             Self::ValueOutsideBounds { unit_id, field } => write!(f, "{field} for {unit_id} is outside its declared bounds"),
             Self::KernelValueForNonSelectedUnit(x) => write!(f, "non-selected or unevaluable unit {x} has a conditional kernel"),
             Self::SelectionStatusMismatch(x) => write!(f, "combined selection status does not match source/target response states for {x}"),
+            Self::InvalidProbability(x) => write!(f, "{x} must be finite and in [0,1]"),
+            Self::InfeasibleDetectorCalibration => write!(f, "observed detector-positive rate is incompatible with all declared sensitivity/specificity values"),
             Self::NumericOverflow => write!(f, "numeric overflow while computing bounds"),
         }
     }
@@ -223,6 +235,75 @@ fn validate_bounds(b: ValueBounds, name: &'static str) -> Result<(), EvalError> 
         return Err(EvalError::InvalidBounds(name));
     }
     Ok(())
+}
+
+
+fn validate_probability_bounds(bounds: ValueBounds, field: &'static str) -> Result<(), EvalError> {
+    if !bounds.lower.is_finite() || !bounds.upper.is_finite()
+        || bounds.lower < 0.0 || bounds.upper > 1.0 || bounds.lower > bounds.upper
+    {
+        return Err(EvalError::InvalidProbability(field));
+    }
+    Ok(())
+}
+
+/// Intersect [lower, upper] with coefficient * p <= rhs.
+fn intersect_linear_leq(lower: &mut f64, upper: &mut f64, coefficient: f64, rhs: f64) -> bool {
+    if coefficient > 0.0 {
+        *upper = upper.min(rhs / coefficient);
+    } else if coefficient < 0.0 {
+        *lower = lower.max(rhs / coefficient);
+    } else if rhs < 0.0 {
+        return false;
+    }
+    *lower <= *upper
+}
+
+/// Partially identify latent binary response prevalence from an observed detector-positive
+/// fraction and externally qualified sensitivity/specificity ranges.
+///
+/// q = Se*p + (1-Sp)*(1-p), where p is latent prevalence. Sensitivity and specificity
+/// independently vary inside their declared rectangles. The result contains every p in
+/// [0,1] compatible with at least one operating point. It does not assume source/target
+/// detector independence; marginal intervals must never be multiplied into a joint rate.
+///
+/// The interval is conditional on the population represented by the observed fraction.
+/// The caller's operating ranges are treated as fixed admissible ranges, not as estimated
+/// confidence intervals. This function does not correct trace missingness or transport
+/// detector calibration across animals/sessions.
+pub fn latent_prevalence_bounds(
+    observed_positive_fraction: f64,
+    operating: DetectorOperatingBounds,
+) -> Result<NumericInterval, EvalError> {
+    if !observed_positive_fraction.is_finite()
+        || !(0.0..=1.0).contains(&observed_positive_fraction)
+    {
+        return Err(EvalError::InvalidProbability("observed_positive_fraction"));
+    }
+    validate_probability_bounds(operating.sensitivity, "sensitivity")?;
+    validate_probability_bounds(operating.specificity, "specificity")?;
+
+    // For fixed p, the possible observed rates form:
+    // q_min(p)=Se_L*p+(1-Sp_U)*(1-p)
+    // q_max(p)=Se_U*p+(1-Sp_L)*(1-p).
+    // Feasibility requires q_min(p) <= q <= q_max(p), two linear constraints in p.
+    let q = observed_positive_fraction;
+    let min_slope = operating.sensitivity.lower + operating.specificity.upper - 1.0;
+    let min_rhs = q + operating.specificity.upper - 1.0;
+    let max_slope = operating.sensitivity.upper + operating.specificity.lower - 1.0;
+    let max_rhs = q + operating.specificity.lower - 1.0;
+
+    let mut lower = 0.0;
+    let mut upper = 1.0;
+    if !intersect_linear_leq(&mut lower, &mut upper, min_slope, min_rhs)
+        || !intersect_linear_leq(&mut lower, &mut upper, -max_slope, -max_rhs)
+        || lower > upper
+        || !lower.is_finite()
+        || !upper.is_finite()
+    {
+        return Err(EvalError::InfeasibleDetectorCalibration);
+    }
+    Ok(NumericInterval { lower: lower.max(0.0), upper: upper.min(1.0) })
 }
 
 fn validate(input: &StudyInput) -> Result<(), EvalError> {
@@ -445,6 +526,97 @@ mod tests {
         }
     }
     fn close(a: f64, b: f64) { assert!((a-b).abs() < 1e-12, "actual={a}, expected={b}"); }
+
+    #[test]
+    fn detector_calibration_bounds_match_analytic_known_answer() {
+        let bounds = latent_prevalence_bounds(
+            0.6,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 0.8, upper: 0.9 },
+                specificity: ValueBounds { lower: 0.9, upper: 0.95 },
+            },
+        ).unwrap();
+        close(bounds.lower, 0.625);
+        close(bounds.upper, 11.0/15.0);
+    }
+
+    #[test]
+    fn perfect_detector_identifies_observed_prevalence() {
+        let bounds = latent_prevalence_bounds(
+            0.73,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 1.0, upper: 1.0 },
+                specificity: ValueBounds { lower: 1.0, upper: 1.0 },
+            },
+        ).unwrap();
+        close(bounds.lower, 0.73);
+        close(bounds.upper, 0.73);
+    }
+
+    #[test]
+    fn uninformative_detector_does_not_create_false_precision() {
+        let bounds = latent_prevalence_bounds(
+            0.41,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 0.0, upper: 1.0 },
+                specificity: ValueBounds { lower: 0.0, upper: 1.0 },
+            },
+        ).unwrap();
+        close(bounds.lower, 0.0);
+        close(bounds.upper, 1.0);
+    }
+
+    #[test]
+    fn incompatible_detector_calibration_is_rejected() {
+        let result = latent_prevalence_bounds(
+            0.99,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 0.8, upper: 0.9 },
+                specificity: ValueBounds { lower: 0.9, upper: 0.95 },
+            },
+        );
+        assert_eq!(result.unwrap_err(), EvalError::InfeasibleDetectorCalibration);
+    }
+
+    #[test]
+    fn invalid_detector_probability_ranges_fail_closed() {
+        let result = latent_prevalence_bounds(
+            0.4,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: -0.1, upper: 0.9 },
+                specificity: ValueBounds { lower: 0.9, upper: 1.1 },
+            },
+        );
+        assert_eq!(result.unwrap_err(), EvalError::InvalidProbability("sensitivity"));
+        let result = latent_prevalence_bounds(
+            f64::NAN,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 0.8, upper: 0.9 },
+                specificity: ValueBounds { lower: 0.9, upper: 0.95 },
+            },
+        );
+        assert_eq!(result.unwrap_err(), EvalError::InvalidProbability("observed_positive_fraction"));
+    }
+
+    #[test]
+    fn wider_detector_uncertainty_cannot_narrow_prevalence_bounds() {
+        let narrow = latent_prevalence_bounds(
+            0.6,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 0.8, upper: 0.9 },
+                specificity: ValueBounds { lower: 0.9, upper: 0.95 },
+            },
+        ).unwrap();
+        let wide = latent_prevalence_bounds(
+            0.6,
+            DetectorOperatingBounds {
+                sensitivity: ValueBounds { lower: 0.75, upper: 0.95 },
+                specificity: ValueBounds { lower: 0.85, upper: 0.98 },
+            },
+        ).unwrap();
+        assert!(wide.lower <= narrow.lower);
+        assert!(wide.upper >= narrow.upper);
+    }
 
     #[test]
     fn known_answer_manski_bounds_match_hand_calculation() {

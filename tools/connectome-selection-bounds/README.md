@@ -85,3 +85,16 @@ The input carries independent source-neuron and target-neuron response statuses.
 - Otherwise RegistrationFailed takes precedence over ClassifierInvalid, then Unobserved.
 
 This deterministic summary is not a latent neural-response label. It states whether the declared conjunctive detector rule was met or could be evaluated. The report also counts every raw status separately for source and target.
+
+
+## Detector operating-range inversion
+
+`latent_prevalence_bounds` provides separate sensitivity analysis for a binary source or target detector. Given an observed positive fraction q and externally qualified sensitivity/specificity ranges Se in [Se_L, Se_U] and Sp in [Sp_L, Sp_U], it returns the set of latent prevalence values p in [0,1] compatible with at least one operating point:
+
+    q = Se*p + (1-Sp)*(1-p)
+
+The implementation solves the two equivalent linear feasibility inequalities. It does not divide by a possibly near-zero Youden index or silently assume a perfect detector. Completely uninformative detector ranges can return the full [0,1] interval; incompatible ranges return an explicit error.
+
+Sensitivity and specificity ranges must come from independent calibration evidence representative of the evaluation population, and should already include their own sampling/cluster uncertainty. This function treats them as fixed admissible ranges; it does not estimate them from validation counts or create confidence intervals. Apply it separately to source and target detectors. Do not multiply marginal prevalence intervals into a joint probability: source/target dependence is not identified by marginal rates. The result is conditional on the detector-evaluable population and does not correct trace missingness or transport across animals/sessions.
+
+Analytic tests cover q=0.6 with Se in [0.8,0.9] and Sp in [0.9,0.95] (latent prevalence [0.625, 11/15]), a perfect detector, a completely uninformative detector returning [0,1], incompatible ranges, invalid probabilities and monotonicity under wider calibration uncertainty.
