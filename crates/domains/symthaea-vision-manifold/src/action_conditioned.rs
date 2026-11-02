@@ -246,9 +246,9 @@ impl ActionForecastBank {
 
     /// Check that a producer returned a bank for exactly the request it received.
     ///
-    /// The manifest digest is supplied by the caller and is not recomputed here;
-    /// canonical action-manifest serialization and digest verification belong
-    /// to the runner/receipt layer.
+    /// The action manifest is recomputed from the request descriptors. The
+    /// joint-draw manifest is recomputed from sorted draw IDs and coupling.
+    /// The predictor bank digest is recomputed over the exact sample bytes.
     pub fn validate_for_request(&self, request: &ActionForecastRequest<'_>) -> Result<(), String> {
         request.validate()?;
         self.validate()?;
@@ -704,6 +704,8 @@ mod tests {
 
     const HISTORY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const MODEL: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const ACTION_MANIFEST_SHA: &str = "8cd89f9287f4cfe2f5b69b6e35fa8b33f74150f6f4850271ab283a95418b48aa";
+    const JOINT_DRAW_MANIFEST_SHA: &str = "f0fd63f7e8fbc17b1c19e93e7437488528f5db2d254507e93fac1595b7637616";
 
     fn request() -> ActionForecastRequest<'static> {
         static BELIEF: [f32; 3] = [1.0, 0.0, 0.0];
@@ -719,8 +721,8 @@ mod tests {
                 captured_at_seconds: 1.0,
                 belief: &BELIEF,
             },
-            action_manifest_sha256: compute_action_manifest_sha256(actions).unwrap().leak(),
-            joint_draw_manifest_sha256: compute_joint_draw_manifest_sha256(&DRAWS, ActionDrawCoupling::PairedExogenousDisturbance).unwrap().leak(),
+            action_manifest_sha256: ACTION_MANIFEST_SHA,
+            joint_draw_manifest_sha256: JOINT_DRAW_MANIFEST_SHA,
             model_sha256: MODEL,
             horizon_seconds: 0.5,
             target_frame_sequence: 45,
@@ -772,15 +774,9 @@ mod tests {
         captured_at_seconds: f64,
         belief: &'a [f32],
     ) -> BranchVisualObservation<'a> {
-        let action_manifest_sha256 = Box::leak(
-            compute_action_manifest_sha256(&[
-                ActionDescriptor { action_id: 17, canonical_descriptor: "move:left".into() },
-                ActionDescriptor { action_id: 9, canonical_descriptor: "move:right".into() },
-            ]).unwrap().into_boxed_str()
-        );
         BranchVisualObservation {
             history_sha256: HISTORY,
-            action_manifest_sha256,
+            action_manifest_sha256: ACTION_MANIFEST_SHA,
             action_id,
             joint_draw_id: draw_id,
             branch_id,
@@ -843,6 +839,21 @@ mod tests {
         tampered.action_manifest_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
         tampered.bank_sha256 = compute_action_forecast_bank_sha256(&tampered);
         assert!(tampered.validate_for_request(&request).is_err());
+    }
+
+    #[test]
+    fn manifest_hashes_match_pinned_canonical_known_answers() {
+        let actions = [
+            ActionDescriptor { action_id: 17, canonical_descriptor: "move:left".into() },
+            ActionDescriptor { action_id: 9, canonical_descriptor: "move:right".into() },
+        ];
+        assert_eq!(compute_action_manifest_sha256(&actions).unwrap(), ACTION_MANIFEST_SHA);
+        assert_eq!(
+            compute_joint_draw_manifest_sha256(
+                &[100, 101], ActionDrawCoupling::PairedExogenousDisturbance
+            ).unwrap(),
+            JOINT_DRAW_MANIFEST_SHA
+        );
     }
 
     #[test]
