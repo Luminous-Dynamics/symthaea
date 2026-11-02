@@ -129,7 +129,6 @@ pub fn plan_reviews(
 ) -> Result<ReviewPlan, PolicyError> {
     let mut seen = BTreeSet::new();
     let mut scored = Vec::with_capacity(candidates.len());
-    let mut expected_baseline_error_cost_units = 0.0_f64;
 
     for candidate in candidates {
         let id = candidate.operation_id.as_str();
@@ -170,17 +169,31 @@ pub fn plan_reviews(
         {
             return Err(PolicyError::NonFiniteExpectedCost(id.to_owned()));
         }
-        expected_baseline_error_cost_units += expected_baseline_cost;
-        if !expected_baseline_error_cost_units.is_finite() {
-            return Err(PolicyError::ExpectedCostOverflow);
-        }
-
         scored.push(ScoredCandidate {
             candidate,
             expected_baseline_cost,
             expected_avoided_cost,
             avoided_cost_per_second,
         });
+    }
+
+    // Sum in canonical operation-ID order so a permutation of input rows produces
+    // identical floating-point accumulation and an identical receipt.
+    scored.sort_by(|left, right| {
+        left.candidate
+            .operation_id
+            .cmp(&right.candidate.operation_id)
+    });
+    let mut expected_baseline_error_cost_units = 0.0_f64;
+    let mut compensation = 0.0_f64;
+    for item in &scored {
+        let adjusted = item.expected_baseline_cost - compensation;
+        let next = expected_baseline_error_cost_units + adjusted;
+        compensation = (next - expected_baseline_error_cost_units) - adjusted;
+        expected_baseline_error_cost_units = next;
+        if !expected_baseline_error_cost_units.is_finite() {
+            return Err(PolicyError::ExpectedCostOverflow);
+        }
     }
 
     scored.sort_by(|left, right| {
