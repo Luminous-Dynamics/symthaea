@@ -913,7 +913,7 @@ pub fn plan_next_experiment_decision_aware(
             experiment.estimated_risk,
             config.robust.base,
         );
-        let evaluated = evaluate_candidate(
+        let evaluated = match evaluate_candidate(
             &candidate.experiment_id,
             &candidate.scenario_results,
             decisions,
@@ -923,10 +923,25 @@ pub fn plan_next_experiment_decision_aware(
             baseline_value,
             cost,
             config,
-        )?;
+        ) {
+            Ok(result) => result,
+            Err(error) if error.kind == DecisionErrorKind::PolicySearchBudgetExceeded => {
+                rejected.push(RejectedDecisionExperiment {
+                    experiment_id: candidate.experiment_id.clone(),
+                    reasons: vec![DecisionRejectionReason::PolicySearchBudgetExceeded],
+                });
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
 
         let mut reasons = Vec::new();
-        if evaluated.result.selected_value <= config.minimum_selection_value {
+        let lacks_value = if config.ranking_policy == DecisionRankingPolicy::MinimaxRegret {
+            evaluated.result.expected_evsi <= config.minimum_selection_value
+        } else {
+            evaluated.result.selected_value <= config.minimum_selection_value
+        };
+        if lacks_value {
             reasons.push(DecisionRejectionReason::NoPositiveValueOfInformation);
         }
         if evaluated.result.decision_stability < config.minimum_decision_stability {
@@ -947,11 +962,21 @@ pub fn plan_next_experiment_decision_aware(
         }
     }
 
-    ranked.sort_by(|left, right| {
-        right.utility.total_cmp(&left.utility)
-            .then_with(|| right.selected_value.total_cmp(&left.selected_value))
-            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
-    });
+    if config.ranking_policy == DecisionRankingPolicy::MinimaxRegret {
+        ranked.sort_by(|left, right| {
+            left.worst_case_shared_policy_regret
+                .total_cmp(&right.worst_case_shared_policy_regret)
+                .then_with(|| right.expected_evsi.total_cmp(&left.expected_evsi))
+                .then_with(|| left.normalized_cost.total_cmp(&right.normalized_cost))
+                .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+        });
+    } else {
+        ranked.sort_by(|left, right| {
+            right.utility.total_cmp(&left.utility)
+                .then_with(|| right.selected_value.total_cmp(&left.selected_value))
+                .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+        });
+    }
     rejected.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
 
     let selected = ranked.first().cloned();
@@ -965,6 +990,10 @@ pub fn plan_next_experiment_decision_aware(
         item.reasons.contains(&DecisionRejectionReason::WorstCaseRegretExceeded)
     }) {
         Some(DecisionAbstentionReason::WorstCaseRegretExceeded)
+    } else if rejected.iter().any(|item| {
+        item.reasons.contains(&DecisionRejectionReason::PolicySearchBudgetExceeded)
+    }) {
+        Some(DecisionAbstentionReason::PolicySearchBudgetExceeded)
     } else if !rejected.is_empty()
         && rejected.iter().all(|item| {
             item.reasons.iter().all(|reason| matches!(
