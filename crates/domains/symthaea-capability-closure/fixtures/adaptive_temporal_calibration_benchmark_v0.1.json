@@ -648,7 +648,7 @@
       "code_url": "https://github.com/AdaMLLab/up-for-ocp",
       "code_commit": "3575f1f94a14620e089422f52cf9e1a6766ec7b1",
       "code_license": "MIT",
-      "code_audit_note": "Pinned main commit inspected 2026-11-02. Core UniversalPortfolio class includes Dirichlet/uniform mixture choices, an explicit alpha -= 0.015 correction, wealth/betting updates and quantile-radius calculation. Reproduce the paper's exact experiment/configuration and tests before treating repository behavior as the formal UP-OCP implementation."
+      "code_audit_note": "Pinned public main commit inspected 2026-11-02; commit author/committer date is 2026-01-05, before the ICML 2026 paper publication. Treat this as a supplementary pre-publication reference snapshot, not a confirmed paper-matched release. Core UniversalPortfolio class includes Dirichlet/uniform mixture choices, an alpha -= 0.015 correction, wealth/betting updates and quantile-radius calculation. Confirm exact hyperparameters, corrected alpha and paper theorem mapping before calling it a reproduction."
     }
   ],
   "metrics": {
