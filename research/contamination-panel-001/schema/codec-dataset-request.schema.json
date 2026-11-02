@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/codec-dataset-request-v1.json",
+  "title": "CoDeC dataset scoring request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dataset_id",
+    "dataset_version",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "chat_template_sha256",
+    "dataset_manifest_sha256",
+    "dataset_item_set_sha256",
+    "context_policy_id",
+    "context_policy_sha256",
+    "inference_backend_id",
+    "inference_receipt_sha256",
+    "n_context_examples",
+    "sampling_mode",
+    "dataset_item_ids",
+    "targets"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.codec_dataset_request.v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "chat_template_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_item_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "context_policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "context_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "inference_backend_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "inference_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "n_context_examples": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "sampling_mode": {
+      "type": "string",
+      "enum": [
+        "single_seed_efficiency",
+        "five_seed_paper_robustness",
+        "multi_seed_sensitivity"
+      ]
+    },
+    "dataset_item_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9._:-]+$"
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "target_token_count",
+          "target_token_sequence_sha256",
+          "baseline_target_token_logprobs",
+          "context_evaluations"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "target_token_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32768
+          },
+          "target_token_sequence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "baseline_target_token_logprobs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32768,
+            "items": {
+              "type": "number",
+              "maximum": 0
+            }
+          },
+          "context_evaluations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "context_seed",
+                "context_item_ids",
+                "context_item_set_sha256",
+                "target_token_logprobs"
+              ],
+              "properties": {
+                "context_seed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "context_item_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  }
+                },
+                "context_item_set_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "target_token_logprobs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 32768,
+                  "items": {
+                    "type": "number",
+                    "maximum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
