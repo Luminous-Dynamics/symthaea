@@ -196,6 +196,8 @@ pub enum LedgerError {
     DuplicateEventId(String),
     DuplicateIdempotencyKey(String),
     EventSequenceOverflow,
+    ReplaySequenceMismatch { expected: u64, actual: u64 },
+    ReplayDecisionMismatch { sequence: u64 },
 }
 
 impl fmt::Display for LedgerError {
@@ -228,6 +230,13 @@ impl fmt::Display for LedgerError {
                 write!(f, "duplicate idempotency key: {key}")
             }
             Self::EventSequenceOverflow => write!(f, "ledger event sequence overflow"),
+            Self::ReplaySequenceMismatch { expected, actual } => write!(
+                f,
+                "replay sequence mismatch: expected {expected}, got {actual}"
+            ),
+            Self::ReplayDecisionMismatch { sequence } => {
+                write!(f, "replayed decision differs at sequence {sequence}")
+            }
         }
     }
 }
@@ -271,6 +280,54 @@ impl EditTransactionLedger {
 
     pub fn events(&self) -> &[LedgerEvent] {
         &self.events
+    }
+
+    /// Replay an append-only event stream from its initial graph snapshot.
+    ///
+    /// Every recorded sequence number and decision is recomputed. Any divergence,
+    /// duplicate ID/key, malformed artifact reference or altered event causes replay to fail.
+    /// The caller must separately verify the actual bytes behind all digest references.
+    pub fn replay_events(
+        initial_snapshot_sha256: impl Into<String>,
+        events: &[LedgerEvent],
+    ) -> Result<Self, LedgerError> {
+        let mut ledger = Self::new(initial_snapshot_sha256)?;
+        for event in events {
+            let expected_sequence = ledger.next_event_sequence;
+            let (actual_sequence, replayed_decision) = match event {
+                LedgerEvent::Edit(record) => {
+                    if record.sequence != expected_sequence {
+                        return Err(LedgerError::ReplaySequenceMismatch {
+                            expected: expected_sequence,
+                            actual: record.sequence,
+                        });
+                    }
+                    let decision = ledger.submit_edit(record.submission.clone())?;
+                    (record.sequence, decision)
+                }
+                LedgerEvent::Rollback(record) => {
+                    if record.sequence != expected_sequence {
+                        return Err(LedgerError::ReplaySequenceMismatch {
+                            expected: expected_sequence,
+                            actual: record.sequence,
+                        });
+                    }
+                    let decision = ledger.submit_rollback(record.submission.clone())?;
+                    (record.sequence, decision)
+                }
+            };
+
+            let recorded_decision = match event {
+                LedgerEvent::Edit(record) => &record.decision,
+                LedgerEvent::Rollback(record) => &record.decision,
+            };
+            if &replayed_decision != recorded_decision {
+                return Err(LedgerError::ReplayDecisionMismatch {
+                    sequence: actual_sequence,
+                });
+            }
+        }
+        Ok(ledger)
     }
 
     pub fn snapshot(&self) -> LedgerSnapshot {
@@ -1045,7 +1102,7 @@ mod tests {
         assert_eq!(ledger.current_snapshot_sha256(), SHA_A);
         assert!(ledger.snapshot().committed_transaction_ids.is_empty());
         assert_eq!(ledger.events().len(), 2);
-        assert!(matches!(ledger.events()[0], LedgerEvent::Edit(_)));
+        assert!(matches!(&ledger.events()[0], LedgerEvent::Edit(_)));
         assert!(matches!(ledger.events()[1], LedgerEvent::Rollback(_)));
     }
 
@@ -1151,6 +1208,69 @@ mod tests {
             .collect();
         assert_eq!(sequences, vec![1, 2, 3]);
         assert_eq!(ledger.snapshot().next_event_sequence, 4);
+    }
+
+    #[test]
+    fn event_stream_replays_to_identical_ledger_state() {
+        let mut ledger = EditTransactionLedger::new(SHA_A).unwrap();
+        let mut stale = edit("tx-stale", SHA_B, SHA_C);
+        stale.idempotency_key = "idem-stale".to_owned();
+        ledger.submit_edit(stale).unwrap();
+
+        let mut good = edit("tx-good", SHA_A, SHA_B);
+        good.idempotency_key = "idem-good".to_owned();
+        ledger.submit_edit(good).unwrap();
+        ledger
+            .submit_rollback(rollback("rb-good", "tx-good", SHA_B, SHA_A))
+            .unwrap();
+
+        let events = ledger.events().to_vec();
+        let replayed = EditTransactionLedger::replay_events(SHA_A, &events).unwrap();
+
+        assert_eq!(replayed, ledger);
+        assert_eq!(replayed.snapshot(), ledger.snapshot());
+    }
+
+    #[test]
+    fn replay_rejects_mutated_decision_and_out_of_order_sequence() {
+        let mut ledger = committed_ledger();
+        let mut events = ledger.events().to_vec();
+
+        if let LedgerEvent::Edit(record) = &mut events[0] {
+            record.decision = EventDecision::Rejected {
+                reason: RejectReason::ReviewRejected,
+            };
+        }
+        assert_eq!(
+            EditTransactionLedger::replay_events(SHA_A, &events),
+            Err(LedgerError::ReplayDecisionMismatch { sequence: 1 })
+        );
+
+        events = ledger.events().to_vec();
+        if let LedgerEvent::Edit(record) = &mut events[0] {
+            record.sequence = 2;
+        }
+        assert_eq!(
+            EditTransactionLedger::replay_events(SHA_A, &events),
+            Err(LedgerError::ReplaySequenceMismatch {
+                expected: 1,
+                actual: 2
+            })
+        );
+    }
+
+    #[test]
+    fn event_sequence_overflow_does_not_reserve_event_ids_or_idempotency_keys() {
+        let mut ledger = EditTransactionLedger::new(SHA_A).unwrap();
+        ledger.next_event_sequence = u64::MAX;
+
+        assert_eq!(
+            ledger.submit_edit(edit("tx-overflow", SHA_A, SHA_B)),
+            Err(LedgerError::EventSequenceOverflow)
+        );
+        assert!(ledger.events().is_empty());
+        assert!(!ledger.seen_event_ids.contains("tx-overflow"));
+        assert!(!ledger.seen_idempotency_keys.contains("idem-tx-overflow"));
     }
 
     #[test]
