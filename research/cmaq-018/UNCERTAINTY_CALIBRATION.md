@@ -148,3 +148,27 @@ WorldOracle's dataset-access restriction in the existing CMAQ frontier remains u
 ## Claim ceiling
 
 Passing these metric tests proves only that the interval calculations and validation rules behave as specified. It does not prove the current Symthaea predictor is calibrated, that an action-set confidence certificate is valid under distribution shift, that a planner is safer, or that the model beats SOTA. Those claims require an actual VIS-005 adapter, frozen calibration data, a sealed qualification panel, measured compute and independent replay.
+
+
+## Executable VIS-005 joint action-bank interface
+
+The current branch adds a typed action-bank object to `src/uncertainty.rs` and a separate [VIS-005 adapter contract](VIS005_ACTION_SET_ADAPTER.md). A bank contains one history digest, one horizon, a canonical action-manifest digest, one scalar outcome channel, unique action IDs, unique joint-draw IDs, a content digest for the draw bank, a declared coupling kind, and outcome samples indexed by action and shared draw.
+
+The API validates the complete bank, returns action intervals, constructs all pairwise effects from same-column differences, and orders effect results by action ID rather than input row order. Tests demonstrate common-mode cancellation and action-row permutation invariance, and reject duplicate IDs, malformed provenance, invalid horizons and sample-cardinality mismatches.
+
+The focused workflow now schema-validates a synthetic joint-bank fixture and hostile duplicate-ID mutations. These are interface/metric tests only. They do not show that a production CfC/vision predictor emits calibrated joint distributions, nor that a producer is honest about its draw coupling. A future VIS-005 adapter must retain and independently verify the action manifest and joint-draw bytes while preserving the Predicted/Counterfactual memory boundary.
+
+
+### Joint action-bank content integrity
+
+The new action-bank structure has a canonical SHA-256 over its exact semantic content (history/horizon/action manifest/outcome channel/action IDs/draw IDs/coupling/matrix dimensions/f64 bits). The public compute helper produces this digest; validation recomputes and rejects mismatch. The digest is deterministic across little-endian canonical encoding rules and is pinned by a Rust known-answer test plus an independent Python workflow calculation. This closes payload-tampering risk but does not attest producer honesty or calibration.
+
+
+### Selection-event evaluation
+
+The selected action is the product of an adaptive choice, so marginal interval coverage is not the end metric. The new `evaluate_selected_action_sets` primitive scores realized regret, the conditional regret bound, bound coverage, complete-set simultaneous coverage, and false dominance certificates at the episode level. A false dominance certificate is a zero-regret interval claim contradicted by evaluator truth. The four-episode fixture intentionally includes one such failure; it is a test vector, not a calibration result. See `selected-action-evaluation.v0.1.schema.json` and `fixtures/selected-action-evaluation.example.json`.
+
+
+### Fail-closed selection and external benchmark comparison
+
+The joint action-bank work now includes a unique interval-dominance selector that abstains when no unique action is certified. The 2026 benchmark matrix defines a P0–P6 ladder and compares direct policies, fixed world-model planning, uncertainty-aware planning and adaptive inference under equal budgets. It also records the current literature gap between open-loop/prediction-level evaluations and prediction-to-action evidence. No external benchmark score is treated as a directly comparable Symthaea result.

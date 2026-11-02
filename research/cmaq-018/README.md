@@ -129,3 +129,60 @@ The additive design and executable metric primitives in UNCERTAINTY_CALIBRATION.
 ## Claim ceiling
 
 A synthetic pass demonstrates only the branch identity, known-answer intervention and metric contracts implemented by this generator. It does not establish real-world counterfactual correctness, physical safety, learned Symthaea world-model reliability, or SOTA. No physical robot intervention or actuator-control authority is enabled.
+
+
+## VIS-005 joint action-set adapter bridge
+
+This branch adds an executable same-history joint action-bank primitive for the future VIS-005 predictor adapter. See [VIS005_ACTION_SET_ADAPTER.md](VIS005_ACTION_SET_ADAPTER.md), [joint-action-bank.v0.1.schema.json](joint-action-bank.v0.1.schema.json) and the synthetic [joint-action-bank fixture](fixtures/joint-action-bank.example.json).
+
+The payload binds one observed-history digest, forecast horizon, canonical action-manifest digest, scalar outcome channel, unique action identities, unique shared draw IDs, joint-draw-bank digest and a matrix whose columns share the same joint draw across all action rows. Rust validates matrix cardinality and provenance digest syntax, computes per-action intervals and constructs paired differences directly from shared draw columns. Action-row permutation does not change an action-ID-defined effect interval.
+
+This is the interface seam VIS-005 needs for CfC/vision dynamics or a later learned predictor. It is not a production predictor, and the code cannot authenticate that the declared coupling was actually used; the action manifest, draw spec and raw sample bytes still need independent adapter provenance. Predictions remain Predicted/Counterfactual and never become observations.
+
+
+### Canonical joint-draw content digest
+
+The action-bank digest is no longer a digest-shaped declaration: Rust recomputes SHA-256 from a canonical encoding of the bank's history, horizon, action manifest, outcome channel, ordered IDs, coupling mode and exact f64 sample bits. Validation rejects changed values with a stale digest. The schema fixture's digest is checked independently in Python and pinned by a Rust known-answer test. A row permutation preserves a named pair's numerical effect but must receive a newly computed content digest.
+
+
+### Selected-action regret and false-dominance diagnostics
+
+CMAQ-018 now evaluates the decision event that follows interval prediction. The new `SelectionEpisode` / `evaluate_selected_action_sets` API reports episode-level realized regret, conditional regret-bound coverage, full action-set simultaneous coverage, and false interval-dominance certificates. A false certificate is counted when the chosen action's lower bound exceeds every competitor's upper bound but the evaluator's realized outcomes still show positive regret.
+
+The synthetic known-answer fixture has mean realized regret 1.25, mean bound 1.25, 75% bound coverage, 75% simultaneous coverage, two dominance certificates and one false certificate. It exists to test accounting and hostile behavior; it is not model calibration. The schema and fixture are `selected-action-evaluation.v0.1.schema.json` and `fixtures/selected-action-evaluation.example.json`.
+
+
+### Fail-closed selection and industry benchmark matrix
+
+CMAQ-018 now has a fail-closed interval-dominant action selector: it returns an action only when exactly one action's lower bound clears all competing upper bounds; otherwise it abstains. This is conditional on simultaneous interval coverage and is not actuator authority. The new frontier benchmark matrix in `INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md` defines P0–P6 evaluation, matched D0/D1/W1/W2/W3 baselines, selection-aware calibration and explicit SOTA comparison rules.
+
+
+### Executable net decision value
+
+A new matched-episode evaluator charges inference, information acquisition and failure/recovery costs against realized utility, comparing the world-model arm with D0 and D1. It reports gross advantage, net advantage and win rate for each baseline, rejecting negative costs and non-finite outcomes. The schema and synthetic arithmetic fixture are `net-decision-value.v0.1.schema.json` and `fixtures/net-decision-value.example.json`. This is metric plumbing—not a claim of real decision improvement.
+
+
+### VIS-005 source-backed architecture gap
+
+See [VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md). The current vision manifold delayed evaluator measures autonomous future-frame prediction against later observations, but it is not action-conditioned. The cross-manifold predictor maps vision to cognition. The current JEPA path uses the previous FEP action but its target is the CfC prediction approximation, not an independently encoded future frame. This distinction is now explicit in the benchmark claims and next-step plan.
+
+
+### Structured visual-belief action banks
+
+The scalar action bank is retained for a single declared outcome channel. The new `StructuredJointActionSetSamples` API carries multiple independent channels—such as object geometry, motion, gripper contact probability, visibility, terminal risk and task utility—under one history digest, action manifest and shared joint-draw axis. It computes a canonical SHA-256 over each channel's semantic tag, unit and exact f64 sample bits, and returns per-channel prediction/effect intervals without scalarizing heterogeneous quantities.
+
+See `structured-visual-action-bank.v0.1.schema.json` and `fixtures/structured-visual-action-bank.example.json`. The synthetic known-answer bank keeps object x-position (metres) and contact probability on one shared draw axis. A one-unit paired position effect and a 0.4 paired contact-probability effect are tested independently. These are metric/contract tests, not predictions from a real visual model.
+
+
+Structured-channel action selection is now constrained to an explicitly named `TaskUtility` channel. The same bank fixture includes position, contact probability and task utility, and the selector rejects a geometry channel. This prevents heterogeneous visual beliefs from being accidentally treated as one scalar reward.
+
+### Decision-aware evidence acquisition and constrained action selection
+
+The CMAQ-018 metric layer now includes:
+
+- `evaluate_information_acquisition`: EVSI per query, choosing a query only when expected post-information decision utility exceeds the prior best-action utility plus acquisition cost.
+- Canonical EVSI evidence digests binding the exact history, action/query manifests, outcome partition, probabilities, conditional utilities and cost.
+- `evaluate_information_probabilities`: multiclass Brier score, log loss, zero-probability miss count and top-outcome accuracy on held-out query outcomes.
+- `select_constrained_structured_action`: filters actions through explicit channel constraints (e.g. maximum terminal risk or minimum contact probability), then uses task utility only among feasible actions. It reports whether selection rests on sole feasibility or utility dominance, and uses a Bonferroni-adjusted per-interval nominal level across the full action/constraint family.
+
+Schemas and synthetic fixtures: `information-acquisition.v0.1.schema.json`, `fixtures/information-acquisition.example.json`, `information-probability-metrics.v0.1.schema.json`, and `fixtures/information-probability-metrics.example.json`. These are arithmetic/contract fixtures, not evidence of calibrated query probabilities, actual information value or physical safety.

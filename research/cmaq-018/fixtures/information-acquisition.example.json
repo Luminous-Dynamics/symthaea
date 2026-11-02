@@ -1,0 +1,58 @@
+{
+  "schema_version": "cmaq-018-information-acquisition-v0.1",
+  "claim_ceiling": "synthetic_known_answer_fixture_only_no_probability_calibration_or_real_query_utility_claim",
+  "options": [
+    {
+      "history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "query_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "evidence_sha256": "80f500f511bff1bccfd0ca03aa164de21ea84a64e8c924a4b2385132e62257e8",
+      "query_id": "camera_peek",
+      "action_ids": [
+        17,
+        3
+      ],
+      "outcome_ids": [
+        "grasp_success",
+        "slip_detected"
+      ],
+      "prior_best_action_id": 3,
+      "best_action_by_outcome": [
+        17,
+        3
+      ],
+      "expected_utility_without_information": 5,
+      "expected_utility_after_information": 6.5,
+      "expected_value_of_sample_information": 1.5,
+      "acquisition_cost": 1,
+      "net_information_value": 0.5
+    },
+    {
+      "history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "query_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_sha256": "d9feb04acc7a9dcd1c108c30862eada2c91863857daf103c74998cc76c3a5412",
+      "query_id": "expensive_probe",
+      "action_ids": [
+        17,
+        3
+      ],
+      "outcome_ids": [
+        "grasp_success",
+        "slip_detected"
+      ],
+      "prior_best_action_id": 3,
+      "best_action_by_outcome": [
+        17,
+        3
+      ],
+      "expected_utility_without_information": 5,
+      "expected_utility_after_information": 6.5,
+      "expected_value_of_sample_information": 1.5,
+      "acquisition_cost": 2,
+      "net_information_value": -0.5
+    }
+  ],
+  "choice": "acquire_best_query",
+  "selected_query_id": "camera_peek"
+}

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-information-acquisition-v0.1.json",
+  "title": "CMAQ-018 expected value of sample information evaluation",
+  "description": "Query selection based on expected post-observation decision utility minus prior best-action expected utility and all-in acquisition cost. This is conditional on calibrated outcome probabilities and conditional utility estimates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "options",
+    "choice",
+    "selected_query_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-information-acquisition-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_known_answer_fixture_only_no_probability_calibration_or_real_query_utility_claim"
+    },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "history_sha256",
+          "action_manifest_sha256",
+          "query_manifest_sha256",
+          "evidence_sha256",
+          "query_id",
+          "action_ids",
+          "outcome_ids",
+          "prior_best_action_id",
+          "best_action_by_outcome",
+          "expected_utility_without_information",
+          "expected_utility_after_information",
+          "expected_value_of_sample_information",
+          "acquisition_cost",
+          "net_information_value"
+        ],
+        "properties": {
+          "history_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "action_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "query_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "query_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_ids": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "outcome_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "prior_best_action_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "best_action_by_outcome": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "expected_utility_without_information": {
+            "type": "number"
+          },
+          "expected_utility_after_information": {
+            "type": "number"
+          },
+          "expected_value_of_sample_information": {
+            "type": "number",
+            "minimum": 0
+          },
+          "acquisition_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "net_information_value": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "choice": {
+      "enum": [
+        "acquire_best_query",
+        "abstain"
+      ]
+    },
+    "selected_query_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

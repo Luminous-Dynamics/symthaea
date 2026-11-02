@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-selected-action-evaluation-v0.1.json",
+  "title": "CMAQ-018 selected-action regret and certificate evaluation",
+  "description": "Episode-level evaluation of selected-action regret under a frozen candidate action set. Each episode is the statistical unit; action pairs are not treated as independent samples.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "episode_count",
+    "actions_per_episode",
+    "mean_realized_regret",
+    "mean_regret_upper_bound",
+    "regret_bound_coverage",
+    "simultaneous_interval_coverage",
+    "dominant_certificate_count",
+    "false_dominant_certificate_count",
+    "false_dominant_certificate_rate",
+    "mean_selected_interval_width"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-selected-action-evaluation-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_evaluator_fixture_only_no_predictor_calibration_or_physical_safety_claim"
+    },
+    "episode_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "actions_per_episode": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "mean_realized_regret": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_regret_upper_bound": {
+      "type": "number",
+      "minimum": 0
+    },
+    "regret_bound_coverage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "simultaneous_interval_coverage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "dominant_certificate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_dominant_certificate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_dominant_certificate_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mean_selected_interval_width": {
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}
