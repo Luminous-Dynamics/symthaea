@@ -4,7 +4,7 @@ A dependency-free, exact-arithmetic research crate for the ETH-001 / ETH-002 pro
 
 ## Scope of this first slice
 
-The crate implements the tensor-product Möbius/Newton transform on the finite grid
+The crate implements the tensor-product binomial/Newton transform on the finite grid
 \(\{0,\ldots,d\}^n\), using checked i128 arithmetic:
 
 - forward differences at the origin;
@@ -37,7 +37,7 @@ complexity and cannot treat an arithmetic-operation bound as a Turing-time bound
 
 ## Claim boundary
 
-- finite-grid inversion identity is not a finite-domain subexponential algorithm;
+- the q-ary binomial/Newton inversion identity is not a finite-domain subexponential algorithm;
 - passing finite tests is not a formal proof;
 - i128 reference arithmetic is not an arbitrary-precision implementation;
 - exact interpolation does not guarantee low degree or low coefficient growth
