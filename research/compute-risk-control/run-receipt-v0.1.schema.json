@@ -130,7 +130,9 @@
               "lower_risk_ucb_ppm",
               "mean_tokens_used_ppm",
               "meets_all_three_risk_budgets",
-              "task_loss_receipt_sha256"
+              "task_loss_receipt_sha256",
+              "mean_upper_efficiency_loss_ppm",
+              "mean_lower_efficiency_loss_ppm"
             ],
             "properties": {
               "candidate_id": {
@@ -153,28 +155,44 @@
                 "minimum": 1
               },
               "upper_mean_loss_ceil_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "lower_mean_loss_ceil_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "emitted_answer_error_mean_ceil_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "emitted_answer_error_ucb_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "simultaneous_ucb_correction_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "upper_risk_ucb_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "lower_risk_ucb_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "mean_tokens_used_ppm": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               },
               "meets_all_three_risk_budgets": {
                 "type": "boolean"
@@ -182,6 +200,16 @@
               "task_loss_receipt_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
+              },
+              "mean_upper_efficiency_loss_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "mean_lower_efficiency_loss_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
               }
             }
           }
