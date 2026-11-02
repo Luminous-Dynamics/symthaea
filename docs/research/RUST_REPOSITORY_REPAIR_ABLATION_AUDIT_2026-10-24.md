@@ -2,7 +2,7 @@
 
 **Protocol ID:** `symthaea-rust-repair-ablation-v1`  
 **Version:** `1`  
-**Status:** analysis implementation; preregistration required before any scored comparison.
+**Status:** Design specification only on current `main` (checked 2026-11-02). The documented `tools/rust-repair-benchmark-harness/Cargo.toml` and named binary source were not found; commands below are intended interfaces only and are not currently runnable from `main`. See issue #10138.
 
 This is an analysis contract, not a result. It does not claim that GCS improves repair quality or that Symthaea is state of the art.
 
