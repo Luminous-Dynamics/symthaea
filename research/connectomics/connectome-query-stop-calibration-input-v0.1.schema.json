@@ -25,7 +25,7 @@
     "calibration_trajectories",
     "exchangeability_assessment_sha256",
     "target_exchangeability_supported",
-    "target_independence_cluster_id"
+    "calibration_trajectory_manifest_sha256"
   ],
   "$defs": {
     "id": {
@@ -140,6 +140,9 @@
     },
     "target_exchangeability_supported": {
       "type": "boolean"
+    },
+    "calibration_trajectory_manifest_sha256": {
+      "$ref": "#/$defs/sha"
     }
   }
 }
