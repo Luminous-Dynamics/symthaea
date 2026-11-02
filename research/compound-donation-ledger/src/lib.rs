@@ -722,6 +722,92 @@ impl StaircaseAdjuster {
         )
     }
 
+    /// Builds a horizon-independent candidate-weighted rank calibrator.
+    ///
+    /// For every rank r = 2^j, j in 0..=max_rank_exponent, allocate the
+    /// fixed prior mass pi_j = 1 / ((j+1)(j+2)). These masses telescope to
+    /// at most one. A candidate with fixed global weight gamma receives the
+    /// threshold for its weighted e-BH boundary 1/(alpha * gamma * r).
+    ///
+    /// This constructor does not depend on the active family size. Existing
+    /// candidates keep exactly the same calibrator when higher-ID hypotheses
+    /// arrive. With j=floor(log2 k), the largest dyadic rank r<=k satisfies
+    /// k/2<r<=k, and 1/pi_j=(j+1)(j+2), giving an O((log k)^2) raw-threshold
+    /// overhead (plus fixed-point rounding) for all finite k.
+    ///
+    /// max_rank_exponent is capped at 63, covering every rank representable
+    /// in a u64-sized finite family. The unallocated prior tail remains valid.
+    pub fn projective_weighted_e_bh_rank_prior(
+        max_rank_exponent: u32,
+        weight_numerator: u64,
+        weight_denominator: u64,
+        alpha_numerator: u64,
+        alpha_denominator: u64,
+    ) -> Result<Self, LedgerError> {
+        if max_rank_exponent > 63
+            || weight_numerator == 0
+            || weight_denominator == 0
+            || weight_numerator > weight_denominator
+            || alpha_numerator == 0
+            || alpha_denominator == 0
+            || alpha_numerator >= alpha_denominator
+        {
+            return Err(LedgerError::InvalidThresholdGrid);
+        }
+
+        let mut merged = BTreeMap::<u128, u128>::new();
+        for exponent in 0..=max_rank_exponent {
+            let index = exponent as u128 + 1;
+            let denominator = index
+                .checked_mul(index + 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let prior_mass = PRIOR_MASS_SCALE / denominator;
+            if prior_mass == 0 {
+                return Err(LedgerError::InvalidThresholdGrid);
+            }
+
+            let rank = 1_u64
+                .checked_shl(exponent)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let target_numerator = (alpha_denominator as u128)
+                .checked_mul(weight_denominator as u128)
+                .and_then(|value| value.checked_mul(EVIDENCE_ONE))
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let target_denominator = (alpha_numerator as u128)
+                .checked_mul(rank as u128)
+                .and_then(|value| value.checked_mul(weight_numerator as u128))
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let target_ticks = target_numerator
+                .checked_add(target_denominator - 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?
+                / target_denominator;
+
+            let raw_numerator = target_ticks
+                .checked_mul(PRIOR_MASS_SCALE)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+            let raw_threshold = (raw_numerator
+                .checked_add(prior_mass - 1)
+                .ok_or(LedgerError::ArithmeticOverflow)?
+                / prior_mass)
+                .max(EVIDENCE_ONE);
+
+            let entry = merged.entry(raw_threshold).or_insert(0);
+            *entry = entry
+                .checked_add(prior_mass)
+                .ok_or(LedgerError::ArithmeticOverflow)?;
+        }
+
+        Self::new(
+            merged
+                .into_iter()
+                .map(|(threshold, prior_mass)| ThresholdMass {
+                    threshold,
+                    prior_mass,
+                })
+                .collect(),
+        )
+    }
+
     /// Builds a finite prefix of a horizon-independent dyadic prior.
     ///
     /// The ideal infinite prior is pi_j = 1 / (j * (j + 1)) at K_j = 2^j,
@@ -1120,6 +1206,69 @@ mod tests {
 
         let equal_weight = StaircaseAdjuster::e_bh_rank_geometric(100, 1, 20).unwrap();
         assert_eq!(equal_weight, unit_weight);
+    }
+
+    #[test]
+    fn projective_weighted_rank_prior_covers_all_ranks_without_family_size() {
+        let m = 10_000_u64;
+        let weight_num = 3_u64;
+        let weight_den = 1_000_u64;
+        let alpha_num = 1_u64;
+        let alpha_den = 20_u64;
+        let adjuster = StaircaseAdjuster::projective_weighted_e_bh_rank_prior(
+            13, weight_num, weight_den, alpha_num, alpha_den
+        ).unwrap();
+
+        let total_mass: u128 = adjuster.points().iter().map(|point| point.prior_mass).sum();
+        let expected_mass: u128 = (0..=13)
+            .map(|j| PRIOR_MASS_SCALE / ((j as u128 + 1) * (j as u128 + 2)))
+            .sum();
+        assert_eq!(total_mass, expected_mass);
+        assert!(total_mass <= PRIOR_MASS_SCALE);
+
+        for k in 1..=m {
+            let exponent = 63 - (k.leading_zeros());
+            let rank = 1_u64 << exponent;
+            let denominator = (exponent as u128 + 1) * (exponent as u128 + 2);
+            let mass = PRIOR_MASS_SCALE / denominator;
+            let target_numerator = (alpha_den as u128)
+                * (weight_den as u128) * EVIDENCE_ONE;
+            let target_denominator = (alpha_num as u128)
+                * (rank as u128) * (weight_num as u128);
+            let target = (target_numerator + target_denominator - 1) / target_denominator;
+            let raw_numerator = target * PRIOR_MASS_SCALE;
+            let raw = ((raw_numerator + mass - 1) / mass).max(EVIDENCE_ONE);
+
+            assert!(
+                adjuster.value_at(raw).unwrap() >= target,
+                "rank {k} unsupported by its dyadic prior point"
+            );
+
+            let actual_denominator = (alpha_num as u128)
+                * (k as u128) * (weight_num as u128);
+            let actual = (target_numerator + actual_denominator - 1) / actual_denominator;
+            let overhead_numerator = 2 * denominator * PRIOR_MASS_SCALE;
+            let overhead_denominator = PRIOR_MASS_SCALE - denominator;
+            let overhead = (overhead_numerator + overhead_denominator - 1)
+                / overhead_denominator;
+            assert!(
+                raw <= (overhead * actual + EVIDENCE_ONE)
+                    .max(EVIDENCE_ONE),
+                "rank {k} exceeds projective rank prior overhead"
+            );
+        }
+    }
+
+    #[test]
+    fn projective_rank_prior_has_same_prefix_under_horizon_extension() {
+        let short = StaircaseAdjuster::projective_weighted_e_bh_rank_prior(
+            63, 3, 1_000, 1, 20
+        ).unwrap();
+        let long = StaircaseAdjuster::projective_weighted_e_bh_rank_prior(
+            63, 3, 1_000, 1, 20
+        ).unwrap();
+        assert_eq!(short, long);
+        assert_eq!(short.points(), long.points());
     }
 
     #[test]
