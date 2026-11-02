@@ -161,22 +161,23 @@ fn event_bounds(score: &Score, events: &[ScoreEventRef]) -> Option<(f64, f64)> {
 fn period_sentence_return_binding(
     score: &Score,
     occurrences: &[MotifAssertion],
-) -> Option<(Vec<ScoreEventRef>, Vec<ScoreEventRef>)> {
+) -> Option<(Vec<ScoreEventRef>, Option<Vec<ScoreEventRef>>)> {
     let total = score.total_beats.beats();
     let source = occurrences.iter().find(|item| {
         event_bounds(score, &item.events)
             .is_some_and(|(start, _)| start <= total * 0.2)
     })?;
-    let target = occurrences.iter().rev().find(|item| {
-        event_bounds(score, &item.events)
-            .is_some_and(|(start, _)| start >= total * 0.8)
-    })?;
     let (_, source_end) = event_bounds(score, &source.events)?;
-    let (target_start, _) = event_bounds(score, &target.events)?;
-    if source.events == target.events || target_start <= source_end {
-        return None;
-    }
-    Some((source.events.clone(), target.events.clone()))
+    // Preserve the promised source even when no later return is found. An
+    // unresolved obligation still needs an exact identity for future edits.
+    let target = occurrences.iter().rev().find_map(|item| {
+        let (target_start, _) = event_bounds(score, &item.events)?;
+        (item.events != source.events
+            && target_start >= total * 0.8
+            && target_start > source_end)
+            .then(|| item.events.clone())
+    });
+    Some((source.events.clone(), target))
 }
 
 fn motif_assertions(
@@ -524,9 +525,11 @@ pub fn build_grammar_trace(
                 .unwrap_or_default();
             let target_evidence = period_sentence_return
                 .as_ref()
-                .map(|(_, target)| target.clone())
+                .and_then(|(_, target)| target.clone())
                 .unwrap_or_default();
-            let fulfilled = period_sentence_return.is_some();
+            let fulfilled = period_sentence_return
+                .as_ref()
+                .is_some_and(|(_, target)| target.is_some());
             let definition = plan.typed_return_obligation.clone();
             obligations.push(ObligationAssertion {
                 obligation_id: "thematic-return-and-closure".into(),
