@@ -10,6 +10,8 @@ This crate validates that:
 - row/column orientation is explicit;
 - reordered axes and annotation tables resolve through deterministic bijections;
 - stimulus and keep/remove requests resolve through stable neuron IDs;
+- numeric matrices and per-neuron annotation/parameter vectors can be reordered into canonical identity order;
+- returned identity mappings are immutable through the public API;
 - duplicate, missing, extra, unknown or conflicting identities fail closed.
 
 It emits two SHA-256 commitments: a canonical identity commitment invariant to source ordering, and a source-binding commitment that binds the exact row, column and annotation order.
