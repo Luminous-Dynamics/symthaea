@@ -1,0 +1,72 @@
+{
+  "suite": "ETH-014 carry-free scalarization exact micro-oracle",
+  "passed": 7,
+  "total": 7,
+  "cases": [
+    {
+      "name": "triangle_max_cut",
+      "base": 9,
+      "decoded_optimum": 2,
+      "decoded_multiplicity": 6,
+      "expected_optimum": 2,
+      "expected_multiplicity": 6,
+      "scalar_bits": 9,
+      "passed": true
+    },
+    {
+      "name": "max_2sat_clause_profile",
+      "base": 9,
+      "decoded_optimum": 4,
+      "decoded_multiplicity": 2,
+      "expected_optimum": 4,
+      "expected_multiplicity": 2,
+      "scalar_bits": 15,
+      "passed": true
+    },
+    {
+      "name": "path4_independence_polynomial",
+      "base": 17,
+      "decoded_optimum": 2,
+      "decoded_multiplicity": 3,
+      "expected_optimum": 2,
+      "expected_multiplicity": 3,
+      "scalar_bits": 10,
+      "passed": true
+    },
+    {
+      "name": "even_parity_code_weight_enumerator",
+      "base": 9,
+      "decoded_optimum": 2,
+      "decoded_multiplicity": 3,
+      "expected_optimum": 2,
+      "expected_multiplicity": 3,
+      "scalar_bits": 8,
+      "passed": true
+    },
+    {
+      "name": "two_resource_knapsack_lexicographic_optimum",
+      "base": 9,
+      "radices": [
+        3,
+        4
+      ],
+      "decoded_vector": [
+        2,
+        3
+      ],
+      "decoded_multiplicity": 1,
+      "expected_vector": [
+        2,
+        3
+      ],
+      "expected_multiplicity": 1,
+      "scalar_bits": 35,
+      "passed": true
+    }
+  ],
+  "negative_controls": {
+    "signed_coefficients_rejected": true,
+    "insufficient_base_rejected": true
+  },
+  "claim_boundary": "Finite exact encoding checks only; requires nonnegative coefficients and proven coefficient/base bounds; no runtime or asymptotic claim."
+}
