@@ -119,6 +119,16 @@ pub fn verify_overshoot_refund_transition(
     let cap = (alpha_numerator as u128)
         .checked_mul(EVIDENCE_ONE)
         .ok_or(VerifyError::Overflow)?;
+    let previous_scaled_evidence = (alpha_numerator as u128)
+        .checked_mul(previous_evidence_value)
+        .ok_or(VerifyError::Overflow)?;
+    let previous_expected_refund = previous_scaled_evidence
+        .saturating_sub(denominator)
+        .min(cap);
+    if previous_expected_refund != previous_refund_numerator {
+        return Err(VerifyError::RefundReplayMismatch);
+    }
+
     let alpha_scaled_evidence = (alpha_numerator as u128)
         .checked_mul(receipt.evidence_value)
         .ok_or(VerifyError::Overflow)?;
@@ -647,6 +657,25 @@ mod tests {
                 1, 20, Some(0), EVIDENCE_ONE, 0, &receipt
             ),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn independent_verifier_rejects_forged_previous_refund_state() {
+        let next = OvershootRefundReceipt {
+            round: 3,
+            evidence_value: 40 * EVIDENCE_ONE,
+            refund_increment_numerator: 0,
+            cumulative_refund_numerator: EVIDENCE_ONE,
+            effective_cost_numerator: 39 * EVIDENCE_ONE,
+            denominator: 20 * EVIDENCE_ONE,
+            rejected: true,
+        };
+        assert_eq!(
+            verify_overshoot_refund_transition(
+                1, 20, Some(2), 30 * EVIDENCE_ONE, 0, &next
+            ),
+            Err(VerifyError::RefundReplayMismatch)
         );
     }
 
