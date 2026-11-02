@@ -183,7 +183,16 @@
         "verifier_sha256",
         "verification_receipt_sha256",
         "expected_world_ids",
-        "closure_verified"
+        "closure_verified",
+        "query_definition_sha256",
+        "metric_id",
+        "unit_id",
+        "decision_threshold",
+        "materiality_threshold",
+        "source_volume_id",
+        "base_graph_snapshot_sha256",
+        "hypothetical_result_graph_snapshot_sha256",
+        "candidate_patch_sha256"
       ],
       "properties": {
         "universe_id": {
@@ -222,7 +231,35 @@
           }
         },
         "closure_verified": {
-          "const": true
+          "type": "boolean"
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "metric_id": {
+          "$ref": "#/$defs/id"
+        },
+        "unit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "decision_threshold": {
+          "type": "number"
+        },
+        "materiality_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_volume_id": {
+          "$ref": "#/$defs/id"
+        },
+        "base_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "hypothetical_result_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "candidate_patch_sha256": {
+          "$ref": "#/$defs/sha"
         }
       }
     }
