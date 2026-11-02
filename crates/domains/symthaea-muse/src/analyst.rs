@@ -20,7 +20,8 @@ use symthaea_muse_protocol::{
     TraceVerificationReport, VerificationStatus,
 };
 use symthaea_music_theory::{
-    AssertedObligationState, GrammarStructuralTrace, ScoreEventRef, VoiceRole,
+    AssertedObligationState, GrammarStructuralTrace, ObligationKind, ReturnTransformation,
+    ScoreEventRef, VoiceRole,
 };
 use symthaea_music_theory::{GrammarPlanEvidence, MusicalIntent};
 
@@ -328,6 +329,43 @@ fn assertion_envelope(
     }
 }
 
+
+fn typed_obligation_definition(
+    kind: &ObligationKind,
+    source_evidence: &[ScoreEventRef],
+) -> Option<ObligationDefinitionV1> {
+    let ObligationKind::ReturnMotif {
+        motif_id,
+        transformation,
+    } = kind
+    else {
+        // Other theory obligation kinds remain untyped on this protocol path
+        // until their score-side semantics have a qualified mapping.
+        return None;
+    };
+    let transformation = match transformation {
+        ReturnTransformation::Literal => ObligationMotifTransformationV1::Literal,
+        ReturnTransformation::Transposed => ObligationMotifTransformationV1::Transposed,
+        ReturnTransformation::Inverted => ObligationMotifTransformationV1::Inverted,
+        ReturnTransformation::Augmented => ObligationMotifTransformationV1::Augmented,
+        ReturnTransformation::Diminished => ObligationMotifTransformationV1::Diminished,
+        ReturnTransformation::Fragmented => ObligationMotifTransformationV1::Fragmented,
+        ReturnTransformation::Restored => ObligationMotifTransformationV1::Restored,
+    };
+    Some(ObligationDefinitionV1 {
+        schema_version: 1,
+        kind: ObligationKindV1::ReturnMotif {
+            motif_id: motif_id.clone(),
+            source_event_ids: source_evidence
+                .iter()
+                .copied()
+                .map(trace_event_id)
+                .collect(),
+            transformation,
+        },
+    })
+}
+
 fn obligation_state(state: AssertedObligationState) -> ObligationState {
     match state {
         AssertedObligationState::Created => ObligationState::Created,
@@ -421,9 +459,10 @@ pub fn composer_trace_from_theory(
                     score_event_ids: item.evidence.iter().copied().map(trace_event_id).collect(),
                     responsible_pass: item.responsible_pass.clone(),
                     transformation: item.transformation.clone(),
-                    // The current grammar trace carries lifecycle assertions but
-                    // not yet the typed ObligationKind. Do not invent a kind here.
-                    definition: None,
+                    definition: item
+                        .definition
+                        .as_ref()
+                        .and_then(|kind| typed_obligation_definition(kind, &item.source_evidence)),
                     assertion: assertion_envelope(&record_id, score_sha256, created_at_unix_ms),
                 }
             })
@@ -2263,6 +2302,48 @@ mod tests {
             "{:?}",
             impulses.issues
         );
+    }
+
+
+
+    #[test]
+    fn period_sentence_return_definition_preserves_source_ids_across_protocol_boundary() {
+        use symthaea_music_theory::{MusicalIntent, Style, compose_with_grammar_plan};
+
+        let style = Style::Classical;
+        let intent = MusicalIntent {
+            bars: 8,
+            seed: 11,
+            ..MusicalIntent::default()
+        };
+        let realized = compose_with_grammar_plan(style.grammar_profile(), &intent, &style.spec());
+        let source = realized
+            .trace
+            .obligation_transitions
+            .iter()
+            .find(|item| item.obligation_id == "thematic-return-and-closure")
+            .expect("period/sentence source transition");
+        let public = composer_trace_from_theory(&realized.trace, "score", 0, None);
+        let public_source = public
+            .obligation_transitions
+            .iter()
+            .find(|item| item.obligation_id == "thematic-return-and-closure")
+            .expect("protocol source transition");
+        let expected_source_ids: Vec<_> = source
+            .source_evidence
+            .iter()
+            .copied()
+            .map(trace_event_id)
+            .collect();
+        let Some(definition) = &public_source.definition else {
+            panic!("typed period/sentence return definition must survive conversion");
+        };
+        match &definition.kind {
+            ObligationKindV1::ReturnMotif { source_event_ids, .. } => {
+                assert_eq!(source_event_ids, &expected_source_ids);
+            }
+            other => panic!("unexpected typed obligation: {other:?}"),
+        }
     }
 
     #[test]
