@@ -70,6 +70,7 @@ struct SidecarRow {
 struct ParsedRow {
     row: SidecarRow,
     metadata: Value,
+    species: String,
     bank: String,
     split: String,
     source_line: usize,
@@ -92,7 +93,7 @@ impl Finding {
     fn row(code: &str, row: &ParsedRow, key: Option<&str>, detail: impl Into<String>) -> Self {
         Self {
             code: code.into(),
-            species: Some(row.row.species.clone()),
+            species: Some(row.species.clone()),
             bank: Some(row.bank.clone()),
             key: key.map(str::to_owned),
             sample_id: Some(row.row.combined_sample_hash.clone()),
@@ -195,6 +196,22 @@ fn archive_bank(source_archive: &str) -> Option<&'static str> {
 
 /// Upstream Python calls int(value) for integer lineage keys. Preserve 64-bit IDs
 /// exactly; do not round them through f64.
+fn archive_species(source_archive: &str) -> Option<String> {
+    for prefix in [
+        "edits_and_adj_controls",
+        "junction_controls",
+        "synapse_controls",
+    ] {
+        let prefix = format!("{prefix}_");
+        if let Some(species) = source_archive.strip_prefix(&prefix) {
+            if SPECIES.contains(&species) {
+                return Some(species.to_owned());
+            }
+        }
+    }
+    None
+}
+
 fn python_int_key(value: &Value) -> Option<String> {
     match value {
         Value::String(value) => {
@@ -290,7 +307,7 @@ fn row_lineage_key(row: &ParsedRow) -> Option<String> {
         }
         _ => return None,
     };
-    Some(format!("{}|{}|{}", row.row.species, row.bank, local))
+    Some(format!("{}|{}|{}", row.species, row.bank, local))
 }
 
 fn parse_sidecar(bytes: &[u8], errors: &mut Vec<Finding>) -> Vec<ParsedRow> {
@@ -328,6 +345,16 @@ fn parse_sidecar(bytes: &[u8], errors: &mut Vec<Finding>) -> Vec<ParsedRow> {
                 continue;
             }
         };
+        let species = match archive_species(&row.source_archive) {
+            Some(species) => species,
+            None => {
+                errors.push(Finding::global("sidecar_archive_species_unknown", format!("line {} source_archive suffix must identify a supported species", line_index + 1)));
+                continue;
+            }
+        };
+        if row.species != species {
+            errors.push(Finding::global("sidecar_archive_species_mismatch", format!("line {} source_archive resolves to {species}, but sidecar species is {}", line_index + 1, row.species)));
+        }
         let split = match normalize_split(&row.split) {
             Some(split) => split.to_owned(),
             None => {
@@ -344,7 +371,7 @@ fn parse_sidecar(bytes: &[u8], errors: &mut Vec<Finding>) -> Vec<ParsedRow> {
             || row.combined_sample_hash != sample_key_md5(&row.source_archive, &row.source_archive_sample_hash) {
             errors.push(Finding::global("sidecar_sample_key_mismatch", format!("line {} combined_sample_hash does not match the upstream MD5 row-key formula/format", line_index + 1)));
         }
-        rows.push(ParsedRow { row, metadata, bank, split, source_line: line_index + 1 });
+        rows.push(ParsedRow { row, metadata, species, bank, split, source_line: line_index + 1 });
     }
     rows
 }
@@ -546,7 +573,7 @@ fn audit(
             split_root.to_path_buf()
         }
     };
-    let species_names: BTreeSet<String> = rows.iter().map(|row| row.row.species.clone()).collect();
+    let species_names: BTreeSet<String> = rows.iter().map(|row| row.species.clone()).collect();
     let mut species_replays = BTreeMap::new();
     let mut total_matched = 0_u64;
     let mut total_mismatched = 0_u64;
@@ -556,7 +583,7 @@ fn audit(
         let Some(mut loaded) = load_species_split_index(&root, &species, &mut errors) else {
             continue;
         };
-        for row in rows.iter().filter(|row| row.row.species == species) {
+        for row in rows.iter().filter(|row| row.species == species) {
             *loaded.replay.sidecar_row_counts.entry(format!("{}|{}", row.bank, row.split)).or_default() += 1;
             let Some(key) = row_lineage_key(row) else {
                 loaded.replay.missing_sidecar_keys += 1;
@@ -836,6 +863,13 @@ mod tests {
         symlink(&outside, species.join("train.json")).unwrap();
         let report = audit(&bytes, sha256(&bytes), &root, "a".repeat(40));
         assert!(report.errors.iter().any(|finding| finding.code == "split_file_missing" && finding.detail.contains("outside the pinned split root")));
+    }
+    #[test]
+    fn source_archive_not_sidecar_species_controls_split_namespace() {
+        let (root, bytes) = fixture();
+        let altered = String::from_utf8(bytes).unwrap().replace("\"species\":\"mouse\"", "\"species\":\"fly\"");
+        let report = audit(altered.as_bytes(), sha256(altered.as_bytes()), &root, "a".repeat(40));
+        assert!(report.errors.iter().any(|finding| finding.code == "sidecar_archive_species_mismatch"));
     }
 
 }
