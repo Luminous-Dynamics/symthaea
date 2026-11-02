@@ -403,6 +403,26 @@
               "heuristic_no_matching_formal_guarantee",
               "research_candidate_not_implemented"
             ]
+          },
+          "paper_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "code_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "code_commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "code_license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code_audit_note": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
