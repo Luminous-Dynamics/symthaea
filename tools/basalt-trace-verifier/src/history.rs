@@ -54,7 +54,9 @@ fn state_fingerprint(state: &ModelState) -> String {
 }
 
 fn expected_optional_matches<T: PartialEq>(expected: &Option<T>, actual: &Option<T>) -> bool {
-    expected.as_ref().is_none_or(|expected| Some(expected) == actual.as_ref())
+    expected
+        .as_ref()
+        .is_none_or(|expected| Some(expected) == actual.as_ref())
 }
 
 /// Missing optional output fields mean that the backend did not expose that field.
@@ -306,12 +308,7 @@ fn visit(
         }
 
         order.push(index);
-        if visit(
-            context,
-            remaining & !(1_u64 << index),
-            next_state,
-            order,
-        ) {
+        if visit(context, remaining & !(1_u64 << index), next_state, order) {
             return true;
         }
         order.pop();
@@ -328,10 +325,7 @@ fn visit(
 /// Checks whether any sequential execution explains a fully completed observed
 /// history while respecting client order, explicit dependencies and same-runner
 /// real-time precedence. The declared reference_linearization_order is ignored.
-pub fn verify_observed_history(
-    trace: &Trace,
-    config: &HistorySearchConfig,
-) -> HistorySearchReport {
+pub fn verify_observed_history(trace: &Trace, config: &HistorySearchConfig) -> HistorySearchReport {
     let claim_ceiling = "Bounded search over trace-shaped, fully completed operations. Final modeled revision/cursors/policy/receipt fields are compared; the opaque final state digest is not recomputed from a complete canonical manifest. This does not parse raw backend event streams, resolve pending operations, verify witness signatures, test physical durability, or qualify a backend.";
 
     let invalid = |errors: Vec<String>| HistorySearchReport {
@@ -372,9 +366,11 @@ pub fn verify_observed_history(
             claim_ceiling: claim_ceiling.to_string(),
         };
     }
-    if trace.operations.iter().any(|operation| {
-        operation.completed_at_ns < operation.invoked_at_ns
-    }) {
+    if trace
+        .operations
+        .iter()
+        .any(|operation| operation.completed_at_ns < operation.invoked_at_ns)
+    {
         return invalid(vec![
             "completed history contains an impossible operation interval".to_string(),
         ]);
@@ -411,12 +407,7 @@ pub fn verify_observed_history(
     };
     let all = (1_u64 << count) - 1;
     let mut order = Vec::with_capacity(count);
-    let found = visit(
-        &mut context,
-        all,
-        initial_model_state(trace),
-        &mut order,
-    );
+    let found = visit(&mut context, all, initial_model_state(trace), &mut order);
 
     let status = if found {
         "pass"
@@ -471,7 +462,11 @@ mod tests {
         state: ModelState,
     ) -> usize {
         if remaining == 0 {
-            return if final_state_matches(&state, trace) { 1 } else { 0 };
+            return if final_state_matches(&state, trace) {
+                1
+            } else {
+                0
+            };
         }
         let mut total = 0usize;
         for index in 0..trace.operations.len() {
@@ -518,7 +513,8 @@ mod tests {
             operation.completed_at_ns = end;
             operation.happens_after.clear();
             operation.request.restored_incarnation_id = Some(witness.incarnation_id.clone());
-            operation.request.restored_authority_revision = Some(witness.authority_revision.clone());
+            operation.request.restored_authority_revision =
+                Some(witness.authority_revision.clone());
             operation.request.restored_state_digest = Some(witness.state_digest.clone());
             operation.request.witness_sequence_seen = Some(witness.sequence);
             operation.expected_result = ExpectedResult {
@@ -556,7 +552,11 @@ mod tests {
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
         assert_eq!(report.linearization.len(), trace.operations.len());
-        assert!(!report.linearization.contains(&"this-order-is-not-authoritative".to_string()));
+        assert!(
+            !report
+                .linearization
+                .contains(&"this-order-is-not-authoritative".to_string())
+        );
     }
 
     #[test]
@@ -579,8 +579,12 @@ mod tests {
         let mut trace = three_overlapping_restore_reads();
         let (predecessors, _) = build_partial_order(&trace).unwrap();
         let all = (1_u64 << trace.operations.len()) - 1;
-        let oracle_count = exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
-        assert_eq!(oracle_count, 6, "all six read-only orderings should be legal");
+        let oracle_count =
+            exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
+        assert_eq!(
+            oracle_count, 6,
+            "all six read-only orderings should be legal"
+        );
 
         trace.operations.reverse();
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
@@ -594,8 +598,12 @@ mod tests {
         trace.operations.reverse();
         let (predecessors, _) = build_partial_order(&trace).unwrap();
         let all = (1_u64 << trace.operations.len()) - 1;
-        let oracle_count = exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
-        assert_eq!(oracle_count, 1, "the shared-predecessor race has one legal winner order");
+        let oracle_count =
+            exhaustive_count(&trace, &predecessors, all, initial_model_state(&trace));
+        assert_eq!(
+            oracle_count, 1,
+            "the shared-predecessor race has one legal winner order"
+        );
 
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
