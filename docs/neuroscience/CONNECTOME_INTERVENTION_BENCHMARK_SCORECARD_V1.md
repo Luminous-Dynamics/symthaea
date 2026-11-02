@@ -58,6 +58,18 @@ A custom verifier must reject:
 
 Within-animal repeated-measures designs may be valid for a specific within-subject estimand, but are not evidence of cross-animal generalization. State the estimand rather than calling all partitions "unseen."
 
+### Pseudonymous split membership and paired-unit manifests
+
+For executable disjointness checks, each independent evaluation unit is represented by a dataset-scoped HMAC-SHA256 token. The HMAC key itself is never included in the run manifest; only a commitment digest is recorded. Tokens use the pinned `UNIT-TOKEN-V1` canonicalization and are safe to compare across the train/validation/test partitions without publishing raw animal, session or target identifiers.
+
+The semantic verifier recomputes each partition digest as:
+
+`SHA256(sorted lowercase token strings, UTF-8, newline-delimited with one trailing newline)`
+
+It rejects duplicate tokens within a partition, any overlap between train/validation/test, membership-count mismatches and a digest that does not match the token list. Paired comparisons carry their own hashed independent-unit tokens and recomputed membership digest. This lets the verifier check the actual paired membership count instead of trusting `n_independent_units` and a digest string independently.
+
+A complete run requires at least two training units, one validation unit and two test units. The example remains incomplete and has empty token arrays and null commitments; no unit identity has been fabricated.
+
 ## 5. Competing model and baseline matrix
 
 At minimum, include these model families where data and task semantics make them applicable:
