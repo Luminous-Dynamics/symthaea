@@ -624,6 +624,8 @@ pub fn verify_guardrail_constrained_frontier_report(
         .iter()
         .map(|policy| selected_map.get(policy.policy_id.as_str()).copied().unwrap_or(0.0))
         .collect::<Vec<_>>();
+    let mut expected_null_sizes = Vec::with_capacity(plan.policies[0].null_models.len());
+    let mut worst_null_size = 0.0_f64;
     for null in &plan.policies[0].null_models {
         let size = plan.policies.iter().zip(&weights).map(|(policy, weight)| {
             let value = policy.null_models.iter()
@@ -638,11 +640,17 @@ pub fn verify_guardrail_constrained_frontier_report(
                 "selected mixture violates a declared null Type-I constraint",
             ));
         }
+        worst_null_size = worst_null_size.max(size);
+        expected_null_sizes.push(FrontierNullSize {
+            model_id: null.model_id.clone(),
+            null_size: size,
+        });
     }
 
     let mut worst_power = f64::INFINITY;
     let mut worst_utility = f64::INFINITY;
     let mut maximum_cost = 0.0_f64;
+    let mut expected_alternatives = Vec::with_capacity(plan.policies[0].alternatives.len());
     for alternative in &plan.policies[0].alternatives {
         let mut power = 0.0;
         let mut cost = 0.0;
@@ -673,14 +681,30 @@ pub fn verify_guardrail_constrained_frontier_report(
         worst_power = worst_power.min(power);
         worst_utility = worst_utility.min(utility);
         maximum_cost = maximum_cost.max(cost);
+        expected_alternatives.push(FrontierAlternativeMetrics {
+            model_id: alternative.model_id.clone(),
+            rejection_power: power,
+            expected_evaluator_cost: cost,
+            decision_utility: utility,
+        });
     }
-    if (report.optimizer_report.worst_case_rejection_power - worst_power).abs() > 1e-7
+    let entropy = weights.iter().filter(|weight| **weight > 0.0)
+        .map(|weight| -weight * weight.ln())
+        .sum::<f64>();
+    if (report.optimizer_report.worst_case_null_size - worst_null_size).abs() > 1e-7
+        || (report.optimizer_report.worst_case_rejection_power - worst_power).abs() > 1e-7
         || (report.optimizer_report.worst_case_decision_utility - worst_utility).abs() > 1e-7
         || (report.optimizer_report.maximum_expected_evaluator_cost - maximum_cost).abs() > 1e-7
+        || (report.optimizer_report.mixture_entropy_nats - entropy).abs() > 1e-7
+        || (report.optimizer_report.remaining_alpha_budget
+            - (plan.significance_level - worst_null_size)).abs() > 1e-7
+        || report.optimizer_report.support_size != report.selected_policy_weights.len()
+        || report.optimizer_report.null_model_sizes != expected_null_sizes
+        || report.optimizer_report.alternatives != expected_alternatives
     {
         return Err(GuardrailFrontierError::new(
             "report.optimizer_report",
-            "nested performance metrics do not reconstruct from the selected mixture",
+            "nested frontier metrics do not reconstruct from the selected mixture",
         ));
     }
 
@@ -736,6 +760,28 @@ pub fn verify_guardrail_constrained_frontier_report(
         return Err(GuardrailFrontierError::new(
             "report.guardrail_results",
             "stored guardrail mixture intervals differ from independent reconstruction",
+        ));
+    }
+    let mut expected_active_ids = expected_eligibility
+        .iter()
+        .filter(|row| !row.eligible)
+        .map(|row| format!("EXCLUDE_POLICY:{}", row.policy_id))
+        .collect::<Vec<_>>();
+    expected_active_ids.extend(expected_results
+        .iter()
+        .filter(|row| row.active_at_tolerance)
+        .map(|row| {
+            let direction = match row.requirement.direction {
+                GuardrailDirection::UpperBound => "UPPER",
+                GuardrailDirection::LowerBound => "LOWER",
+            };
+            format!("GUARDRAIL:{direction}:{}", row.requirement.requirement_id)
+        }));
+    expected_active_ids.sort();
+    if report.active_constraint_ids != expected_active_ids {
+        return Err(GuardrailFrontierError::new(
+            "report.active_constraint_ids",
+            "active/exclusion constraint roster differs from reconstructed guardrail constraints",
         ));
     }
 
