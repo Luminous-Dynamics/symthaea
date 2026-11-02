@@ -107,9 +107,14 @@ jobs:
               }
               if counts != actual:
                   raise ValueError("repository graph node/edge counts do not match its records")
+              edge_keys = [(edge["from"], edge["to"], edge["relation"]) for edge in graph_value["edges"]]
+              if len(edge_keys) != len(set(edge_keys)):
+                  raise ValueError("duplicate repository graph edges")
               for edge in graph_value["edges"]:
                   if edge["from"] not in id_set or edge["to"] not in id_set:
                       raise ValueError("repository graph edge has a dangling endpoint")
+                  if edge["authority"] not in {"syntax_declared", "expected_semantic", "manifest_declared"}:
+                      raise ValueError("repository graph edge has an unknown authority")
                   if edge["authority"] == "compiler_verified":
                       raise ValueError("unverified fixture cannot contain compiler_verified edges")
               for node in nodes:
@@ -170,9 +175,25 @@ jobs:
           mutant_graph["counts"]["edges"] += 1
           expect_repo_reject(mutant_graph, mutations, "forged graph edge count")
 
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["edges"].append(copy.deepcopy(mutant_graph["edges"][0]))
+          expect_repo_reject(mutant_graph, mutations, "duplicate graph edge")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["nodes"][0]["source_anchor"]["text"] = "not the source line"
+          expect_repo_reject(mutant_graph, mutations, "source anchor text mismatch")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["nodes"][0]["path"] = "../../grader.json"
+          expect_repo_reject(mutant_graph, mutations, "source path traversal")
+
           mutant_mutations = copy.deepcopy(mutations)
           mutant_mutations["mutations"][0]["expected_impact"].append("sym.not-present")
           expect_repo_reject(graph, mutant_mutations, "mutation references unknown graph node")
+
+          mutant_mutations = copy.deepcopy(mutations)
+          mutant_mutations["mutations"][1]["id"] = mutant_mutations["mutations"][0]["id"]
+          expect_repo_reject(graph, mutant_mutations, "duplicate mutation scenario ID")
 
           # Positive shape control: a design-only task is valid as a design record.
           task_validator.validate(catalog["tasks"][0])
@@ -363,7 +384,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=25"
+              "schemas=3 negative_controls=29"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
