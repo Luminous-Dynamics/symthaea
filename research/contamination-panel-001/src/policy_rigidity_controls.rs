@@ -281,7 +281,7 @@ pub struct PolicyRigidityControlsReportV1 {
     pub claim_boundary: String,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct CleanGroupCalibration {
     baseline_entropy: Vec<f64>,
     global_rigidity: Vec<f64>,
@@ -754,9 +754,6 @@ pub fn analyze_policy_rigidity_controls(
         let alpha_resolvable =
             u128::from(request.target_alpha_permille) * (clean.len() as u128 + 1) >= 1_000;
         let alpha = f64::from(request.target_alpha_permille) / 1_000.0;
-        let mut flagged = 0_u64;
-        let mut no_flag = 0_u64;
-        let mut abstained = 0_u64;
         let mut clean_labelled = 0_u64;
         let mut exposed_labelled = 0_u64;
         let mut fp = 0_u64;
@@ -770,13 +767,10 @@ pub fn analyze_policy_rigidity_controls(
             let excess_p = upper_tail_p(&excess_reference, decomposed.response_conditioned_excess)?;
             let pattern = pattern_from_diagnostics(entropy_p, global_p, excess_p, alpha);
             let decision = if row.path_multiplicity.classification == PathMultiplicityV1::Indeterminate {
-                abstained += 1;
                 RigidityDecisionV1::AbstainIndeterminatePathMultiplicity
             } else if !alpha_resolvable {
-                abstained += 1;
                 RigidityDecisionV1::AbstainInsufficientCalibrationResolution
             } else {
-                no_flag += 1;
                 RigidityDecisionV1::NoResponseConditionedExcessFlag
             };
             match row.exposure_label {
@@ -821,25 +815,22 @@ pub fn analyze_policy_rigidity_controls(
                 score.by_adjusted_excess_p = Some(adjusted);
                 score.by_family_size = Some(family_size);
                 score.decision = if adjusted * 1_000.0 <= f64::from(request.target_alpha_permille) {
-                    flagged += 1;
                     RigidityDecisionV1::FlagResponseConditionedExcess
                 } else {
-                    no_flag += 1;
                     RigidityDecisionV1::NoResponseConditionedExcessFlag
                 };
             }
         }
-        // The provisional no-flag count above included all eligible rows.
-        // Recompute group decision counts after BY to avoid double counting.
-        no_flag = score_rows[start..]
+        // Group counts are computed only after BY has assigned final decisions.
+        let no_flag = score_rows[start..]
             .iter()
             .filter(|row| row.decision == RigidityDecisionV1::NoResponseConditionedExcessFlag)
             .count() as u64;
-        flagged = score_rows[start..]
+        let flagged = score_rows[start..]
             .iter()
             .filter(|row| row.decision == RigidityDecisionV1::FlagResponseConditionedExcess)
             .count() as u64;
-        abstained = score_rows[start..]
+        let abstained = score_rows[start..]
             .iter()
             .filter(|row| matches!(
                 row.decision,
