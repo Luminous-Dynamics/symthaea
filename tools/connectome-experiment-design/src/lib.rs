@@ -435,7 +435,7 @@ pub fn evaluate_candidate(
     }
 
     let mut information_gain = prior_entropy - expected_posterior_entropy;
-    if information_gain < 0.0 && information_gain >= -ROUND_OFF_TOLERANCE {
+    if (-ROUND_OFF_TOLERANCE..0.0).contains(&information_gain) {
         information_gain = 0.0;
     }
     if information_gain > prior_entropy && information_gain <= prior_entropy + ROUND_OFF_TOLERANCE {
@@ -624,23 +624,19 @@ fn best_expected_utility(
     utilities_by_hypothesis: &[Vec<f64>],
     action_count: usize,
 ) -> Result<f64, DesignError> {
-    let mut best = f64::NEG_INFINITY;
-    for action_index in 0..action_count {
-        let expected = probabilities
-            .iter()
-            .enumerate()
-            .map(|(h, probability)| probability * utilities_by_hypothesis[h][action_index])
-            .sum::<f64>();
-        if !expected.is_finite() {
-            return Err(DesignError::NumericalInstability);
+    let mut expected_by_action = vec![0.0; action_count];
+    for (&probability, utilities) in probabilities.iter().zip(utilities_by_hypothesis) {
+        for (expected, &utility) in expected_by_action.iter_mut().zip(utilities) {
+            *expected += probability * utility;
         }
-        best = best.max(expected);
     }
-    if best.is_finite() {
-        Ok(best)
-    } else {
-        Err(DesignError::NumericalInstability)
+    if expected_by_action.iter().any(|expected| !expected.is_finite()) {
+        return Err(DesignError::NumericalInstability);
     }
+    expected_by_action
+        .into_iter()
+        .reduce(f64::max)
+        .ok_or(DesignError::NumericalInstability)
 }
 
 /// Evaluate the expected value of sample information for a candidate.
@@ -690,7 +686,7 @@ pub fn evaluate_decision_value(
     }
 
     let mut evsi = expected_post_experiment_best - prior_best;
-    if evsi < 0.0 && evsi >= -ROUND_OFF_TOLERANCE {
+    if (-ROUND_OFF_TOLERANCE..0.0).contains(&evsi) {
         evsi = 0.0;
     }
     if !evsi.is_finite() || evsi < 0.0 {
