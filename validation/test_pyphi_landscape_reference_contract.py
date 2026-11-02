@@ -52,6 +52,9 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
                 "mip_default_resolved_tie_count",
                 "mip_default_resolved_cut_sha256s",
                 "mip_default_resolved_lex_key_hex",
+                "minimum_numeric_tie_lex_key_hex",
+                "lex_resolution_matches_numeric_ties",
+                "numeric_tie_contains_default_representative",
                 "partition_scores",
                 "theta",
                 "partition",
@@ -68,6 +71,8 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
             self.assertEqual(props[name]["pattern"], "^[0-9a-f]{64}$")
         self.assertEqual(props["mip_default_resolved_tie_count"]["const"], 1)
         self.assertEqual(props["mip_default_resolved_cut_sha256s"]["maxItems"], 1)
+        self.assertEqual(props["lex_resolution_matches_numeric_ties"]["type"], "boolean")
+        self.assertTrue(props["numeric_tie_contains_default_representative"]["const"])
         partition_scores = props["partition_scores"]
         self.assertEqual(partition_scores["type"], "array")
         score_required = set(partition_scores["items"]["required"])
