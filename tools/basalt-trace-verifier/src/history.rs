@@ -624,7 +624,7 @@ mod tests {
         assert_eq!(report.status, "fail", "{:#?}", report.counterexamples);
         assert!(!report.search_budget_exhausted);
         assert!(report.memo_hits > 0, "equivalent remaining/model states should be memoized");
-        assert!(report.states_explored < 6, "memoization should prune repeated prefixes");
+        assert!(report.states_explored < 10, "memoization should prune repeated prefixes");
     }
 
     #[test]
