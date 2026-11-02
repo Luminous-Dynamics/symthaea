@@ -583,5 +583,22 @@ mod tests {
         // perception observations.
         assert_eq!(estimate.confidence, report.confidence);
         assert_eq!(judgment.decision, HumanPreferenceDecisionV1::Tie);
+        assert!(estimate.validate().is_ok());
+        assert!(report.validate().is_ok());
+        assert!(judgment.validate().is_ok());
+
+        let mut invalid_report = report;
+        invalid_report.participant_pseudonym = " ".into();
+        assert_eq!(
+            invalid_report.validate(),
+            Err(AppraisalError::EmptyIdentifier("participant_pseudonym"))
+        );
+
+        let mut invalid_judgment = judgment;
+        invalid_judgment.audio_b_sha256 = "missing-digest".into();
+        assert_eq!(
+            invalid_judgment.validate(),
+            Err(AppraisalError::InvalidDigest("audio_b_sha256"))
+        );
     }
 }
