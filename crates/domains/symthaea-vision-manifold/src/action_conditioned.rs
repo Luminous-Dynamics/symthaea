@@ -662,6 +662,7 @@ pub fn compute_joint_draw_manifest_sha256(
 /// branch IDs, baseline belief and all provenance identities are bound.
 pub fn compute_action_forecast_bank_sha256(bank: &ActionForecastBank) -> String {
     let mut bytes = b"cmaq-018-vision-action-forecast-bank-v0.1\0".to_vec();
+    bytes.extend_from_slice(&bank.schema_version.to_le_bytes());
     append_len_prefixed(&mut bytes, bank.history_sha256.as_bytes());
     append_len_prefixed(&mut bytes, bank.action_manifest_sha256.as_bytes());
     append_len_prefixed(&mut bytes, bank.joint_draw_manifest_sha256.as_bytes());
