@@ -44,7 +44,7 @@ impl CompilerGroundedTrainer {
         // predictable candidate-derived path under a shared temporary directory.
         // Keep the handle alive until the child process has finished; Drop then
         // removes the file on both success and failure paths.
-        let mut candidate_file = match create_nix_temp_file(code) {
+        let candidate_file = match create_nix_temp_file(code) {
             Ok(file) => file,
             Err(e) => {
                 return CompilerVerdict::Fail {
@@ -152,5 +152,40 @@ mod tests {
             stage: "spawn",
         };
         assert_eq!(reward_for_verdict(&verdict), 0.0);
+    }
+}
+
+
+#[cfg(test)]
+mod temporary_file_tests {
+    use super::create_nix_temp_file;
+
+    #[test]
+    fn candidate_files_are_unique_even_for_identical_source() {
+        let first = create_nix_temp_file("{ value = 1; }").expect("first temp file");
+        let second = create_nix_temp_file("{ value = 1; }").expect("second temp file");
+
+        assert_ne!(first.path(), second.path());
+    }
+
+    #[test]
+    fn candidate_contents_are_written_before_verification() {
+        let source = "{ value = 42; }";
+        let candidate = create_nix_temp_file(source).expect("candidate temp file");
+
+        let actual = std::fs::read_to_string(candidate.path()).expect("read candidate");
+        assert_eq!(actual, source);
+    }
+
+    #[test]
+    fn candidate_file_is_removed_when_handle_is_dropped() {
+        let path = {
+            let candidate = create_nix_temp_file("{ value = 7; }").expect("candidate temp file");
+            let path = candidate.path().to_path_buf();
+            assert!(path.exists());
+            path
+        };
+
+        assert!(!path.exists(), "temporary candidate must be removed on drop");
     }
 }
