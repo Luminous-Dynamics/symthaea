@@ -1,0 +1,386 @@
+{
+  "schema_version": 0,
+  "fixture_id": "CEB-REPO-001-SYNTHETIC-V0",
+  "status": "design_only_unverified",
+  "authority_policy": {
+    "syntax_facts": "fixture_declared",
+    "semantic_facts": "expected_semantic_not_compiler_verified",
+    "compiler_verified": "none",
+    "note": "Do not label any expected trait/call/type edge compiler_verified until an independent pinned compiler or rust-analyzer run emits evidence."
+  },
+  "nodes": [
+    {
+      "id": "pkg.domain",
+      "kind": "package",
+      "name": "symthaea-ceb-domain"
+    },
+    {
+      "id": "pkg.store",
+      "kind": "package",
+      "name": "symthaea-ceb-store"
+    },
+    {
+      "id": "pkg.service",
+      "kind": "package",
+      "name": "symthaea-ceb-service"
+    },
+    {
+      "id": "pkg.api",
+      "kind": "package",
+      "name": "symthaea-ceb-api"
+    },
+    {
+      "id": "pkg.cli",
+      "kind": "package",
+      "name": "symthaea-ceb-cli"
+    },
+    {
+      "id": "sym.UserId",
+      "kind": "struct",
+      "path": "crates/domain/src/lib.rs",
+      "name": "UserId"
+    },
+    {
+      "id": "sym.User",
+      "kind": "struct",
+      "path": "crates/domain/src/lib.rs",
+      "name": "User"
+    },
+    {
+      "id": "sym.Authorizer",
+      "kind": "trait",
+      "path": "crates/domain/src/lib.rs",
+      "name": "Authorizer"
+    },
+    {
+      "id": "sym.DefaultAuthorizer",
+      "kind": "struct",
+      "path": "crates/domain/src/lib.rs",
+      "name": "DefaultAuthorizer"
+    },
+    {
+      "id": "sym.DefaultAuthorizer.can_read",
+      "kind": "method",
+      "path": "crates/domain/src/lib.rs",
+      "name": "DefaultAuthorizer::can_read"
+    },
+    {
+      "id": "sym.Store",
+      "kind": "trait",
+      "path": "crates/store/src/lib.rs",
+      "name": "Store"
+    },
+    {
+      "id": "sym.MemoryStore",
+      "kind": "struct",
+      "path": "crates/store/src/lib.rs",
+      "name": "MemoryStore"
+    },
+    {
+      "id": "sym.MemoryStore.insert",
+      "kind": "method",
+      "path": "crates/store/src/lib.rs",
+      "name": "MemoryStore::insert"
+    },
+    {
+      "id": "sym.MemoryStore.get_user",
+      "kind": "method",
+      "path": "crates/store/src/lib.rs",
+      "name": "MemoryStore::get_user"
+    },
+    {
+      "id": "sym.UserService",
+      "kind": "struct",
+      "path": "crates/service/src/lib.rs",
+      "name": "UserService"
+    },
+    {
+      "id": "sym.UserService.new",
+      "kind": "method",
+      "path": "crates/service/src/lib.rs",
+      "name": "UserService::new"
+    },
+    {
+      "id": "sym.UserService.get_user",
+      "kind": "method",
+      "path": "crates/service/src/lib.rs",
+      "name": "UserService::get_user"
+    },
+    {
+      "id": "sym.Profile",
+      "kind": "struct",
+      "path": "crates/api/src/profile_api.rs",
+      "name": "Profile"
+    },
+    {
+      "id": "sym.get_profile",
+      "kind": "function",
+      "path": "crates/api/src/profile_api.rs",
+      "name": "get_profile"
+    },
+    {
+      "id": "sym.build_info",
+      "kind": "function",
+      "path": "crates/api/src/lib.rs",
+      "name": "build_info"
+    },
+    {
+      "id": "sym.audit.AccessRecord",
+      "kind": "struct",
+      "path": "crates/api/src/audit.rs",
+      "name": "AccessRecord",
+      "conditional": "feature=audit"
+    },
+    {
+      "id": "sym.audit.record_access",
+      "kind": "function",
+      "path": "crates/api/src/audit.rs",
+      "name": "record_access",
+      "conditional": "feature=audit"
+    },
+    {
+      "id": "sym.windows.os_version",
+      "kind": "function",
+      "path": "crates/api/src/windows_native.rs",
+      "name": "os_version",
+      "conditional": "target_os=windows && feature=windows-native"
+    },
+    {
+      "id": "sym.cli.main",
+      "kind": "function",
+      "path": "crates/cli/src/main.rs",
+      "name": "main"
+    },
+    {
+      "id": "test.profile_query_returns_the_matching_user",
+      "kind": "test",
+      "path": "crates/api/tests/profile.rs",
+      "name": "profile_query_returns_the_matching_user"
+    },
+    {
+      "id": "test.profile_query_returns_none_for_unknown_user",
+      "kind": "test",
+      "path": "crates/api/tests/profile.rs",
+      "name": "profile_query_returns_none_for_unknown_user"
+    },
+    {
+      "id": "feature.api.audit",
+      "kind": "feature",
+      "path": "crates/api/Cargo.toml",
+      "name": "audit"
+    },
+    {
+      "id": "feature.api.windows_native",
+      "kind": "feature",
+      "path": "crates/api/Cargo.toml",
+      "name": "windows-native"
+    },
+    {
+      "id": "target.api.windows",
+      "kind": "target",
+      "path": "crates/api/Cargo.toml",
+      "name": "cfg(windows)"
+    }
+  ],
+  "edges": [
+    {
+      "from": "pkg.domain",
+      "to": "sym.UserId",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.domain",
+      "to": "sym.User",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.domain",
+      "to": "sym.Authorizer",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.domain",
+      "to": "sym.DefaultAuthorizer",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.DefaultAuthorizer",
+      "to": "sym.Authorizer",
+      "relation": "implements",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "pkg.store",
+      "to": "sym.Store",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.store",
+      "to": "sym.MemoryStore",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.MemoryStore",
+      "to": "sym.Store",
+      "relation": "implements",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "pkg.service",
+      "to": "sym.UserService",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.UserService.get_user",
+      "to": "sym.Store.get_user",
+      "relation": "calls_trait_method",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "sym.UserService.get_user",
+      "to": "sym.Authorizer.can_read",
+      "relation": "calls_trait_method",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "sym.UserService",
+      "to": "sym.Store",
+      "relation": "generic_bound",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.UserService",
+      "to": "sym.Authorizer",
+      "relation": "generic_bound",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.UserService.get_user",
+      "to": "sym.UserId",
+      "relation": "parameter_type",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.UserService.get_user",
+      "to": "sym.User",
+      "relation": "return_type",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.api",
+      "to": "sym.get_profile",
+      "relation": "reexports",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.get_profile",
+      "to": "sym.UserService.get_user",
+      "relation": "calls_generic_method",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "sym.get_profile",
+      "to": "sym.Profile",
+      "relation": "constructs",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "sym.get_profile",
+      "to": "sym.Store",
+      "relation": "generic_bound",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.get_profile",
+      "to": "sym.Authorizer",
+      "relation": "generic_bound",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.audit.record_access",
+      "to": "sym.audit.AccessRecord",
+      "relation": "constructs",
+      "authority": "syntax_declared",
+      "conditional": "feature=audit"
+    },
+    {
+      "from": "feature.api.audit",
+      "to": "sym.audit.AccessRecord",
+      "relation": "enables_module",
+      "authority": "manifest_declared"
+    },
+    {
+      "from": "feature.api.audit",
+      "to": "sym.audit.record_access",
+      "relation": "enables_module",
+      "authority": "manifest_declared"
+    },
+    {
+      "from": "target.api.windows",
+      "to": "sym.windows.os_version",
+      "relation": "target_gates_module",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "feature.api.windows_native",
+      "to": "sym.windows.os_version",
+      "relation": "feature_gates_module",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "pkg.cli",
+      "to": "sym.cli.main",
+      "relation": "defines",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.cli.main",
+      "to": "sym.build_info",
+      "relation": "calls",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "test.profile_query_returns_the_matching_user",
+      "to": "sym.get_profile",
+      "relation": "calls",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "test.profile_query_returns_none_for_unknown_user",
+      "to": "sym.get_profile",
+      "relation": "calls",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "test.profile_query_returns_the_matching_user",
+      "to": "sym.MemoryStore.insert",
+      "relation": "calls",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "test.profile_query_returns_the_matching_user",
+      "to": "sym.UserService.new",
+      "relation": "calls",
+      "authority": "expected_semantic"
+    }
+  ],
+  "counts": {
+    "package_nodes": 5,
+    "symbol_and_test_nodes": 22,
+    "feature_and_target_nodes": 3,
+    "edges": 31
+  },
+  "limitations": [
+    "Fixture has not been compiled.",
+    "Expected semantic edges are design labels, not compiler-verified facts.",
+    "No macro-generated or build-script-generated symbol evidence is present yet.",
+    "No fixture tree digest or immutable revision is frozen yet."
+  ]
+}
