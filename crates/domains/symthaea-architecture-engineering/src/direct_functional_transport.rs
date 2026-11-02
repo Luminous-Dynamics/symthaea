@@ -870,6 +870,10 @@ mod tests {
         assert!(row.calibration_hoeffding_radius < 0.02);
         assert!(row.shift_lower_confidence_bound > -0.04);
         assert!(row.shift_upper_confidence_bound < 0.04);
+        let tv_slack_per_side =
+            ((k as f64 * LN_2 + (1.0_f64 / 0.005).ln()) / (2.0 * 51_200.0)).sqrt();
+        assert!(row.shift_upper_confidence_bound - row.shift_lower_confidence_bound
+            < 0.3 * 2.0 * tv_slack_per_side);
         assert_eq!(row.status, DirectFunctionalStatus::Informative);
     }
 
@@ -912,19 +916,22 @@ mod tests {
     #[test]
     fn orthogonal_unregistered_functional_is_not_claimed_as_covered() {
         let registered = request(
-            vec![50, 50, 0, 0],
-            vec![50, 50, 0, 0],
+            vec![25, 25, 25, 25],
+            vec![40, 10, 20, 30],
             vec![functional("registered-first-half", vec![1.0, 1.0, 0.0, 0.0], 0.0, 1.0)],
         );
         let report = calibrate_direct_functional_transport(&registered).unwrap();
         assert_eq!(report.functional_bounds.len(), 1);
         assert_eq!(report.functional_bounds[0].functional_id, "registered-first-half");
         assert_eq!(report.functional_contract_sha256, registered.functional_contract_sha256);
-        // The certificate has no API result for an omitted second-half function.
+        // The registered first-half functional is unchanged (mean 0.5),
+        // while the omitted category-zero indicator shifts from 0.25 to 0.40.
+        assert_eq!(report.functional_bounds[0].calibration_empirical_mean, 0.5);
+        assert_eq!(report.functional_bounds[0].target_empirical_mean, 0.5);
         assert!(transport_registered_functional_interval(
             &registered,
             &report,
-            "omitted-second-half",
+            "omitted-category-zero",
             &registered.functional_contract_sha256,
             CAL_INTERVAL,
             0.0,
