@@ -60,5 +60,6 @@
     "source_revision": "6551e3000dcda3d76491f30cc687d64618807c5b",
     "source_readiness": "preliminary_reference_paper_is_authoritative_code_not_used",
     "audit_note": "The paper is the algorithmic source. The pinned repository README calls its contents preliminary, says full code/assets will be released soon, contains no LICENSE in the inspected tree, and has an unfinished lower-threshold helper. This implementation is independent Rust research code, not copied from that repository or claimed as a reproduction."
-  }
+  },
+  "risk_output_error_budget_ppm": 350000
 }
