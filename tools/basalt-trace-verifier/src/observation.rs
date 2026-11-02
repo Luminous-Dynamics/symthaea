@@ -1414,6 +1414,22 @@ mod tests {
         }
     }
 
+    const REFERENCE_TRACE_BYTES: &[u8] =
+        include_bytes!("../../../benchmarks/basalt/storage-conformance-trace.v1.json");
+
+    fn verify_observation(
+        observation_bytes: &[u8],
+        expected_reference_trace_sha256: &str,
+        search_config: &HistorySearchConfig,
+    ) -> ObservationReport {
+        verify_backend_observation(
+            observation_bytes,
+            REFERENCE_TRACE_BYTES,
+            expected_reference_trace_sha256,
+            search_config,
+        )
+    }
+
     fn retry_observation() -> (ObservationEnvelope, String) {
         let (mut observation, raw_trace, reference_pin) = valid_observation();
         let trace: Trace = serde_json::from_slice(&raw_trace).unwrap();
@@ -1626,7 +1642,7 @@ mod tests {
             Some("incomplete-retry-group".to_string());
         observation.observed_operations[0].transaction_attempt = Some(1);
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "inconclusive");
         assert_eq!(
             report.incomplete_retry_groups,
@@ -1638,7 +1654,7 @@ mod tests {
     fn strict_backend_observation_ingestion_reaches_history_search() {
         let (observation, raw_trace, reference_pin) = valid_observation();
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
         assert_eq!(report.operations_observed, 1);
         assert_eq!(report.events_observed, 3);
@@ -1650,13 +1666,13 @@ mod tests {
     fn mismatched_external_reference_pin_is_invalid_evidence() {
         let (observation, _, _) = valid_observation();
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(
+        let report = verify_observation(
             &bytes,
             &format!("sha256:{}", "ff".repeat(32)),
             &config(),
         );
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("caller pin")));
+        assert!(report.counterexamples.iter().any(|error| error.contains("caller reference-trace bytes digest mismatch")));
     }
 
     #[test]
@@ -1664,7 +1680,7 @@ mod tests {
         let (mut observation, _, reference_pin) = valid_observation();
         observation.raw_events[1].monotonic_ns += 1;
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "invalid_evidence");
         assert!(report.counterexamples.iter().any(|error| error.contains("raw_event_log_sha256 mismatch")));
     }
@@ -1677,7 +1693,7 @@ mod tests {
         observation.raw_events.retain(|event| event.phase != "response");
         observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "inconclusive");
         assert_eq!(report.pending_operation_ids, vec!["obs-restore-check"]);
         assert!(report.history_search.is_none());
@@ -1694,7 +1710,7 @@ mod tests {
         });
         observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
     }
 
@@ -1704,7 +1720,7 @@ mod tests {
         observation.raw_events[2].monotonic_ns = 14;
         observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "invalid_evidence");
         assert!(report.counterexamples.iter().any(|error| error.contains("clock regressed")));
     }
@@ -1718,7 +1734,7 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("outcome");
-        let report = verify_backend_observation(
+        let report = verify_observation(
             &serde_json::to_vec(&value).unwrap(),
             &reference_pin,
             &config(),
@@ -1736,7 +1752,7 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("transaction_id");
-        let report = verify_backend_observation(
+        let report = verify_observation(
             &serde_json::to_vec(&value).unwrap(),
             &reference_pin,
             &config(),
@@ -1751,7 +1767,7 @@ mod tests {
         let mut value: serde_json::Value =
             serde_json::from_slice(&serde_json::to_vec(&observation).unwrap()).unwrap();
         value["raw_events"][1]["payload_sha256"] = serde_json::Value::Null;
-        let report = verify_backend_observation(
+        let report = verify_observation(
             &serde_json::to_vec(&value).unwrap(),
             &reference_pin,
             &config(),
@@ -1769,7 +1785,7 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .insert("adapter_says_pass".to_string(), serde_json::Value::Bool(true));
-        let report = verify_backend_observation(
+        let report = verify_observation(
             &serde_json::to_vec(&value).unwrap(),
             &reference_pin,
             &config(),
