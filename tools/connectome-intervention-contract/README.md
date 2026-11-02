@@ -29,6 +29,8 @@ Malformed JSON, file errors and INVALID reports exit nonzero. INCOMPLETE exits z
 
 - HMAC token format, duplicate detection and pairwise train/validation/test disjointness.
 - Recomputed SHA-256 membership hashes using sorted lowercase token strings, newline-delimited with a trailing newline.
+- Exact measured scorecard unit cohorts and recomputed membership digests.
+- Candidate, baseline and paired-comparison unit sets must be identical; equal counts alone are insufficient.
 - Paired-unit subset-of-test rule, unit count and paired membership digest.
 - Model/hypothesis/metric/stratum references and declared baseline-family coverage.
 - Matched data scope and training budgets.
