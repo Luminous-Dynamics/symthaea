@@ -2,7 +2,7 @@
 
 Tracking: #9779  
 Implementation branch: `research/edge-core-nostd-v0.3`  
-Parent programme: #9775 / PR #9778.
+Parent programme: #9775 / PR #9778 at exact head `061374a93fae8e77b1daae615b030b32b28d9040`.
 
 ## Why a separate substrate
 
