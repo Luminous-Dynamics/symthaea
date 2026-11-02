@@ -84,6 +84,8 @@ The constrained solution exposes the actual price of evaluator budget; it does n
 
 These are exact constructed finite-frontier arithmetic fixtures, not empirical performance measurements.
 
+I independently encoded the same LP in SciPy's HiGHS-backed `linprog` solver. It returned (1/3, 1/3, 1/3) with z=1/3 without a cost cap and (0.6, 0.2, 0.2) with z=0.2 at cap 1.6. This cross-check validates the fixture formulation and the expected optimum; it does not compile or execute the Rust basis enumerator, and broader randomized-fixture agreement is still required.
+
 ## 4. Algorithm and numerical boundaries
 
 The implementation enumerates active constraint bases rather than invoking an external solver. It uses f64, deterministic pivot selection, tolerance-checked feasibility, and independent metric reconstruction after solving each basis.
