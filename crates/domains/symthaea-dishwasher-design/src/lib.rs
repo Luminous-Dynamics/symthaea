@@ -496,7 +496,11 @@ pub mod hydraulic_network {
         let mut high = pump.shutoff_pressure_pa;
         let mut iterations = 0;
 
-        if pump.pressure_coefficient_pa_per_flow_squared > 0.0 {
+        if pump.pressure_coefficient_pa_per_flow_squared == 0.0 {
+            // A perfectly flat ideal pump curve holds its shutoff pressure
+            // independent of flow in this simplified model.
+            low = high;
+        } else {
             while (high - low) > pressure_tolerance_pa && iterations < max_iterations {
                 let midpoint = low + (high - low) * 0.5;
                 let flow = total_flow_at_pressure(midpoint, branches);
@@ -577,6 +581,25 @@ pub mod hydraulic_network {
             assert!((estimate.operating_pressure_pa - 50_000.0).abs() < 1e-3);
             assert!((estimate.total_flow_m3_s - 0.000_223_606_8).abs() < 1e-9);
             assert_eq!(estimate.branch_flows_m3_s.len(), 1);
+        }
+
+        #[test]
+        fn zero_slope_pump_curve_uses_shutoff_pressure() {
+            let estimate = solve_parallel_network(
+                PumpCurve {
+                    shutoff_pressure_pa: 80_000.0,
+                    pressure_coefficient_pa_per_flow_squared: 0.0,
+                    efficiency: 0.5,
+                },
+                &[Branch {
+                    resistance_pa_per_flow_squared: 1.0e12,
+                    open: true,
+                }],
+                1.0e-5,
+                128,
+            )
+            .unwrap();
+            assert!((estimate.operating_pressure_pa - 80_000.0).abs() < 1e-9);
         }
 
         #[test]
