@@ -659,6 +659,249 @@
           "const": false
         }
       }
+    },
+    "query_stop_calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "report_sha256",
+        "calibration_profile_sha256",
+        "group_disjointness_report_sha256",
+        "exchangeability_assessment_sha256",
+        "query_id",
+        "query_definition_sha256",
+        "analysis_code_sha256",
+        "metric_id",
+        "unit_id",
+        "calibration_stratum_id",
+        "source_volume_id",
+        "target_independence_cluster_id",
+        "first_graph_snapshot_sha256",
+        "latest_graph_snapshot_sha256",
+        "future_horizon_edits",
+        "alpha",
+        "calibration_trajectory_count",
+        "order_statistic_rank",
+        "residual_quantile_ratio",
+        "observed_max_drift_ratio",
+        "current_uncertainty_width_ratio",
+        "projected_future_drift_upper_ratio",
+        "group_disjoint",
+        "exchangeability_supported",
+        "outcome"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "calibration_profile_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "group_disjointness_report_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "exchangeability_assessment_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "analysis_code_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "metric_id": {
+          "$ref": "#/$defs/id"
+        },
+        "unit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "calibration_stratum_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_volume_id": {
+          "$ref": "#/$defs/id"
+        },
+        "target_independence_cluster_id": {
+          "$ref": "#/$defs/id"
+        },
+        "first_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "latest_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "future_horizon_edits": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "calibration_trajectory_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "order_statistic_rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "residual_quantile_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "observed_max_drift_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "current_uncertainty_width_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "projected_future_drift_upper_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "group_disjoint": {
+          "type": "boolean"
+        },
+        "exchangeability_supported": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "enum": [
+            "InsufficientCalibration",
+            "NotCalibratedGroupOverlap",
+            "NotCalibratedExchangeability",
+            "ProjectedStableWithinHorizon",
+            "ProjectedUnstableWithinHorizon"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "InsufficientCalibration"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "residual_quantile_ratio": {
+                "type": "null"
+              },
+              "projected_future_drift_upper_ratio": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "NotCalibratedGroupOverlap"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "group_disjoint": {
+                "const": false
+              },
+              "residual_quantile_ratio": {
+                "type": "null"
+              },
+              "projected_future_drift_upper_ratio": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "NotCalibratedExchangeability"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "group_disjoint": {
+                "const": true
+              },
+              "exchangeability_supported": {
+                "const": false
+              },
+              "residual_quantile_ratio": {
+                "type": "null"
+              },
+              "projected_future_drift_upper_ratio": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "ProjectedStableWithinHorizon",
+                  "ProjectedUnstableWithinHorizon"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "group_disjoint": {
+                "const": true
+              },
+              "exchangeability_supported": {
+                "const": true
+              },
+              "residual_quantile_ratio": {
+                "type": "number",
+                "minimum": 0
+              },
+              "projected_future_drift_upper_ratio": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "properties": {
@@ -686,7 +929,8 @@
         "view_decision",
         "review",
         "edit_transaction",
-        "query_stability"
+        "query_stability",
+        "query_stop_calibration"
       ],
       "properties": {
         "split_audit": {
@@ -743,6 +987,16 @@
           "oneOf": [
             {
               "$ref": "#/$defs/query"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "query_stop_calibration": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/query_stop_calibration"
             },
             {
               "type": "null"
