@@ -998,8 +998,11 @@ pub mod pareto {
     pub fn pareto_front<'a>(
         candidates: &'a [CandidateMetrics],
         tolerance: f64,
-    ) -> Vec<&'a CandidateMetrics> {
-        candidates
+    ) -> Result<Vec<&'a CandidateMetrics>, &'static str> {
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return Err("Pareto tolerance must be finite and non-negative");
+        }
+        Ok(candidates
             .iter()
             .enumerate()
             .filter(|(_, candidate)| valid(**candidate))
@@ -1010,7 +1013,7 @@ pub mod pareto {
                 })
             })
             .map(|(_, candidate)| candidate)
-            .collect()
+            .collect())
     }
 
     #[cfg(test)]
@@ -1042,11 +1045,24 @@ pub mod pareto {
                     cycle_duration_s: 900.0,
                 },
             ];
-            let front = pareto_front(&candidates, 1e-12);
+            let front = pareto_front(&candidates, 1e-12).unwrap();
             assert_eq!(front.len(), 2);
             assert!(front.iter().any(|candidate| candidate.id == "baseline"));
             assert!(front.iter().any(|candidate| candidate.id == "faster"));
             assert!(!front.iter().any(|candidate| candidate.id == "dominated"));
+        }
+
+        #[test]
+        fn rejects_invalid_tolerance() {
+            let candidates = [CandidateMetrics {
+                id: "candidate",
+                residual_soil_fraction: 0.1,
+                energy_kwh: 0.5,
+                fresh_water_l: 5.0,
+                cycle_duration_s: 600.0,
+            }];
+            assert!(pareto_front(&candidates, f64::NAN).is_err());
+            assert!(pareto_front(&candidates, -1.0).is_err());
         }
 
         #[test]
@@ -1067,7 +1083,7 @@ pub mod pareto {
                     cycle_duration_s: 700.0,
                 },
             ];
-            let front = pareto_front(&candidates, 0.0);
+            let front = pareto_front(&candidates, 0.0).unwrap();
             assert_eq!(front.len(), 1);
             assert_eq!(front[0].residual_soil_fraction, 0.1);
         }
