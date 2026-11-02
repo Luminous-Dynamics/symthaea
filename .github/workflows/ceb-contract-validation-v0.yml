@@ -108,49 +108,98 @@ jobs:
           })
           expect_reject(task_validator, fixture_ready, "fixture_ready task on trusted host")
 
+          def validate_statement(value):
+              receipt_validator.validate(value)
+              predicate = value["predicate"]
+              checks = predicate["checks"]
+              required = [check for check in checks if check["required"]]
+              check_ids = [check["check_id"] for check in checks]
+              if len(check_ids) != len(set(check_ids)):
+                  raise ValueError("duplicate check IDs")
+              counts = {
+                  "required_check_count": len(required),
+                  "required_pass_count": sum(check["status"] == "pass" for check in required),
+                  "required_fail_count": sum(check["status"] == "fail" for check in required),
+                  "required_error_count": sum(check["status"] == "error" for check in required),
+                  "required_skipped_count": sum(check["status"] == "skipped" for check in required),
+              }
+              for field, expected in counts.items():
+                  if predicate["result"][field] != expected:
+                      raise ValueError(f"claimed {field} does not match check rows")
+              subject_digests = {
+                  subject["name"]: subject["digest"]["sha256"]
+                  for subject in value["subject"]
+              }
+              candidate = predicate["candidate"]
+              task = predicate["task"]
+              if subject_digests.get("ceb/candidate.patch") != candidate["patch_sha256"]:
+                  raise ValueError("in-toto candidate subject does not match predicate patch digest")
+              if subject_digests.get("ceb/source.tree") != task["source_tree_sha256"]:
+                  raise ValueError("in-toto source subject does not match predicate source tree digest")
+              if predicate["result"]["verdict"] == "pass":
+                  if not required or any(check["status"] != "pass" for check in required):
+                      raise ValueError("pass requires every required check to pass")
+                  if predicate["result"]["safety_violation"] or predicate["result"]["protocol_violation"]:
+                      raise ValueError("pass cannot include a safety or protocol violation")
+
           # Validate the explicitly unresolved example statement.
           sample_path = root / "examples/design-only-unexecuted-example.statement.json"
           statement = json.loads(sample_path.read_text())
-          receipt_validator.validate(statement)
+          validate_statement(statement)
           if statement["predicate"]["result"]["verdict"] != "unresolved":
               raise SystemExit("design-only statement example must be unresolved")
           if statement["predicate"]["execution"]["runner_profile"] != "simulation":
               raise SystemExit("design-only statement example must not claim isolation")
 
-          # Negative controls: a pass cannot be primary-only, host-executed,
-          # missing a pristine-regrade link, skipped, unsafe, or unsigned at envelope level.
+          # Build a structurally valid passing pristine-regrade statement, then
+          # mutate one invariant at a time. This checks relationships that JSON
+          # Schema alone cannot express (for example, counters vs. check rows).
+          valid_pass = copy.deepcopy(statement)
+          predicate = valid_pass["predicate"]
+          predicate["checks"][0].update({"status": "pass", "evidence_sha256": "9" * 64})
+          predicate["result"].update({
+              "verdict": "pass",
+              "required_check_count": 1,
+              "required_pass_count": 1,
+              "required_fail_count": 0,
+              "required_error_count": 0,
+              "required_skipped_count": 0,
+              "safety_violation": False,
+              "protocol_violation": False
+          })
+          predicate["execution"].update({
+              "stage": "pristine_regrade",
+              "runner_profile": "isolated_microvm",
+              "image_digest": "sha256:" + "f" * 64,
+              "network_policy": "disabled",
+              "regrade_of_receipt_sha256": "a" * 64
+          })
+          predicate["grader"].update({
+              "trust_domain": "separate_host_control_plane",
+              "candidate_access": "read_only"
+          })
+          validate_statement(valid_pass)
+
+          def expect_statement_reject(mutant, label):
+              try:
+                  validate_statement(mutant)
+              except (ValidationError, ValueError):
+                  return
+              raise SystemExit(f"receipt semantic negative control unexpectedly passed: {label}")
+
           for label, mutate in [
               ("pass in primary stage", lambda p: p["execution"].update({"stage": "primary"})),
               ("pass on simulation runner", lambda p: p["execution"].update({"runner_profile": "simulation"})),
               ("pass without regrade link", lambda p: p["execution"].update({"regrade_of_receipt_sha256": None})),
-              ("pass with required check skipped", lambda p: p["result"].update({"required_skipped_count": 1})),
               ("pass after safety violation", lambda p: p["result"].update({"safety_violation": True})),
+              ("pass when a required check row is skipped", lambda p: p["checks"][0].update({"status": "skipped"})),
+              ("forged required-pass counter", lambda p: p["result"].update({"required_pass_count": 0})),
+              ("duplicate check identity", lambda p: p["checks"].append(copy.deepcopy(p["checks"][0]))),
+              ("candidate subject digest mismatch", lambda p: p["subject"][0]["digest"].update({"sha256": "8" * 64})),
           ]:
-              mutant = copy.deepcopy(statement)
-              predicate = mutant["predicate"]
-              predicate["result"].update({
-                  "verdict": "pass",
-                  "required_check_count": 1,
-                  "required_pass_count": 1,
-                  "required_fail_count": 0,
-                  "required_error_count": 0,
-                  "required_skipped_count": 0,
-                  "safety_violation": False,
-                  "protocol_violation": False
-              })
-              predicate["execution"].update({
-                  "stage": "pristine_regrade",
-                  "runner_profile": "isolated_microvm",
-                  "image_digest": "sha256:" + "f" * 64,
-                  "network_policy": "disabled",
-                  "regrade_of_receipt_sha256": "a" * 64
-              })
-              predicate["grader"].update({
-                  "trust_domain": "separate_host_control_plane",
-                  "candidate_access": "read_only"
-              })
-              mutate(predicate)
-              expect_reject(receipt_validator, mutant, label)
+              mutant = copy.deepcopy(valid_pass)
+              mutate(mutant["predicate"] if label not in {"candidate subject digest mismatch"} else mutant)
+              expect_statement_reject(mutant, label)
 
           envelope = {
               "payloadType": "application/vnd.in-toto+json",
@@ -165,7 +214,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=9"
+              "schemas=3 negative_controls=12"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
