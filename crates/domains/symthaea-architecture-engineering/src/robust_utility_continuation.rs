@@ -1137,9 +1137,10 @@ mod tests {
         assert!(alt_mass.validate().is_err());
 
         let mut budget = fixture();
-        budget.history_nodes.iter_mut()
-            .find(|node| node.node_id == "early").unwrap()
-            .continuation_test.outcomes[0].rejection_probability = 0.9;
+        let early_continuation = &mut budget.history_nodes.iter_mut()
+            .find(|node| node.node_id == "early").unwrap().continuation_test;
+        early_continuation.outcomes[0].null_probability = 0.9;
+        early_continuation.outcomes[1].null_probability = 0.1;
         assert!(budget.validate().is_err());
     }
 
