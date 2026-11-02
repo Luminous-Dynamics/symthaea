@@ -117,7 +117,7 @@ The first candidate family is specified in [SYNTHETIC_INTERSECTION_FIXTURE_V0_1.
 - Two-approach marked crossing; one ego vehicle and one scripted pedestrian.
 - Seven explicitly-unitized factors: ego speed, crossing onset, observation occlusion, sensor delay, sensor dropout duration, lateral localization bias and brake actuation delay.
 - Seed, ordinal, generation budget, generator policy, exact factor bits and fixed geometry are bound into a BLAKE3 candidate identity.
-- A deterministic, independently stratified candidate set is available with a bounded budget of 1–4,096.
+- Two deterministic generator baselines are available under the same candidate contract and 1–4,096 budget: independently stratified affine-permuted sampling and seeded SplitMix64 pseudorandom sampling. The generator policy ID is part of candidate identity.
 - The first module owns candidate generation only. Symtropy #3387 must execute and replay each candidate; it owns engine capability reporting and observed outputs.
 
 The first benchmark comparison must pair controllers on identical candidate IDs and compute budgets. Start with seeded random and stratified search. Add boundary and controller-disagreement objectives only after the first two policies have reproducible execution baselines. Explicit positive, sensor-loss, timing-boundary and non-discovery controls must be executed before using discovery yield as a metric. A high search score or generated candidate is not itself a failure.
