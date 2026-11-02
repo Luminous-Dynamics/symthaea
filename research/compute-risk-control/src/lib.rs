@@ -666,6 +666,18 @@ pub fn verify_compute_risk_report(report: &ComputeRiskReport) -> Result<(), Comp
     if report.correction_ppm > PPM as u32 {
         return Err(fail("correction_ppm", "must be in [0, 1,000,000] PPM"));
     }
+    if report.claim_ceiling.trim().is_empty()
+        || !report.claim_ceiling.contains("none of which is verified") {
+        return Err(fail("claim_ceiling", "must preserve the explicit unverified-assumptions claim ceiling"));
+    }
+    let expected_correction = simultaneous_hoeffding_correction_ppm(
+        report.candidate_evaluations.len(),
+        report.sample_count,
+        report.confidence_delta_ppm,
+    )?;
+    if report.correction_ppm != expected_correction {
+        return Err(fail("correction_ppm", "does not match the simultaneous 3G Hoeffding correction"));
+    }
     let expected_claim_count = report.candidate_evaluations.len().checked_mul(3)
         .ok_or_else(|| fail("simultaneous_claim_count", "3G claim count overflow"))?;
     if report.simultaneous_claim_count != expected_claim_count {
@@ -688,6 +700,32 @@ pub fn verify_compute_risk_report(report: &ComputeRiskReport) -> Result<(), Comp
         if candidate.sample_count != report.sample_count
             || candidate.simultaneous_ucb_correction_ppm != report.correction_ppm {
             return Err(fail("candidate_evaluations", "candidate sample count or correction differs from report"));
+        }
+        if candidate.candidate_id.trim().is_empty() {
+            return Err(fail("candidate_evaluations.candidate_id", "must be non-empty"));
+        }
+        let maximum_loss_sum = (report.sample_count as u128)
+            .checked_mul(u128::from(PPM))
+            .ok_or_else(|| fail("candidate_evaluations.loss_sum", "sample-count bound overflow"))?;
+        for (field, value) in [
+            ("upper_loss_sum_ppm", candidate.upper_loss_sum_ppm),
+            ("lower_loss_sum_ppm", candidate.lower_loss_sum_ppm),
+            ("emitted_answer_error_sum_ppm", candidate.emitted_answer_error_sum_ppm),
+        ] {
+            if value > maximum_loss_sum {
+                return Err(fail(format!("candidate_evaluations.{field}"), "cannot exceed sample_count times the bounded loss range"));
+            }
+        }
+        let expected_upper_mean = u32::try_from(ceil_div(candidate.upper_loss_sum_ppm, report.sample_count as u128)?)
+            .map_err(|_| fail("candidate_evaluations.upper_mean", "PPM conversion overflow"))?;
+        let expected_lower_mean = u32::try_from(ceil_div(candidate.lower_loss_sum_ppm, report.sample_count as u128)?)
+            .map_err(|_| fail("candidate_evaluations.lower_mean", "PPM conversion overflow"))?;
+        let expected_output_mean = u32::try_from(ceil_div(candidate.emitted_answer_error_sum_ppm, report.sample_count as u128)?)
+            .map_err(|_| fail("candidate_evaluations.output_mean", "PPM conversion overflow"))?;
+        if candidate.upper_mean_loss_ceil_ppm != expected_upper_mean
+            || candidate.lower_mean_loss_ceil_ppm != expected_lower_mean
+            || candidate.emitted_answer_error_mean_ceil_ppm != expected_output_mean {
+            return Err(fail("candidate_evaluations", "empirical risk means do not match loss sums and sample count"));
         }
         for (field, value) in [
             ("upper_mean_loss_ceil_ppm", candidate.upper_mean_loss_ceil_ppm),
@@ -1008,6 +1046,39 @@ mod tests {
         assert_eq!(report.confidence_failure_allocation.numerator_ppm,100_000);
         assert_eq!(report.confidence_failure_allocation.denominator,12);
         verify_compute_risk_report(&report).unwrap();
+    }
+
+    #[test]
+    fn verifier_rejects_recomputed_but_inconsistent_loss_sums_and_means() {
+        let fixture=load_builtin_fixture().unwrap();
+        let traces=generate_synthetic_validation_panel(&fixture).unwrap();
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.candidate_evaluations[0].upper_loss_sum_ppm=0;
+        assert!(verify_compute_risk_report(&report).is_err());
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.candidate_evaluations[0].upper_mean_loss_ceil_ppm+=1;
+        assert!(verify_compute_risk_report(&report).is_err());
+    }
+
+    #[test]
+    fn verifier_rejects_optimistic_hoeffding_correction() {
+        let fixture=load_builtin_fixture().unwrap();
+        let traces=generate_synthetic_validation_panel(&fixture).unwrap();
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.correction_ppm=report.correction_ppm.saturating_sub(1);
+        assert!(verify_compute_risk_report(&report).is_err());
     }
 
     #[test]
