@@ -26,6 +26,7 @@ The action contains:
 - an alarm decision for the current step;
 - optional LowPower or HighFidelity sample acquisition at the current step;
 - next wake interval, bounded to 1–1,024 steps;
+- a frozen application decision deadline in the evaluator scenario, never exposed as hidden event truth;
 - candidate-declared compute-cycle, transmit-byte and memory-write counters.
 
 The candidate-facing types contain no scenario seed, hidden event schedule, current hidden label, shift schedule, event count, or evaluator metrics. The scenario is supplied only to the simulator entry point and is not passed to policy code.
@@ -52,14 +53,15 @@ The adaptive confirmation policy is deliberately modest. It is a control baselin
 ## Evaluator metrics and receipts
 
 Each episode retains:
-- event count, detected events and missed events;
+- event count, detected events, on-time detections, late detections and missed events;
+- all-event recall and on-time recall under the frozen application deadline;
 - false alarms and duplicate alarms;
 - event recall and alarm precision with explicit denominators;
 - false alarms per 1,000 simulated steps;
 - all detected-event delays and nearest-rank p95 delay;
 - sample counts by sensor and wake count;
-- separate modeled sensor and wake energy;
-- total modeled energy and modeled energy per detected event;
+- separate synthetic sensor-acquisition and wake energy;
+- combined modeled sensor-plus-wake energy per on-time detected event. This deliberately excludes compute, radio and memory energy;
 - candidate-declared compute cycles, transmitted bytes and memory-write bytes;
 - scenario, policy, causal trace and result SHA-256 commitments.
 
@@ -96,6 +98,6 @@ Report each scenario and subgroup separately. Do not collapse quality, latency, 
 
 ## Authored tests
 
-The module authors tests for deterministic replay, sensor-cost monotonicity, sleeping without acquisition, adaptive-policy denominator integrity, action-bound rejection, result-tamper detection, scenario commitment changes, and invalid shift bounds.
+The module authors tests for deterministic replay, paired sensor-noise consistency, sensor-cost monotonicity, sleeping without acquisition, adaptive-policy denominator integrity, on-time versus late event qualification, action-bound rejection, result-tamper detection, scenario commitment changes, and invalid shift bounds.
 
-**Execution status:** tests are authored but have not been compiled or run. No performance or SOTA result is claimed.
+**Execution status:** ten tests are authored but have not been compiled or run. No performance or SOTA result is claimed.
