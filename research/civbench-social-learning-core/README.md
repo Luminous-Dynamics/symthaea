@@ -86,6 +86,21 @@ The separate `src/cultural_evolution.rs` module is a parameterized reference ABM
 
 It follows the broad mechanism sequence described in the 2026 Reward Network III paper but is **not** a reproduction of the authors' ABM. The published supplementary parameters and archived implementation must be ingested before claiming replication. Tests cover fixed-seed reproducibility, perfect transmission, empty-teacher and no-transmission controls, observation without acquisition, acquisition without integration, corruption, and the distinction between individual discovery and social acquisition.
 
+## Paper-shaped exploratory ABM
+
+The separate `src/paper_abm.rs` models the paper's **exploratory agent-based simulation**, not the human experiment and not the task-level DQN. Its reference population has 20 generations and 20 agents per generation; heterogeneous conditions seed five machine agents in generation zero. Human settings use 10 exploration trials and optimality bias 0.01; myopic discovery rate is 0.5. It also represents ten demonstrations, optimal/myopic demonstration rewards of 1/0.5, and reward noise with standard deviation `epsilon * sqrt(K_demo)`.
+
+Discovery is sampled from the exact terminal-outcome distribution implied by independent per-trial choices: each trial attempts optimal with probability `q` (otherwise myopic) and succeeds at its strategy's per-trial discovery rate; when both strategies are discovered, optimal takes priority. This closed form avoids simulating up to 100,000 RNG steps per machine agent while preserving the terminal distribution under that model. The exact authors' random draw ordering and any supplementary implementation details still require Zenodo v2.0 review.
+
+Not every ABM parameter is specified in the article's main text. In particular, V0's five-teacher candidate count, default `d_opt=0.001`, default machine capacity, `tau`, and the two placement treatments are sensitivity-design choices, not claimed author defaults. The paper-shaped sweep varies these explicitly where appropriate.
+
+The `paper-abm-sweep` binary runs 50 fixed-seed replications per condition. Its 649 conditions comprise one no-machine control plus a 2 × 3 × 3 × 3 × 3 × 2 × 2 sensitivity grid over machine placement, machine exploration capacity, machine optimality bias, optimal discoverability, social-transmission probability, teacher-selection temperature and reward noise. It reports generation-level optimal/myopic/null prevalence, machine-originated optimal prevalence, average demonstration reward and non-null social transmission. Placement schemes and the condition grid are CivBench stress tests, not an exact reproduction of every published supplementary condition.
+
+Run:
+```sh
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin paper-abm-sweep > paper-abm-sweep.csv
+```
+
 ## Run
 
 ```sh
@@ -93,9 +108,14 @@ cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-transmission-sweep > cultural-transmission-sweep.csv
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-frontier-sweep > cultural-frontier-sweep.csv
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin paper-abm-sweep > paper-abm-sweep.csv
 ```
 
 The example binary prints a small chain-network adoption trace.
+
+## Paper ABM sensitivity sweep
+
+The `paper-abm-sweep` binary targets the article's separate 20-generation/20-agent exploratory ABM and runs 50 replications per condition. It reports a 649-condition CivBench grid: one no-machine control plus machine placement (clustered/random), machine capacity (1k/10k/100k), machine optimality bias (0.01/0.25/0.5), optimal discoverability (0.0001/0.001/0.01), social transmission (0.3/0.6/0.9), teacher-selection temperature (0.1/0.5), and demonstration reward noise (0.1/0.5). It reports per-generation prevalence, machine-origin lineage prevalence, demonstration reward and social transmission. The machine-placement options and grid are research extensions; they are not asserted to be the authors' exact supplementary grid. The model's unreported teacher-candidate count and selected defaults remain explicit V0 assumptions.
 
 ## Multi-seed cultural-transmission sweep
 
