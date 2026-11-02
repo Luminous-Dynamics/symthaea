@@ -33,14 +33,14 @@ pub struct Generator {
     pub ordering_rule: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Authority {
     pub authority_id: String,
     pub incarnation_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct InitialState {
     pub authority_revision: String,
@@ -85,29 +85,43 @@ pub struct Operation {
     pub expected_result: ExpectedResult,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Scope {
     pub source_id: String,
     pub log_origin_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_source_generation: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_source_predecessor_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_log_checkpoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_policy_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub receipt_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_source_cursor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_source_predecessor_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_log_checkpoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restored_incarnation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restored_authority_revision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restored_state_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub witness_sequence_seen: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_policy_digest: Option<String>,
 }
 
@@ -133,7 +147,7 @@ pub struct Fault {
     pub action: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WitnessObservation {
     pub witness_id: String,
@@ -146,7 +160,7 @@ pub struct WitnessObservation {
     pub signed_record_digest: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FinalObservation {
     pub authority_revision: String,
@@ -157,7 +171,7 @@ pub struct FinalObservation {
     pub accepted_receipts: Vec<AcceptedReceipt>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AcceptedReceipt {
     pub receipt_id: String,
@@ -1418,6 +1432,13 @@ pub fn verify_mutants(trace: &Trace) -> Vec<(String, bool)> {
         })
         .collect()
 }
+
+mod observation;
+pub use observation::{
+    BackendProvenance, ObservationEnvelope, ObservationReport, ObservedFault, ObservedOperation,
+    RawEvent, RunnerClockWindow, canonical_raw_event_log_bytes, raw_event_log_digest,
+    verify_backend_observation,
+};
 
 mod history;
 pub use history::{HistorySearchConfig, HistorySearchReport, verify_observed_history};

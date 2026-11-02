@@ -32,6 +32,8 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
+      - name: Generate standalone Cargo lockfile
+        run: cargo generate-lockfile --manifest-path tools/basalt-trace-verifier/Cargo.toml
       - name: Verify standalone package formatting
         run: cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --check
       - name: Test reference reducer and negative controls
