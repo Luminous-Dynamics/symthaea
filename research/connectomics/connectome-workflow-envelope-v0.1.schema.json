@@ -689,7 +689,9 @@
         "projected_future_drift_upper_ratio",
         "group_disjoint",
         "exchangeability_supported",
-        "outcome"
+        "outcome",
+        "calibration_trajectory_manifest_sha256",
+        "materiality_threshold"
       ],
       "properties": {
         "receipt_sha256": {
@@ -790,6 +792,13 @@
             "ProjectedStableWithinHorizon",
             "ProjectedUnstableWithinHorizon"
           ]
+        },
+        "calibration_trajectory_manifest_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "materiality_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       },
       "allOf": [
