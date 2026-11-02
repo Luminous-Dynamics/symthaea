@@ -18,7 +18,8 @@ A workflow envelope contains immutable references and operation identity plus op
 4. active-view decision or stop receipt;
 5. review allocation and observed human disposition;
 6. independently verified edit transaction;
-7. query-specific graph-stability report.
+7. query-specific graph-stability report;
+8. optional finite-horizon future-drift calibration, bound to the same query and exact graph-history snapshots.
 
 The validator advances only while the evidence supports the next transition. A missing receipt remains pending. A deferred review is not a completed review. A rejected or quarantined edit never advances the canonical graph head. A query report is accepted only if its first snapshot equals the envelope base snapshot and its latest snapshot equals the committed edit result.
 
@@ -32,7 +33,10 @@ The validator advances only while the evidence supports the next transition. A m
 - `ReviewAllocationPending`, `ReviewPending`, `ReviewDeferred`, `ReviewRejected`: allocation and actual human disposition are distinct.
 - `EditPending`, `EditRejected`, `EditQuarantined`: proposals and non-committed outcomes never masquerade as committed edits.
 - `QueryAuditPending`, `QueryInsufficientHistory`, `QueryUnstable`: a committed edit alone does not establish query readiness.
-- `QueryReadyObservedWindow`: the named query was stable across the observed graph-history window only.
+- `QueryReadyObservedWindow`: the named query was stable across the observed graph-history window only; no future-drift calibration is attached.
+- `QueryStopCalibrationInsufficient`, `QueryStopCalibrationGroupOverlap`, `QueryStopCalibrationExchangeabilityUnsupported`: finite-horizon calibration abstains because its support or assumptions are inadequate.
+- `QueryProjectedUnstableWithinHorizon`: calibrated upper future drift or current uncertainty exceeds the declared query materiality tolerance.
+- `QueryProjectedStableWithinHorizon`: observed query stability plus a finite-sample future-drift upper bound within tolerance for the declared horizon. This is a marginal projection, not a future-stability guarantee.
 
 Every computed report hard-codes `future_stability_certified = false` and `universal_connectome_completeness_claimed = false`.
 
@@ -45,6 +49,7 @@ Every computed report hard-codes `future_stability_certified = false` and `unive
 - Review receipt binds operation/task/sample. A deferred allocation has no reviewer/disposition/time; a completed disposition requires a reviewer and positive observed duration.
 - Edit receipt binds operation/task/sample, operation-binding digest, base graph snapshot, event stream, independent verifier and annotation-propagation receipts. A committed edit must change the snapshot, include a result digest, and have passing verifier and annotation attestations.
 - Query receipt binds query/analysis/uncertainty references and source volume. Its first snapshot must equal the envelope base; its latest snapshot must equal the committed edit result. It cannot claim future stability or universal completeness.
+- Optional query-stop receipt binds the exact observed query definition, analysis, source volume and first/latest snapshots. It recomputes the finite-sample rank `ceil((n+1)*(1-alpha))`, checks the evidence-backed group/exchangeability flags, and rejects status/quantile contradictions. The envelope keeps `future_stability_certified=false` even for `QueryProjectedStableWithinHorizon`.
 
 ## Canonical serialization and digest boundary
 
@@ -66,6 +71,7 @@ A well-formed 64-character digest string is not proof of artifact authenticity. 
 
 - Input schema: `research/connectomics/connectome-workflow-envelope-v0.1.schema.json`.
 - Computed report schema: `research/connectomics/connectome-workflow-audit-report-v0.1.schema.json`.
+- Optional future-stop calibration receipt: `query_stop_calibration` in the input schema, matching [#10073](https://github.com/Luminous-Dynamics/symthaea/pull/10073).
 - Fixture schema: `research/connectomics/connectome-workflow-envelope-fixture-v0.1.schema.json`.
 - Known-answer cases: `research/connectomics/fixtures/connectome-workflow-envelope-known-answer-v0.1.json`.
 
@@ -79,9 +85,13 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-workflow-envelope/Cargo.toml
 ```
 
-Twenty-eight unit tests are authored for pending/blocked statuses, operation/task/split consistency, uncalibrated predictions, view leakage and unit mismatch, stopped views, pending/deferred/rejected human review, verified commit, rejected/quarantined edit, snapshot continuity, query readiness, instability, missing history, source-volume mismatch, forbidden future/universal claims, malformed identities and digests.
+Thirty-four unit tests are authored for pending/blocked statuses, operation/task/split consistency, uncalibrated predictions, view leakage and unit mismatch, stopped views, pending/deferred/rejected human review, verified commit, rejected/quarantined edit, snapshot continuity, query readiness, instability, missing history, source-volume mismatch, forbidden future/universal claims, malformed identities and digests, finite-horizon conformal rank, distinct group/exchangeability abstentions, snapshot binding and projection-status contradictions.
 
 They have **not** been compiled or executed in the current authoring environment.
+
+## Finite-horizon stopping boundary
+
+The optional calibration receipt is separate from observed-window stability. It carries the frozen query/materiality context, group-disjointness and exchangeability assessment digests, unique source-volume/independence-cluster support, alpha, exact conformal rank, residual quantile, target observed drift, current uncertainty width and future edit horizon. The envelope checks rank and the arithmetic relation `projected upper = observed ratio + residual quantile` within numerical tolerance. A projected-stable status is allowed only when the observed query is stable and both current width and projected upper drift are <= 1. The report still hard-codes future stability certification to false.
 
 ## Integration and performance benchmarks
 
