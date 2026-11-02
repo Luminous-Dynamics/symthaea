@@ -56,4 +56,7 @@ pub use inference::{
 };
 pub use regression::{LinearFit, linear_regression};
 pub use signal_detection::{SignalDetectionCounts, SignalDetectionMetrics};
-pub use roc::{RocCurve, RocError, RocObservation, RocPoint, try_roc_curve};
+pub use roc::{
+    PrecisionRecallCurve, PrecisionRecallPoint, RocCurve, RocError, RocObservation, RocPoint,
+    try_precision_recall_curve, try_roc_curve,
+};
