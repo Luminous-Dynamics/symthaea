@@ -286,5 +286,56 @@
     "expected_first_by_d_optimal": "concentrated",
     "expected_first_by_a_optimal": "balanced",
     "notes": "Closed-form local Gaussian fixture. Candidate sensitivities and noise are stipulated, not estimated from biological observations."
+  },
+  "multi_objective_pareto_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "cost_unit": "declared experiment-cost units",
+    "objective_axes": {
+      "maximize": [
+        "eig_bits",
+        "d_optimal_information_bits",
+        "a_optimal_trace_reduction",
+        "evsi_utility"
+      ],
+      "minimize": [
+        "cost"
+      ],
+      "scalarization": "none"
+    },
+    "candidates": [
+      {
+        "id": "within-group",
+        "cost": 1,
+        "eig_bits": 1,
+        "d_optimal_information_bits": 3.3291057413758973,
+        "a_optimal_trace_reduction": 0.9900990099009901,
+        "evsi_utility": 0
+      },
+      {
+        "id": "decision-group",
+        "cost": 1,
+        "eig_bits": 0.2780719051126377,
+        "d_optimal_information_bits": 2.321928094887362,
+        "a_optimal_trace_reduction": 1.6,
+        "evsi_utility": 0.3
+      },
+      {
+        "id": "dominated",
+        "cost": 1,
+        "eig_bits": 0,
+        "d_optimal_information_bits": 0.32192809488736235,
+        "a_optimal_trace_reduction": 0.4,
+        "evsi_utility": 0
+      }
+    ],
+    "expected_pareto_frontier": [
+      "decision-group",
+      "within-group"
+    ],
+    "expected_dominated": [
+      "dominated"
+    ],
+    "notes": "Same declared cost across candidates. This example proves no single candidate need optimize every objective."
   }
 }
