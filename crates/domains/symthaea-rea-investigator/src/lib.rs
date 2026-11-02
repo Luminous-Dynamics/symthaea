@@ -122,6 +122,7 @@ pub enum PlannerErrorKind {
     DuplicateExperimentId,
     InvalidPlannerConfig,
     InvalidMeasuredDistribution,
+    InvalidLikelihoods,
     UnqualifiedObservationEvidence,
 }
 
