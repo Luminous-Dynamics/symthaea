@@ -93,6 +93,6 @@ The \`mobile-device-read-only-v1\` ceiling permits local provider process launch
 
 The distinction matters: \`pull_adb_file\` writes a host-side copy but does not mutate the device; \`push_adb_file\` changes the device and is denied. Package install/uninstall and app/activity start/stop are also denied.
 
-MCP annotations are derived from effects exactly as in upstream REA. They are not the policy authority. Unknown or unaudited names fail closed. Authorization results bind a JCS digest of the effect row and a JCS digest of the policy ceiling.
+MCP annotations are derived from effects exactly as in upstream REA. They are not the policy authority. Unknown or unaudited names fail closed. Authorization results bind a JCS digest of the effect row and a JCS digest of the policy ceiling. The dedicated upstream CI generator also compares all 30 effect rows, annotations and target-content trust flags with the pinned TypeScript source.
 
 This is a policy evaluator and typed catalog, not yet proof that every MCP/CLI/provider execution path calls it. Adapter wiring and exact tool-catalog parity remain acceptance requirements in issue #9909.
