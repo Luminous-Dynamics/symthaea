@@ -74,6 +74,7 @@ pub enum TransmissionError {
     ZeroSteps,
     EmptyChainSet,
     InconsistentChainLengths,
+    ZeroPopulationSize,
 }
 
 impl fmt::Display for TransmissionError {
@@ -89,6 +90,7 @@ impl fmt::Display for TransmissionError {
             Self::ZeroSteps => write!(f, "transmission chain must have at least one step"),
             Self::EmptyChainSet => write!(f, "population metrics require at least one chain"),
             Self::InconsistentChainLengths => write!(f, "all transmission chains must have equal step counts"),
+            Self::ZeroPopulationSize => write!(f, "branching population requires at least one initial signal"),
         }
     }
 }
@@ -175,6 +177,10 @@ impl DeterministicRng {
         let u1 = self.uniform().max(f64::MIN_POSITIVE);
         let u2 = self.uniform();
         (-2.0 * u1.ln()).sqrt() * (core::f64::consts::TAU * u2).cos()
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        (self.next_u64() as usize) % upper
     }
 }
 
@@ -327,6 +333,148 @@ pub fn population_metrics(
     })
 }
 
+/// One descendant artifact in a branching cultural population.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BranchingAgent {
+    pub signal: CultureSignal,
+    /// Root-source identity; preserved across all descendants.
+    pub lineage_id: usize,
+    /// Initial signal for this root lineage, used for cumulative drift.
+    pub root_signal: CultureSignal,
+    /// Parent index in the previous generation; None only for generation zero.
+    pub parent_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BranchingTransmissionRun {
+    pub generations: Vec<Vec<BranchingAgent>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BranchingGenerationMetrics {
+    pub generation: usize,
+    pub population_size: usize,
+    pub unique_lineages: usize,
+    pub lineage_hhi: f64,
+    pub effective_lineage_diversity: f64,
+    pub mean_pairwise_content_distance: f64,
+    pub mean_distance_from_root_signal: f64,
+    pub extinct_root_lineages: usize,
+}
+
+/// Evolve a fixed-size population. Every descendant samples one parent
+/// uniformly from the preceding generation, then passes through the specified
+/// content-transmission channel. This is a branching population, not a single
+/// linear chain; lineage identity is retained for extinction/diversity metrics.
+pub fn simulate_branching_population(
+    initial_signals: &[CultureSignal],
+    config: TransmissionChannelConfig,
+    generations: usize,
+    seed: u64,
+) -> Result<BranchingTransmissionRun, TransmissionError> {
+    config.validate()?;
+    if initial_signals.is_empty() {
+        return Err(TransmissionError::ZeroPopulationSize);
+    }
+    if generations == 0 {
+        return Err(TransmissionError::ZeroSteps);
+    }
+    for signal in initial_signals {
+        for (index, value) in signal.attributes.iter().copied().enumerate() {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(TransmissionError::InvalidAttribute {
+                    index,
+                    value_bits: value.to_bits(),
+                });
+            }
+        }
+    }
+
+    let mut rng = DeterministicRng::new(seed);
+    let mut population: Vec<BranchingAgent> = initial_signals.iter().copied().enumerate()
+        .map(|(lineage_id, signal)| BranchingAgent {
+            signal,
+            lineage_id,
+            root_signal: signal,
+            parent_index: None,
+        })
+        .collect();
+    let mut history = Vec::with_capacity(generations + 1);
+    history.push(population.clone());
+
+    for _ in 0..generations {
+        let mut next = Vec::with_capacity(initial_signals.len());
+        for _ in 0..initial_signals.len() {
+            let parent_index = rng.index(population.len());
+            let parent = &population[parent_index];
+            let signal = transmit_once(parent.signal, config, &mut rng);
+            next.push(BranchingAgent {
+                signal,
+                lineage_id: parent.lineage_id,
+                root_signal: parent.root_signal,
+                parent_index: Some(parent_index),
+            });
+        }
+        population = next;
+        history.push(population.clone());
+    }
+
+    Ok(BranchingTransmissionRun { generations: history })
+}
+
+pub fn branching_generation_metrics(
+    run: &BranchingTransmissionRun,
+) -> Result<Vec<BranchingGenerationMetrics>, TransmissionError> {
+    if run.generations.is_empty() || run.generations.iter().any(Vec::is_empty) {
+        return Err(TransmissionError::ZeroPopulationSize);
+    }
+    let total_root_lineages = run.generations[0].iter()
+        .map(|agent| agent.lineage_id)
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let mut metrics = Vec::with_capacity(run.generations.len());
+
+    for (generation, agents) in run.generations.iter().enumerate() {
+        let mut lineage_counts = std::collections::BTreeMap::<usize, usize>::new();
+        let mut root_distance = 0.0;
+        for agent in agents {
+            *lineage_counts.entry(agent.lineage_id).or_default() += 1;
+            root_distance += agent.signal.euclidean_distance(agent.root_signal);
+        }
+        let population_size = agents.len();
+        let lineage_hhi = lineage_counts.values()
+            .map(|count| {
+                let share = *count as f64 / population_size as f64;
+                share * share
+            })
+            .sum::<f64>();
+        let mut pairwise_distance = 0.0;
+        let mut pair_count = 0usize;
+        for left in 0..agents.len() {
+            for right in (left + 1)..agents.len() {
+                pairwise_distance += agents[left].signal.euclidean_distance(agents[right].signal);
+                pair_count += 1;
+            }
+        }
+
+        metrics.push(BranchingGenerationMetrics {
+            generation,
+            population_size,
+            unique_lineages: lineage_counts.len(),
+            lineage_hhi,
+            effective_lineage_diversity: if lineage_hhi > 0.0 { 1.0 / lineage_hhi } else { 0.0 },
+            mean_pairwise_content_distance: if pair_count == 0 {
+                0.0
+            } else {
+                pairwise_distance / pair_count as f64
+            },
+            mean_distance_from_root_signal: root_distance / population_size as f64,
+            extinct_root_lineages: total_root_lineages.saturating_sub(lineage_counts.len()),
+        });
+    }
+    Ok(metrics)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -410,6 +558,66 @@ mod tests {
             simulate_chain(initial, config, 16, 77).unwrap(),
             simulate_chain(initial, config, 16, 77).unwrap()
         );
+    }
+
+    #[test]
+    fn branching_population_tracks_parent_and_root_lineage() {
+        let initial = [
+            signal([0.1, 0.2, 0.3, 0.4]),
+            signal([0.8, 0.7, 0.6, 0.5]),
+            signal([0.2, 0.8, 0.4, 0.6]),
+            signal([0.9, 0.1, 0.7, 0.3]),
+        ];
+        let config = zero_noise_config(0.0, [0.0; 4]);
+        let run = simulate_branching_population(&initial, config, 3, 123).unwrap();
+        assert_eq!(run.generations.len(), 4);
+        for agent in &run.generations[0] {
+            assert_eq!(agent.parent_index, None);
+            assert_eq!(agent.signal, agent.root_signal);
+            assert_eq!(agent.signal, initial[agent.lineage_id]);
+        }
+        for generation in run.generations.iter().skip(1) {
+            for agent in generation {
+                assert!(agent.parent_index.is_some());
+                assert_eq!(agent.signal, agent.root_signal);
+            }
+        }
+    }
+
+    #[test]
+    fn branching_population_reports_lineage_extinction_and_diversity() {
+        let initial = [
+            signal([0.1, 0.2, 0.3, 0.4]),
+            signal([0.8, 0.7, 0.6, 0.5]),
+            signal([0.2, 0.8, 0.4, 0.6]),
+            signal([0.9, 0.1, 0.7, 0.3]),
+        ];
+        let config = zero_noise_config(0.0, [0.0; 4]);
+        let run = simulate_branching_population(&initial, config, 4, 77).unwrap();
+        let metrics = branching_generation_metrics(&run).unwrap();
+        assert_eq!(metrics[0].unique_lineages, 4);
+        assert_eq!(metrics[0].extinct_root_lineages, 0);
+        assert_eq!(metrics[0].effective_lineage_diversity, 4.0);
+        assert!(metrics[4].unique_lineages <= 4);
+        assert_eq!(
+            metrics[4].unique_lineages + metrics[4].extinct_root_lineages,
+            4
+        );
+    }
+
+    #[test]
+    fn branching_channel_and_metrics_are_reproducible_for_fixed_seed() {
+        let initial = [
+            signal([0.1, 0.2, 0.3, 0.4]),
+            signal([0.8, 0.7, 0.6, 0.5]),
+            signal([0.2, 0.8, 0.4, 0.6]),
+            signal([0.9, 0.1, 0.7, 0.3]),
+        ];
+        let config = TransmissionChannelConfig::default();
+        let a = simulate_branching_population(&initial, config, 6, 88).unwrap();
+        let b = simulate_branching_population(&initial, config, 6, 88).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(branching_generation_metrics(&a), branching_generation_metrics(&b));
     }
 
     #[test]
