@@ -29,5 +29,12 @@
     "threshold_permille": 850,
     "minimum_predictions": 64
   },
-  "note": "Seeds and expected world labels belong to evaluator-side fixture manifests, never candidate-facing campaign data."
+  "note": "Seeds and expected world labels belong to evaluator-side fixture manifests, never candidate-facing campaign data.",
+  "synthetic_worlds": [
+    "null",
+    "signal_injected",
+    "known_leakage_injected",
+    "confounded",
+    "adversarial_mutation"
+  ]
 }
