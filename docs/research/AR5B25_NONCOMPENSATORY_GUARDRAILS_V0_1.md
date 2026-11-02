@@ -76,7 +76,7 @@ Quantiles, CVaR, maxima, nonlinear ratios, pathwise requirements and interaction
 
 The supplied confidence failure probability must cover the full policy × requirement bound family simultaneously. This module records the declared guardrail false-safe confidence failure; it does not prove that the upstream method achieved it.
 
-V1 requires calibration independent of confirmation and `SAME_TARGET_LAW_BY_DESIGN` with matching design digests. The design identity is an assumption/binding, not proof of target-law equality. Bounded transport, dependent data and adaptive guardrail discovery are unsupported.
+V1 requires calibration independent of confirmation, independently sampled units as defined by a sampling-unit contract digest, a declared absence of cross-unit interference, and `SAME_TARGET_LAW_BY_DESIGN` with matching design digests. The design identity is an assumption/binding, not proof of target-law equality. Bounded transport, dependent data and adaptive guardrail discovery are unsupported.
 
 Guardrail confidence failure is not Type-I alpha. A top-level decision that combines this guardrail gate with the statistical test must compose the distinct failure events according to the claims being made.
 
@@ -97,7 +97,7 @@ The module defines tests for:
 - invalid/non-finite confidence bounds;
 - deterministic report-tampering detection.
 
-These tests are authored, not run. No Rust compile, formatting, Clippy, unit-test, CI or benchmark pass is claimed.
+Sixteen tests are authored, not run. No Rust compile, formatting, Clippy, unit-test, CI or benchmark pass is claimed.
 
 ## 7. Next work
 
@@ -120,3 +120,6 @@ Source: Spotify Confidence, 3 August 2026, *42% of Spotify experiments get rolle
 The request now carries one `simultaneous_coverage_receipt_sha256` in addition to each row's source receipt digest. This receipt is intended to bind the complete policy × requirement confidence family, its calibration method, split identity, predeclared family and failure probability. The verifier checks digest shape and includes it in the deterministic report identity; it does not independently verify the upstream statistical derivation or artifact authenticity.
 
 Randomized policy evidence must satisfy the declared assignment design. The caller's no-cross-unit-interference and sampling-unit declarations remain assumptions. The exact independent experimental unit (e.g. cluster, experiment replication, or another justified unit) is separately specified by the upstream sampling-unit contract.
+
+
+The current request also binds one simultaneous-coverage-family receipt and the sampling-unit contract digest. The report preserves the sampling-unit identity, joint confidence receipt and the contributing per-policy source receipt digests, availability states and sample sizes for each requirement. These bindings support audit reconstruction; they do not independently authenticate the source receipts or prove the assumptions asserted by the sampling design.
