@@ -2,7 +2,7 @@
 
 A dependency-free, deterministic Rust reference model for testing whether richer cognitive/social-learning mechanisms add value beyond simple diffusion rules.
 
-This is a benchmark baseline, not a human-behaviour simulator and not a theory of culture. It deliberately uses binary propositions, fixed networks, synchronous updates, and explicit source metadata so each mechanism can be inspected.
+This is a benchmark baseline, not a human-behaviour simulator and not a theory of culture. It contains two distinct task slices: a binary-proposition diffusion model, and a Reward Network III task environment with explicit reward edges and local-observation policies.
 
 ## Implemented reference rules
 
@@ -19,6 +19,12 @@ Declared source reliability is an experimental input. It is not evidence that th
 The evaluator knows the synthetic ground truth, but the learning policy does not receive it. Metrics report coverage, accuracy among informed agents, consensus, confidence, and high-confidence error fraction separately.
 
 Updates are synchronous: all agents read the previous state and write the next state. This prevents node iteration order from changing the result.
+
+## Reward Network III protocol
+
+See [REWARD_NETWORK_III_PROTOCOL_V0_1.md](REWARD_NETWORK_III_PROTOCOL_V0_1.md) for the empirical task definition, study design, published result references, baseline ladder, transfer/correction experiments, and Zenodo ingestion gates. The Rust module `src/reward_network.rs` implements Random, ImmediateGreedy, LossSeeking and LossThenGreedy policies plus a full-information finite-horizon oracle. The oracle is an upper bound, not a participant policy.
+
+The current 12-node/30-edge test graph is synthetic. It checks the published task shape and reproduces the 2,000-versus-2,650 reward contrast under a deliberately constructed three-loss route. It is not an original Reward Network III network. The Zenodo v2.0 archive has not been downloaded or hashed in this branch; no paper replication is claimed.
 
 ## Run
 
