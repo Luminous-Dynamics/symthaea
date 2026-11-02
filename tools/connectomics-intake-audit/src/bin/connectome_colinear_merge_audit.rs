@@ -7,7 +7,7 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -434,10 +434,18 @@ fn build_physical_resampled_input(
         total_resampled_sample_count = total_resampled_sample_count
             .checked_add(resampled_count)
             .ok_or_else(|| "total resampled sample count overflowed".to_string())?;
+        let original_end_nm = track.samples.last()
+            .ok_or_else(|| format!("track {} has no terminal sample", track.track_id))?
+            .distance_nm;
+        let resampled_end_nm = resampled.samples.last()
+            .ok_or_else(|| format!("track {} produced no resampled samples", track.track_id))?
+            .distance_nm;
+        let uncovered_terminal_nm = (original_end_nm - resampled_end_nm).max(0.0);
         per_track_sample_counts.push(TrackResamplingCount {
             track_id: track.track_id.clone(),
             original_sample_count: track.samples.len(),
             resampled_sample_count: resampled_count,
+            uncovered_terminal_nm,
         });
         resampled_tracks.push(resampled);
     }
