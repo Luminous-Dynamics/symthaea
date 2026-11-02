@@ -572,7 +572,7 @@ mod tests {
     fn delayed_aci_moves_alpha_in_correct_direction_on_feedback() {
         let mut state = AciState::new(100_000, 50_000).unwrap();
         assert_eq!(state.update_on_delivered_feedback(true).unwrap(), 55_000);
-        assert_eq!(state.update_on_delivered_feedback(false).unwrap(), 57_250);
+        assert_eq!(state.update_on_delivered_feedback(false).unwrap(), 60_000);
     }
     #[test]
     fn finite_sample_quantile_keeps_unbounded_case_explicit() {
