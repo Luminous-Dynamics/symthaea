@@ -1059,6 +1059,93 @@ mod tests {
     }
 
     #[test]
+    fn view_must_inherit_sample_hash_from_parent_operation() {
+        let mut op = operation(
+            "op",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        op.views[0].sample_hash = "00000000000000000000000000000002".to_owned();
+
+        assert!(matches!(
+            audit_splits(&policy(vec![GroupKey::SourceVolume]), &[op]),
+            Err(SplitAuditError::ViewSampleMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn view_must_inherit_task_route_from_parent_operation() {
+        let mut op = operation(
+            "op",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        op.views[0].task_route = TaskRoute::FalseMergeIdentification;
+
+        assert!(matches!(
+            audit_splits(&policy(vec![GroupKey::SourceVolume]), &[op]),
+            Err(SplitAuditError::ViewTaskMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn report_is_invariant_to_operation_input_order() {
+        let first = operation(
+            "op-train",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-train",
+            "neuron-train",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        let second = operation(
+            "op-val",
+            "00000000000000000000000000000002",
+            DataSplit::Validation,
+            TaskRoute::FalseSplitCorrection,
+            "volume-val",
+            "neuron-val",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        let third = operation(
+            "op-test",
+            "00000000000000000000000000000003",
+            DataSplit::Test,
+            TaskRoute::FalseMergeIdentification,
+            "volume-test",
+            "neuron-test",
+            "fly",
+            ViewKind::EmXy,
+        );
+
+        let forward = audit_splits(
+            &policy(vec![GroupKey::SourceVolume, GroupKey::Neuron]),
+            &[first.clone(), second.clone(), third.clone()],
+        )
+        .unwrap();
+        let reverse = audit_splits(
+            &policy(vec![GroupKey::SourceVolume, GroupKey::Neuron]),
+            &[third, second, first],
+        )
+        .unwrap();
+
+        assert_eq!(forward, reverse);
+    }
+
+    #[test]
     fn view_must_be_permitted_for_task() {
         let op = operation(
             "op",
