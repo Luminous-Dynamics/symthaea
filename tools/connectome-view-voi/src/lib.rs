@@ -1085,6 +1085,64 @@ mod tests {
     }
 
     #[test]
+    fn gross_voi_is_nonnegative_and_redundant_views_have_zero_value_on_grid() {
+        for p_step in 1..10 {
+            let p_error = f64::from(p_step) / 10.0;
+            for sensitivity_step in 1..10 {
+                let sensitivity = f64::from(sensitivity_step) / 10.0;
+                for specificity_step in 1..10 {
+                    let specificity = f64::from(specificity_step) / 10.0;
+                    let informative = standard_problem(
+                        vec![scenario("base", p_error)],
+                        vec![view(
+                            "informative",
+                            0.0,
+                            true,
+                            &["false_merge_identification"],
+                            vec![likelihood(
+                                "base",
+                                &["positive", "negative"],
+                                vec![
+                                    vec![sensitivity, 1.0 - specificity],
+                                    vec![1.0 - sensitivity, specificity],
+                                ],
+                            )],
+                        )],
+                    );
+                    let informative_result = choose_next_view(&informative).unwrap();
+                    assert!(
+                        informative_result.evaluations[0].net_voi_bounds.lower >= -1.0e-10,
+                        "gross VOI became negative for p={p_error}, sensitivity={sensitivity}, specificity={specificity}"
+                    );
+
+                    let redundant = standard_problem(
+                        vec![scenario("base", p_error)],
+                        vec![view(
+                            "redundant",
+                            0.0,
+                            true,
+                            &["false_merge_identification"],
+                            vec![likelihood(
+                                "base",
+                                &["positive", "negative"],
+                                vec![
+                                    vec![sensitivity, sensitivity],
+                                    vec![1.0 - sensitivity, 1.0 - sensitivity],
+                                ],
+                            )],
+                        )],
+                    );
+                    let redundant_result = choose_next_view(&redundant).unwrap();
+                    assert!(
+                        redundant_result.evaluations[0].net_voi_bounds.lower.abs() <= 1.0e-10,
+                        "conditionally redundant view changed Bayes risk"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn equal_worst_case_value_uses_lexicographic_view_id() {
         let shared = vec![
             likelihood(
