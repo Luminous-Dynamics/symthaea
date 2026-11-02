@@ -27,4 +27,8 @@ path = "src/bin/cultural_frontier_sweep.rs"
 name = "networked-mediation-sweep"
 path = "src/bin/networked_mediation_sweep.rs"
 
+[[bin]]
+name = "telephone-attractor-sweep"
+path = "src/bin/telephone_attractor_sweep.rs"
+
 [dependencies]
