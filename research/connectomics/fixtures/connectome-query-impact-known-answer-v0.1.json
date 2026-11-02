@@ -76,7 +76,9 @@
                 "decision_flip": "Guaranteed",
                 "materiality_exceeded_possible": true,
                 "materiality_exceeded_guaranteed": true,
-                "effect_method": "RectangularOuterBound"
+                "effect_method": "RectangularOuterBound",
+                "decision_flip_method": "MarginalIntervalOuterBound",
+                "paired_decision_world_count": 0
               }
             ],
             "worst_case_maximum_absolute_effect": 0.8,
@@ -181,7 +183,9 @@
                 "decision_flip": "Guaranteed",
                 "materiality_exceeded_possible": true,
                 "materiality_exceeded_guaranteed": true,
-                "effect_method": "RectangularOuterBound"
+                "effect_method": "RectangularOuterBound",
+                "decision_flip_method": "MarginalIntervalOuterBound",
+                "paired_decision_world_count": 0
               },
               {
                 "scenario_id": "h2",
@@ -206,7 +210,9 @@
                 "decision_flip": "Impossible",
                 "materiality_exceeded_possible": true,
                 "materiality_exceeded_guaranteed": false,
-                "effect_method": "RectangularOuterBound"
+                "effect_method": "RectangularOuterBound",
+                "decision_flip_method": "MarginalIntervalOuterBound",
+                "paired_decision_world_count": 0
               }
             ],
             "worst_case_maximum_absolute_effect": 0.8,
@@ -311,7 +317,9 @@
                 "decision_flip": "Guaranteed",
                 "materiality_exceeded_possible": true,
                 "materiality_exceeded_guaranteed": true,
-                "effect_method": "RectangularOuterBound"
+                "effect_method": "RectangularOuterBound",
+                "decision_flip_method": "MarginalIntervalOuterBound",
+                "paired_decision_world_count": 0
               }
             ],
             "worst_case_maximum_absolute_effect": 0.39999999999999997,
@@ -350,7 +358,9 @@
                 "decision_flip": "NotConfigured",
                 "materiality_exceeded_possible": false,
                 "materiality_exceeded_guaranteed": false,
-                "effect_method": "RectangularOuterBound"
+                "effect_method": "RectangularOuterBound",
+                "decision_flip_method": "NotConfigured",
+                "paired_decision_world_count": 0
               }
             ],
             "worst_case_maximum_absolute_effect": 15,
@@ -488,7 +498,6 @@
                   "lower": 0,
                   "upper": 0.2
                 },
-                "effect_method": "PairedSharedWorlds",
                 "minimum_absolute_effect": 0,
                 "maximum_absolute_effect": 0.2,
                 "normalized_materiality_lower": 0,
@@ -497,7 +506,10 @@
                 "after_edit_decision": "Indeterminate",
                 "decision_flip": "Possible",
                 "materiality_exceeded_possible": true,
-                "materiality_exceeded_guaranteed": false
+                "materiality_exceeded_guaranteed": false,
+                "effect_method": "PairedSharedWorlds",
+                "decision_flip_method": "MarginalIntervalOuterBound",
+                "paired_decision_world_count": 0
               }
             ],
             "worst_case_maximum_absolute_effect": 0.2,
