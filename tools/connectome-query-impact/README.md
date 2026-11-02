@@ -59,7 +59,19 @@ An adapter may optionally supply a `PairedEffectBounds` interval computed from m
 
 This permits a tighter effect estimate when shared uncertainty is modeled jointly. The core only checks containment and digest shape; the adapter must verify that the same world/latent state was used on both sides and that the paired effect artifact is authentic. A paired interval is not trusted merely because it is narrower.
 
-One important limitation remains: threshold-decision flip classification is still computed conservatively from the marginal baseline and post-edit intervals. A narrow paired metric-effect interval does not by itself prove that a threshold decision cannot flip. Sharp decision-flip certification requires paired decision-state evidence, which is future work.
+### Paired decision-world evidence
+
+A paired effect artifact may additionally include a non-empty list of `PairedDecisionWorld` rows. Each row has a unique world ID and exact baseline/post-edit endpoint values from the same latent graph world. When a decision threshold is pre-registered, the threshold status is compared within each matched world:
+
+- all supplied worlds flip -> `Guaranteed`;
+- no supplied worlds flip -> `Impossible`;
+- some supplied worlds flip -> `Possible`.
+
+The report labels the method as `PairedSharedWorlds` and records the paired-world count. If paired decision worlds are absent, the original marginal-interval classification remains and is labelled `MarginalIntervalOuterBound`.
+
+Each paired endpoint must lie inside its corresponding marginal interval, and its before/after difference must lie inside the paired effect interval (with a small numerical tolerance). Duplicate world IDs, empty paired-world lists, or paired decision data without a pre-registered threshold fail closed.
+
+A paired-world result applies only to the supplied worlds. It is not a probability, and guaranteed / impossible mean only within that supplied set. The adapter must prove that the world manifest is complete for the declared admissible structural scenario and that each before/after pair shares the same latent graph world.
 
 ## Scenario handling
 
@@ -88,7 +100,7 @@ Every query must be marked pre-registered. The same query must carry the same de
 - Fixture schema: `research/connectomics/connectome-query-impact-fixture-v0.1.schema.json`.
 - Known-answer cases: `research/connectomics/fixtures/connectome-query-impact-known-answer-v0.1.json`.
 
-The fixture also checks a paired-world interval that tightens a rectangular bound and a negative control that rejects a paired interval outside it.
+The fixture checks paired-effect interval containment plus matched decision worlds: an impossible flip despite marginal intervals straddling the threshold, guaranteed and possible flips, duplicate world IDs, values outside marginal intervals, differences outside paired effect bounds, missing decision thresholds and empty world sets.
 
 The fixture covers guaranteed threshold flips, scenario disagreement, independent units across different queries and conflicting query-unit declarations.
 
@@ -100,7 +112,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-query-impact/Cargo.toml
 ```
 
-Twenty Rust unit tests are authored for interval difference, threshold-flip classifications, materiality bounds, uncertainty/scenario preservation, differing query units, pre-registration, duplicate scenarios, inconsistent query signatures, malformed intervals/hashes and deterministic ordering, paired-world interval containment and paired evidence digests.
+Twenty-seven Rust unit tests are authored for interval difference, threshold-flip classifications, materiality bounds, uncertainty/scenario preservation, differing query units, pre-registration, duplicate scenarios, inconsistent query signatures, malformed intervals/hashes and deterministic ordering, paired-world interval containment, paired evidence digests, matched threshold-decision flips, world uniqueness, marginal/effect containment, and paired decision abstention rules.
 
 They have **not** been compiled or executed in the current authoring environment.
 
