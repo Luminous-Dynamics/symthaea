@@ -279,6 +279,70 @@ https://www.kirkusreviews.com/book-reviews/a/-146/beyond-telepathy/
 5. Mark where Puharich's published account is incomplete, inconsistent or differs from the later sources; do not silently harmonize discrepancies.
 6. Seek the underlying journals/raw trial logs separately. A first-person published account is not the same as a complete raw dataset or independent replication.
 
+## PH-017 — 22 January 1952 Garrett cage-charge detection experiment (Puharich's first-person published account)
+
+**Document:** Andrija Puharich, *Beyond Telepathy*, original text ©1962; 2026 Park Street Press / Inner Traditions reissue, ISBN 9781644116906. The currently accessible Everand preview reproduces the relevant original chapter text.
+
+- 2026 publisher record: https://www.simonandschuster.com/books/Beyond-Telepathy/Andrija-Puharich/9781644116890
+- eBook preview: https://www.everand.com/book/991433468/Beyond-Telepathy-The-Classic-Work-on-the-Conscious-Cultivation-of-Psychic-Phenomena
+- Relevant preview lines: Everand lines 1134–1145 (web source turn876489view0; find result turn171632view0).
+- 1962 edition bibliographic record: https://books.google.com/books/about/Beyond_Telepathy.html?id=q68SUck-Q44C
+
+**Classification:** P1 for Puharich's own published first-person account of what he says occurred. Not raw trial data, not independently verified experimental records, and not evidence that the interpretation is correct. The preview is partial; the complete appendix and full edition have not yet been inspected.
+
+### What Puharich reports
+
+- Date/time: 22 January 1952, 10:27 a.m.
+- Receiver: Eileen Garrett, seated in a copper-screen room/enclosure.
+- Outside observer/sender role: Loren Wedlock, outside the enclosure, able to observe Garrett through the mesh and read an indicator for charge timing.
+- Task: Garrett, through her trance-state control persona, was asked to call when a ten-second electrical charge was applied to the enclosure wall.
+- First event series: three charge events occurred during a 30-minute session; two calls were reported as correct.
+- Negative-control series: a 30-minute session with no electrical charges; Puharich says Garrett made no calls.
+- Second event series: after a 20-minute break, six charge events occurred during another 30-minute session; six calls were reported within 15 seconds after the charge appeared.
+- Puharich subsequently interpreted the episode as an unusually strong telepathic demonstration and connected it to his cholinergia hypothesis.
+
+### What is missing / what must not be inferred
+
+- No full target/event schedule, randomization algorithm, event timestamps, response timestamps, trial-level raw data or complete false-alarm accounting.
+- No independent observer, scorer or target custodian is described in the preview account.
+- The outside observer had access to a charge indicator and visual observation through the mesh; ordinary cue leakage has not been excluded.
+- No calibrated voltage, current, waveform, source impedance, field strength, enclosure transfer function, grounding/bonding state, or instrument calibration is supplied in the accessible account.
+- The first session's two calls out of three events are a tiny numerator/denominator and cannot support a stable effect estimate.
+- The 6/6 second series is not independently replicated and its exact event/response protocol is unavailable.
+- The 30-minute no-event control is not equivalent to a fully randomized interleaved set of event and no-event windows.
+- The description does not supply enough information to calculate a trustworthy modern p-value, sensitivity, specificity, d-prime or false-alarm rate.
+- This is a first-person account, not proof of ESP, a new physical field, or an electromagnetic transmission mechanism.
+
+### Task-family identity
+
+Assign the distinct historical profile PH-GARRETT-CHARGE-1952:
+
+- randomized ten-second cage-charge event detection / timing;
+- receiver in a copper-screen enclosure;
+- observer outside, historically able to see receiver and event indicator;
+- two reported event blocks separated by a no-event control.
+
+Keep separate from:
+- face-down card-colour identification in the 1969 patent appeal (PH-015);
+- paired sender–receiver Zener-card task described in the later memoir;
+- later memoir's separate cage-charge discrimination account (PH-009), whose reported event totals do not match or establish this 1952 sequence;
+- Hurkos hidden-object identification (PH-011);
+- one-mile matching claim described by the 1972 SRI proposal (PH-001);
+- modern hidden-target remote viewing.
+
+### Modern experimental implication
+
+A modern reconstruction should use signal-detection methodology, not raw percent-correct alone:
+
+- Interleave unpredictable event-present and event-absent windows under independent target custody.
+- Require time-stamped receiver responses and confidence reports before reveal.
+- Estimate hit rate, miss rate, false-alarm rate, correct-rejection rate, sensitivity (d-prime where model assumptions fit), response criterion and ROC performance.
+- Randomize event timing and duration independently; preserve all no-event windows.
+- Blind participant, operator and scorer; use independent event generation and instrument verification.
+- Measure actual field conditions and all procedural/acoustic/visual/thermal/vibration/timing/network leakage.
+- Keep a separate physical metrology experiment; never infer shielding from behavioural responses.
+- No historical high-voltage apparatus or human electrical exposure procedure is authorized.
+
 ## PH-013 — Eileen J. Garrett Parapsychology Foundation Collection at UMBC
 
 **Repository:** Albin O. Kuhn Library and Gallery Special Collections, University of Maryland, Baltimore County (UMBC).
