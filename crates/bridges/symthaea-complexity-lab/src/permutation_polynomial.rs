@@ -11,7 +11,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::matrix::{MatrixCertificateError, RationalMatrix, verify_rational_matrix_equality};
+use crate::matrix::{\n    MatrixCertificateError, RationalMatrix, verify_identity_minus_rank_factorization,\n    verify_rational_matrix_equality,\n};
 
 /// One monomial term c * P_1^e1 * ... * P_s^es.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -453,6 +453,48 @@ mod tests {
             evaluate_permutation_polynomial(1, &overflow),
             Err(PermutationPolynomialError::DenominatorLcmOverflow)
         ));
+    }
+
+    #[test]
+    fn polynomial_matrix_and_rank_one_factorization_compose() {
+        // For the 3-cycle P, I + P + P^2 is the all-ones matrix.
+        // M0 = (2/3)I - (1/3)P - (1/3)P^2, so
+        // I-M0 = (1/3) * 1 * 1^T has rank one.
+        let claimed_m0 = matrix(
+            3,
+            3,
+            &[2, -1, -1, -1, 2, -1, -1, -1, 2],
+            3,
+        );
+        let polynomial = PermutationPolynomialCertificate {
+            generators: vec![vec![1, 2, 0]],
+            terms: vec![
+                PermutationMonomial {
+                    exponents: vec![0],
+                    coefficient_numerator: 2,
+                    coefficient_denominator: 3,
+                },
+                PermutationMonomial {
+                    exponents: vec![1],
+                    coefficient_numerator: -1,
+                    coefficient_denominator: 3,
+                },
+                PermutationMonomial {
+                    exponents: vec![2],
+                    coefficient_numerator: -1,
+                    coefficient_denominator: 3,
+                },
+            ],
+        };
+        assert!(verify_permutation_polynomial(&claimed_m0, &polynomial).unwrap());
+
+        let left = matrix(3, 1, &[1, 1, 1], 1);
+        let right = matrix(1, 3, &[1, 1, 1], 3);
+        assert!(verify_identity_minus_rank_factorization(
+            &claimed_m0,
+            &left,
+            &right
+        ).unwrap());
     }
 
     #[test]
