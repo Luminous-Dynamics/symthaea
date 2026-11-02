@@ -18,55 +18,50 @@ It does not estimate the full path distribution. Its statistical guarantee appli
 
 ## 2. Finite-sample bounds
 
-For independent sampling units (X_1,ldots,X_n) and a predeclared function (g(X)in[L,U]), the empirical mean is:
+For independent sampling units (X_1,\ldots,X_n) and a predeclared function (g(X)\in[L,U]), the empirical mean is:
 
-[
-widehatmu = rac{1}{n}sum_{i=1}^{n} g(X_i).
-]
+```text
+mu_hat = (1/n) * sum(i=1..n) g(X_i)
+```
 
-For a one-sided failure probability (delta), V1 uses Hoeffding:
+For one-sided failure probability `delta`, V1 uses the bounded-IID Hoeffding radius:
 
-[
-r=(U-L)sqrt{rac{log(1/delta)}{2n}}.
-]
-
-The upper and lower bounds are clipped to the known support:
-
-[
-U_g=min(U,widehatmu+r),qquad
-L_g=max(L,widehatmu-r).
-]
+```text
+r = (U - L) * sqrt(log(1/delta) / (2*n))
+upper = min(U, mu_hat + r)
+lower = max(L, mu_hat - r)
+```
 
 The implementation caps the radius at the support width when the bound is already uninformative. It rejects empty samples, non-finite values, support violations and non-finite support widths.
 
 ### Simultaneous family allocation
 
-For (P) candidate policies and (M_0) null models, the null failure budget (delta_0) is Bonferroni-allocated as:
+For `P` candidate policies and `M0` null models, the null failure budget `delta0` is Bonferroni-allocated as:
 
-[
-delta_{0,i}=rac{delta_0}{P M_0}.
-]
+```text
+delta_null_per_row = delta0 / (P * M0)
+```
 
-For (P) policies, (M_1) alternatives and three alternative functionals (power, cost and utility), the alternative budget is:
+For `P` policies, `M1` alternatives and three alternative functionals (power, cost and utility), the alternative budget `delta1` is:
 
-[
-delta_{1,i}=rac{delta_1}{3 P M_1}.
-]
+```text
+delta_alt_per_functional = delta1 / (3 * P * M1)
+```
 
 No independence between rows or metric coordinates is needed for the union bound. Each row's own sampling-unit assumptions still need to hold.
 
 The null-side confidence event is used to spend Type-I error:
 
-[
-alpha_{mathrm{cond}} =
-rac{alpha-delta_0}{1-delta_0},qquad delta_0<alpha.
-]
+```text
+alpha_cond = (alpha - delta0) / (1 - delta0)
+require delta0 < alpha
+```
 
-On the simultaneous null-coverage event, the robustified frontier has worst-case null size no larger than (alpha_{mathrm{cond}}). Outside that event, the conservative rejection bound is one. The report reconstructs:
+On the simultaneous null-coverage event, the robustified frontier has worst-case null size no larger than `alpha_cond`. Outside that event, the conservative rejection bound is one. The report reconstructs:
 
-[
-delta_0+(1-delta_0),alpha_{mathrm{cond}}leqalpha.
-]
+```text
+unconditional_type_i <= delta0 + (1 - delta0) * alpha_cond <= alpha
+```
 
 This is conditional on calibration being independent of the confirmatory stream and sharing its target law by design. A same-design digest is an identity binding, not proof of stationarity, exchangeability, provenance or equality of the actual data distributions.
 
@@ -78,7 +73,7 @@ The input records the evidence mode:
 - `SIMULATOR_GROUND_TRUTH`;
 - `OFF_POLICY_ESTIMATE` (rejected by V1).
 
-For randomized execution, V1 requires positive assignment probability for every candidate policy arm, assignment probabilities summing to one within each model family, and globally disjoint sampling-unit IDs across all randomized policy/model evidence rows. Repeated observations must be aggregated to the declared independent sampling unit before entry. Unmodeled interference is rejected by the V1 declaration contract.
+For randomized execution, V1 requires positive assignment probability for every candidate policy arm, assignment probabilities summing to one within each model family, and globally disjoint sampling-unit IDs across all randomized policy/model evidence rows. Repeated observations must be aggregated to the declared independent sampling unit before entry. The request binds a separate sampling-unit contract digest defining what one independent unit means (for example, an experiment replication or randomized cluster). The no-cross-unit-interference flag is a design declaration, not an independently verified fact.
 
 For simulator ground truth, paired/common-random-number experiments may reuse seed/unit identities across policy rows because the evaluator observes counterfactuals inside the simulator. This is not an assertion that real-world counterfactual outcomes are observed.
 
@@ -126,7 +121,7 @@ The module currently defines tests for:
 - row-order canonicalization;
 - report tampering.
 
-These tests are authored, not run. No Rust compile, format, Clippy, unit-test, CI or performance result is claimed.
+Fifteen unit tests are authored, not run. No Rust compile, format, Clippy, unit-test, CI or performance result is claimed.
 
 ## 7. Known limitations and next work
 
