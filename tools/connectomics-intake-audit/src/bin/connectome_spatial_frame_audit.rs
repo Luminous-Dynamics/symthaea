@@ -502,24 +502,6 @@ fn validate_mask_bytes(
     apply_mask_summary(frame, scan, actual_sha256, artifact.len() as u64, report)
 }
 
-fn validate_mask_bytes(frame: &FrameInput, artifact_bytes: &[u8]) -> Result<MaskScan, String> {
-    let actual_sha = sha256(artifact_bytes);
-    if actual_sha != frame.eligibility_mask.artifact_sha256 {
-        return Err("eligibility mask SHA-256 does not match manifest".into());
-    }
-    let decoded = match frame.eligibility_mask.encoding.as_str() {
-        "packed_bitset_lsb0_x_fastest_v1" => artifact_bytes.to_vec(),
-        "hex_bitset_lsb0_x_fastest_v1" => {
-            let mut reader = HexBitsetReader { inner: Cursor::new(artifact_bytes) };
-            let expected = expected_mask_bytes(frame)?;
-            let mut decoded = Vec::with_capacity(usize::try_from(expected).map_err(|_| "mask too large for test buffer")?);
-            reader.read_to_end(&mut decoded).map_err(|error| error.to_string())?;
-            decoded
-        }
-        other => return Err(format!("unsupported eligibility mask encoding {other}")),
-    };
-    scan_mask(frame, Cursor::new(decoded))
-}
 
 fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
     if frame.schema_version != 1 {
