@@ -462,6 +462,10 @@ pub fn analyze_candidate(
             });
         }
 
+        let aggregate_decision_flip_scope = aggregate_flip_scope(
+            accumulator.scenarios.iter().map(|scenario| scenario.decision_flip_scope),
+        );
+
         query_impacts.push(QueryImpactSummary {
             query_id,
             query_definition_sha256: accumulator.signature.definition_sha256,
@@ -474,9 +478,7 @@ pub fn analyze_candidate(
             materiality_exceeded_possible,
             materiality_exceeded_guaranteed,
             aggregate_decision_flip,
-            aggregate_decision_flip_scope: aggregate_flip_scope(
-                accumulator.scenarios.iter().map(|scenario| scenario.decision_flip_scope),
-            ),
+            aggregate_decision_flip_scope,
         });
     }
 
@@ -823,11 +825,17 @@ fn validate_evaluation(
                 });
             }
         }
-        let actual_ids: BTreeSet<String> = evaluation
+        let Some(actual_worlds) = evaluation
             .paired_effect
             .as_ref()
             .and_then(|paired| paired.decision_worlds.as_ref())
-            .expect("paired decision worlds checked above")
+        else {
+            return Err(QueryImpactError::PairedWorldCoverageRequiresDecisionWorlds {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+            });
+        };
+        let actual_ids: BTreeSet<String> = actual_worlds
             .iter()
             .map(|world| world.world_id.clone())
             .collect();
@@ -1028,6 +1036,22 @@ mod tests {
             hypothetical_after_edit: after,
             paired_effect: None,
             paired_world_set_coverage: None,
+        }
+    }
+
+    fn world_set_coverage(expected_world_ids: &[&str]) -> PairedWorldSetCoverage {
+        PairedWorldSetCoverage {
+            universe_id: "finite-universe-v1".to_owned(),
+            universe_manifest_sha256: SHA_A.to_owned(),
+            admissibility_policy_sha256: SHA_B.to_owned(),
+            enumeration_input_sha256: SHA_C.to_owned(),
+            enumerator_sha256: SHA_A.to_owned(),
+            expected_world_manifest_sha256: SHA_B.to_owned(),
+            closure_proof_sha256: SHA_C.to_owned(),
+            verifier_sha256: SHA_A.to_owned(),
+            verification_receipt_sha256: SHA_B.to_owned(),
+            expected_world_ids: expected_world_ids.iter().map(|id| (*id).to_owned()).collect(),
+            closure_verified: true,
         }
     }
 
@@ -1370,6 +1394,210 @@ mod tests {
             analyze_candidate(&candidate(vec![item])),
             Err(QueryImpactError::PairedDecisionWorldsEmpty { .. })
         ));
+    }
+
+    #[test]
+    fn exact_finite_universe_coverage_upgrades_scope_only_after_id_set_equality() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![
+                PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.3,
+                },
+                PairedDecisionWorld {
+                    world_id: "world-b".to_owned(),
+                    baseline_value: 0.8,
+                    after_edit_value: 0.7,
+                },
+            ]),
+        });
+        item.paired_world_set_coverage =
+            Some(world_set_coverage(&["world-b", "world-a"]));
+
+        let report = analyze_candidate(&candidate(vec![item])).unwrap();
+        let query = &report.query_impacts[0];
+        assert_eq!(
+            query.scenarios[0].decision_flip_scope,
+            DecisionFlipScope::DeclaredFiniteUniverse
+        );
+        assert_eq!(
+            query.aggregate_decision_flip_scope,
+            DecisionFlipScope::DeclaredFiniteUniverse
+        );
+        assert_eq!(query.aggregate_decision_flip, DecisionFlipStatus::Impossible);
+    }
+
+    #[test]
+    fn missing_expected_world_cannot_be_called_a_closed_finite_universe() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        item.paired_world_set_coverage =
+            Some(world_set_coverage(&["world-a", "world-b"]));
+        assert_eq!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::ExpectedWorldSetMismatch {
+                query_id: "pathway".to_owned(),
+                scenario_id: "h1".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn unverified_world_closure_receipt_is_rejected() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        let mut coverage = world_set_coverage(&["world-a"]);
+        coverage.closure_verified = false;
+        item.paired_world_set_coverage = Some(coverage);
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::WorldSetCoverageNotVerified { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_expected_world_ids_are_rejected() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        item.paired_world_set_coverage =
+            Some(world_set_coverage(&["world-a", "world-a"]));
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::DuplicateExpectedWorldId { .. })
+        ));
+    }
+
+    #[test]
+    fn world_set_coverage_requires_actual_paired_decision_worlds() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: None,
+        });
+        item.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedWorldCoverageRequiresDecisionWorlds { .. })
+        ));
+    }
+
+    #[test]
+    fn differing_scenario_scopes_are_preserved_as_mixed_at_query_level() {
+        let mut supplied = evaluation(
+            "pathway",
+            "a-supplied",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        supplied.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+
+        let mut closed = evaluation(
+            "pathway",
+            "b-closed",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        closed.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        closed.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+
+        let report = analyze_candidate(&candidate(vec![supplied, closed])).unwrap();
+        let impact = &report.query_impacts[0];
+        assert_eq!(
+            impact.scenarios[0].decision_flip_scope,
+            DecisionFlipScope::SuppliedPairedWorldSet
+        );
+        assert_eq!(
+            impact.scenarios[1].decision_flip_scope,
+            DecisionFlipScope::DeclaredFiniteUniverse
+        );
+        assert_eq!(
+            impact.aggregate_decision_flip_scope,
+            DecisionFlipScope::Mixed
+        );
     }
 
     #[test]
