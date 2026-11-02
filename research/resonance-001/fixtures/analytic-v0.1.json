@@ -1,0 +1,47 @@
+{
+  "schema": "symthaea.resonance.analytic_reference.v0.1",
+  "claim_ceiling": "ideal_lumped_analytical_only",
+  "series_rlc": {
+    "resistance_ohm": 10,
+    "inductance_h": 0.01,
+    "capacitance_f": 0.000001,
+    "expected": {
+      "angular_frequency_rad_s": 10000,
+      "frequency_hz": 1591.5494309189535,
+      "quality_factor": 10,
+      "half_power_bandwidth_hz": 159.15494309189535,
+      "impedance_at_resonance_ohm": {
+        "real": 10,
+        "imaginary": 0
+      }
+    }
+  },
+  "parallel_rlc": {
+    "resistance_ohm": 1000,
+    "inductance_h": 0.01,
+    "capacitance_f": 0.000001,
+    "expected": {
+      "angular_frequency_rad_s": 10000,
+      "frequency_hz": 1591.5494309189535,
+      "quality_factor": 10,
+      "half_power_bandwidth_hz": 159.15494309189535,
+      "impedance_at_resonance_ohm": {
+        "real": 1000,
+        "imaginary": 0
+      }
+    }
+  },
+  "coupled_identical_resonators": {
+    "inductance_1_h": 0.01,
+    "capacitance_1_f": 0.000001,
+    "inductance_2_h": 0.01,
+    "capacitance_2_f": 0.000001,
+    "coupling_coefficient": 0.2,
+    "expected": {
+      "isolated_frequency_hz": 1591.5494309189535,
+      "mutual_inductance_h": 0.002,
+      "lower_mode_frequency_hz": 1452.8792078313684,
+      "upper_mode_frequency_hz": 1779.4063585429428
+    }
+  }
+}
