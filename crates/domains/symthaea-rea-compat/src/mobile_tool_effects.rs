@@ -7,7 +7,7 @@
 
 use crate::{canonical_jcs_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fmt;
 
 pub const UPSTREAM_REA_COMMIT: &str = "8250bf2320ea57aab4e664db4b4d44b8abd2004e";
@@ -256,20 +256,76 @@ const fn adb_device_mutation() -> ToolEffects {
 /// Pinned mobile subset from REA's TOOL_EFFECTS, not inferred from names or
 /// MCP descriptions. Review the source commit when this table changes.
 pub const MOBILE_TOOL_EFFECTS: [MobileToolEffectEntry; 30] = [
-    MobileToolEffectEntry { tool: MobileTool::InspectAndroidJniBindings, effects: static_android_analysis(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::TraceAndroidReferences, effects: static_android_analysis(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAndroidPackage, effects: static_android_analysis(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::SearchAndroidClasses, effects: static_android_analysis(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAndroidClass, effects: static_android_analysis(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAndroidMethod, effects: static_android_analysis(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAdbClient, effects: observed_with_process_and_session(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ListAdbDevices, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAdbDevice, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ListAdbPackages, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::PullAdbPackage, effects: adb_host_capture(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ReadAdbLogcat, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAdbPackage, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::PullAdbFile, effects: adb_host_capture(), returns_target_content: true },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAndroidJniBindings,
+        effects: static_android_analysis(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::TraceAndroidReferences,
+        effects: static_android_analysis(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAndroidPackage,
+        effects: static_android_analysis(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::SearchAndroidClasses,
+        effects: static_android_analysis(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAndroidClass,
+        effects: static_android_analysis(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAndroidMethod,
+        effects: static_android_analysis(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAdbClient,
+        effects: observed_with_process_and_session(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ListAdbDevices,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAdbDevice,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ListAdbPackages,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::PullAdbPackage,
+        effects: adb_host_capture(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ReadAdbLogcat,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAdbPackage,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::PullAdbFile,
+        effects: adb_host_capture(),
+        returns_target_content: true,
+    },
     MobileToolEffectEntry {
         tool: MobileTool::PushAdbFile,
         effects: ToolEffects {
@@ -283,20 +339,76 @@ pub const MOBILE_TOOL_EFFECTS: [MobileToolEffectEntry; 30] = [
         effects: adb_host_capture(),
         returns_target_content: true,
     },
-    MobileToolEffectEntry { tool: MobileTool::ListAdbProcesses, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ListAdbDirectory, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ListAdbFeatures, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ListAdbServices, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAdbDisplay, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InspectAdbWindow, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ReadAdbSetting, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::CollectAdbBugreport, effects: adb_host_capture(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::ResolveAdbPackages, effects: observed_with_adb_transport(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::InstallAdbPackage, effects: adb_device_mutation(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::UninstallAdbPackage, effects: adb_device_mutation(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::StartAdbApp, effects: adb_device_mutation(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::StartAdbActivity, effects: adb_device_mutation(), returns_target_content: true },
-    MobileToolEffectEntry { tool: MobileTool::StopAdbApp, effects: adb_device_mutation(), returns_target_content: true },
+    MobileToolEffectEntry {
+        tool: MobileTool::ListAdbProcesses,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ListAdbDirectory,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ListAdbFeatures,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ListAdbServices,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAdbDisplay,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InspectAdbWindow,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ReadAdbSetting,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::CollectAdbBugreport,
+        effects: adb_host_capture(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::ResolveAdbPackages,
+        effects: observed_with_adb_transport(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::InstallAdbPackage,
+        effects: adb_device_mutation(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::UninstallAdbPackage,
+        effects: adb_device_mutation(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::StartAdbApp,
+        effects: adb_device_mutation(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::StartAdbActivity,
+        effects: adb_device_mutation(),
+        returns_target_content: true,
+    },
+    MobileToolEffectEntry {
+        tool: MobileTool::StopAdbApp,
+        effects: adb_device_mutation(),
+        returns_target_content: true,
+    },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -365,21 +477,45 @@ impl EffectFlag {
 pub enum ToolAuthorizationError {
     UnknownTool(String),
     MissingCatalogEntry(MobileTool),
-    EffectExceedsCeiling { tool: MobileTool, effect: EffectFlag },
+    EffectExceedsCeiling {
+        tool: MobileTool,
+        effect: EffectFlag,
+    },
     Canonicalization(String),
     InvalidProviderCapability(String),
-    ProviderOperationUnavailable { tool: MobileTool, reason: String },
+    ProviderOperationUnavailable {
+        tool: MobileTool,
+        reason: String,
+    },
 }
 
 impl fmt::Display for ToolAuthorizationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownTool(name) => write!(f, "unknown mobile tool '{name}'; denied by default"),
-            Self::MissingCatalogEntry(tool) => write!(f, "mobile tool {} has no effect entry; denied by default", tool.as_str()),
-            Self::EffectExceedsCeiling { tool, effect } => write!(f, "mobile tool {} exceeds policy ceiling for {}; denied", tool.as_str(), effect.as_str()),
-            Self::Canonicalization(message) => write!(f, "cannot bind tool authorization to effect/policy digest: {message}"),
-            Self::InvalidProviderCapability(message) => write!(f, "provider capability report is invalid: {message}"),
-            Self::ProviderOperationUnavailable { tool, reason } => write!(f, "provider reports {} unavailable: {reason}", tool.as_str()),
+            Self::MissingCatalogEntry(tool) => write!(
+                f,
+                "mobile tool {} has no effect entry; denied by default",
+                tool.as_str()
+            ),
+            Self::EffectExceedsCeiling { tool, effect } => write!(
+                f,
+                "mobile tool {} exceeds policy ceiling for {}; denied",
+                tool.as_str(),
+                effect.as_str()
+            ),
+            Self::Canonicalization(message) => write!(
+                f,
+                "cannot bind tool authorization to effect/policy digest: {message}"
+            ),
+            Self::InvalidProviderCapability(message) => {
+                write!(f, "provider capability report is invalid: {message}")
+            }
+            Self::ProviderOperationUnavailable { tool, reason } => write!(
+                f,
+                "provider reports {} unavailable: {reason}",
+                tool.as_str()
+            ),
         }
     }
 }
@@ -477,9 +613,8 @@ impl MobileProviderCapabilityReport {
             ));
         }
         if let Some(digest) = &self.provider_executable_sha256 {
-            validate_lowercase_sha256(digest).map_err(|message| {
-                ToolAuthorizationError::InvalidProviderCapability(message)
-            })?;
+            validate_lowercase_sha256(digest)
+                .map_err(|message| ToolAuthorizationError::InvalidProviderCapability(message))?;
         }
         if let Some(reason) = &self.reason {
             if reason.trim().is_empty() {
@@ -494,33 +629,34 @@ impl MobileProviderCapabilityReport {
         let mut unavailable_count = 0usize;
         for operation in &self.operations {
             if !seen.insert(operation.tool) {
-                return Err(ToolAuthorizationError::InvalidProviderCapability(
-                    format!("duplicate operation {}", operation.tool.as_str()),
-                ));
+                return Err(ToolAuthorizationError::InvalidProviderCapability(format!(
+                    "duplicate operation {}",
+                    operation.tool.as_str()
+                )));
             }
             let expected = mobile_tool_effect_entry(operation.tool)
                 .ok_or(ToolAuthorizationError::MissingCatalogEntry(operation.tool))?;
             if operation.effects != expected.effects
                 || operation.returns_target_content != expected.returns_target_content
             {
-                return Err(ToolAuthorizationError::InvalidProviderCapability(
-                    format!(
-                        "provider effect/target-content declaration differs from the canonical row for {}",
-                        operation.tool.as_str()
-                    ),
-                ));
+                return Err(ToolAuthorizationError::InvalidProviderCapability(format!(
+                    "provider effect/target-content declaration differs from the canonical row for {}",
+                    operation.tool.as_str()
+                )));
             }
             if operation.available {
                 available_count += 1;
             } else {
                 unavailable_count += 1;
-                if operation.reason.as_deref().is_none_or(|reason| reason.trim().is_empty()) {
-                    return Err(ToolAuthorizationError::InvalidProviderCapability(
-                        format!(
-                            "unavailable operation {} requires a reason",
-                            operation.tool.as_str()
-                        ),
-                    ));
+                if operation
+                    .reason
+                    .as_deref()
+                    .is_none_or(|reason| reason.trim().is_empty())
+                {
+                    return Err(ToolAuthorizationError::InvalidProviderCapability(format!(
+                        "unavailable operation {} requires a reason",
+                        operation.tool.as_str()
+                    )));
                 }
             }
         }
@@ -542,7 +678,10 @@ impl MobileProviderCapabilityReport {
             }
             ProviderAvailability::Unavailable => {
                 if available_count != 0
-                    || self.reason.as_deref().is_none_or(|reason| reason.trim().is_empty())
+                    || self
+                        .reason
+                        .as_deref()
+                        .is_none_or(|reason| reason.trim().is_empty())
                 {
                     return Err(ToolAuthorizationError::InvalidProviderCapability(
                         "unavailable provider requires a reason and cannot advertise an available operation".to_owned(),
@@ -550,7 +689,11 @@ impl MobileProviderCapabilityReport {
                 }
             }
             ProviderAvailability::Unknown => {
-                if self.reason.as_deref().is_none_or(|reason| reason.trim().is_empty()) {
+                if self
+                    .reason
+                    .as_deref()
+                    .is_none_or(|reason| reason.trim().is_empty())
+                {
                     return Err(ToolAuthorizationError::InvalidProviderCapability(
                         "unknown provider availability requires an explicit reason".to_owned(),
                     ));
@@ -602,7 +745,10 @@ pub fn authorize_reported_mobile_tool(
     if !operation.available {
         return Err(ToolAuthorizationError::ProviderOperationUnavailable {
             tool,
-            reason: operation.reason.clone().unwrap_or_else(|| "not available".to_owned()),
+            reason: operation
+                .reason
+                .clone()
+                .unwrap_or_else(|| "not available".to_owned()),
         });
     }
 
@@ -623,7 +769,9 @@ fn validate_lowercase_sha256(value: &str) -> Result<(), String> {
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
-        return Err("provider executable digest must be 64 lowercase hexadecimal characters".to_owned());
+        return Err(
+            "provider executable digest must be 64 lowercase hexadecimal characters".to_owned(),
+        );
     }
     Ok(())
 }
@@ -640,20 +788,58 @@ pub fn authorize_mobile_tool(
     policy_id: &str,
     ceiling: EffectCeiling,
 ) -> Result<ToolAuthorization, ToolAuthorizationError> {
-    let tool = MobileTool::parse(name).ok_or_else(|| ToolAuthorizationError::UnknownTool(name.to_owned()))?;
-    let entry = mobile_tool_effect_entry(tool).ok_or(ToolAuthorizationError::MissingCatalogEntry(tool))?;
+    let tool = MobileTool::parse(name)
+        .ok_or_else(|| ToolAuthorizationError::UnknownTool(name.to_owned()))?;
+    let entry =
+        mobile_tool_effect_entry(tool).ok_or(ToolAuthorizationError::MissingCatalogEntry(tool))?;
     let effects = entry.effects;
 
     for (active, allowed, flag) in [
-        (effects.mutates_target, ceiling.allow_mutates_target, EffectFlag::MutatesTarget),
-        (effects.mutates_session, ceiling.allow_mutates_session, EffectFlag::MutatesSession),
-        (effects.writes_filesystem, ceiling.allow_writes_filesystem, EffectFlag::WritesFilesystem),
-        (effects.launches_process, ceiling.allow_launches_process, EffectFlag::LaunchesProcess),
-        (effects.accesses_network, ceiling.allow_accesses_network, EffectFlag::AccessesNetwork),
-        (effects.changes_ui_state, ceiling.allow_changes_ui_state, EffectFlag::ChangesUiState),
-        (effects.may_discard_data, ceiling.allow_may_discard_data, EffectFlag::MayDiscardData),
-        (effects.executes_foreign_code, ceiling.allow_executes_foreign_code, EffectFlag::ExecutesForeignCode),
-        (effects.mutates_device, ceiling.allow_mutates_device, EffectFlag::MutatesDevice),
+        (
+            effects.mutates_target,
+            ceiling.allow_mutates_target,
+            EffectFlag::MutatesTarget,
+        ),
+        (
+            effects.mutates_session,
+            ceiling.allow_mutates_session,
+            EffectFlag::MutatesSession,
+        ),
+        (
+            effects.writes_filesystem,
+            ceiling.allow_writes_filesystem,
+            EffectFlag::WritesFilesystem,
+        ),
+        (
+            effects.launches_process,
+            ceiling.allow_launches_process,
+            EffectFlag::LaunchesProcess,
+        ),
+        (
+            effects.accesses_network,
+            ceiling.allow_accesses_network,
+            EffectFlag::AccessesNetwork,
+        ),
+        (
+            effects.changes_ui_state,
+            ceiling.allow_changes_ui_state,
+            EffectFlag::ChangesUiState,
+        ),
+        (
+            effects.may_discard_data,
+            ceiling.allow_may_discard_data,
+            EffectFlag::MayDiscardData,
+        ),
+        (
+            effects.executes_foreign_code,
+            ceiling.allow_executes_foreign_code,
+            EffectFlag::ExecutesForeignCode,
+        ),
+        (
+            effects.mutates_device,
+            ceiling.allow_mutates_device,
+            EffectFlag::MutatesDevice,
+        ),
     ] {
         if active && !allowed {
             return Err(ToolAuthorizationError::EffectExceedsCeiling { tool, effect: flag });
@@ -717,7 +903,10 @@ mod tests {
         assert_eq!(MOBILE_TOOL_EFFECTS.len(), MobileTool::ALL.len());
         for (index, tool) in MobileTool::ALL.iter().enumerate() {
             assert_eq!(
-                MOBILE_TOOL_EFFECTS.iter().filter(|entry| entry.tool == *tool).count(),
+                MOBILE_TOOL_EFFECTS
+                    .iter()
+                    .filter(|entry| entry.tool == *tool)
+                    .count(),
                 1,
                 "mobile catalog index {index} must contain {} once",
                 tool.as_str()
@@ -803,28 +992,35 @@ mod tests {
         assert!(!read.policy_sha256.is_empty());
     }
 
-    fn report(available_tools: &[MobileTool], unavailable_tools: &[MobileTool]) -> MobileProviderCapabilityReport {
-        let operations = available_tools.iter().map(|tool| {
-            let entry = mobile_tool_effect_entry(*tool).unwrap();
-            ProviderOperationCapability {
-                tool: *tool,
-                available: true,
-                reason: None,
-                effects: entry.effects,
-                returns_target_content: entry.returns_target_content,
-                limitations: vec!["bounded provider inspection".to_owned()],
-            }
-        }).chain(unavailable_tools.iter().map(|tool| {
-            let entry = mobile_tool_effect_entry(*tool).unwrap();
-            ProviderOperationCapability {
-                tool: *tool,
-                available: false,
-                reason: Some("required platform capability is absent".to_owned()),
-                effects: entry.effects,
-                returns_target_content: entry.returns_target_content,
-                limitations: vec!["operation unavailable for this provider build".to_owned()],
-            }
-        })).collect();
+    fn report(
+        available_tools: &[MobileTool],
+        unavailable_tools: &[MobileTool],
+    ) -> MobileProviderCapabilityReport {
+        let operations = available_tools
+            .iter()
+            .map(|tool| {
+                let entry = mobile_tool_effect_entry(*tool).unwrap();
+                ProviderOperationCapability {
+                    tool: *tool,
+                    available: true,
+                    reason: None,
+                    effects: entry.effects,
+                    returns_target_content: entry.returns_target_content,
+                    limitations: vec!["bounded provider inspection".to_owned()],
+                }
+            })
+            .chain(unavailable_tools.iter().map(|tool| {
+                let entry = mobile_tool_effect_entry(*tool).unwrap();
+                ProviderOperationCapability {
+                    tool: *tool,
+                    available: false,
+                    reason: Some("required platform capability is absent".to_owned()),
+                    effects: entry.effects,
+                    returns_target_content: entry.returns_target_content,
+                    limitations: vec!["operation unavailable for this provider build".to_owned()],
+                }
+            }))
+            .collect();
 
         MobileProviderCapabilityReport {
             provider_id: "rea.adb".to_owned(),
@@ -855,16 +1051,14 @@ mod tests {
 
     #[test]
     fn provider_availability_is_separate_from_policy_authority() {
-        let capability = report(
-            &[MobileTool::InspectAdbDevice],
-            &[MobileTool::PushAdbFile],
-        );
+        let capability = report(&[MobileTool::InspectAdbDevice], &[MobileTool::PushAdbFile]);
         let grant = authorize_reported_mobile_tool(
             "inspect_adb_device",
             &capability,
             MOBILE_DEVICE_READ_ONLY_POLICY_ID,
             EffectCeiling::MOBILE_DEVICE_READ_ONLY,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(grant.provider_id, "rea.adb");
         assert_eq!(grant.authorization.tool, MobileTool::InspectAdbDevice);
         assert!(!grant.capability_report_sha256.is_empty());
@@ -874,8 +1068,12 @@ mod tests {
             &capability,
             MOBILE_DEVICE_READ_ONLY_POLICY_ID,
             EffectCeiling::MOBILE_DEVICE_READ_ONLY,
-        ).unwrap_err();
-        assert!(matches!(denied, ToolAuthorizationError::ProviderOperationUnavailable { .. }));
+        )
+        .unwrap_err();
+        assert!(matches!(
+            denied,
+            ToolAuthorizationError::ProviderOperationUnavailable { .. }
+        ));
 
         // Even an available tool remains subject to the independent effect ceiling.
         let mut permissive_capability = report(&[MobileTool::PushAdbFile], &[]);
@@ -885,8 +1083,12 @@ mod tests {
             &permissive_capability,
             MOBILE_DEVICE_READ_ONLY_POLICY_ID,
             EffectCeiling::MOBILE_DEVICE_READ_ONLY,
-        ).unwrap_err();
-        assert!(matches!(denied, ToolAuthorizationError::EffectExceedsCeiling { .. }));
+        )
+        .unwrap_err();
+        assert!(matches!(
+            denied,
+            ToolAuthorizationError::EffectExceedsCeiling { .. }
+        ));
     }
 
     #[test]
@@ -899,7 +1101,8 @@ mod tests {
             &capability,
             MOBILE_DEVICE_READ_ONLY_POLICY_ID,
             EffectCeiling::MOBILE_DEVICE_READ_ONLY,
-        ).unwrap_err();
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             ToolAuthorizationError::ProviderOperationUnavailable { .. }
@@ -925,20 +1128,14 @@ mod tests {
 
     #[test]
     fn provider_report_requires_unavailable_reasons_and_preserves_limitations_order() {
-        let mut capability = report(
-            &[MobileTool::InspectAdbDevice],
-            &[MobileTool::PushAdbFile],
-        );
+        let mut capability = report(&[MobileTool::InspectAdbDevice], &[MobileTool::PushAdbFile]);
         capability.operations[1].reason = None;
         assert!(matches!(
             capability.validate(),
             Err(ToolAuthorizationError::InvalidProviderCapability(_))
         ));
 
-        let capability = report(
-            &[MobileTool::InspectAdbDevice],
-            &[MobileTool::PushAdbFile],
-        );
+        let capability = report(&[MobileTool::InspectAdbDevice], &[MobileTool::PushAdbFile]);
         assert_eq!(
             capability.limitations[0],
             "USB and network device transports are caller-managed"
