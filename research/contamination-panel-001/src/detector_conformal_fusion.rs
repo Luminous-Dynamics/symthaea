@@ -1176,15 +1176,32 @@ mod tests {
     }
 
     fn sample_request() -> DetectorConformalFusionRequestV1 {
+        let detector_specs = vec![
+            DetectorSpecV1 {
+                detector_id: "ftd".to_owned(),
+                direction: DetectorScoreDirectionV1::HigherMeansContaminated,
+                weight_permille: 500,
+                feature_contract_sha256: "c".repeat(64),
+            },
+            DetectorSpecV1 {
+                detector_id: "dvd".to_owned(),
+                direction: DetectorScoreDirectionV1::HigherMeansContaminated,
+                weight_permille: 500,
+                feature_contract_sha256: "d".repeat(64),
+            },
+        ];
+        let detector_registry_sha256 =
+            compute_detector_registry_sha256(&detector_specs).unwrap();
         DetectorConformalFusionRequestV1 {
             schema: CONFORMAL_FUSION_REQUEST_SCHEMA.to_owned(),
             study_id: "study-001".to_owned(),
             benchmark_id: "benchmark-001".to_owned(),
             benchmark_version: "v1".to_owned(),
             calibration_protocol_sha256: "a".repeat(64),
-            detector_registry_sha256: "b".repeat(64),
+            detector_registry_sha256,
             target_alpha_permille: 500,
             fusion_method_id: FUSION_METHOD_ID.to_owned(),
+            detector_specs,
             calibration_a: vec![
                 row("a-1", 0.1, 0.1, "mathematics", "qwen-rlvr"),
                 row("a-2", 0.2, 0.2, "mathematics", "qwen-rlvr"),
@@ -1202,6 +1219,77 @@ mod tests {
                 evaluation_row("t-2", 0.2, 0.2, Some(false)),
             ],
         }
+    }
+
+    #[test]
+    fn detector_registry_digest_binds_ids_directions_weights_and_contracts() {
+        let request = sample_request();
+        assert_eq!(
+            compute_detector_registry_sha256(&request.detector_specs).unwrap(),
+            request.detector_registry_sha256
+        );
+        let mut changed = request.detector_specs.clone();
+        changed[0].weight_permille = 400;
+        assert_ne!(
+            compute_detector_registry_sha256(&changed).unwrap(),
+            request.detector_registry_sha256
+        );
+    }
+
+    #[test]
+    fn detector_weights_must_be_fixed_and_sum_to_one_thousand() {
+        let mut request = sample_request();
+        request.detector_specs[0].weight_permille = 400;
+        request.detector_registry_sha256 =
+            compute_detector_registry_sha256(&request.detector_specs).unwrap();
+        assert!(calibrate_detector_panel(&request).is_err());
+    }
+
+    #[test]
+    fn benjamini_yekutieli_adjustment_handles_arbitrary_dependence_conservatively() {
+        let p = vec![
+            ("p1".to_owned(), 0.01),
+            ("p2".to_owned(), 0.03),
+            ("p3".to_owned(), 0.04),
+        ];
+        let adjusted = benjamini_yekutieli_adjusted_p_values(&p).unwrap();
+        assert!((adjusted["p1"] - 0.055).abs() < 1.0e-12);
+        assert!((adjusted["p2"] - (0.04 * 5.5 / 3.0)).abs() < 1.0e-12);
+        assert!((adjusted["p3"] - (0.04 * 5.5 / 3.0)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn spearman_rank_correlation_is_one_for_identical_detector_orderings() {
+        let rho = spearman_rank_correlation(&[1.0, 2.0, 2.0, 4.0], &[10.0, 20.0, 20.0, 40.0]);
+        assert!((rho.unwrap() - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn constant_detector_scores_report_undefined_rank_correlation() {
+        assert!(spearman_rank_correlation(&[1.0, 1.0, 1.0], &[2.0, 2.0, 2.0]).is_none());
+    }
+
+    #[test]
+    fn weighted_fusion_preserves_pvalue_contributions() {
+        let report = calibrate_detector_panel(&sample_request()).unwrap();
+        for row in &report.score_rows {
+            if row.detector_p_values.len() == 2 {
+                let total_weight: u16 = row.detector_p_values.iter().map(|p| p.weight_permille).sum();
+                assert_eq!(total_weight, 1_000);
+                let sum: f64 = row.detector_p_values.iter().map(|p| p.weighted_contribution).sum();
+                assert!((sum - row.fused_nonconformity.unwrap()).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn report_applies_by_adjustment_and_records_calibration_manifests() {
+        let report = calibrate_detector_panel(&sample_request()).unwrap();
+        assert_eq!(report.multiple_testing_method, "benjamini_yekutieli");
+        assert!(report.fdr_control_conditional_on_exchangeability);
+        assert_eq!(report.calibration_a_manifest_sha256.len(), 64);
+        assert_eq!(report.calibration_b_manifest_sha256.len(), 64);
+        assert_eq!(report.evaluation_manifest_sha256.len(), 64);
     }
 
     #[test]
