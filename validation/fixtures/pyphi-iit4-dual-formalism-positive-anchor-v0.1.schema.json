@@ -240,6 +240,8 @@
         "effect_phi",
         "effect_signed_phi",
         "intrinsic_information",
+        "cause_intrinsic_specification",
+        "effect_intrinsic_specification",
         "intrinsic_differentiation",
         "cause_state",
         "effect_state",
@@ -286,6 +288,14 @@
             "number",
             "null"
           ],
+          "minimum": 0
+        },
+        "cause_intrinsic_specification": {
+          "type": "number",
+          "minimum": 0
+        },
+        "effect_intrinsic_specification": {
+          "type": "number",
           "minimum": 0
         },
         "intrinsic_differentiation": {
