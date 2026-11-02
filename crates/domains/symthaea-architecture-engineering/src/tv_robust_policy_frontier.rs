@@ -151,6 +151,12 @@ impl TvAmbiguityEnvelope {
             self.alternative_family_coverage_failure_probability,
             "envelope.alternative_family_coverage_failure_probability",
         )?;
+        if self.alternative_family_coverage_failure_probability >= 1.0 {
+            return Err(TvRobustnessError::new(
+                "envelope.alternative_family_coverage_failure_probability",
+                "alternative-family coverage failure must be strictly smaller than one",
+            ));
+        }
         if !self.calibration_independent_of_confirmatory_stream {
             return Err(TvRobustnessError::new(
                 "envelope.calibration_independent_of_confirmatory_stream",
@@ -547,7 +553,12 @@ mod tests {
         let uncertainty = envelope(&plan);
         let report = analyze_tv_robust_policy_frontier(&plan, &uncertainty).unwrap();
         assert!((report.conditional_significance_level - (0.05 - 0.0025) / 0.9975).abs() < 1e-12);
-        assert!(report.frontier.null_model_sizes.iter().any(|row| (row.null_size - 0.025).abs() < 1e-10));
+        let null_a = report.frontier.null_model_sizes.iter()
+            .find(|row| row.model_id == "null-a").unwrap().null_size;
+        let null_b = report.frontier.null_model_sizes.iter()
+            .find(|row| row.model_id == "null-b").unwrap().null_size;
+        assert!((0.020 - TOLERANCE..=0.022 + TOLERANCE).contains(&null_a));
+        assert!((0.030 - TOLERANCE..=0.035 + TOLERANCE).contains(&null_b));
         assert!(report.frontier.alternatives.iter().all(|row| row.rejection_power >= 0.0));
         assert!(report.worst_case_unconditional_type_i_upper_bound <= 0.05 + TOLERANCE);
         verify_tv_robust_policy_frontier_report(&plan, &uncertainty, &report).unwrap();
