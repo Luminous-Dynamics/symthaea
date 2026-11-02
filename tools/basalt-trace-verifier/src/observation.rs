@@ -543,10 +543,35 @@ fn validate_observation_envelope(
         }
 
         let outcome = operation.outcome.as_deref().unwrap_or("");
+        if ![
+            "committed",
+            "duplicate",
+            "compare_conflict",
+            "indeterminate",
+            "retryable_abort",
+            "receipt_found",
+            "restore_verified",
+            "rejected_anti_rollback_unknown",
+            "rejected_anti_rollback",
+        ]
+        .contains(&outcome)
+        {
+            errors.push(format!("{} has an unsupported observed outcome", operation.op_id));
+        }
         if outcome == "indeterminate" {
             if !responses.is_empty() {
                 errors.push(format!(
                     "{} is indeterminate but has a definite response event",
+                    operation.op_id
+                ));
+            }
+            if !observation.observed_faults.iter().any(|fault| {
+                fault.target_op_id == operation.op_id
+                    && fault.applied
+                    && fault.fault_class == "response_loss"
+            }) {
+                errors.push(format!(
+                    "{} is indeterminate without an applied response_loss fault",
                     operation.op_id
                 ));
             }
@@ -714,6 +739,7 @@ fn validate_observation_envelope(
     let mut incomplete_retry_groups = Vec::new();
     let mut retry_groups_validated = 0usize;
     for (group_id, mut attempts) in retry_groups {
+        let errors_before_group = errors.len();
         attempts.sort_by_key(|operation| operation.transaction_attempt.unwrap_or(u64::MAX));
         if attempts.len() < 2 {
             incomplete_retry_groups.push(group_id.clone());
@@ -813,9 +839,16 @@ fn validate_observation_envelope(
                 ));
             }
         }
-        if errors.is_empty() || !errors.iter().any(|error| error.contains(&group_id)) {
+        if errors.len() == errors_before_group {
             retry_groups_validated += 1;
         }
+    }
+
+    if observation.raw_events.is_empty() {
+        errors.push("observation contains no raw events".to_string());
+    }
+    if !valid_sha256(&observation.raw_event_log_sha256) {
+        errors.push("raw_event_log_sha256 is malformed".to_string());
     }
 
     let computed_digest = match raw_event_log_digest(&observation.raw_events) {
