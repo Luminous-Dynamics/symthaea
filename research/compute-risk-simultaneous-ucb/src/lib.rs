@@ -315,6 +315,13 @@ pub fn evaluate_trajectory(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RiskFailureAllocation {
+    /// Exact Bonferroni allocation is numerator_ppm / denominator.
+    pub numerator_ppm: u32,
+    pub denominator: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateRiskReceipt {
     pub candidate_id: String,
     pub trajectory_count: usize,
@@ -334,8 +341,8 @@ pub struct CandidateRiskReceipt {
     pub mean_normalized_compute_ppm: u32,
     pub mean_upper_efficiency_regret_ppm: u32,
     pub mean_lower_efficiency_regret_ppm: u32,
-    pub upper_ucb_failure_allocation_ppm: u32,
-    pub lower_ucb_failure_allocation_ppm: u32,
+    pub upper_ucb_failure_allocation: RiskFailureAllocation,
+    pub lower_ucb_failure_allocation: RiskFailureAllocation,
     pub outcome_digest_sha256: String,
 }
 
@@ -494,8 +501,14 @@ pub fn evaluate_candidate_grid(
             mean_normalized_compute_ppm: mean_ppm(compute_sum, n)?,
             mean_upper_efficiency_regret_ppm: mean_ppm(upper_efficiency_sum, n)?,
             mean_lower_efficiency_regret_ppm: mean_ppm(lower_efficiency_sum, n)?,
-            upper_ucb_failure_allocation_ppm: fixture.statistical_delta_ppm / ((2 * m) as u32),
-            lower_ucb_failure_allocation_ppm: fixture.statistical_delta_ppm / ((2 * m) as u32),
+            upper_ucb_failure_allocation: RiskFailureAllocation {
+                numerator_ppm: fixture.statistical_delta_ppm,
+                denominator: (2 * m) as u32,
+            },
+            lower_ucb_failure_allocation: RiskFailureAllocation {
+                numerator_ppm: fixture.statistical_delta_ppm,
+                denominator: (2 * m) as u32,
+            },
             outcome_digest_sha256: outcome_digest,
         });
     }
@@ -637,7 +650,7 @@ mod tests {
         assert!(selected.risk_feasible);
         assert!(selected.upper_risk_ucb_ppm <= fixture.upper_risk_budget_ppm);
         assert!(selected.lower_risk_ucb_ppm <= fixture.lower_risk_budget_ppm);
-        assert_eq!(selected.upper_risk_ucb_ppm,216_885);
+        assert_eq!(selected.upper_risk_ucb_ppm,216_886);
         assert_eq!(selected.lower_risk_ucb_ppm,127_042);
     }
 
@@ -716,7 +729,7 @@ mod tests {
         let radii: BTreeSet<u32> = report.candidate_receipts.iter().map(|x|x.simultaneous_ucb_radius_ppm).collect();
         assert_eq!(radii.len(),1);
         assert_eq!(radii.first().copied(),Some(70_401));
-        assert!(report.candidate_receipts.iter().all(|x|x.upper_ucb_failure_allocation_ppm==6_250));
-        assert!(report.candidate_receipts.iter().all(|x|x.lower_ucb_failure_allocation_ppm==6_250));
+        assert!(report.candidate_receipts.iter().all(|x|x.upper_ucb_failure_allocation.numerator_ppm==50_000 && x.upper_ucb_failure_allocation.denominator==8));
+        assert!(report.candidate_receipts.iter().all(|x|x.lower_ucb_failure_allocation.numerator_ppm==50_000 && x.lower_ucb_failure_allocation.denominator==8));
     }
 }
