@@ -378,7 +378,36 @@
             "decision": {
               "$ref": "#/$defs/decision"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "event_type": {
+                    "const": "EDIT"
+                  }
+                },
+                "required": [
+                  "event_type"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "decision": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "COMMITTED",
+                          "REJECTED",
+                          "QUARANTINED"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
         },
         {
           "type": "object",
@@ -403,7 +432,36 @@
             "decision": {
               "$ref": "#/$defs/decision"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "event_type": {
+                    "const": "ROLLBACK"
+                  }
+                },
+                "required": [
+                  "event_type"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "decision": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "ROLLED_BACK",
+                          "REJECTED",
+                          "QUARANTINED"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
         }
       ]
     }
