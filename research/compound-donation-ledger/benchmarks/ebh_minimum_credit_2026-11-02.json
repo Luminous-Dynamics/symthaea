@@ -1,0 +1,27 @@
+{
+  "benchmark": "ebh_minimum_credit_exact_rational",
+  "scope": "Deterministic e-BH allocation calculation only; not e-process validity, FDR/SupFDR, or statistical power.",
+  "algorithm": "O(n log n) batch feasible-rank calculation plus per-candidate predecessor search",
+  "arithmetic": "fractions.Fraction exact",
+  "local_microcheck": {
+    "optimized_batch_vs_breakpoint_oracle_comparisons": 15936,
+    "exhaustive_dimensions": [1, 2, 3, 4],
+    "exhaustive_score_grid": ["0", "1", "2", "3", "4"],
+    "random_dimensions": "20 random vector sizes between 5 and 100",
+    "alphas": ["1/2", "1/3", "1/5", "1/10"],
+    "result": "all optimized minimum-credit amounts matched brute-force breakpoint search"
+  },
+  "committed_test_suite": {
+    "exhaustive_comparisons": 11720,
+    "randomized_comparisons": 72000,
+    "additional": [
+      "tie-boundary e-BH behavior",
+      "feasible-rank characterization",
+      "exact source-before-destination bank split",
+      "insufficient bank leaves state unchanged",
+      "fundable-recipient selection"
+    ],
+    "note": "The full committed unittest suite has been authored; it was not run as a Rust or CI test."
+  },
+  "claim_boundary": "No stochastic FDR experiment, Rust performance measurement, power-optimality or SOTA claim."
+}
