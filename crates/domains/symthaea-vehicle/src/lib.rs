@@ -84,6 +84,7 @@ pub mod plugin;
 pub mod reward;
 pub mod road;
 pub mod runtime_assurance;
+pub mod scenario_discovery;
 pub mod scenarios;
 pub mod simulator;
 pub mod subterranean;
@@ -98,6 +99,10 @@ pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepRes
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
 pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
 pub use road::{Road, RoadSegment};
+pub use scenario_discovery::{
+    CrossingActor, IntersectionGenerationError, IntersectionScenarioCandidate,
+    ScenarioRangeSemantics, generate_stratified_intersection_candidates,
+};
 pub use runtime_assurance::{
     VehicleRtaConfig, VehicleRtaDecision, VehicleRtaError, VehicleRtaMode, VehicleRtaObservation,
     VehicleRtaReason, VehicleRtaWitness, VehicleRuntimeAssurance,
