@@ -1306,6 +1306,89 @@ mod tests {
     }
 
     #[test]
+    fn minimax_regret_prefers_robust_shared_policy_over_scenario_weighted_bayes_policy() {
+        let scenarios = vec![
+            scenario("nominal", 0.9, vec![matrix("probe", 0.9, 0.1)]),
+            scenario("shifted", 0.1, vec![matrix("probe", 0.1, 0.9)]),
+        ];
+
+        let bayes = plan_next_experiment_decision_aware(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe")],
+            &scenarios,
+            &decisions(),
+            DecisionAwareConfig {
+                minimum_decision_stability: 0.0,
+                ranking_policy: DecisionRankingPolicy::ExpectedEvsi,
+                ..DecisionAwareConfig::default()
+            },
+        )
+        .unwrap()
+        .selected
+        .unwrap();
+        assert_eq!(
+            bayes.shared_policy.iter().map(|item| item.decision_id.as_str()).collect::<Vec<_>>(),
+            vec!["remediate-a", "remediate-b"]
+        );
+
+        let minimax_plan = plan_next_experiment_decision_aware(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe")],
+            &scenarios,
+            &decisions(),
+            DecisionAwareConfig {
+                minimum_decision_stability: 0.0,
+                ranking_policy: DecisionRankingPolicy::MinimaxRegret,
+                ..DecisionAwareConfig::default()
+            },
+        )
+        .unwrap();
+        let minimax = minimax_plan.selected.unwrap();
+        assert_eq!(
+            minimax.shared_policy.iter().map(|item| item.decision_id.as_str()).collect::<Vec<_>>(),
+            vec!["remediate-a", "remediate-a"],
+            "exact minimax regret uses deterministic lexical tie-breaking"
+        );
+        assert!(
+            minimax.worst_case_shared_policy_regret < bayes.worst_case_shared_policy_regret,
+            "minimax policy must reduce maximum scenario regret"
+        );
+        assert!((minimax.expected_evsi - bayes.expected_evsi).abs() < 1e-12);
+        assert!((minimax.worst_case_shared_policy_regret - 0.45).abs() < 1e-12);
+        assert!((minimax.decision_stability - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn minimax_policy_search_abstains_when_exact_search_exceeds_declared_cap() {
+        let plan = plan_next_experiment_decision_aware(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe")],
+            &[scenario("nominal", 1.0, vec![matrix("probe", 0.9, 0.1)])],
+            &decisions(),
+            DecisionAwareConfig {
+                minimum_decision_stability: 0.0,
+                ranking_policy: DecisionRankingPolicy::MinimaxRegret,
+                max_policy_evaluations: 3,
+                ..DecisionAwareConfig::default()
+            },
+        )
+        .unwrap();
+
+        assert!(plan.selected.is_none());
+        assert_eq!(
+            plan.abstention,
+            Some(DecisionAbstentionReason::PolicySearchBudgetExceeded)
+        );
+        assert_eq!(
+            plan.rejected_experiments[0].reasons,
+            vec![DecisionRejectionReason::PolicySearchBudgetExceeded]
+        );
+    }
+
+    #[test]
     fn rejects_when_shared_policy_regret_exceeds_limit() {
         let scenarios = vec![
             scenario("world-a", 0.5, vec![matrix("probe", 0.9, 0.1)]),
