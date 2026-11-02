@@ -51,11 +51,19 @@ pub struct PolicyAlternativeReceipt {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct PolicyNullModelReceipt {
+    pub model_id: String,
+    pub null_size: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeterministicPolicyReceipt {
     pub policy_id: String,
     /// Hash of the utility definition and weights used to calculate utilities.
     pub utility_contract_sha256: String,
-    pub null_size: f64,
+    /// A separate type-I error size under every declared null model.
+    pub null_models: Vec<PolicyNullModelReceipt>,
     pub alternatives: Vec<PolicyAlternativeReceipt>,
 }
 
@@ -93,6 +101,8 @@ impl TwoPolicyMixturePlan {
     }
 
     pub fn canonicalize(&mut self) -> Result<(), PolicyMixtureError> {
+        self.policy_a.null_models.sort_by(|a, b| a.model_id.cmp(&b.model_id));
+        self.policy_b.null_models.sort_by(|a, b| a.model_id.cmp(&b.model_id));
         self.policy_a.alternatives.sort_by(|a, b| a.model_id.cmp(&b.model_id));
         self.policy_b.alternatives.sort_by(|a, b| a.model_id.cmp(&b.model_id));
         self.validate()
@@ -142,8 +152,8 @@ impl TwoPolicyMixturePlan {
                 "both policy receipts must use the same utility definition",
             ));
         }
-        validate_probability(self.policy_a.null_size, "plan.policy_a.null_size")?;
-        validate_probability(self.policy_b.null_size, "plan.policy_b.null_size")?;
+        validate_null_receipts(&self.policy_a, "plan.policy_a")?;
+        validate_null_receipts(&self.policy_b, "plan.policy_b")?;
         validate_alternative_receipts(&self.policy_a, "plan.policy_a")?;
         validate_alternative_receipts(&self.policy_b, "plan.policy_b")?;
 
@@ -165,6 +175,16 @@ impl TwoPolicyMixturePlan {
                 "policy receipts must contain identical alternative model IDs",
             ));
         }
+        let nulls_a = self.policy_a.null_models.iter()
+            .map(|row| row.model_id.as_str()).collect::<BTreeSet<_>>();
+        let nulls_b = self.policy_b.null_models.iter()
+            .map(|row| row.model_id.as_str()).collect::<BTreeSet<_>>();
+        if nulls_a != nulls_b {
+            return Err(PolicyMixtureError::new(
+                "plan.null_models",
+                "policy receipts must contain identical null model IDs",
+            ));
+        }
         Ok(())
     }
 
@@ -173,6 +193,42 @@ impl TwoPolicyMixturePlan {
         canonical.canonicalize()?;
         digest(&canonical)
     }
+}
+
+fn validate_null_receipts(
+    policy: &DeterministicPolicyReceipt,
+    path: &str,
+) -> Result<(), PolicyMixtureError> {
+    if policy.null_models.is_empty() {
+        return Err(PolicyMixtureError::new(
+            format!("{path}.null_models"),
+            "null model size vector cannot be empty",
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for (index, row) in policy.null_models.iter().enumerate() {
+        let row_path = format!("{path}.null_models[{index}]");
+        if row.model_id.trim().is_empty() || !seen.insert(row.model_id.as_str()) {
+            return Err(PolicyMixtureError::new(
+                format!("{row_path}.model_id"),
+                "null model IDs must be non-empty and unique",
+            ));
+        }
+        validate_probability(row.null_size, &format!("{row_path}.null_size"))?;
+    }
+    Ok(())
+}
+
+fn null_row<'a>(
+    policy: &'a DeterministicPolicyReceipt,
+    model_id: &str,
+) -> Result<&'a PolicyNullModelReceipt, PolicyMixtureError> {
+    policy.null_models.iter()
+        .find(|row| row.model_id == model_id)
+        .ok_or_else(|| PolicyMixtureError::new(
+            "plan.null_models",
+            format!("policy {} is missing null model {model_id}", policy.policy_id),
+        ))
 }
 
 fn validate_alternative_receipts(
@@ -241,6 +297,13 @@ fn validate_nonnegative(value: f64, path: &str) -> Result<(), PolicyMixtureError
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct MixedNullModelSize {
+    pub model_id: String,
+    pub null_size: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MixedAlternativeEvaluation {
     pub model_id: String,
     pub rejection_power: f64,
@@ -261,7 +324,8 @@ pub struct TwoPolicyMixtureReport {
     pub mixture_entropy_nats: f64,
     pub candidate_probability_count: usize,
     pub feasible_probability_count: usize,
-    pub mixed_null_size: f64,
+    pub worst_case_null_size: f64,
+    pub null_model_sizes: Vec<MixedNullModelSize>,
     pub worst_case_rejection_power: f64,
     pub worst_case_decision_utility: f64,
     pub maximum_expected_evaluator_cost: f64,
@@ -281,7 +345,8 @@ struct ReportPayload<'a> {
     mixture_entropy_nats: f64,
     candidate_probability_count: usize,
     feasible_probability_count: usize,
-    mixed_null_size: f64,
+    worst_case_null_size: f64,
+    null_model_sizes: &'a [MixedNullModelSize],
     worst_case_rejection_power: f64,
     worst_case_decision_utility: f64,
     maximum_expected_evaluator_cost: f64,
@@ -292,7 +357,8 @@ struct ReportPayload<'a> {
 #[derive(Debug, Clone)]
 struct MixtureCandidate {
     q: f64,
-    null_size: f64,
+    worst_null_size: f64,
+    null_model_sizes: Vec<MixedNullModelSize>,
     worst_power: f64,
     worst_utility: f64,
     maximum_cost: f64,
@@ -339,12 +405,16 @@ fn candidate_probabilities(
         }
     }
 
-    let null_delta = plan.policy_a.null_size - plan.policy_b.null_size;
-    if null_delta.abs() > OBJECTIVE_TOLERANCE {
-        add_candidate(
-            &mut candidates,
-            (plan.significance_level - plan.policy_b.null_size) / null_delta,
-        );
+    for null_model in &plan.policy_a.null_models {
+        let size_a = null_model.null_size;
+        let size_b = null_row(&plan.policy_b, &null_model.model_id)?.null_size;
+        let null_delta = size_a - size_b;
+        if null_delta.abs() > OBJECTIVE_TOLERANCE {
+            add_candidate(
+                &mut candidates,
+                (plan.significance_level - size_b) / null_delta,
+            );
+        }
     }
     if let Some(cap) = plan.maximum_expected_cost {
         for model in &plan.policy_a.alternatives {
@@ -366,7 +436,16 @@ fn evaluate_mixture(
     plan: &TwoPolicyMixturePlan,
     q: f64,
 ) -> Result<MixtureCandidate, PolicyMixtureError> {
-    let p0 = q * plan.policy_a.null_size + (1.0 - q) * plan.policy_b.null_size;
+    let null_model_sizes = plan.policy_a.null_models.iter().map(|row_a| {
+        let row_b = null_row(&plan.policy_b, &row_a.model_id)?;
+        Ok(MixedNullModelSize {
+            model_id: row_a.model_id.clone(),
+            null_size: q * row_a.null_size + (1.0 - q) * row_b.null_size,
+        })
+    }).collect::<Result<Vec<_>, PolicyMixtureError>>()?;
+    let worst_null_size = null_model_sizes.iter()
+        .map(|row| row.null_size)
+        .fold(0.0_f64, f64::max);
     let mut alternatives = Vec::with_capacity(plan.policy_a.alternatives.len());
     let mut worst_power = f64::INFINITY;
     let mut worst_utility = f64::INFINITY;
@@ -387,7 +466,7 @@ fn evaluate_mixture(
             decision_utility: utility,
         });
     }
-    if !p0.is_finite() || !worst_power.is_finite()
+    if !worst_null_size.is_finite() || !worst_power.is_finite()
         || !worst_utility.is_finite() || !maximum_cost.is_finite()
     {
         return Err(PolicyMixtureError::new(
@@ -397,7 +476,8 @@ fn evaluate_mixture(
     }
     Ok(MixtureCandidate {
         q,
-        null_size: p0,
+        worst_null_size,
+        null_model_sizes,
         worst_power,
         worst_utility,
         maximum_cost,
@@ -418,10 +498,10 @@ fn better_candidate(candidate: &MixtureCandidate, incumbent: &MixtureCandidate) 
     if (candidate.maximum_cost - incumbent.maximum_cost).abs() > OBJECTIVE_TOLERANCE {
         return false;
     }
-    if candidate.null_size < incumbent.null_size - OBJECTIVE_TOLERANCE {
+    if candidate.worst_null_size < incumbent.worst_null_size - OBJECTIVE_TOLERANCE {
         return true;
     }
-    if (candidate.null_size - incumbent.null_size).abs() > OBJECTIVE_TOLERANCE {
+    if (candidate.worst_null_size - incumbent.worst_null_size).abs() > OBJECTIVE_TOLERANCE {
         return false;
     }
     candidate.q < incumbent.q
@@ -438,7 +518,7 @@ pub fn analyze_two_policy_mixture(
 
     for q in &candidates {
         let candidate = evaluate_mixture(&plan, *q)?;
-        if candidate.null_size > plan.significance_level + PROBABILITY_TOLERANCE {
+        if candidate.worst_null_size > plan.significance_level + PROBABILITY_TOLERANCE {
             continue;
         }
         if plan.maximum_expected_cost.is_some_and(|cap| {
@@ -473,11 +553,12 @@ pub fn analyze_two_policy_mixture(
         mixture_entropy_nats: entropy,
         candidate_probability_count: candidates.len(),
         feasible_probability_count: feasible_count,
-        mixed_null_size: best.null_size,
+        worst_case_null_size: best.worst_null_size,
+        null_model_sizes: &best.null_model_sizes,
         worst_case_rejection_power: best.worst_power,
         worst_case_decision_utility: best.worst_utility,
         maximum_expected_evaluator_cost: best.maximum_cost,
-        remaining_alpha_budget: plan.significance_level - best.null_size,
+        remaining_alpha_budget: plan.significance_level - best.worst_null_size,
         alternatives: &best.alternatives,
     };
     let report_sha256 = digest(&payload)?;
@@ -491,7 +572,8 @@ pub fn analyze_two_policy_mixture(
         mixture_entropy_nats: entropy,
         candidate_probability_count: candidates.len(),
         feasible_probability_count: feasible_count,
-        mixed_null_size: best.null_size,
+        worst_case_null_size: best.worst_null_size,
+        null_model_sizes: best.null_model_sizes,
         worst_case_rejection_power: best.worst_power,
         worst_case_decision_utility: best.worst_utility,
         maximum_expected_evaluator_cost: best.maximum_cost,
@@ -645,7 +727,7 @@ mod tests {
         assert_eq!(report, analyze_two_policy_mixture(&reordered).unwrap());
 
         let mut altered = report.clone();
-        altered.mixed_null_size += 0.01;
+        altered.worst_case_null_size += 0.01;
         assert!(verify_two_policy_mixture_report(&plan, &altered).is_err());
     }
 }
