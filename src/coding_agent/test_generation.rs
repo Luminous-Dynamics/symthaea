@@ -3,9 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Self-Test Generation — Agent Writes Its Own Tests
 //!
-//! Generates `#[test]` modules from function signatures and docstrings.
-//! This enables the coding agent to validate its own output without
-//! relying on externally provided test suites.
+//! Generates example-based assertions and conservative invocation smoke checks.
+//!
+//! A generated call is not a behavioral oracle: it can establish that a call
+//! shape compiles and that the candidate does not panic for one input, but it
+//! cannot establish the requested result without an independent expected value.
 //!
 //! ```text
 //! Function signature: fn fibonacci(n: u64) -> u64
@@ -22,8 +24,8 @@
 //! }
 //! ```
 //!
-//! No LLM can do this natively — it requires understanding function semantics
-//! well enough to derive test cases, not just pattern-match from training data.
+//! Return types alone do not specify behavior. This generator therefore does
+//! not invent Property/Result/Option assertions without an independent oracle.
 
 use symthaea_core::synthesis_trait::SynthesisRequest;
 
@@ -36,6 +38,17 @@ pub struct GeneratedTest {
     pub assertion: String,
     /// Category of this test
     pub category: TestCategory,
+    /// Provenance and strength of the oracle; smoke checks are not correctness proofs.
+    pub oracle_kind: TestOracleKind,
+}
+
+/// Provenance of the assertion/oracle attached to a generated test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestOracleKind {
+    /// Explicit input/output pair supplied with the synthesis request.
+    ProvidedExample,
+    /// Type-derived input only; checks invocation/compilation, not expected behavior.
+    TypeDerivedInvocationSmoke,
 }
 
 /// Category of generated test — informs which testing patterns to use.
@@ -43,11 +56,12 @@ pub struct GeneratedTest {
 pub enum TestCategory {
     /// Derived from user-provided examples
     Example,
-    /// Boundary values (0, 1, empty, max)
+    /// Type-derived boundary input. This category is an invocation smoke check,
+    /// not a specification-backed assertion about the returned value.
     Boundary,
-    /// Property-based (e.g., output type, non-negative, idempotent)
+    /// Reserved for future properties supplied with an independent specification.
     Property,
-    /// Error handling (invalid inputs, overflow)
+    /// Reserved for future error cases supplied with an independent specification.
     ErrorCase,
 }
 
@@ -75,12 +89,13 @@ impl TestGenerator {
     pub fn generate(request: &SynthesisRequest) -> GeneratedTestSuite {
         let mut tests = Vec::new();
 
-        // 1. Example-based tests
+        // 1. Example-based tests with explicitly supplied expected values
         for (i, (input, expected)) in request.examples.iter().enumerate() {
             tests.push(GeneratedTest {
                 name: format!("test_{}_example_{}", request.name, i),
                 assertion: format!("assert_eq!({}, {});", input, expected),
                 category: TestCategory::Example,
+                oracle_kind: TestOracleKind::ProvidedExample,
             });
         }
 
@@ -90,12 +105,9 @@ impl TestGenerator {
             tests.extend(boundary_tests);
         }
 
-        // 3. Property tests (inferred from return type)
-        if let Some(ref sig) = request.signature {
-            let property_tests = Self::generate_property_tests(&request.name, sig);
-            tests.extend(property_tests);
-        }
-
+        // 3. Do not infer behavioral properties from return types alone.
+        // An Option<T> result does not imply that None is expected, and bool or
+        // Result<T, E> does not supply valid arguments or an expected outcome.
         // Build the test module source
         let source = Self::render_test_module(&request.name, &tests);
 
@@ -106,129 +118,49 @@ impl TestGenerator {
         }
     }
 
-    /// Generate boundary value tests from a function signature.
+    /// Generate conservative invocation smoke checks using known boundary inputs.
+    ///
+    /// Every non-target argument must have an explicit, known literal constructor.
+    /// Unknown types are skipped rather than guessed with `Default::default()`.
+    /// These calls do not assert return-value semantics.
     fn generate_boundary_tests(fn_name: &str, signature: &str) -> Vec<GeneratedTest> {
         let mut tests = Vec::new();
-
-        // Parse parameter types from signature
         let params = Self::extract_param_types(signature);
 
         for (param_name, param_type) in &params {
-            match param_type.as_str() {
+            let cases: &[(&str, &str)] = match param_type.as_str() {
                 "u8" | "u16" | "u32" | "u64" | "usize" => {
-                    // Unsigned integer boundaries: 0, 1
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_zero"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "0")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_one"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "1")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
+                    &[("zero", "0"), ("one", "1")]
                 }
                 "i8" | "i16" | "i32" | "i64" | "isize" => {
-                    // Signed integer boundaries: -1, 0, 1
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_negative"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "-1")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_zero"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "0")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
+                    &[("negative", "-1"), ("zero", "0")]
                 }
-                "f32" | "f64" => {
-                    // Float boundaries: 0.0, -0.0, very small
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_zero"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "0.0")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                t if t.starts_with("&str") || t.starts_with("&String") || t == "String" => {
-                    // String boundaries: empty, single char
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_empty"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "\"\"")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                t if t.contains("Vec<") || t.contains("&[") => {
-                    // Collection boundaries: empty
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_empty"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "&[]")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                _ => {}
-            }
-        }
+                "f32" => &[("zero", "0.0f32")],
+                "f64" => &[("zero", "0.0f64")],
+                "&str" => &[("empty", "\"\"\"")],
+                "&String" => &[("empty", "&String::new()")],
+                "String" => &[("empty", "String::new()")],
+                t if t.starts_with("&[") => &[("empty", "&[]")],
+                t if t.starts_with("&Vec<") => &[("empty", "&Vec::new()")],
+                t if t.starts_with("Vec<") => &[("empty", "vec![]")],
+                _ => continue,
+            };
 
-        tests
-    }
+            for (suffix, value) in cases {
+                let Some(arguments) =
+                    Self::make_call_with_value(&params, param_name, value)
+                else {
+                    // At least one other parameter has no known safe constructor.
+                    continue;
+                };
 
-    /// Generate property-based tests from return type.
-    fn generate_property_tests(fn_name: &str, signature: &str) -> Vec<GeneratedTest> {
-        let mut tests = Vec::new();
-
-        let return_type = Self::extract_return_type(signature);
-
-        match return_type.as_deref() {
-            Some("bool") => {
-                // Boolean return: test that it returns a bool (type check)
                 tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_returns_bool"),
-                    assertion: format!(
-                        "let result: bool = {fn_name}(Default::default()); let _ = result;"
-                    ),
-                    category: TestCategory::Property,
+                    name: format!("test_{fn_name}_boundary_{param_name}_{suffix}"),
+                    assertion: format!("let _ = {fn_name}({arguments});"),
+                    category: TestCategory::Boundary,
+                    oracle_kind: TestOracleKind::TypeDerivedInvocationSmoke,
                 });
             }
-            Some(t) if t.starts_with("Result<") => {
-                // Result return: test that it doesn't panic
-                tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_does_not_panic"),
-                    assertion: format!("let _ = std::panic::catch_unwind(|| {{ let _ = {fn_name}(Default::default()); }});"),
-                    category: TestCategory::ErrorCase,
-                });
-            }
-            Some(t) if t.starts_with("Option<") => {
-                // Option return: test None case
-                tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_can_return_none"),
-                    assertion: format!(
-                        "// Option return type: {fn_name} should handle None gracefully"
-                    ),
-                    category: TestCategory::Property,
-                });
-            }
-            _ => {}
         }
 
         tests
@@ -322,52 +254,44 @@ impl TestGenerator {
         parts
     }
 
-    /// Extract return type from a Rust function signature.
-    fn extract_return_type(signature: &str) -> Option<String> {
-        let arrow_pos = signature.find("->")?;
-        let ret = signature[arrow_pos + 2..].trim();
-        // Remove trailing { if present
-        let ret = ret.trim_end_matches('{').trim();
-        if ret.is_empty() {
-            None
-        } else {
-            Some(ret.to_string())
-        }
-    }
-
-    /// Create a function call string with one parameter replaced by a specific value.
+    /// Create a function call only when every argument can be constructed safely.
     fn make_call_with_value(
         params: &[(String, String)],
         target_param: &str,
         value: &str,
-    ) -> String {
-        params
+    ) -> Option<String> {
+        let arguments = params
             .iter()
             .map(|(name, typ)| {
                 if name == target_param {
-                    value.to_string()
+                    Some(value.to_string())
                 } else {
                     Self::default_value_for_type(typ)
                 }
             })
-            .collect::<Vec<_>>()
-            .join(", ")
+            .collect::<Option<Vec<_>>>()?;
+
+        Some(arguments.join(", "))
     }
 
-    /// Get a default value for a Rust type (for filling non-target parameters).
-    fn default_value_for_type(typ: &str) -> String {
+    /// Return a conservative literal for a small set of well-understood types.
+    ///
+    /// Returning None is intentional: guessing that an arbitrary user type
+    /// implements Default can produce uncompilable tests and false confidence.
+    fn default_value_for_type(typ: &str) -> Option<String> {
         match typ.trim() {
-            "u8" | "u16" | "u32" | "u64" | "usize" => "0".to_string(),
-            "i8" | "i16" | "i32" | "i64" | "isize" => "0".to_string(),
-            "f32" => "0.0f32".to_string(),
-            "f64" => "0.0f64".to_string(),
-            "bool" => "false".to_string(),
-            "&str" => "\"\"".to_string(),
-            "String" => "String::new()".to_string(),
-            t if t.contains("Vec<") => "vec![]".to_string(),
-            t if t.starts_with("&[") => "&[]".to_string(),
-            t if t.starts_with("Option<") => "None".to_string(),
-            _ => "Default::default()".to_string(),
+            "u8" | "u16" | "u32" | "u64" | "usize"
+            | "i8" | "i16" | "i32" | "i64" | "isize" => Some("0".to_string()),
+            "f32" => Some("0.0f32".to_string()),
+            "f64" => Some("0.0f64".to_string()),
+            "bool" => Some("false".to_string()),
+            "&str" => Some("\"\"".to_string()),
+            "&String" => Some("&String::new()".to_string()),
+            "String" => Some("String::new()".to_string()),
+            t if t.starts_with("&[") => Some("&[]".to_string()),
+            t if t.starts_with("&Vec<") => Some("&Vec::new()".to_string()),
+            t if t.starts_with("Vec<") => Some("vec![]".to_string()),
+            _ => None,
         }
     }
 }
@@ -470,16 +394,57 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_return_type() {
-        assert_eq!(
-            TestGenerator::extract_return_type("fn add(a: i32) -> i32"),
-            Some("i32".to_string())
-        );
-        assert_eq!(
-            TestGenerator::extract_return_type("fn check() -> Result<(), Error>"),
-            Some("Result<(), Error>".to_string())
-        );
-        assert_eq!(TestGenerator::extract_return_type("fn noop()"), None);
+    fn generated_option_tests_never_contain_comment_only_passing_oracles() {
+        let request = SynthesisRequest::new("rust", "lookup", "Find a value")
+            .with_signature("fn lookup(key: &str) -> Option<String>");
+
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.iter().all(|test| {
+            test.category != TestCategory::Property
+                && test.category != TestCategory::ErrorCase
+        }));
+        assert!(!suite.source.contains("should handle None gracefully"));
+        assert!(!suite.source.contains("test_lookup_can_return_none"));
+    }
+
+    #[test]
+    fn return_type_alone_never_generates_default_argument_property_tests() {
+        let bool_request = SynthesisRequest::new("rust", "allowed", "Check access")
+            .with_signature("fn allowed(user: User, resource: Resource) -> bool");
+        let result_request = SynthesisRequest::new("rust", "load", "Load an item")
+            .with_signature("fn load(key: Key, store: Store) -> Result<Value, Error>");
+
+        for request in [&bool_request, &result_request] {
+            let suite = TestGenerator::generate(request);
+            assert!(suite.tests.is_empty());
+            assert!(!suite.source.contains("Default::default()"));
+            assert!(suite.source.contains("No tests generated"));
+        }
+    }
+
+    #[test]
+    fn boundary_smoke_calls_skip_unknown_non_target_types() {
+        let request = SynthesisRequest::new("rust", "check", "Check a value")
+            .with_signature("fn check(value: u32, policy: CustomPolicy) -> bool");
+
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.is_empty());
+        assert!(!suite.source.contains("Default::default()"));
+    }
+
+    #[test]
+    fn boundary_smoke_calls_construct_all_known_arguments() {
+        let request = SynthesisRequest::new("rust", "check", "Check a value")
+            .with_signature("fn check(value: u32, enabled: bool) -> bool");
+
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.source.contains("check(0, false)"));
+        assert!(suite.tests.iter().all(|test| {
+            test.oracle_kind == TestOracleKind::TypeDerivedInvocationSmoke
+        }));
     }
 
     #[test]
