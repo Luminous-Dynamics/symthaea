@@ -1,0 +1,540 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-view-voi-run-v0.1.schema.json",
+  "title": "Connectome next-view robust VOI run manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scope",
+    "dataset",
+    "operation",
+    "task_route",
+    "model",
+    "calibration",
+    "view_policy",
+    "view_candidates",
+    "belief_scenarios",
+    "decision_loss",
+    "acquisition_cost_profile",
+    "split_policy",
+    "decision_receipt",
+    "license_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "enum": [
+        "SYNTHETIC_KNOWN_ANSWER",
+        "CACHED_CB2_REPLAY",
+        "PROSPECTIVE_ACQUISITION"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "repository",
+        "revision",
+        "revision_commit_sha",
+        "card_sha256",
+        "shard_manifest_sha256",
+        "operation_identity_field",
+        "operation_manifest_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "CONNECTOMEBENCH2"
+        },
+        "repository": {
+          "const": "jeffbbrown2/ConnectomeBench2"
+        },
+        "revision": {
+          "const": "v2"
+        },
+        "revision_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "card_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shard_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "operation_identity_field": {
+          "const": "combined_sample_hash"
+        },
+        "operation_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "evidence_state_sha256",
+        "observed_view_ids",
+        "evidence_state_schema_sha256"
+      ],
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_state_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "observed_view_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_state_schema_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "task_route": {
+      "enum": [
+        "false_split_correction",
+        "false_merge_identification",
+        "split_mask_generation"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "checkpoint_sha256",
+        "inference_config_sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "inference_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_sha256",
+        "population",
+        "calibration_unit",
+        "validation_protocol_sha256",
+        "frozen_before_test_access"
+      ],
+      "properties": {
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frozen_before_test_access": {
+          "const": true
+        }
+      }
+    },
+    "view_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_sha256",
+        "leakage_audit_sha256",
+        "task_view_contract_sha256",
+        "em_best_allowed_for_merge_error"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "leakage_audit_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "task_view_contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "em_best_allowed_for_merge_error": {
+          "const": false
+        }
+      }
+    },
+    "view_candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "view_id",
+          "view_artifact_sha256",
+          "modality",
+          "available",
+          "leakage_safe",
+          "allowed_task_routes",
+          "likelihood_artifact_sha256"
+        ],
+        "properties": {
+          "view_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "view_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "modality": {
+            "enum": [
+              "em_xy",
+              "em_xz",
+              "em_yz",
+              "em_oblique",
+              "mesh_geometry",
+              "other"
+            ]
+          },
+          "available": {
+            "const": true
+          },
+          "leakage_safe": {
+            "const": true
+          },
+          "allowed_task_routes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "false_split_correction",
+                "false_merge_identification",
+                "split_mask_generation"
+              ]
+            }
+          },
+          "likelihood_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "belief_scenarios": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_set_sha256",
+        "scenarios"
+      ],
+      "properties": {
+        "scenario_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scenario_id",
+              "prior_artifact_sha256",
+              "likelihood_manifest_sha256",
+              "population"
+            ],
+            "properties": {
+              "scenario_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prior_artifact_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "likelihood_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "population": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision_loss": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loss_unit_id",
+        "action_set_sha256",
+        "state_schema_sha256",
+        "loss_matrix_sha256",
+        "frozen_before_test_access"
+      ],
+      "properties": {
+        "loss_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "state_schema_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "loss_matrix_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frozen_before_test_access": {
+          "const": true
+        }
+      }
+    },
+    "acquisition_cost_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "profile_sha256",
+        "cost_unit_id",
+        "measurement_protocol_sha256",
+        "frozen_before_test_access",
+        "per_view_costs"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "cost_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frozen_before_test_access": {
+          "const": true
+        },
+        "per_view_costs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "view_id",
+              "cost_units"
+            ],
+            "properties": {
+              "view_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cost_units": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "split_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_keys",
+        "no_group_overlap",
+        "freeze_before_test"
+      ],
+      "properties": {
+        "group_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "contains": {
+            "const": "source_volume_id"
+          },
+          "items": {
+            "enum": [
+              "source_volume_id",
+              "neuron_id",
+              "animal_id",
+              "session_id"
+            ]
+          }
+        },
+        "no_group_overlap": {
+          "const": true
+        },
+        "freeze_before_test": {
+          "const": true
+        }
+      }
+    },
+    "decision_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "evaluations_sha256",
+        "selected_view_id",
+        "stop_reason",
+        "result_status"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evaluations_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "selected_view_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stop_reason": {
+          "enum": [
+            "NO_ADMISSIBLE_VIEWS",
+            "NO_POSITIVE_NET_VALUE",
+            "NO_ROBUSTLY_POSITIVE_VIEW",
+            null
+          ]
+        },
+        "result_status": {
+          "enum": [
+            "VIEW_SELECTED",
+            "STOPPED",
+            "NOT_ESTIMABLE"
+          ]
+        }
+      }
+    },
+    "license_status": {
+      "const": "APPROVED_FOR_EVALUATION"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "task_route": {
+            "const": "false_merge_identification"
+          }
+        },
+        "required": [
+          "task_route"
+        ]
+      },
+      "then": {
+        "properties": {
+          "view_policy": {
+            "properties": {
+              "em_best_allowed_for_merge_error": {
+                "const": false
+              }
+            }
+          },
+          "view_candidates": {
+            "items": {
+              "properties": {
+                "view_id": {
+                  "not": {
+                    "const": "em_best"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "SYNTHETIC_KNOWN_ANSWER"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "kind": {
+                "const": "CONNECTOMEBENCH2"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
