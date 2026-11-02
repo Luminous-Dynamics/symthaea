@@ -110,7 +110,37 @@ The important design choice is that \(\delta=1-\Gamma_*\) is computed from the *
 
 whose infinite sum is exactly \(1-\delta\) by telescoping. Its first n weights are a prefix of the same sequence; no renormalization occurs when candidates arrive.
 
-The constant \(\delta\) is the uniform leftover mass available for every finite intersection. More aggressive S-specific slack such as \(1-\Gamma_{\max S}\) may be valid for a known finite envelope, but it is not the same horizon-independent constant and needs a separate extension analysis. This implementation deliberately uses the uniform \(\delta\).
+The constant \(\delta\) is the uniform leftover mass available for every finite intersection. There are two distinct deployment modes:
+
+### Open-ended projective universe
+
+For a countably unbounded universe, choose a fixed \(\lambda<1\) and set
+
+\[
+\gamma_i=\frac{\lambda}{i(i+1)},\qquad
+\Gamma_*=\lambda,\qquad
+\delta=1-\lambda.
+\]
+
+The weight sequence and anchor reserve are invariant under arbitrary horizon extension. This is the genuinely open-ended mode, but it scales every candidate's weight below the full telescoping prior.
+
+### Precommitted finite envelope
+
+If a maximum family size \(n_{\max}\) is fixed before data collection, retain the unscaled weights
+
+\[
+\gamma_i=\frac{1}{i(i+1)},\qquad i=1,\ldots,n_{\max}.
+\]
+
+They sum to \(n_{\max}/(n_{\max}+1)\), leaving the exact anchor slack
+
+\[
+\delta_{n_{\max}}=\frac{1}{n_{\max}+1}.
+\]
+
+This preserves the full unscaled candidate weights within the precommitted envelope, and supports predictable delayed arrivals inside that universe. It is not an open-ended guarantee: adding candidate \(n_{\max}+1\) changes the precommitted contract and requires a new analysis. The pilot runner includes both modes separately.
+
+Do not replace either constant with \(1-\sum_{i\in A_t}\gamma_i\) computed from the current active roster; that would make the anchor change with arrivals.
 
 ## 4. Slack-anchored closure
 
