@@ -236,7 +236,7 @@ Report each metric separately. Never collapse scientific performance, shielding 
 
 SPECTRA should be compared to mature practice rather than claim a new SOTA from architectural novelty.
 
-- Shielding: align enclosure measurements with IEEE P299 where applicable; use ASTM D4935 only for the planar-material cases inside its scope.
+- Shielding: distinguish large-enclosure IEEE 299-2006 and 0.1–2 m enclosure IEEE 299.1-2013 as historical methods (both currently inactive-reserved in the IEEE catalogue); P299/P299.1 are revision projects, not approved standards. Use active IEEE 2715-2023 guidance and ASTM D4935-18R26 only for planar-material cases inside their scopes. Re-check catalogue status at the time of any formal test.
 - Experimental psychology: preregistration, registered reports, blinding, power planning, full trial accounting, independent scoring and independent replication.
 - Neurophysiology: BIDS data organization and established MNE/FieldTrip/Brainstorm pipelines; publish raw/preprocessed provenance and multiplicity policy.
 - Computational electromagnetics: compare a small, independently checked case suite against a pinned mature 3D solver; report mesh and time-step convergence, boundary-condition sensitivity and measured discrepancy.
@@ -257,7 +257,10 @@ The first deliverable should be a reproducible report that can return Better, Wo
 
 ## 10. References
 
-- IEEE SA, P299, Standard Method for Measuring the Effectiveness of Electromagnetic Shielding Enclosures: https://standards.ieee.org/ieee/299/11952/
+- IEEE 299-2006 (large enclosures, historical published method; IEEE currently lists it inactive-reserved): https://standards.ieee.org/ieee/299/3090/
+- IEEE 299.1-2013 (0.1 m–2 m enclosures, historical published method; IEEE currently lists it inactive-reserved): https://standards.ieee.org/ieee/299.1/4061/
+- IEEE P299 and P299.1 are active revision projects (PARs), not yet approved published standards; verify their status and final scope again before claiming alignment: https://standards.ieee.org/ieee/299/11952/ and https://standards.ieee.org/ieee/299.1/11953/
+- IEEE 2715-2023 is an active guide for planar-material shielding characterization: https://standards.ieee.org/ieee/2715/6810/
 - ASTM D4935-18R26, Standard Test Method for Measuring the Electromagnetic Shielding Effectiveness of Planar Materials: https://store.astm.org/d4935-18r26.html
 - Acunzo et al. (2026), Neuroimaging studies of extra-sensory perception: A systematic and critical review, NeuroImage 333, 121937: https://doi.org/10.1016/j.neuroimage.2026.121937
 - Tressoldi & Storm (2024), Stage 2 Registered Report: Anomalous perception in a Ganzfeld condition: https://pubmed.ncbi.nlm.nih.gov/38813059/
