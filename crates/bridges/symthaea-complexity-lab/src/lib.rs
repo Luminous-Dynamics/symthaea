@@ -364,12 +364,22 @@ pub fn forward_term_count(shape: &GridShape) -> Option<u128> {
     if shape.variables == 0 {
         return Some(0);
     }
-    let n = shape.variables as u128;
-    let entries = shape.entries as u128;
-    let side_plus_one = (shape.side as u128).checked_add(1)?;
-    n.checked_mul(entries)?
-        .checked_mul(side_plus_one)
-        .map(|numerator| numerator / 2)
+    let mut n = shape.variables as u128;
+    let mut entries = shape.entries as u128;
+    let mut side_plus_one = (shape.side as u128).checked_add(1)?;
+
+    // Divide one even factor before multiplying. This avoids returning None
+    // merely because the unreduced intermediate product overflows u128 while
+    // the mathematically divided count would still fit.
+    if n % 2 == 0 {
+        n /= 2;
+    } else if entries % 2 == 0 {
+        entries /= 2;
+    } else {
+        side_plus_one /= 2;
+    }
+
+    n.checked_mul(entries)?.checked_mul(side_plus_one)
 }
 
 #[cfg(test)]
