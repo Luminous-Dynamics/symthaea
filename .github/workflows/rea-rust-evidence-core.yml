@@ -10,6 +10,10 @@ on:
       - "src/rea_compat.rs"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "schemas/benchmark-run-receipt-v1.schema.json"
+      - "examples/benchmark-run-receipt-v1.synthetic.json"
+      - "tools/benchmark-run-receipt-verify.rs"
+      - "docs/research/BENCHMARK_RUN_RECEIPT_V1.md"
       - ".github/workflows/rea-rust-evidence-core.yml"
   push:
     branches: [main]
@@ -102,5 +106,9 @@ jobs:
       - name: Rust format check
         run: cargo fmt --manifest-path tools/rea-evidence-compat-harness/Cargo.toml -- --check
 
-      - name: Rust Evidence identity and upstream differential tests
+      - name: Rust Evidence and benchmark receipt tests
         run: cargo test --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked
+
+      - name: Validate synthetic benchmark receipt
+        run: |
+          cargo run --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked --bin benchmark-run-receipt-verify -- examples/benchmark-run-receipt-v1.synthetic.json
