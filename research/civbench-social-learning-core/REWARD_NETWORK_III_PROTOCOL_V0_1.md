@@ -60,3 +60,18 @@ The archive has not been ingested into this branch. No reanalysis or reproductio
 ## Implementation assumptions that require source verification
 
 The initial Rust V0 represents an action as a directed transition (from node to node) and resolves equal-reward/equal-loss choices by stable edge-index order. This is an explicit implementation choice for deterministic tests, not yet a verified property of the original experiment interface or network serialization. Before original-data replay, inspect the v2.0 network files and experiment code to establish whether source edges are directed or undirected, whether reverse traversal is available, how visited nodes/edges are treated, the legal-move rules, and the exact tie-breaking/randomization behavior. The importer must preserve the source representation and must not silently coerce undirected edges to directed arcs or vice versa.
+
+## External AI cultural-transmission reference
+
+A second important comparison target is DeepMind's cultural-general-intelligence work:
+- Platonov et al. (2023), *Learning few-shot imitation as cultural transmission*, Nature Communications 14, 7536: https://www.nature.com/articles/s41467-023-42875-2
+- Research summary: https://deepmind.google/blog/learning-robust-real-time-cultural-transmission-without-human-data/
+
+That work studies real-time imitation from demonstrations on novel contexts and reports a training recipe (MEDAL-ADR) involving memory, expert dropout, attentional bias toward the expert and automatic domain randomization. Its authors report outperformance over ablations, including ME-AL, on held-out tasks. This is a different task family from Reward Network III and should be treated as a separate transfer benchmark, not as a directly comparable score.
+
+CivBench should compare at least three axes:
+- **Human-population transmission:** Reward Network III (does the strategy spread, become understood and persist in populations?).
+- **Agent-to-agent few-shot transfer:** DeepMind-style demonstration imitation (can the learner infer, recall and generalize a behaviour after few examples?).
+- **Mechanism-based social learning:** transparent diffusion, prestige/performance selection, Bayesian/evidence-weighted learning and Symthaea cognitive mechanisms (which mechanism improves correctness, retention, correction and transfer under controlled budgets?).
+
+The 2024 PNAS control-condition study above is a further warning: social transmission is not automatically superior to individual learning. Comparisons must equalize accumulated learning opportunity and measure acquisition cost, fatigue and redundancy.
