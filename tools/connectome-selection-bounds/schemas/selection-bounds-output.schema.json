@@ -57,13 +57,26 @@
         "selection_unknown_units":{"type":"integer","minimum":0}
       }
     },
+    "responseStatusCounts":{
+      "type":"object","additionalProperties":false,
+      "required":["detected","not_detected","unobserved","classifier_invalid","registration_failed"],
+      "properties":{
+        "detected":{"type":"integer","minimum":0},
+        "not_detected":{"type":"integer","minimum":0},
+        "unobserved":{"type":"integer","minimum":0},
+        "classifier_invalid":{"type":"integer","minimum":0},
+        "registration_failed":{"type":"integer","minimum":0}
+      }
+    },
     "armReport":{
       "type":"object","additionalProperties":false,
-      "required":["arm_id","role","selection","all_event_outcome","conditional_kernel_among_selected"],
+      "required":["arm_id","role","selection","source_response_counts","target_response_counts","all_event_outcome","conditional_kernel_among_selected"],
       "properties":{
         "arm_id":{"type":"string","minLength":1},
         "role":{"enum":["Treatment","Control"]},
         "selection":{"$ref":"#/$defs/selectionSummary"},
+        "source_response_counts":{"$ref":"#/$defs/responseStatusCounts"},
+        "target_response_counts":{"$ref":"#/$defs/responseStatusCounts"},
         "all_event_outcome":{"$ref":"#/$defs/meanBounds"},
         "conditional_kernel_among_selected":{"$ref":"#/$defs/meanBounds"}
       }

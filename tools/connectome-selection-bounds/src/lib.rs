@@ -12,6 +12,15 @@ use std::fmt;
 pub enum ArmRole { Treatment, Control }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResponseStatus {
+    Detected,
+    NotDetected,
+    Unobserved,
+    ClassifierInvalid,
+    RegistrationFailed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionStatus {
     /// The preregistered source/target response-selection rule was met.
     Selected,
@@ -29,6 +38,10 @@ pub enum SelectionStatus {
 pub struct ObservationUnit {
     pub unit_id: String,
     pub selection_status: SelectionStatus,
+    /// Source-neuron response detector state, independent from target.
+    pub source_response_status: ResponseStatus,
+    /// Target-neuron response detector state, independent from source.
+    pub target_response_status: ResponseStatus,
     /// A separate outcome defined for every planned unit. None means missing.
     /// Do not populate this from detector non-detection unless that detector output
     /// is itself the declared estimand and its measurement error is qualified.
@@ -81,6 +94,15 @@ pub struct BoundedMeanResult {
     pub status: BoundStatus,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ResponseStatusCounts {
+    pub detected: usize,
+    pub not_detected: usize,
+    pub unobserved: usize,
+    pub classifier_invalid: usize,
+    pub registration_failed: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionSummary {
     pub planned_units: usize,
@@ -102,6 +124,8 @@ pub struct ArmReport {
     pub arm_id: String,
     pub role: ArmRole,
     pub selection: SelectionSummary,
+    pub source_response_counts: ResponseStatusCounts,
+    pub target_response_counts: ResponseStatusCounts,
     /// Bounded over every planned unit, regardless of response-selection status.
     pub all_event_outcome: BoundedMeanResult,
     /// Bounded only over selected units; non-selected units are not imputed.
@@ -151,6 +175,7 @@ pub enum EvalError {
     NonFiniteValue { unit_id: String, field: &'static str },
     ValueOutsideBounds { unit_id: String, field: &'static str },
     KernelValueForNonSelectedUnit(String),
+    SelectionStatusMismatch(String),
     NumericOverflow,
 }
 
@@ -167,11 +192,31 @@ impl fmt::Display for EvalError {
             Self::NonFiniteValue { unit_id, field } => write!(f, "{field} for {unit_id} is not finite"),
             Self::ValueOutsideBounds { unit_id, field } => write!(f, "{field} for {unit_id} is outside its declared bounds"),
             Self::KernelValueForNonSelectedUnit(x) => write!(f, "non-selected or unevaluable unit {x} has a conditional kernel"),
+            Self::SelectionStatusMismatch(x) => write!(f, "combined selection status does not match source/target response states for {x}"),
             Self::NumericOverflow => write!(f, "numeric overflow while computing bounds"),
         }
     }
 }
 impl std::error::Error for EvalError {}
+
+/// Derive the combined source-and-target selection state without discarding either raw state.
+///
+/// A measured NotDetected status makes the conjunctive selection rule fail even if the
+/// other detector is unknown; the unknown source/target status remains separately retained.
+fn derive_selection_status(source: ResponseStatus, target: ResponseStatus) -> SelectionStatus {
+    use ResponseStatus::*;
+    if source == Detected && target == Detected {
+        SelectionStatus::Selected
+    } else if source == NotDetected || target == NotDetected {
+        SelectionStatus::NotSelected
+    } else if source == RegistrationFailed || target == RegistrationFailed {
+        SelectionStatus::RegistrationFailed
+    } else if source == ClassifierInvalid || target == ClassifierInvalid {
+        SelectionStatus::ClassifierInvalid
+    } else {
+        SelectionStatus::Unobserved
+    }
+}
 
 fn validate_bounds(b: ValueBounds, name: &'static str) -> Result<(), EvalError> {
     if !b.lower.is_finite() || !b.upper.is_finite() || b.lower > b.upper {
@@ -205,6 +250,9 @@ fn validate(input: &StudyInput) -> Result<(), EvalError> {
         match arm.role { ArmRole::Treatment => treatments += 1, ArmRole::Control => controls += 1 }
         if arm.units.is_empty() { return Err(EvalError::EmptyArm(arm.arm_id.clone())); }
         for unit in &arm.units {
+            if derive_selection_status(unit.source_response_status, unit.target_response_status) != unit.selection_status {
+                return Err(EvalError::SelectionStatusMismatch(unit.unit_id.clone()));
+            }
             if unit.unit_id.trim().is_empty() || !unit_ids.insert(unit.unit_id.as_str()) {
                 return Err(EvalError::DuplicateUnitId(unit.unit_id.clone()));
             }
@@ -258,6 +306,21 @@ fn bounded_mean(
     })
 }
 
+fn count_response_status(arm: &StudyArm, source: bool) -> ResponseStatusCounts {
+    let mut counts = ResponseStatusCounts::default();
+    for unit in &arm.units {
+        let status = if source { unit.source_response_status } else { unit.target_response_status };
+        match status {
+            ResponseStatus::Detected => counts.detected += 1,
+            ResponseStatus::NotDetected => counts.not_detected += 1,
+            ResponseStatus::Unobserved => counts.unobserved += 1,
+            ResponseStatus::ClassifierInvalid => counts.classifier_invalid += 1,
+            ResponseStatus::RegistrationFailed => counts.registration_failed += 1,
+        }
+    }
+    counts
+}
+
 fn evaluate_arm(arm: &StudyArm, input: &StudyInput) -> Result<ArmReport, EvalError> {
     let (mut selected, mut not_selected, mut unobserved) = (0usize, 0usize, 0usize);
     let (mut classifier_invalid, mut registration_failed) = (0usize, 0usize);
@@ -293,6 +356,8 @@ fn evaluate_arm(arm: &StudyArm, input: &StudyInput) -> Result<ArmReport, EvalErr
         arm_id: arm.arm_id.clone(),
         role: arm.role,
         selection,
+        source_response_counts: count_response_status(arm, true),
+        target_response_counts: count_response_status(arm, false),
         all_event_outcome: bounded_mean(planned, all_sum, all_n, input.all_event_outcome_bounds)?,
         conditional_kernel_among_selected: bounded_mean(selected, kernel_sum, kernel_n, input.conditional_kernel_bounds)?,
     })
@@ -340,7 +405,15 @@ pub fn evaluate(input: &StudyInput) -> Result<StudyReport, EvalError> {
 mod tests {
     use super::*;
     fn u(id: &str, s: SelectionStatus, y: Option<f64>, k: Option<f64>) -> ObservationUnit {
-        ObservationUnit { unit_id: id.to_string(), selection_status: s, all_event_outcome: y, conditional_kernel: k }
+        let (source_response_status, target_response_status) = match s {
+            SelectionStatus::Selected => (ResponseStatus::Detected, ResponseStatus::Detected),
+            SelectionStatus::NotSelected => (ResponseStatus::NotDetected, ResponseStatus::Detected),
+            SelectionStatus::Unobserved => (ResponseStatus::Unobserved, ResponseStatus::Detected),
+            SelectionStatus::ClassifierInvalid => (ResponseStatus::ClassifierInvalid, ResponseStatus::Detected),
+            SelectionStatus::RegistrationFailed => (ResponseStatus::RegistrationFailed, ResponseStatus::Detected),
+        };
+        ObservationUnit { unit_id: id.to_string(), selection_status: s, source_response_status,
+            target_response_status, all_event_outcome: y, conditional_kernel: k }
     }
     fn study() -> StudyInput {
         StudyInput {
@@ -476,6 +549,24 @@ mod tests {
     fn wrong_arm_roles_are_rejected() {
         let mut x = study(); x.arms[1].role = ArmRole::Treatment;
         assert_eq!(evaluate(&x).unwrap_err(), EvalError::DuplicateArmRole);
+    }
+    #[test]
+    fn source_and_target_detector_states_are_separately_reported() {
+        let mut x = study();
+        x.arms[0].units[4].source_response_status = ResponseStatus::NotDetected;
+        x.arms[0].units[4].target_response_status = ResponseStatus::RegistrationFailed;
+        let r = evaluate(&x).unwrap();
+        let t = r.arms.iter().find(|a| a.role == ArmRole::Treatment).unwrap();
+        assert_eq!(t.source_response_counts.not_detected, 1);
+        assert_eq!(t.target_response_counts.registration_failed, 1);
+        assert_eq!(t.selection.not_selected_units, 1);
+        assert_eq!(t.selection.registration_failed_units, 0);
+    }
+    #[test]
+    fn inconsistent_combined_selection_status_is_rejected() {
+        let mut x = study();
+        x.arms[0].units[0].target_response_status = ResponseStatus::NotDetected;
+        assert_eq!(evaluate(&x).unwrap_err(), EvalError::SelectionStatusMismatch("t1".into()));
     }
     #[test]
     fn report_hard_codes_claim_boundaries() {

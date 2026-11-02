@@ -28,11 +28,14 @@
         "units":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/unit"}}
       }
     },
+    "responseStatus":{"enum":["detected","not_detected","unobserved","classifier_invalid","registration_failed"]},
     "unit": {
-      "type":"object","additionalProperties":false,"required":["unit_id","selection_status","all_event_outcome","conditional_kernel"],
+      "type":"object","additionalProperties":false,"required":["unit_id","selection_status","source_response_status","target_response_status","all_event_outcome","conditional_kernel"],
       "properties":{
         "unit_id":{"type":"string","minLength":1},
         "selection_status":{"enum":["selected","not_selected","unobserved","classifier_invalid","registration_failed"]},
+        "source_response_status":{"$ref":"#/$defs/responseStatus"},
+        "target_response_status":{"$ref":"#/$defs/responseStatus"},
         "all_event_outcome":{"type":["number","null"]},
         "conditional_kernel":{"type":["number","null"]}
       }

@@ -7,7 +7,7 @@ A dependency-free Rust library for finite-cohort worst-case bounds when a declar
 Do not let a successful response detector define the population you claim to understand. The tool preserves three different objects:
 
 1. **All-event outcome:** a scalar outcome defined for every planned stimulation unit. Missing values are bounded using only its declared range.
-2. **Selection process:** whether the preregistered response-selection rule was met, not met, or could not be evaluated.
+2. **Source and target detector states:** both are retained independently (detected, not detected, unobserved, classifier invalid, registration failed); the combined selection state is derived from the conjunctive rule and checked against those raw states.
 3. **Conditional propagation/kernel:** a value defined only among units meeting the selection rule. Its denominator is the selected cohort. Missing kernels among selected units are bounded; non-selected units are outside this conditional estimand, not zero-valued kernels.
 
 The output reports these quantities separately. It never collapses them into one score.
@@ -75,3 +75,13 @@ The library API is evaluate(&StudyInput) -> Result<StudyReport, EvalError>.
 This is an arithmetic kernel, not a full selection model. It does not provide detector sensitivity/specificity correction, MAR/MNAR point identification, sequential excursion-effect estimation, propensity/positivity analysis, cluster-robust confidence intervals, raw-trace reconstruction or prospective outcomes.
 
 The next integration should connect these summaries to sequential DGP work in #9834 and the response/measurement schema in #9810. Calibrated detector-error intervals and sensitivity analyses should be separate layers rather than hidden assumptions inside an adjusted point estimate.
+
+
+## Source/target status derivation
+
+The input carries independent source-neuron and target-neuron response statuses. The combined selection status is:
+- Selected only when both are Detected.
+- NotSelected when either is known NotDetected (even if the other side is unknown); the unknown side remains visible in its own status field.
+- Otherwise RegistrationFailed takes precedence over ClassifierInvalid, then Unobserved.
+
+This deterministic summary is not a latent neural-response label. It states whether the declared conjunctive detector rule was met or could be evaluated. The report also counts every raw status separately for source and target.
