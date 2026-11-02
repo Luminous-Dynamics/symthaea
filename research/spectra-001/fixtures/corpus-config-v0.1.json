@@ -6,7 +6,8 @@
     "calibration_trials": 512,
     "evaluation_trials": 512,
     "candidate_count": 4,
-    "signal_hit_rate_permille": 400
+    "signal_hit_rate_permille": 400,
+    "campaign_instance_id": 600000001
   },
   "known_answer_seeds": {
     "null": "0x5eed12349876abcd",
