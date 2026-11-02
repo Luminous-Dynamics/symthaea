@@ -285,7 +285,7 @@ Here `TV(P0, Q_aligned) = 0.10`, and expectations become `(0.6, 0.5, 0.4, 0.5)`.
 
 ### Pilot calibration settings and formula checks
 
-For (K=8), (n=5{,}000), four functionals and family failure budget (delta=0.01), Bonferroni gives (delta_j=0.0025). Scalar Hoeffding gives:
+For `K = 8`, `n = 5,000`, four functionals and family failure budget `delta = 0.01`, Bonferroni gives `delta_j = 0.0025`. Scalar Hoeffding gives:
 
 ```text
 r_j = sqrt(ln(1 / 0.0025) / (2 * 5000)) = 0.02447747
