@@ -60,11 +60,12 @@ For each source token:
 
 The allowed transitions are:
 
-    UnassignedReserved(source, token_id, amount, creation_round)
+    Evidence + UnassignedReserved(source, token_id, amount, creation_round)
         -> Assigned(source, token_id, assignment_id, destination, amount, round)
         -> Credited(source, token_id, assignment_id, destination, amount, round)
+        -> LookCommit(round)
 
-A token may be split over several assignment events. Each assignment subtoken has its own immutable destination and source-scoped assignment ordinal. The sum of all assignment amounts cannot exceed the source token's face amount.
+Evidence and its reserve deduction are one atomic score transaction. The event log may contain both records, but score monotonicity is checked at the LookCommit boundary, not between intra-look bookkeeping records. A token may be split over several assignment events. Each assignment subtoken has its own immutable destination and source-scoped assignment ordinal. The sum of all assignment amounts cannot exceed the source token's face amount.
 
 The verifier must reject:
 - destination <= source;
