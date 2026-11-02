@@ -77,7 +77,8 @@
         "after_edit_decision",
         "decision_flip",
         "materiality_exceeded_possible",
-        "materiality_exceeded_guaranteed"
+        "materiality_exceeded_guaranteed",
+        "effect_method"
       ],
       "properties": {
         "scenario_id": {
@@ -122,6 +123,9 @@
         },
         "materiality_exceeded_guaranteed": {
           "type": "boolean"
+        },
+        "effect_method": {
+          "$ref": "#/$defs/effect_method"
         }
       }
     },
@@ -183,6 +187,12 @@
           "$ref": "#/$defs/decision_flip"
         }
       }
+    },
+    "effect_method": {
+      "enum": [
+        "RectangularOuterBound",
+        "PairedSharedWorlds"
+      ]
     }
   },
   "properties": {
