@@ -21,6 +21,7 @@ const DATASET_REVISION: &str = "v2";
 const UPSTREAM_COMMIT: &str = "5679b39aa2641d8d0afeed88b441e696f87a66df";
 const EXPECTED_EDGE_NM: f64 = 50_000.0;
 const SPLITS: [&str; 3] = ["train", "val", "test"];
+const SPECIES: [&str; 4] = ["mouse", "fly", "human", "zebrafish"];
 const BANKS: [&str; 3] = [
     "operation_bank",
     "operation_bank_junction_controls",
@@ -146,6 +147,14 @@ struct Report {
 
 fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
+}
+
+fn read_inside_root(root: &Path, path: &Path, label: &str) -> Result<Vec<u8>, String> {
+    let canonical = path.canonicalize().map_err(|error| format!("{label} cannot be resolved: {error}"))?;
+    if !canonical.starts_with(root) {
+        return Err(format!("{label} resolves outside the pinned split root"));
+    }
+    fs::read(&canonical).map_err(|error| format!("cannot read {label}: {error}"))
 }
 
 fn file_digest(path: &Path, relative: &str) -> Result<FileDigest, String> {
@@ -351,12 +360,26 @@ fn load_species_split_index(
     species: &str,
     errors: &mut Vec<Finding>,
 ) -> Option<LoadedSpecies> {
-    let species_root = root.join(species);
+    if !SPECIES.contains(&species) {
+        errors.push(Finding::global("unsupported_species", format!("{species:?} is not one of the four ConnectomeBench2 species")));
+        return None;
+    }
+    let species_root = match root.join(species).canonicalize() {
+        Ok(path) if path.starts_with(root) => path,
+        Ok(_) => {
+            errors.push(Finding::global("split_species_path_escape", format!("{species} directory resolves outside the split root")));
+            return None;
+        }
+        Err(error) => {
+            errors.push(Finding::global("split_manifest_missing", format!("{species} directory cannot be resolved: {error}")));
+            return None;
+        }
+    };
     let manifest_path = species_root.join("manifest.json");
-    let manifest_bytes = match fs::read(&manifest_path) {
+    let manifest_bytes = match read_inside_root(&species_root, &manifest_path, &format!("{species}/manifest.json")) {
         Ok(bytes) => bytes,
         Err(error) => {
-            errors.push(Finding::global("split_manifest_missing", format!("{species}/manifest.json: {error}")));
+            errors.push(Finding::global("split_manifest_missing", error));
             return None;
         }
     };
@@ -397,10 +420,10 @@ fn load_species_split_index(
     for split in SPLITS {
         let filename = format!("{split}.json");
         let path = species_root.join(&filename);
-        let bytes = match fs::read(&path) {
+        let bytes = match read_inside_root(&species_root, &path, &format!("{species}/{filename}")) {
             Ok(bytes) => bytes,
             Err(error) => {
-                errors.push(Finding::global("split_file_missing", format!("{species}/{filename}: {error}")));
+                errors.push(Finding::global("split_file_missing", error));
                 continue;
             }
         };
@@ -776,4 +799,25 @@ mod tests {
         assert_eq!(value.len(), 32);
         assert_ne!(value, sha256(b"edits_and_adj_controls_mouse|000000000011"));
     }
+    #[test]
+    fn rejects_species_path_traversal_from_sidecar() {
+        let (root, bytes) = fixture();
+        let altered = String::from_utf8(bytes).unwrap().replace("\"species\":\"mouse\"", "\"species\":\"../outside\"");
+        let report = audit(altered.as_bytes(), sha256(altered.as_bytes()), &root, "a".repeat(40));
+        assert!(report.errors.iter().any(|finding| finding.code == "unsupported_species"));
+    }
+
+    #[test]
+    fn rejects_symlinked_split_file_that_escapes_species_root() {
+        use std::os::unix::fs::symlink;
+        let (root, bytes) = fixture();
+        let species = root.join("mouse");
+        let outside = root.join("outside.json");
+        fs::write(&outside, br#"{"operation_bank":[],"operation_bank_junction_controls":[],"operation_bank_synapse_controls":[]}"#).unwrap();
+        fs::remove_file(species.join("train.json")).unwrap();
+        symlink(&outside, species.join("train.json")).unwrap();
+        let report = audit(&bytes, sha256(&bytes), &root, "a".repeat(40));
+        assert!(report.errors.iter().any(|finding| finding.code == "split_file_missing" && finding.detail.contains("outside the pinned split root")));
+    }
+
 }
