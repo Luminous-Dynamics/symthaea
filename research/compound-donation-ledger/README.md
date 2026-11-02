@@ -8,9 +8,10 @@ contract and API stabilize.
 
 The crate implements three bounded research primitives:
 
-1. A fixed-point, append-only donation ledger. Each donor automatically
-   reserves a precommitted fraction of its **own new adjusted-evidence
-   increments**. Incoming donations cannot be re-donated. Reservations become
+1. A fixed-point, append-only donation ledger. Each donor uses either a fixed
+   rational reserve fraction of its **own new adjusted-evidence increments**
+   or a capped-overshoot reserve above its weighted evidence threshold.
+   Incoming donations cannot be re-donated. Reservations become
    source-tagged escrow tokens; each token records its precommitted destination
    ID and can be credited once (or split without exceeding the original
    amount) only to that destination after it is active and has positive weight.
@@ -205,4 +206,28 @@ inequalities are documented in RESEARCH.md. A global alpha-wealth theorem is
 still required before released refunds can be spent across hypotheses. Do not
 mix these alpha-wealth units with the weighted evidence-capital units of the
 donation ledger without a joint proof.
+
+
+## SCORE-informed capped-overshoot donations
+
+The DonationLedger::new_capped_overshoot constructor selects a distinct
+reserve policy. For donor weight gamma and time-monotone evidence X_t, its
+cumulative withdrawal is
+
+~~~text
+D_t = min(max(gamma * X_t - 1, 0), gamma)
+~~~
+
+In the ledger's fixed-point units, the target outgoing balance is
+min(max(weight_ticks * evidence_ticks - WEIGHT_SCALE * EVIDENCE_ONE, 0),
+weight_ticks * EVIDENCE_ONE). Each update tokenizes only the difference from
+the previous cumulative target. The policy is therefore self-financing,
+monotone, and threshold-triggered; it does not withdraw a fixed fraction of
+low evidence increments.
+
+The independent verifier accepts an explicit DonationReservePolicy and
+recomputes this rule using its own state model. The writer and verifier tests
+cover the threshold boundary, the cumulative cap, the increment bound and
+receipt tampering. See Issue #9967 for the mathematical comparison and
+confirmatory benchmark plan.
 
