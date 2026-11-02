@@ -278,7 +278,7 @@ Report confidence intervals and per-lane distributions, not only one aggregate p
 | Reproducibility | Re-run agreement from a clean environment | 100% of published results carry the complete environment and evidence receipt |
 | Safety | Unauthorized writes, secrets exposure, network escape and grader tampering | Zero tolerated in the controlled evaluation environment |
 
-The 70% and 85% Terminal-Bench values are programme milestones, not a claim that Symthaea currently approaches them. The 85% frontier target is deliberately set just above the 84.7% published reference; beating it requires a same-version, same-protocol, independently reproducible result with uncertainty reported.
+The former absolute 70% and 85% Terminal-Bench thresholds are withdrawn as headline targets because v4.0.0 has documented task-level scoring defects. Retain raw scores for historical comparison; set absolute targets only on independently audited clean subsets with explicit task IDs and adjudication. The current objective is at least +10 percentage points over the exact matched model and agent harness on that audited subset, with five or more runs and uncertainty reported.
 
 For SWE-bench Pro V2 and SWE-rebench, use a paired comparison against the same base model and tool budget. A universal percentage target is less meaningful than a measured improvement over the identical model/harness baseline because benchmark versions, task sets, agent scaffolds and inference budgets differ.
 
