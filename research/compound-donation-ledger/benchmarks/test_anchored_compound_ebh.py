@@ -140,6 +140,34 @@ class AnchoredCompoundEBHTests(unittest.TestCase):
         )
         self.assertLess(sum(long, F(0)), mass)
 
+    def test_neutral_zero_padding_preserves_old_decisions(self):
+        values = [F(0), F(1, 4), F(1, 2), F(1), F(2), F(5), F(10), F(100)]
+        alphas = [F(1, 10), F(1, 5), F(1, 2), F(1)]
+        deltas = [F(0), F(1, 100), F(1, 20), F(1, 5), F(1, 2), F(1)]
+        checks = 0
+        for n in range(1, 5):
+            for scores in itertools.product(values, repeat=n):
+                for alpha in alphas:
+                    for delta in deltas:
+                        before = anchored_rejections(scores, alpha, delta)
+                        after = anchored_rejections(
+                            tuple(scores) + (F(0),), alpha, delta
+                        )
+                        old_after = tuple(i for i in after if i < n)
+                        self.assertEqual(old_after, before)
+                        checks += 1
+        self.assertEqual(checks, 112320)
+
+    def test_high_score_extension_is_not_claimed_projective(self):
+        alpha, delta = F(1, 10), F(1, 20)
+        old_scores = [F(99, 10)]
+        extended_scores = old_scores + [F(100)]
+        old_set = anchored_rejections(old_scores, alpha, delta)
+        extended_set = anchored_rejections(extended_scores, alpha, delta)
+        self.assertEqual(old_set, ())
+        self.assertIn(0, extended_set)
+        self.assertEqual(extended_set, (1, 0))
+
     def test_local_intersection_process_is_pathwise_monotone(self):
         delta = F(1, 20)
         path = [
