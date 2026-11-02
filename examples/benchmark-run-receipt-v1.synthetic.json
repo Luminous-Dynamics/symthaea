@@ -170,7 +170,7 @@
       "disposition": "passed",
       "attempted": true,
       "graded": true,
-      "grade": 1.0,
+      "grade": 1,
       "reason_code": null,
       "grader_result_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
       "evidence_ids": [],
@@ -350,7 +350,7 @@
   },
   "integrity": {
     "canonicalization": "RFC8785-JCS",
-    "payload_sha256_excludes_integrity": "f118c53edfccfab95ea8160c0545f4492a221c88681794d64f8daff22a40a07c",
+    "payload_sha256_excludes_integrity": "5b97c0eff3f2ea1bcd6b31246a7e54c543eced62ffff9185cd9ebbaa80b13dfb",
     "signature": null
   },
   "claim_ceiling": {
