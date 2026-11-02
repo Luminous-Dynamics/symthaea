@@ -51,7 +51,12 @@
         "covariate_stream",
         "residual_equation",
         "seed_policy",
-        "candidate_visibility"
+        "candidate_visibility",
+        "substream_seed_derivation",
+        "stream_tags",
+        "uniform_integer_mapping",
+        "tail_draw",
+        "feedback_delay_draw"
       ],
       "properties": {
         "id": {
@@ -73,6 +78,46 @@
           "type": "string"
         },
         "candidate_visibility": {
+          "type": "string"
+        },
+        "substream_seed_derivation": {
+          "type": "string"
+        },
+        "stream_tags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "residual",
+            "covariate",
+            "tail_decision",
+            "tail_sign",
+            "feedback_delay"
+          ],
+          "properties": {
+            "residual": {
+              "const": 1
+            },
+            "covariate": {
+              "const": 2
+            },
+            "tail_decision": {
+              "const": 3
+            },
+            "tail_sign": {
+              "const": 4
+            },
+            "feedback_delay": {
+              "const": 5
+            }
+          }
+        },
+        "uniform_integer_mapping": {
+          "type": "string"
+        },
+        "tail_draw": {
+          "type": "string"
+        },
+        "feedback_delay_draw": {
           "type": "string"
         }
       }
