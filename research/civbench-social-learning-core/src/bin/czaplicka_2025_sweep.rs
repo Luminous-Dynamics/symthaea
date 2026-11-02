@@ -107,7 +107,6 @@ fn fmt(value: Option<f64>) -> String {
 }
 
 fn run_condition(
-    label: &str,
     population_size: usize,
     steps_per_agent: usize,
     replications: usize,
@@ -132,7 +131,6 @@ fn run_condition(
         stats.push(summarize_run(&run));
     }
 
-    let _ = label;
     stats
 }
 
@@ -209,8 +207,6 @@ fn main() {
             let seed_base = 0xC2_A5_2025_u64.wrapping_add(condition_index << 24);
 
             let reference = run_condition(
-                "social_learning_plus_algorithmic_mediation",
-                if paper_grid || extension_grid { "reference" } else { "quick" },
                 population_size,
                 steps_per_agent,
                 replications,
@@ -234,8 +230,6 @@ fn main() {
             if !paper_grid {
                 for weight in if quick { vec![5.0] } else { vec![0.5, 1.0, 2.0, 5.0] } {
                     let ucb = run_condition(
-                        "social_learning_plus_algorithmic_mediation",
-                        "exposure_aware",
                         population_size,
                         steps_per_agent,
                         replications,
