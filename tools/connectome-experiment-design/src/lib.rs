@@ -630,7 +630,10 @@ fn best_expected_utility(
             *expected += probability * utility;
         }
     }
-    if expected_by_action.iter().any(|expected| !expected.is_finite()) {
+    if expected_by_action
+        .iter()
+        .any(|expected| !expected.is_finite())
+    {
         return Err(DesignError::NumericalInstability);
     }
     expected_by_action
