@@ -797,14 +797,17 @@ pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, Evidence
 ///
 /// This parser is shared by Evidence and EvidenceBundle import. Its duplicate-key
 /// and input-size policy is stricter than upstream JavaScript JSON.parse.
-pub(crate) fn parse_strict_json_bytes(input: &[u8]) -> Result<Value, EvidenceError> {
-    if input.len() > MAX_EVIDENCE_JSON_BYTES {
+pub(crate) fn parse_strict_json_bytes(
+    input: &[u8],
+    max_bytes: usize,
+) -> Result<Value, EvidenceError> {
+    if input.len() > max_bytes {
         return Err(EvidenceError::new(
             EvidenceErrorKind::InputTooLarge,
             format!(
                 "JSON input is {} bytes; native importer limit is {} bytes",
                 input.len(),
-                MAX_EVIDENCE_JSON_BYTES
+                max_bytes
             ),
         ));
     }
@@ -827,7 +830,7 @@ pub(crate) fn parse_strict_json_bytes(input: &[u8]) -> Result<Value, EvidenceErr
 }
 
 pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
-    let parsed = parse_strict_json_bytes(input)?;
+    let parsed = parse_strict_json_bytes(input, MAX_EVIDENCE_JSON_BYTES)?;
     let mut verified = verify_evidence_value(&parsed)?;
     verified.raw_file_sha256 = Some(sha256_hex(input));
     Ok(verified)
