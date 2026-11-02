@@ -540,9 +540,6 @@
             "properties": {
               "execution": {
                 "properties": {
-                  "stage": {
-                    "const": "pristine_regrade"
-                  },
                   "runner_profile": {
                     "enum": [
                       "isolated_container",
