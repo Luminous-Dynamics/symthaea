@@ -2,14 +2,17 @@
 
 This standalone Rust crate implements the first executable slice of SPECTRA-001:
 a strict structural validator and exact descriptive rank scorer for synthetic,
-blinded hidden-target trial records.
+blinded hidden-target trial records. The participant-facing TrialV1 deliberately
+contains no target label; evaluator-only target truth is a separate type and must
+remain outside candidate-facing APIs.
 
 ## What it checks
 
 - distinct participant, operator, target-custodian, evaluator and judge roles;
 - lowercase SHA-256 digest syntax for the declared protocol, target pool,
   target-selection receipt and response commitments;
-- unique candidate identity and exactly one true-target candidate;
+- unique, semantically neutral candidate identity;
+- evaluator-only target identity kept separate from the participant-facing trial;
 - a complete permutation of the candidate set from every blinded judge;
 - strictly ordered uncertainty windows for apparatus lock, target selection,
   response sealing and target reveal, all in one declared clock domain;
