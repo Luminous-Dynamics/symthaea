@@ -32,7 +32,7 @@ const EVIDENCE_VERSION: &str = "0.1.0";
 const CONTRAST_DOMAIN: &[u8] = b"symthaea.temporal-intervention-contrast.v0.1\0";
 const PAIR_BATCH_DOMAIN: &[u8] = b"symthaea.temporal-intervention-pair-batch.v0.1\0";
 const EVIDENCE_LEDGER_DOMAIN: &[u8] = b"symthaea.temporal-intervention-evidence-ledger.v0.1\0";
-const MAX_CONTRASTS: usize = 100_000;
+const MAX_CONTRASTS: usize = 30_000;
 const MAX_BATCH_PAIRS: usize = 1_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -257,6 +257,8 @@ pub fn append_temporal_intervention_batch(
     pair_outcomes: &[TemporalInterventionPairOutcome],
 ) -> Result<AnytimeBoundedMeanReceipt, TemporalInterventionLedgerError> {
     verify_temporal_intervention_evidence_ledger(ledger)?;
+    // Mutate a clone and commit only after the complete wrapper verifies.
+    let mut next_ledger = ledger.clone();
     if pair_outcomes.is_empty() {
         return Err(TemporalInterventionLedgerError::new(
             "pair_outcomes", "an appended look must contain at least one pair",
@@ -268,7 +270,7 @@ pub fn append_temporal_intervention_batch(
         ));
     }
 
-    let contrast = ledger.family.contrasts
+    let contrast = next_ledger.family.contrasts
         .binary_search_by(|item| item.contrast_id.as_str().cmp(contrast_id))
         .ok()
         .and_then(|index| ledger.family.contrasts.get(index))
@@ -278,18 +280,18 @@ pub fn append_temporal_intervention_batch(
     let digest = contrast_sha256(contrast)?;
     let stream_id = temporal_stream_id(contrast_id, &digest, axis);
 
-    let prior_ids = existing_pair_ids_for_stream(ledger, &stream_id);
-    let prior_contexts = existing_contexts_for_stream(ledger, &stream_id);
-    let prior_receipts = existing_assignment_receipts_for_stream(ledger, &stream_id);
+    let prior_ids = existing_pair_ids_for_stream(&next_ledger, &stream_id);
+    let prior_contexts = existing_contexts_for_stream(&next_ledger, &stream_id);
+    let prior_receipts = existing_assignment_receipts_for_stream(&next_ledger, &stream_id);
     let (observations, pair_batch_sha256) = encode_pair_outcomes(
         &stream_id, pair_outcomes, &prior_ids, &prior_contexts, &prior_receipts,
     )?;
 
     let receipt = append_anytime_confidence_look(
-        &mut ledger.confidence_ledger, &stream_id, &observations,
+        &mut next_ledger.confidence_ledger, &stream_id, &observations,
     ).map_err(TemporalInterventionLedgerError::from_ledger)?;
 
-    ledger.pair_bindings.push(TemporalInterventionBatchBinding {
+    next_ledger.pair_bindings.push(TemporalInterventionBatchBinding {
         contrast_id: contrast_id.to_owned(),
         contrast_sha256: digest,
         axis,
@@ -299,7 +301,9 @@ pub fn append_temporal_intervention_batch(
         pair_batch_sha256,
         confidence_receipt_sha256: receipt.receipt_sha256.clone(),
     });
-    ledger.evidence_ledger_sha256 = compute_evidence_ledger_sha256(ledger)?;
+    next_ledger.evidence_ledger_sha256 = compute_evidence_ledger_sha256(&next_ledger)?;
+    verify_temporal_intervention_evidence_ledger(&next_ledger)?;
+    *ledger = next_ledger;
     Ok(receipt)
 }
 
@@ -780,7 +784,10 @@ mod tests {
         assert!(verify_temporal_intervention_evidence_ledger(&pair_tamper).is_err());
 
         let mut ledger_tamper = ledger;
-        ledger_tamper.confidence_ledger.streams[0].looks[0].replicate_batch[0] = 0.0;
+        let stream_id = ledger_tamper.pair_bindings[0].stream_id.clone();
+        let stream = ledger_tamper.confidence_ledger.streams.iter_mut()
+            .find(|stream| stream.stream_id == stream_id).unwrap();
+        stream.looks[0].replicate_batch[0] = 0.0;
         assert!(verify_temporal_intervention_evidence_ledger(&ledger_tamper).is_err());
     }
 
