@@ -35,6 +35,32 @@ EXCLUDES=(
   "crates/domains/symthaea-perception"
 )
 
+# Guard the mirror itself: a script-only exclusion could hide a real workspace
+# member, while a manifest-only exclusion would make this diagnostic disagree
+# with Cargo's actual package discovery.
+manifest_excludes=()
+while IFS= read -r path; do
+  [[ -n "$path" ]] && manifest_excludes+=("$path")
+done < <(
+  awk '
+    /^exclude[[:space:]]*=[[:space:]]*\[/ { in_exclude = 1; next }
+    in_exclude && /^[[:space:]]*\]/ { exit }
+    in_exclude && /^[[:space:]]*"/ {
+      value = $0
+      sub(/^[[:space:]]*"/, "", value)
+      sub(/",[[:space:]]*(#.*)?$/, "", value)
+      print value
+    }
+  ' Cargo.toml
+)
+if [[ "${manifest_excludes[*]}" != "${EXCLUDES[*]}" ]]; then
+  echo "WORKSPACE EXCLUSION MIRROR MISMATCH:"
+  echo "  Cargo.toml: ${manifest_excludes[*]}"
+  echo "  script:     ${EXCLUDES[*]}"
+  echo "Keep the diagnostic mirror exactly aligned with [workspace].exclude."
+  exit 1
+fi
+
 is_excluded() {
   local d="$1" e
   for e in "${EXCLUDES[@]}"; do [[ "$d" == "$e" ]] && return 0; done
