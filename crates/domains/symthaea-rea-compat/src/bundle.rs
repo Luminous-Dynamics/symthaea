@@ -897,3 +897,282 @@ fn safe_integer_field(value: &Value, name: &str) -> Option<f64> { value.get(name
 fn string_field<'a>(value: &'a Value, name: &str) -> Option<&'a str> { value.get(name).and_then(Value::as_str) }
 fn graph_error(message: impl Into<String>) -> BundleError { BundleError::new(BundleErrorKind::UnknownGraphInvalid, message) }
 fn schema_error(message: impl Into<String>) -> BundleError { BundleError::new(BundleErrorKind::SchemaViolation, message) }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compute_evidence_id;
+
+    fn record() -> Value {
+        serde_json::from_str(include_str!("../tests/fixtures/rea-evidence-v1.json"))
+            .expect("source-derived Evidence fixture is valid")
+    }
+
+    fn unknown_id(question: &str, domain: &str) -> String {
+        let identity = json!({
+            "domain": domain.trim(),
+            "question": collapse_ecmascript_whitespace(trim_ecmascript_whitespace(question)),
+            "scope_digest": null
+        });
+        format!("unk_{}", hash_canonical(&identity).unwrap())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn unknown_revision(
+        question: &str,
+        domain: &str,
+        revision: u64,
+        previous_revision_digest: Option<&str>,
+        relationships: Value,
+        status: &str,
+        supporting_evidence_ids: Vec<String>,
+        contradicting_evidence_ids: Vec<String>,
+        resolution: Value,
+        required_authority: Value,
+        required_confidence: &str,
+    ) -> Value {
+        let evidence_id = record()["evidence_id"].as_str().unwrap().to_owned();
+        let mut unknown = json!({
+            "unknown_id": unknown_id(question, domain),
+            "revision": revision,
+            "previous_revision_digest": previous_revision_digest,
+            "revision_digest": "0".repeat(64),
+            "scope_digest": null,
+            "question": question,
+            "status": status,
+            "severity": "medium",
+            "domain": domain,
+            "supporting_evidence_ids": supporting_evidence_ids,
+            "contradicting_evidence_ids": contradicting_evidence_ids,
+            "required_authority": required_authority,
+            "required_confidence": required_confidence,
+            "required_environment": null,
+            "recommended_probes": [],
+            "relationships": relationships,
+            "resolution": resolution,
+            "mutation_evidence_ids": [evidence_id]
+        });
+        let mut revision_payload = unknown.clone();
+        revision_payload.as_object_mut().unwrap().remove("revision_digest");
+        unknown["revision_digest"] = json!(hash_canonical(&revision_payload).unwrap());
+        unknown
+    }
+
+    fn open_unknown(question: &str, relationships: Value) -> Value {
+        unknown_revision(
+            question,
+            "archive",
+            1,
+            None,
+            relationships,
+            "open",
+            vec![],
+            vec![],
+            Value::Null,
+            Value::Null,
+            "inferred",
+        )
+    }
+
+    fn verified_unknown(question: &str, required_authority: Value) -> Value {
+        let evidence_id = record()["evidence_id"].as_str().unwrap().to_owned();
+        unknown_revision(
+            question,
+            "archive",
+            1,
+            None,
+            json!([]),
+            "resolved",
+            vec![evidence_id.clone()],
+            vec![],
+            json!({
+                "disposition": "verified",
+                "rationale": "The observation satisfies the declared requirement",
+                "evidence_ids": [evidence_id]
+            }),
+            required_authority,
+            "observed",
+        )
+    }
+
+    fn bundle(records: Vec<Value>, unknowns: Vec<Value>) -> Value {
+        create_evidence_bundle(&records, &unknowns).unwrap()
+    }
+
+    #[test]
+    fn verifies_canonical_manifest_projection_and_separate_digests() {
+        let evidence = record();
+        let unknown = open_unknown("Archive member metadata is complete", json!([]));
+        let input = bundle(vec![evidence], vec![unknown]);
+        let verified = verify_evidence_bundle_value(&input).unwrap();
+
+        assert_eq!(verified.record_count, 1);
+        assert_eq!(verified.unknown_revision_count, 1);
+        assert_eq!(verified.raw_file_sha256, None);
+        assert_eq!(
+            verified.canonical_sha256,
+            sha256_hex(&canonical_jcs_bytes(&verified.bundle).unwrap())
+        );
+
+        let raw = serde_json::to_vec(&input).unwrap();
+        let from_json = verify_evidence_bundle_json(&raw).unwrap();
+        let expected_raw_sha256 = sha256_hex(&raw);
+        assert_eq!(
+            from_json.raw_file_sha256.as_deref(),
+            Some(expected_raw_sha256.as_str())
+        );
+        assert_eq!(from_json.canonical_sha256, verified.canonical_sha256);
+        assert_ne!(
+            from_json.raw_file_sha256.as_deref(),
+            Some(from_json.canonical_sha256.as_str())
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_evidence_records() {
+        let evidence = record();
+        let duplicate = bundle(vec![evidence.clone(), evidence], vec![]);
+        let error = verify_evidence_bundle_value(&duplicate).unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::DuplicateEvidenceId);
+    }
+
+    #[test]
+    fn rejects_noncanonical_manifest_projection() {
+        let mut input = bundle(vec![record()], vec![]);
+        input["artifacts"][0]["format"] = json!("zip");
+        let error = verify_evidence_bundle_value(&input).unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::NonCanonicalBundle);
+    }
+
+    #[test]
+    fn rejects_missing_evidence_references_from_unknown_history() {
+        let mut unknown = open_unknown("A claim with missing support", json!([]));
+        unknown["supporting_evidence_ids"] = json!([
+            "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ]);
+        let mut payload = unknown.clone();
+        payload.as_object_mut().unwrap().remove("revision_digest");
+        unknown["revision_digest"] = json!(hash_canonical(&payload).unwrap());
+
+        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![unknown]))
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
+        assert!(error.message.contains("references missing Evidence"));
+    }
+
+    #[test]
+    fn rejects_revision_gaps_and_broken_predecessor_chains() {
+        let first = open_unknown("A versioned unresolved claim", json!([]));
+        let first_digest = first["revision_digest"].as_str().unwrap().to_owned();
+        let third = unknown_revision(
+            "A versioned unresolved claim",
+            "archive",
+            3,
+            Some(&first_digest),
+            json!([]),
+            "investigating",
+            vec![],
+            vec![],
+            Value::Null,
+            Value::Null,
+            "inferred",
+        );
+        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![first, third]))
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
+        assert!(error.message.contains("revision history has a gap"));
+
+        let first = open_unknown("A second revision chain", json!([]));
+        let second = unknown_revision(
+            "A second revision chain",
+            "archive",
+            2,
+            Some(&"a".repeat(64)),
+            json!([]),
+            "investigating",
+            vec![],
+            vec![],
+            Value::Null,
+            Value::Null,
+            "inferred",
+        );
+        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![first, second]))
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
+        assert!(error.message.contains("revision chain is broken"));
+    }
+
+    #[test]
+    fn rejects_dangling_relationships_and_dependency_cycles() {
+        let dangling = open_unknown(
+            "Unknown with a dangling relation",
+            json!([{
+                "type": "related-to",
+                "unknown_id": format!("unk_{}", "f".repeat(64))
+            }]),
+        );
+        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![dangling]))
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
+        assert!(error.message.contains("references missing unknown"));
+
+        let left_id = unknown_id("Left dependency", "archive");
+        let right_id = unknown_id("Right dependency", "archive");
+        let left = open_unknown(
+            "Left dependency",
+            json!([{"type": "depends-on", "unknown_id": right_id}]),
+        );
+        let right = open_unknown(
+            "Right dependency",
+            json!([{"type": "depends-on", "unknown_id": left_id}]),
+        );
+        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![left, right]))
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
+        assert!(error.message.contains("dependency cycle"));
+    }
+
+    #[test]
+    fn accepts_only_evidence_qualified_verified_resolutions() {
+        let valid = verified_unknown("A claim that can be verified", Value::Null);
+        assert!(verify_evidence_bundle_value(&bundle(vec![record()], vec![valid])).is_ok());
+
+        let invalid = verified_unknown(
+            "A claim requiring a different authority",
+            json!("controlled-replay"),
+        );
+        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![invalid]))
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
+        assert!(error.message.contains("no qualifying resolution Evidence"));
+    }
+
+    #[test]
+    fn evidence_link_closure_is_a_separate_stricter_audit() {
+        let mut evidence = record();
+        evidence["evidence_links"] = json!([
+            "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ]);
+        evidence["evidence_id"] = json!(compute_evidence_id(&evidence).unwrap());
+        let input = bundle(vec![evidence], vec![]);
+
+        // Upstream REA bundle authentication does not require links to resolve
+        // inside the same bundle; the stricter graph audit reports them.
+        assert!(verify_evidence_bundle_value(&input).is_ok());
+        let missing = audit_evidence_link_closure(&input).unwrap();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(
+            missing[0].1,
+            "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_keys_in_raw_bundle_json() {
+        let error = verify_evidence_bundle_json(br#"{"records":[],"records":[]}"#)
+            .unwrap_err();
+        assert_eq!(error.kind, BundleErrorKind::InvalidJson);
+    }
+}
