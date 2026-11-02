@@ -388,3 +388,25 @@ and require `delta_null_total < alpha`. Do not spend only the calibration delta 
 The event used for this calculation must be independent of the confirmatory stream, or the method needs a separate joint/sequential proof. If the transport estimator consumes confirmatory outcomes, the independent-split derivation does not apply automatically.
 
 Keep alternative-performance confidence failure and guardrail false-safe confidence failure as separately named budgets because they support different claims. If a top-level authorization claim composes several gates, state exactly which failure events govern that claim and how they combine; never relabel guardrail or alternative failure as Type-I error.
+
+
+## 19. Learning yield: classify outcomes and prevent metric gaming
+
+Spotify's approximately 64% learning / 12% win figures originate in its September 2025 *Beyond Winning: Spotify's Experiments with Learning Framework* and are reiterated in its May 2026 *Better Experiments with LLM Evals* article, not a September 2026 publication:
+- https://engineering.atspotify.com/2025/9/spotifys-experiments-with-learning-framework
+- https://engineering.atspotify.com/2026/5/better-experiments-with-llm-evals-a-funnel-not-a-fork
+
+Spotify's definition requires a valid, decision-ready experiment. Its learning outcomes include a win without regressions, a detected regression, or a sufficiently powered neutral result. It states that every relevant metric must be powered for a neutral result to qualify and warns against improving the learning rate by sacrificing win rate, experiment volume or precision. These are Spotify's inclusion criteria and company-reported outcomes, not universal industry standards.
+
+For this benchmark:
+- require health/setup checks before classifying a learning outcome;
+- require decision readiness across the complete predeclared metric and guardrail family, not only the primary metric;
+- classify win, regression, powered-neutral, hypothesis-elimination, invalid, underpowered and indeterminate separately;
+- report per-metric achieved power, precision/MDE, restarts/attempts, experiment volume, false-learning rate and all-in cost;
+- treat learning yield as an outcome vector, with win-rate, volume and precision guardrails, not a scalar optimization target.
+
+Do not set a target to reproduce Spotify's 64% learning rate. Compare methods at matched inclusion rules, sample/evaluator budget, metric families and power requirements.
+
+References:
+- Spotify Engineering (September 2025), *Beyond Winning: Spotify's Experiments with Learning Framework*. https://engineering.atspotify.com/2025/9/spotifys-experiments-with-learning-framework
+- Spotify Engineering (May 2026), *Better Experiments with LLM Evals — A funnel, not a fork*. https://engineering.atspotify.com/2026/5/better-experiments-with-llm-evals-a-funnel-not-a-fork
