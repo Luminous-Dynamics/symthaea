@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
-pub mod design;
-
 //! Exact finite-grid binomial/Newton transforms for ETH-002.
 //!
 //! This is a finite-table reference implementation, not a complexity-theoretic
 //! speedup. Values use checked i128 arithmetic; overflow is an explicit error.
+
+pub mod design;
 
 use std::error::Error;
 use std::fmt;
