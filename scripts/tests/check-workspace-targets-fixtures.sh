@@ -15,6 +15,17 @@ cp "$repo_root/scripts/check-workspace-targets.sh" "$tmp/scripts/check-workspace
 cat > "$tmp/Cargo.toml" <<'EOF'
 [workspace]
 members = ["crates/core/*"]
+exclude = [
+    "crates/core/nixward-web",
+    "crates/core/symthaea",
+    "crates/core/symthaea-observation-attestation",
+    "crates/core/symthaea-zkproof/methods",
+    "crates/core/symthaea-zkproof/host",
+    "crates/domains/symthaea-spore/fuzz",
+    "crates/domains/spark-engine",
+    "crates/domains/symthaea-lab",
+    "crates/domains/symthaea-perception",
+]
 EOF
 
 cat > "$tmp/crates/core/good/Cargo.toml" <<'EOF'
@@ -45,6 +56,19 @@ fi
 grep -F "MISSING MANIFEST: crates/core/unlisted-examples-only" "$tmp/negative.log" >/dev/null || {
   cat "$tmp/negative.log" >&2
   echo "FAIL: preflight did not identify the exact missing-manifest path" >&2
+  exit 1
+}
+
+# A script-only exclusion must not hide an unexcluded directory from Cargo.
+sed '/"crates\/domains\/symthaea-perception",/d' "$tmp/Cargo.toml" > "$tmp/Cargo.mismatch.toml"
+cp "$tmp/Cargo.mismatch.toml" "$tmp/Cargo.toml"
+if bash "$tmp/scripts/check-workspace-targets.sh" > "$tmp/mismatch.log" 2>&1; then
+  echo "FAIL: mismatched exclusion mirror was accepted" >&2
+  exit 1
+fi
+grep -F "WORKSPACE EXCLUSION MIRROR MISMATCH" "$tmp/mismatch.log" >/dev/null || {
+  cat "$tmp/mismatch.log" >&2
+  echo "FAIL: exclusion mirror mismatch was not reported" >&2
   exit 1
 }
 
