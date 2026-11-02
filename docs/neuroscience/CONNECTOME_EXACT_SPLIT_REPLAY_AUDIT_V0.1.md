@@ -22,7 +22,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
   --output split-replay-report.json
 ```
 
-Each species directory must contain `manifest.json`, `train.json`, `val.json`, and `test.json`. The tool requires upstream generator commit `5679b39aa2641d8d0afeed88b441e696f87a66df` and the dataset's exact Hub commit SHA resolved from `revision="v2"`.
+Each species directory must contain `train.json`, `val.json`, and `test.json`, matching the exact directory layout consumed by upstream `load_split_index(splits_root)`. The build-time `manifest.json` is optional because the downstream loader does not read it; when present, its species, 50,000 nm edge and per-bank `op_counts` are checked. The tool requires upstream generator commit `5679b39aa2641d8d0afeed88b441e696f87a66df` and the dataset's exact Hub commit SHA resolved from `revision="v2"`.
 
 ## Fail-closed checks
 
@@ -30,13 +30,13 @@ Each species directory must contain `manifest.json`, `train.json`, `val.json`, a
 - reconstruct the bank-specific key using Python-compatible integer semantics and exact finite coordinate values;
 - verify every observed sidecar row maps to the exact split declared by the corresponding upstream JSON;
 - require every split key to occur exactly once across all three split files, rejecting both within-split duplicates and cross-split dictionary overwrites;
-- compare every bank/split key count to the upstream `manifest.json` `op_counts`;
-- hash the bytes of every source split file and species manifest into a deterministic report.
+- when the optional build manifest exists, compare every bank/split key count to its `op_counts`;
+- hash the bytes of every consumed source split file and, when present, the species build manifest into a deterministic report.
 
 The exact sidecar-to-split replay is complementary to the existing dataset audit: the latter checks duplicate row IDs, operation-group split isolation, 50 µm cube split isolation, labels, routes, masks and modality cohorts. This tool checks that the row's assigned partition equals the actual upstream split key lookup.
 
 ## Trust and limitations
 
-A PASS is conditional on the supplied files. The report hashes the split files and requires an exact upstream code commit and operator-supplied Hub V2 commit SHA, but it cannot authenticate that files copied to `--split-root` are the ones used to produce the published V2 data unless their provenance is separately authenticated and pinned. It also does not prove biological independence, label truth, population representativeness or model performance.
+A PASS is conditional on the supplied files. The report hashes the consumed split files and optional build manifest and requires an exact upstream code commit and operator-supplied Hub V2 commit SHA, but it cannot authenticate that files copied to `--split-root` are the ones used to produce the published V2 data unless their provenance is separately authenticated and pinned. It also does not prove biological independence, label truth, population representativeness or model performance.
 
 The upstream sample key is MD5 of `source_archive|source_archive_sample_hash`; it is only an identity convention. All artifact integrity in the audit report uses SHA-256.
