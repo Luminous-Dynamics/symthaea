@@ -2,11 +2,13 @@
 
 Deterministic event-driven simulation of the proposed InstantClean QuickCell + FullLoad architecture.
 
-## What it compares
+## Policies compared
 
-- `FullLoadOnly`: accumulate eligible jobs until the full-load capacity or maximum batch wait is reached.
-- `QuickCellOnly`: clean eligible jobs individually as the single cell becomes available.
-- `HybridDeadlineAware`: use QuickCell when FullLoad is not eligible or the next possible full batch would miss the job deadline; otherwise accumulate for FullLoad.
+- `FullLoadOnly`: accumulate eligible jobs until full-load capacity or maximum batch wait.
+- `QuickCellOnly`: clean each eligible item individually as the single cell becomes available.
+- `HybridResourceAware`: use QuickCell for jobs that are ineligible for FullLoad, would miss their deadline in the next full batch, or belong to a timed-out partial batch that QuickCell Pareto-dominates on both modeled energy and fresh water per item.
+
+The hybrid policy has no opaque weighted score. If QuickCell is better on both energy and water for a timed-out partial batch, it diverts the items to QuickCell. If the resource objectives conflict or FullLoad is no worse, it retains FullLoad and reports the resulting trade-off.
 
 ## What is explicit
 
@@ -14,9 +16,10 @@ Deterministic event-driven simulation of the proposed InstantClean QuickCell + F
 - Soil class and sanitization requirement.
 - Mode capacity and process duration.
 - Base and per-item energy and fresh-water coefficients.
-- Soil support, sanitization support and a caller-supplied cleaning/rinse validation flag.
+- Soil support, sanitization support and caller-supplied cleaning/rinse validation flag.
+- Maximum wait before a partial full-load batch is dispatched or compared with QuickCell.
 
-A process with an unvalidated cleaning/rinse flag is never selected. Soil or sanitation incompatibility is not traded away for speed or resource use. Unprocessable jobs are reported rather than silently forced into a mode.
+A process with an unvalidated cleaning/rinse flag is never selected. Soil or sanitation incompatibility is not traded away for speed or resource use. Unprocessable jobs are reported rather than forced into a mode.
 
 ## Critical evidence boundary
 
@@ -24,7 +27,7 @@ The included `illustrative_profiles()` values are hypothetical design inputs onl
 - QuickCell: 5 minutes, 0.05 kWh and 0.7 L per item.
 - FullLoad: 14-item capacity, 120 minutes, 0.39 kWh and 6.7 L at full capacity.
 
-They are not measured product performance and are not pulled from an industry label. The linear base-plus-per-item model is a convenient sensitivity scaffold; it must be replaced with measured partial-load and full-load resource curves before product decisions.
+They are not measured product performance and are not pulled from an industry label. The linear base-plus-per-item model is a sensitivity scaffold; it must be replaced with measured partial-load and full-load resource curves before product decisions.
 
 The simulator does not model:
 - Physical cleaning or rinse outcomes.
@@ -35,6 +38,18 @@ The simulator does not model:
 
 Cleaning/rinse and sanitation flags are supplied assumptions. This crate cannot certify those processes.
 
+## Simulation semantics
+
+The finite workload trace is sorted by arrival and replayed deterministically. The hybrid deadline check uses known future arrivals in the replay trace to estimate the next possible full batch; that is an offline benchmark assumption, not a deployable forecast. A production controller must use a declared forecast or conservative no-forecast rule and report forecast error.
+
+The result reports:
+- Energy and fresh water totals.
+- QuickCell and FullLoad cycle counts.
+- Unprocessed jobs and deadline misses.
+- Mean and p95 queue wait (arrival to process start).
+- Mean and p95 end-to-end latency (arrival to item release).
+- Workload makespan measured from first arrival to final completion.
+
 ## Run
 
 ~~~sh
@@ -43,8 +58,8 @@ cargo run -p symthaea-dishwasher-scheduler --bin dispatch_bench
 cargo clippy -p symthaea-dishwasher-scheduler --all-targets -- -D warnings
 ~~~
 
-Synthetic workload generators use a fixed seed and explicit pattern, so results are reproducible but are not representative household data without calibration.
+Synthetic workload generators use fixed seeds and explicit scenario families. They are reproducible but are not representative household-use data until calibrated.
 
-## Interpreting the output
+## Interpreting output
 
-Compare energy, fresh water, waiting-time percentiles, deadline misses, unprocessed jobs and cycle counts together. Never rank policies on one weighted score without showing Pareto alternatives. Keep labelled eco-cycle comparisons separate from per-item QuickCell experiments.
+Compare energy, fresh water, p95 end-to-end latency, deadline misses, unprocessed jobs and cycle counts together. Do not reduce the comparison to one weighted score. Keep eco-label tests separate from per-item QuickCell experiments.
