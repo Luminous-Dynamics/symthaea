@@ -59,7 +59,7 @@ A candidate is feasible only when all three adjusted bounds satisfy their indepe
     UCB_minus_i  <= epsilon_minus
     UCB_output_i <= epsilon_output
 
-A union bound over all 3G statements controls the familywise statistical failure probability by delta, conditional on independent iid task-level observations from the intended validation population, bounded losses, and a candidate grid frozen before calibration outcomes are inspected. The three losses on an individual task may be dependent; the union bound does not multiply probabilities.
+A union bound over all 3G statements controls the familywise statistical failure probability by delta, conditional on independent iid task-level observations from the intended validation population, bounded losses, and a candidate grid frozen before calibration outcomes are inspected. The three losses on an individual task may be dependent; the union bound does not multiply probabilities. The receipt now preserves the exact per-claim failure allocation as the rational value `confidence_delta_ppm / (3 * candidate_count)`; it does not round or truncate that allocation to an integer PPM field. The report verifier independently checks the 3G count, allocation denominator, UCB arithmetic, all three feasibility flags, and the selected minimum-compute feasible candidate.
 
 The method enumerates the entire grid and assumes no monotonicity in threshold or risk. Among feasible candidates it selects the lowest mean token fraction, using candidate ID as a deterministic tie-break. If none is feasible it reports that outcome and never relaxes a budget.
 
@@ -94,6 +94,8 @@ Independent JavaScript replay of the fixture gives a three-channel Hoeffding cor
 | d_full_budget | 0.00% | 0.00% | 25.00% | 100.00% | Yes |
 
 At the declared 23% upper/lower budgets and 35% output-error budget, only the full-budget baseline passes all three numerical UCB thresholds. The experiment therefore demonstrates **no compute saving at the current answer-quality requirement**. That is a negative but useful result: the current confidence signal/candidate grid is insufficient. A stronger verifier or solvability/continuation-value signal is needed before claiming efficiency gains.
+
+A separate Monte Carlo sanity check of the correction used `N=256`, `G=4`, 12 Bernoulli risk streams with true mean 0.5, delta=10%, and 20,000 independently generated calibration families. With the documented outward-rounded correction of 96,700 PPM, all 12 population means were simultaneously below their UCBs in 98.755% of families (95% Wilson interval 98.592%–98.900%). This is a synthetic check of the arithmetic under a simple iid design; it does not validate the stratified fixture, the LLM confidence signal, or a real deployment.
 
 ## 7. Industry comparisons and benchmark targets
 
