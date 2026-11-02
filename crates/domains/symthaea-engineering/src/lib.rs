@@ -436,6 +436,12 @@ impl EngineeringManager {
                     "Build-volume check rejected: resolved geometry bounds are invalid.".into(),
                 );
             }
+            ConstraintFitStatus::InvalidGeometryStructure => {
+                return Err(
+                    "Build-volume check rejected: CSG structure or transform validation failed."
+                        .into(),
+                );
+            }
             ConstraintFitStatus::ExceedsDeclaredBuildVolume => {
                 return Err(
                     "Build-volume check rejected: geometry exceeds the declared printer volume."
@@ -443,7 +449,9 @@ impl EngineeringManager {
                 );
             }
         }
-        let mesh = thought.resolve();
+        let mesh = thought
+            .try_resolve()
+            .map_err(|error| format!("Checked CSG resolution failed: {error:?}"))?;
         self.last_mesh = Some(mesh);
         self.fabrication_loop
             .0
