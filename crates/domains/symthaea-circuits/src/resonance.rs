@@ -476,6 +476,22 @@ mod tests {
     }
 
     #[test]
+    fn detuned_coupled_resonators_match_known_mode_frequencies() {
+        let first = SeriesRlc::new(10.0, 1e-3, 1e-6).expect("first resonator");
+        let second = SeriesRlc::new(20.0, 2e-3, 1e-6).expect("second resonator");
+        let k = 0.3;
+        let coupled =
+            CoupledSeriesRlc::new(first, second, k).expect("valid detuned pair");
+        let modes = coupled.mode_frequencies_hz().expect("finite coupled modes");
+
+        assert!((modes.lower_hz - 3427.8479810908657).abs() < 1e-8);
+        assert!((modes.upper_hz - 5477.507940293483).abs() < 1e-8);
+        assert!(
+            (coupled.mutual_inductance_henry() - k * (2e-6_f64).sqrt()).abs() < 1e-15
+        );
+    }
+
+    #[test]
     fn zero_coupling_recovers_independent_resonances() {
         let first = SeriesRlc::new(10.0, 1e-3, 1e-6).expect("first resonator");
         let second = SeriesRlc::new(20.0, 2e-3, 1e-6).expect("second resonator");
