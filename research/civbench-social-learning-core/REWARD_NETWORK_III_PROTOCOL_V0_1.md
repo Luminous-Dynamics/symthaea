@@ -75,3 +75,19 @@ CivBench should compare at least three axes:
 - **Mechanism-based social learning:** transparent diffusion, prestige/performance selection, Bayesian/evidence-weighted learning and Symthaea cognitive mechanisms (which mechanism improves correctness, retention, correction and transfer under controlled budgets?).
 
 The 2024 PNAS control-condition study above is a further warning: social transmission is not automatically superior to individual learning. Comparisons must equalize accumulated learning opportunity and measure acquisition cost, fatigue and redundancy.
+
+## Simplified executable generational model in this crate
+
+`src/cultural_evolution.rs` is an independent reference ABM, not the paper's original agent-based model. It deliberately exposes separate state transitions:
+
+1. individual discovery, with distinct first-generation/later-generation trial budgets and human/machine search biases;
+2. teacher-candidate sampling;
+3. teacher choice by uniform selection or performance softmax;
+4. demonstration observation;
+5. strategy acquisition conditional on observation;
+6. optional transmission corruption (optimal → myopic → none);
+7. integration into the learner's active strategy, independently parameterized from acquisition.
+
+The model records the selected teacher and their strategy, what the learner acquired, whether integration occurred, and whether the selected teacher was the best-scoring member of the candidate set. Metrics separate individual discovery, demonstration observation, strategy acquisition, optimal-strategy acquisition, active integration and top-teacher selection.
+
+This decomposition helps localize failure: a strategy may fail to spread because it was not discovered, because the wrong teacher was selected, because the learner did not observe the demonstration, because it was not acquired, because transmission corrupted it, or because the acquired strategy was not integrated. V0 still simplifies the task to a three-strategy repertoire, one teacher per learner, scalar demonstration performance, one-step corruption and a Bernoulli integration gate. It does not reproduce the authors' experiment or ABM; the archive and supplementary parameters must be ingested before any reproduction claim.
