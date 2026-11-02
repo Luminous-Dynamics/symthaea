@@ -13,7 +13,7 @@ if (!reaRootArgument || !outputArgument) {
 const reaRoot = resolve(reaRootArgument);
 const outputPath = resolve(outputArgument);
 const importFromRea = async (relativePath) =>
-  import(pathToFileURL(resolve(reaRoot, "dist", relativePath)).href);
+  import(pathToFileURL(resolve(reaRoot, "src", relativePath)).href);
 
 const [{ createEvidence, withEvidenceCallerInputPath }, { createAnalysisProfile }] =
   await Promise.all([
