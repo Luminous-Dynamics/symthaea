@@ -24,7 +24,7 @@ Updates are synchronous: all agents read the previous state and write the next s
 
 See [REWARD_NETWORK_III_PROTOCOL_V0_1.md](REWARD_NETWORK_III_PROTOCOL_V0_1.md) for the empirical task definition, study design, published result references, baseline ladder, transfer/correction experiments, and Zenodo ingestion gates. The Rust module `src/reward_network.rs` implements Random, ImmediateGreedy, LossSeeking and LossThenGreedy policies plus a full-information finite-horizon oracle. The oracle is an upper bound, not a participant policy.
 
-The current 12-node/30-edge test graph is synthetic. It checks the published task shape and reproduces the 2,000-versus-2,650 reward contrast under a deliberately constructed three-loss route. It is not an original Reward Network III network. The Zenodo v2.0 archive has not been downloaded or hashed in this branch; no paper replication is claimed.
+The current 12-node/30-edge graph is a synthetic unit-test fixture only; it does not claim to match the published task shape. It checks the abstract three-loss/2,000-versus-2,650 incentive contrast. The paper specifies ten moves, but the exact final v2.0 network topology must be taken from the Zenodo archive. The older public GitHub repository snapshot is separately audited in [LEGACY_GITHUB_SNAPSHOT_AUDIT.md](LEGACY_GITHUB_SNAPSHOT_AUDIT.md): its 841 networks are 10-node/20-edge, levels 0–4, with 8-transition solutions. Do not substitute that historical profile for Zenodo v2.0. No final v2.0 archive digest or paper replication is claimed yet.
 
 
 ## Generational cultural-transmission model
