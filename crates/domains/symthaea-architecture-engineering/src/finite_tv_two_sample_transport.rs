@@ -286,6 +286,8 @@ struct ReportPayload<'a> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransportedExpectationInterval {
+    pub functional_contract_sha256: String,
+    pub calibration_interval_source_sha256: String,
     pub functional_lower_bound: f64,
     pub functional_upper_bound: f64,
     pub calibration_lower_confidence_bound: f64,
@@ -535,12 +537,25 @@ pub fn verify_finite_tv_two_sample_transport_report(
 pub fn transport_bounded_expectation_interval(
     request: &FiniteTvTwoSampleTransportRequest,
     report: &FiniteTvTwoSampleTransportReport,
+    functional_contract_sha256: &str,
+    calibration_interval_source_sha256: &str,
     functional_lower_bound: f64,
     functional_upper_bound: f64,
     calibration_lower_confidence_bound: f64,
     calibration_upper_confidence_bound: f64,
 ) -> Result<TransportedExpectationInterval, FiniteTvTransportError> {
     verify_finite_tv_two_sample_transport_report(request, report)?;
+    validate_hash(functional_contract_sha256, "functional_contract_sha256")?;
+    if functional_contract_sha256 != request.functional_contract_sha256 {
+        return Err(FiniteTvTransportError::new(
+            "functional_contract_sha256",
+            "requested expectation functional does not match the transport certificate's frozen contract",
+        ));
+    }
+    validate_hash(
+        calibration_interval_source_sha256,
+        "calibration_interval_source_sha256",
+    )?;
     if !functional_lower_bound.is_finite()
         || !functional_upper_bound.is_finite()
         || functional_lower_bound > functional_upper_bound
@@ -594,6 +609,8 @@ pub fn transport_bounded_expectation_interval(
         ));
     }
     Ok(TransportedExpectationInterval {
+        functional_contract_sha256: functional_contract_sha256.into(),
+        calibration_interval_source_sha256: calibration_interval_source_sha256.into(),
         functional_lower_bound,
         functional_upper_bound,
         calibration_lower_confidence_bound,
@@ -793,6 +810,8 @@ mod tests {
         let transported = transport_bounded_expectation_interval(
             &request,
             &report,
+            FUNCTION_HASH,
+            CALIBRATION_DATA_HASH,
             2.0,
             6.0,
             3.0,
@@ -878,12 +897,42 @@ mod tests {
     }
 
     #[test]
+    fn rejects_contract_mismatch_or_unbound_calibration_interval_source() {
+        let request = request(vec![80, 20], vec![50, 50]);
+        let report = calibrate_finite_tv_two_sample_transport(&request).unwrap();
+        assert!(transport_bounded_expectation_interval(
+            &request,
+            &report,
+            TARGET_DESIGN_HASH,
+            CALIBRATION_DATA_HASH,
+            0.0,
+            1.0,
+            0.2,
+            0.8,
+        )
+        .is_err());
+        assert!(transport_bounded_expectation_interval(
+            &request,
+            &report,
+            FUNCTION_HASH,
+            "not-a-sha256",
+            0.0,
+            1.0,
+            0.2,
+            0.8,
+        )
+        .is_err());
+    }
+
+    #[test]
     fn rejects_overflowing_functional_range_instead_of_emitting_infinite_bounds() {
         let request = request(vec![80, 20], vec![50, 50]);
         let report = calibrate_finite_tv_two_sample_transport(&request).unwrap();
         assert!(transport_bounded_expectation_interval(
             &request,
             &report,
+            FUNCTION_HASH,
+            CALIBRATION_DATA_HASH,
             -f64::MAX,
             f64::MAX,
             -1.0,
@@ -926,6 +975,8 @@ mod tests {
         assert!(transport_bounded_expectation_interval(
             &request,
             &report,
+            FUNCTION_HASH,
+            CALIBRATION_DATA_HASH,
             0.0,
             1.0,
             -0.1,
