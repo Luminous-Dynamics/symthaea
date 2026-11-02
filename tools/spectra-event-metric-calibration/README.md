@@ -24,8 +24,8 @@ The synthetic latent evidence is generated from:
 
 The equal-variance model gives analytic expectations:
 
-- hit rate: (Phi(d'/2-c));
-- false-alarm rate: (Phi(-d'/2-c));
+- hit probability: standard-normal CDF at `d-prime / 2 - c`.
+- false-alarm probability: standard-normal CDF at `-d-prime / 2 - c`.
 - ROC AUC: (Phi(d'/\sqrt{2})).
 
 The model allows sensitivity (d') and response criterion (c) to vary
