@@ -180,7 +180,7 @@ fn validate_times(trial: &TrialV1, errors: &mut Vec<ValidationErrorV1>) {
         ("target_revealed_at", &trial.target_revealed_at),
     ];
 
-    for (name, window) in windows {
+    for &(name, window) in &windows {
         if !valid_time_window(window) {
             errors.push(ValidationErrorV1::InvalidTimeWindow(name));
         }
