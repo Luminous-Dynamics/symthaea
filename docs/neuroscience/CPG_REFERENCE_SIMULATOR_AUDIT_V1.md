@@ -152,3 +152,13 @@ Do not claim superiority until the same connectome versions, observations, pertu
 - Only held-out, independently measured interventions can support the corresponding empirical prediction claim.
 
 **No benchmark outcome, biological reproduction or SOTA result is claimed by this audit document.**
+
+### Raw-state artifact format
+
+The verifier consumes a separate raw-state file referenced relative to the receipt JSON. It is a contiguous little-endian float array with the declared encoding (`f32le` or `f64le`), dimension and saved-timepoint count. The byte length must equal:
+
+`state_dimension × actual_saved_timepoints × bytes_per_value`
+
+The SHA-256 is recomputed from the file bytes. Every value is decoded and checked for finiteness; observed min/max/max-absolute values and the non-finite count must reconcile with the receipt. The capture stage must be `direct_solver_output_before_postprocessing`; a hash of an already-sanitized array is not acceptable.
+
+The raw-state array is authoritative for numerical-integrity checks. Save it before any NaN/Inf replacement, clipping, interpolation, or other post-solver transformation. For large runs, a streaming implementation may scan/hash in chunks, but must produce the same byte-level digest and counts.
