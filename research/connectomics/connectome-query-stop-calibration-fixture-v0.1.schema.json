@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-query-stop-calibration-fixture-v0.1.schema.json",
+  "title": "Synthetic query stop calibration fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "synthetic_only",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "input"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input": {
+            "$ref": "connectome-query-stop-calibration-input-v0.1.schema.json"
+          },
+          "expected_report": {
+            "$ref": "connectome-query-stop-calibration-report-v0.1.schema.json"
+          },
+          "expected_error": {
+            "enum": [
+              "InvalidIdentifier",
+              "InvalidSha256",
+              "InvalidAlpha",
+              "InvalidMaterialityThreshold",
+              "InvalidFutureHorizon",
+              "InvalidRatio",
+              "DuplicateTrajectoryId",
+              "DuplicateSourceVolume",
+              "DuplicateIndependenceCluster",
+              "TargetVolumeAppearsInCalibration",
+              "TargetClusterAppearsInCalibration",
+              "EmptySourceVolume",
+              "RankOverflow"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "expected_report"
+            ],
+            "not": {
+              "required": [
+                "expected_error"
+              ]
+            }
+          },
+          {
+            "required": [
+              "expected_error"
+            ],
+            "not": {
+              "required": [
+                "expected_report"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
