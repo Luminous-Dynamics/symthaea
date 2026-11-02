@@ -732,9 +732,13 @@ fn compute_report_digest(report: &RiskCompositionReport) -> Result<String, RiskL
 
 pub const BUILTIN_PLAN_JSON: &str = include_str!("../fixtures/compositional_risk_plan_v0.1.json");
 pub fn load_builtin_plan() -> Result<RiskBudgetPlan, RiskLedgerError> {
-    let plan: RiskBudgetPlan = serde_json::from_str(BUILTIN_PLAN_JSON)
+    let mut plan: RiskBudgetPlan = serde_json::from_str(BUILTIN_PLAN_JSON)
         .map_err(|error| fail("fixture", format!("risk plan JSON parse failed: {error}")))?;
-    validate_risk_budget_plan(&plan)?;
+    if plan.plan_sha256.is_empty() {
+        plan = seal_risk_budget_plan(plan)?;
+    } else {
+        validate_risk_budget_plan(&plan)?;
+    }
     Ok(plan)
 }
 
