@@ -17,7 +17,9 @@
 //! to compute expected free energy over future time horizons.
 
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
-use crate::dynamics::ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
+use crate::dynamics::ode_solvers::{
+    OdeConfig, OdeResult, OdeSolveLimits, OdeSolver, OdeSolverEngine, OdeSystem,
+};
 use crate::exploration::SurpriseExplorationBridge;
 use std::collections::VecDeque;
 use symthaea_core::embodiment::EmbodimentBridge;
@@ -160,9 +162,13 @@ pub struct TrajectoryTelemetry {
     pub horizon: f64,
     /// Total ODE steps across all action rollouts.
     pub total_ode_steps: usize,
-    /// Number of actions evaluated.
+    /// Number of actions attempted by the planner, including failed rollouts.
     pub actions_evaluated: usize,
-    /// Surprise from the best trajectory.
+    /// Number of rollouts rejected because the numerical solver did not complete.
+    pub failed_ode_rollouts: usize,
+    /// Total rejected adaptive steps across successful and failed rollouts.
+    pub total_ode_rejections: usize,
+    /// Surprise from the best successfully completed trajectory.
     pub best_trajectory_surprise: f64,
 }
 
@@ -300,6 +306,14 @@ impl FepModule {
 
         let mut rollouts = Vec::with_capacity(num_actions);
         let mut total_ode_steps = 0;
+        let mut failed_ode_rollouts = 0;
+        let mut total_ode_rejections = 0;
+
+        let limits = OdeSolveLimits {
+            max_attempts: self.trajectory_config.max_steps.saturating_mul(16).max(16),
+            max_accepted_steps: self.trajectory_config.max_steps,
+            max_state_values: 10_000_000,
+        };
 
         for action in 0..num_actions {
             let action_idx = action.min(model.num_actions - 1);
@@ -308,17 +322,31 @@ impl FepModule {
                 self.trajectory_config.tau,
             );
 
-            // Integrate from current belief state over planning horizon
-            let result: OdeResult = solver.solve(
+            // Integrate from current belief state over planning horizon. A
+            // failed or tolerance-unmet partial trajectory must not be scored
+            // as if it reached the requested horizon.
+            let result: OdeResult = match solver.try_solve_dormand_prince(
                 &ode_system,
                 belief_state,
                 (0.0, self.trajectory_config.horizon_seconds),
-            );
+                limits,
+            ) {
+                Ok(result) => result,
+                Err(failure) => {
+                    failed_ode_rollouts += 1;
+                    if let Some(partial) = failure.partial_result {
+                        total_ode_steps += partial.step_sizes.len();
+                        total_ode_rejections += partial.num_rejections;
+                    }
+                    continue;
+                }
+            };
 
-            let ode_steps = result.times.len();
+            let ode_steps = result.step_sizes.len();
             total_ode_steps += ode_steps;
+            total_ode_rejections += result.num_rejections;
 
-            // Compute expected free energy along trajectory via trapezoidal rule
+            // Compute expected free energy along a complete, successful trajectory.
             let (efe, info_gain, pragmatic, surprise) =
                 Self::compute_trajectory_efe(&result, model, belief_state);
 
@@ -339,7 +367,22 @@ impl FepModule {
             });
         }
 
-        // Select action with lowest EFE (most preferred under active inference)
+        // If no solver completed its requested horizon, no action has a
+        // comparable EFE value. Record failures and abstain rather than
+        // defaulting to action zero from an empty rollout set.
+        if rollouts.is_empty() {
+            self.trajectory_telemetry = TrajectoryTelemetry {
+                horizon: self.trajectory_config.horizon_seconds,
+                total_ode_steps,
+                actions_evaluated: num_actions,
+                failed_ode_rollouts,
+                total_ode_rejections,
+                ..TrajectoryTelemetry::default()
+            };
+            return None;
+        }
+
+        // Select action with lowest EFE among successfully completed rollouts.
         let best = rollouts
             .iter()
             .enumerate()
@@ -348,8 +391,7 @@ impl FepModule {
                     .partial_cmp(&b.1.expected_free_energy)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map(|(i, _)| i)?;
 
         let best_rollout = &rollouts[best];
 
@@ -360,6 +402,8 @@ impl FepModule {
             horizon: self.trajectory_config.horizon_seconds,
             total_ode_steps,
             actions_evaluated: num_actions,
+            failed_ode_rollouts,
+            total_ode_rejections,
             best_trajectory_surprise: best_rollout.trajectory_surprise,
         };
 
