@@ -77,23 +77,24 @@ From the repository root:
 cargo test --manifest-path research/temporal-intervention-audit/Cargo.toml
 ```
 
-Twenty-six test functions are authored across the fixed-sample and sequential audit modules. They have not been compiled or executed. No effect-size, p-value, SOTA or hardware claim is made.
+Twenty-eight test functions are authored across the fixed-sample and sequential audit modules. They have not been compiled or executed. No effect-size, p-value, SOTA or hardware claim is made.
+
 
 
 ## Anytime-valid sequential lane
 
-The exported `sequential` module supports repeated looks for one frozen treatment/control contrast. Each non-tied pair contributes an exact rational betting factor:
+The exported sequential module supports repeated looks for one frozen treatment/control contrast. Each non-tied pair contributes an exact rational betting factor:
 
-[
-E_t = (3/2)^{W_t}(1/2)^{L_t},
-]
+**Eₜ = (3/2)^Wₜ × (1/2)^Lₜ**
 
-where (W_t) and (L_t) are the numbers of beneficial and harmful paired signs. Ties contribute a factor of one. Under the Fisher sharp null and independently randomized fair-coin assignment orientation within every pair, each nonzero sign is conditionally symmetric and this is a nonnegative martingale.
+where Wₜ and Lₜ are the numbers of beneficial and harmful paired signs. Ties contribute a factor of one. Under the Fisher sharp null and independently randomized fair-coin assignment orientation within every pair, each nonzero sign is conditionally symmetric and this is a nonnegative martingale.
 
-For (M) predeclared comparisons and familywise level (alpha), a comparison crosses at (E_t ge M/alpha). Ville's inequality and a union bound give time-uniform familywise control across arbitrary stopping times under the stated design. The first crossing is latched in the report; later harmful evidence does not erase the earlier stopping event.
+For M predeclared comparisons and familywise level α, a comparison crosses at Eₜ ≥ M/α. Ville's inequality and a union bound give time-uniform familywise control across arbitrary stopping times under the stated design. The first crossing is latched in the report; later harmful evidence does not erase the earlier stopping event.
 
-This is not the same as the fixed-sample exact sign-flip p-value above. It is a simple, exact-rational betting baseline that intentionally ignores effect magnitude. It may be less powerful than the terminal randomization test. It is valid only for independently randomized fair-coin pairs under the sharp no-effect null. Fixed-count blocked randomization, clustered assignment, carryover or interference require a design-specific process and are rejected/not supported here.
+This is not the same as the fixed-sample exact sign-flip p-value above. It is a simple, exact-rational betting baseline that intentionally ignores effect magnitude. It may be less powerful than the terminal randomization test. It is valid only for independently randomized fair-coin pairs under the sharp no-effect null. Fixed-count blocked randomization, clustered assignment, carryover or interference require a design-specific process and are not supported here.
 
-The state is in-memory. The runner must persist each update and receipt append-only; this crate does not prevent storage rollback, verify assignment signatures, or prove that an assignment was random. Maximum exact state is 64 pairs; the integer e-value is returned as an exact numerator/denominator pair. Fourteen additional sequential-module test functions are authored, including exact finite-null-tree enumeration through 20 looks. They have not been compiled or executed.
+The state is in-memory. The runner must persist each update and receipt append-only; this crate does not prevent storage rollback, verify assignment signatures, or prove that an assignment was random. Maximum exact state is 64 pairs; the integer e-value is returned as an exact numerator/denominator pair. Fourteen sequential-module test functions are authored, including exact finite-null-tree enumeration and a repeated-fixed-look negative control through 20 looks. They have not been compiled or executed.
 
-Related work: [#8679](https://github.com/Luminous-Dynamics/symthaea/issues/8679) covers general bounded value/risk e-processes; [#9820](https://github.com/Luminous-Dynamics/symthaea/issues/9820) covers induction of fixed-horizon tests; [#9855](https://github.com/Luminous-Dynamics/symthaea/issues/9855) covers finite-filtration optional-stopping/continuation. This module is narrower: it exploits the sign symmetry induced by the paired fair-coin assignment design.
+At 20 looks with per-axis alpha = 0.05/3, the betting process crosses in 4,186 / 1,048,576 fair-sign sequences (0.399%). Repeatedly inspecting exact one-sided binomial sign-test p-values at each look crosses in 36,740 / 1,048,576 sequences (3.504%), above the per-axis 1.667% budget. This is a synthetic mathematical negative control, not an observed Symthaea effect.
+
+Related work: [#8679](https://github.com/Luminous-Dynamics/symthaea/issues/8679) covers general bounded value/risk e-processes; [#9820](https://github.com/Luminous-Dynamics/symthaea/issues/9820) covers induction of fixed-horizon tests; [#9855](https://github.com/Luminous-Dynamics/symthaea/issues/9855) covers finite-filtration optional-stopping/continuation; [#9670](https://github.com/Luminous-Dynamics/symthaea/issues/9670) covers blocked randomization inference. This module is narrower: it exploits the sign symmetry induced by the paired fair-coin assignment design.
