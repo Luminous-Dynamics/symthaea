@@ -68,7 +68,14 @@
         "real": 0,
         "imaginary": -0.6666666666666666
       },
-      "secondary_resistor_power_w_per_v2": 0.022222222222222223
+      "secondary_resistor_power_w_per_v2": 0.022222222222222223,
+      "primary_current_per_volt_a_per_v": {
+        "real": 0.06666666666666667,
+        "imaginary": 0
+      },
+      "primary_input_power_w_per_v2": 0.06666666666666667,
+      "primary_resistor_power_w_per_v2": 0.044444444444444446,
+      "power_balance_residual_w_per_v2": 0
     }
   }
 }
