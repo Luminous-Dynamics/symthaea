@@ -257,6 +257,10 @@ fn is_lower_hex(value: &str, length: usize) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn nonempty(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
 fn frame_sha256(frame: &[PopulationPsu]) -> String {
     let mut rows: Vec<(String, String)> = frame
         .iter()
@@ -1085,9 +1089,9 @@ fn evaluate(
         let (family_total, _) = estimate_metric(&plans, frame, outcomes, selected, family_count)?;
         let (family_covered_total, _) = estimate_metric(&plans, frame, outcomes, selected, family_covered)?;
         let (family_uncovered_total, _) = estimate_metric(&plans, frame, outcomes, selected, family_uncovered)?;
-        let (family_total_impact, _) = estimate_metric(&plans, frame, outcomes, selected, family_impact)?;
-        let (family_covered_impact, _) = estimate_metric(&plans, frame, outcomes, selected, family_covered_impact)?;
-        let (family_uncovered_impact, _) = estimate_metric(&plans, frame, outcomes, selected, family_uncovered_impact)?;
+        let (family_total_impact_estimate, _) = estimate_metric(&plans, frame, outcomes, selected, family_impact)?;
+        let (family_covered_impact_estimate, _) = estimate_metric(&plans, frame, outcomes, selected, family_covered_impact)?;
+        let (family_uncovered_impact_estimate, _) = estimate_metric(&plans, frame, outcomes, selected, family_uncovered_impact)?;
         let family_recall = ratio_estimate(
             &plans, frame, outcomes, selected, family_covered, family_count,
         )?;
@@ -1103,9 +1107,9 @@ fn evaluate(
             estimated_covered_errors: family_covered_total,
             estimated_uncovered_errors: family_uncovered_total,
             candidate_generation_recall: family_recall,
-            estimated_total_impact_weight: family_total_impact,
-            estimated_covered_impact_weight: family_covered_impact,
-            estimated_uncovered_impact_weight: family_uncovered_impact,
+            estimated_total_impact_weight: family_total_impact_estimate,
+            estimated_covered_impact_weight: family_covered_impact_estimate,
+            estimated_uncovered_impact_weight: family_uncovered_impact_estimate,
             impact_weighted_candidate_generation_recall: family_impact_recall,
         });
     }
@@ -1672,7 +1676,8 @@ mod tests {
     #[test]
     fn duplicate_verified_error_id_is_rejected() {
         let (proposals, ranking, mut audit, proposal, ranking_hash, protocol) = fixture();
-        audit.sampled_units[1].errors.push(audit.sampled_units[0].errors[0].clone());
+        let duplicated_error = audit.sampled_units[0].errors[0].clone();
+        audit.sampled_units[1].errors.push(duplicated_error);
         assert!(validate(&proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol)
             .unwrap_err().contains("globally unique"));
     }
