@@ -14,7 +14,7 @@ This protocol is a prerequisite, **not an OS sandbox**. It does not itself launc
 
 ## Frame layout
 
-All integer fields are unsigned little-endian. Every frame has a fixed 48-byte header:
+All integer fields are unsigned little-endian. Every frame has a fixed 56-byte header:
 
 | Offset | Bytes | Field |
 |---:|---:|---|
@@ -23,7 +23,8 @@ All integer fields are unsigned little-endian. Every frame has a fixed 48-byte h
 | 10 | 1 | Frame kind: 1 observation, 2 action |
 | 11 | 1 | Reserved, must be zero |
 | 12 | 4 | Exact payload length |
-| 16 | 32 | Domain-separated SHA-256 of the payload |
+| 16 | 8 | Monotonic request/response sequence number |
+| 24 | 32 | Domain-separated SHA-256 binding the sequence number and payload |
 
 Frame lengths are bounded and exact. Unknown versions/kinds, nonzero reserved fields, truncation, trailing bytes, wrong payload lengths and digest mismatches are rejected.
 
@@ -31,13 +32,14 @@ Observation v1 is exactly 51 payload bytes: current public step; presence flags;
 
 Action v1 is exactly 30 payload bytes: alarm flag, selected sensor (none/LowPower/HighFidelity), next wake interval, candidate-declared compute cycles, transmitted bytes and memory-write bytes. Wake intervals must be 1–1,024 steps.
 
-Maximum frame size is 99 bytes. No dynamic-length user text, paths, serialized objects or arbitrary metadata are accepted.
+Observation frames are 107 bytes total; action frames are 86 bytes total. Maximum frame size is 107 bytes. The action must echo the observation sequence number; the host rejects stale, replayed or out-of-order sequence values. The module includes bounded streaming readers/writers that validate the fixed payload length before reading the payload. No dynamic-length user text, paths, serialized objects or arbitrary metadata are accepted.
 
 ## Causal semantics
 
 The simulator emits an observation to the candidate at a wake. The candidate responds with an action. The evaluator applies the alarm decision at the current wake, performs the optional requested sample, then advances to the next wake. The new measurement is visible only in the next observation frame. This preserves the delay between acquisition and policy use.
 
 The host runner must enforce:
+- a strictly monotonic sequence number per episode, with every action echoing the exact current observation sequence;
 - one observation frame -> exactly one action frame;
 - bounded frame count and per-frame/episode wall-clock deadline;
 - no candidate-controlled evaluator seed, scenario ID or oracle-derived metadata;
@@ -52,6 +54,6 @@ A container or network namespace alone is not enough. A candidate process with a
 
 ## Tests authored
 
-The module includes nine synthetic tests for observation round trips with and without measurements, action round trips with and without sensor acquisition, payload corruption, wrong magic/version/kind, truncation, invalid action bounds, inconsistent measurement age/counters and noncanonical absent-field encoding.
+The module includes fourteen synthetic tests for observation/action round trips, sequence echo and replay rejection, sequence/payload tampering, wrong magic/version/kind/reserved fields, truncation, oversized payload rejection before payload read, invalid action bounds, inconsistent measurement age/counters, noncanonical absent-field encoding, concatenated frame reading, EOF semantics, and streaming writer interoperability.
 
 **Execution status:** tests are authored but not compiled or executed. No sandbox or confirmatory execution is claimed.
