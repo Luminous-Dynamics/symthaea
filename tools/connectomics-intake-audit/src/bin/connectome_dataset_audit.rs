@@ -105,7 +105,7 @@ impl Finding {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 struct DenominatorAudit {
     /// Physical rows in the union of metadata sidecars.
     dataset_rows: usize,
@@ -1000,7 +1000,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
     warnings.sort_by(|a, b| a.code.cmp(&b.code).then_with(|| a.sample_id.cmp(&b.sample_id)).then_with(|| a.detail.cmp(&b.detail)));
 
     Report {
-        schema_version: 1,
+        schema_version: 2,
         tool: "connectome-dataset-audit",
         input_sha256: input_hash,
         dataset_id: DATASET_ID,
@@ -1244,6 +1244,21 @@ mod tests {
             1
         );
         assert_eq!(denominators.legacy_md5_identity_collision_count, 0);
+        assert_eq!(
+            denominators.task_operation_instances,
+            denominators.task_operation_instances_by_route.values().sum::<u64>() as usize
+        );
+        assert_eq!(
+            denominators.available_legal_modality_view_instances,
+            denominators
+                .available_legal_modality_view_instances_by_route_and_view
+                .values()
+                .sum::<u64>() as usize
+        );
+
+        let reversed_rows: Vec<ParsedRow> = rows.iter().cloned().rev().collect();
+        let reversed_report = report(&reversed_rows);
+        assert_eq!(denominators, reversed_report.denominator_audit);
     }
 
     #[test]
