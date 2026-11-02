@@ -7,13 +7,14 @@
   "required": [
     "schema_version",
     "initial_snapshot_sha256",
-    "events"
+    "events",
+    "synthetic_only",
+    "expected_final_state"
   ],
   "$defs": {
     "id": {
       "type": "string",
-      "minLength": 1,
-      "pattern": "^\\\\S(?:.*\\\\S)?$"
+      "minLength": 1
     },
     "sha": {
       "type": "string",
@@ -418,6 +419,39 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/event"
+      }
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "expected_final_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_snapshot_sha256",
+        "committed_transaction_ids",
+        "event_count",
+        "next_event_sequence"
+      ],
+      "properties": {
+        "current_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "committed_transaction_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_event_sequence": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     }
   }
