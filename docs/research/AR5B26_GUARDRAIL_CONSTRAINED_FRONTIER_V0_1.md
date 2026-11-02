@@ -48,12 +48,15 @@ An unavailable, non-estimable, missing, or under-sampled policy/requirement cell
 
 **policy_frontier_lp.rs** now exports:
 
-- **FrontierAdditionalLinearConstraint { constraint_id, coefficients, upper_bound }**
+- **FrontierPolicyCoefficient { policy_id, coefficient }**
+- **FrontierAdditionalLinearConstraint { constraint_id, policy_coefficients, upper_bound }**
 - **analyze_policy_frontier_with_constraints(plan, constraints)**
 
 The original **analyze_policy_frontier** API delegates to the new method with an empty additional-constraint list, preserving existing callers.
 
-Additional inequalities are validated for unique non-empty IDs, exact policy-vector length, and finite coefficients/bounds. They are appended to the same active-constraint set before exhaustive basis enumeration. Every candidate is also checked against every additional inequality after reconstruction.
+Every coefficient is keyed by stable policy ID rather than a positional vector. The solver rejects missing/duplicate/unknown IDs and reorders coefficients after canonicalizing the plan. This prevents a reordered policy list from silently binding a safety coefficient to the wrong policy.
+
+Additional inequalities are validated for unique non-empty constraint IDs and finite coefficients/bounds. They are appended to the same active-constraint set before exhaustive basis enumeration. Every candidate is also checked against every additional inequality after reconstruction.
 
 The objective and existing constraints remain unchanged: worst-case alternative utility, composite-null Type-I ceilings, and optional alternative-specific expected evaluator-cost caps. The existing deterministic tie-break order is preserved.
 
@@ -110,7 +113,7 @@ The solver uses floating-point arithmetic and fixed feasibility/pivot tolerances
 
 ## 4. Tests authored
 
-The new module includes six tests:
+The new module includes eight tests:
 
 1. **Utility trap / hard boundary:** the unsafe high-utility policy is capped at the exact confidence-bound boundary; the independent checker passes the selected mixture.
 2. **Non-estimable evidence:** a policy with a NOT_ESTIMABLE required cell is excluded and receives zero selected mass.
@@ -118,6 +121,10 @@ The new module includes six tests:
 4. **Family expansion:** adding a policy after calibration is rejected.
 5. **Tampering:** changes to guardrail results or the outer report digest are rejected.
 6. **Inclusive boundary:** guardrail feasibility is checked using the frozen tolerance.
+7. **Local-stratum trap:** a local lower-bound guardrail binds even though the global upper-bound guardrail has positive slack.
+8. **Infeasible polytope:** when every policy violates a mandatory global guardrail, optimization fails closed.
+
+The generic policy-frontier module also adds two tests for policy-ID-bound coefficient order invariance and missing/duplicate policy identities.
 
 The earlier noncompensatory verifier module adds a regression test showing that a zero-weight policy with a missing bound does not make an otherwise fully evidenced mixture indeterminate.
 
