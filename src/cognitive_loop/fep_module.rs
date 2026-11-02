@@ -32,6 +32,13 @@ use super::routing::ActiveInferenceBridge;
 
 // ─── Trajectory Planning Constants ──────────────────────────────────────────
 
+/// A trajectory can be ranked only when every derived score component is finite.
+fn trajectory_score_is_finite(efe: f64, information_gain: f64, pragmatic: f64, surprise: f64) -> bool {
+    [efe, information_gain, pragmatic, surprise]
+        .iter()
+        .all(|value| value.is_finite())
+}
+
 /// Default trajectory planning horizon in seconds (~10 cycles at 20Hz).
 const TRAJECTORY_HORIZON_SECONDS: f64 = 0.5;
 
@@ -170,6 +177,8 @@ pub struct TrajectoryTelemetry {
     pub actions_evaluated: usize,
     /// Number of rollouts rejected because the numerical solver did not complete.
     pub failed_ode_rollouts: usize,
+    /// Number of complete solver rollouts rejected because a derived score was non-finite.
+    pub invalid_efe_rollouts: usize,
     /// Total rejected adaptive steps across successful and failed rollouts.
     pub total_ode_rejections: usize,
     /// Surprise from the best successfully completed trajectory.
@@ -313,6 +322,7 @@ impl FepModule {
         let mut rollouts = Vec::with_capacity(num_actions);
         let mut total_ode_steps = 0;
         let mut failed_ode_rollouts = 0;
+        let mut invalid_efe_rollouts = 0;
         let mut successful_ode_rollouts = 0;
         let mut total_ode_rejections = 0;
 
@@ -356,6 +366,10 @@ impl FepModule {
             // Compute expected free energy along a complete, successful trajectory.
             let (efe, info_gain, pragmatic, surprise) =
                 Self::compute_trajectory_efe(&result, model, belief_state);
+            if !trajectory_score_is_finite(efe, info_gain, pragmatic, surprise) {
+                invalid_efe_rollouts += 1;
+                continue;
+            }
 
             let final_state = result
                 .states
@@ -384,6 +398,7 @@ impl FepModule {
                 total_ode_steps,
                 actions_evaluated: num_actions,
                 failed_ode_rollouts,
+                invalid_efe_rollouts,
                 successful_ode_rollouts,
                 total_ode_rejections,
                 has_best_rollout: false,
@@ -413,6 +428,7 @@ impl FepModule {
             total_ode_steps,
             actions_evaluated: num_actions,
             failed_ode_rollouts,
+            invalid_efe_rollouts,
             successful_ode_rollouts,
             total_ode_rejections,
             has_best_rollout: true,
@@ -624,5 +640,19 @@ impl FepModule {
     /// Get the current effective blanket permeability.
     pub fn blanket_effective_permeability(&self) -> f64 {
         self.enhanced_bridge.blanket.permeability().effective
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trajectory_scores_require_all_finite_components() {
+        assert!(trajectory_score_is_finite(1.0, 2.0, 3.0, 4.0));
+        assert!(!trajectory_score_is_finite(f64::NAN, 2.0, 3.0, 4.0));
+        assert!(!trajectory_score_is_finite(1.0, f64::INFINITY, 3.0, 4.0));
+        assert!(!trajectory_score_is_finite(1.0, 2.0, f64::NEG_INFINITY, 4.0));
     }
 }
