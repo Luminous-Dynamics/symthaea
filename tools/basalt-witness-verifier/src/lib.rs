@@ -563,9 +563,7 @@ pub fn verify_head_read_quorum(
         ($response_index:expr, $status:expr, $message:expr) => {{
             response_rejections.push(format!(
                 "response {} {}: {}",
-                $response_index,
-                $status,
-                $message
+                $response_index, $status, $message
             ));
             continue;
         }};
@@ -581,14 +579,22 @@ pub fn verify_head_read_quorum(
         ) {
             Ok(value) => value,
             Err(error) => {
-                reject_response!(index, "rejected_witness_response", format!("response {index} failed authentication: {error}"));
+                reject_response!(
+                    index,
+                    "rejected_witness_response",
+                    format!("response {index} failed authentication: {error}")
+                );
             }
         };
         let response_payload: WitnessHeadResponse =
             match serde_json::from_value(response.json.clone()) {
                 Ok(value) => value,
                 Err(error) => {
-                    reject_response!(index, "rejected_witness_response", format!("response {index} payload shape invalid: {error}"));
+                    reject_response!(
+                        index,
+                        "rejected_witness_response",
+                        format!("response {index} payload shape invalid: {error}")
+                    );
                 }
             };
         if response_payload.record_type != "basalt.authority.witness-head-response"
@@ -601,9 +607,13 @@ pub fn verify_head_read_quorum(
             || response_payload.witness_set_version != trust.witness_set_version.to_string()
             || response_payload.trust_root_version != trust.trust_root_version.to_string()
         {
-            reject_response!(index, "rejected_witness_response", format!(
+            reject_response!(
+                index,
+                "rejected_witness_response",
+                format!(
                     "response {index} is not bound to the expected nonce/authority/witness set"
-                ));
+                )
+            );
         }
         if let Err(error) = parse_canonical_u64(
             &response_payload.head_authority_revision,
@@ -618,10 +628,18 @@ pub fn verify_head_read_quorum(
             || !is_prefixed_sha256(&response_payload.head_state_digest)
             || !is_prefixed_sha256(&response_payload.head_policy_digest)
         {
-            reject_response!(index, "rejected_witness_response", format!("response {index} contains a malformed digest"));
+            reject_response!(
+                index,
+                "rejected_witness_response",
+                format!("response {index} contains a malformed digest")
+            );
         }
         let Some(member_key_id) = response.accepted_key_ids.first().cloned() else {
-            reject_response!(index, "rejected_witness_response", format!("response {index} has no authenticated member key"));
+            reject_response!(
+                index,
+                "rejected_witness_response",
+                format!("response {index} has no authenticated member key")
+            );
         };
 
         if let Some(previous_digest) = reported_heads.get(&member_key_id) {
@@ -648,18 +666,30 @@ pub fn verify_head_read_quorum(
         ) {
             Ok(value) => value,
             Err(error) => {
-                reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint certificate failed: {error}"));
+                reject_response!(
+                    index,
+                    "rejected_checkpoint_certificate",
+                    format!("response {index} checkpoint certificate failed: {error}")
+                );
             }
         };
         let checkpoint_payload: WitnessCheckpoint =
             match serde_json::from_value(checkpoint.json.clone()) {
                 Ok(value) => value,
                 Err(error) => {
-                    reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint payload shape invalid: {error}"));
+                    reject_response!(
+                        index,
+                        "rejected_checkpoint_certificate",
+                        format!("response {index} checkpoint payload shape invalid: {error}")
+                    );
                 }
             };
         if checkpoint_payload.state_schema != "basalt.authority-state.v1" {
-            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint uses an unsupported state schema"));
+            reject_response!(
+                index,
+                "rejected_checkpoint_certificate",
+                format!("response {index} checkpoint uses an unsupported state schema")
+            );
         }
         let checkpoint_sequence =
             match parse_canonical_u64(&checkpoint_payload.sequence, "checkpoint sequence") {
@@ -687,7 +717,11 @@ pub fn verify_head_read_quorum(
                 .as_deref()
                 .is_some_and(|value| !is_prefixed_sha256(value))
         {
-            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint contains malformed revision/digest fields"));
+            reject_response!(
+                index,
+                "rejected_checkpoint_certificate",
+                format!("response {index} checkpoint contains malformed revision/digest fields")
+            );
         }
         if checkpoint_payload.record_type != "basalt.authority.witness-checkpoint"
             || checkpoint_payload.schema_version != 1
@@ -702,11 +736,19 @@ pub fn verify_head_read_quorum(
             || checkpoint_payload.state_digest != response_payload.head_state_digest
             || checkpoint_payload.policy_digest != response_payload.head_policy_digest
         {
-            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} fields disagree with its write-quorum checkpoint"));
+            reject_response!(
+                index,
+                "rejected_checkpoint_certificate",
+                format!("response {index} fields disagree with its write-quorum checkpoint")
+            );
         }
         let computed_checkpoint_digest = checkpoint_digest_from_payload(&checkpoint.payload);
         if computed_checkpoint_digest != response_payload.head_checkpoint_digest {
-            reject_response!(index, "rejected_checkpoint_certificate", format!("response {index} checkpoint digest does not bind canonical payload"));
+            reject_response!(
+                index,
+                "rejected_checkpoint_certificate",
+                format!("response {index} checkpoint digest does not bind canonical payload")
+            );
         }
 
         if let Some(existing_digest) = certified_by_sequence.get(&checkpoint_sequence) {
@@ -1001,14 +1043,8 @@ mod tests {
             &seeds[..3],
         ));
 
-        let selected = verify_head_read_quorum(
-            &evidence,
-            &trust_bytes,
-            &pin,
-            &nonce,
-            "incarnation-1",
-            "1",
-        );
+        let selected =
+            verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "fresh_head_selected");
         assert_eq!(selected.distinct_member_responses, 3);
         assert_eq!(selected.sequence, "5");
@@ -1034,14 +1070,8 @@ mod tests {
             &[test_seed(7), test_seed(8), test_seed(9)],
         ));
 
-        let selected = verify_head_read_quorum(
-            &evidence,
-            &trust_bytes,
-            &pin,
-            &nonce,
-            "incarnation-1",
-            "1",
-        );
+        let selected =
+            verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "anti_rollback_unknown");
         assert_eq!(selected.distinct_member_responses, 0);
         assert!(!selected.counterexamples.is_empty());
@@ -1139,7 +1169,12 @@ mod tests {
             "1",
         );
         assert_eq!(selected.status, "anti_rollback_unknown");
-        assert!(selected.counterexamples.iter().any(|reason| reason.contains("nonce/authority/witness set")));
+        assert!(
+            selected
+                .counterexamples
+                .iter()
+                .any(|reason| reason.contains("nonce/authority/witness set"))
+        );
     }
 
     #[test]
@@ -1159,7 +1194,13 @@ mod tests {
         let selected =
             verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "anti_rollback_unknown");
-        assert!(selected.counterexamples.iter().any(|reason| reason.contains("checkpoint certificate failed") || reason.contains("fields disagree")));
+        assert!(
+            selected
+                .counterexamples
+                .iter()
+                .any(|reason| reason.contains("checkpoint certificate failed")
+                    || reason.contains("fields disagree"))
+        );
     }
 
     #[test]
@@ -1179,7 +1220,13 @@ mod tests {
         let selected =
             verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
         assert_eq!(selected.status, "anti_rollback_unknown");
-        assert!(selected.counterexamples.iter().any(|reason| reason.contains("checkpoint certificate failed") || reason.contains("fields disagree")));
+        assert!(
+            selected
+                .counterexamples
+                .iter()
+                .any(|reason| reason.contains("checkpoint certificate failed")
+                    || reason.contains("fields disagree"))
+        );
     }
 
     #[test]
