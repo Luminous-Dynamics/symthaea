@@ -53,6 +53,7 @@ def intersection_flow_sides(
         raise ValueError("invalid outgoing vector")
 
     incoming = [Fraction(0) for _ in range(n)]
+    credited_outgoing = [Fraction(0) for _ in range(n)]
     for source, destination, amount_raw in edges:
         amount = q(amount_raw)
         if not (0 <= source < destination < n):
@@ -60,6 +61,15 @@ def intersection_flow_sides(
         if amount < 0:
             raise ValueError("transfer amount must be nonnegative")
         incoming[destination] += amount
+        credited_outgoing[source] += amount
+    if any(credited_outgoing[i] > out[i] for i in range(n)):
+        raise ValueError("credited transfers exceed source reserve")
+
+    prefix_balance = Fraction(0)
+    for i in range(n):
+        prefix_balance += incoming[i] - out[i]
+        if prefix_balance > 0:
+            raise ValueError("forward prefix budget violated")
 
     k = max(s)
     lhs = sum((incoming[i] - out[i] for i in s), Fraction(0))
