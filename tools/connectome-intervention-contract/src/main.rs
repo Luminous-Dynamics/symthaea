@@ -524,6 +524,7 @@ fn verify_metrics_and_scores<'a>(
             }
             let state = item.get("score_state").and_then(Value::as_str).unwrap_or("");
             let score = item.get("score").and_then(Value::as_f64);
+            paired_keys.insert((candidate.to_owned(), baseline.to_owned(), metric.to_owned(), stratum.to_owned()));
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
             let key = (model.to_owned(), metric.to_owned(), stratum.to_owned());
@@ -550,6 +551,20 @@ fn verify_metrics_and_scores<'a>(
     }
     if score_count == 0 {
         errors.push("results.scorecards: at least one scorecard is required".to_owned());
+    }
+    let required_families: HashSet<String> = arr_at(value, &["evaluation", "baseline_matrix", "required_families"])
+        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+    for (model_id, model) in models {
+        let family = model.get("model_family").and_then(Value::as_str).unwrap_or("");
+        if required_families.contains(family) {
+            for metric in &primary {
+                for stratum in &strata {
+                    if !scores.contains_key(&(model_id.clone(), metric.clone(), stratum.clone())) {
+                        errors.push(format!("required baseline/candidate model {model_id} ({family}) lacks measured scorecard for {metric}/{stratum}"));
+                    }
+                }
+            }
+        }
     }
     for metric in &primary {
         for stratum in &strata {
@@ -581,6 +596,7 @@ fn verify_paired(
     errors: &mut Vec<String>,
 ) {
     let mut count = 0;
+    let mut paired_keys = HashSet::new();
     if let Some(comparisons) = arr_at(value, &["results", "paired_comparisons"]) {
         for (index, item) in comparisons.iter().enumerate() {
             count += 1;
@@ -671,6 +687,27 @@ fn verify_paired(
     }
     if count == 0 {
         errors.push("results.paired_comparisons: at least one paired comparison required".to_owned());
+    }
+    let candidates: Vec<String> = models.iter()
+        .filter(|(_, model)| model.get("role").and_then(Value::as_str) == Some("candidate"))
+        .map(|(id, _)| id.clone()).collect();
+    let baselines: Vec<String> = models.iter()
+        .filter(|(_, model)| matches!(model.get("role").and_then(Value::as_str), Some("baseline" | "negative_control" | "oracle_reference")))
+        .map(|(id, _)| id.clone()).collect();
+    let metrics: Vec<String> = arr_at(value, &["evaluation", "primary_metric_ids"])
+        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+    let strata: Vec<String> = arr_at(value, &["evaluation", "strata"])
+        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+    for candidate in &candidates {
+        for baseline in &baselines {
+            for metric in &metrics {
+                for stratum in &strata {
+                    if !paired_keys.contains(&(candidate.clone(), baseline.clone(), metric.clone(), stratum.clone())) {
+                        errors.push(format!("paired_comparisons: missing paired comparison {candidate} vs {baseline} for {metric}/{stratum}"));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -841,6 +878,24 @@ mod tests {
         })
     }
 
+    fn fixture_scorecard(model_id: &str, score: f64, low: f64, high: f64) -> Value {
+        json!({
+            "model_id":model_id,"metric_id":"nll","stratum":"overall",
+            "n_independent_units":2,"score":score,"ci_low":low,"ci_high":high,"score_state":"measured"
+        })
+    }
+
+    fn fixture_paired_comparison(baseline_id: &str, baseline_score: f64, low: f64, high: f64) -> Value {
+        let pair = vec![token(4), token(5)];
+        json!({
+            "candidate_model_id":"candidate","baseline_model_id":baseline_id,"metric_id":"nll","stratum":"overall",
+            "paired_unit_manifest_sha256":membership_digest(&pair),"n_independent_units":2,
+            "mean_candidate_minus_baseline":0.8-baseline_score,"ci_low":low,"ci_high":high,
+            "minimum_meaningful_effect":0.05,"non_inferiority_margin":0.1,
+            "outcome":"outperforms_by_margin","paired_unit_tokens":pair
+        })
+    }
+
     fn complete_fixture() -> Value {
         let train = vec![token(1), token(2)];
         let validation = vec![token(3)];
@@ -859,6 +914,17 @@ mod tests {
             fixture_intervention("sham", "sham", &["n-1"]),
             fixture_intervention("single-control", "single_target_control", &["n-1"]),
             fixture_intervention("combination-control", "combination_control", &["n-1", "n-2"]),
+        ];
+        let scorecards = vec![
+            fixture_scorecard("candidate", 0.8, 0.7, 0.9),
+            fixture_scorecard("activity", 1.0, 0.95, 1.05),
+            fixture_scorecard("linear", 1.2, 1.1, 1.3),
+            fixture_scorecard("rewired", 1.4, 1.3, 1.5),
+        ];
+        let paired_comparisons = vec![
+            fixture_paired_comparison("activity", 1.0, -0.3, -0.1),
+            fixture_paired_comparison("linear", 1.2, -0.5, -0.3),
+            fixture_paired_comparison("rewired", 1.4, -0.7, -0.5),
         ];
         json!({"model_id":"candidate","role":"candidate","model_family":"graph_constrained_state_space","hypothesis_id":"H_GRAPH","code_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","config_sha256":config,"parameter_count":10,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("structural"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"candidate"}),
             json!({"model_id":"activity","role":"baseline","model_family":"activity_only","hypothesis_id":null,"code_commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","config_sha256":config,"parameter_count":8,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"activity baseline"}),
@@ -909,16 +975,8 @@ mod tests {
             },
             "results":{
                 "status":"complete","observed_outcomes_sha256":digest("outcomes"),"heldout_prediction_sha256":digest("predictions"),
-                "scorecards":[
-                    {"model_id":"candidate","metric_id":"nll","stratum":"overall","n_independent_units":2,"score":0.8,"ci_low":0.7,"ci_high":0.9,"score_state":"measured"},
-                    {"model_id":"activity","metric_id":"nll","stratum":"overall","n_independent_units":2,"score":1.0,"ci_low":0.95,"ci_high":1.05,"score_state":"measured"}
-                ],
-                "paired_comparisons":[{
-                    "candidate_model_id":"candidate","baseline_model_id":"activity","metric_id":"nll","stratum":"overall",
-                    "paired_unit_manifest_sha256":membership_digest(&pair),"n_independent_units":2,"mean_candidate_minus_baseline":-0.2,
-                    "ci_low":-0.3,"ci_high":-0.1,"minimum_meaningful_effect":0.05,"non_inferiority_margin":0.1,
-                    "outcome":"outperforms_by_margin","paired_unit_tokens":pair
-                }],
+                "scorecards":scorecards,
+                "paired_comparisons":paired_comparisons,
                 "calibration":[{"model_id":"candidate","metric_id":"coverage","stratum":"overall","nominal_coverage":0.95,"observed_coverage":0.95,"interval_sharpness":0.1,"n_independent_units":2}],
                 "failures":[]
             },
