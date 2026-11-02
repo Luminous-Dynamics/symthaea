@@ -564,11 +564,16 @@ not silently inherit a one-e-value-per-arrival theorem or the CPQD-specific
 SCORE+ result.
 
 Let \(V_{i,t}\) be an already-valid, nonnegative, adapted, pathwise
-nondecreasing e-process under the null, normalized with \(V_{i,0}=1\), and
-assume its conditional terminal budget at activation satisfies
+nondecreasing e-process under the null, with a **known, precommitted initial
+value** \(V_{i,0}=v_{i,0}\ge0\), and assume its conditional terminal budget
+at activation satisfies
 \[
 \mathbb E[V_{i,\infty}\mid\mathcal F_{i,0}]\le1.
 \]
+The common normalized case is \(v_{i,0}=1\), but adjusted processes such as
+the staircase calibrator may legitimately start at zero. The initial value
+must be supplied to both the writer and independent verifier; it is not
+inferred from the first observed increment.
 Fix a predictable rational test level \(a_i\in(0,1)\) before observing the
 process. Define
 \[
@@ -613,7 +618,13 @@ online FDR procedure is valid.
 
 ### Exactly-once fixed-point implementation
 
-The Rust reference stores the refund as the exact numerator
+The Rust reference exposes `ProcessOvershootRefund::new` for the normalized
+initial value one and `with_initial_evidence_value` for a precommitted
+initial value such as zero. The independent sequence verifier has matching
+normalized and explicit-initial entry points. It checks the previous
+cumulative refund against the previous evidence value at every transition,
+not merely that the cumulative amount has not decreased. The Rust reference
+stores the refund as the exact numerator
 \[
 R_{i,t}=
 \min\!\left\{
