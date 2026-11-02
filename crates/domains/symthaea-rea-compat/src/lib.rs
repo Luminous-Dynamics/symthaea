@@ -1050,7 +1050,7 @@ mod tests {
         evidence["evidence_id"] = json!(new_id);
         assert!(verify_evidence_value(&evidence).is_ok());
 
-        evidence["locations"] = json!([{"kind": "file-offset", "offset": 9007199254740991}]);
+        evidence["locations"] = json!([{"kind": "file-offset", "offset": 9007199254740991u64}]);
         let new_id = compute_evidence_id(&evidence).unwrap();
         evidence["evidence_id"] = json!(new_id);
         assert!(verify_evidence_value(&evidence).is_ok());
