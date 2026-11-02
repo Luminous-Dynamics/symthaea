@@ -46,6 +46,21 @@ than silently wrap. It is only a bounded exact oracle. Large model counts need
 an arbitrary-precision backend; the future algorithm must account for bit
 complexity and cannot treat an arithmetic-operation bound as a Turing-time bound.
 
+## Finite-domain scope correction
+
+For fixed alphabet size q and fixed extensional constraint arity k, a q-ary CSP
+already has a constant-overhead parsimonious encoding into bounded-width
+Boolean #SAT: encode each domain value with ceil(log2(q)) bits, exclude unused
+codewords, and forbid each invalid local tuple. Therefore this crate does not
+claim a new q-ary subexponential theorem. It provides a direct exact transform
+and a certificate primitive whose representation overhead can be measured;
+stronger asymptotic claims require a parameter regime not already covered by
+that Boolean reduction.
+
+For d=1 the transform is Boolean subset Möbius inversion. For d>1, the precise
+name is the tensor product of one-dimensional binomial/Newton transforms,
+not the ordinary Möbius function of a finite-chain poset.
+
 ## Claim boundary
 
 - the q-ary binomial/Newton inversion identity is not a finite-domain subexponential algorithm;
