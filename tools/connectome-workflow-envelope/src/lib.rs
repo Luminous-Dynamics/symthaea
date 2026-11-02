@@ -1065,7 +1065,9 @@ fn validate_query_stop_calibration(
 
     match receipt.outcome {
         QueryStopCalibrationOutcome::InsufficientCalibration => {
-            if receipt.order_statistic_rank <= receipt.calibration_trajectory_count
+            if !receipt.group_disjoint
+                || !receipt.exchangeability_supported
+                || receipt.order_statistic_rank <= receipt.calibration_trajectory_count
                 || quantile.is_some()
                 || upper.is_some()
             {
