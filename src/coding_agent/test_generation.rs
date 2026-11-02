@@ -444,19 +444,45 @@ mod tests {
         let params = TestGenerator::extract_param_types("fn add(a: i32, b: i32) -> i32");
         assert_eq!(params.len(), 2);
         assert_eq!(params[0].0, "a");
-        assert_eq!(params[0].1, "i32");
+        assert_eq!(TestGenerator::path_type_ident(&params[0].1).as_deref(), Some("i32"));
         assert_eq!(params[1].0, "b");
-        assert_eq!(params[1].1, "i32");
+        assert_eq!(TestGenerator::path_type_ident(&params[1].1).as_deref(), Some("i32"));
     }
 
     #[test]
-    fn test_extract_param_types_generic() {
+    fn test_extract_concrete_generic_argument_types() {
         let params = TestGenerator::extract_param_types(
             "fn find(haystack: &[u8], needle: Vec<u8>) -> Option<usize>",
         );
         assert_eq!(params.len(), 2);
-        assert_eq!(params[0].1, "&[u8]");
-        assert_eq!(params[1].1, "Vec<u8>");
+        assert!(matches!(
+            &params[0].1,
+            syn::Type::Reference(reference)
+                if matches!(reference.elem.as_ref(), syn::Type::Slice(_))
+        ));
+        assert!(TestGenerator::is_supported_vec_type(&params[1].1));
+    }
+
+    #[test]
+    fn nested_function_pointer_arguments_are_parsed_without_splitting() {
+        let params = TestGenerator::extract_param_types(
+            "fn register(callback: fn(u32, Result<(), Error>), enabled: bool)",
+        );
+
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].0, "callback");
+        assert_eq!(params[1].0, "enabled");
+    }
+
+    #[test]
+    fn generic_functions_do_not_receive_unresolved_smoke_inputs() {
+        let request = SynthesisRequest::new("rust", "collect", "Collect generic values")
+            .with_signature("fn collect<T>(values: Vec<T>) -> usize");
+
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.is_empty());
+        assert!(suite.source.contains("No tests generated"));
     }
 
     #[test]
