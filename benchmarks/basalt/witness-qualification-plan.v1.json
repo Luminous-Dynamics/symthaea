@@ -1,0 +1,261 @@
+{
+  "suite_id": "basalt-witness-projection-qualification",
+  "version": 1,
+  "claim_ceiling": "Plan only. No engine, witness topology, protocol or physical durability profile is qualified by this manifest.",
+  "commit_protocols": [
+    {
+      "protocol_id": "db_first_witness_after",
+      "authority_order": "Database transaction commits a candidate state; an independent witness quorum then accepts its canonical state digest and transition bundle.",
+      "authoritative_ack_condition": "A client may be told authoritative success only after the witness write quorum has durably signed the exact accepted transition and the required projection state is confirmed.",
+      "failure_semantics": "A local DB commit without a witness quorum is an un-attested candidate, not authoritative success. The next writer must reconcile or quarantine it. Witness timeout is indeterminate until receipt lookup resolves it."
+    },
+    {
+      "protocol_id": "witness_first_projection_after",
+      "authority_order": "Witness quorum commits an immutable transition receipt and content-addressed bundle; the selected database backend applies the certified transition as a projection.",
+      "authoritative_ack_condition": "A client may be told authoritative success after the witness receipt is quorum-certified and the projection has applied it or a verifiable deterministic rebuild path is retained and admitted by policy.",
+      "failure_semantics": "A witness-committed receipt with a projection write failure remains accepted authority state but the projection is unavailable/incomplete. Recovery replays the immutable bundle idempotently."
+    },
+    {
+      "protocol_id": "quorum_serialized_transition",
+      "authority_order": "Witness quorum assigns the next authority sequence to a compare-and-advance intent; deterministic transition evaluation emits the accepted state digest and receipt; database projections consume the ordered result.",
+      "authoritative_ack_condition": "A client may be told authoritative success only after the quorum has committed the unique transition decision and its receipt is retrievable from the independent ledger.",
+      "failure_semantics": "At most one transition may consume a given predecessor under the same authority scope. Conflicting proposals receive compare-conflict. Quorum loss fails closed; no DB-local fallback becomes authoritative."
+    }
+  ],
+  "storage_backends": [
+    {
+      "backend_id": "sqlite-wal-full",
+      "engine": "SQLite",
+      "profile": "Local single-host transactional state with WAL and synchronous=FULL; capture VFS, filesystem, sync and backup configuration.",
+      "version_policy": "Pin exact library and runtime version, compile options, VFS and configuration digest for every run.",
+      "role": "primary_candidate"
+    },
+    {
+      "backend_id": "postgres18-local",
+      "engine": "PostgreSQL 18",
+      "profile": "Local primary, WAL durability explicitly pinned; no synchronous replica claim.",
+      "version_policy": "Pin server, SQLx adapter, schema migration, wal_sync_method, synchronous_commit and fsync values.",
+      "role": "remote_candidate"
+    },
+    {
+      "backend_id": "postgres18-sync-standby",
+      "engine": "PostgreSQL 18",
+      "profile": "Primary with named synchronous standby and synchronous commit; record acknowledgement semantics and failover policy.",
+      "version_policy": "Pin server, standby count, replication mode, commit settings, schema and adapter digest.",
+      "role": "remote_candidate"
+    },
+    {
+      "backend_id": "etcd-3-member",
+      "engine": "etcd",
+      "profile": "Three-member cluster, scoped compare-and-swap, MVCC revision and snapshot/restore revision bump.",
+      "version_policy": "Pin exact server version, cluster topology, member IDs, compaction and snapshot restore settings.",
+      "role": "coordination_control"
+    },
+    {
+      "backend_id": "etcd-5-member",
+      "engine": "etcd",
+      "profile": "Five-member cluster, scoped compare-and-swap, MVCC revision and snapshot/restore revision bump.",
+      "version_policy": "Pin exact server version, cluster topology, member IDs, compaction and snapshot restore settings.",
+      "role": "coordination_control"
+    },
+    {
+      "backend_id": "turso-local",
+      "engine": "Turso",
+      "profile": "Rust-native local SQL candidate; explicitly record pinned release, sync behavior and compatibility suite results.",
+      "version_policy": "Pin exact release/commit, VFS/filesystem, synchronous setting, schema compatibility and build digest.",
+      "role": "experimental_candidate"
+    }
+  ],
+  "witness_profiles": [
+    {
+      "profile_id": "witness-4-3-f1",
+      "member_count": 4,
+      "fault_tolerance": 1,
+      "write_quorum": 3,
+      "read_quorum": 3,
+      "failure_domains": [
+        "separate-cloud-account",
+        "separate-kms-and-root-operator",
+        "separate-region",
+        "separate-backup-administrator"
+      ]
+    },
+    {
+      "profile_id": "witness-7-5-f2",
+      "member_count": 7,
+      "fault_tolerance": 2,
+      "write_quorum": 5,
+      "read_quorum": 5,
+      "failure_domains": [
+        "separate-cloud-account",
+        "separate-region",
+        "separate-cloud-provider",
+        "separate-kms-operator",
+        "separate-backup-administrator",
+        "separate-network-administrator",
+        "separate-incident-response-owner"
+      ]
+    }
+  ],
+  "workload_matrix": [
+    {
+      "workload_id": "single-authority-hotspot",
+      "concurrent_clients": [1, 2, 4, 8, 16, 32],
+      "accepted_transitions": [1000, 10000, 100000],
+      "transition_bytes": [256, 4096, 65536],
+      "scope_distribution": "single_hot_scope"
+    },
+    {
+      "workload_id": "independent-scope-throughput",
+      "concurrent_clients": [1, 2, 4, 8, 16, 32],
+      "accepted_transitions": [1000, 10000, 100000, 1000000],
+      "transition_bytes": [256, 4096, 65536],
+      "scope_distribution": "uniform_independent_scopes"
+    },
+    {
+      "workload_id": "zipf-skew-and-tail-latency",
+      "concurrent_clients": [4, 8, 16, 32],
+      "accepted_transitions": [10000, 100000],
+      "transition_bytes": [256, 4096],
+      "scope_distribution": "zipfian_skew"
+    },
+    {
+      "workload_id": "policy-source-contention",
+      "concurrent_clients": [2, 4, 8, 16],
+      "accepted_transitions": [1000, 10000],
+      "transition_bytes": [4096, 65536],
+      "scope_distribution": "mixed_policy_and_source"
+    }
+  ],
+  "fault_scenarios": [
+    {
+      "scenario_id": "WQ-001",
+      "phase": "before-witness-write",
+      "fault": "one witness member unavailable",
+      "expected_classification": "pass",
+      "must_not_ack_authoritative_success": false
+    },
+    {
+      "scenario_id": "WQ-002",
+      "phase": "before-witness-write",
+      "fault": "write quorum unavailable",
+      "expected_classification": "anti_rollback_unknown",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-003",
+      "phase": "after-one-witness-signature",
+      "fault": "client response lost before write quorum",
+      "expected_classification": "incomplete",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-004",
+      "phase": "after-write-quorum-before-client-response",
+      "fault": "client response lost after witness commit",
+      "expected_classification": "recovery_required",
+      "must_not_ack_authoritative_success": false
+    },
+    {
+      "scenario_id": "WQ-005",
+      "phase": "restore",
+      "fault": "restore old database snapshot with old local witness pointer",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-006",
+      "phase": "head-read",
+      "fault": "replay previously valid head response against fresh nonce",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-007",
+      "phase": "checkpoint-append",
+      "fault": "same sequence signed with two different checkpoint digests",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-008",
+      "phase": "checkpoint-append",
+      "fault": "checkpoint predecessor digest mismatch",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-009",
+      "phase": "projection-apply",
+      "fault": "process crash after witness commit but before projection transaction",
+      "expected_classification": "recovery_required",
+      "must_not_ack_authoritative_success": false
+    },
+    {
+      "scenario_id": "WQ-010",
+      "phase": "projection-rebuild",
+      "fault": "transition bundle unavailable",
+      "expected_classification": "incomplete",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-011",
+      "phase": "checkpoint-append",
+      "fault": "policy digest changes without policy revision advance",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-012",
+      "phase": "trust-rotation",
+      "fault": "successor trust root lacks old-root or new-root threshold",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-013",
+      "phase": "projection-restore",
+      "fault": "database revision is higher than witness head but is not checkpoint-linked",
+      "expected_classification": "rejected",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-014",
+      "phase": "witness-read",
+      "fault": "read quorum reports inconsistent head digests",
+      "expected_classification": "anti_rollback_unknown",
+      "must_not_ack_authoritative_success": true
+    },
+    {
+      "scenario_id": "WQ-015",
+      "phase": "checker",
+      "fault": "linearization search reaches configured state bound",
+      "expected_classification": "inconclusive",
+      "must_not_ack_authoritative_success": true
+    }
+  ],
+  "metrics": [
+    { "metric_id": "false_freshness_accepts", "unit": "count", "class": "safety", "required": true },
+    { "metric_id": "same_sequence_equivocations_accepted", "unit": "count", "class": "safety", "required": true },
+    { "metric_id": "authoritative_acks_without_write_quorum", "unit": "count", "class": "safety", "required": true },
+    { "metric_id": "reference_oracle_disagreements", "unit": "count", "class": "safety", "required": true },
+    { "metric_id": "projection_rebuild_digest_mismatches", "unit": "count", "class": "safety", "required": true },
+    { "metric_id": "commit_latency", "unit": "milliseconds p50/p95/p99", "class": "latency", "required": true },
+    { "metric_id": "fresh_head_read_latency", "unit": "milliseconds p50/p95/p99", "class": "latency", "required": true },
+    { "metric_id": "accepted_transitions_per_second", "unit": "transitions/second", "class": "throughput", "required": true },
+    { "metric_id": "witness_quorum_availability", "unit": "fraction and outage duration", "class": "availability", "required": true },
+    { "metric_id": "projection_rebuild_time", "unit": "seconds", "class": "recovery", "required": true },
+    { "metric_id": "transition_bundle_bytes", "unit": "bytes", "class": "resource", "required": true },
+    { "metric_id": "witness_sign_verify_cpu", "unit": "cpu milliseconds per transition", "class": "resource", "required": true },
+    { "metric_id": "checker_states_explored", "unit": "states", "class": "reproducibility", "required": true },
+    { "metric_id": "exact_seed_replay_status", "unit": "identical status/counterexample digest", "class": "reproducibility", "required": true }
+  ],
+  "acceptance": {
+    "false_freshness_accepts": 0,
+    "dual_accepts_same_sequence": 0,
+    "oracle_disagreement": 0,
+    "authoritative_ack_without_write_quorum": 0,
+    "rebuild_digest_mismatches": 0,
+    "search_exhaustion_as_pass": 0
+  }
+}
