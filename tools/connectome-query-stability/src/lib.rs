@@ -32,6 +32,8 @@ pub struct NumericInterval {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetricInterval {
     pub metric_id: String,
+    /// Must exactly match the corresponding MetricTolerance.unit_id.
+    pub unit_id: String,
     pub bounds: NumericInterval,
 }
 
@@ -137,6 +139,7 @@ pub enum StabilityError {
     ParentSnapshotMismatch { checkpoint_id: String },
     SourceVolumeMismatch { expected: String, actual: String },
     MetricUnitMismatch { metric_id: String, expected: String, actual: String },
+    GraphBuilderConfigMismatch { checkpoint_id: String },
     NonFiniteDrift(String),
 }
 
@@ -209,6 +212,10 @@ impl fmt::Display for StabilityError {
             } => write!(
                 f,
                 "metric unit mismatch for {metric_id}: expected {expected}, got {actual}"
+            ),
+            Self::GraphBuilderConfigMismatch { checkpoint_id } => write!(
+                f,
+                "graph builder configuration changed at checkpoint {checkpoint_id}"
             ),
             Self::NonFiniteDrift(metric) => {
                 write!(f, "non-finite temporal drift for metric {metric}")
@@ -396,6 +403,7 @@ fn validate_input(input: &QueryStabilityInput) -> Result<(), StabilityError> {
 
     let mut previous_edit_count: Option<u64> = None;
     let mut previous_snapshot: Option<&str> = None;
+    let mut graph_builder_config: Option<&str> = None;
 
     for checkpoint in &input.checkpoints {
         validate_id("checkpoint", &checkpoint.checkpoint_id)?;
@@ -409,6 +417,15 @@ fn validate_input(input: &QueryStabilityInput) -> Result<(), StabilityError> {
         validate_sha("graph snapshot", &checkpoint.graph_snapshot_sha256)?;
         validate_sha("edit history manifest", &checkpoint.edit_history_manifest_sha256)?;
         validate_sha("graph builder config", &checkpoint.graph_builder_config_sha256)?;
+        if let Some(expected_config) = graph_builder_config {
+            if checkpoint.graph_builder_config_sha256 != expected_config {
+                return Err(StabilityError::GraphBuilderConfigMismatch {
+                    checkpoint_id: checkpoint.checkpoint_id.clone(),
+                });
+            }
+        } else {
+            graph_builder_config = Some(checkpoint.graph_builder_config_sha256.as_str());
+        }
         validate_sha(
             "structural uncertainty manifest",
             &checkpoint.structural_uncertainty_manifest_sha256,
@@ -490,13 +507,11 @@ fn validate_input(input: &QueryStabilityInput) -> Result<(), StabilityError> {
                         scenario_id: scenario.scenario_id.clone(),
                     });
                 }
-                // Unit identity is part of the metric contract. Values are represented in
-                // that unit by the upstream query artifact; mismatched units fail closed.
-                if tolerance.unit_id.trim().is_empty() {
+                if result.unit_id != tolerance.unit_id {
                     return Err(StabilityError::MetricUnitMismatch {
                         metric_id: result.metric_id.clone(),
-                        expected: "non-empty declared unit".to_owned(),
-                        actual: tolerance.unit_id.clone(),
+                        expected: tolerance.unit_id.clone(),
+                        actual: result.unit_id.clone(),
                     });
                 }
             }
@@ -562,6 +577,11 @@ mod tests {
     fn metric(id: &str, lower: f64, upper: f64) -> MetricInterval {
         MetricInterval {
             metric_id: id.to_owned(),
+            unit_id: if id == "global_motif_count" {
+                "count".to_owned()
+            } else {
+                "normalized_strength".to_owned()
+            },
             bounds: NumericInterval { lower, upper },
         }
     }
@@ -819,6 +839,31 @@ mod tests {
         assert!(matches!(
             audit_query_stability(&input(checkpoints)),
             Err(StabilityError::DuplicateMetric { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_metric_unit_mismatch_and_graph_builder_config_drift() {
+        let mut checkpoints = vec![
+            checkpoint("cp-1", 10, SHA_A, None, vec![scenario("h1", (1.0, 1.0), (1.0, 1.0))]),
+            checkpoint("cp-2", 20, SHA_B, Some(SHA_A), vec![scenario("h1", (1.0, 1.0), (1.0, 1.0))]),
+        ];
+        checkpoints[1].scenario_results[0].metric_intervals[0].unit_id =
+            "normalized_strength".to_owned();
+        assert_eq!(
+            audit_query_stability(&input(checkpoints.clone())),
+            Err(StabilityError::MetricUnitMismatch {
+                metric_id: "global_motif_count".to_owned(),
+                expected: "count".to_owned(),
+                actual: "normalized_strength".to_owned(),
+            })
+        );
+
+        checkpoints[1].scenario_results[0].metric_intervals[0].unit_id = "count".to_owned();
+        checkpoints[1].graph_builder_config_sha256 = SHA_A.to_owned();
+        assert!(matches!(
+            audit_query_stability(&input(checkpoints)),
+            Err(StabilityError::GraphBuilderConfigMismatch { .. })
         ));
     }
 
