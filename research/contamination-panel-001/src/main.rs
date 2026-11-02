@@ -364,8 +364,7 @@ fn analyze_measurement_distribution_cli(args: &[String]) -> Result<(), Box<dyn E
     let bundle_bytes = read_file_bounded(&args[2], MAX_MEASUREMENT_BYTES)?;
     let protocol: MeasurementProtocolV1 = serde_json::from_slice(&protocol_bytes)?;
     let bundle: MeasurementRunBundleV1 = serde_json::from_slice(&bundle_bytes)?;
-    let report = analyze_measurement_distribution(&protocol, &bundle)
-        .map_err(io::Error::other)?;
+    let report = analyze_measurement_distribution(&protocol, &bundle).map_err(io::Error::other)?;
     write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
     println!(
         "models={} model_families={} runs={} independent_units={} instances={} observations={} distributional_eligible={} claim_scope_eligible={} rank_status={}",
