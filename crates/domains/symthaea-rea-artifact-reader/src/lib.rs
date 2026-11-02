@@ -136,7 +136,9 @@ pub struct ArtifactEntry {
     pub local_header_offset: u64,
     pub data_offset: u64,
     pub compressed_data_end: u64,
-    /// A local data descriptor, when present, is not included in this range.
+    /// Verified descriptor end, including the optional signature, when present.
+    pub data_descriptor_end: Option<u64>,
+    pub data_descriptor_has_signature: Option<bool>,
     pub limitations: Vec<String>,
 }
 
@@ -245,7 +247,7 @@ impl ZipArtifactReader {
 
         let max_member_end = entries
             .iter()
-            .map(|entry| entry.compressed_data_end)
+            .map(|entry| entry.data_descriptor_end.unwrap_or(entry.compressed_data_end))
             .max()
             .unwrap_or(preflight.archive_start);
         let opaque_pre_central_directory_bytes = preflight
@@ -255,7 +257,7 @@ impl ZipArtifactReader {
         let mut coverage_limitations = vec![
             "unlisted local-file-header scan is not implemented".to_owned(),
             "member payloads were not decompressed, hashed, or CRC-verified".to_owned(),
-            "data-descriptor records are not parsed or verified".to_owned(),
+            "data descriptor metadata is compared with the central directory; payload CRC is not verified".to_owned(),
             "APK Signing Block and other non-entry regions are retained as opaque byte ranges".to_owned(),
         ];
         if entries.iter().any(|entry| entry.encrypted) {
@@ -876,14 +878,33 @@ fn read_central_directory(
             uses_data_descriptor,
             limits,
         )?;
+        let descriptor = if uses_data_descriptor {
+            Some(verify_data_descriptor(
+                file,
+                local.compressed_data_end,
+                end_record.central_directory_offset,
+                declared_crc32,
+                declared_compressed_size,
+                declared_uncompressed_size,
+                needs_compressed || needs_uncompressed,
+            )?)
+        } else {
+            None
+        };
+        let member_extent_end = descriptor
+            .map(|facts| facts.end)
+            .unwrap_or(local.compressed_data_end);
         ranges.push(EntryRange {
             start: local.local_header_offset,
-            end: local.compressed_data_end,
+            end: member_extent_end,
         });
 
         let mut limitations = Vec::new();
         if uses_data_descriptor {
-            limitations.push("local data descriptor was not parsed or verified".to_owned());
+            limitations.push(
+                "data descriptor matched central-directory metadata; payload CRC remains unverified"
+                    .to_owned(),
+            );
         }
         if encrypted {
             limitations.push("encrypted member is metadata-only; decryption is disabled".to_owned());
@@ -912,6 +933,8 @@ fn read_central_directory(
             local_header_offset: local.local_header_offset,
             data_offset: local.data_offset,
             compressed_data_end: local.compressed_data_end,
+            data_descriptor_end: descriptor.map(|facts| facts.end),
+            data_descriptor_has_signature: descriptor.map(|facts| facts.has_signature),
             limitations,
         });
     }
@@ -1164,6 +1187,92 @@ struct LocalEntryFacts {
     local_header_offset: u64,
     data_offset: u64,
     compressed_data_end: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DataDescriptorFacts {
+    end: u64,
+    has_signature: bool,
+}
+
+/// Verify the optional-signature 32-bit or ZIP64 data descriptor against the
+/// central-directory declaration. Ambiguous boundaries are rejected.
+fn verify_data_descriptor(
+    file: &mut File,
+    descriptor_offset: u64,
+    central_directory_offset: u64,
+    expected_crc32: u32,
+    expected_compressed_size: u64,
+    expected_uncompressed_size: u64,
+    zip64_sizes: bool,
+) -> Result<DataDescriptorFacts, ReaderError> {
+    let size_width = if zip64_sizes { 8usize } else { 4usize };
+    let mut matches = Vec::new();
+
+    for has_signature in [true, false] {
+        let prefix_width = if has_signature { 4usize } else { 0usize };
+        let descriptor_width = prefix_width + 4 + size_width * 2;
+        let descriptor_end = descriptor_offset
+            .checked_add(descriptor_width as u64)
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "data descriptor end offset overflow",
+                )
+            })?;
+        if descriptor_end > central_directory_offset {
+            continue;
+        }
+
+        file.seek(SeekFrom::Start(descriptor_offset))
+            .map_err(|error| ReaderError::io("cannot seek to data descriptor", error))?;
+        let mut bytes = vec![0u8; descriptor_width];
+        file.read_exact(&mut bytes)
+            .map_err(|error| ReaderError::io("cannot read data descriptor", error))?;
+
+        let mut cursor = 0usize;
+        if has_signature {
+            if read_u32(&bytes[0..4]) != DATA_DESCRIPTOR_SIGNATURE {
+                continue;
+            }
+            cursor += 4;
+        }
+        let actual_crc32 = read_u32(&bytes[cursor..cursor + 4]);
+        cursor += 4;
+        let actual_compressed_size = if zip64_sizes {
+            read_u64(&bytes[cursor..cursor + 8])
+        } else {
+            read_u32(&bytes[cursor..cursor + 4]) as u64
+        };
+        cursor += size_width;
+        let actual_uncompressed_size = if zip64_sizes {
+            read_u64(&bytes[cursor..cursor + 8])
+        } else {
+            read_u32(&bytes[cursor..cursor + 4]) as u64
+        };
+
+        if actual_crc32 == expected_crc32
+            && actual_compressed_size == expected_compressed_size
+            && actual_uncompressed_size == expected_uncompressed_size
+        {
+            matches.push(DataDescriptorFacts {
+                end: descriptor_end,
+                has_signature,
+            });
+        }
+    }
+
+    match matches.as_slice() {
+        [facts] => Ok(*facts),
+        [] => Err(ReaderError::new(
+            ReaderErrorKind::InvalidArchive,
+            "data descriptor is missing, truncated, or disagrees with central-directory CRC/sizes",
+        )),
+        _ => Err(ReaderError::new(
+            ReaderErrorKind::InvalidArchive,
+            "data descriptor boundary is ambiguous",
+        )),
+    }
 }
 
 fn decode_member_name(raw: &[u8], flags: u16, extra: &[u8]) -> Option<String> {
@@ -1546,7 +1655,35 @@ mod tests {
         assert!(entry.uses_data_descriptor);
         assert_eq!(entry.declared_crc32, crc32(b"payload"));
         assert_eq!(entry.declared_uncompressed_size, 7);
-        assert!(entry.limitations.iter().any(|item| item.contains("data descriptor")));
+        assert!(entry.data_descriptor_end.is_some());
+        assert_eq!(entry.data_descriptor_has_signature, Some(true));
+        assert!(entry.limitations.iter().any(|item| item.contains("payload CRC remains unverified")));
+        fs::remove_file(path).unwrap();
+
+        let path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"descriptor.bin",
+                data: b"payload",
+                flags: DATA_DESCRIPTOR_FLAG,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let mut bytes = fs::read(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        let descriptor_start = LOCAL_HEADER_FIXED_BYTES as usize + b"descriptor.bin".len() + b"payload".len();
+        bytes.drain(descriptor_start..descriptor_start + 4);
+        let eocd = bytes.len() - EOCD_FIXED_BYTES;
+        let old_directory_offset = read_u32(&bytes[eocd + 16..eocd + 20]);
+        bytes[eocd + 16..eocd + 20]
+            .copy_from_slice(&(old_directory_offset - 4).to_le_bytes());
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        assert_eq!(
+            reader.inventory().entries[0].data_descriptor_has_signature,
+            Some(false)
+        );
         fs::remove_file(path).unwrap();
     }
 
