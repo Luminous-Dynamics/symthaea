@@ -60,7 +60,8 @@
         "selection_status",
         "formal_theorem_verified",
         "claim_ceiling",
-        "report_sha256"
+        "report_sha256",
+        "confidence_failure_allocation"
       ],
       "properties": {
         "schema": {
@@ -211,6 +212,25 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000000
+        },
+        "confidence_failure_allocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator_ppm",
+            "denominator"
+          ],
+          "properties": {
+            "numerator_ppm": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999
+            },
+            "denominator": {
+              "type": "integer",
+              "minimum": 3
+            }
+          }
         }
       }
     }
