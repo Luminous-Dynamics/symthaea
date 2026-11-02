@@ -111,7 +111,7 @@ struct FileDigest {
 #[derive(Debug, serde::Serialize)]
 struct SpeciesReplay {
     species: String,
-    manifest_file: FileDigest,
+    manifest_file: Option<FileDigest>,
     split_manifest_sha256: String,
     split_files: BTreeMap<String, FileDigest>,
     source_key_counts: BTreeMap<String, u64>,
@@ -376,41 +376,55 @@ fn load_species_split_index(
         }
     };
     let manifest_path = species_root.join("manifest.json");
-    let manifest_bytes = match read_inside_root(&species_root, &manifest_path, &format!("{species}/manifest.json")) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            errors.push(Finding::global("split_manifest_missing", error));
-            return None;
-        }
-    };
-    let manifest_file = FileDigest { relative_path: format!("{species}/manifest.json"), bytes: manifest_bytes.len() as u64, sha256: sha256(&manifest_bytes) };
-    let manifest: Value = match serde_json::from_slice(&manifest_bytes) {
-        Ok(value) if value.is_object() => value,
-        Ok(_) => {
-            errors.push(Finding::global("split_manifest_invalid", format!("{species}/manifest.json must be an object")));
-            return None;
-        }
-        Err(error) => {
-            errors.push(Finding::global("split_manifest_invalid", format!("{species}/manifest.json: {error}")));
-            return None;
-        }
-    };
-    if manifest.get("species").and_then(Value::as_str) != Some(species) {
-        errors.push(Finding::global("split_manifest_species_mismatch", format!("{species}/manifest.json species does not match directory")));
-    }
-    if let Some(object) = manifest.as_object() {
-        for field in object.keys() {
-            if !matches!(field.as_str(),
-                "species" | "edge_nm" | "ratios" | "seed" | "bbox_nm" | "grid"
-                | "cube_counts" | "op_counts" | "outliers_dropped" | "duplicate_keys_dropped"
-            ) {
-                warnings.push(Finding::global("split_manifest_unknown_field", format!("{species}/manifest.json contains unrecognized field {field:?}")));
+    let (manifest_file, manifest): (Option<FileDigest>, Option<Value>) = if manifest_path.exists() {
+        let bytes = match read_inside_root(&species_root, &manifest_path, &format!("{species}/manifest.json")) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                errors.push(Finding::global("split_manifest_invalid", error));
+                Vec::new()
+            }
+        };
+        if bytes.is_empty() {
+            (None, None)
+        } else {
+            let digest = FileDigest { relative_path: format!("{species}/manifest.json"), bytes: bytes.len() as u64, sha256: sha256(&bytes) };
+            match serde_json::from_slice::<Value>(&bytes) {
+                Ok(value) if value.is_object() => (Some(digest), Some(value)),
+                Ok(_) => {
+                    errors.push(Finding::global("split_manifest_invalid", format!("{species}/manifest.json must be an object")));
+                    (Some(digest), None)
+                }
+                Err(error) => {
+                    errors.push(Finding::global("split_manifest_invalid", format!("{species}/manifest.json: {error}")));
+                    (Some(digest), None)
+                }
             }
         }
-    }
-    let edge = manifest.get("edge_nm").and_then(Value::as_f64);
-    if edge.is_none_or(|value| (value - EXPECTED_EDGE_NM).abs() > 1.0e-9) {
-        errors.push(Finding::global("split_manifest_edge_mismatch", format!("{species}/manifest.json edge_nm must be {EXPECTED_EDGE_NM}")));
+    } else {
+        warnings.push(Finding::global(
+            "source_build_manifest_missing",
+            format!("{species}/manifest.json is absent; exact replay still uses the three split files consumed by the upstream loader, but source op-count metadata cannot be cross-checked"),
+        ));
+        (None, None)
+    };
+    if let Some(manifest) = manifest.as_ref() {
+        if manifest.get("species").and_then(Value::as_str) != Some(species) {
+            errors.push(Finding::global("split_manifest_species_mismatch", format!("{species}/manifest.json species does not match directory")));
+        }
+        if let Some(object) = manifest.as_object() {
+            for field in object.keys() {
+                if !matches!(field.as_str(),
+                    "species" | "edge_nm" | "ratios" | "seed" | "bbox_nm" | "grid"
+                    | "cube_counts" | "op_counts" | "outliers_dropped" | "duplicate_keys_dropped"
+                ) {
+                    warnings.push(Finding::global("split_manifest_unknown_field", format!("{species}/manifest.json contains unrecognized field {field:?}")));
+                }
+            }
+        }
+        let edge = manifest.get("edge_nm").and_then(Value::as_f64);
+        if edge.is_none_or(|value| (value - EXPECTED_EDGE_NM).abs() > 1.0e-9) {
+            errors.push(Finding::global("split_manifest_edge_mismatch", format!("{species}/manifest.json edge_nm must be {EXPECTED_EDGE_NM}")));
+        }
     }
 
     let mut assignments = BTreeMap::<String, String>::new();
@@ -467,7 +481,7 @@ fn load_species_split_index(
         }
     }
 
-    if let Some(op_counts) = manifest.get("op_counts").and_then(Value::as_object) {
+    if let Some(op_counts) = manifest.as_ref().and_then(|value| value.get("op_counts")).and_then(Value::as_object) {
         for bank in BANKS {
             for split in SPLITS {
                 let actual = counts.get(&format!("{bank}|{split}")).copied().unwrap_or(0);
@@ -481,13 +495,17 @@ fn load_species_split_index(
                 }
             }
         }
-    } else {
-        errors.push(Finding::global("split_manifest_counts_missing", format!("{species}/manifest.json missing op_counts object")));
+    } else if manifest.is_some() {
+        warnings.push(Finding::global("split_manifest_counts_missing", format!("{species}/manifest.json has no op_counts object; split-file membership remains checked, source build counts are unavailable")));
     }
 
     let mut split_manifest_hasher = Sha256::new();
     split_manifest_hasher.update(b"connectomebench2-upstream-split-manifest-set-v1\n");
-    split_manifest_hasher.update(sha256(&manifest_bytes).as_bytes());
+    if let Some(manifest_file) = manifest_file.as_ref() {
+        split_manifest_hasher.update(manifest_file.sha256.as_bytes());
+    } else {
+        split_manifest_hasher.update(b"NO_OPTIONAL_BUILD_MANIFEST");
+    }
     for split in SPLITS {
         if let Some(file) = split_files.get(split) {
             split_manifest_hasher.update(split.as_bytes());
@@ -576,7 +594,7 @@ fn audit(
         upstream_repo: "https://github.com/timfarkas/ConnectomeBench2",
         upstream_commit: UPSTREAM_COMMIT,
         sidecar_jsonl_sha256: sidecar_digest,
-        split_root_layout: "species/{manifest.json,train.json,val.json,test.json}",
+        split_root_layout: "species/{train.json,val.json,test.json}; manifest.json optional",
         species: species_replays,
         sidecar_rows: rows.len() as u64,
         matched_sidecar_rows: total_matched,
