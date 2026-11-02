@@ -123,7 +123,7 @@
       "path": "crates/domain/src/lib.rs",
       "name": "DefaultAuthorizer::can_read",
       "source_anchor": {
-        "line": 13,
+        "line": 20,
         "kind": "declaration_anchor",
         "text": "fn can_read(&self, user: &User) -> bool;",
         "authority": "source_text_anchor"
