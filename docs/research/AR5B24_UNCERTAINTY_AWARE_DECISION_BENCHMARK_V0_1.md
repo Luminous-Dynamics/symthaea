@@ -423,3 +423,7 @@ The following follow-on artifacts separate the mathematical/engineering concerns
 - [Issue #10009 — vector empirical-Bernstein confidence sets](https://github.com/Luminous-Dynamics/symthaea/issues/10009): theorem-faithful joint confidence regions and directional support functions.
 
 These are draft research artifacts. No Rust compile/test, CI pass, performance result or SOTA superiority is claimed for the new implementations. The benchmark waves must qualify them at exact heads and with independent solvers/verifiers before promotion.
+
+
+Wave-1 now has an executable categorical generator and CLI:
+- [PR #10011 — functional shift benchmark](https://github.com/Luminous-Dynamics/symthaea/pull/10011): seeded F01/F02 generation, declared functional vectors, omitted-functional trap, Hoeffding/Weissman confidence calculations, empirical coverage and TV radius summaries. Draft; tests authored, not executed.
