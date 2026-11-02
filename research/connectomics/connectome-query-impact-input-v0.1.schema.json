@@ -113,6 +113,7 @@
       "required": [
         "effect_interval",
         "evidence_sha256",
+        "decision_worlds",
         "decision_worlds"
       ],
       "properties": {
