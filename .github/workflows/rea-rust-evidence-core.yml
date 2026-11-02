@@ -75,13 +75,13 @@ jobs:
           test "$(npm --version)" = "$REA_NPM_VERSION"
           npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Execute the pinned upstream Evidence source
+      - name: Execute the pinned upstream Evidence source and generate corpus
         working-directory: rea-upstream
         run: |
           ./node_modules/.bin/tsx "$GITHUB_WORKSPACE/scripts/rea/generate-upstream-evidence.mjs" \
             "$GITHUB_WORKSPACE/rea-upstream" \
-            "$RUNNER_TEMP/rea-evidence-upstream-v1.json"
-          echo "REA_UPSTREAM_EVIDENCE_FIXTURE=$RUNNER_TEMP/rea-evidence-upstream-v1.json" >> "$GITHUB_ENV"
+            "$RUNNER_TEMP/rea-evidence-upstream-v1"
+          echo "REA_UPSTREAM_EVIDENCE_FIXTURE_DIR=$RUNNER_TEMP/rea-evidence-upstream-v1" >> "$GITHUB_ENV"
 
       - name: Validate Symthaea workspace metadata
         run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/symthaea-metadata.json"
