@@ -872,4 +872,25 @@ mod tests {
         assert!(report.errors.iter().any(|finding| finding.code == "sidecar_archive_species_mismatch"));
     }
 
+    #[test]
+    fn optional_build_manifest_absence_does_not_block_exact_loader_replay() {
+        let (root, bytes) = fixture();
+        fs::remove_file(root.join("mouse/manifest.json")).unwrap();
+        let report = audit(&bytes, sha256(&bytes), &root, "a".repeat(40));
+        assert_eq!(report.status, "PASS", "{:?}", report.errors);
+        assert!(report.warnings.iter().any(|finding| finding.code == "source_build_manifest_missing"));
+        assert!(report.species["mouse"].manifest_file.is_none());
+    }
+
+    #[test]
+    fn accepts_complete_metadata_sidecar_rows_with_additional_fields() {
+        let (root, bytes) = fixture();
+        let altered = String::from_utf8(bytes).unwrap().replace(
+            "{\"combined_sample_hash\":",
+            "{\"sample_type\":\"merge_edit\",\"has_em\":false,\"present_slots\":[\"geometry\"],\"combined_sample_hash\":"
+        );
+        let report = audit(altered.as_bytes(), sha256(altered.as_bytes()), &root, "a".repeat(40));
+        assert_eq!(report.status, "PASS", "{:?}", report.errors);
+    }
+
 }
