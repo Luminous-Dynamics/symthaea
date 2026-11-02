@@ -203,6 +203,14 @@ impl DirectFunctionalTransportRequest {
             ));
         }
         let support_size = self.calibration_sample.observed_path_counts.len();
+        if self.registered_functionals.windows(2).any(|pair| {
+            pair[0].functional_id >= pair[1].functional_id
+        }) {
+            return Err(DirectFunctionalTransportError::new(
+                "request.registered_functionals",
+                "functional roster must be strictly sorted by unique functional ID",
+            ));
+        }
         let mut ids = BTreeSet::new();
         for (index, functional) in self.registered_functionals.iter().enumerate() {
             let path = format!("request.registered_functionals[{index}]");
@@ -997,17 +1005,24 @@ mod tests {
 
     #[test]
     fn rejects_missing_duplicate_or_out_of_range_functional_values() {
-        let duplicate = request(
-            vec![50, 50],
-            vec![50, 50],
+        let duplicate = DirectFunctionalTransportRequest::new(
+            "duplicate-functional",
+            CAL_DESIGN,
+            TARGET_DESIGN,
+            sample(vec![50, 50], CAL_DATA),
+            sample(vec![50, 50], TARGET_DATA),
+            0.01,
+            true,
+            true,
+            true,
+            true,
+            true,
             vec![
                 functional("duplicate", vec![0.0, 1.0], 0.0, 1.0),
                 functional("duplicate", vec![1.0, 0.0], 0.0, 1.0),
             ],
         );
-        // The constructor can calculate a digest, but structural validation
-        // rejects the duplicate functional identity.
-        assert!(duplicate.validate().is_err());
+        assert!(duplicate.is_err());
 
         let mut out_of_range = request(
             vec![50, 50],
@@ -1079,6 +1094,7 @@ mod tests {
         verify_direct_functional_transport_report(&request, &report).unwrap();
         let mut altered_sample = request.clone();
         altered_sample.target_sample.observed_path_counts[0] += 1;
-        assert!(altered_sample.validate().is_err());
+        assert!(altered_sample.validate().is_ok());
+        assert!(verify_direct_functional_transport_report(&altered_sample, &report).is_err());
     }
 }
