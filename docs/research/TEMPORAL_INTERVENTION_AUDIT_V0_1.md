@@ -167,7 +167,7 @@ The implementation deliberately ignores effect magnitude and uses a single fixed
 
 The Rust module adds fourteen authored tests: rational wealth under beneficial/harmful/tied signs; familywise threshold; latched first crossing; exact integer arithmetic at the 64-pair cap; non-fair assignment and design mismatch rejection; sequential-gap/replay/context failure controls; separate failure exposure; and exact dynamic-programming enumeration of crossing probability through a 20-look finite null tree.
 
-An independent exhaustive sign-sequence calculation gives 4,186 crossings among 1,048,576 sequences by look 20 at familywise α = 0.05 and M = 3. This is 0.399% for one axis, below its 1.667% allocated bound. The authored Rust dynamic-programming test pins this count and verifies the bound at every prefix. This is a finite mathematical regression for the specified design, not evidence about real Symthaea effects.
+An independent exhaustive sign-sequence calculation gives 4,186 crossings among 1,048,576 sequences by look 20 at familywise α = 0.05 and M = 3. This is 0.399% for one axis, below its 1.667% allocated bound. The authored Rust dynamic-programming test pins this count and verifies the bound at every prefix. This is a finite mathematical regression for the specified design, not evidence about real Symthaea effects. This is contrasted with an individually exact one-sided binomial sign-test p-value inspected after every look: that naive repeated-look rule crosses in 36,740 of 1,048,576 null sequences (3.504%), exceeding the 1.667% per-axis budget. The Rust test suite pins this as the invalid optional-stopping negative control.
 
 Compare the sequential process with:
 1. the fixed-sample exact sign-flip p-value after the preregistered final look;
