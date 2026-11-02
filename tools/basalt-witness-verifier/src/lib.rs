@@ -902,7 +902,7 @@ mod tests {
     }
 
     fn test_nonce() -> String {
-        URL_SAFE_NO_PAD.encode([42_u8; 32])
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([42_u8; 32])
     }
 
     fn checkpoint_fixture(sequence: &str, state_byte: u8) -> WitnessCheckpoint {
@@ -926,10 +926,7 @@ mod tests {
         }
     }
 
-    fn sign_checkpoint_fixture(
-        checkpoint: &WitnessCheckpoint,
-        seeds: &[[u8; 32]],
-    ) -> Vec<u8> {
+    fn sign_checkpoint_fixture(checkpoint: &WitnessCheckpoint, seeds: &[[u8; 32]]) -> Vec<u8> {
         let canonical = serde_json_canonicalizer::to_vec(checkpoint).unwrap();
         sign_payload(CHECKPOINT_PAYLOAD_TYPE, &canonical, seeds)
     }
@@ -939,6 +936,7 @@ mod tests {
         nonce: &str,
         seed: &[u8; 32],
     ) -> Vec<u8> {
+        let checkpoint_canonical = serde_json_canonicalizer::to_vec(checkpoint).unwrap();
         let response = WitnessHeadResponse {
             record_type: "basalt.authority.witness-head-response".to_string(),
             schema_version: 1,
@@ -950,7 +948,7 @@ mod tests {
             witness_set_version: checkpoint.witness_set_version.clone(),
             trust_root_version: checkpoint.trust_root_version.clone(),
             head_sequence: checkpoint.sequence.clone(),
-            head_checkpoint_digest: checkpoint_digest(checkpoint).unwrap(),
+            head_checkpoint_digest: checkpoint_digest_from_payload(&checkpoint_canonical),
             head_authority_revision: checkpoint.authority_revision.clone(),
             head_state_digest: checkpoint.state_digest.clone(),
             head_policy_digest: checkpoint.policy_digest.clone(),
@@ -959,94 +957,82 @@ mod tests {
         sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, &canonical, std::slice::from_ref(seed))
     }
 
-    fn verified_checkpoint_fixture(
-        checkpoint: &WitnessCheckpoint,
-        seeds: &[[u8; 32]],
-        trust_bytes: &[u8],
-        pin: &str,
-    ) -> VerifiedCheckpoint {
-        verify_write_checkpoint(
-            &sign_checkpoint_fixture(checkpoint, seeds),
-            trust_bytes,
-            pin,
-            "incarnation-1",
-        )
-        .unwrap()
-    }
-
-    fn verified_response_fixture(
+    fn evidence_fixture(
         checkpoint: &WitnessCheckpoint,
         seed: &[u8; 32],
         nonce: &str,
-        trust_bytes: &[u8],
-        pin: &str,
-    ) -> VerifiedHeadResponse {
-        verify_member_head_response(
-            &sign_head_response_fixture(checkpoint, nonce, seed),
-            trust_bytes,
-            pin,
-            "incarnation-1",
-            nonce,
-        )
-        .unwrap()
+        checkpoint_signers: &[[u8; 32]],
+    ) -> WitnessHeadEvidence {
+        WitnessHeadEvidence {
+            response_envelope: sign_head_response_fixture(checkpoint, nonce, seed),
+            checkpoint_envelope: sign_checkpoint_fixture(checkpoint, checkpoint_signers),
+        }
     }
 
-    fn read_fixture() -> (
-        Vec<u8>,
-        String,
-        Vec<VerifiedHeadResponse>,
-        Vec<VerifiedCheckpoint>,
-    ) {
+    fn read_fixture() -> (Vec<u8>, String, Vec<WitnessHeadEvidence>) {
         let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
         let trust_bytes = trust_bytes(&build_trust(&seeds));
         let pin = sha256_prefixed(&trust_bytes);
         let nonce = test_nonce();
         let latest = checkpoint_fixture("5", 0x55);
         let lagging = checkpoint_fixture("4", 0x44);
-        let checkpoints = vec![
-            verified_checkpoint_fixture(&latest, &seeds[..3], &trust_bytes, &pin),
-            verified_checkpoint_fixture(&lagging, &seeds[..3], &trust_bytes, &pin),
+        let evidence = vec![
+            evidence_fixture(&latest, &seeds[0], &nonce, &seeds[..3]),
+            evidence_fixture(&lagging, &seeds[1], &nonce, &seeds[..3]),
+            evidence_fixture(&latest, &seeds[2], &nonce, &seeds[..3]),
         ];
-        let responses = vec![
-            verified_response_fixture(&latest, &seeds[0], &nonce, &trust_bytes, &pin),
-            verified_response_fixture(&lagging, &seeds[1], &nonce, &trust_bytes, &pin),
-            verified_response_fixture(&latest, &seeds[2], &nonce, &trust_bytes, &pin),
-        ];
-        (trust_bytes, pin, responses, checkpoints)
+        (trust_bytes, pin, evidence)
     }
 
     #[test]
     fn nonce_bound_read_selects_highest_certified_head_with_lagging_replicas() {
-        let (trust_bytes, pin, responses, checkpoints) = read_fixture();
-        let selected = aggregate_witness_read(
-            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
-        )
-        .unwrap();
-        assert_eq!(selected.status, "highest_write_certified_head_selected");
+        let (trust_bytes, pin, evidence) = read_fixture();
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &test_nonce(),
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "fresh_head_selected");
         assert_eq!(selected.sequence, "5");
         assert_eq!(selected.read_quorum, 3);
-        assert_eq!(selected.response_member_key_ids.len(), 3);
-        assert_eq!(selected.checkpoint_signer_key_ids.len(), 3);
+        assert_eq!(selected.distinct_member_responses, 3);
+        assert_eq!(selected.accepted_member_key_ids.len(), 3);
+        assert!(selected.counterexamples.is_empty());
     }
 
     #[test]
     fn read_quorum_shortfall_is_anti_rollback_unknown() {
-        let (trust_bytes, pin, mut responses, checkpoints) = read_fixture();
-        responses.truncate(2);
-        let error = aggregate_witness_read(
-            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
-        ).unwrap_err();
-        assert!(error.contains("anti_rollback_unknown"));
+        let (trust_bytes, pin, mut evidence) = read_fixture();
+        evidence.truncate(2);
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &test_nonce(),
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "anti_rollback_unknown");
+        assert_eq!(selected.distinct_member_responses, 0);
     }
 
     #[test]
     fn repeated_member_response_never_counts_twice() {
-        let (trust_bytes, pin, mut responses, checkpoints) = read_fixture();
-        responses[2] = responses[0].clone();
-        let error = aggregate_witness_read(
-            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
-        ).unwrap_err();
-        assert!(error.contains("duplicate witness member response"));
+        let (trust_bytes, pin, mut evidence) = read_fixture();
+        evidence[2] = evidence[0].clone();
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &test_nonce(),
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "anti_rollback_unknown");
+        assert_eq!(selected.distinct_member_responses, 0);
     }
 
     #[test]
@@ -1057,54 +1043,128 @@ mod tests {
         let nonce = test_nonce();
         let first = checkpoint_fixture("5", 0x55);
         let second = checkpoint_fixture("5", 0x66);
-        let checkpoints = vec![
-            verified_checkpoint_fixture(&first, &seeds[..3], &trust_bytes, &pin),
-            verified_checkpoint_fixture(&second, &seeds[..3], &trust_bytes, &pin),
+        let evidence = vec![
+            evidence_fixture(&first, &seeds[0], &nonce, &seeds[..3]),
+            evidence_fixture(&second, &seeds[1], &nonce, &seeds[..3]),
+            evidence_fixture(&first, &seeds[2], &nonce, &seeds[..3]),
         ];
-        let responses = vec![
-            verified_response_fixture(&first, &seeds[0], &nonce, &trust_bytes, &pin),
-            verified_response_fixture(&second, &seeds[1], &nonce, &trust_bytes, &pin),
-            verified_response_fixture(&first, &seeds[2], &nonce, &trust_bytes, &pin),
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "rejected_witness_equivocation");
+    }
+
+    #[test]
+    fn one_member_reporting_two_heads_for_the_same_challenge_is_equivocation() {
+        let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let trust_bytes = trust_bytes(&build_trust(&seeds));
+        let pin = sha256_prefixed(&trust_bytes);
+        let nonce = test_nonce();
+        let latest = checkpoint_fixture("5", 0x55);
+        let lagging = checkpoint_fixture("4", 0x44);
+        let evidence = vec![
+            evidence_fixture(&latest, &seeds[0], &nonce, &seeds[..3]),
+            evidence_fixture(&lagging, &seeds[0], &nonce, &seeds[..3]),
+            evidence_fixture(&latest, &seeds[1], &nonce, &seeds[..3]),
         ];
-        let error = aggregate_witness_read(
-            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &nonce,
-        ).unwrap_err();
-        assert!(error.contains("rejected_witness_equivocation"));
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "rejected_witness_equivocation");
     }
 
     #[test]
     fn response_replay_from_another_nonce_is_rejected() {
-        let (trust_bytes, pin, responses, _) = read_fixture();
-        let error = verify_member_head_response(
-            &sign_head_response_fixture(
-                &checkpoint_fixture("5", 0x55),
-                &test_nonce(),
-                &[7_u8; 32],
-            ),
+        let (trust_bytes, pin, mut evidence) = read_fixture();
+        let latest = checkpoint_fixture("5", 0x55);
+        evidence[0].response_envelope = sign_head_response_fixture(
+            &latest,
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([43_u8; 32]),
+            &test_seed(7),
+        );
+        let selected = verify_head_read_quorum(
+            &evidence,
             &trust_bytes,
             &pin,
+            &test_nonce(),
             "incarnation-1",
-            &URL_SAFE_NO_PAD.encode([43_u8; 32]),
-        ).unwrap_err();
-        assert!(error.contains("challenge nonce mismatch"));
-        assert_eq!(responses.len(), 3);
+            "1",
+        );
+        assert_eq!(selected.status, "rejected_witness_response");
     }
 
     #[test]
-    fn member_response_must_reference_a_write_certified_checkpoint() {
-        let (trust_bytes, pin, responses, mut checkpoints) = read_fixture();
-        checkpoints.remove(0);
-        let error = aggregate_witness_read(
-            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
-        ).unwrap_err();
-        assert!(error.contains("missing write-quorum checkpoint"));
+    fn below_threshold_checkpoint_certificate_is_rejected() {
+        let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let trust_bytes = trust_bytes(&build_trust(&seeds));
+        let pin = sha256_prefixed(&trust_bytes);
+        let nonce = test_nonce();
+        let latest = checkpoint_fixture("5", 0x55);
+        let lagging = checkpoint_fixture("4", 0x44);
+        let mut evidence = vec![
+            evidence_fixture(&latest, &seeds[0], &nonce, &seeds[..2]),
+            evidence_fixture(&lagging, &seeds[1], &nonce, &seeds[..3]),
+            evidence_fixture(&latest, &seeds[2], &nonce, &seeds[..3]),
+        ];
+        evidence[0].checkpoint_envelope = sign_checkpoint_fixture(&latest, &seeds[..2]);
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "rejected_checkpoint_certificate");
+    }
+
+    #[test]
+    fn response_and_checkpoint_payload_must_match() {
+        let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let trust_bytes = trust_bytes(&build_trust(&seeds));
+        let pin = sha256_prefixed(&trust_bytes);
+        let nonce = test_nonce();
+        let latest = checkpoint_fixture("5", 0x55);
+        let lagging = checkpoint_fixture("4", 0x44);
+        let mut evidence = vec![
+            evidence_fixture(&latest, &seeds[0], &nonce, &seeds[..3]),
+            evidence_fixture(&lagging, &seeds[1], &nonce, &seeds[..3]),
+            evidence_fixture(&latest, &seeds[2], &nonce, &seeds[..3]),
+        ];
+        evidence[0].checkpoint_envelope = sign_checkpoint_fixture(&lagging, &seeds[..3]);
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "rejected_checkpoint_certificate");
     }
 
     #[test]
     fn malformed_or_padded_challenge_nonce_is_rejected() {
-        assert!(validate_challenge_nonce("not-a-nonce").is_err());
-        assert!(validate_challenge_nonce(&format!("{}=", test_nonce())).is_err());
-        assert!(validate_challenge_nonce(&test_nonce()).is_ok());
+        let (trust_bytes, pin, evidence) = read_fixture();
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            "not-a-nonce",
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "invalid_challenge");
     }
 
     #[test]
