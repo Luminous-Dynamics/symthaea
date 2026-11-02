@@ -617,6 +617,62 @@ mod tests {
     }
 
     #[test]
+    fn machine_origin_lineage_requires_actual_social_inheritance() {
+        let config = Config {
+            generations: 4,
+            population_size: 20,
+            machine_count_generation_zero: 5,
+            human_exploration_capacity: 10,
+            machine_exploration_capacity: 1_000,
+            human_optimality_bias: 0.0,
+            machine_optimality_bias: 1.0,
+            optimal_discovery_rate: 1.0,
+            myopic_discovery_rate: 0.0,
+            teacher_candidate_count: 20,
+            teacher_selection_temperature: 0.01,
+            social_transmission_probability: 1.0,
+            reward_noise_epsilon: 0.0,
+            ..Config::default()
+        };
+        let run = simulate(config, 101).unwrap();
+        assert!(run.generations[1..].iter().all(|generation| {
+            generation.agents.iter().all(|agent| {
+                agent.integrated_strategy == Strategy::Optimal
+                    && agent.machine_originated_strategy
+            })
+        }));
+        assert!(run.final_generation_contains_machine_originated_optimal());
+    }
+
+    #[test]
+    fn independent_optimal_discovery_is_not_mislabeled_machine_originated() {
+        let config = Config {
+            generations: 2,
+            population_size: 20,
+            machine_count_generation_zero: 0,
+            human_exploration_capacity: 10,
+            machine_exploration_capacity: 1_000,
+            human_optimality_bias: 1.0,
+            machine_optimality_bias: 0.5,
+            optimal_discovery_rate: 1.0,
+            myopic_discovery_rate: 0.0,
+            teacher_candidate_count: 20,
+            social_transmission_probability: 0.0,
+            reward_noise_epsilon: 0.0,
+            ..Config::default()
+        };
+        let run = simulate(config, 202).unwrap();
+        assert!(run.generations[0].agents.iter().all(|agent| {
+            agent.integrated_strategy == Strategy::Optimal
+                && !agent.machine_originated_strategy
+        }));
+        assert!(run.generations[1].agents.iter().all(|agent| {
+            agent.integrated_strategy == Strategy::Optimal
+                && !agent.machine_originated_strategy
+        }));
+    }
+
+    #[test]
     fn invalid_parameters_fail_closed() {
         let config = Config {
             social_transmission_probability: 1.5,
