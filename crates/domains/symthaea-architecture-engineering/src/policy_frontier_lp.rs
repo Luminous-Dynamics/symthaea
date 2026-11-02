@@ -742,6 +742,16 @@ pub fn analyze_policy_frontier(
         let Some(candidate) = evaluate_weights(&plan, weights)? else {
             continue;
         };
+        // The LP basis must satisfy every utility hypograph inequality, and
+        // z must touch the lower envelope. Reconstructing the lower envelope
+        // independently prevents a malformed basis from overstating utility.
+        let basis_utility = solution[policy_count];
+        if !basis_utility.is_finite()
+            || basis_utility > candidate.worst_utility + FEASIBILITY_TOLERANCE
+            || (basis_utility - candidate.worst_utility).abs() > 1e-7
+        {
+            continue;
+        }
         if !feasible_vertices.iter().any(|existing| same_weights(&existing.weights, &candidate.weights)) {
             feasible_vertices.push(candidate);
         }
