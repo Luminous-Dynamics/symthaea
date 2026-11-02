@@ -552,6 +552,27 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_standard_error_reflects_subject_level_variation() {
+        let mut folds = fold_set(HarthLabelTrack::Native12);
+        // Make one subject fold imperfect while leaving the other 21 perfect.
+        let classes = HarthLabelTrack::Native12.class_count();
+        folds[0].confusion_counts[0] = 90;
+        folds[0].confusion_counts[1] = 10;
+        let receipt = build_harth_loso_receipt(
+            [4; 32],
+            [5; 32],
+            HarthLabelTrack::Native12,
+            candidate(),
+            folds,
+        )
+        .unwrap();
+        assert!(receipt.aggregate.standard_error_subject_macro_f1_ppm > 0);
+        assert!(receipt.aggregate.worst_subject_macro_f1_ppm
+            < receipt.aggregate.mean_subject_macro_f1_ppm);
+        assert_eq!(classes, 12);
+    }
+
+    #[test]
     fn selfpab_comparable_receipt_uses_ten_class_confusion_matrices() {
         let receipt = build_harth_loso_receipt(
             [4; 32],
