@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/PHYS_CHAIN_002_CLAIM_LEDGER_V1.schema.json",
+  "title": "Luminous Dynamics PHYS-CHAIN-002 claim ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "audit_metadata",
+    "author_reported_compendium_scope",
+    "status_vocabulary",
+    "claim_count",
+    "claims",
+    "anti_double_counting_rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.phys_chain_claim_ledger.v1"
+    },
+    "audit_metadata": {
+      "type": "object"
+    },
+    "author_reported_compendium_scope": {
+      "type": "object",
+      "required": [
+        "document_status",
+        "theorem_count",
+        "conditional_theorem_count",
+        "open_result_count",
+        "theorem_statements_tied_to_named_lean_declarations",
+        "note"
+      ],
+      "properties": {
+        "document_status": {
+          "type": "string"
+        },
+        "theorem_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conditional_theorem_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_result_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "theorem_statements_tied_to_named_lean_declarations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "status_vocabulary": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "claim_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "family",
+          "source_status",
+          "source_locator",
+          "proposition_summary",
+          "dependency_ids",
+          "mathematical_or_computational_result",
+          "physical_bridge_gap",
+          "discriminating_test",
+          "falsifier_or_failure_condition",
+          "independence_group",
+          "repository_tracks",
+          "independent_reproduction_status"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9-]+$"
+          },
+          "family": {
+            "type": "string"
+          },
+          "source_status": {
+            "type": "string"
+          },
+          "source_locator": {
+            "type": "object"
+          },
+          "proposition_summary": {
+            "type": "string"
+          },
+          "dependency_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mathematical_or_computational_result": {
+            "type": "string"
+          },
+          "physical_bridge_gap": {
+            "type": "string"
+          },
+          "discriminating_test": {
+            "type": "string"
+          },
+          "falsifier_or_failure_condition": {
+            "type": "string"
+          },
+          "independence_group": {
+            "type": "string"
+          },
+          "current_comparison_note": {
+            "type": "string"
+          },
+          "repository_tracks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "independent_reproduction_status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "anti_double_counting_rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}
