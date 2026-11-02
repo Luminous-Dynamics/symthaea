@@ -4,31 +4,85 @@
   "title": "SPECTRA synthetic corpus configuration v0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "claim_ceiling", "generator_version", "campaign_config", "known_answer_seeds", "leakage_modalities", "detector", "note"],
+  "required": [
+    "schema",
+    "claim_ceiling",
+    "generator_version",
+    "campaign_config",
+    "known_answer_seeds",
+    "leakage_modalities",
+    "detector",
+    "note",
+    "synthetic_worlds"
+  ],
   "properties": {
-    "schema": { "const": "symthaea.spectra.synthetic_corpus_config.v0.1" },
-    "claim_ceiling": { "const": "synthetic_only" },
-    "generator_version": { "const": "splitmix64-fy-reject-v0.1" },
+    "schema": {
+      "const": "symthaea.spectra.synthetic_corpus_config.v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_only"
+    },
+    "generator_version": {
+      "const": "splitmix64-fy-reject-v0.1"
+    },
     "campaign_config": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["calibration_trials", "evaluation_trials", "candidate_count", "signal_hit_rate_permille"],
+      "required": [
+        "calibration_trials",
+        "evaluation_trials",
+        "candidate_count",
+        "signal_hit_rate_permille"
+      ],
       "properties": {
-        "calibration_trials": { "type": "integer", "minimum": 16, "maximum": 10000 },
-        "evaluation_trials": { "type": "integer", "minimum": 16, "maximum": 10000 },
-        "candidate_count": { "type": "integer", "minimum": 2, "maximum": 64 },
-        "signal_hit_rate_permille": { "type": "integer", "minimum": 0, "maximum": 1000 }
+        "calibration_trials": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 10000
+        },
+        "evaluation_trials": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 10000
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 64
+        },
+        "signal_hit_rate_permille": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
       }
     },
     "known_answer_seeds": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["null", "signal_injected", "adversarial_mutation", "leakage_base"],
+      "required": [
+        "null",
+        "signal_injected",
+        "adversarial_mutation",
+        "leakage_base"
+      ],
       "properties": {
-        "null": { "type": "string", "pattern": "^0x[0-9a-f]{16}$" },
-        "signal_injected": { "type": "string", "pattern": "^0x[0-9a-f]{16}$" },
-        "adversarial_mutation": { "type": "string", "pattern": "^0x[0-9a-f]{16}$" },
-        "leakage_base": { "type": "string", "pattern": "^0x[0-9a-f]{16}$" }
+        "null": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{16}$"
+        },
+        "signal_injected": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{16}$"
+        },
+        "adversarial_mutation": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{16}$"
+        },
+        "leakage_base": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{16}$"
+        }
       }
     },
     "leakage_modalities": {
@@ -36,17 +90,57 @@
       "minItems": 9,
       "maxItems": 9,
       "uniqueItems": true,
-      "items": { "enum": ["rf", "low_frequency_magnetic", "acoustic", "optical", "vibration", "thermal_airflow", "power_conducted", "network_timing", "procedural"] }
+      "items": {
+        "enum": [
+          "rf",
+          "low_frequency_magnetic",
+          "acoustic",
+          "optical",
+          "vibration",
+          "thermal_airflow",
+          "power_conducted",
+          "network_timing",
+          "procedural"
+        ]
+      }
     },
     "detector": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["threshold_permille", "minimum_predictions"],
+      "required": [
+        "threshold_permille",
+        "minimum_predictions"
+      ],
       "properties": {
-        "threshold_permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
-        "minimum_predictions": { "type": "integer", "minimum": 1 }
+        "threshold_permille": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "minimum_predictions": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
-    "note": { "type": "string", "minLength": 1 }
+    "note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "synthetic_worlds": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "null",
+          "signal_injected",
+          "known_leakage_injected",
+          "confounded",
+          "adversarial_mutation"
+        ]
+      }
+    }
   }
 }
