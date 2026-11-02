@@ -382,3 +382,46 @@ References:
 - zip-rs 8.6.0: https://docs.rs/zip/8.6.0/zip/
 - object: https://docs.rs/object/latest/object/
 - goblin: https://docs.rs/goblin/latest/goblin/
+
+
+## 13. Measure Symthaea's reasoning value separately from parser parity
+
+Rust-native compatibility can establish that the new implementation preserves REA's semantics. It does **not** establish that Symthaea adds better reverse-engineering decisions. That is a separate experimental question tracked in [REA-RUST-008 / #9911](https://github.com/Luminous-Dynamics/symthaea/issues/9911).
+
+Use three blinded, budget-matched arms on held-out source-derived mobile targets:
+
+- **A — REA alone:** pinned REA tools and their documented output.
+- **B — Symthaea without REA-derived analysis:** equivalent permitted raw context, but no derived REA Evidence.
+- **C — REA + Symthaea:** Symthaea reasons over immutable REA Evidence and the same raw context.
+
+The target task is not "summarize this binary diff". It is "identify the component or admit uncertainty, then select the next experiment that best separates competing hypotheses."
+
+### Causal investigation loop
+
+1. Build a typed hypothesis graph: candidate cause, supporting observations, contradiction, assumed dependencies, and unobserved links.
+2. Identify the competing hypotheses that remain observationally equivalent.
+3. Select the next permitted experiment using expected information gain divided by time, energy, execution risk and target disruption.
+4. Execute only an authorized, bounded and reversible experiment.
+5. Bind the intervention, input state, output trace and environment to separate evidence records.
+6. Update the hypothesis distribution and calibration.
+7. Abstain where the corpus provides no discriminating evidence or the evidence is stale/incomplete.
+
+Do not let a Symthaea-generated explanation or synthetic trace qualify its own causal hypothesis. Use independently generated planted faults, held-out source mappings and blinded graders.
+
+### Outcome metrics
+
+- Top-1/top-3 component localization and mean reciprocal rank.
+- Cause precision/recall and false-cause rate.
+- Brier score, expected calibration error and reliability by fault family.
+- Selective risk versus coverage as the model abstains.
+- Predicted versus measured reduction in hypothesis entropy after the selected experiment.
+- Time-to-first-correct diagnosis and total experiment cost.
+- Generated test precision/recall and reproduction rate.
+- Citation completeness from claim to exact evidence and intervention.
+- p50/p95 latency, peak memory and energy per investigation on named hardware.
+
+The proposed gate is at least 20% relative top-3 localization improvement over the stronger single-system baseline without increasing false-cause rate. Calibration ECE <= 0.05 and 15% lower median time-to-correct diagnosis are stretch targets. They are not current results or universal standards.
+
+Keep Android, Apple applications, emulators, simulators and physical-device cohorts separate. Report confidence intervals, per-fault-family outcomes, negative controls and abstention performance. Never pool them into one headline score.
+
+The machine-readable benchmark manifest includes this ablation as its tenth family. See [#9911](https://github.com/Luminous-Dynamics/symthaea/issues/9911).
