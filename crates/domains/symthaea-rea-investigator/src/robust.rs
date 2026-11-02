@@ -417,7 +417,9 @@ pub fn plan_next_experiment_robust(
                 RejectionReason::TimeBudgetExceeded => RobustRejectionReason::TimeBudgetExceeded,
                 RejectionReason::EnergyBudgetExceeded => RobustRejectionReason::EnergyBudgetExceeded,
                 RejectionReason::RiskBudgetExceeded => RobustRejectionReason::RiskBudgetExceeded,
-                RejectionReason::InvalidOutcomeSpace
+                RejectionReason::InvalidOutcomeSpace => {
+                    RobustRejectionReason::InvalidOutcomeSpace
+                }
                 | RejectionReason::InvalidLikelihoods
                 | RejectionReason::NoPredictedInformationGain => {
                     RobustRejectionReason::NoRobustInformationGain
@@ -892,6 +894,100 @@ mod tests {
             .unwrap_err()
             .kind,
             PlannerErrorKind::InvalidPlannerConfig
+        );
+    }
+
+    #[test]
+    fn expected_and_worst_case_policies_select_from_their_declared_objective() {
+        let scenarios = vec![
+            LikelihoodModelScenario {
+                scenario_id: "fragile-high".to_owned(),
+                scenario_probability: 0.5,
+                experiments: vec![
+                    matrix("probe-a", 0.95, 0.05),
+                    matrix("probe-b", 0.75, 0.25),
+                ],
+            },
+            LikelihoodModelScenario {
+                scenario_id: "fragile-zero".to_owned(),
+                scenario_probability: 0.5,
+                experiments: vec![
+                    matrix("probe-a", 0.5, 0.5),
+                    matrix("probe-b", 0.75, 0.25),
+                ],
+            },
+        ];
+        let expected = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe-a"), proposal("probe-b")],
+            &scenarios,
+            RobustPlannerConfig {
+                ranking_policy: RobustRankingPolicy::ExpectedInformationGain,
+                minimum_top1_stability: 0.0,
+                ..RobustPlannerConfig::default()
+            },
+        ).unwrap();
+        assert_eq!(expected.selected.unwrap().experiment_id, "probe-a");
+
+        let worst = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe-a"), proposal("probe-b")],
+            &scenarios,
+            RobustPlannerConfig {
+                ranking_policy: RobustRankingPolicy::WorstCaseInformationGain,
+                minimum_top1_stability: 0.0,
+                ..RobustPlannerConfig::default()
+            },
+        ).unwrap();
+        assert_eq!(worst.selected.unwrap().experiment_id, "probe-b");
+    }
+
+    #[test]
+    fn uninformative_across_all_scenarios_abstains() {
+        let scenarios = vec![
+            LikelihoodModelScenario {
+                scenario_id: "a".to_owned(),
+                scenario_probability: 0.5,
+                experiments: vec![matrix("probe", 0.5, 0.5)],
+            },
+            LikelihoodModelScenario {
+                scenario_id: "b".to_owned(),
+                scenario_probability: 0.5,
+                experiments: vec![matrix("probe", 0.5, 0.5)],
+            },
+        ];
+        let plan = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[proposal("probe")],
+            &scenarios,
+            RobustPlannerConfig::default(),
+        ).unwrap();
+        assert!(plan.selected.is_none());
+        assert_eq!(plan.abstention, Some(RobustAbstentionReason::NoDiscriminatingExperiment));
+        assert_eq!(
+            plan.rejected_experiments[0].reason,
+            RobustRejectionReason::NoRobustInformationGain
+        );
+    }
+
+    #[test]
+    fn invalid_outcome_space_preserves_a_specific_rejection_reason() {
+        let scenarios = vec![scenarios_for(vec![matrix("probe", 0.9, 0.1)])];
+        let mut invalid = proposal("probe");
+        invalid.outcomes = vec!["yes".to_owned()];
+        let plan = plan_next_experiment_robust(
+            &evidence(),
+            &hypotheses(),
+            &[invalid],
+            &scenarios,
+            RobustPlannerConfig::default(),
+        ).unwrap();
+        assert_eq!(
+            plan.rejected_experiments[0].reason,
+            RobustRejectionReason::InvalidOutcomeSpace
         );
     }
 
