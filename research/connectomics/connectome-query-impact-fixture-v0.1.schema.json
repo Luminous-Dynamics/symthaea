@@ -60,7 +60,12 @@
               "PairedDecisionWorldsRequireThreshold",
               "DuplicatePairedDecisionWorld",
               "PairedDecisionValueOutsideMarginal",
-              "PairedDecisionDifferenceOutsideEffect"
+              "PairedDecisionDifferenceOutsideEffect",
+              "PairedWorldCoverageRequiresDecisionWorlds",
+              "EmptyExpectedWorldSet",
+              "DuplicateExpectedWorldId",
+              "ExpectedWorldSetMismatch",
+              "WorldSetCoverageNotVerified"
             ]
           }
         },
