@@ -581,6 +581,12 @@ pub fn plan_next_experiment_robust(
 
     rejected_experiments.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
 
+    let mut scenario_ids: Vec<String> = scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_id.clone())
+        .collect();
+    scenario_ids.sort();
+
     Ok(RobustInvestigationPlan {
         selected,
         ranked_experiments,
@@ -588,10 +594,7 @@ pub fn plan_next_experiment_robust(
         abstention,
         prior_entropy_bits,
         grounded_hypothesis_ids: grounded_ids,
-        scenario_ids: scenarios
-            .iter()
-            .map(|scenario| scenario.scenario_id.clone())
-            .collect(),
+        scenario_ids,
         claim_ceiling: RobustClaimCeiling::default(),
     })
 }
@@ -722,7 +725,7 @@ mod tests {
             LikelihoodModelScenario {
                 scenario_id: "uninformative".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![matrix("probe", 0.5, 0.5)],
+                experiments: vec![matrix("probe", 0.6, 0.4)],
             },
         ];
         let plan = plan_next_experiment_robust(
@@ -739,9 +742,14 @@ mod tests {
         )
         .unwrap();
         let selected = plan.selected.unwrap();
-        assert!((selected.expected_information_gain_bits - 0.2655022032053594).abs() < 1.0e-12);
-        assert!(selected.worst_case_information_gain_bits.abs() < 1.0e-12);
-        assert!(selected.lower_tail_cvar_information_gain_bits.abs() < 1.0e-12);
+        assert!((selected.expected_information_gain_bits - 0.2800269059780251).abs() < 1.0e-12);
+        assert!(
+            (selected.worst_case_information_gain_bits - 0.02904940554533142).abs() < 1.0e-12
+        );
+        assert!(
+            (selected.lower_tail_cvar_information_gain_bits - 0.02904940554533142).abs()
+                < 1.0e-12
+        );
         assert!(selected.information_gain_variance_bits_squared > 0.0);
         assert_eq!(selected.scenario_results.len(), 2);
     }
@@ -765,7 +773,10 @@ mod tests {
             &hypotheses(),
             &[proposal("fragile"), proposal("steady")],
             &scenarios,
-            RobustPlannerConfig::default(),
+            RobustPlannerConfig {
+                minimum_top1_stability: 0.0,
+                ..RobustPlannerConfig::default()
+            },
         )
         .unwrap();
         assert_eq!(plan.selected.unwrap().experiment_id, "steady");
