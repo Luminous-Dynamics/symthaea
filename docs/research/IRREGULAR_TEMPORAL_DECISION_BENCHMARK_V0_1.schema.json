@@ -240,6 +240,10 @@
               "external_reference_only",
               "methodology_reference_only"
             ]
+          },
+          "reported_task_count": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }
