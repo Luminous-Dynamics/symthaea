@@ -39,7 +39,10 @@ impl DreamingService {
                 // This checks Nix syntax, not preservation of task semantics.
                 let result = self.trainer.train_step("dream", &mutated.target_text);
                 if result.converged {
-                    println!("Staged syntax-accepted proposal; independent task verification is required: reward={:.2}", result.reward);
+                    println!(
+                        "Staged syntax-accepted proposal; independent task verification is required: reward={:.2}",
+                        result.reward
+                    );
                     self.stage_proposal(mutated);
                 }
             }
@@ -49,7 +52,8 @@ impl DreamingService {
     fn stage_proposal(&self, candidate: TrainingPair) {
         let mut proposals = self.proposal_pool.lock();
         let duplicate = proposals.pairs.iter().any(|existing| {
-            existing.target_text == candidate.target_text && existing.channels == candidate.channels
+            existing.target_text == candidate.target_text
+                && existing.channels == candidate.channels
         });
         if !duplicate {
             proposals.push(candidate);
