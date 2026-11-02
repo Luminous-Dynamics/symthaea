@@ -185,3 +185,21 @@ The strict JSON Schema is `CONNECTOME_INTERVENTION_BENCHMARK_MANIFEST.schema.jso
 - Sapkal et al., *Central versus peripheral neural control of a coordinated walking pattern in Drosophila*, bioRxiv v2 (2026-04-29): https://doi.org/10.64898/2026.04.29.721658
 
 External solver implementation and synthetic oracle status must not be confused with biological validation. The benchmark remains source- and assay-specific.
+
+## 13. Baseline coverage gate and run-completion verifier
+
+A `complete` run is stricter than an incomplete research plan. It requires:
+- at least four pinned model implementations, including a candidate, at least one non-connectome baseline and a negative control;
+- an explicit baseline coverage manifest, with at least five required families and a hash of the coverage decision; every required family must have a pinned model or a specific not-applicable reason;
+- preregistered selected interventions, a frozen candidate-pool digest and an independently hashed feasibility audit;
+- sham, single-target, combined-target, rewired-graph and activity-only controls;
+- a qualified, hashed train/validation/test split with positive leakage checks;
+- non-empty scorecards, paired comparisons and calibration results;
+- at least two independent units for inferential paired comparisons, with a paired-unit manifest digest;
+- pinned source, connectome, observation kernel, preprocessing, code, configuration, environment, raw outputs and run receipt.
+
+For measured-intervention evidence, the manifest additionally requires `rights_state = documented_permitted` and a permission-receipt digest. The source payload and operation scope still need independent review; the digest alone is not permission.
+
+The JSON Schema enforces local shape and completion prerequisites. A separate semantic verifier must enforce cross-object references and arithmetic: model IDs resolve in scorecards, metric IDs resolve in the metric catalogue, required baselines map to models or justified exclusions, model comparison uses matched scope/budgets, paired membership resolves to the same units, reported mean differences reconcile, confidence intervals are ordered, strata use the declared taxonomy and missing/abstained results are never converted to zero. Do not promote a run based on JSON Schema validation alone.
+
+The included example remains `incomplete` with `not_run` results and null artifact digests. It is a contract fixture, not a completed run.
