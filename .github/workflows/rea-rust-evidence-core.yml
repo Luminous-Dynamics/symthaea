@@ -73,13 +73,10 @@ jobs:
           npm install --global "npm@$REA_NPM_VERSION"
           npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Build upstream Evidence domain modules
+      - name: Execute the pinned upstream Evidence source
         working-directory: rea-upstream
-        run: ./node_modules/.bin/tsc -p tsconfig.build.json
-
-      - name: Generate Evidence from the actual upstream REA runtime
         run: |
-          node scripts/rea/generate-upstream-evidence.mjs \
+          ./node_modules/.bin/tsx "$GITHUB_WORKSPACE/scripts/rea/generate-upstream-evidence.mjs" \
             "$GITHUB_WORKSPACE/rea-upstream" \
             "$RUNNER_TEMP/rea-evidence-upstream-v1.json"
           echo "REA_UPSTREAM_EVIDENCE_FIXTURE=$RUNNER_TEMP/rea-evidence-upstream-v1.json" >> "$GITHUB_ENV"
