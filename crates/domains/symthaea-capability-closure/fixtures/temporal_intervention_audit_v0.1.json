@@ -33,7 +33,7 @@
     "arbitrary_temporal_drift_guarantee": false
   },
   "tests": {
-    "rust_test_functions_authored": 26,
+    "rust_test_functions_authored": 27,
     "rust_tests_executed": false,
     "benchmark_executed": false,
     "assignment_receipts_verified": false,
@@ -53,8 +53,11 @@
     "supports_blocked_or_clustered_assignment": false,
     "first_crossing_latched": true,
     "storage_rollback_protected": false,
-    "rust_test_functions_authored": 12,
+    "rust_test_functions_authored": 13,
     "rust_tests_executed": false,
-    "finite_null_tree_horizon_test_authored": 20
+    "finite_null_tree_horizon_test_authored": 20,
+    "null_tree_horizon20_crossings": 4186,
+    "null_tree_horizon20_paths": 1048576,
+    "single_axis_crossing_probability": "4186/1048576"
   }
 }
