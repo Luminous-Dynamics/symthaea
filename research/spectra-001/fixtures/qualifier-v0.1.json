@@ -307,7 +307,7 @@
         "target_revealed_at": {
           "clock_domain_id": "lab-clock-01",
           "earliest_ns": 490,
-          "latest_ns": 401
+          "latest_ns": 491
         },
         "judge_rankings": [
           {
