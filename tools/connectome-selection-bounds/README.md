@@ -98,3 +98,14 @@ The implementation solves the two equivalent linear feasibility inequalities. It
 Sensitivity and specificity ranges must come from independent calibration evidence representative of the evaluation population, and should already include their own sampling/cluster uncertainty. This function treats them as fixed admissible ranges; it does not estimate them from validation counts or create confidence intervals. Apply it separately to source and target detectors. Do not multiply marginal prevalence intervals into a joint probability: source/target dependence is not identified by marginal rates. The result is conditional on the detector-evaluable population and does not correct trace missingness or transport across animals/sessions.
 
 Analytic tests cover q=0.6 with Se in [0.8,0.9] and Sp in [0.9,0.95] (latent prevalence [0.625, 11/15]), a perfect detector, a completely uninformative detector returning [0,1], incompatible ranges, invalid probabilities and monotonicity under wider calibration uncertainty.
+
+
+## Machine-readable contracts
+
+- `schemas/selection-bounds-input.schema.json` defines the finite-cohort selection/bounds input.
+- `schemas/selection-bounds-output.schema.json` defines the report and hard claim-boundary flags.
+- `schemas/selection-bounds-fixture.schema.json` validates the input/expected wrapper for `fixtures/selection-bounds-known-answer.json`.
+- `schemas/detector-prevalence-input.schema.json` defines the observed rate and sensitivity/specificity ranges for detector inversion.
+- `schemas/detector-prevalence-fixture.schema.json` validates the wrapper for `fixtures/detector-prevalence-known-answer.json`.
+
+The known-answer fixtures separate input from expected output; the expected values are never accepted as part of the strict evaluator input object.
