@@ -684,7 +684,7 @@ mod tests {
         assert_eq!(score.history_sha256, HISTORY);
         assert_eq!(score.action_id, 17);
         assert_eq!(score.joint_draw_id, 100);
-        assert_eq!(score.timing_error_seconds, 0.005);
+        assert!((score.timing_error_seconds - 0.005).abs() < 1e-9);
         assert!(score.prediction_error.abs() < 1e-12);
         assert!((score.persistence_error - 1.0).abs() < 1e-12);
         assert_eq!(score.relative_skill, Some(1.0));
