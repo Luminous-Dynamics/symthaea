@@ -1,0 +1,11 @@
+{
+  "suite": "Exact semiring/ring algebra laws",
+  "seed": "0xE7015",
+  "trials_per_algebra": 256,
+  "maxcount_law_cases": 256,
+  "pareto_law_cases": 256,
+  "truncated_polynomial_ring_cases": 256,
+  "passed": 768,
+  "total": 768,
+  "claim_boundary": "Deterministic finite property-style exact checks on reference Python algebra implementations; does not compile Rust or constitute formal proof."
+}
