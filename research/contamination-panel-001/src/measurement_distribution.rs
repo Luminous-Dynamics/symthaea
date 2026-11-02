@@ -226,6 +226,8 @@ pub struct MeasurementObservationV1 {
     pub source_cluster_id: String,
     pub decision: ObservationDecisionV1,
     pub validation_receipt_sha256: Option<String>,
+    pub perturbation_seed_commitment_sha256: Option<String>,
+    pub external_egress_receipt_sha256: Option<String>,
     pub score: Option<f64>,
     pub runtime_milliseconds: u64,
     pub input_tokens: u64,
@@ -315,6 +317,8 @@ pub struct MeasurementDistributionReportV1 {
     pub observation_count: u64,
     pub distributional_evidence_eligible: bool,
     pub claim_scope_eligible: bool,
+    pub independently_authenticated: bool,
+    pub confirmatory_eligible: bool,
     pub rank_stability_status: String,
     pub profile_cells: Vec<DistributionProfileCellV1>,
     pub rank_stability: Vec<RankStabilityV1>,
@@ -664,6 +668,9 @@ pub fn analyze_measurement_distribution(
     if bundle.instance_manifest_sha256 != manifest_sha {
         return Err("instance manifest digest mismatch".to_owned());
     }
+    if protocol.generator.generated_manifest_sha256 != manifest_sha {
+        return Err("generator's committed output manifest does not match the evaluator instance manifest".to_owned());
+    }
     if bundle.models.is_empty() || bundle.models.len() > MAX_MODELS {
         return Err(format!("model count must be in 1..={MAX_MODELS}"));
     }
@@ -794,12 +801,19 @@ pub fn analyze_measurement_distribution(
         }
         match (is_baseline, observation.decision, observation.score) {
             (true, ObservationDecisionV1::Baseline, Some(score)) if score.is_finite() => {
-                if observation.validation_receipt_sha256.is_some() {
-                    return Err("baseline observations must not claim perturbation validation receipts".to_owned());
+                if observation.validation_receipt_sha256.is_some()
+                    || observation.perturbation_seed_commitment_sha256.is_some()
+                {
+                    return Err("baseline observations must not claim perturbation validation or seed receipts".to_owned());
                 }
             }
             (true, _, _) => return Err("baseline condition requires Baseline decision and a finite score".to_owned()),
             (false, ObservationDecisionV1::Validated, Some(score)) if score.is_finite() => {
+                let seed = observation
+                    .perturbation_seed_commitment_sha256
+                    .as_deref()
+                    .ok_or_else(|| "perturbation observation requires a seed commitment".to_owned())?;
+                require_digest(seed, "perturbation_seed_commitment_sha256")?;
                 let receipt = observation
                     .validation_receipt_sha256
                     .as_deref()
@@ -807,6 +821,11 @@ pub fn analyze_measurement_distribution(
                 require_digest(receipt, "validation_receipt_sha256")?;
             }
             (false, ObservationDecisionV1::FallbackApplied, Some(score)) if score.is_finite() => {
+                let seed = observation
+                    .perturbation_seed_commitment_sha256
+                    .as_deref()
+                    .ok_or_else(|| "fallback observation requires a perturbation seed commitment".to_owned())?;
+                require_digest(seed, "perturbation_seed_commitment_sha256")?;
                 let family = family.unwrap();
                 if family.fallback_condition_id.is_none() {
                     return Err("fallback observation has no declared fallback condition".to_owned());
@@ -830,6 +849,12 @@ pub fn analyze_measurement_distribution(
         }
         if let Some(receipt) = &observation.validation_receipt_sha256 {
             require_digest(receipt, "validation_receipt_sha256")?;
+        }
+        match (observation.external_calls, observation.external_egress_receipt_sha256.as_deref()) {
+            (0, None) => {}
+            (0, Some(_)) => return Err("zero external calls must not carry an external-egress receipt".to_owned()),
+            (_, Some(receipt)) => require_digest(receipt, "external_egress_receipt_sha256")?,
+            (_, None) => return Err("external calls require a destination/egress evidence receipt".to_owned()),
         }
         independent_units.insert(observation.independent_unit_id.clone());
         let key = ObservationKey {
@@ -1142,6 +1167,8 @@ pub fn analyze_measurement_distribution(
         observation_count: bundle.observations.len() as u64,
         distributional_evidence_eligible,
         claim_scope_eligible,
+        independently_authenticated: false,
+        confirmatory_eligible: false,
         rank_stability_status: if rank_met { "qualified_or_not_required" } else { "non_estimable" }.to_owned(),
         profile_cells,
         rank_stability,
