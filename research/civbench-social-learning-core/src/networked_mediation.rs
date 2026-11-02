@@ -815,5 +815,13 @@ mod tests {
             simulate_networked_mediation(config, 1),
             Err(MediationError::InvalidProbability { name: "mediation_fraction" })
         );
+        let invalid_novelty = NetworkedMediationConfig {
+            recommender_objective: RecommenderObjective::PerformanceDiversity { novelty_weight: 1.1 },
+            ..NetworkedMediationConfig::default()
+        };
+        assert_eq!(
+            simulate_networked_mediation(invalid_novelty, 2),
+            Err(MediationError::InvalidNoveltyWeight)
+        );
     }
 }
