@@ -1,0 +1,40 @@
+# CivBench Social Learning Core
+
+A dependency-free, deterministic Rust reference model for testing whether richer cognitive/social-learning mechanisms add value beyond simple diffusion rules.
+
+This is a benchmark baseline, not a human-behaviour simulator and not a theory of culture. It deliberately uses binary propositions, fixed networks, synchronous updates, and explicit source metadata so each mechanism can be inspected.
+
+## Implemented reference rules
+
+- **NoLearning:** agents retain their current state.
+- **MajorityImitation:** adopt the strict majority belief among informed neighbours; ties preserve the current state.
+- **ThresholdMajority:** require a declared minimum number of informed neighbours before strict-majority adoption.
+- **PrestigeImitation:** copy the belief of the highest-prestige informed neighbour; equal prestige ties resolve to the lowest node ID.
+- **EvidenceWeighted:** combine neighbours' declared reliability weights and an optional self-prior weight; adopt only when the weighted margin reaches a declared threshold.
+
+Declared source reliability is an experimental input. It is not evidence that the source is truly reliable, and it must not be confused with the receiving agent's confidence or trustworthiness.
+
+## Evaluation
+
+The evaluator knows the synthetic ground truth, but the learning policy does not receive it. Metrics report coverage, accuracy among informed agents, consensus, confidence, and high-confidence error fraction separately.
+
+Updates are synchronous: all agents read the previous state and write the next state. This prevents node iteration order from changing the result.
+
+## Run
+
+```sh
+cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
+```
+
+The example binary prints a small chain-network adoption trace.
+
+## Limitations
+
+- Binary beliefs are a tractable reference task, not a model of language, skill acquisition, norms, institutions, or plural interpretation.
+- Topologies and source metadata are supplied by the experiment.
+- There is no learning from raw artefacts or semantic content in V0.
+- No cryptographic peer identity or transport protocol is implemented.
+- No claim of psychological validity, cultural universality, human collective intelligence, or consciousness is made.
+
+Use this crate to establish simple baseline behaviour and regression fixtures before integrating Symthaea's HDC/cognitive components.
