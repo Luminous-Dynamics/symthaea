@@ -128,6 +128,11 @@ SOURCE_SNAPSHOT_ALLOWLIST = {
     "data/README.md",
     "statistics/README.md",
     ".gitattributes",
+    ".lfsconfig",
+    ".gitlab-ci.yml",
+    "setup/ci/.gitlab-ci-backend.yml",
+    "setup/ci/.gitlab-ci-frontend.yml",
+    "setup/ci/.gitlab-ci-streamlit.yml",
 }
 NOTEBOOK_SNAPSHOT_MAX_BYTES = 1_500_000
 
@@ -319,7 +324,7 @@ def main() -> int:
             "This report inventories archive structure and field names; it is not a reproduction of the paper's analysis.",
             "CSV headers and JSON keys are metadata only; no participant or move-level row values are exported.",
             "Git LFS pointer files are identified by OID and declared size but are not hydrated by this inventory step; underlying LFS data rows are not inspected.",
-            "Research source snapshots include only an explicit allowlist of README, ABM notebook code/markdown headings, ABM source, DQN source and configuration files; notebook cell outputs are excluded and no participant-level raw or processed data files are included.",
+            "Research source snapshots include only an explicit allowlist of README, ABM notebook code/markdown headings, ABM source, DQN source, configuration and CI/LFS endpoint metadata files; notebook cell outputs are excluded and no participant-level raw or processed data files are included.",
             "Network orientation, tie-breaking, path legality and hidden-level constraints still require source-code review.",
             "The archive license and per-file data-use terms must be preserved from the source metadata before any redistribution.",
         ],
