@@ -10,7 +10,8 @@ Standalone Rust research crate for exact finite-support policy clipping and risk
 - Exact expected evaluator loss, reward and discrete upper-tail CVaR.
 - Exact finite-support supremum importance weight for a declared calibration mixture.
 - CPC-inspired weighted empirical diagnostic, augmented with the declared worst-case bounded test loss.
-- Full beta-grid enumeration without assuming risk monotonicity.
+- Full beta-grid enumeration without assuming risk monotonicity, including a fixture whose evaluator risk rises and then falls as beta increases.
+- A JSON run receipt bound to the fixture SHA-256 and exact source commit, with schema in run-receipt-v0.1.schema.json.
 - Synthetic fixture with non-monotonic loss over actions and a rare high-risk action.
 
 ## Commands
@@ -18,7 +19,7 @@ Standalone Rust research crate for exact finite-support policy clipping and risk
     GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run --manifest-path research/conformal-policy-control/Cargo.toml --bin cpc-finite-support
     GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo test --manifest-path research/conformal-policy-control/Cargo.toml
 
-Generate Cargo.lock on first dependency resolution, commit it, then use --locked.
+Generate Cargo.lock on first dependency resolution, commit it, then use --locked. The CLI refuses to emit a receipt unless GIT_COMMIT_SHA is an exact 40-character lowercase commit SHA; this is metadata, not a signature or proof the worktree was clean.
 
 ## Scientific boundary
 
