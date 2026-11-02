@@ -761,6 +761,9 @@
                 "type": "number",
                 "exclusiveMinimum": 0
               }
+            },
+            "throw_on_failure": {
+              "const": true
             }
           },
           "simulation": {
@@ -786,6 +789,10 @@
                 "type": "number",
                 "exclusiveMinimum": 0
               }
+            },
+            "attempted_steps": {
+              "type": "integer",
+              "minimum": 1
             }
           },
           "perturbation": {
@@ -862,9 +869,6 @@
                 "$ref": "#/$defs/sha256"
               },
               "logs_sha256": {
-                "$ref": "#/$defs/sha256"
-              },
-              "run_receipt_sha256": {
                 "$ref": "#/$defs/sha256"
               }
             }
