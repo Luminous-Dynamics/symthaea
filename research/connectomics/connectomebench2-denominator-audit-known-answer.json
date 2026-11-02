@@ -1,0 +1,91 @@
+{
+  "manifest_version": "connectomebench2-run-manifest-v0.1",
+  "dataset": {
+    "repository_id": "jeffbbrown2/ConnectomeBench2",
+    "requested_revision": "v2",
+    "revision_resolution_status": "UNRESOLVED",
+    "resolved_commit_sha": null
+  },
+  "artifact_identity": {
+    "digest_status": "UNRESOLVED",
+    "dataset_card_sha256": null,
+    "shards_csv_sha256": null,
+    "source_file_manifest_sha256": null,
+    "declared_parquet_shard_count": null
+  },
+  "dataset_row_counts": {
+    "declared_total_rows": 401170,
+    "split_rows": {
+      "train": 319727,
+      "validation": 43517,
+      "test": 37926
+    },
+    "sample_type_rows": {
+      "adjacent_control": 121333,
+      "junction_control": 38272,
+      "synapse_control": 18182,
+      "merge_edit": 146461,
+      "split_edit": 77213
+    },
+    "em_rows": 251499,
+    "geometry_rows": 401170
+  },
+  "task_operation_counts": {
+    "status": "NOT_MATERIALIZED",
+    "unique_source_rows": null,
+    "routed_operation_instances": null,
+    "per_task": null,
+    "per_split": null,
+    "count_artifact_sha256": null
+  },
+  "published_external_reference": {
+    "source_url": "https://arxiv.org/abs/2609.36492",
+    "unit_definition": "task-operation instances reported by the external VLM study; not assumed equivalent to unique dataset rows",
+    "train_operations": 531734,
+    "validation_operations": 82822,
+    "test_operations": 101929,
+    "total_operations": 716485
+  },
+  "reconciliation": {
+    "status": "DOCUMENTED_MISMATCH",
+    "sample_type_count_sum": 401461,
+    "sample_type_count_delta": 291,
+    "split_count_sum": 401170,
+    "split_count_delta": 0,
+    "audit_note": "The currently rendered Hugging Face card reports 401170 total rows and split totals that sum to 401170, but its five displayed sample_type counts sum to 401461. The external VLM paper separately reports 716485 task-operation instances. Neither discrepancy is silently corrected; exact v2 revision, shards.csv and unique combined_sample_hash × task_routing expansion must be audited."
+  },
+  "license_review_status": "PENDING",
+  "task_view_policies": {
+    "false_split_correction": {
+      "required_mask_layout": "dual",
+      "allowed_em_views": [
+        "xy",
+        "xz",
+        "yz",
+        "best"
+      ],
+      "excluded_em_views": [],
+      "policy_source": "PUBLISHED_VLM_PROTOCOL"
+    },
+    "false_merge_identification": {
+      "required_mask_layout": "single",
+      "allowed_em_views": [
+        "xy",
+        "xz",
+        "yz"
+      ],
+      "excluded_em_views": [
+        "best"
+      ],
+      "policy_source": "DATASET_CARD"
+    },
+    "split_mask_generation": {
+      "required_mask_layout": "geometry_target_mask",
+      "allowed_em_views": [],
+      "excluded_em_views": [
+        "best"
+      ],
+      "policy_source": "DATASET_CARD"
+    }
+  }
+}
