@@ -672,3 +672,87 @@ The analyzer revalidates the base causal study, transfer-study identity and per-
 
 The bounds are conservative partial-identification intervals under the binary per-item treatment-effect definition. They do not repair wrong labels among accepted candidates, prove reviewers are independent, authenticate evaluator custody, identify why examples were disputed, eliminate global model interference, or prove transfer outside the registered benchmark. A wide interval is an honest statement that the evidence is insufficient—not a failure to be concealed.
 
+## Measurement-as-Distribution and claim-scoped robustness profiles (SCI-MEASUREMENT-AS-DISTRIBUTION-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9931
+
+Research source: Afli & Frank, Findings of EMNLP 2026, "The Benchmark Is Not the Construct: Toward Distribution-Based Evaluation in NLP":
+https://aclanthology.org/2026.findings-emnlp.1992/
+
+### Paradigm
+
+A fixed benchmark estimates performance conditional on one specific configuration of items, prompts, labels, metrics and model execution. It does not, by itself, measure how the construct behaves across other valid instances or measurement conditions.
+
+Measurement-as-Distribution makes the evaluation process explicit as:
+
+    P = (C, G, Φ, E, R)
+
+- C — construct specification: what is measured, what must remain invariant, which nuisance dimensions may vary, and which claims are prohibited.
+- G — generation: the source, generator, version/configuration, seed commitments, item manifest and checkpoint-freeze relation.
+- Φ — validated perturbations: named axes, transformation families, invariant claims, validation method, acceptance rule, failed transformations and fallback evidence.
+- E — evaluation: models/checkpoints, harness, prompt, scorer, decoding, repeated runs, resampling policy and independent uncertainty unit.
+- R — reporting: original and perturbed score distributions, paired deltas, uncertainty, validation/fallback/coverage rates, rank stability and compute/data-egress costs.
+
+This complements existing fixed benchmarks; it does not replace them. The amount of evidence required increases with the breadth of the claim. A result for one frozen benchmark is a fixed-configuration claim, not a deployment-distribution claim.
+
+### Rust implementation
+
+The module src/measurement_distribution.rs implements the protocol and a model-agnostic evaluator-output analysis kernel.
+
+- Strict protocol types and schema for C/G/Φ/E/R.
+- Instance manifest with source-cluster and source-lineage commitments.
+- Model/checkpoint/tokenizer identities and repeated evaluation runs with seed commitments.
+- Exact observation matrix: one explicit status for each model × run × base item × axis × condition. Missing/failed/rejected/indeterminate outcomes remain visible; no silent row dropping.
+- Independent uncertainty units are declared as model_pair_replicate, source_cluster, base_item or evaluation_run. Paired deltas aggregate within those units before computing 95% Student-t intervals. Perturbations and repeated model calls do not become independent training replicates.
+- Distribution summaries include mean, sample standard deviation and configured quantiles; per-axis validation acceptance, missingness, coverage, runtime, tokens and external calls are reported separately.
+- Paired score deltas compare each transformed result with the exact same model/run/base item under the baseline condition.
+- Kendall's τ-b compares unperturbed and perturbed model rankings per primary axis/condition when at least three models are present. Ties are handled explicitly.
+- Prompt-sensitivity axes are auxiliary unless instruction following is the target construct.
+- Fixed-configuration Measurement-as-Instance can be represented as a baseline-only axis. The report labels it measurement_as_instance_restricted and never marks it as distributional evidence.
+- Cross-domain, model-family and deployment-distribution claim scopes have explicit population checks.
+- The report records whether evidence thresholds support the requested claim scope. It does not assert that the registered distribution equals deployment.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-measurement-distribution \
+      measurement-protocol.json \
+      measurement-run-bundle.json \
+      robustness-report.json
+
+The CLI applies bounded streaming reads (512 MiB per input) and emits a digest-bound report. Public helpers expose protocol and instance-manifest digest construction. JSON Schemas are under schema/measurement-distribution-*.schema.json.
+
+### Statistical contract
+
+The report distinguishes:
+- observation-level score distributions (descriptive);
+- paired condition deltas within identical model/run/item keys;
+- 95% confidence intervals across the declared independent-unit means;
+- Kendall rank-stability statistics across models;
+- coverage and validation/fallback failures.
+
+A large number of paraphrases or questions does not increase the number of independently trained model-pair replicates. For a source_cluster unit, observations from one source cluster are averaged before the interval is calculated. For a model_pair_replicate, the model-pair replicate is the unit. The interval is valid only to the extent that the declared units are genuinely independent and sampled as claimed.
+
+This implementation performs no hypothesis tests. If a separately preregistered analysis reports multiple p-values, the protocol requires a declared test family and Holm correction; it does not infer significance from overlapping confidence intervals or ranking shifts.
+
+### Fixed-instance and distributional qualification
+
+- A baseline-only fixed benchmark is recoverable as measurement_as_instance_restricted.
+- A distributional profile requires at least one primary construct-preserving perturbation family.
+- Each axis requires explicit validation evidence; rejected, indeterminate, fallback, execution-failed and missing observations remain in the denominator.
+- The report computes paired deltas only when the exact baseline item/run is present and scored.
+- An accepted perturbation without a scored baseline is not silently treated as an independent observation.
+- Rank stability is non-estimable with fewer than the configured number of models; the default minimum for rank reporting is three.
+- Cross-domain claims require at least two task families; model-family claims require at least two model families; deployment-distribution claims require both.
+- The protocol's thresholds are configurable; they are not universal sample-size guarantees.
+
+### Industry alignment
+
+Use Inspect for composable tasks, solvers, tools and scorers, and Lighteval for multi-backend execution. The Symthaea module consumes their exported per-item observations and adds a shared measurement contract: construct invariants, generation and perturbation evidence, explicit resampling/cluster structure, exact condition coverage, paired profiles and claim-scope eligibility. It intentionally does not rebuild generic model execution.
+
+Evaluation Cards and contamination transparency reporting are complementary distribution/reporting surfaces; the Symthaea report binds machine-readable artifacts and claim boundaries that can feed such cards.
+
+### Claim ceiling
+
+A valid report describes performance over the exact registered generator, instance set, perturbation families, model identities and execution conditions. It does not prove all generated examples preserve the construct, authenticate model or evaluator identities, establish the registered distribution as the real deployment distribution, eliminate training/test interference, or prove universal generalization. It does not make a SOTA claim. A fixed-instance result remains explicitly narrower than a distributional robustness result.
+
