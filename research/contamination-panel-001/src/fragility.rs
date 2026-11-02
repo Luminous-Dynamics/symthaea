@@ -225,7 +225,11 @@ pub struct CheckpointPerformanceV1 {
 pub struct FragilityCheckpointReportV1 {
     pub stage: TrainingStageV1,
     pub checkpoint_sha256: String,
+    pub parent_checkpoint_sha256: String,
     pub training_receipt_sha256: String,
+    pub training_config_sha256: String,
+    pub objective_config_sha256: String,
+    pub training_data_manifest_sha256: String,
     pub optimizer_steps: u64,
     pub performance: CheckpointPerformanceV1,
     pub detectors: Vec<DetectorCheckpointMetricsV1>,
@@ -370,7 +374,10 @@ fn validate_score_vector(
     }
     let mut directions = BTreeMap::new();
     for score in &first.detector_scores {
-        if !valid_id(&score.detector_id, 128) || !score.raw_score.is_finite() {
+        if !valid_id(&score.detector_id, 128)
+            || !valid_digest(&score.detector_spec_sha256)
+            || !score.raw_score.is_finite()
+        {
             return Err("detector IDs must be valid and scores finite".to_owned());
         }
         if directions
@@ -1021,7 +1028,11 @@ pub fn analyze_detector_fragility(
             checkpoint_reports.push(FragilityCheckpointReportV1 {
                 stage,
                 checkpoint_sha256: checkpoint.checkpoint_sha256.clone(),
+                parent_checkpoint_sha256: checkpoint.parent_checkpoint_sha256.clone(),
                 training_receipt_sha256: checkpoint.training_receipt_sha256.clone(),
+                training_config_sha256: checkpoint.training_config_sha256.clone(),
+                objective_config_sha256: checkpoint.objective_config_sha256.clone(),
+                training_data_manifest_sha256: checkpoint.training_data_manifest_sha256.clone(),
                 optimizer_steps: checkpoint.optimizer_steps,
                 performance: performance_for_stage(checkpoint)?,
                 detectors: checkpoint_detector_metrics(
@@ -1137,6 +1148,191 @@ mod tests {
     fn zero_pre_intervention_signal_has_undefined_retention() {
         assert_eq!(retention_ratio(100.0, 0.0), None);
         assert_eq!(retention_ratio(100.0, 200.0), Some(500.0));
+    }
+
+    fn stage_hash(stage: TrainingStageV1) -> char {
+        let index = TrainingStageV1::ALL
+            .iter()
+            .position(|candidate| *candidate == stage)
+            .unwrap();
+        char::from_digit(index as u32, 10).unwrap()
+    }
+
+    fn stage_parent(
+        stage: TrainingStageV1,
+        base: &str,
+        advanced: &str,
+    ) -> String {
+        match stage {
+            TrainingStageV1::SftClean | TrainingStageV1::SftContaminated => base.to_owned(),
+            TrainingStageV1::SftCleanThenGrpoClean => digest(stage_hash(TrainingStageV1::SftClean)),
+            TrainingStageV1::SftContaminatedThenGrpoClean => digest(stage_hash(TrainingStageV1::SftContaminated)),
+            TrainingStageV1::SftCleanThenRaft => digest(stage_hash(TrainingStageV1::SftClean)),
+            TrainingStageV1::SftContaminatedThenRaft => digest(stage_hash(TrainingStageV1::SftContaminated)),
+            TrainingStageV1::SftCleanThenRaftPlusPlus => digest(stage_hash(TrainingStageV1::SftClean)),
+            TrainingStageV1::SftContaminatedThenRaftPlusPlus => digest(stage_hash(TrainingStageV1::SftContaminated)),
+            TrainingStageV1::AdvancedLrmClean | TrainingStageV1::AdvancedLrmCotContaminated => advanced.to_owned(),
+        }
+    }
+
+    fn objective(stage: TrainingStageV1) -> char {
+        match stage {
+            TrainingStageV1::SftClean | TrainingStageV1::SftContaminated => 'c',
+            TrainingStageV1::SftCleanThenGrpoClean | TrainingStageV1::SftContaminatedThenGrpoClean => 'd',
+            TrainingStageV1::SftCleanThenRaft | TrainingStageV1::SftContaminatedThenRaft => 'e',
+            TrainingStageV1::SftCleanThenRaftPlusPlus | TrainingStageV1::SftContaminatedThenRaftPlusPlus => 'f',
+            TrainingStageV1::AdvancedLrmClean | TrainingStageV1::AdvancedLrmCotContaminated => 'g',
+        }
+    }
+
+    fn steps(stage: TrainingStageV1) -> u64 {
+        match stage {
+            TrainingStageV1::SftClean | TrainingStageV1::SftContaminated => 100,
+            TrainingStageV1::SftCleanThenGrpoClean | TrainingStageV1::SftContaminatedThenGrpoClean => 156,
+            TrainingStageV1::SftCleanThenRaft | TrainingStageV1::SftContaminatedThenRaft => 156,
+            TrainingStageV1::SftCleanThenRaftPlusPlus | TrainingStageV1::SftContaminatedThenRaftPlusPlus => 156,
+            TrainingStageV1::AdvancedLrmClean | TrainingStageV1::AdvancedLrmCotContaminated => 20,
+        }
+    }
+
+    fn member_accuracy(stage: TrainingStageV1) -> usize {
+        match stage {
+            TrainingStageV1::SftClean => 70,
+            TrainingStageV1::SftContaminated => 90,
+            TrainingStageV1::SftCleanThenGrpoClean => 72,
+            TrainingStageV1::SftContaminatedThenGrpoClean => 90,
+            TrainingStageV1::SftCleanThenRaft => 72,
+            TrainingStageV1::SftContaminatedThenRaft => 88,
+            TrainingStageV1::SftCleanThenRaftPlusPlus => 72,
+            TrainingStageV1::SftContaminatedThenRaftPlusPlus => 87,
+            TrainingStageV1::AdvancedLrmClean => 80,
+            TrainingStageV1::AdvancedLrmCotContaminated => 90,
+        }
+    }
+
+    fn member_score(stage: TrainingStageV1, member: bool) -> f64 {
+        match stage {
+            TrainingStageV1::SftContaminated if member => 0.9,
+            TrainingStageV1::SftContaminated => 0.1,
+            TrainingStageV1::SftContaminatedThenGrpoClean => 0.5,
+            TrainingStageV1::SftContaminatedThenRaft if member => 0.9,
+            TrainingStageV1::SftContaminatedThenRaft => 0.2,
+            TrainingStageV1::SftContaminatedThenRaftPlusPlus if member => 0.7,
+            TrainingStageV1::SftContaminatedThenRaftPlusPlus => 0.6,
+            TrainingStageV1::SftClean | TrainingStageV1::SftCleanThenGrpoClean
+            | TrainingStageV1::SftCleanThenRaft | TrainingStageV1::SftCleanThenRaftPlusPlus
+            | TrainingStageV1::AdvancedLrmClean
+            | TrainingStageV1::AdvancedLrmCotContaminated => 0.5,
+        }
+    }
+
+    fn observations(stage: TrainingStageV1) -> Vec<FragilityItemObservationV1> {
+        let mut output = Vec::with_capacity(700);
+        for index in 0..300 {
+            output.push(FragilityItemObservationV1 {
+                item_id: format!("cal-neg-{index:04}"),
+                split: EvaluationSplitV1::Calibration,
+                intended_member: false,
+                correct: false,
+                detector_scores: vec![score("min_k", 0.5)],
+            });
+        }
+        for index in 0..100 {
+            output.push(FragilityItemObservationV1 {
+                item_id: format!("test-member-{index:04}"),
+                split: EvaluationSplitV1::Test,
+                intended_member: true,
+                correct: index < member_accuracy(stage),
+                detector_scores: vec![score("min_k", member_score(stage, true))],
+            });
+        }
+        for index in 0..300 {
+            output.push(FragilityItemObservationV1 {
+                item_id: format!("test-nonmember-{index:04}"),
+                split: EvaluationSplitV1::Test,
+                intended_member: false,
+                correct: index < 165,
+                detector_scores: vec![score("min_k", member_score(stage, false))],
+            });
+        }
+        output
+    }
+
+    fn synthetic_study() -> DetectorFragilityStudyV1 {
+        let base = digest('a');
+        let advanced = digest('b');
+        let mut pairs = Vec::new();
+        for replicate in 0..2 {
+            let checkpoints = TrainingStageV1::ALL
+                .iter()
+                .map(|stage| {
+                    let stage_byte = stage_hash(*stage);
+                    FragilityCheckpointV1 {
+                        stage: *stage,
+                        checkpoint_sha256: digest(stage_byte),
+                        parent_checkpoint_sha256: stage_parent(*stage, &base, &advanced),
+                        training_receipt_sha256: digest('h'),
+                        training_config_sha256: digest(char::from_digit(replicate + 1, 10).unwrap()),
+                        objective_config_sha256: digest(objective(*stage)),
+                        training_data_manifest_sha256: digest(char::from_digit(replicate + 3, 10).unwrap()),
+                        optimizer_steps: steps(*stage),
+                        observations: observations(*stage),
+                    }
+                })
+                .collect();
+            pairs.push(FragilityModelPairV1 {
+                replicate_id: format!("pair-{:02}", replicate + 1),
+                base_checkpoint_sha256: base.clone(),
+                advanced_lrm_base_checkpoint_sha256: advanced.clone(),
+                randomization_manifest_sha256: digest(char::from_digit(replicate + 5, 10).unwrap()),
+                checkpoints,
+            });
+        }
+        DetectorFragilityStudyV1 {
+            schema: FRAGILITY_STUDY_SCHEMA.to_owned(),
+            study_id: "fragility-pilot-001".to_owned(),
+            benchmark_id: "frozen-benchmark-001".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            target_fpr_permille: 10,
+            minimum_calibration_negatives: 300,
+            minimum_test_negatives: 300,
+            minimum_test_members: 100,
+            model_pair_replicates: pairs,
+        }
+    }
+
+    #[test]
+    fn full_fragility_analysis_detects_inflation_preserved_with_auc_concealment() {
+        let report = analyze_detector_fragility(&synthetic_study()).unwrap();
+        assert_eq!(report.independent_model_pair_replicate_count, 2);
+        assert!(!report.confirmatory_eligible);
+        let pair = &report.pair_reports[0];
+        let grpo = pair
+            .intervention_comparisons
+            .iter()
+            .find(|row| row.intervention == InterventionComparisonV1::SftThenCleanGrpo)
+            .unwrap();
+        assert_eq!(
+            grpo.member_performance_inflation_before_permille,
+            Some(200.0)
+        );
+        assert_eq!(
+            grpo.member_performance_inflation_after_permille,
+            180.0
+        );
+        assert_eq!(grpo.member_inflation_retention_permille, Some(900.0));
+        let detector = &grpo.detectors[0];
+        assert_eq!(detector.auroc_before, Some(1.0));
+        assert_eq!(detector.auroc_after, 0.5);
+        assert_eq!(detector.signal_retention_permille, Some(0.0));
+        assert_eq!(detector.concealment_gap_permille, Some(900.0));
+    }
+
+    #[test]
+    fn missing_checkpoint_stage_is_rejected() {
+        let mut study = synthetic_study();
+        study.model_pair_replicates[0].checkpoints.pop();
+        assert!(analyze_detector_fragility(&study).is_err());
     }
 
     #[test]
