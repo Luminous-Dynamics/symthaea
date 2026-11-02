@@ -66,49 +66,77 @@ Never concatenate participant files and then randomly split windows. Repeated wi
 
 The parser's normalized time key is only an ordering/interval representation. Since the source timestamp is timezone-naive, it is not an absolute UTC instant. Keep the source bytes and archive SHA-256 in the existing real-data manifest; the parser's digest binds parsed row values and the declared source-family identity, not the publisher or original file bytes. Activity code 130/140 semantics are deliberately left unresolved in the base parser because the current UCI metadata and original article use different descriptions.
 
-## Initial comparison target
+## Initial comparison target and current reference point
 
-The original HARTH paper reports two different label protocols. With all **12 annotated label IDs**, its SVM leave-one-subject-out mean F1 is **0.66 ± 0.32** (Table 2). The frequently cited **0.81 ± 0.18** is the SVM result after the paper merges those 12 labels into **nine physical activities** (Table 3). Its merge maps label 3 (shuffling), 140 and 6 (standing) to standing, and labels 7 (sitting) and 130 to sitting. **There is a source-description conflict:** the original article names 130/140 as transport-sitting/transport-standing, while the current UCI dataset metadata names them cycling-sitting/standing inactive. The parser therefore preserves 130 and 140 as opaque IDs (`Label130`, `Label140`) and does not decide the semantics. The nine-class reproduction profile must document the paper's merge explicitly and pin the exact archive version/annotation source. These are different tasks and must never be presented as one baseline. Reproduce both protocols with the exact paper features, participant folds, confusion-matrix aggregation and scoring before making an SOTA comparison.
+HARTH is not a solved classification task. Its 12 activity labels are highly imbalanced, rare classes such as cycling-standing and stair transitions are difficult, and a random-window split would overstate generalization. Use subject-held-out evaluation.
 
-The next matched comparison should include:
-- majority/stratified prior and simple threshold/feature baselines;
-- the paper's SVM baseline with pinned preprocessing;
-- a compact INT8 CNN/TCN;
-- GRU/LSTM and GRU-D where missingness handling is relevant;
-- HDC-only, CfC-only and HDC-LTC;
-- sensor-subset experiments (back only, thigh only, both);
-- fixed-rate and active-sensing policies only when the acquisition semantics are matched.
+### Strong HARTH-specific reference: SelfPAB
 
-Report participant-wise macro-F1 and worst-subject F1, per-class recall/precision, transition-event detection, false alarms/hour, detection delay, sensor samples/hour and complete-event energy on physical hardware. Do not report only pooled window accuracy.
+The strongest directly comparable HARTH-specific reference found in this audit is **SelfPAB 100k** (Logacjov et al., *Applied Intelligence*, 2024):
+- Pretrained by masked reconstruction on up to 100,000 hours of unlabeled dual-accelerometer HUNT4 data using the same thigh/lower-back placement style.
+- Evaluated on HARTH v1.2 with 22-subject leave-one-subject-out (LOSO).
+- Reports **81.3 ± 1.3% mean F1** for SelfPAB 100k and **74.2% F1** for its best supervised XGBoost baseline.
+- Its main HARTH comparison uses ten classes: cycling-sit-inactive is merged with cycling-sit, and cycling-stand-inactive with cycling-stand. It produces 1-second activity predictions with 0.5-second overlap, then unfolds predictions to the original temporal grid.
+- The paper's subject-average F1, not raw window accuracy, is its primary quality measure because of severe class imbalance.
 
-## Industry context and qualification targets
+These are published figures, not reproduced scores. They must not be compared to a 12-class result or a different window/aggregation protocol as though the tasks were identical. Reproduce SelfPAB's ten-class label merge, 50 Hz six-channel signal pipeline, LOSO grouping, prediction cadence, per-subject macro-F1 aggregation and evaluation conventions before claiming a direct win.
 
-Published edge-HAR systems provide useful architecture and system-cost anchors, but scores from different datasets and split protocols are not interchangeable:
+### Cross-dataset pretrained comparator: HART (2026)
 
-| Reference | Reported result | How to use it |
-|---|---|---|
-| HARTH original paper | 12-label SVM F1 0.66 ± 0.32; merged nine-activity SVM F1 0.81 ± 0.18 (LOSO) | Two distinct protocols; reproduce both and never compare across different label spaces |
-| TinyHAR-Net (STM32F446RE) | F1 96.75–99.76% across WISDM, MotionSense and MHEALTH; 30.12 KiB RAM; 43.78–51.30 KiB flash; 41.31–51.57 ms inference | MCU footprint/deployment anchor only; do not compare those cross-dataset scores directly with HARTH |
-| STORM (X-HEEP + streaming CGRA) | 19.7k parameters; 0.801 macro-F1 on its own 8-class cross-source benchmark; 67.4 ms at 100 MHz; 632.4 µJ activity-based energy estimate | Cross-source co-design and energy-accounting anchor; its dataset, hardware, task and power methodology differ from HARTH |
-| L-HAR (2026 deployment study) | Three IMUs from one participant; quantized TCN Raspberry Pi streaming 9.066 ms E2E / 69.928 Hz and 49.933 mJ software-estimated energy per inference | Streaming methodology and backend-dependence warning, not cross-subject evidence; energy is an estimate rather than a direct physical power-trace result |
+The HART repository describes a HAR-specialized pretrained model based on TSPulse:
+- Pretrained on 26 public HAR datasets, with 23,930 sessions, 507 subjects and approximately 456.6 million standardized sensor points.
+- The released L120/d48 configuration uses 120 samples (4 seconds at 30 Hz), eight encoder blocks and 206,860 trainable parameters before downstream adaptation.
+- Its 14-dataset benchmark reports aggregate F1 of 0.6803 on its in-distribution set and 0.5656 on its OOD set. These are **aggregate across different datasets**, not HARTH-specific scores.
+- Its repository includes INT8 quantization and Raspberry Pi 5 deployment experiments. The listed 24.45 ms bs=1 inference / 1,255 MB RSS numbers are for WISDM, not HARTH and not an MCU measurement.
 
-References:
-- [HARTH original paper](https://doi.org/10.3390/s21237853)
-- [TinyHAR-Net](https://doi.org/10.1109/LES.2025.3639944)
-- [STORM](https://www.mdpi.com/2079-9292/15/9/1924)
-- [L-HAR](https://doi.org/10.3390/s26175678)
+HART is a necessary cross-dataset representation and deployment comparator, but its aggregate scores cannot be inserted into the HARTH leaderboard. Before assigning HART to the HARTH ID or OOD lane, pin its exact pretraining dataset inventory and subject overlap. A dataset-family-level OOD claim requires that the target family and its subjects are absent from pretraining.
 
-### Proposed gates (aspirational, not measured)
+### Matched experiment matrix
 
-1. **Reproducibility:** independently reproduce both HARTH SVM LOSO protocols: (a) the strict 12-label result (reported F1 0.66 ± 0.32) and (b) the explicitly merged nine-activity result (reported F1 0.81 ± 0.18). Publish all 22 participant-fold results, not just pooled windows, and preserve the exact confusion-matrix aggregation.
-2. **Quality:** aim for at least +3 percentage points in participant-mean macro-F1 over the reproduced SVM within each fixed label protocol, with a participant-paired confidence interval above zero and no material regression in the worst-subject tail. Treat +3 pp as a research target, not a claim or guaranteed threshold.
-3. **Active sensing:** at a preregistered non-inferiority margin of -1 pp macro-F1, target at least 25% fewer sensor samples and report transition-event recall and p95 transition-detection delay. Do not infer these metrics from a randomly windowed classification split.
-4. **Edge feasibility:** report full application-event p50/p95/p99 latency, peak SRAM after reserve, flash, sensor/wake/compute/update/communication costs and physical complete-event energy. For 50 Hz streaming, p95 end-to-end processing below the 20 ms sample period is a useful target where the selected board and workload make it meaningful; it is not a universal requirement for lower-rate active sensing.
-5. **Energy superiority:** target at least 10% lower measured complete-event energy than the strongest matched baseline at the same preregistered quality and deadline constraints, with uncertainty reported. A modeled energy estimate or model-only inference measurement does not qualify.
-6. **Robustness:** report subject-held-out, sensor-subset, missingness, time-jitter, abrupt and gradual shift strata separately. Use participant as the independent statistical unit; multiple windows from one participant do not create independent subjects.
+The HARTH evaluation should retain two explicit label tracks:
+1. **12-class native track:** all documented HARTH labels remain distinct.
+2. **10-class SelfPAB-comparable track:** merge label 130 into 13 and label 140 into 14 exactly as described in SelfPAB.
 
-Do not target the 96–99% figures from other datasets as a HARTH requirement. The first hard milestone is a faithful reproduction of both HARTH label protocols under participant-held-out evaluation. Use the nine-class 0.81 ± 0.18 comparator only for the nine-class track; use the 12-class 0.66 ± 0.32 comparator for the full-label track.
+For each track and each LOSO fold, compare:
+- majority/stratified prior, threshold and feature-statistic baselines;
+- pinned SVM and XGBoost pipelines;
+- compact CNN/TCN, GRU/LSTM and GRU-D where missingness semantics apply;
+- SelfPAB 100k under its published compatible pipeline;
+- HART only with exact pretraining overlap disclosed and its 30 Hz / 4-second protocol reproduced where possible;
+- HDC-only, CfC-only and HDC-LTC, with equal access to sensor channels and label budgets;
+- fixed-rate and active-sensing policies only in a separate acquisition-policy track with matched deadlines and sensor access.
 
+Use the same frozen participant splits for every candidate. Fit normalization, feature transforms, resampling filters, calibration and thresholds using training/development/calibration subjects only. Never window then split.
+
+### Metrics and evidence
+
+Primary quality:
+- participant-wise macro-F1 averaged across the 22 held-out subjects;
+- paired per-subject difference against the best reproduced baseline;
+- worst-subject and per-class F1/recall, particularly stairs, shuffling and cycling-standing;
+- both 12-class and 10-class results, never merged without explicit mapping.
+
+For dynamic recognition:
+- transition-event precision/recall, detection delay and false transitions/hour;
+- quality and calibration under missingness, timestamp jitter, sensor dropout and subject-held-out shift;
+- label efficiency at fixed annotation budgets (for example 1 minute, 5 minutes, 15 minutes, and full training data per activity where feasible).
+
+For edge deployment:
+- peak SRAM/flash and persistent state;
+- raw p50/p95/p99 latency;
+- online update time and state-write bytes;
+- sensor samples/hour and wake count for active policies;
+- physical complete-event energy per correct on-time decision with expanded uncertainty, measured on the same target and measurement boundary.
+
+### Aspirational research gates (not achieved results)
+
+- First reproduce SelfPAB's 81.3% ± 1.3% figure within its stated ten-class/LOSO protocol. A non-reproduction is still useful evidence; do not silently tune the test folds.
+- Aim for at least **+2 absolute F1 percentage points** over the reproduced SelfPAB comparator, with a paired subject-level 95% confidence interval above zero, on the exact comparable track.
+- A second win condition is to match the best comparator within **1 absolute F1 point** while reducing measured complete-event energy by at least **2×** on the same physical target and deadline, without worse worst-subject recall.
+- For label efficiency, aim to match the full-label baseline with at most 25% of its annotated subject-time while preserving rare-class recall. This is an aspiration; establish a reproducible label-budget curve first.
+- For active sensing, aim for at least 25% fewer sensor samples/hour at a preregistered fixed on-time recall and false-alarm ceiling. Measure real sensor wake and acquisition energy; do not derive battery-life claims from the synthetic simulator.
+
+The first evidence report must publish all 22 subject-fold results, class-wise confusion counts, exact pipeline/config digests and baseline source revisions. With only 22 independent subjects, confidence intervals and paired tests matter more than a tiny difference in the aggregate point estimate.
 ## Claim ceiling and status
 
 - This parser does not download or redistribute data.
