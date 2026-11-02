@@ -504,7 +504,7 @@ fn outer_conformal_p_value(
 
 fn ln_gamma_lanczos(value: f64) -> f64 {
     const COEFFICIENTS: [f64; 9] = [
-        0.999_999_999_999_809_93,
+        0.999_999_999_999_809_9,
         676.520_368_121_885_1,
         -1_259.139_216_722_402_8,
         771.323_428_777_653_1,
@@ -1332,7 +1332,7 @@ pub fn calibrate_detector_panel(
             minimum_attainable_p_value: min_p,
             minimum_detector_rank_p_value: 1.0
                 / (calibration_a.scores.values().next().map_or(0, Vec::len) as f64 + 1.0),
-            pairwise_rank_correlations: pairwise_detector_spearman(rows, &calibration_a),
+            pairwise_rank_correlations: pairwise_detector_spearman(rows, calibration_a),
             target_alpha_permille: request.target_alpha_permille,
         });
     }
