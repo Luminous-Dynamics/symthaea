@@ -1,6 +1,6 @@
 # Temporal Intervention Audit
 
-**Package:** \`symthaea-temporal-intervention-audit\`  
+**Package:** `symthaea-temporal-intervention-audit`  
 **Tracking:** NEURO-SILICON-011 / #9561; related to NEURO-SILICON-010 / #9872  
 **Status:** evaluator-only research implementation; Rust tests authored, not compiled or executed.
 
@@ -73,9 +73,9 @@ The result is causal only for the randomized intervention, measured outcomes, ca
 
 From the repository root:
 
-\`\`\`sh
+```sh
 cargo test --manifest-path research/temporal-intervention-audit/Cargo.toml
-\`\`\`
+```
 
 Twenty-six test functions are authored across the fixed-sample and sequential audit modules. They have not been compiled or executed. No effect-size, p-value, SOTA or hardware claim is made.
 
