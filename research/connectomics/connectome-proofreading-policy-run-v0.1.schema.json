@@ -19,7 +19,8 @@
     "baselines",
     "metrics",
     "impact_weighting",
-    "license_status"
+    "license_status",
+    "review_resolution_profile"
   ],
   "properties": {
     "schema_version": {
@@ -218,7 +219,8 @@
         "sha256",
         "frozen_before_test_access",
         "review_minutes_per_case",
-        "missed_error_cost_units_by_task"
+        "missed_error_cost_units_by_task",
+        "unit"
       ],
       "properties": {
         "profile_id": {
@@ -253,6 +255,10 @@
               "exclusiveMinimum": 0
             }
           }
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -304,7 +310,7 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 6,
+      "minItems": 9,
       "uniqueItems": true,
       "items": {
         "enum": [
@@ -355,6 +361,21 @@
         {
           "contains": {
             "const": "cluster_bootstrap_ci"
+          }
+        },
+        {
+          "contains": {
+            "const": "ece"
+          }
+        },
+        {
+          "contains": {
+            "const": "selective_risk"
+          }
+        },
+        {
+          "contains": {
+            "const": "coverage"
           }
         }
       ]
@@ -441,6 +462,97 @@
       "enum": [
         "APPROVED_FOR_EVALUATION"
       ]
+    },
+    "review_resolution_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "sha256",
+        "calibration_population",
+        "calibration_unit",
+        "validation_protocol_sha256",
+        "frozen_before_test_access"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "calibration_population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_protocol_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "frozen_before_test_access": {
+          "const": true
+        }
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "track": {
+            "const": "IMPACT_AWARE_TRIAGE"
+          }
+        },
+        "required": [
+          "track"
+        ]
+      },
+      "then": {
+        "properties": {
+          "impact_weighting": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "impact_weighting": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "impact_weighting"
+        ]
+      },
+      "then": {
+        "properties": {
+          "track": {
+            "const": "IMPACT_AWARE_TRIAGE"
+          }
+        }
+      }
+    }
+  ]
 }
