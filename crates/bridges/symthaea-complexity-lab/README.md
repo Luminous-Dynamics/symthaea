@@ -22,16 +22,28 @@ It verifies supplied witnesses only; it does not search for a design.
 
 The separate matrix module verifies exact rational factorizations
 `I - M0 = U * V`, giving a certificate for
-`rank(I - M0) <= U.columns`. It does not prove that a suitable M0 exists,
-that M0 has the required polynomial-in-permutation representation, or that
-its support satisfies the paper's degree bound.
+`rank(I - M0) <= U.columns`.
+
+The permutation-polynomial module independently reconstructs a rational
+`M0` from a supplied polynomial in explicitly listed commuting permutation
+generators. It verifies bijectivity, pairwise commutativity, exponent shape,
+common-denominator construction, coefficient scaling, and exact matrix
+equality. Exponents are reduced modulo point-cycle length, so huge exponents
+do not cause unbounded repeated application.
+
+These are supplied-certificate verifiers only. They do not search for a
+suitable M0, prove the paper's generic matrix-existence theorem, or establish
+the separate support/sparsity and degree properties.
 
 The Python independent oracle checked 2,000 deterministic transform tables
 (49,800 coefficient comparisons and 49,800 reconstructed entries), 2,006
 row-space certificate cases (1,000 valid witnesses, 1,000 one-coordinate
-mutations, and six malformed/overflow controls), and 2,002 rational
+mutations, and six malformed/overflow controls), 2,004 rational
 `I - M0 = U * V` cases (1,000 valid factorizations, 1,000 mutated matrices
-rejected, and two shape/overflow controls). These are finite checks only.
+rejected, and four shape/overflow controls), and 2,004 polynomial-in-commuting-
+permutations cases (1,000 valid generated polynomials, 1,000 mutated M0
+claims rejected, and four structural/composition controls). These are finite
+checks only.
 
 It is a finite-table reference implementation. Its table size is \((d+1)^n\),
 and the transform takes \(O(n(d+1)^{n+1})\) arithmetic operations. It is
