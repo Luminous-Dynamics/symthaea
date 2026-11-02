@@ -279,6 +279,50 @@ https://www.kirkusreviews.com/book-reviews/a/-146/beyond-telepathy/
 5. Mark where Puharich's published account is incomplete, inconsistent or differs from the later sources; do not silently harmonize discrepancies.
 6. Seek the underlying journals/raw trial logs separately. A first-person published account is not the same as a complete raw dataset or independent replication.
 
+## PH-018 — Hurkos sender / charged-footplate experiment and role reversal
+
+**Document:** Andrija Puharich, *Beyond Telepathy*, original text ©1962; 1973 Anchor Press reprint, Chapter 2, "The Telepathic Sender," printed pp.21–25 in the reprint.
+
+**Source:** third-party searchable scan/transcription, not an authenticated original-edition page image:
+https://pdfcoffee.com/beyond-telepathy-pdf-free.html
+
+**Source locator:** web source turn920335view0, lines 1393–1435; statistical table/role-reversal notes lines 1574–1610. The OCR is malformed in places, so printed page images must be inspected before exact table transcription.
+
+**Classification:** P1 for Puharich's own published narrative; not raw trial logs or independent verification.
+
+### What the narrative reports
+
+- Peter Hurkos was sender and Harry Stone receiver; Puharich says the pair averaged about 12 hits per 50-trial run under normal room conditions.
+- Puharich then placed Hurkos on a footplate described as carrying 10,000 V DC. He says that the arrangement would not produce a shock, but also describes visible fear/doubt in Hurkos.
+- The average was said to rise from about 12/50 to 30/50; Puharich says he repeated the experiment seven times.
+- Puharich says tests with other senders were variable: some scores rose, some fell, and he attributed the variation to individuals' psychological reactions to electricity.
+- When the roles were reversed (Stone sender, Hurkos receiver), he says the dramatic score increase did not recur.
+- A statistical table later in the chapter appears to summarize 350 trials / 223 hits for the Hurkos-sender condition, and 200 trials / 60 hits for reversed roles. The OCR is interleaved with adjacent columns and footnotes; these figures must not be cited as verified until page-image comparison confirms labels and alignment.
+
+### What it does not establish
+
+- No complete raw target/response series, randomization schedule, scoring sheets, independent scorer records, session order, false calls, exclusions or stopping records are provided by the accessible text.
+- It does not isolate a physical electrical effect from subjective fear, expectancy, experimenter behavior, role, practice, session order or target/scoring leakage.
+- The high-voltage source's true electrical potential at the subject, current path, source impedance, current limit, waveform, grounding, transient behavior and field distribution are not specified.
+- The author's statement that the person would not receive a shock is not an independently verified safety assessment.
+- The observation that other senders varied and that role reversal did not repeat the effect argues against a simple universal "electricity improves telepathy" conclusion even within the author's own narrative.
+
+### Task identity
+
+Assign separate task profile PH-HURKOS-SENDER-STATE-FOOTPLATE:
+- Hurkos as sender, Stone as receiver;
+- a conventional sender–receiver matching task under a baseline condition;
+- a reported high-voltage footplate condition applied to the sender;
+- other-sender heterogeneity and a sender/receiver role-reversal comparison.
+
+This is not the same as the Stone-sender/Hurkos-receiver charged cage plus negative-ion experiment (PH-ION-001 / #10080), the Garrett 1952 cage-charge event-detection account (PH-017 / #10079), the 1969 card-colour test (PH-015 / #10070), or the Zener-card task described in the later memoir.
+
+### Research treatment
+
+Use the account only to motivate a sender-state × receiver-state × role interaction hypothesis. The historical 12/50 and 30/50 narrative averages must not be used as effect priors, synthetic truth, power assumptions or acceptance thresholds.
+
+Any modern synthetic benchmark should vary sender role, receiver role, safe measured/subjective state, pair identity, order, expectancy, target leakage and response criterion independently. Any future human research must use separately approved low-risk methods and must not reproduce the high-voltage footplate. A safe psychological/physiological state measure would test a different, narrower proposition and must be labeled as such.
+
 ## PH-017 — 22 January 1952 Garrett cage-charge detection experiment (Puharich's first-person published account)
 
 **Document:** Andrija Puharich, *Beyond Telepathy*, original text ©1962; 2026 Park Street Press / Inner Traditions reissue, ISBN 9781644116906. The currently accessible Everand preview reproduces the relevant original chapter text.
