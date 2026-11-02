@@ -102,6 +102,57 @@ The entry discusses Puharich's medical and biophysical work, patents, Round Tabl
 
 A searchable passage describes an early copper-screen cage, a receiver/sender setup, grounding and an electrically charged cage. Treat this as a retrospective description, not the original lab notebook, not independently authenticated raw data and not a direct replication record.
 
+## PH-007 — "Experiments with Faraday Cage Apparatus" (Darshana, April 1961)
+
+**Bibliographic lead:** Puharich's own later research-program background paper, archived as CIA-RDP96-00787R000100190001-2, lists "Experiments with Faraday Cage Apparatus," *Darshana* (India), Vol. 1, pp. 30–43, April 1961 (the pagination differs slightly in a later memoir bibliography, which gives pp. 30–42).
+
+**Classification:** P1 for the fact that Puharich's later paper lists this as his publication; the article itself remains **not yet recovered**. Do not quote its contents or treat its findings as verified until the original issue/article is located and inspected.
+
+**Priority:** very high. This is the earliest specifically identified publication on the Faraday-cage experiments and may describe apparatus, conditions, task definitions and results more directly than the later SRI summary or memoir.
+
+**Archive reference:** https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2 (printed p.42 in the hosted transcription; check the original CIA scan because the site warns that transcription can contain errors).
+
+## PH-008 — "Signal Detection in the Faraday Cage" (562-page work listed as "in press")
+
+The same Puharich-authored background paper lists:
+
+> "Signal detection in the Faraday Cage." Henry K. Puharich, Parapsychology Foundation, New York, 562 pages (in press).
+
+**Classification:** P1 for the existence of this bibliographic claim in Puharich's own paper; the 562-page manuscript itself has **not yet been recovered or authenticated**.
+
+A later secondary source quotes a draft dated 18 October 1968 that was sent to Professor Olivier L. Reiser. That provides a specific archival lead, not a substitute for the draft.
+
+**Priority:** highest alongside PH-007. Search the Parapsychology Foundation archive, Olivier L. Reiser papers/correspondence, Puharich papers/estate, and relevant university special collections. Seek the complete manuscript, appendices, tables, protocols and raw records, not only a summary.
+
+## PH-009 — Project I details in *Memories of a Maverick* (later memoir)
+
+**Record:** *Memories of a Maverick*, page 52 in the located scan: https://pub.deadnet.se/Books_and_manuals_on_various_stuff/Metaphysics%20%26%20Spirituality/MEMORIES%20OF%20A%20MAVERICK.pdf
+
+**Classification:** S1 later memoir; useful for hypothesis reconstruction only.
+
+The memoir describes a 7 × 7 × 7 ft copper-screen cage on insulating supports, with Eileen Garrett as receiver and a sender in another room using Zener cards. It says the initial cage-door-open/floating control and the door-closed condition both produced chance-expectation results. It then describes a separate cage-state discrimination procedure: a random switch applied an electrical charge to the outer cage, and Garrett was asked to guess when the charge appeared. The memoir claims 91 charge appearances over 22 experiments and 89 correct guesses. It says Puharich considered ionization of air a possible cue and contemplated a gas-tight solid copper inner cage.
+
+**Critical qualifications:**
+- These are retrospective memoir claims, not trial-level records.
+- "91 times in 22 experiments" does not specify the independent randomized unit, trial sequence, missing trials, timing, stimulus generation, feedback or exact statistical analysis.
+- The paired Zener-card task and the randomized cage-state task are different protocols and must not be combined.
+- The memoir's proposed gas-tight inner cage is a design intention in the account; it is not evidence that a completed, characterized gas-tight apparatus was tested.
+
+The memoir supports two separately labelled modern reconstruction profiles:
+1. paired sender–receiver symbol transfer with the receiver in an enclosure;
+2. blinded cage-state discrimination under a safe, independently verified apparatus state.
+
+It does not establish a direct replication protocol.
+
+## PH-010 — 1971/72 background paper bibliography and historical task vocabulary
+
+The CIA release CIA-RDP96-00787R000100190001-2 is a P1 record authored/edited by Puharich and submitted by Captain Edgar D. Mitchell. Its preface states that it is a first-draft background paper being circulated for review, not a contractor proposal or final research protocol. In its bibliography it identifies both PH-007 and PH-008.
+
+This document is also useful because it explicitly distinguishes (in its own terminology) direct brain perception from direct brain action. That historical vocabulary should be captured as source terminology only; it must not be imported as a scientific ontology or treated as established physical categories.
+
+Hosted transcription: https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2
+The host warns that the transcription is machine-generated and may contain errors; use document ID CIA-RDP96-00787R000100190001-2 to retrieve/check the official CIA scan.
+
 ## What we still need to recover
 
 For the reported Puharich cage experiments, search for:
