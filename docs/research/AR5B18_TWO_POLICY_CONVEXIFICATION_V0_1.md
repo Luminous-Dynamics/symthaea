@@ -17,7 +17,7 @@ cost_k(q) = q * cost_k(A) + (1-q) * cost_k(B)
 utility_k(q) = q * utility_k(A) + (1-q) * utility_k(B)
 ```
 
-Therefore, if both component policies satisfy a linear null-size limit, their mixture does too. Expected-cost constraints are preserved by the same argument.
+Therefore, a mixture preserves each linear null-size limit by convexity. With a finite composite null family, it must satisfy the size limit separately for every declared null model; the feasible set is the intersection of all those linear constraints. Expected-cost constraints are preserved by the same argument.
 
 This is a randomized policy over two **complete deterministic strategies**. The random choice is made before the experiment; it is not a post-outcome selection and must not depend on which alternative model is thought to be true.
 
@@ -27,8 +27,8 @@ For a finite alternative family, each model's mixture utility is affine in q. Wo
 
 The optimum on the feasible interval must occur at one of:
 - q=0 or q=1;
-- an intersection of two model-specific utility lines;
-- a null-size feasibility boundary;
+- an intersection of two alternative-model utility lines;
+- a size boundary for any declared null model;
 - a per-model expected-cost feasibility boundary.
 
 The implementation enumerates all these breakpoints, evaluates each feasible point and selects the highest worst-case utility. Ties are broken by lower maximum expected cost, lower null size, then lower q. This is exact for two-policy mixtures and a finite supplied model family.
@@ -46,9 +46,11 @@ Policy A is the middle-depth deterministic policy from AR-5B17; policy B is the 
 | B (deep) | alt-a | 0.576 | 3.7 | 4.542 |
 | B (deep) | alt-b | 0.615 | 3.3 | 5.050 |
 
-Null sizes:
-- A: 0.035.
-- B: 0.0225.
+Composite-null size receipts:
+- Policy A: null-a = 0.035; null-b = 0.020.
+- Policy B: null-a = 0.0225; null-b = 0.030.
+
+The optimizer enforces alpha separately under both null models.
 
 With alpha=0.05 and a maximum expected cost of 3.6, the utility lines intersect at:
 
@@ -67,13 +69,17 @@ The independently calculated mixed metrics are:
 - alt-b power: **0.59544**;
 - worst-case power: **0.59544**;
 - utility under both alternatives: **4.82312**;
-- mixed null size: **0.02576**;
+- null-a size: **0.02576**;
+- null-b size: **0.02739**;
+- worst-case null size across the family: **0.02739**;
 - maximum expected cost: **3.51745**;
 - binary mixture entropy: **0.57387 nats**.
 
 The best deterministic policy has worst-case utility 4.542. The randomized mixture raises it to 4.82312 while respecting alpha and the 3.6 cost cap.
 
 When the cost cap is tightened to 3.2, the utility intersection is infeasible. The cost boundary forces q >= 0.7142857; the exact optimizer selects that boundary, yielding worst-case utility 4.42857 and maximum expected cost 3.2. This is a useful negative case: randomization cannot preserve the unconstrained optimum after the resource set contracts.
+
+The null-family intersection also matters: at alpha = 0.026, null-a requires q <= 0.28 while null-b requires q >= 0.40. No randomized mixture can meet both constraints, so the analyzer correctly reports infeasibility rather than averaging the two null sizes into a misleading single guarantee.
 
 These values are exact constructed arithmetic, not compiled test output or empirical results.
 
@@ -88,7 +94,7 @@ The implementation rejects:
 - infeasible alpha/cost constraints;
 - report tampering or non-canonical receipt ordering.
 
-The reference only mixes **two supplied policies**. It does not solve the full LP over every deterministic policy, nor randomized policies over a continuous action space. It does not protect against omitted null or alternative models. It assumes that each policy receipt accurately represents the complete policy's operating characteristics and that randomization is independent of experiment outcomes.
+The reference only mixes **two supplied policies**. It checks null size under each model in the declared finite null family and robust utility under each supplied alternative. It does not solve the full LP over every deterministic policy, nor randomized policies over a continuous action space. It does not protect against omitted null or alternative models. It assumes that each policy receipt accurately represents the complete policy's operating characteristics and that randomization is independent of experiment outcomes.
 
 A future full policy-frontier LP could optimize a distribution over many policies. The current two-policy routine is a small exact convexification oracle and benchmark point, not a general robust optimizer.
 
@@ -113,4 +119,4 @@ cargo test -p symthaea-architecture-engineering
 cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 ```
 
-Six tests are authored. No compile, formatting, clippy, unit-test, CI, benchmark or SOTA pass is claimed.
+Seven tests are authored. No compile, formatting, clippy, unit-test, CI, benchmark or SOTA pass is claimed.
