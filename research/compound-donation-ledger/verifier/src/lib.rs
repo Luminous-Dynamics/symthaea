@@ -98,6 +98,7 @@ pub fn verify_receipt(
             || spec.reserve_rate_denominator == 0
             || spec.reserve_rate_numerator > spec.reserve_rate_denominator
             || spec.destination_id.is_some_and(|destination| destination <= spec.id)
+            || (spec.destination_id.is_none() && spec.reserve_rate_numerator > 0)
         {
             return Err(VerifyError::InvalidSpecs);
         }
@@ -384,7 +385,7 @@ mod tests {
             CandidateSpec {
                 id: 30,
                 weight: 200_000_000,
-                reserve_rate_numerator: 1,
+                reserve_rate_numerator: 0,
                 reserve_rate_denominator: 1,
                 destination_id: None,
             },
