@@ -7,7 +7,7 @@ pub mod matrix;
 pub mod permutation_polynomial;
 pub mod profile;
 
-
+use std::error::Error;
 use std::fmt;
 
 /// The arithmetic operation that overflowed while transforming a table.
