@@ -22,6 +22,7 @@ const REPORT_SCHEMA: &str =
 const REPORT_VERSION: &str = "0.1.0";
 const MAX_SUPPORT_SIZE: usize = 100_000;
 const MAX_FUNCTIONAL_COUNT: usize = 10_000;
+const MAX_FUNCTIONAL_VALUE_CELLS: usize = 10_000_000;
 const MAX_EXACT_F64_INTEGER: u64 = 9_007_199_254_740_992;
 const LN_2: f64 = std::f64::consts::LN_2;
 
@@ -203,8 +204,20 @@ impl DirectFunctionalTransportRequest {
             ));
         }
         let support_size = self.calibration_sample.observed_path_counts.len();
+        let value_cells = support_size
+            .checked_mul(self.registered_functionals.len())
+            .ok_or_else(|| DirectFunctionalTransportError::new(
+                "request.registered_functionals",
+                "support-by-functional value matrix size overflowed",
+            ))?;
+        if value_cells > MAX_FUNCTIONAL_VALUE_CELLS {
+            return Err(DirectFunctionalTransportError::new(
+                "request.registered_functionals",
+                format!("support-by-functional value matrix exceeds {MAX_FUNCTIONAL_VALUE_CELLS} cells"),
+            ));
+        }
         if self.registered_functionals.windows(2).any(|pair| {
-            pair[0].functional_id >= pair[1].functional_id
+            pair[0].functional_id.as_str() >= pair[1].functional_id.as_str()
         }) {
             return Err(DirectFunctionalTransportError::new(
                 "request.registered_functionals",
@@ -872,8 +885,9 @@ mod tests {
         assert!(row.shift_upper_confidence_bound < 0.04);
         let tv_slack_per_side =
             ((k as f64 * LN_2 + (1.0_f64 / 0.005).ln()) / (2.0 * 51_200.0)).sqrt();
+        let full_tv_shift_interval_width = 2.0 * (2.0 * tv_slack_per_side);
         assert!(row.shift_upper_confidence_bound - row.shift_lower_confidence_bound
-            < 0.3 * 2.0 * tv_slack_per_side);
+            < 0.3 * full_tv_shift_interval_width);
         assert_eq!(row.status, DirectFunctionalStatus::Informative);
     }
 
