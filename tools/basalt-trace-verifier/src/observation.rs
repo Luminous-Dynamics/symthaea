@@ -1197,6 +1197,226 @@ mod tests {
         }
     }
 
+    fn retry_observation() -> (ObservationEnvelope, String) {
+        let (mut observation, raw_trace, reference_pin) = valid_observation();
+        let trace: Trace = serde_json::from_slice(&raw_trace).unwrap();
+        let first = trace
+            .operations
+            .iter()
+            .find(|operation| operation.op_id == "op-serializable-attempt-1")
+            .unwrap();
+        let second = trace
+            .operations
+            .iter()
+            .find(|operation| operation.op_id == "op-serializable-attempt-2")
+            .unwrap();
+        assert_eq!(first.request, second.request);
+        assert_eq!(first.scope, second.scope);
+
+        let read_one = format!("sha256:{}", "aa".repeat(32));
+        let decision_one = format!("sha256:{}", "bb".repeat(32));
+        let read_two = format!("sha256:{}", "cc".repeat(32));
+        let decision_two = format!("sha256:{}", "dd".repeat(32));
+
+        let observed_attempt = |operation: &Operation,
+                                attempt: u64,
+                                read_digest: &str,
+                                decision_digest: &str| ObservedOperation {
+            op_id: operation.op_id.clone(),
+            kind: operation.kind.clone(),
+            request: operation.request.clone(),
+            happens_after: if attempt == 1 {
+                Vec::new()
+            } else {
+                vec![first.op_id.clone()]
+            },
+            retry_group_id: Some("retry-group-postgres-40001".to_string()),
+            transaction_attempt: Some(attempt),
+            read_snapshot_sha256: Some(read_digest.to_string()),
+            decision_input_sha256: Some(decision_digest.to_string()),
+            scope: Some(operation.scope.clone()),
+            runner_id: "runner-postgres".to_string(),
+            client_id: operation.client_id.clone(),
+            client_sequence: operation.client_sequence,
+            invoked_at_ns: operation.invoked_at_ns,
+            completed_at_ns: Some(operation.completed_at_ns),
+            outcome: Some(operation.expected_result.outcome.clone()),
+            receipt_id: operation.expected_result.receipt_id.clone(),
+            receipt_acceptance_revision: operation
+                .expected_result
+                .receipt_acceptance_revision
+                .clone(),
+            current_authority_revision: operation
+                .expected_result
+                .current_authority_revision
+                .clone(),
+            observed_store_revision: None,
+        };
+
+        let mut events = Vec::new();
+        let mut sequence = 0_u64;
+        let mut add = |op: &Operation,
+                       phase: &str,
+                       time: u64,
+                       tx: Option<&str>,
+                       payload: Option<&str>,
+                       sqlstate: Option<&str>| {
+            events.push(RawEvent {
+                event_id: format!("event-{}", sequence),
+                runner_id: "runner-postgres".to_string(),
+                operation_id: op.op_id.clone(),
+                runner_sequence: sequence,
+                monotonic_ns: time,
+                phase: phase.to_string(),
+                transaction_id: tx.map(str::to_string),
+                payload_sha256: payload.map(str::to_string),
+                sqlstate: sqlstate.map(str::to_string),
+                fault_id: None,
+            });
+            sequence += 1;
+        };
+
+        add(first, "invoke", first.invoked_at_ns, None, None, None);
+        add(first, "transaction_begin", 151, Some("tx-attempt-1"), None, None);
+        add(
+            first,
+            "read_state",
+            152,
+            Some("tx-attempt-1"),
+            Some(&read_one),
+            None,
+        );
+        add(
+            first,
+            "decision",
+            153,
+            Some("tx-attempt-1"),
+            Some(&decision_one),
+            None,
+        );
+        add(
+            first,
+            "abort",
+            154,
+            Some("tx-attempt-1"),
+            None,
+            Some("40001"),
+        );
+        add(first, "response", first.completed_at_ns, None, None, None);
+
+        add(second, "invoke", second.invoked_at_ns, None, None, None);
+        add(second, "transaction_begin", 163, Some("tx-attempt-2"), None, None);
+        add(
+            second,
+            "read_state",
+            164,
+            Some("tx-attempt-2"),
+            Some(&read_two),
+            None,
+        );
+        add(
+            second,
+            "decision",
+            165,
+            Some("tx-attempt-2"),
+            Some(&decision_two),
+            None,
+        );
+        add(
+            second,
+            "write_source",
+            166,
+            Some("tx-attempt-2"),
+            None,
+            None,
+        );
+        add(
+            second,
+            "write_log",
+            167,
+            Some("tx-attempt-2"),
+            None,
+            None,
+        );
+        add(
+            second,
+            "write_receipt",
+            168,
+            Some("tx-attempt-2"),
+            None,
+            None,
+        );
+        add(second, "commit", 170, Some("tx-attempt-2"), None, None);
+        add(second, "response", second.completed_at_ns, None, None, None);
+
+        observation.backend.engine_name = "PostgreSQL".to_string();
+        observation.backend.engine_version = "18".to_string();
+        observation.runner_clock_windows = vec![RunnerClockWindow {
+            runner_id: "runner-postgres".to_string(),
+            clock_basis: "monotonic_nanoseconds".to_string(),
+            capture_start_ns: 0,
+            capture_end_ns: 200,
+        }];
+        observation.observed_operations = vec![
+            observed_attempt(first, 1, &read_one, &decision_one),
+            observed_attempt(second, 2, &read_two, &decision_two),
+        ];
+        observation.raw_events = events;
+        observation.observed_faults.clear();
+        observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
+        (observation, reference_pin)
+    }
+
+    #[test]
+    fn sqlstate_40001_retry_requires_two_fresh_full_transactions() {
+        let (observation, reference_pin) = retry_observation();
+        let validated = validate_observation_envelope(&observation, &reference_pin).unwrap();
+        assert_eq!(validated.retry_groups_validated, 1);
+        assert!(validated.incomplete_retry_groups.is_empty());
+    }
+
+    #[test]
+    fn serialization_retry_rejects_reused_transaction_id() {
+        let (mut observation, reference_pin) = retry_observation();
+        for event in &mut observation.raw_events {
+            if event.operation_id == "op-serializable-attempt-2"
+                && event_is_transactional(&event.phase)
+            {
+                event.transaction_id = Some("tx-attempt-1".to_string());
+            }
+        }
+        observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
+        let errors = validate_observation_envelope(&observation, &reference_pin).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("reused transaction ID")));
+    }
+
+    #[test]
+    fn serialization_retry_rejects_missing_second_read() {
+        let (mut observation, reference_pin) = retry_observation();
+        observation.raw_events.retain(|event| {
+            !(event.operation_id == "op-serializable-attempt-2"
+                && event.phase == "read_state")
+        });
+        observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
+        let errors = validate_observation_envelope(&observation, &reference_pin).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("missing transaction phase read_state")));
+    }
+
+    #[test]
+    fn one_captured_attempt_of_a_declared_retry_group_is_inconclusive() {
+        let (mut observation, _, reference_pin) = valid_observation();
+        observation.observed_operations[0].retry_group_id =
+            Some("incomplete-retry-group".to_string());
+        observation.observed_operations[0].transaction_attempt = Some(1);
+        let bytes = serde_json::to_vec(&observation).unwrap();
+        let report = verify_backend_observation(&bytes, &reference_pin, &config());
+        assert_eq!(report.status, "inconclusive");
+        assert_eq!(
+            report.incomplete_retry_groups,
+            vec!["incomplete-retry-group"]
+        );
+    }
+
     #[test]
     fn strict_backend_observation_ingestion_reaches_history_search() {
         let (observation, raw_trace, reference_pin) = valid_observation();
