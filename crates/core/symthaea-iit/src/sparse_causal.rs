@@ -18,7 +18,8 @@ use crate::{
     FactorGraphError, FormalismProfile, Iit4IntrinsicSpecificationResult, MinFillPlannerWork,
     Iit4SystemIntrinsicSpecification, Iit4SystemPhiAnalysis,
     Iit4SystemPhiPartitionSummary, Iit4SystemPhiSearchConfig,
-    Iit4SystemPhiStatePairResult, Iit4SystemPhiStatus,
+    Iit4SystemPhiStatePairResult, Iit4SystemPhiStatus, Iit4SystemState,
+    Iit4SystemIntrinsicInformation, RepertoireError,
     ModelError, PartitionApplyError, SystemPhiDirectionScore, SystemPhiError,
     SystemPhiPartitionScore, MAX_DENSE_UNITS,
 };
@@ -1257,11 +1258,9 @@ impl SparseBinaryCausalModel {
         )?;
         let mut cause_repertoire = self.forward_cause_likelihood_iit4(
             candidate_system,
-            candidate_system,
             current_state,
-            candidate_system,
             max_factor_entries,
-        )?;
+        )?.forward_likelihood;
         let cause_mass: f64 = cause_repertoire.iter().sum();
         if !cause_mass.is_finite() || cause_mass <= 0.0 {
             return Err(RepertoireError::UndefinedCauseRepertoire.into());
