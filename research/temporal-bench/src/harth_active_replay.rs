@@ -917,8 +917,10 @@ pub fn validate_harth_active_replay_receipt(
     if expected_ece != receipt.expected_calibration_error_ppm {
         return Err(HarthActiveReplayError::new("expected_calibration_error_ppm", "ECE does not reproduce from calibration bins"));
     }
-    if receipt.transitions.detected_transition_count.checked_add(receipt.transitions.missed_transition_count)
-        != Some(receipt.transitions.true_transition_count)
+    if receipt.transitions.true_transition_count >= receipt.row_count
+        || receipt.transitions.false_transition_alarm_count >= receipt.row_count
+        || receipt.transitions.detected_transition_count.checked_add(receipt.transitions.missed_transition_count)
+            != Some(receipt.transitions.true_transition_count)
         || receipt.transitions.detected_transition_delays_ns.len() as u64
             != receipt.transitions.detected_transition_count
         || receipt.transitions.transition_delay_p95_ns
@@ -1142,6 +1144,67 @@ mod tests {
         let receipt = run(&mut policy);
         assert_eq!(receipt.wake_interval_max_ns, Some(40_000_000));
         assert_eq!(receipt.back_sample_count, receipt.row_count);
+    }
+
+    #[test]
+    fn selfpab_comparable_track_merges_only_the_two_documented_codes() {
+        assert_eq!(
+            HarthLabelTrack::SelfPabComparable10.class_index(130),
+            HarthLabelTrack::SelfPabComparable10.class_index(13),
+        );
+        assert_eq!(
+            HarthLabelTrack::SelfPabComparable10.class_index(140),
+            HarthLabelTrack::SelfPabComparable10.class_index(14),
+        );
+        assert_eq!(HarthLabelTrack::Native12.class_index(130), Some(10));
+        assert_eq!(HarthLabelTrack::Native12.class_index(140), Some(11));
+        assert_eq!(HarthLabelTrack::SelfPabComparable10.class_index(130), Some(8));
+    }
+
+    #[test]
+    fn calibration_bins_retain_every_covered_row() {
+        let mut policy = FixedPolicy {
+            prediction: Some(1), mask: HarthSensorMask::Both,
+            interval: 1, confidence: 900_000, seen: Vec::new(),
+        };
+        let receipt = run(&mut policy);
+        let calibrated = receipt.calibration_bins.iter().map(|bin| bin.sample_count).sum::<u64>();
+        assert_eq!(calibrated, receipt.covered_rows);
+        assert!(receipt.expected_calibration_error_ppm > 0);
+    }
+
+    #[test]
+    fn early_wrong_class_switch_is_false_transition_not_a_true_detection() {
+        struct EarlySwitchPolicy;
+        impl HarthActiveReplayPolicy for EarlySwitchPolicy {
+            fn decide(&mut self, observation: &HarthPublicObservation) -> HarthActiveReplayAction {
+                let prediction = if observation.wake_row_index == 0
+                    || observation.wake_row_index >= 4
+                {
+                    1
+                } else {
+                    2
+                };
+                HarthActiveReplayAction {
+                    prediction_label_code: Some(prediction),
+                    confidence_ppm: 900_000,
+                    next_sensor_mask: HarthSensorMask::None,
+                    next_wake_after_rows: 1,
+                    declared_compute_cycles: 0,
+                    declared_transmit_bytes: 0,
+                    declared_memory_write_bytes: 0,
+                }
+            }
+        }
+        let mut policy = EarlySwitchPolicy;
+        let receipt = run_harth_active_replay(
+            &rows(), [3; 32], [4; 32], [5; 32], [6; 32],
+            HarthLabelTrack::Native12, candidate(), &mut policy
+        ).unwrap();
+        assert_eq!(receipt.transitions.true_transition_count, 2);
+        assert_eq!(receipt.transitions.detected_transition_count, 1);
+        assert_eq!(receipt.transitions.missed_transition_count, 1);
+        assert_eq!(receipt.transitions.false_transition_alarm_count, 1);
     }
 
     #[test]
