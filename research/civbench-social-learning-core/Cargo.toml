@@ -15,4 +15,8 @@ path = "src/lib.rs"
 name = "social-learning-baseline"
 path = "src/main.rs"
 
+[[bin]]
+name = "cultural-transmission-sweep"
+path = "src/bin/cultural_transmission_sweep.rs"
+
 [dependencies]
