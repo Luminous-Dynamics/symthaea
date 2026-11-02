@@ -571,7 +571,7 @@ mod tests {
             .outcome = "compare_conflict".to_string();
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert_eq!(report.status, "fail");
-        assert!(report.search_budget_exhausted == false);
+        assert!(!report.search_budget_exhausted);
     }
 
     #[test]
