@@ -685,7 +685,8 @@
               "observation_kernel_only"
             ]
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "minItems": 1
         },
         "feasibility_audit_sha256": {
           "$ref": "#/$defs/sha256OrNull"
@@ -776,7 +777,8 @@
         "metrics",
         "uncertainty",
         "strata",
-        "promotion_targets"
+        "promotion_targets",
+        "baseline_matrix"
       ],
       "properties": {
         "task_ids": {
@@ -820,6 +822,67 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/promotionTarget"
+          }
+        },
+        "baseline_matrix": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required_families",
+            "unavailable_families",
+            "coverage_sha256"
+          ],
+          "properties": {
+            "required_families": {
+              "type": "array",
+              "minItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "activity_only",
+                  "linear_lds_var_glm",
+                  "pairwise_effective_response",
+                  "graph_constrained_state_space",
+                  "cell_type_mechanistic",
+                  "anatomical_plus_latent",
+                  "degree_type_rewired",
+                  "spatial_rewired",
+                  "pairwise_additive",
+                  "nonlinear_higher_order",
+                  "phenomenological_cpg",
+                  "connectome_cpg",
+                  "flygym_cpg",
+                  "flygym_rule_based",
+                  "flygym_hybrid",
+                  "learned_recurrent_rl"
+                ]
+              }
+            },
+            "unavailable_families": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "family",
+                  "reason"
+                ],
+                "properties": {
+                  "family": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            },
+            "coverage_sha256": {
+              "$ref": "#/$defs/sha256OrNull"
+            }
           }
         }
       }
@@ -1689,8 +1752,12 @@
           },
           "source": {
             "properties": {
-              "source_kind": {
-                "const": "measured_intervention"
+              "rights_state": {
+                "const": "documented_permitted"
+              },
+              "permission_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
               }
             }
           }
@@ -1755,16 +1822,25 @@
           },
           "results": {
             "properties": {
-              "status": {
-                "const": "complete"
+              "scorecards": {
+                "minItems": 1
               },
-              "observed_outcomes_sha256": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
+              "paired_comparisons": {
+                "minItems": 1,
+                "items": {
+                  "properties": {
+                    "paired_unit_manifest_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "n_independent_units": {
+                      "minimum": 2
+                    }
+                  }
+                }
               },
-              "heldout_prediction_sha256": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
+              "calibration": {
+                "minItems": 1
               }
             }
           },
@@ -1785,6 +1861,127 @@
               "raw_output_manifest_sha256": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "connectome": {
+            "properties": {
+              "canonical_identity_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "structural_edge_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "observation_model": {
+            "properties": {
+              "observation_kernel_parameters_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "preprocessing_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "models": {
+            "minItems": 4,
+            "items": {
+              "properties": {
+                "code_commit_sha": {
+                  "type": "string",
+                  "pattern": "^[a-fA-F0-9]{40}$"
+                },
+                "config_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "training_data_scope_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "model_artifact_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "intervention_design": {
+            "properties": {
+              "candidate_pool_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "preregistered_before_test": {
+                "const": true
+              },
+              "selected_interventions": {
+                "minItems": 1
+              },
+              "feasibility_audit_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "required_controls": {
+                "allOf": [
+                  {
+                    "contains": {
+                      "const": "sham"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "single_target"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "combined_target"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "rewired_graph"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "activity_only"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "evaluation": {
+            "properties": {
+              "baseline_matrix": {
+                "properties": {
+                  "coverage_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "required_families": {
+                    "minItems": 5
+                  }
+                }
+              },
+              "uncertainty": {
+                "properties": {
+                  "method_id": {
+                    "not": {
+                      "const": "none_not_eligible"
+                    }
+                  },
+                  "minimum_independent_units": {
+                    "minimum": 2
+                  }
+                }
               }
             }
           }
