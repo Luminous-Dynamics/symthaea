@@ -47,7 +47,7 @@ The eight authored tests include:
 
 1. strict lower-cost first-order dominance;
 2. crossing CDFs, where neither first-order direction is asserted;
-3. equal-mean distributions with different tail shapes and no unsupported dominance claim;
+3. equal-mean distributions with different tail shapes, where first-order CDFs cross but stop-loss ordering still identifies the lower-tail-risk distribution;
 4. lower treatment mean but worse p99, with neither first-order nor stop-loss dominance;
 5. identical distributions, which are not labelled strict dominance;
 6. nonuniform support gaps;
