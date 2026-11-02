@@ -646,6 +646,56 @@ mod tests {
     }
 
     #[test]
+    fn repeated_fixed_look_sign_tests_inflate_crossing_rate() {
+        use std::collections::BTreeMap;
+
+        fn choose(n: u32, k: u32) -> u128 {
+            let k = k.min(n - k);
+            (1..=k).fold(1_u128, |value, i| {
+                value * u128::from(n + 1 - i) / u128::from(i)
+            })
+        }
+
+        fn binomial_upper_tail(n: u32, observed_wins: u32) -> u128 {
+            (observed_wins..=n).map(|wins| choose(n, wins)).sum()
+        }
+
+        const HORIZON: u32 = 20;
+        const ALPHA_DENOMINATOR: u128 = 60; // familywise .05 / three axes
+
+        let mut alive = BTreeMap::<(u32, u32), u128>::from([((0, 0), 1)]);
+        let mut crossed_terminal_paths = 0_u128;
+
+        for look in 1..=HORIZON {
+            let mut next = BTreeMap::<(u32, u32), u128>::new();
+            let mut newly_crossed = 0_u128;
+            for ((wins, losses), paths) in alive {
+                for (next_wins, next_losses) in [(wins + 1, losses), (wins, losses + 1)] {
+                    let n = next_wins + next_losses;
+                    let p_numerator = binomial_upper_tail(n, next_wins);
+                    let p_denominator = 1_u128 << n;
+                    // An individually exact fixed-look p-value crosses at 1/60.
+                    if p_numerator * ALPHA_DENOMINATOR <= p_denominator {
+                        newly_crossed += paths;
+                    } else {
+                        *next.entry((next_wins, next_losses)).or_default() += paths;
+                    }
+                }
+            }
+            crossed_terminal_paths = crossed_terminal_paths * 2 + newly_crossed;
+            alive = next;
+        }
+
+        assert_eq!(crossed_terminal_paths, 36_740);
+        let total_terminal_paths = 1_u128 << HORIZON;
+        // 3.504% > the allocated 1.667% per-axis familywise budget.
+        assert!(
+            crossed_terminal_paths * ALPHA_DENOMINATOR
+                > total_terminal_paths
+        );
+    }
+
+    #[test]
     fn missing_and_abstained_runs_remain_distinct_full_horizon_exposures() {
         let mut state = AnytimeAuditState::new(config(10)).unwrap();
         let treatment_missing = pair(
