@@ -177,6 +177,7 @@ pub struct DetectorDisagreementV1 {
 pub struct DetectorConformalFusionReportV1 {
     pub schema: String,
     pub fusion_method_id: String,
+    pub detector_specs: Vec<DetectorSpecV1>,
     pub study_id: String,
     pub benchmark_id: String,
     pub benchmark_version: String,
@@ -286,6 +287,18 @@ fn validate_evaluation_features(features: &[DetectorFeatureV1], label: &str) -> 
         }
     }
     Ok(())
+}
+
+/// Canonical domain-separated digest for the pinned detector registry.
+pub fn compute_detector_registry_sha256(
+    specs: &[DetectorSpecV1],
+) -> Result<String, String> {
+    validate_detector_specs(specs)?;
+    let mut normalized = specs.to_vec();
+    normalized.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
+    let bytes = serde_json::to_vec(&normalized)
+        .map_err(|error| format!("cannot serialize detector registry: {error}"))?;
+    Ok(crate::hash_domain(b"detector-conformal-registry.v1", &bytes))
 }
 
 fn validate_detector_specs(specs: &[DetectorSpecV1]) -> Result<(), String> {
@@ -678,6 +691,11 @@ pub fn calibrate_detector_panel(
     validate_digest(&request.calibration_protocol_sha256, "calibration_protocol_sha256")?;
     validate_digest(&request.detector_registry_sha256, "detector_registry_sha256")?;
     validate_detector_specs(&request.detector_specs)?;
+    if compute_detector_registry_sha256(&request.detector_specs)?
+        != request.detector_registry_sha256
+    {
+        return Err("detector_registry_sha256 does not match the pinned detector_specs".to_owned());
+    }
     if request.calibration_a.len() < 2
         || request.calibration_a.len() > MAX_CALIBRATION_ROWS
         || request.calibration_b.len() < 2
@@ -1029,6 +1047,12 @@ pub fn calibrate_detector_panel(
             target_alpha_permille: request.target_alpha_permille,
         });
     }
+    apply_by_adjustment(
+        &mut score_rows,
+        &mut group_summaries,
+        request.target_alpha_permille,
+    )?;
+
     score_rows.sort_by(|left, right| {
         (&left.task_family, &left.model_regime, &left.evaluation_unit_id)
             .cmp(&(&right.task_family, &right.model_regime, &right.evaluation_unit_id))
@@ -1049,16 +1073,36 @@ pub fn calibrate_detector_panel(
 
     let request_bytes = serde_json::to_vec(request)
         .map_err(|error| format!("cannot serialize conformal fusion request: {error}"))?;
+    let calibration_a_bytes = canonical_calibration_manifest(&request.calibration_a)?;
+    let calibration_b_bytes = canonical_calibration_manifest(&request.calibration_b)?;
+    let evaluation_bytes = canonical_evaluation_manifest(&request.evaluation)?;
+    let mut detector_specs = request.detector_specs.clone();
+    detector_specs.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
     Ok(DetectorConformalFusionReportV1 {
         schema: CONFORMAL_FUSION_REPORT_SCHEMA.to_owned(),
         fusion_method_id: FUSION_METHOD_ID.to_owned(),
+        detector_specs,
         study_id: request.study_id.clone(),
         benchmark_id: request.benchmark_id.clone(),
         benchmark_version: request.benchmark_version.clone(),
         calibration_protocol_sha256: request.calibration_protocol_sha256.clone(),
         detector_registry_sha256: request.detector_registry_sha256.clone(),
         request_sha256: crate::hash_domain(b"detector-conformal-fusion-request.v1", &request_bytes),
+        calibration_a_manifest_sha256: crate::hash_domain(
+            b"detector-conformal-calibration-a.v1",
+            &calibration_a_bytes,
+        ),
+        calibration_b_manifest_sha256: crate::hash_domain(
+            b"detector-conformal-calibration-b.v1",
+            &calibration_b_bytes,
+        ),
+        evaluation_manifest_sha256: crate::hash_domain(
+            b"detector-conformal-evaluation.v1",
+            &evaluation_bytes,
+        ),
         target_alpha_permille: request.target_alpha_permille,
+        multiple_testing_method: "benjamini_yekutieli".to_owned(),
+        fdr_control_conditional_on_exchangeability: true,
         group_count: group_summaries.len() as u64,
         evaluation_unit_count: score_rows.len() as u64,
         flagged_count,
@@ -1074,11 +1118,12 @@ pub fn calibrate_detector_panel(
             "Calibration-A is an independent clean reference used to map detector-specific score directions and scales.".to_owned(),
             "Calibration-B is disjoint from Calibration-A and is exchangeable with future clean evaluation units within each task-family × model-regime group.".to_owned(),
             "The final empirical rank is calibrated on the fused statistic itself; detector-feature independence is not assumed.".to_owned(),
+            "Benjamini-Yekutieli adjustment is applied within each predeclared task-family × model-regime testing family; its FDR control is conditional on each outer conformal p-value being super-uniform.".to_owned(),
             "Calibration units are independent source/task clusters or other predeclared exchangeability units, not repeated generations or near-duplicate questions.".to_owned(),
             "Arbitrary temporal, language, domain, model or source shift breaks the exchangeability basis; no validity guarantee is claimed under such shift.".to_owned(),
             "Ground-truth labels are used only for evaluation summaries and do not affect calibration, fusion or final p-values.".to_owned(),
         ],
-        claim_boundary: "The two-stage empirical-rank fusion produces a group-conditional conformal-style p-value only under the declared clean-cohort and exchangeability assumptions. It does not prove calibration cohorts are genuinely clean, authenticate detector/model receipts, guarantee validity under arbitrary distribution shift, establish a causal direct effect, or imply FDR control across multiple test items. Missing features and insufficient calibration resolution lead to abstention. This report is exploratory and multiplicity-adjustment is not applied.".to_owned(),
+        claim_boundary: "The two-stage empirical-rank fusion produces a group-conditional conformal-style p-value only under the declared clean-cohort and exchangeability assumptions. Benjamini-Yekutieli is applied to eligible test p-values within each predeclared task-family × model-regime family and controls FDR only if each null p-value is super-uniform. It does not prove calibration cohorts are genuinely clean, authenticate detector/model receipts, guarantee validity under arbitrary distribution shift, establish a causal direct effect, or establish simultaneous confidence-interval coverage. Missing features and insufficient calibration resolution lead to abstention. This report remains exploratory.".to_owned(),
     })
 }
 
