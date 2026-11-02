@@ -39,7 +39,7 @@ struct Args {
     #[arg(long)]
     sidecar_jsonl: PathBuf,
 
-    /// Root containing <species>/{manifest.json,train.json,val.json,test.json}.
+    /// Root containing <species>/{train.json,val.json,test.json}; optional build manifest.
     #[arg(long)]
     split_root: PathBuf,
 
@@ -628,7 +628,7 @@ fn audit(
         status: if errors.is_empty() { "PASS" } else { "FAIL" },
         errors,
         warnings,
-        scope_note: "PASS means every observed metadata-sidecar row maps to the exact partition in the supplied upstream per-species/per-bank split files, the source split-file counts match the source manifest, and no source split key is duplicated or overwritten across partitions. It does not prove that the supplied files are the ones used to publish the dataset unless their provenance is independently authenticated and their hashes are pinned; it does not prove sample independence, biological correctness, or benchmark representativeness.",
+        scope_note: "PASS means every observed metadata-sidecar row maps to the exact partition in the supplied upstream per-species/per-bank split files, no source split key is duplicated or overwritten across partitions, and—when the optional build manifest is present—its declared key counts match the split JSON files. It does not prove that the supplied files are the ones used to publish the dataset unless their provenance is independently authenticated and their hashes are pinned; it does not prove sample independence, biological correctness, or benchmark representativeness.",
     }
 }
 
