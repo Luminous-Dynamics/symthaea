@@ -184,6 +184,16 @@ mod tests {
     }
 
     #[test]
+    fn accepts_different_common_denominators_exactly() {
+        let matrix = vec![vec![1, 0], vec![0, 1]];
+        let certificate = RowSpaceCertificate {
+            multipliers: rational(&[1, 2], 3),
+            target: rational(&[2, 4], 6),
+        };
+        assert!(verify_row_space_witness(&matrix, &certificate).unwrap());
+    }
+
+    #[test]
     fn rejects_one_coordinate_mutation() {
         let matrix = vec![vec![1, 0, 1], vec![0, 1, 1]];
         let certificate = RowSpaceCertificate {
