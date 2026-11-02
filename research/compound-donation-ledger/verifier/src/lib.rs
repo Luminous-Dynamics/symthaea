@@ -9,8 +9,8 @@
 use std::collections::BTreeMap;
 
 use symthaea_compound_donation_ledger::{
-    AuditEvent, CandidateSpec, LedgerSnapshot, ThresholdMass, WEIGHT_SCALE,
-    EVIDENCE_ONE, PRIOR_MASS_SCALE, OvershootRefundReceipt,
+    AuditEvent, CandidateSpec, DonationReservePolicy, LedgerSnapshot, ThresholdMass,
+    WEIGHT_SCALE, EVIDENCE_ONE, PRIOR_MASS_SCALE, OvershootRefundReceipt,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -400,17 +400,40 @@ pub fn verify_receipt(
     receipt: &[AuditEvent],
     expected_snapshot: Option<&LedgerSnapshot>,
 ) -> Result<VerifiedSnapshot, VerifyError> {
+    verify_receipt_with_policy(
+        specs,
+        DonationReservePolicy::FixedRate,
+        receipt,
+        expected_snapshot,
+    )
+}
+
+pub fn verify_receipt_with_policy(
+    specs: &[CandidateSpec],
+    reserve_policy: DonationReservePolicy,
+    receipt: &[AuditEvent],
+    expected_snapshot: Option<&LedgerSnapshot>,
+) -> Result<VerifiedSnapshot, VerifyError> {
     let mut spec_map = BTreeMap::<u64, CandidateSpec>::new();
     let mut state = BTreeMap::<u64, Candidate>::new();
     let mut weight_sum = 0_u64;
     let mut previous_id = None;
 
     for spec in specs {
+        let invalid_reserve_policy = match reserve_policy {
+            DonationReservePolicy::FixedRate => {
+                spec.reserve_rate_numerator > spec.reserve_rate_denominator
+                    || (spec.destination_id.is_none() && spec.reserve_rate_numerator > 0)
+            }
+            DonationReservePolicy::CappedOvershoot => {
+                spec.reserve_rate_numerator != 0
+                    || (spec.weight > 0 && spec.destination_id.is_none())
+            }
+        };
         if previous_id.is_some_and(|previous| spec.id <= previous)
             || spec.reserve_rate_denominator == 0
-            || spec.reserve_rate_numerator > spec.reserve_rate_denominator
+            || invalid_reserve_policy
             || spec.destination_id.is_some_and(|destination| destination <= spec.id)
-            || (spec.destination_id.is_none() && spec.reserve_rate_numerator > 0)
         {
             return Err(VerifyError::InvalidSpecs);
         }
@@ -467,23 +490,50 @@ pub fn verify_receipt(
                 }
 
                 let delta = *new_value - candidate.x;
-                let weighted_delta = (spec.weight as u128)
-                    .checked_mul(delta)
-                    .ok_or(VerifyError::Overflow)?;
-                let numerator = weighted_delta
-                    .checked_mul(spec.reserve_rate_numerator as u128)
-                    .and_then(|value| value.checked_add(candidate.remainder))
-                    .ok_or(VerifyError::Overflow)?;
-                let denominator = spec.reserve_rate_denominator as u128;
-                let proposed = numerator / denominator;
-                let next_remainder = numerator % denominator;
+                let (reserve, next_remainder) = match reserve_policy {
+                    DonationReservePolicy::FixedRate => {
+                        let weighted_delta = (spec.weight as u128)
+                            .checked_mul(delta)
+                            .ok_or(VerifyError::Overflow)?;
+                        let numerator = weighted_delta
+                            .checked_mul(spec.reserve_rate_numerator as u128)
+                            .and_then(|value| value.checked_add(candidate.remainder))
+                            .ok_or(VerifyError::Overflow)?;
+                        let denominator = spec.reserve_rate_denominator as u128;
+                        let proposed = numerator / denominator;
+                        let remainder = numerator % denominator;
+                        let donor_limit = (spec.weight as u128)
+                            .checked_mul((*new_value).min(EVIDENCE_ONE))
+                            .ok_or(VerifyError::Overflow)?;
+                        let room = donor_limit
+                            .checked_sub(candidate.outgoing)
+                            .ok_or(VerifyError::InvalidAmount)?;
+                        (proposed.min(room), remainder)
+                    }
+                    DonationReservePolicy::CappedOvershoot => {
+                        let weighted_value = (spec.weight as u128)
+                            .checked_mul(*new_value)
+                            .ok_or(VerifyError::Overflow)?;
+                        let threshold = (WEIGHT_SCALE as u128)
+                            .checked_mul(EVIDENCE_ONE)
+                            .ok_or(VerifyError::Overflow)?;
+                        let raw = weighted_value.saturating_sub(threshold);
+                        let cap = (spec.weight as u128)
+                            .checked_mul(EVIDENCE_ONE)
+                            .ok_or(VerifyError::Overflow)?;
+                        let target = raw.min(cap);
+                        let reserve = target
+                            .checked_sub(candidate.outgoing)
+                            .ok_or(VerifyError::InvalidAmount)?;
+                        (reserve, 0)
+                    }
+                };
                 let donor_limit = (spec.weight as u128)
                     .checked_mul((*new_value).min(EVIDENCE_ONE))
                     .ok_or(VerifyError::Overflow)?;
-                let room = donor_limit
-                    .checked_sub(candidate.outgoing)
-                    .ok_or(VerifyError::InvalidAmount)?;
-                let reserve = proposed.min(room);
+                if candidate.outgoing.checked_add(reserve).ok_or(VerifyError::Overflow)? > donor_limit {
+                    return Err(VerifyError::PrefixBudget);
+                }
 
                 candidate.x = *new_value;
                 candidate.outgoing = candidate.outgoing
@@ -1063,6 +1113,74 @@ mod tests {
         assert_eq!(
             verify_staircase_value(&unsorted, 2 * EVIDENCE_ONE, 0),
             Err(VerifyError::InvalidStaircase)
+        );
+    }
+
+
+    #[test]
+    fn independent_verifier_replays_capped_overshoot_donation_policy() {
+        let policy = vec![
+            CandidateSpec {
+                id: 10,
+                weight: 300_000_000,
+                destination_id: Some(20),
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+            CandidateSpec {
+                id: 20,
+                weight: 300_000_000,
+                destination_id: Some(30),
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+            CandidateSpec {
+                id: 30,
+                weight: 200_000_000,
+                destination_id: Some(40),
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+        ];
+        let mut writer = DonationLedger::new_capped_overshoot(policy.clone()).unwrap();
+        writer.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+        writer.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: 4 * EVIDENCE_ONE,
+        }).unwrap();
+        writer.apply(InputEvent::EvidenceUpdate {
+            round: 2,
+            candidate_id: 10,
+            new_value: 5 * EVIDENCE_ONE,
+        }).unwrap();
+
+        let snapshot = writer.snapshot().unwrap();
+        let verified = verify_receipt_with_policy(
+            &policy,
+            DonationReservePolicy::CappedOvershoot,
+            writer.audit_log(),
+            Some(&snapshot),
+        ).unwrap();
+        assert_eq!(verified.escrow[0].original_amount, 200_000_000_000_000);
+        assert_eq!(verified.escrow[1].original_amount, 100_000_000_000_000);
+        assert_eq!(verified.candidates[0].outgoing, 300_000_000_000_000);
+
+        let mut tampered = writer.audit_log().to_vec();
+        let reserve = tampered.iter_mut()
+            .find(|event| matches!(event, AuditEvent::Reserved { .. }))
+            .unwrap();
+        if let AuditEvent::Reserved { amount, .. } = reserve {
+            *amount += 1;
+        }
+        assert_eq!(
+            verify_receipt_with_policy(
+                &policy,
+                DonationReservePolicy::CappedOvershoot,
+                &tampered,
+                None,
+            ),
+            Err(VerifyError::ReceiptMismatch)
         );
     }
 
