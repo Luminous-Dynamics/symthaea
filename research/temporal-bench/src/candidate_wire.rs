@@ -165,7 +165,7 @@ fn unwrap_frame<'a>(
 
     let payload = &frame[HEADER_LEN..];
     let expected_digest = digest(expected_kind, payload);
-    if frame[16..48] != expected_digest {
+    if frame[16..48] != expected_digest[..] {
         return Err(WireProtocolError::new("payload_digest", "payload digest mismatch"));
     }
     Ok(payload)
@@ -458,8 +458,8 @@ mod tests {
 
         let mut frame = encode_action(&PolicyAction::sleep(1)).unwrap();
         frame[HEADER_LEN + 2..HEADER_LEN + 6].copy_from_slice(&0_u32.to_le_bytes());
-        let payload = &frame[HEADER_LEN..];
-        frame[16..48].copy_from_slice(&digest(KIND_ACTION, payload));
+        let checksum = digest(KIND_ACTION, &frame[HEADER_LEN..]);
+        frame[16..48].copy_from_slice(&checksum);
         assert_eq!(decode_action(&frame).unwrap_err().field, "next_wake_after_steps");
     }
 
@@ -492,8 +492,8 @@ mod tests {
         };
         let mut frame = encode_observation(&valid).unwrap();
         frame[HEADER_LEN + 9] = 1; // sample_step without the present flag
-        let payload = &frame[HEADER_LEN..];
-        frame[16..48].copy_from_slice(&digest(KIND_OBSERVATION, payload));
+        let checksum = digest(KIND_OBSERVATION, &frame[HEADER_LEN..]);
+        frame[16..48].copy_from_slice(&checksum);
         assert_eq!(
             decode_observation(&frame).unwrap_err().field,
             "optional_measurement",
