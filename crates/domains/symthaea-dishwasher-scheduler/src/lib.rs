@@ -278,10 +278,21 @@ pub fn simulate(
     full: &ModeProfile,
     policy: Policy,
 ) -> Result<SimulationResult, &'static str> {
-    quick.validate(Some(1))?;
-    full.validate(None)?;
-    if full.capacity < 2 {
-        return Err("FullLoad capacity must be at least two");
+    match policy {
+        Policy::FullLoadOnly { .. } => {
+            full.validate(None)?;
+            if full.capacity < 2 {
+                return Err("FullLoad capacity must be at least two");
+            }
+        }
+        Policy::QuickCellOnly => quick.validate(Some(1))?,
+        Policy::HybridResourceAware { .. } => {
+            quick.validate(Some(1))?;
+            full.validate(None)?;
+            if full.capacity < 2 {
+                return Err("FullLoad capacity must be at least two");
+            }
+        }
     }
 
     let max_batch_wait_s = match policy {
@@ -859,6 +870,22 @@ mod tests {
         let second = generate_workload(42, 500, DemandPattern::Irregular);
         assert_eq!(first, second);
         assert!(first.iter().all(|job| job.deadline_s >= job.arrival_s));
+    }
+
+    #[test]
+    fn quickcell_only_does_not_require_an_unused_full_load_profile() {
+        let (quick, mut full) = profiles();
+        full.capacity = 0;
+        full.energy_per_item_kwh = f64::NAN;
+        let result = simulate(
+            &[sample_job(1, 0, 600)],
+            &quick,
+            &full,
+            Policy::QuickCellOnly,
+        )
+        .unwrap();
+        assert_eq!(result.completed_items(), 1);
+        assert_eq!(result.full_load_cycles, 0);
     }
 
     #[test]
