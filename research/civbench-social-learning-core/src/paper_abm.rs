@@ -379,26 +379,29 @@ fn discover_strategy(
     config: Config,
     rng: &mut Rng,
 ) -> Strategy {
-    // One explicit finite exploration trial at a time: q selects which
-    // strategy is attempted; its per-trial discovery rate determines whether
-    // that strategy is discovered. The archive/supplement must still be checked
-    // for the exact random draw ordering before calling this a reproduction.
-    let mut found_optimal = false;
-    let mut found_myopic = false;
-    for _ in 0..capacity {
-        if rng.bernoulli(optimality_bias) {
-            found_optimal |= rng.bernoulli(config.optimal_discovery_rate);
-        } else {
-            found_myopic |= rng.bernoulli(config.myopic_discovery_rate);
-        }
-        if found_optimal {
-            break;
-        }
-    }
+    // Exact terminal-outcome probabilities for K independent trials:
+    // each trial attempts optimal with probability q and discovers it with
+    // rate d_opt; otherwise it attempts myopic and discovers it with rate
+    // d_myo. Optimal takes priority if both strategies are discovered.
+    //
+    // This closed form is distribution-equivalent to explicitly simulating
+    // all K independent categorical trials, but avoids O(K) RNG work for the
+    // machine exploration capacities (up to 100,000 in the paper).
+    let k = f64::from(capacity);
+    let q = optimality_bias;
+    let p_optimal_per_trial = q * config.optimal_discovery_rate;
+    let p_myopic_per_trial = (1.0 - q) * config.myopic_discovery_rate;
 
-    if found_optimal {
+    let p_no_optimal = (1.0 - p_optimal_per_trial).powf(k);
+    let p_no_discovery = (1.0 - p_optimal_per_trial - p_myopic_per_trial).powf(k);
+
+    let p_optimal = (1.0 - p_no_optimal).clamp(0.0, 1.0);
+    let p_myopic_only = (p_no_optimal - p_no_discovery).clamp(0.0, 1.0);
+
+    let draw = rng.uniform();
+    if draw < p_optimal {
         Strategy::Optimal
-    } else if found_myopic {
+    } else if draw < p_optimal + p_myopic_only {
         Strategy::Myopic
     } else {
         Strategy::None
@@ -620,6 +623,32 @@ mod tests {
                 .filter(|agent| agent.kind == AgentKind::Machine).count(),
             PAPER_ABM_MACHINE_COUNT
         );
+    }
+
+    #[test]
+    fn closed_form_discovery_matches_extreme_per_trial_cases() {
+        let mut config = Config::default();
+        config.optimal_discovery_rate = 1.0;
+        config.myopic_discovery_rate = 1.0;
+        let mut optimal_rng = Rng::new(44);
+        let mut myopic_rng = Rng::new(44);
+        assert_eq!(
+            discover_strategy(100, 1.0, config, &mut optimal_rng),
+            Strategy::Optimal
+        );
+        assert_eq!(
+            discover_strategy(100, 0.0, config, &mut myopic_rng),
+            Strategy::Myopic
+        );
+    }
+
+    #[test]
+    fn no_discovery_when_both_per_trial_rates_are_zero() {
+        let mut config = Config::default();
+        config.optimal_discovery_rate = 0.0;
+        config.myopic_discovery_rate = 0.0;
+        let mut rng = Rng::new(1);
+        assert_eq!(discover_strategy(100_000, 0.5, config, &mut rng), Strategy::None);
     }
 
     #[test]
