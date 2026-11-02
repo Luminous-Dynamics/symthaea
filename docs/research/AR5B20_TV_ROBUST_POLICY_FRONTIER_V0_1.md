@@ -122,6 +122,19 @@ Eight tests cover:
 7. infeasible robustification rejection;
 8. report-tampering detection.
 
+### Independent LP fixture check
+
+For the committed two-policy fixture, the independently encoded robust LP was solved with SciPy 1.17.0 / HiGHS. It returned:
+- policy-a weight 0.6 and policy-b weight 0.4;
+- worst-case decision utility 6.7;
+- robust alternative powers 0.700 and 0.738;
+- robust null sizes 0.0208 and 0.0320;
+- nominal alpha 0.05, null-radius coverage failure 0.0025, conditional alpha 0.047619047619;
+- unconditional type-I upper bound 0.03442;
+- alternative evaluator costs 3.7 and 7.3, below the cap of 9.
+
+The Rust regression test now locks these values. This independent solve checks the finite LP formulation and synthetic fixture; it does **not** execute the Rust basis enumerator, prove its numerical behavior on all fixtures, or establish empirical performance.
+
 No Rust test has run. No compile, formatting, Clippy, CI or benchmark pass is claimed.
 
 Exact-head commands:
