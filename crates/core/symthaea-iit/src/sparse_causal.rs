@@ -1237,6 +1237,54 @@ impl SparseBinaryCausalModel {
         Ok(Iit4SystemIntrinsicSpecification { cause, effect })
     }
 
+    /// Compute the fixed-state IIT 4.0 (2026) intrinsic-information term.
+    ///
+    /// This evaluates Eq. 13 for one cause/effect state pair. It does not
+    /// perform MIP selection or apply the post-MIP system-phi cap.
+    pub fn system_intrinsic_information_iit4_2026(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        system_state: &Iit4SystemState,
+        decimal_precision: u32,
+        max_factor_entries: usize,
+    ) -> Result<Iit4SystemIntrinsicInformation, SystemPhiError> {
+        let specification = self.system_intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            decimal_precision,
+            max_factor_entries,
+        )?;
+        let mut cause_repertoire = self.forward_cause_likelihood_iit4(
+            candidate_system,
+            candidate_system,
+            current_state,
+            candidate_system,
+            max_factor_entries,
+        )?;
+        let cause_mass: f64 = cause_repertoire.iter().sum();
+        if !cause_mass.is_finite() || cause_mass <= 0.0 {
+            return Err(RepertoireError::UndefinedCauseRepertoire.into());
+        }
+        for probability in &mut cause_repertoire {
+            *probability /= cause_mass;
+        }
+        let effect_repertoire = self.effect_repertoire_iit4(
+            candidate_system,
+            candidate_system,
+            current_state,
+            candidate_system,
+            max_factor_entries,
+        )?;
+        crate::compute_iit4_2026_intrinsic_information(
+            &specification,
+            system_state,
+            &cause_repertoire,
+            &effect_repertoire,
+            decimal_precision,
+        )
+    }
+
     /// Bounded exhaustive sparse IIT 4.0 (2023) Integration-level system search.
     ///
     /// The search uses the same intrinsic-state tie families, directed partition
