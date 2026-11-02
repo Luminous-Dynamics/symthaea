@@ -305,6 +305,7 @@ pub struct MeasurementDistributionReportV1 {
     pub instance_manifest_sha256: String,
     pub run_bundle_sha256: String,
     pub claim_scope: ClaimScopeV1,
+    pub measurement_paradigm: String,
     pub model_count: u64,
     pub model_family_count: u64,
     pub run_count: u64,
@@ -482,8 +483,14 @@ pub fn validate_measurement_protocol(protocol: &MeasurementProtocolV1) -> Result
         {
             return Err("prompt sensitivity must be auxiliary unless instruction following is the target".to_owned());
         }
-        if axis.families.is_empty() || axis.families.len() > MAX_FAMILIES_PER_AXIS {
-            return Err(format!("axis {} must declare 1..={} perturbation families", axis.axis_id, MAX_FAMILIES_PER_AXIS));
+        if axis.families.len() > MAX_FAMILIES_PER_AXIS
+            || (axis.families.is_empty()
+                && protocol.construct.claim_scope != ClaimScopeV1::FixedConfiguration)
+        {
+            return Err(format!(
+                "axis {} must declare perturbation families unless this is a fixed-configuration protocol",
+                axis.axis_id
+            ));
         }
         let mut family_ids = BTreeSet::new();
         for family in &axis.families {
@@ -979,10 +986,16 @@ pub fn analyze_measurement_distribution(
     let mut rank_stability = Vec::new();
     let mut any_rank_not_estimable = false;
     for axis in &protocol.axes {
+        if axis.auxiliary_only {
+            continue;
+        }
         let conditions = conditions_by_axis
             .get(&axis.axis_id)
             .ok_or_else(|| "rank-stability condition set missing".to_owned())?;
         for condition_id in conditions {
+            if condition_id == &axis.baseline_condition_id {
+                continue;
+            }
             let mut baseline_scores = Vec::new();
             let mut condition_scores = Vec::new();
             for model in &bundle.models {
@@ -1036,15 +1049,19 @@ pub fn analyze_measurement_distribution(
         runs_by_model.get(&model.model_id).copied().unwrap_or(0)
             >= protocol.evaluation.minimum_runs_per_model as u64
     });
-    let coverage_met = profile_cells.iter().all(|cell| {
+    let primary_cells: Vec<&DistributionProfileCellV1> = profile_cells
+        .iter()
+        .filter(|cell| !axes[cell.axis_id.as_str()].auxiliary_only)
+        .collect();
+    let coverage_met = primary_cells.iter().all(|cell| {
         cell.coverage_permille >= protocol.reporting.minimum_coverage_permille as f64
     });
-    let acceptance_met = profile_cells.iter().all(|cell| {
+    let acceptance_met = primary_cells.iter().all(|cell| {
         cell.validation_acceptance_permille.is_none_or(|value| {
             value >= protocol.reporting.minimum_acceptance_permille as f64
         })
     });
-    let independent_units_met = profile_cells
+    let independent_units_met = primary_cells
         .iter()
         .filter(|cell| cell.condition_id != axes[cell.axis_id.as_str()].baseline_condition_id)
         .all(|cell| cell.paired_independent_unit_count
@@ -1058,14 +1075,34 @@ pub fn analyze_measurement_distribution(
         ClaimScopeV1::DeploymentDistribution => task_families.len() >= 2 && model_families.len() >= 2,
     };
     let rank_met = !protocol.reporting.require_rank_stability
-        || (!any_rank_not_estimable
+        || (!rank_stability.is_empty()
+            && !any_rank_not_estimable
             && models.len() >= protocol.reporting.minimum_models_for_rank_stability as usize);
-    let distributional_evidence_eligible = minimum_model_count_met
+    let core_evidence_met = minimum_model_count_met
         && minimum_runs_met
         && coverage_met
         && acceptance_met
         && independent_units_met;
-    let claim_scope_eligible = distributional_evidence_eligible && scope_population_met && rank_met;
+    let primary_perturbation_count = protocol.axes
+        .iter()
+        .filter(|axis| !axis.auxiliary_only)
+        .map(|axis| axis.families.len())
+        .sum::<usize>();
+    let distributional_evidence_eligible =
+        primary_perturbation_count > 0 && core_evidence_met;
+    let fixed_configuration_evidence_eligible =
+        protocol.construct.claim_scope == ClaimScopeV1::FixedConfiguration
+            && primary_perturbation_count == 0
+            && core_evidence_met;
+    let claim_scope_eligible = (distributional_evidence_eligible
+        || fixed_configuration_evidence_eligible)
+        && scope_population_met
+        && rank_met;
+    let measurement_paradigm = if primary_perturbation_count > 0 {
+        "measurement_as_distribution"
+    } else {
+        "measurement_as_instance_restricted"
+    };
 
     let mut issues = Vec::new();
     if !minimum_model_count_met { issues.push("model count is below the protocol minimum".to_owned()); }
@@ -1074,7 +1111,10 @@ pub fn analyze_measurement_distribution(
     if !acceptance_met { issues.push("one or more perturbation axes are below minimum validation acceptance".to_owned()); }
     if !independent_units_met { issues.push("one or more paired deltas lack the minimum independent units".to_owned()); }
     if !scope_population_met { issues.push("observed model/task population is too narrow for the declared claim scope".to_owned()); }
-    if !rank_met { issues.push("rank stability is required but is not estimable for every declared axis/condition".to_owned()); }
+    if !rank_met { issues.push("rank stability is required but is not estimable for every declared primary axis/condition".to_owned()); }
+    if primary_perturbation_count == 0 {
+        issues.push("fixed-configuration Measurement-as-Instance evidence does not support a distributional robustness claim".to_owned());
+    }
     if protocol.axes.iter().any(|axis| axis.auxiliary_only && axis.kind == PerturbationAxisKindV1::Prompt) {
         issues.push("prompt sensitivity is reported as a separate auxiliary axis and is not included in the primary construct claim".to_owned());
     }
@@ -1091,6 +1131,7 @@ pub fn analyze_measurement_distribution(
         instance_manifest_sha256: manifest_sha,
         run_bundle_sha256: run_bundle_sha,
         claim_scope: protocol.construct.claim_scope,
+        measurement_paradigm: measurement_paradigm.to_owned(),
         model_count: models.len() as u64,
         model_family_count: model_families.len() as u64,
         run_count: bundle.runs.len() as u64,
@@ -1103,7 +1144,7 @@ pub fn analyze_measurement_distribution(
         rank_stability_status: if rank_met { "qualified_or_not_required" } else { "non_estimable" }.to_owned(),
         profile_cells,
         rank_stability,
-        model_summaries: build_model_summaries(&models, &profile_cells),
+        model_summaries: build_model_summaries(&models, &primary_cells.iter().map(|cell| (*cell).clone()).collect::<Vec<_>>()),
         issues,
         claim_boundary: "This report describes score distributions and paired robustness deltas only over the supplied, digest-bound measurement protocol, instance manifest, models, runs and observations. It does not prove that generated items or perturbations preserve the intended construct, that the declared model/evaluator identities are authenticated, or that the registered distribution equals deployment. Confidence intervals are computed over the declared independent-unit means; items, perturbation variants and repeated calls do not create independent training replicates. This analysis performs no hypothesis tests; the declared Holm policy applies if a separate registered test family reports p-values.".to_owned(),
     })
@@ -1324,6 +1365,20 @@ mod tests {
         let mut b = bundle(&p);
         b.observations.pop();
         assert!(analyze_measurement_distribution(&p, &b).is_err());
+    }
+
+    #[test]
+    fn fixed_configuration_is_representable_without_perturbations() {
+        let mut p = protocol();
+        p.construct.claim_scope = ClaimScopeV1::FixedConfiguration;
+        p.axes[0].families.clear();
+        let mut b = bundle(&p);
+        b.observations.retain(|row| row.condition_id == "original");
+        b.protocol_sha256 = compute_measurement_protocol_sha256(&p).unwrap();
+        let report = analyze_measurement_distribution(&p, &b).unwrap();
+        assert_eq!(report.measurement_paradigm, "measurement_as_instance_restricted");
+        assert!(!report.distributional_evidence_eligible);
+        assert!(report.claim_scope_eligible);
     }
 
     #[test]
