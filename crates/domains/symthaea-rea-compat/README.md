@@ -83,3 +83,49 @@ The committed unit fixture is a source-derived reference vector; its semantic di
 ## Claim ceiling
 
 A matching Evidence ID proves that the supplied object is internally consistent with this implementation's semantic projection and canonicalization. It does not prove producer authorship, provenance authenticity, observation truth, hardware identity, runtime behavior, or security compliance. Use HARDSEC and independently trusted signed/anchored receipts for those claims.
+
+
+## Fail-closed Android mobile tool policy
+
+The crate also exposes a bounded Android ADB effect audit pinned to upstream REA tool-effects source commit:
+
+`8250bf2320ea57aab4e664db4b4d44b8abd2004e`.
+
+The Rust policy distinguishes:
+- target/device mutation;
+- local filesystem writes;
+- session/Evidence mutation;
+- subprocess creation;
+- ADB transport/network use;
+- UI-state changes;
+- data discard;
+- foreign-code execution;
+- idempotence.
+
+The strict read-only observation profile permits only explicitly audited observation calls. It requires a selected device for device-scoped operations, and explicit opt-in for device discovery. It permits the ADB client inspection without a device target. It denies local artifact-writing operations by default and denies all known device mutators (install, uninstall, push, app/activity start and app stop). Unknown tool names or missing effect audit are denied.
+
+Two profiles are distinct:
+- `StrictReadOnlyObservation`: no device writes and no local file writes.
+- `ReadOnlyDeviceWithLocalArtifacts`: no device writes, but allows explicitly audited local output operations such as pull and screenshot capture.
+
+The policy allows session mutation, process launches and ADB transport use for read observations because these are present in upstream REA's effect metadata. They are not silently reclassified as device writes. The policy does not authenticate ADB output or device identity, sanitize stable identifiers in output, or attest hardware state; those remain separate controls.
+
+Direct Rust API:
+
+```rust,ignore
+use symthaea::rea_mobile_policy::{
+    authorize_mobile_tool, InvocationScope, MobileToolProfile,
+};
+
+let decision = authorize_mobile_tool(
+    "inspect_adb_device",
+    MobileToolProfile::StrictReadOnlyObservation,
+    InvocationScope {
+        selected_target: Some("caller-selected-adb-serial"),
+        discovery_explicitly_requested: false,
+    },
+);
+assert!(decision.allowed);
+```
+
+The allowlist is deliberately a small mobile slice, not a full port of REA's 121-tool effect registry. Every unlisted operation is denied until its exact effect metadata and target scope are reviewed.
