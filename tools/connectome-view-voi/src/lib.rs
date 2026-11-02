@@ -403,6 +403,12 @@ fn validate_problem(problem: &DecisionProblem) -> Result<(), VoiError> {
         if !view.cost_units.is_finite() || view.cost_units < 0.0 {
             return Err(VoiError::InvalidCost(view.view_id.clone()));
         }
+        // CB2's oblique em_best view is selected using post-split masks. It is
+        // target-leaking for the single-segment false-merge identification task,
+        // even if an upstream caller accidentally marks the view as safe.
+        if problem.task_route == "false_merge_identification" && view.view_id == "em_best" {
+            return Err(VoiError::LeakageForbidden(view.view_id.clone()));
+        }
         if !view.leakage_safe {
             return Err(VoiError::LeakageForbidden(view.view_id.clone()));
         }
@@ -952,7 +958,7 @@ mod tests {
             vec![view(
                 "em_best",
                 0.0,
-                false,
+                true,
                 &["false_merge_identification"],
                 vec![likelihood(
                     "base",
@@ -993,6 +999,29 @@ mod tests {
                 expected_unit: "risk_units".to_owned(),
                 actual_unit: "milliseconds".to_owned(),
             })
+        );
+    }
+
+    #[test]
+    fn cb2_em_best_is_rejected_for_merge_error_even_if_flagged_safe() {
+        let problem = standard_problem(
+            vec![scenario("base", 0.5)],
+            vec![view(
+                "em_best",
+                0.0,
+                true,
+                &["false_merge_identification"],
+                vec![likelihood(
+                    "base",
+                    &["yes", "no"],
+                    vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                )],
+            )],
+        );
+
+        assert_eq!(
+            choose_next_view(&problem),
+            Err(VoiError::LeakageForbidden("em_best".to_owned()))
         );
     }
 
