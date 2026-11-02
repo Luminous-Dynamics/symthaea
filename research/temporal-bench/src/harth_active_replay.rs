@@ -102,6 +102,7 @@ pub trait HarthActiveReplayPolicy {
 pub struct HarthReplayCandidateIdentity {
     pub policy_id: String,
     pub source_revision: String,
+    pub dependency_lock_sha256: [u8; 32],
     pub artifact_sha256: [u8; 32],
     pub configuration_sha256: [u8; 32],
 }
@@ -357,13 +358,20 @@ fn calibration_error(
     let mut total = 0_u64;
     let mut weighted_error = 0_u128;
     for (index, bin) in bins.iter().enumerate() {
+        let lower_confidence = (index as u64) * u64::from(PROBABILITY_SCALE) / CALIBRATION_BINS as u64;
+        let upper_confidence = ((index + 1) as u64) * u64::from(PROBABILITY_SCALE) / CALIBRATION_BINS as u64;
+        let minimum_sum = lower_confidence.saturating_mul(bin.sample_count);
+        let maximum_sum_exclusive = upper_confidence.saturating_mul(bin.sample_count);
         if usize::from(bin.bin_index) != index
             || bin.correct_count > bin.sample_count
             || bin.confidence_sum_ppm > bin.sample_count.saturating_mul(u64::from(PROBABILITY_SCALE))
+            || (bin.sample_count > 0 && bin.confidence_sum_ppm < minimum_sum)
+            || (bin.sample_count > 0 && index + 1 < CALIBRATION_BINS
+                && bin.confidence_sum_ppm >= maximum_sum_exclusive)
         {
             return Err(HarthActiveReplayError::new(
                 format!("calibration_bins[{index}]"),
-                "bin identity, confidence sum or correct-count denominator is invalid",
+                "bin identity, confidence range or correct-count denominator is invalid",
             ));
         }
         total = total.checked_add(bin.sample_count).ok_or_else(|| {
@@ -418,6 +426,7 @@ fn result_digest(receipt: &HarthActiveReplayReceipt) -> [u8; 32] {
     hash.u8(receipt.label_track as u8);
     hash.bytes(receipt.candidate.policy_id.as_bytes());
     hash.bytes(receipt.candidate.source_revision.as_bytes());
+    hash.bytes(&receipt.candidate.dependency_lock_sha256);
     hash.bytes(&receipt.candidate.artifact_sha256);
     hash.bytes(&receipt.candidate.configuration_sha256);
     hash.u64(receipt.row_count);
@@ -501,6 +510,7 @@ pub fn run_harth_active_replay<P: HarthActiveReplayPolicy>(
         ("preprocessing_sha256", &preprocessing_sha256),
         ("source_family_sha256", &source_family_sha256),
         ("source_normalized_rows_sha256", &source_normalized_rows_sha256),
+        ("candidate.dependency_lock_sha256", &candidate.dependency_lock_sha256),
         ("candidate.artifact_sha256", &candidate.artifact_sha256),
         ("candidate.configuration_sha256", &candidate.configuration_sha256),
     ] {
@@ -735,7 +745,10 @@ pub fn run_harth_active_replay<P: HarthActiveReplayPolicy>(
                 segment_end += 1;
             }
             let detection = (index..segment_end)
-                .find(|candidate_index| predictions[*candidate_index] == Some(truth_current));
+                .find(|candidate_index| {
+                    predictions[*candidate_index] == Some(truth_current)
+                        && predictions[*candidate_index - 1] != Some(truth_current)
+                });
             if let Some(detected_at) = detection {
                 detected_transition_count += 1;
                 let delay = u64::try_from(rows[detected_at].timestamp_ns - rows[index].timestamp_ns)
@@ -828,6 +841,7 @@ pub fn validate_harth_active_replay_receipt(
         ("preprocessing_sha256", &receipt.preprocessing_sha256),
         ("source_family_sha256", &receipt.source_family_sha256),
         ("source_normalized_rows_sha256", &receipt.source_normalized_rows_sha256),
+        ("candidate.dependency_lock_sha256", &receipt.candidate.dependency_lock_sha256),
         ("candidate.artifact_sha256", &receipt.candidate.artifact_sha256),
         ("candidate.configuration_sha256", &receipt.candidate.configuration_sha256),
         ("candidate_trace_sha256", &receipt.candidate_trace_sha256),
@@ -982,6 +996,7 @@ mod tests {
         HarthReplayCandidateIdentity {
             policy_id: "test-policy".to_owned(),
             source_revision: "test-rev".to_owned(),
+            dependency_lock_sha256: [7; 32],
             artifact_sha256: [1; 32],
             configuration_sha256: [2; 32],
         }
