@@ -533,6 +533,10 @@ pub fn analyze_noncompensatory_guardrails(
                 unavailable_reason.get_or_insert_with(|| "MISSING_POLICY_EVIDENCE".to_owned());
                 continue;
             };
+            let requirement_minimum = request.requirements.iter()
+                .find(|candidate| candidate.requirement_id == bound.requirement_id)
+                .map(|candidate| candidate.minimum_sample_size)
+                .unwrap_or(usize::MAX);
             match bound.availability {
                 GuardrailEvidenceAvailability::NotEstimable => {
                     unavailable_reason.get_or_insert_with(|| {
@@ -540,9 +544,23 @@ pub fn analyze_noncompensatory_guardrails(
                     });
                 }
                 GuardrailEvidenceAvailability::SimultaneousBoundsAvailable => {
-                    if probability > 0.0 {
-                        lower_sum += probability * bound.lower_confidence_bound.unwrap_or_default();
-                        upper_sum += probability * bound.upper_confidence_bound.unwrap_or_default();
+                    if bound.sample_size < requirement_minimum {
+                        unavailable_reason.get_or_insert_with(|| "BELOW_MINIMUM_SAMPLE_SIZE".to_owned());
+                    } else if probability > 0.0 {
+                        let lower = bound.lower_confidence_bound.ok_or_else(|| {
+                            GuardrailError::new(
+                                "request.policy_bounds.lower_confidence_bound",
+                                "validated bound unexpectedly lacks a lower confidence limit",
+                            )
+                        })?;
+                        let upper = bound.upper_confidence_bound.ok_or_else(|| {
+                            GuardrailError::new(
+                                "request.policy_bounds.upper_confidence_bound",
+                                "validated bound unexpectedly lacks an upper confidence limit",
+                            )
+                        })?;
+                        lower_sum += probability * lower;
+                        upper_sum += probability * upper;
                     }
                 }
             }
@@ -744,7 +762,8 @@ mod tests {
     }
 
     fn request() -> NoncompensatoryGuardrailRequest {
-        let reqs = requirements();
+        let mut reqs = requirements();
+        reqs.sort_by(|left, right| left.requirement_id.cmp(&right.requirement_id));
         let roster_sha = digest(&reqs).unwrap();
         let mut bounds = Vec::new();
         for policy_id in ["policy-a", "policy-b"] {
@@ -847,6 +866,19 @@ mod tests {
                 .unwrap().decision,
             GuardrailCellDecision::MissingEvidence
         );
+    }
+
+    #[test]
+    fn below_minimum_sample_size_is_indeterminate() {
+        let mut request = request();
+        let row = request
+            .policy_bounds
+            .iter_mut()
+            .find(|row| row.policy_id == "policy-a" && row.requirement_id == "local-revenue-null")
+            .unwrap();
+        row.sample_size = 10;
+        let report = analyze_noncompensatory_guardrails(&request).unwrap();
+        assert_eq!(report.overall_decision, GuardrailOverallDecision::Indeterminate);
     }
 
     #[test]
