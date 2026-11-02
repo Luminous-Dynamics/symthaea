@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-workflow-audit-report-v0.1.schema.json",
+  "title": "Connectome proofreading workflow audit report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelope_id",
+    "status",
+    "completed_stages",
+    "unresolved_stages",
+    "base_graph_snapshot_sha256",
+    "canonical_graph_snapshot_sha256",
+    "query_id",
+    "future_stability_certified",
+    "universal_connectome_completeness_claimed"
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "properties": {
+    "envelope_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "DatasetLicensePending",
+        "SplitAuditPending",
+        "BlockedBySplitLeakage",
+        "PredictionPending",
+        "PredictionUncalibrated",
+        "ViewDecisionPending",
+        "ReviewAllocationPending",
+        "ReviewPending",
+        "ReviewDeferred",
+        "ReviewRejected",
+        "EditPending",
+        "EditRejected",
+        "EditQuarantined",
+        "QueryAuditPending",
+        "QueryInsufficientHistory",
+        "QueryUnstable",
+        "QueryReadyObservedWindow"
+      ]
+    },
+    "completed_stages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "DATASET_IDENTITY",
+          "OPERATION_IDENTITY",
+          "LICENSE_APPROVED",
+          "SPLIT_AUDIT",
+          "PREDICTION",
+          "VIEW_DECISION",
+          "REVIEW_ALLOCATION",
+          "HUMAN_REVIEW",
+          "EDIT_REJECTED",
+          "EDIT_QUARANTINED",
+          "EDIT_COMMITTED",
+          "QUERY_STABILITY_AUDIT"
+        ]
+      }
+    },
+    "unresolved_stages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "LICENSE_APPROVAL",
+          "SPLIT_AUDIT",
+          "GROUP_DISJOINTNESS",
+          "PREDICTION",
+          "CALIBRATION",
+          "VIEW_DECISION",
+          "REVIEW_ALLOCATION",
+          "HUMAN_REVIEW",
+          "EDIT_AUTHORIZATION",
+          "EDIT_TRANSACTION",
+          "EDIT_NOT_AUTHORIZED",
+          "GRAPH_UPDATE",
+          "QUERY_STABILITY_AUDIT",
+          "QUERY_READINESS"
+        ]
+      }
+    },
+    "base_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "canonical_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "query_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "future_stability_certified": {
+      "const": false
+    },
+    "universal_connectome_completeness_claimed": {
+      "const": false
+    }
+  }
+}
