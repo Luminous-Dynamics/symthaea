@@ -73,7 +73,7 @@ The objective and existing constraints remain unchanged: worst-case alternative 
 
 The wrapper binds the base policy-frontier plan to the existing typed global/local guardrail evidence request. It requires exact policy-family identity, a structurally valid applicable requirement roster, the same-target-law-by-design relation, independent sampling units, the no-cross-unit-interference declaration, the linear-mixture estimand declaration, and the simultaneous confidence-family receipt digest.
 
-For every frozen requirement, the optimizer uses the bound direction and confidence limit. It emits the policy exclusions, selected mixture, all requirement-level mixture confidence intervals, signed slack, active guardrail identifiers, evidence digests, and an outer deterministic report digest.
+For every frozen requirement, the optimizer uses the bound direction and confidence limit. It emits the policy exclusions, selected mixture, all requirement-level mixture confidence intervals, signed slack, active guardrail identifiers, evidence digests, and an outer deterministic report digest. The report stores the frontier's experiment Type-I significance level separately from the guardrail simultaneous failure probability. It also embeds immutable solver settings (algorithm ID, policy ceiling, active-basis ceiling, and feasibility/pivot/objective tolerances), and the verifier checks those settings against the implementation constants.
 
 The embedded **simultaneous_coverage_receipt_sha256** binds an evidence artifact; **a digest is not proof that the artifact is valid, complete, or statistically calibrated**. The calibration producer and its coverage proof remain separately governed.
 
