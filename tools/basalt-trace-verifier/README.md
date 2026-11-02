@@ -14,6 +14,12 @@ cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- \
   --trace benchmarks/basalt/storage-conformance-trace.v1.json \
   --schema benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json \
   --out basalt-reference-report.json
+
+cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- \
+  --trace benchmarks/basalt/storage-conformance-trace.v1.json \
+  --schema benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json \
+  --check-linearization --max-states 100000 \
+  --out basalt-linearization-report.json
 ```
 
 The standalone package is intentionally not a root workspace member. It uses a private lockfile so the repository-wide workspace glob/manifest problems do not contaminate this focused check. The source is normalized with the repository-pinned Rust 1.96 formatter; the dedicated verifier workflow checks formatting again on every exact PR head.
@@ -31,12 +37,15 @@ The standalone package is intentionally not a root workspace member. It uses a p
 - Witness sequence, authority/incarnation, predecessor digest chain, strictly advancing authority revisions, final state binding and the exact witness sequence consulted by restore verification.
 - Final source cursors, log cursors, policy head and immutable accepted receipt set.
 - Six deliberately seeded faulty reference traces; every one must be rejected.
+- A bounded legal-history search that ignores the fixture tie-break and finds a model-consistent sequential order.
+- A reversed commit-order test proving overlapping independent commits can linearize differently from the reference fixture.
+- Search exhaustion reported as inconclusive, never as pass.
 
 ## What it does not verify
 
 - It does not execute SQLite, PostgreSQL, Turso or etcd.
-- It does not ingest the separate observed backend event-log schema yet.
-- It does not find legal linearizations for arbitrary concurrent observed histories; the fixture supplies one deterministic legal reference order.
+- It does not yet ingest backend observation records with nullable completions and raw transaction-phase events. Search mode operates on fully completed typed operation records.
+- The legal-order checker is a bounded depth-first baseline for at most 64 operations. It has no memoization, partial-order reduction or optimized dependency-cycle checker yet; exhaustion is explicitly inconclusive.
 - It does not verify witness signatures, key rotation, quorum independence or trust-root authorization. The witness digests are symbolic fixture records.
 - It does not test process crashes, filesystem ordering, power loss, hardware flush behavior, replication or physical restore.
 - It does not qualify performance, availability or any storage engine.
@@ -48,5 +57,6 @@ The optional `--schema` argument binds the schema file's SHA-256 into the report
 - `pass`: the reference fixture is internally consistent with this reducer and every seeded negative control is detected.
 - `fail`: the well-formed reference trace contradicts the reducer or a seeded negative control was not detected.
 - `invalid_evidence`: strict deserialization, required-field, dependency, ordering, digest, fault-schedule or witness-chain validation failed.
+- `inconclusive` (linearization mode only): the configured state budget was reached before proof or counterexample completion.
 
 A `pass` is not a backend result or a cryptographic/storage durability claim. Live adapter observations must be written separately and checked by the next verifier increment.
