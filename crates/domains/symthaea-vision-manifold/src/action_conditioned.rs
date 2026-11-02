@@ -432,8 +432,18 @@ impl ActionConditionedForecastEvaluator {
         })
     }
 
-    /// Atomically admit a complete action × joint-draw bank.
-    pub fn issue(&mut self, bank: &ActionForecastBank) -> Result<(), String> {
+    /// Atomically admit a complete bank only after checking it against the
+    /// immutable prediction request. This is the only public queue-admission path.
+    pub fn issue_for_request(
+        &mut self,
+        request: &ActionForecastRequest<'_>,
+        bank: &ActionForecastBank,
+    ) -> Result<(), String> {
+        bank.validate_for_request(request)?;
+        self.issue_validated(bank)
+    }
+
+    fn issue_validated(&mut self, bank: &ActionForecastBank) -> Result<(), String> {
         bank.validate()?;
         if self.pending.len().saturating_add(bank.samples.len()) > self.max_pending {
             return Err("pending action forecast capacity would be exceeded".into());
@@ -992,7 +1002,7 @@ mod tests {
     fn exact_target_branch_observation_scores_against_persistence() {
         let forecast_bank = bank();
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&forecast_bank).unwrap();
+        evaluator.issue_for_request(&request(), &forecast_bank).unwrap();
         assert_eq!(evaluator.pending_count(), 4);
         let target = [0.0, 1.0, 0.0];
         let result = evaluator
@@ -1015,7 +1025,7 @@ mod tests {
     #[test]
     fn observations_before_target_wait_and_skipped_target_expires() {
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
-        evaluator.issue(&bank()).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
         let early = [1.0, 0.0, 0.0];
         assert_eq!(
             evaluator.observe_branch(&observation("b17-100", 17, 100, 44, 1.4, &early)).unwrap(),
@@ -1059,12 +1069,12 @@ mod tests {
     fn queue_capacity_is_atomic_and_duplicate_branch_ids_are_rejected() {
         let forecast_bank = bank();
         let mut full = ActionConditionedForecastEvaluator::new(3, 0.01).unwrap();
-        assert!(full.issue(&forecast_bank).is_err());
+        assert!(full.issue_for_request(&request(), &forecast_bank).is_err());
         assert_eq!(full.pending_count(), 0);
 
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
         evaluator.issue(&forecast_bank).unwrap();
-        assert!(evaluator.issue(&forecast_bank).is_err());
+        assert!(evaluator.issue_for_request(&request(), &forecast_bank).is_err());
         assert_eq!(evaluator.pending_count(), 4);
     }
 
@@ -1117,6 +1127,7 @@ mod tests {
     fn persistence_perfect_prediction_has_undefined_relative_skill() {
         let mut forecast_bank = bank();
         forecast_bank.samples[0].predicted_belief = forecast_bank.persistence_belief.clone();
+        forecast_bank.bank_sha256 = compute_action_forecast_bank_sha256(&forecast_bank);
         let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.0).unwrap();
         evaluator.issue(&forecast_bank).unwrap();
         let actual = [1.0, 0.0, 0.0];
