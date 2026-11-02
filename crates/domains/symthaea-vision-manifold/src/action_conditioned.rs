@@ -503,6 +503,9 @@ impl ActionConditionedForecastEvaluator {
             return Ok(ForecastObservationResult::Unmatched);
         };
         let pending = &self.pending[index];
+        if observation.frame_sequence <= pending.source_frame_sequence {
+            return Err("branch observation must follow the forecast source frame".into());
+        }
         if pending.history_sha256 != observation.history_sha256
             || pending.action_manifest_sha256 != observation.action_manifest_sha256
             || pending.joint_draw_manifest_sha256 != observation.joint_draw_manifest_sha256
@@ -1108,6 +1111,40 @@ mod tests {
             evaluator.observe_branch(&observation("b17-100", 17, 100, 45, 1.5, &[0.0, 1.0, 0.0])).unwrap(),
             ForecastObservationResult::Unmatched
         );
+    }
+
+    #[test]
+    fn branch_observation_at_or_before_source_frame_is_rejected() {
+        let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
+        let actual = [0.0, 1.0, 0.0];
+        assert!(evaluator.observe_branch(
+            &observation("b17-100", 17, 100, 40, 1.0, &actual)
+        ).is_err());
+        assert_eq!(evaluator.pending_count(), 4);
+    }
+
+    #[test]
+    fn finish_history_only_expires_the_named_history() {
+        let mut evaluator = ActionConditionedForecastEvaluator::new(16, 0.01).unwrap();
+        evaluator.issue_for_request(&request(), &bank()).unwrap();
+
+        let mut second_bank = bank();
+        second_bank.history_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into();
+        second_bank.bank_sha256 = compute_action_forecast_bank_sha256(&second_bank);
+        let second_request = ActionForecastRequest {
+            observed: ObservedVisualBelief {
+                history_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                ..request().observed
+            },
+            ..request()
+        };
+        evaluator.issue_for_request(&second_request, &second_bank).unwrap();
+
+        let expired = evaluator.finish_history(HISTORY).unwrap();
+        assert_eq!(expired.len(), 4);
+        assert_eq!(evaluator.pending_count(), 4);
+        assert_eq!(evaluator.expired_count(), 4);
     }
 
     #[test]
