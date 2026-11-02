@@ -77,13 +77,13 @@ These targets are intentionally stricter than broad ENERGY STAR thresholds and a
 | Metric | First prototype gate | Competitive target | Stretch target |
 |---|---:|---:|---:|
 | Capacity | 14 place settings under the applicable IEC loading method | 14 place settings | 14 place settings |
-| Eco-cycle electricity | establish baseline, then <=0.46 kWh | <=0.39 kWh | <=0.35 kWh |
-| Fresh water | establish baseline | <=7.0 L | <=6.0 L |
-| Programme duration | establish baseline | <=150 min | <=120 min |
+| Eco-cycle electricity | <=0.53 kWh | <=0.39 kWh | <=0.35 kWh |
+| Fresh water | <=6.7 L | <=6.0 L | <=5.5 L |
+| Programme duration | <=240 min | <=150 min | <=120 min |
 | Cleaning / drying | pass the applicable IEC 60436 assessment | non-inferior to the best tested matched reference | statistically superior on pre-registered soil set without drying regression |
-| Noise | measure | <=40 dB(A) | <=38 dB(A) |
+| Noise | measure | <=38 dB(A) | <=36 dB(A) |
 
-The competitive target would, if achieved under matched conditions, improve on the AS6T-41171 reference by about 15% in electricity, 22% in water and 14% in duration. It would match the 0.39 kWh/eco-cycle energy figure seen in the 13-place heat-pump model while targeting more capacity, less water and a shorter programme. This comparison is a target calculation, not proof that the different tests are directly interchangeable.
+Against the exact AS6T-41147 data sheet (14 place settings, 0.53 kWh, 6.7 L, 405 min, 38 dB(A)), the competitive target would nominally reduce energy by about 26%, water by about 10%, and duration by about 63%. These are arithmetic target comparisons, not achieved results. The model's declared data sheet uses its stated EU test basis; formal product claims must be checked using the current IEC 60436:2025 corrected method and matched loading/soil procedures. The 0.39 kWh energy target also matches the label value of the 13-place AS6T-41173 while targeting one additional place setting and materially lower water use.
 
 ### QuickCell (one item or micro-batch)
 
