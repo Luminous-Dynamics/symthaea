@@ -57,6 +57,7 @@ pub struct DetectorSpecV1 {
 pub struct CalibrationFeatureRowV1 {
     /// One independent source/task cluster. Repeated items/generations are nested.
     pub calibration_unit_id: String,
+    pub source_cluster_sha256: String,
     pub task_family: String,
     pub model_regime: String,
     pub features: Vec<DetectorFeatureV1>,
@@ -66,6 +67,7 @@ pub struct CalibrationFeatureRowV1 {
 #[serde(deny_unknown_fields)]
 pub struct EvaluationFeatureRowV1 {
     pub evaluation_unit_id: String,
+    pub source_cluster_sha256: String,
     pub task_family: String,
     pub model_regime: String,
     pub features: Vec<DetectorFeatureV1>,
@@ -80,6 +82,10 @@ pub struct DetectorConformalFusionRequestV1 {
     pub study_id: String,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    pub model_checkpoint_sha256: String,
+    pub tokenizer_sha256: String,
+    pub prompt_harness_sha256: String,
+    pub runtime_environment_sha256: String,
     pub calibration_protocol_sha256: String,
     pub detector_registry_sha256: String,
     /// Alpha in permille; 10 means 1%, 50 means 5%.
@@ -183,6 +189,10 @@ pub struct DetectorConformalFusionReportV1 {
     pub study_id: String,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    pub model_checkpoint_sha256: String,
+    pub tokenizer_sha256: String,
+    pub prompt_harness_sha256: String,
+    pub runtime_environment_sha256: String,
     pub calibration_protocol_sha256: String,
     pub detector_registry_sha256: String,
     pub request_sha256: String,
@@ -849,6 +859,10 @@ pub fn calibrate_detector_panel(
     if request.fusion_method_id != FUSION_METHOD_ID {
         return Err(format!("fusion_method_id must be {FUSION_METHOD_ID}"));
     }
+    validate_digest(&request.model_checkpoint_sha256, "model_checkpoint_sha256")?;
+    validate_digest(&request.tokenizer_sha256, "tokenizer_sha256")?;
+    validate_digest(&request.prompt_harness_sha256, "prompt_harness_sha256")?;
+    validate_digest(&request.runtime_environment_sha256, "runtime_environment_sha256")?;
     validate_digest(&request.calibration_protocol_sha256, "calibration_protocol_sha256")?;
     validate_digest(&request.detector_registry_sha256, "detector_registry_sha256")?;
     validate_detector_specs(&request.detector_specs)?;
@@ -875,7 +889,12 @@ pub fn calibrate_detector_panel(
     let mut evaluation_rows =
         BTreeMap::<GroupKey, Vec<&EvaluationFeatureRowV1>>::new();
 
+    let mut source_cluster_digests = BTreeSet::new();
     for row in &request.calibration_a {
+        validate_digest(&row.source_cluster_sha256, "calibration-A source_cluster_sha256")?;
+        if !source_cluster_digests.insert(row.source_cluster_sha256.as_str()) {
+            return Err("source cluster digests must be disjoint across all splits".to_owned());
+        }
         validate_calibration_row(
             &row.calibration_unit_id,
             &row.task_family,
@@ -890,6 +909,10 @@ pub fn calibrate_detector_panel(
             .push(row);
     }
     for row in &request.calibration_b {
+        validate_digest(&row.source_cluster_sha256, "calibration-B source_cluster_sha256")?;
+        if !source_cluster_digests.insert(row.source_cluster_sha256.as_str()) {
+            return Err("source cluster digests must be disjoint across all splits".to_owned());
+        }
         validate_calibration_row(
             &row.calibration_unit_id,
             &row.task_family,
@@ -904,6 +927,10 @@ pub fn calibrate_detector_panel(
             .push(row);
     }
     for row in &request.evaluation {
+        validate_digest(&row.source_cluster_sha256, "evaluation source_cluster_sha256")?;
+        if !source_cluster_digests.insert(row.source_cluster_sha256.as_str()) {
+            return Err("source cluster digests must be disjoint across all splits".to_owned());
+        }
         if !valid_id(&row.evaluation_unit_id, 128)
             || !valid_id(&row.task_family, 64)
             || !valid_id(&row.model_regime, 128)
@@ -1246,6 +1273,10 @@ pub fn calibrate_detector_panel(
         study_id: request.study_id.clone(),
         benchmark_id: request.benchmark_id.clone(),
         benchmark_version: request.benchmark_version.clone(),
+        model_checkpoint_sha256: request.model_checkpoint_sha256.clone(),
+        tokenizer_sha256: request.tokenizer_sha256.clone(),
+        prompt_harness_sha256: request.prompt_harness_sha256.clone(),
+        runtime_environment_sha256: request.runtime_environment_sha256.clone(),
         calibration_protocol_sha256: request.calibration_protocol_sha256.clone(),
         detector_registry_sha256: request.detector_registry_sha256.clone(),
         request_sha256: crate::hash_domain(b"detector-conformal-fusion-request.v1", &request_bytes),
@@ -1309,6 +1340,7 @@ mod tests {
     ) -> CalibrationFeatureRowV1 {
         CalibrationFeatureRowV1 {
             calibration_unit_id: id.to_owned(),
+            source_cluster_sha256: crate::hash_domain(b"test-source-cluster.v1", id.as_bytes()),
             task_family: family.to_owned(),
             model_regime: regime.to_owned(),
             features: vec![
@@ -1326,6 +1358,7 @@ mod tests {
     ) -> EvaluationFeatureRowV1 {
         EvaluationFeatureRowV1 {
             evaluation_unit_id: id.to_owned(),
+            source_cluster_sha256: crate::hash_domain(b"test-source-cluster.v1", id.as_bytes()),
             task_family: "mathematics".to_owned(),
             model_regime: "qwen-rlvr".to_owned(),
             features: vec![
@@ -1358,6 +1391,10 @@ mod tests {
             study_id: "study-001".to_owned(),
             benchmark_id: "benchmark-001".to_owned(),
             benchmark_version: "v1".to_owned(),
+            model_checkpoint_sha256: "e".repeat(64),
+            tokenizer_sha256: "f".repeat(64),
+            prompt_harness_sha256: "1".repeat(64),
+            runtime_environment_sha256: "2".repeat(64),
             calibration_protocol_sha256: "a".repeat(64),
             detector_registry_sha256,
             target_alpha_permille: 500,
