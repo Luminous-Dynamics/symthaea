@@ -56,7 +56,6 @@ struct Args {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct SidecarRow {
     combined_sample_hash: String,
     source_archive_sample_hash: String,
@@ -111,6 +110,7 @@ struct FileDigest {
 #[derive(Debug, serde::Serialize)]
 struct SpeciesReplay {
     species: String,
+    manifest_file: FileDigest,
     split_manifest_sha256: String,
     split_files: BTreeMap<String, FileDigest>,
     source_key_counts: BTreeMap<String, u64>,
@@ -131,7 +131,7 @@ struct Report {
     upstream_repo: &'static str,
     upstream_commit: &'static str,
     sidecar_jsonl_sha256: String,
-    split_root_relative_path: String,
+    split_root_layout: &'static str,
     species: BTreeMap<String, SpeciesReplay>,
     sidecar_rows: u64,
     matched_sidecar_rows: u64,
@@ -148,7 +148,7 @@ fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-fn file_digest(path: &Path, root: &Path, relative: &str) -> Result<FileDigest, String> {
+fn file_digest(path: &Path, relative: &str) -> Result<FileDigest, String> {
     let bytes = fs::read(path).map_err(|error| format!("cannot read {relative}: {error}"))?;
     Ok(FileDigest {
         relative_path: relative.to_owned(),
@@ -326,8 +326,14 @@ fn parse_sidecar(bytes: &[u8], errors: &mut Vec<Finding>) -> Vec<ParsedRow> {
                 continue;
             }
         };
-        if row.combined_sample_hash != sample_key_md5(&row.source_archive, &row.source_archive_sample_hash) {
-            errors.push(Finding::global("sidecar_sample_key_mismatch", format!("line {} combined_sample_hash does not match the upstream MD5 row-key formula", line_index + 1)));
+        if row.source_archive_sample_hash.len() != 12
+            || !row.source_archive_sample_hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            errors.push(Finding::global("sidecar_source_hash_format", format!("line {} source_archive_sample_hash must be 12 lowercase hexadecimal characters", line_index + 1)));
+        }
+        if row.combined_sample_hash.len() != 32
+            || !row.combined_sample_hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || row.combined_sample_hash != sample_key_md5(&row.source_archive, &row.source_archive_sample_hash) {
+            errors.push(Finding::global("sidecar_sample_key_mismatch", format!("line {} combined_sample_hash does not match the upstream MD5 row-key formula/format", line_index + 1)));
         }
         rows.push(ParsedRow { row, metadata, bank, split, source_line: line_index + 1 });
     }
@@ -354,6 +360,7 @@ fn load_species_split_index(
             return None;
         }
     };
+    let manifest_file = FileDigest { relative_path: format!("{species}/manifest.json"), bytes: manifest_bytes.len() as u64, sha256: sha256(&manifest_bytes) };
     let manifest: Value = match serde_json::from_slice(&manifest_bytes) {
         Ok(value) if value.is_object() => value,
         Ok(_) => {
@@ -367,6 +374,16 @@ fn load_species_split_index(
     };
     if manifest.get("species").and_then(Value::as_str) != Some(species) {
         errors.push(Finding::global("split_manifest_species_mismatch", format!("{species}/manifest.json species does not match directory")));
+    }
+    if let Some(object) = manifest.as_object() {
+        for field in object.keys() {
+            if !matches!(field.as_str(),
+                "species" | "edge_nm" | "ratios" | "seed" | "bbox_nm" | "grid"
+                | "cube_counts" | "op_counts" | "outliers_dropped" | "duplicate_keys_dropped"
+            ) {
+                warnings.push(Finding::global("split_manifest_unknown_field", format!("{species}/manifest.json contains unrecognized field {field:?}")));
+            }
+        }
     }
     let edge = manifest.get("edge_nm").and_then(Value::as_f64);
     if edge.is_none_or(|value| (value - EXPECTED_EDGE_NM).abs() > 1.0e-9) {
@@ -388,7 +405,7 @@ fn load_species_split_index(
             }
         };
         let relative = format!("{species}/{filename}");
-        match file_digest(&path, root, &relative) {
+        match file_digest(&path, &relative) {
             Ok(digest) => { split_files.insert(split.to_owned(), digest); }
             Err(error) => errors.push(Finding::global("split_file_digest_failed", error)),
         }
@@ -456,6 +473,7 @@ fn load_species_split_index(
     }
     let replay = SpeciesReplay {
         species: species.to_owned(),
+        manifest_file,
         split_manifest_sha256: hex::encode(split_manifest_hasher.finalize()),
         split_files,
         source_key_counts: counts,
@@ -477,6 +495,9 @@ fn audit(
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let rows = parse_sidecar(sidecar_bytes, &mut errors);
+    if rows.is_empty() {
+        errors.push(Finding::global("sidecar_empty", "no valid metadata-sidecar rows were parsed"));
+    }
     let root = match split_root.canonicalize() {
         Ok(root) => root,
         Err(error) => {
@@ -532,7 +553,7 @@ fn audit(
         upstream_repo: "https://github.com/timfarkas/ConnectomeBench2",
         upstream_commit: UPSTREAM_COMMIT,
         sidecar_jsonl_sha256: sidecar_digest,
-        split_root_relative_path: split_root.to_string_lossy().into_owned(),
+        split_root_layout: "species/{manifest.json,train.json,val.json,test.json}",
         species: species_replays,
         sidecar_rows: rows.len() as u64,
         matched_sidecar_rows: total_matched,
