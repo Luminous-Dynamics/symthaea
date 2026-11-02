@@ -1,0 +1,33 @@
+{
+  "schema": "symthaea.spectra.synthetic_corpus_config.v0.1",
+  "claim_ceiling": "synthetic_only",
+  "generator_version": "splitmix64-fy-reject-v0.1",
+  "campaign_config": {
+    "calibration_trials": 512,
+    "evaluation_trials": 512,
+    "candidate_count": 4,
+    "signal_hit_rate_permille": 400
+  },
+  "known_answer_seeds": {
+    "null": "0x5eed12349876abcd",
+    "signal_injected": "0x1111222233334444",
+    "adversarial_mutation": "0x777788889999aaaa",
+    "leakage_base": "0xface100000000001"
+  },
+  "leakage_modalities": [
+    "rf",
+    "low_frequency_magnetic",
+    "acoustic",
+    "optical",
+    "vibration",
+    "thermal_airflow",
+    "power_conducted",
+    "network_timing",
+    "procedural"
+  ],
+  "detector": {
+    "threshold_permille": 850,
+    "minimum_predictions": 64
+  },
+  "note": "Seeds and expected world labels belong to evaluator-side fixture manifests, never candidate-facing campaign data."
+}
