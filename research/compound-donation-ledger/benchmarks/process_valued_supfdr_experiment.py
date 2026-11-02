@@ -274,7 +274,10 @@ def evaluate_method(
         dx = np.maximum(x - previous_x, 0.0)
         old_reserve = previous_reserve.copy()
         if method == "raw_supremum_invalid_control":
-            z = gamma[None, :] * raw_path[:, t, :]
+            # Dormant candidates are excluded from the current active family.
+            z = gamma[None, :] * np.where(
+                active[None, :], raw_path[:, t, :], 0.0
+            )
         else:
             if method != "no_donation":
                 reserve = np.minimum(
