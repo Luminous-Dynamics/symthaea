@@ -374,7 +374,10 @@
       "if": {
         "properties": {
           "execution_status": {
-            "const": "fixture_ready"
+            "enum": [
+              "fixture_ready",
+              "qualified"
+            ]
           }
         }
       },
@@ -469,6 +472,34 @@
             "properties": {
               "checks": {
                 "minItems": 2
+              }
+            }
+          },
+          "budget": {
+            "properties": {
+              "wall_clock_seconds": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_turns": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_tool_calls": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "input_token_budget": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "output_token_budget": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "cost_budget_usd": {
+                "type": "number",
+                "minimum": 0
               }
             }
           }
