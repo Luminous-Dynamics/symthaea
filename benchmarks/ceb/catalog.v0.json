@@ -4,7 +4,7 @@
   "release": "v0-design-catalog",
   "status": "design_only",
   "created_at": "2026-11-02",
-  "task_count": 9,
+  "task_count": 10,
   "tasks": [
     {
       "schema_version": 0,
@@ -530,6 +530,69 @@
         "No benchmark score is produced by identifying or documenting a hypothetical weakness.",
         "The grader-integrity lane is separate from the agent task-resolution denominator.",
         "Do not execute task-controlled code until OS-level isolation is qualified under issue #10064."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-REPO-001",
+      "execution_status": "design_only",
+      "lane": "repository_intelligence",
+      "title": "Construct a typed repository twin and predict change impact",
+      "objective": "Inspect a pinned multi-crate Rust workspace and construct an exact, versioned graph of packages, modules, symbols, types, calls, trait implementations, feature gates, build targets and tests. Predict the change impact of specified source/configuration edits, then update the graph after incremental invalidation without retaining stale facts.",
+      "agent_prompt": "Build a machine-readable typed repository graph from the supplied source and manifest snapshot. For each requested edit, identify affected symbols, call sites, trait implementations, features, build targets and tests with evidence spans. After a sequence of file/configuration edits, incrementally refresh the graph and report removed, changed and newly introduced facts. Do not execute repository build scripts, tests or generated code; use the provided static source and manifest fixture only.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": null,
+        "revision": null,
+        "tree_sha256": null
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled"
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "changes to graph schema",
+          "changes to source snapshot",
+          "changes to gold labels"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "repository-twin-static-fixtures"
+        ],
+        "freshness_policy": "Design-only. Use a synthetic repository family for development and keep repository-family-disjoint holdout fixtures for qualification."
+      },
+      "notes": [
+        "Not executable: no synthetic repository fixture, pinned environment, reference graph or independent grader has been provisioned.",
+        "Gold labels must cover syntax entities, compiler-resolved semantics, call/trait relations, feature/target gates and tests separately.",
+        "Evaluate retrieval and change-impact precision/recall independently; do not count inferred links as compiler-resolved truth.",
+        "Run a deterministic edit sequence to test incremental invalidation, stale-fact removal and graph snapshot provenance.",
+        "This task can be designed as a static-only parser/indexing evaluation that does not execute the fixture repository; any later compiler/build/test lane remains subject to issue #10064."
       ]
     }
   ]
