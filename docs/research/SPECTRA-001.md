@@ -290,6 +290,20 @@ Applicability limits:
 - The bounded-mean confidence sequence assumes independent observations in a fixed, known finite support interval. Repeated trials clustered within participants/sessions are not IID observations; use the correct independent unit or a dependence-aware procedure.
 - Neither statistical procedure repairs target leakage, non-blinding, model misspecification, invalid randomization, multiplicity, missingness or causal confounding.
 
+## 8.2 Experiment-manifest and blinding infrastructure
+
+A repository audit found an existing frozen-study pipeline in symthaea-muse:
+- frozen manifests and preregistration/analysis-plan/randomization commitments;
+- pilot/confirmatory fixture splits and family leakage checks;
+- public blinded schedules with a separately held condition codebook;
+- participant/block schedules, evidence bundles, guarded unblinding and confirmatory analysis.
+
+It is not directly reusable by SPECTRA: its manifest is coupled to music policy arms, renderer/soundfont artifacts, musical fixture strata and music-specific endpoints. SPECTRA must not depend on the Muse product crate.
+
+The proposed extraction boundary is tracked in [SCI-EXP-CORE-001 #10103](https://github.com/Luminous-Dynamics/symthaea/issues/10103). The goal is a domain-neutral experiment-integrity kernel, with SPECTRA/Muse/materials/neuroscience profiles remaining domain-owned. This is an architecture issue, not an already-completed extraction.
+
+Important distinction: deterministic seed-based schedule replay is not cryptographic unpredictability. Any future public randomness-beacon or external-custodian receipt must be represented separately. Hashes bind artifact bytes; they do not prove that role separation or chronology was actually respected.
+
 ## 9. First executable milestones
 
 1. **Protocol freeze:** translate this document into the existing SCI-EXP and ENG-EMC profile owners; freeze the exact task and apparatus configuration.
