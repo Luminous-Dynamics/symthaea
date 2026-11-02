@@ -15,11 +15,8 @@
 //!     ↓
 //! TestSuite {
 //!     tests: [
-//!         Test { name: "test_fibonacci_example_0", assert: "fibonacci(0)", expected: "0" },
-//!         Test { name: "test_fibonacci_example_1", assert: "fibonacci(10)", expected: "55" },
-//!         Test { name: "test_fibonacci_boundary_zero", assert: "fibonacci(0)", expected: "0" },
-//!         Test { name: "test_fibonacci_boundary_one", assert: "fibonacci(1)", expected: "1" },
-//!         Test { name: "test_fibonacci_large", assert: "fibonacci(20)", expected: "6765" },
+//!         Test { assertion: "assert_eq!(fibonacci(10), 55)", oracle: ProvidedExample },
+//!         Test { assertion: "let _ = fibonacci(0)", oracle: TypeDerivedInvocationSmoke },
 //!     ]
 //! }
 //! ```
@@ -314,6 +311,11 @@ mod tests {
         assert!(suite.source.contains("#[cfg(test)]"));
         assert!(suite.source.contains("test_add_example_0"));
         assert!(suite.source.contains("assert_eq!(add(2, 3), 5)"));
+        assert!(suite
+            .tests
+            .iter()
+            .filter(|test| test.category == TestCategory::Example)
+            .all(|test| test.oracle_kind == TestOracleKind::ProvidedExample));
     }
 
     #[test]
@@ -334,6 +336,9 @@ mod tests {
             "Should generate boundary tests for u64 param"
         );
         assert!(suite.source.contains("boundary_n_zero"));
+        assert!(boundary_tests
+            .iter()
+            .all(|test| test.oracle_kind == TestOracleKind::TypeDerivedInvocationSmoke));
     }
 
     #[test]
