@@ -141,3 +141,24 @@ Dependency-aware reuse of exact lemmas and certificates is tracked in ETH-008:
 https://github.com/Luminous-Dynamics/symthaea/issues/10113
 
 The broader work plan is tracked in ETH-001.
+
+
+## Ring-valued Signed Network Sum reference
+
+The `reference` directory contains an independent pure-Python exact oracle
+for the octonionic K4 network identity over the truncated bivariate integer
+polynomial ring `Z[X,Y]/(X^3,Y^3)`:
+
+- `reference/sns_weight_profile_lift.py`
+- `reference/sns_weight_profile_lift_results.json`
+
+The recorded deterministic run checks six valid polynomial-valued K4 networks,
+coefficientwise division by two in all six, and rejects two mutated sign/index
+constructions (8/8 checks). It uses only Python's standard library and
+arbitrary-precision integer coefficients.
+
+This is a research reference, not a production Python path, generic Lean proof,
+asymptotic theorem or practical solver benchmark. The result highlights a
+normalization boundary: the scaled identity (2Z=Z_{row}+Z_{column}) holds
+over a commutative ring, but division by two requires either a Q-algebra or an
+independent exact divisibility proof.
