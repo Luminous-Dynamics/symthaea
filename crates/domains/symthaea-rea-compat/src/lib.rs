@@ -946,13 +946,13 @@ mod tests {
     #[test]
     fn jcs_orders_keys_by_utf16_code_units_and_uses_ecmascript_number_formatting() {
         let value: Value = serde_json::from_str(
-            r#"{"":1,"𐀀":2,"numbers":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001]}"#,
+            r#"{"":1,"𐀀":2,"numbers":[-0,333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001]}"#,
         )
         .unwrap();
         let canonical = String::from_utf8(canonical_jcs_bytes(&value).unwrap()).unwrap();
         assert_eq!(
             canonical,
-            r#"{"𐀀":2,"":1,"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27]}"#
+            r#"{"𐀀":2,"":1,"numbers":[0,333333333.3333333,1e+30,4.5,0.002,1e-27]}"#
         );
     }
 
