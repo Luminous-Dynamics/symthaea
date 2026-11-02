@@ -266,7 +266,7 @@ pub fn audit_splits(
         }
 
         if let Some(previous_groups) = sample_group_identities.get(&operation.sample_hash) {
-            if previous_groups != &operation.groups {
+            if !group_identity_equivalent(previous_groups, &operation.groups) {
                 return Err(SplitAuditError::SampleGroupIdentityMismatch {
                     sample_hash: operation.sample_hash.clone(),
                 });
@@ -456,6 +456,19 @@ fn validate_policy(policy: &SplitAuditPolicy) -> Result<(), SplitAuditError> {
         }
     }
     Ok(())
+}
+
+fn group_identity_equivalent(left: &GroupIdentity, right: &GroupIdentity) -> bool {
+    left.source_archive_id == right.source_archive_id
+        && left.source_volume_id == right.source_volume_id
+        && left.source_operation_id == right.source_operation_id
+        && left.spatial_cube_id == right.spatial_cube_id
+        && left.neuron_ids.iter().collect::<BTreeSet<_>>()
+            == right.neuron_ids.iter().collect::<BTreeSet<_>>()
+        && left.animal_id == right.animal_id
+        && left.session_id == right.session_id
+        && left.species == right.species
+        && left.workflow_id == right.workflow_id
 }
 
 fn group_values(groups: &GroupIdentity, key: GroupKey) -> Vec<String> {
@@ -800,6 +813,41 @@ mod tests {
                 sample_hash: "00000000000000000000000000000001".to_owned(),
             })
         );
+    }
+
+    #[test]
+    fn neuron_root_order_does_not_change_same_sample_group_identity() {
+        let first = operation(
+            "op-split",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        let mut second = operation(
+            "op-merge",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseMergeIdentification,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::EmXy,
+        );
+        second.groups.neuron_ids = vec!["neuron-b".to_owned(), "neuron-a".to_owned()];
+        let mut first = first;
+        first.groups.neuron_ids = vec!["neuron-a".to_owned(), "neuron-b".to_owned()];
+
+        let report = audit_splits(
+            &policy(vec![GroupKey::SourceVolume, GroupKey::Neuron]),
+            &[first, second],
+        )
+        .unwrap();
+
+        assert_eq!(report.status, SplitAuditStatus::GroupDisjoint);
     }
 
     #[test]
