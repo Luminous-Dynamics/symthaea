@@ -120,6 +120,26 @@ pub struct ResponseStatusCounts {
     pub registration_failed: usize,
 }
 
+/// Full-cohort joint-response identification result for two independently observed channels.
+///
+/// Each channel's detector-positive fraction is first bounded over *all planned units*
+/// (unknown detector states are not silently dropped), then inverted through its own
+/// externally qualified sensitivity/specificity ranges. The final joint interval is
+/// sharp given only the resulting two latent marginal intervals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct JointResponseBoundsReport {
+    pub planned_units: usize,
+    pub source_response_counts: ResponseStatusCounts,
+    pub target_response_counts: ResponseStatusCounts,
+    pub source_observed_positive_fraction_bounds: NumericInterval,
+    pub target_observed_positive_fraction_bounds: NumericInterval,
+    pub source_latent_prevalence_bounds: NumericInterval,
+    pub target_latent_prevalence_bounds: NumericInterval,
+    pub joint_response_prevalence_bounds: NumericInterval,
+    /// None when the source marginal may be zero; conditioning is then not identified.
+    pub target_given_source_prevalence_bounds: Option<NumericInterval>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionSummary {
     pub planned_units: usize,
@@ -198,6 +218,9 @@ pub enum EvalError {
     InvalidProbabilityInterval(&'static str),
     InvalidBinomialCounts,
     InvalidZScore,
+    EmptyPlannedCohort,
+    ResponseStatusCountOverflow,
+    ResponseStatusCountTotalMismatch { planned_units: usize, classified_units: usize },
     NumericOverflow,
 }
 
@@ -220,6 +243,9 @@ impl fmt::Display for EvalError {
             Self::InvalidProbabilityInterval(x) => write!(f, "{x} interval must be finite, ordered, and within [0,1]"),
             Self::InvalidBinomialCounts => write!(f, "detector validation counts must have non-zero positive and negative reference denominators without overflow"),
             Self::InvalidZScore => write!(f, "Wilson z score must be finite and greater than zero"),
+            Self::EmptyPlannedCohort => write!(f, "planned cohort must contain at least one unit"),
+            Self::ResponseStatusCountOverflow => write!(f, "response-status counts overflow while summing the planned cohort"),
+            Self::ResponseStatusCountTotalMismatch { planned_units, classified_units } => write!(f, "response-status counts cover {classified_units} units, but the planned cohort contains {planned_units}"),
             Self::NumericOverflow => write!(f, "numeric overflow while computing bounds"),
         }
     }
@@ -453,6 +479,135 @@ pub fn latent_prevalence_bounds(
         return Err(EvalError::InfeasibleDetectorCalibration);
     }
     Ok(NumericInterval { lower: lower.max(0.0), upper: upper.min(1.0) })
+}
+
+
+/// Bound the detector-positive fraction over the complete planned cohort.
+///
+/// Detected units contribute to the lower and upper limits; every unknown detector state
+/// (unobserved, classifier-invalid, or registration-failed) contributes only to the upper
+/// limit. The denominator is always `planned_units`, never the complete-case count.
+/// The returned interval is a finite-cohort identification interval, not a confidence interval.
+pub fn observed_positive_fraction_bounds(
+    counts: ResponseStatusCounts,
+    planned_units: usize,
+) -> Result<NumericInterval, EvalError> {
+    if planned_units == 0 {
+        return Err(EvalError::EmptyPlannedCohort);
+    }
+    let unknown = counts.unobserved
+        .checked_add(counts.classifier_invalid)
+        .and_then(|n| n.checked_add(counts.registration_failed))
+        .ok_or(EvalError::ResponseStatusCountOverflow)?;
+    let classified_units = counts.detected
+        .checked_add(counts.not_detected)
+        .and_then(|n| n.checked_add(unknown))
+        .ok_or(EvalError::ResponseStatusCountOverflow)?;
+    if classified_units != planned_units {
+        return Err(EvalError::ResponseStatusCountTotalMismatch {
+            planned_units,
+            classified_units,
+        });
+    }
+    let positive_upper_count = counts.detected
+        .checked_add(unknown)
+        .ok_or(EvalError::ResponseStatusCountOverflow)?;
+    Ok(NumericInterval {
+        lower: counts.detected as f64 / planned_units as f64,
+        upper: positive_upper_count as f64 / planned_units as f64,
+    })
+}
+
+/// Invert detector operating-characteristic ranges for an interval of observed-positive
+/// fractions. This is the missingness-safe extension of `latent_prevalence_bounds`.
+///
+/// For latent prevalence p, admissible detector rates imply:
+/// q_min(p) = Se_L*p + (1-Sp_U)*(1-p)
+/// q_max(p) = Se_U*p + (1-Sp_L)*(1-p).
+///
+/// A p is feasible exactly when q_min(p) <= q_U and q_max(p) >= q_L.
+/// This routine returns all compatible p values for rectangular sensitivity/specificity
+/// ranges. It does not assume independence between the source and target response events.
+pub fn latent_prevalence_bounds_from_observed_fraction_interval(
+    observed_positive_fraction_bounds: NumericInterval,
+    operating: DetectorOperatingBounds,
+) -> Result<NumericInterval, EvalError> {
+    validate_probability_interval(
+        observed_positive_fraction_bounds,
+        "observed_positive_fraction",
+    )?;
+    validate_probability_bounds(operating.sensitivity, "sensitivity")?;
+    validate_probability_bounds(operating.specificity, "specificity")?;
+
+    let min_slope = operating.sensitivity.lower + operating.specificity.upper - 1.0;
+    let min_rhs = observed_positive_fraction_bounds.upper
+        + operating.specificity.upper - 1.0;
+    let max_slope = operating.sensitivity.upper + operating.specificity.lower - 1.0;
+    let max_rhs = observed_positive_fraction_bounds.lower
+        + operating.specificity.lower - 1.0;
+
+    let mut lower = 0.0;
+    let mut upper = 1.0;
+    if !intersect_linear_leq(&mut lower, &mut upper, min_slope, min_rhs)
+        || !intersect_linear_leq(&mut lower, &mut upper, -max_slope, -max_rhs)
+        || lower > upper
+        || !lower.is_finite()
+        || !upper.is_finite()
+    {
+        return Err(EvalError::InfeasibleDetectorCalibration);
+    }
+    Ok(NumericInterval {
+        lower: lower.max(0.0),
+        upper: upper.min(1.0),
+    })
+}
+
+/// Compose channel-specific missingness and detector-error bounds with the sharp
+/// Fréchet joint-response bounds.
+///
+/// Both status-count tables must describe the same full planned cohort. Unknown channel
+/// outputs remain unknown rather than being treated as negative or excluded complete cases.
+/// Detector operating ranges must be qualified externally (and cluster-aware for repeated
+/// animal/session measurements). The result is a response-prevalence bound, not a causal
+/// effect, a direct-connectivity claim, or a sampling confidence interval.
+pub fn evaluate_joint_response_bounds(
+    planned_units: usize,
+    source_response_counts: ResponseStatusCounts,
+    target_response_counts: ResponseStatusCounts,
+    source_detector_operating_bounds: DetectorOperatingBounds,
+    target_detector_operating_bounds: DetectorOperatingBounds,
+) -> Result<JointResponseBoundsReport, EvalError> {
+    let source_observed = observed_positive_fraction_bounds(
+        source_response_counts,
+        planned_units,
+    )?;
+    let target_observed = observed_positive_fraction_bounds(
+        target_response_counts,
+        planned_units,
+    )?;
+    let source_latent = latent_prevalence_bounds_from_observed_fraction_interval(
+        source_observed,
+        source_detector_operating_bounds,
+    )?;
+    let target_latent = latent_prevalence_bounds_from_observed_fraction_interval(
+        target_observed,
+        target_detector_operating_bounds,
+    )?;
+    let joint = joint_response_prevalence_bounds(source_latent, target_latent)?;
+    let target_given_source =
+        target_given_source_prevalence_bounds(source_latent, target_latent)?;
+
+    Ok(JointResponseBoundsReport {
+        planned_units,
+        source_response_counts,
+        target_response_counts,
+        source_observed_positive_fraction_bounds: source_observed,
+        target_observed_positive_fraction_bounds: target_observed,
+        source_latent_prevalence_bounds: source_latent,
+        target_latent_prevalence_bounds: target_latent,
+        joint_response_prevalence_bounds: joint,
+        target_given_source_prevalence_bounds: target_given_source,
+    })
 }
 
 fn validate(input: &StudyInput) -> Result<(), EvalError> {
@@ -972,6 +1127,182 @@ mod tests {
         ).unwrap();
         assert!(wide.lower <= narrow.lower);
         assert!(wide.upper >= narrow.upper);
+    }
+
+    fn perfect_detector_operating_bounds() -> DetectorOperatingBounds {
+        DetectorOperatingBounds {
+            sensitivity: ValueBounds { lower: 1.0, upper: 1.0 },
+            specificity: ValueBounds { lower: 1.0, upper: 1.0 },
+        }
+    }
+
+    #[test]
+    fn full_cohort_detector_fraction_bounds_keep_unknown_statuses_in_denominator() {
+        let bounds = observed_positive_fraction_bounds(
+            ResponseStatusCounts {
+                detected: 6,
+                not_detected: 2,
+                unobserved: 1,
+                classifier_invalid: 1,
+                registration_failed: 0,
+            },
+            10,
+        ).unwrap();
+        close(bounds.lower, 0.6);
+        close(bounds.upper, 0.8);
+    }
+
+    #[test]
+    fn observed_fraction_rejects_zero_or_mismatched_planned_cohort() {
+        assert_eq!(
+            observed_positive_fraction_bounds(ResponseStatusCounts::default(), 0).unwrap_err(),
+            EvalError::EmptyPlannedCohort,
+        );
+        assert_eq!(
+            observed_positive_fraction_bounds(
+                ResponseStatusCounts {
+                    detected: 6, not_detected: 2, unobserved: 1,
+                    classifier_invalid: 0, registration_failed: 0,
+                },
+                10,
+            ).unwrap_err(),
+            EvalError::ResponseStatusCountTotalMismatch {
+                planned_units: 10,
+                classified_units: 9,
+            },
+        );
+    }
+
+    #[test]
+    fn interval_detector_inversion_contains_point_api_and_handles_missingness() {
+        let operating = DetectorOperatingBounds {
+            sensitivity: ValueBounds { lower: 0.8, upper: 0.9 },
+            specificity: ValueBounds { lower: 0.9, upper: 0.95 },
+        };
+        let point = latent_prevalence_bounds(0.6, operating).unwrap();
+        let interval = latent_prevalence_bounds_from_observed_fraction_interval(
+            NumericInterval { lower: 0.6, upper: 0.6 },
+            operating,
+        ).unwrap();
+        close(point.lower, interval.lower);
+        close(point.upper, interval.upper);
+
+        // Unknown detector outputs widen the observed-rate set rather than being
+        // dropped from the denominator or imputed as negative.
+        let missing = latent_prevalence_bounds_from_observed_fraction_interval(
+            NumericInterval { lower: 0.6, upper: 0.8 },
+            operating,
+        ).unwrap();
+        assert!(missing.lower <= point.lower);
+        assert!(missing.upper >= point.upper);
+    }
+
+    #[test]
+    fn integrated_joint_response_bounds_preserve_full_cohort_and_frechet_interval() {
+        let result = evaluate_joint_response_bounds(
+            10,
+            ResponseStatusCounts {
+                detected: 8, not_detected: 2, unobserved: 0,
+                classifier_invalid: 0, registration_failed: 0,
+            },
+            ResponseStatusCounts {
+                detected: 6, not_detected: 4, unobserved: 0,
+                classifier_invalid: 0, registration_failed: 0,
+            },
+            perfect_detector_operating_bounds(),
+            perfect_detector_operating_bounds(),
+        ).unwrap();
+
+        close(result.source_latent_prevalence_bounds.lower, 0.8);
+        close(result.source_latent_prevalence_bounds.upper, 0.8);
+        close(result.target_latent_prevalence_bounds.lower, 0.6);
+        close(result.target_latent_prevalence_bounds.upper, 0.6);
+        close(result.joint_response_prevalence_bounds.lower, 0.4);
+        close(result.joint_response_prevalence_bounds.upper, 0.6);
+        let conditional = result.target_given_source_prevalence_bounds.unwrap();
+        close(conditional.lower, 0.5);
+        close(conditional.upper, 0.75);
+        // The independence product 0.48 is compatible, but is not identified.
+        assert!(0.48 >= result.joint_response_prevalence_bounds.lower);
+        assert!(0.48 <= result.joint_response_prevalence_bounds.upper);
+    }
+
+    #[test]
+    fn integrated_joint_response_bounds_propagate_channel_missingness() {
+        let result = evaluate_joint_response_bounds(
+            10,
+            ResponseStatusCounts {
+                detected: 6, not_detected: 2, unobserved: 1,
+                classifier_invalid: 1, registration_failed: 0,
+            },
+            ResponseStatusCounts {
+                detected: 3, not_detected: 5, unobserved: 2,
+                classifier_invalid: 0, registration_failed: 0,
+            },
+            perfect_detector_operating_bounds(),
+            perfect_detector_operating_bounds(),
+        ).unwrap();
+
+        close(result.source_observed_positive_fraction_bounds.lower, 0.6);
+        close(result.source_observed_positive_fraction_bounds.upper, 0.8);
+        close(result.target_observed_positive_fraction_bounds.lower, 0.3);
+        close(result.target_observed_positive_fraction_bounds.upper, 0.5);
+        close(result.joint_response_prevalence_bounds.lower, 0.0);
+        close(result.joint_response_prevalence_bounds.upper, 0.5);
+        let conditional = result.target_given_source_prevalence_bounds.unwrap();
+        close(conditional.lower, 0.0);
+        close(conditional.upper, 5.0 / 6.0);
+    }
+
+    #[test]
+    fn all_unknown_detector_channels_produce_uninformative_bounds_not_zeros() {
+        let unknown = ResponseStatusCounts {
+            detected: 0, not_detected: 0, unobserved: 10,
+            classifier_invalid: 0, registration_failed: 0,
+        };
+        let result = evaluate_joint_response_bounds(
+            10,
+            unknown,
+            unknown,
+            perfect_detector_operating_bounds(),
+            perfect_detector_operating_bounds(),
+        ).unwrap();
+        assert_eq!(
+            result.source_observed_positive_fraction_bounds,
+            NumericInterval { lower: 0.0, upper: 1.0 },
+        );
+        assert_eq!(
+            result.target_observed_positive_fraction_bounds,
+            NumericInterval { lower: 0.0, upper: 1.0 },
+        );
+        assert_eq!(
+            result.joint_response_prevalence_bounds,
+            NumericInterval { lower: 0.0, upper: 1.0 },
+        );
+        assert_eq!(result.target_given_source_prevalence_bounds, None);
+    }
+
+    #[test]
+    fn integrated_joint_response_rejects_inconsistent_channel_denominators() {
+        let invalid = ResponseStatusCounts {
+            detected: 8, not_detected: 1, unobserved: 0,
+            classifier_invalid: 0, registration_failed: 0,
+        };
+        let valid = ResponseStatusCounts {
+            detected: 6, not_detected: 4, unobserved: 0,
+            classifier_invalid: 0, registration_failed: 0,
+        };
+        assert_eq!(
+            evaluate_joint_response_bounds(
+                10, invalid, valid,
+                perfect_detector_operating_bounds(),
+                perfect_detector_operating_bounds(),
+            ).unwrap_err(),
+            EvalError::ResponseStatusCountTotalMismatch {
+                planned_units: 10,
+                classified_units: 9,
+            },
+        );
     }
 
     #[test]
