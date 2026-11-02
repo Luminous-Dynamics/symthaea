@@ -54,6 +54,8 @@ pub struct EditSubmission {
     pub parent_transaction_id: Option<String>,
     pub operation: EditKind,
     pub affected_object_ids: Vec<String>,
+    /// Canonical digest of frozen operation parameters (location, split/merge method, options).
+    pub operation_parameters_sha256: String,
     pub base_snapshot_sha256: String,
     pub patch_sha256: String,
     /// Present only when the adapter successfully applied the patch.
@@ -296,12 +298,10 @@ impl EditTransactionLedger {
         submission: EditSubmission,
     ) -> Result<EventDecision, LedgerError> {
         validate_edit_submission(&submission)?;
-        self.reserve_event(
+        let sequence = self.reserve_event_sequence(
             &submission.transaction_id,
             &submission.idempotency_key,
         )?;
-
-        let sequence = self.reserve_sequence()?;
         let decision = self.evaluate_edit(&submission);
 
         if let EventDecision::Committed {
@@ -336,9 +336,10 @@ impl EditTransactionLedger {
         submission: RollbackSubmission,
     ) -> Result<EventDecision, LedgerError> {
         validate_rollback_submission(&submission)?;
-        self.reserve_event(&submission.rollback_id, &submission.idempotency_key)?;
-
-        let sequence = self.reserve_sequence()?;
+        let sequence = self.reserve_event_sequence(
+            &submission.rollback_id,
+            &submission.idempotency_key,
+        )?;
         let decision = self.evaluate_rollback(&submission);
 
         if let EventDecision::RolledBack {
@@ -358,11 +359,11 @@ impl EditTransactionLedger {
         Ok(decision)
     }
 
-    fn reserve_event(
+    fn reserve_event_sequence(
         &mut self,
         event_id: &str,
         idempotency_key: &str,
-    ) -> Result<(), LedgerError> {
+    ) -> Result<u64, LedgerError> {
         if self.seen_event_ids.contains(event_id) {
             return Err(LedgerError::DuplicateEventId(event_id.to_owned()));
         }
@@ -371,17 +372,16 @@ impl EditTransactionLedger {
                 idempotency_key.to_owned(),
             ));
         }
+
+        let next = self
+            .next_event_sequence
+            .checked_add(1)
+            .ok_or(LedgerError::EventSequenceOverflow)?;
+        let sequence = self.next_event_sequence;
         self.seen_event_ids.insert(event_id.to_owned());
         self.seen_idempotency_keys
             .insert(idempotency_key.to_owned());
-        Ok(())
-    }
-
-    fn reserve_sequence(&mut self) -> Result<u64, LedgerError> {
-        let sequence = self.next_event_sequence;
-        self.next_event_sequence = sequence
-            .checked_add(1)
-            .ok_or(LedgerError::EventSequenceOverflow)?;
+        self.next_event_sequence = next;
         Ok(sequence)
     }
 
@@ -584,6 +584,10 @@ fn validate_edit_submission(submission: &EditSubmission) -> Result<(), LedgerErr
 
     validate_sha("base snapshot", &submission.base_snapshot_sha256)?;
     validate_sha("edit patch", &submission.patch_sha256)?;
+    validate_sha(
+        "operation parameters",
+        &submission.operation_parameters_sha256,
+    )?;
     validate_sha("verifier artifact", &submission.verifier_artifact_sha256)?;
     validate_sha("verifier config", &submission.verifier_config_sha256)?;
 
@@ -755,6 +759,7 @@ mod tests {
             parent_transaction_id: None,
             operation: EditKind::Merge,
             affected_object_ids: vec!["segment-1".to_owned(), "segment-2".to_owned()],
+            operation_parameters_sha256: SHA_E.to_owned(),
             base_snapshot_sha256: base.to_owned(),
             patch_sha256: SHA_B.to_owned(),
             resulting_snapshot_sha256: Some(result.to_owned()),
