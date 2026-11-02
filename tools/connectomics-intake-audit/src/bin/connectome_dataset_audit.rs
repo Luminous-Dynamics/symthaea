@@ -106,6 +106,29 @@ impl Finding {
 }
 
 #[derive(Debug, Serialize)]
+struct DenominatorAudit {
+    /// Physical rows in the union of metadata sidecars.
+    dataset_rows: usize,
+    /// Distinct compatibility IDs produced by the upstream MD5 composition.
+    unique_legacy_combined_sample_hashes: usize,
+    /// Distinct SHA-256 digests over a domain-separated, length-prefixed source identity tuple.
+    unique_source_identity_sha256: usize,
+    /// One operation instance per unique (sample identity, task route) pair.
+    task_operation_instances: usize,
+    task_operation_instances_by_route: BTreeMap<String, u64>,
+    /// One available view instance per unique (sample identity, task route, modality) triple.
+    /// These are not model forward passes or independent observations.
+    available_legal_modality_view_instances: usize,
+    available_legal_modality_view_instances_by_route_and_view: BTreeMap<String, u64>,
+    /// em_best is excluded from this conservative cohort for all routes until a route-specific,
+    /// leakage-reviewed view policy explicitly admits it.
+    em_best_excluded_task_operation_instances_by_route: BTreeMap<String, u64>,
+    legacy_md5_identity_collision_count: u64,
+    identity_scheme: &'static str,
+    scope_note: &'static str,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
     tool: &'static str,
@@ -445,6 +468,19 @@ fn md5_sample_hash(source_archive: &str, source_hash: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// Collision-resistant composition of the two source identity fields.
+/// This does not increase the entropy of source_archive_sample_hash itself;
+/// it only binds the archive and sample-hash fields without delimiter ambiguity.
+fn source_identity_sha256(source_archive: &str, source_hash: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectomebench2-source-identity-v1\\0");
+    hasher.update((source_archive.len() as u64).to_be_bytes());
+    hasher.update(source_archive.as_bytes());
+    hasher.update((source_hash.len() as u64).to_be_bytes());
+    hasher.update(source_hash.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
 fn is_lower_hex(value: &str, len: usize) -> bool {
     value.len() == len
         && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
@@ -665,6 +701,14 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
     let mut route_counts = BTreeMap::<String, u64>::new();
     let mut modality_coverage = BTreeMap::<String, ModalityCoverage>::new();
     let mut seen_samples = BTreeSet::<String>::new();
+    let mut legacy_identities = BTreeMap::<String, (String, String)>::new();
+    let mut source_identity_digests = BTreeSet::<String>::new();
+    let mut task_operation_keys = BTreeSet::<(String, String)>::new();
+    let mut task_operation_counts = BTreeMap::<String, u64>::new();
+    let mut legal_view_instance_keys = BTreeSet::<(String, String, String)>::new();
+    let mut legal_view_instance_counts = BTreeMap::<String, u64>::new();
+    let mut em_best_excluded_counts = BTreeMap::<String, u64>::new();
+    let mut legacy_md5_identity_collision_count = 0_u64;
     let mut lineage_splits = BTreeMap::<String, BTreeSet<String>>::new();
     let mut cube_splits = BTreeMap::<String, BTreeSet<String>>::new();
     let mut root_splits = BTreeMap::<String, BTreeSet<String>>::new();
@@ -685,6 +729,27 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
 
         if !seen_samples.insert(row.combined_sample_hash.clone()) {
             errors.push(Finding::row("duplicate_combined_sample_hash", row, "combined_sample_hash is not globally unique"));
+        }
+        let source_identity = (
+            row.source_archive.clone(),
+            row.source_archive_sample_hash.clone(),
+        );
+        let identity_digest = source_identity_sha256(
+            &row.source_archive,
+            &row.source_archive_sample_hash,
+        );
+        source_identity_digests.insert(identity_digest);
+        if let Some(previous) = legacy_identities.get(&row.combined_sample_hash) {
+            if previous != &source_identity {
+                legacy_md5_identity_collision_count += 1;
+                errors.push(Finding::row(
+                    "combined_hash_identity_collision",
+                    row,
+                    "the same legacy combined_sample_hash maps to distinct source_archive/source_archive_sample_hash tuples",
+                ));
+            }
+        } else {
+            legacy_identities.insert(row.combined_sample_hash.clone(), source_identity);
         }
         if !is_lower_hex(&row.combined_sample_hash, 32) {
             errors.push(Finding::row("combined_hash_format", row, "combined_sample_hash must be 32 lowercase hexadecimal characters"));
@@ -764,6 +829,44 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         }
 
         let present_slot_set: BTreeSet<String> = row.present_slots.iter().cloned().collect();
+
+        // Reconcile nested denominator levels without counting a routed operation
+        // as a new dataset row or a modality view as an independent sample.
+        for route in &row.task_routing {
+            let operation_key = (row.combined_sample_hash.clone(), route.clone());
+            if task_operation_keys.insert(operation_key) {
+                *task_operation_counts.entry(route.clone()).or_default() += 1;
+                let geometry_view = match route.as_str() {
+                    "false_split_correction" => Some("geometry"),
+                    "false_merge_identification" | "split_mask_generation" => Some("geometry_single"),
+                    _ => None,
+                };
+                if let Some(view) = geometry_view {
+                    if present_slot_set.contains(view) {
+                        let key = (row.combined_sample_hash.clone(), route.clone(), view.to_string());
+                        if legal_view_instance_keys.insert(key) {
+                            *legal_view_instance_counts
+                                .entry(format!("{route}|{view}"))
+                                .or_default() += 1;
+                        }
+                    }
+                }
+                for view in ["em_xy", "em_xz", "em_yz"] {
+                    if present_slot_set.contains(view) {
+                        let key = (row.combined_sample_hash.clone(), route.clone(), view.to_string());
+                        if legal_view_instance_keys.insert(key) {
+                            *legal_view_instance_counts
+                                .entry(format!("{route}|{view}"))
+                                .or_default() += 1;
+                        }
+                    }
+                }
+                if present_slot_set.contains("em_best") {
+                    *em_best_excluded_counts.entry(route.clone()).or_default() += 1;
+                }
+            }
+        }
+
         for key in modality_coverage_keys(row, split) {
             modality_coverage.entry(key).or_default().observe(row, &present_slot_set);
         }
@@ -879,6 +982,19 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
     let operation_lineage_group_count = lineage_splits.len();
     let spatial_cube_group_count = cube_splits.len();
     let root_ids_shared_across_splits = shared_root_entries.len();
+    let denominator_audit = DenominatorAudit {
+        dataset_rows: rows.len(),
+        unique_legacy_combined_sample_hashes: seen_samples.len(),
+        unique_source_identity_sha256: source_identity_digests.len(),
+        task_operation_instances: task_operation_keys.len(),
+        task_operation_instances_by_route: task_operation_counts,
+        available_legal_modality_view_instances: legal_view_instance_keys.len(),
+        available_legal_modality_view_instances_by_route_and_view: legal_view_instance_counts,
+        em_best_excluded_task_operation_instances_by_route: em_best_excluded_counts,
+        legacy_md5_identity_collision_count,
+        identity_scheme: "SHA-256(domain || u64be(len(archive)) || archive || u64be(len(source_hash)) || source_hash); upstream MD5 combined_sample_hash retained as compatibility ID",
+        scope_note: "Task-operation instances are unique (combined_sample_hash, task_route) pairs. Available legal modality view instances are unique (combined_sample_hash, task_route, modality) triples, counting task-appropriate geometry plus em_xy/em_xz/em_yz; em_best is listed separately and excluded from this conservative denominator. View instances are not model forward passes, effective independent samples, or task-specific model predictions. Source identity SHA-256 binds the two declared source identity fields but does not increase the entropy of the upstream 12-hex source hash.",
+    };
     errors.sort_by(|a, b| a.code.cmp(&b.code).then_with(|| a.sample_id.cmp(&b.sample_id)).then_with(|| a.detail.cmp(&b.detail)));
     warnings.sort_by(|a, b| a.code.cmp(&b.code).then_with(|| a.sample_id.cmp(&b.sample_id)).then_with(|| a.detail.cmp(&b.detail)));
 
@@ -897,6 +1013,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         sample_type_counts,
         route_counts,
         modality_coverage,
+        denominator_audit,
         operation_lineage_group_count,
         spatial_cube_group_count,
         root_ids_shared_across_splits,
