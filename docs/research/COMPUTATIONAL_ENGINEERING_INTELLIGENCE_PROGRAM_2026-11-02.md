@@ -24,8 +24,10 @@ A first source-level review of the public repository found substantial foundatio
 | `src/language/repo_map.rs` | Repository scan, exact symbol spans/snippets, HDC semantic retrieval, compile-error context | Add a versioned, incremental, typed repository graph with explicit invalidation |
 | `src/language/code_orchestrator.rs` | Multi-backend synthesis, verification, repository context, LSP and experience hooks | Make task contracts, budgets, provenance and acceptance policy first-class |
 | `src/language/rust_lsp.rs` | JSON-RPC client for rust-analyzer | Use semantic queries for types, references, implementations and rename safety; record server/version |
+| `src/infrastructure/sandbox.rs` + `src/language/code_executor.rs` | Dry-run and explicit opt-in host command execution | Make the trust mode explicit; add real OS isolation before running untrusted repositories |
 | `src/coding_agent/test_generation.rs` | Generates example, boundary and signature-derived checks | Distinguish smoke checks from behavioral oracles; add property, mutation, differential and fuzz validation |
 | `examples/coding_agent_benchmark.rs` | 55-task coding-agent suite with name, compilation and assertion layers | Retain as a fast regression suite; add hidden, repo-scale and negative-control evaluations |
+| `examples/refactoring_benchmark.rs` | Multi-file refactoring task fixtures | Wire it to the agent and independent compiler/test grader; it currently validates task definitions only |
 | `crates/domains/symthaea-broca/src/compiler_trainer.rs` | Nix compiler-feedback training prototype | Audit the reward path: on compiler failure it compares `code` with itself, and its loop does not produce a changed candidate |
 | `docs/engineering/SYMTHAEA_ENGINEERING_ROADMAP.md` | Simulation, digital twin, formal safety and physical engineering roadmap | Connect software and physical-system evidence through shared requirements/provenance without conflating their solvers |
 
@@ -229,7 +231,7 @@ Learning should be organized as a concept graph with prerequisites, examples, ex
 | [CRUST-bench](https://crust-bench.github.io/) | C-to-Rust translation and repair | Narrow language-semantics and unsafe-to-safe translation probe |
 | HumanEval / MBPP / BigCodeBench | Function-level code synthesis | Smoke/regression tests only; never the headline engineering score |
 
-Do not treat SWE-bench Verified as the sole or primary measure. OpenAI's February 23, 2026 audit reported substantial flawed tests in the audited difficult subset and evidence of training exposure, and recommended SWE-bench Pro instead. SWE-rebench provides a complementary continuously refreshed task pipeline. SWE-bench Pro V2's September 22, 2026 update describes a two-sided task gate (reference patch passes, empty patch fails), pristine-image regrading and a locked agent phase with web access disabled. Those are useful evaluation design principles to adopt internally.
+Do not treat SWE-bench Verified as the sole or primary measure. The repository's `benches/BENCHMARK_GUIDE.md` still lists it among external suites; update that registry/documentation to mark it historical and add Pro plus fresh-task evaluation. OpenAI's February 23, 2026 audit reported substantial flawed tests in the audited difficult subset and evidence of training exposure, and recommended SWE-bench Pro instead. SWE-rebench provides a complementary continuously refreshed task pipeline. SWE-bench Pro V2's September 22, 2026 update describes a two-sided task gate (reference patch passes, empty patch fails), pristine-image regrading and a locked agent phase with web access disabled. Those are useful evaluation design principles to adopt internally.
 
 Terminal-Bench's official leaderboard reports a 84.7% leading result for Terminal-Bench 2.0 in its April 23, 2026 update. Treat this as a moving reference, not a guarantee that another harness will reproduce the same score. Compare only against results using the same benchmark version and evaluation conditions.
 
@@ -322,7 +324,8 @@ Use Nix for repeatable environment definitions where appropriate, but do not mis
 2. Label each feature as active, compiled-only, experimental, placeholder, disabled or unverified.
 3. Trace the exact end-to-end path from user task to accepted patch.
 4. Add regression tests for the self-comparison reward path and for weak/generated test-oracle classifications.
-5. Produce a signed-off baseline report with exact commit, commands, tool versions and missing evidence.
+5. Classify execution honestly as simulation, trusted host execution or isolated execution; track the isolation work in [issue #10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064).
+6. Produce a signed-off baseline report with exact commit, commands, tool versions and missing evidence.
 
 **Exit:** no capability claim depends only on a file existing or a task being accepted by a weak local check.
 
