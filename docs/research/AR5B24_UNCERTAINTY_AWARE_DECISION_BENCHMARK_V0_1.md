@@ -311,3 +311,22 @@ Do not assume that s-rectangular ambiguity is always less conservative than (s,a
 Ramani & Ghate, *A Family of s-Rectangular Robust MDPs: Relative Conservativeness, Asymptotic Analyses, and Finite-Sample Properties*, SIAM Journal on Optimization, DOI https://doi.org/10.1137/23M1559920, show that for their family an s-rectangular model can be compared with an (s,a)-rectangular model in both directions by changing radii; under lower-semicontinuous convex distances, identical robust optimal values can be obtained under their stated conditions.
 
 Therefore compare the geometries at matched statistical coverage and matched calibration evidence, not by assigning the same arbitrary scalar radius. Report ambiguity-set inclusion when provable, the induced robust-value gap, and the calibration/solver cost. The objective is to measure geometry–calibration–computation trade-offs, not to assume one class universally dominates another.
+
+
+## 15. Policy-specific calibration data and estimand identification
+
+A policy-specific functional expectation requires policy-specific evidence. The same observed trajectory does not reveal the realized counterfactual outcome under every candidate policy.
+
+Every calibration row must identify its evidence mode:
+
+- randomized execution of the candidate policy;
+- simulator/evaluator data with explicitly available ground truth;
+- off-policy estimation from behavior-policy data.
+
+For randomized execution, bind assignment unit, randomization probabilities, cluster IDs, eligibility/exposure rules, policy implementation/version, intervention timing, outcome and censoring definitions, and any interference assumptions. In confirmation, execute the selected randomized policy mixture under a declared assignment protocol matching the receipt estimand.
+
+For off-policy estimates, require positivity/support and a typed estimator/weight contract. V1 DFCE must not apply bounded-IID Hoeffding to unbounded importance weights, unsupported actions, unmodeled interference, or informative missingness. Such inputs are unsupported/indeterminate until a separate valid finite-sample method is implemented.
+
+Do not count repeated observations from one subject, user, cluster, experiment or episode as independent calibration paths. Common random numbers are appropriate for synthetic paired-seed evaluation when their coupling is declared; they do not create observable real-world counterfactuals.
+
+Required negative controls: deterministic policy assignment with no overlap, zero-probability policy arms, cluster leakage, interference between units, and informative missingness. None may qualify as IID per-policy calibration rows.
