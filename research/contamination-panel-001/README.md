@@ -590,3 +590,90 @@ Initial replication gate: at least 300 independent clean negatives per preregist
 
 Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
 
+## Two-stage conformal detector fusion with selective abstention (SCI-DETECTOR-CONFORMAL-FUSION-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9770
+
+### Why this is a different architecture
+
+The detector panel contains heterogeneous scores: FTD fusion statistics, DVD repeated-generation likelihood variance, Min-K%++/PPL/Recall/CDD, LaRA hidden-state geometry, Self-Critique entropy-path rigidity, and future syntax/retrieval/modality-specific probes.
+
+These features have different units, directions, missingness and access requirements, and their errors are correlated. An arithmetic average or Fisher combination under detector independence would add an assumption that the benchmark does not justify.
+
+The implementation uses two independent clean calibration splits. Calibration-A converts every detector score into a direction-aware empirical tail rank within a task-family × model-regime group. A fixed, digest-pinned weighted sum of negative log ranks is then calibrated as a complete statistic on disjoint Calibration-B clusters. The final outer rank therefore does not assume detector-feature independence.
+
+### Numerical contract
+
+For detector d with n_A reference scores and candidate score x:
+
+    p_d(x) = (1 + count(reference score at least as extreme in contamination direction)) / (n_A + 1)
+
+- Higher-means-contaminated uses reference >= candidate.
+- Lower-means-contaminated uses reference <= candidate.
+- All ties count as extreme, making the rank conservative.
+- Each detector has a fixed preregistered weight w_d, represented in permille; all weights sum to exactly 1000.
+
+The fixed fused statistic is:
+
+    T(x) = sum_d (w_d / 1000) * -ln(p_d(x))
+
+For each Calibration-B cluster, calculate T using the same Calibration-A ranks and fixed weights. The final outer p-value is:
+
+    p_final(x) = (1 + count(T_B >= T(x))) / (n_B + 1)
+
+This final calibration is conditional on the clean Calibration-B clusters being exchangeable with future clean evaluation clusters within the exact group. It does not assume the detector features are independent.
+
+### Multiple testing and decisions
+
+The same Calibration-B bank is reused for multiple test units, and detector features are correlated. The implementation therefore applies Benjamini-Yekutieli (BY) to the eligible outer p-values within each task-family × model-regime testing family. BY is the conservative arbitrary-dependence procedure; its FDR control still depends on each null outer p-value being super-uniform.
+
+The report preserves raw detector scores, detector ranks, weighted contributions, fused nonconformity, outer p-value rank numerators/denominators, BY-adjusted p-values, flags and abstentions. It also reports pairwise detector Spearman correlations. Missing detector features are never zero-imputed; the candidate abstains. Unsupported groups and insufficient outer p-value resolution also abstain.
+
+### Evidence binding
+
+The request binds:
+- model checkpoint, tokenizer, prompt/harness and runtime environment;
+- detector registry with score direction, fixed weight and feature-contract digest;
+- calibration protocol digest;
+- disjoint Calibration-A, Calibration-B and evaluation cluster identities and source-cluster digests;
+- a canonical manifest digest for each of the three splits and a request digest for the entire request.
+
+Detector registry digest: domain detector-conformal-registry.v1, over compact JSON of detector specs sorted by detector ID. Calibration and evaluation manifest hashes sort rows by unit ID and features by detector ID. These digests establish deterministic content binding, not independent authentication or proof that a reference cohort is clean.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      calibrate-detector-panel \
+      detector-conformal-fusion-request.json \
+      detector-conformal-fusion-report.json
+
+The CLI applies a bounded 512 MiB request size limit.
+
+### Resolution and benchmark targets
+
+- Minimum 99 Calibration-B independent clusters per group to resolve a p-value at or below 1% (minimum p = 1/(n_B+1)). This is only p-value resolution, not FPR precision.
+- At least 300 independent clean evaluation clusters per group as an initial one-sided 95% FPR-precision target when zero false positives are observed; larger cohorts are required with nonzero false positives or stratification.
+- Report exact one-sided 95% Clopper-Pearson upper FPR bound and lower TPR bound, not only empirical rates.
+- Report detector disagreement, BY family size, minimum A and B p-value resolution, abstention reasons and decision coverage.
+- Benchmark across math, code, science, factual QA, tool use and multimodal tasks, by model/checkpoint, language, source age and contamination tier. Never pool groups as the sole result.
+- Compare raw detectors, equal-weight fusion, preregistered weighted fusion, outer conformal calibration and BY decisions on the same locked clusters.
+
+### Qualification tests and current status
+
+The Rust kernel tests:
+- direction-aware empirical ranks and conservative ties;
+- registry-pinned detector weights and feature contracts;
+- disjoint cluster IDs and source-cluster digests;
+- dependent detector score handling through outer calibration;
+- missing/unsupported group abstention with no imputation;
+- p-value resolution abstention;
+- BY adjustment and pairwise Spearman diagnostics;
+- exact one-sided binomial confidence bounds;
+- complete JSON request fixture scoring.
+
+These tests are authored; exact-head formatting, locked tests and Clippy qualification are required before claiming they pass. The report hard-sets independently_authenticated=false, confirmatory_eligible=false and intervals_multiplicity_adjusted=false.
+
+### Claim ceiling
+
+The system produces group-conditional conformal-style p-values under a clean-reference and exchangeability contract, followed by BY-adjusted selective decisions. It does not prove the calibration cohorts are clean, authenticate model/checkpoint/custody, protect against arbitrary temporal/language/domain shift, establish causal exposure, or make a universal detector guarantee. A detector abstention is not a clean label. No SOTA superiority is claimed by this implementation alone.
+

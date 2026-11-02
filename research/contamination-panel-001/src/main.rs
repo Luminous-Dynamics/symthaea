@@ -2,6 +2,7 @@ use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    detector_conformal_fusion::{DetectorConformalFusionRequestV1, calibrate_detector_panel},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
@@ -388,6 +389,32 @@ fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn calibrate_detector_panel_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench calibrate-detector-panel <conformal-fusion-request.json> <conformal-fusion-report.json>"
+                .into(),
+        );
+    }
+    const MAX_CONFORMAL_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_CONFORMAL_REQUEST_BYTES)?;
+    let request: DetectorConformalFusionRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = calibrate_detector_panel(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "groups={} evaluation_units={} flagged={} no_flag={} abstained={} method={} confirmatory_eligible={}",
+        report.group_count,
+        report.evaluation_unit_count,
+        report.flagged_count,
+        report.no_flag_count,
+        report.abstained_count,
+        report.multiple_testing_method,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.first().map(String::as_str) {
@@ -401,9 +428,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
+        Some("calibrate-detector-panel") => calibrate_detector_panel_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | calibrate-detector-panel | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

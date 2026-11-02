@@ -1,0 +1,107 @@
+{
+  "schema": "symthaea.detector_conformal_fusion_protocol.v1",
+  "protocol_id": "SCI-DETECTOR-CONFORMAL-FUSION-001",
+  "version": "2.0.0",
+  "status": "research_protocol_not_qualified",
+  "unit_of_exchangeability": "One independent source/task cluster per row. Multiple questions, generations, prompts or samples from a cluster must be aggregated by a preregistered procedure before scoring and may not be counted as independent units.",
+  "group_key": [
+    "task_family",
+    "model_regime"
+  ],
+  "model_binding": [
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "prompt_harness_sha256",
+    "runtime_environment_sha256"
+  ],
+  "split_contract": {
+    "calibration_a": "Independent clean reference clusters used only to compute detector-specific empirical ranks.",
+    "calibration_b": "Disjoint clean reference clusters used only to calibrate the fixed fused statistic.",
+    "evaluation": "Locked test clusters. Labels may be used only after decisions are computed.",
+    "overlap_policy": "Calibration-A, Calibration-B and evaluation unit IDs and source_cluster_sha256 values must be globally disjoint.",
+    "exchangeability_scope": "Calibration-B and each future clean evaluation cluster must be exchangeable within task_family × model_regime, conditional on calibration-A and the pinned model/detector/protocol registry."
+  },
+  "detector_registry": {
+    "detector_count_min": 2,
+    "detector_count_max": 64,
+    "fixed_weight_sum_permille": 1000,
+    "weights_frozen_before_calibration": true,
+    "feature_contract_digest_required": true,
+    "direction_values": [
+      "higher_means_contaminated",
+      "lower_means_contaminated"
+    ],
+    "detector_registry_hash_domain": "detector-conformal-registry.v1",
+    "registry_canonicalization": "Sort detector_specs by detector_id, serialize typed structs as compact serde_json, and apply domain-separated SHA-256."
+  },
+  "calibration_a": {
+    "minimum_independent_units_per_group": 2,
+    "empirical_detector_tail_p": "(1 + count(reference score at least as extreme in the declared contamination direction)) / (n_A + 1)",
+    "ties": "Conservative: include all ties in the extreme count.",
+    "lower_direction": "For lower_means_contaminated, count reference_score <= candidate_score.",
+    "higher_direction": "For higher_means_contaminated, count reference_score >= candidate_score.",
+    "detector_p_resolution": "1/(n_A+1); coarse A resolution can reduce power even though outer calibration remains the validity step."
+  },
+  "fixed_fusion": {
+    "method_id": "weighted_sum_negative_log_empirical_detector_pvalues_v2",
+    "formula": "sum_d (weight_d_permille / 1000) * -ln(p_d)",
+    "weights": "Fixed registry weights; sum exactly 1000 permille.",
+    "missing_features": "No zero imputation, missing modality or detector score causes an explicit evaluation abstention.",
+    "calibration_b": "Apply the same Stage-A ranks and fixed fusion statistic to every independent Calibration-B cluster."
+  },
+  "outer_calibration": {
+    "final_conformal_p": "(1 + count(Calibration-B fused_nonconformity >= evaluation fused_nonconformity)) / (n_B + 1)",
+    "ties": "Conservative: include all ties.",
+    "minimum_attainable_p": "1/(n_B+1)",
+    "resolution_rule": "Abstain when target_alpha_permille / 1000 is below 1/(n_B+1). For alpha=10 permille (1%), at least 99 Calibration-B units are needed just to resolve the smallest p-value.",
+    "independence_assumption": "No detector-feature independence assumption; validity relies on Stage-B cluster-level exchangeability within the declared group."
+  },
+  "multiple_testing": {
+    "procedure": "Benjamini-Yekutieli",
+    "scope": "Eligible non-abstained evaluation hypotheses within each task_family × model_regime group.",
+    "reason": "The same Calibration-B bank and correlated detector features induce dependence across candidate p-values; BY is selected for arbitrary-dependence FDR control conditional on valid super-uniform p-values.",
+    "abstentions": "Not counted as discoveries; they remain visible in the denominator and count as misses for labelled contaminated evaluation items.",
+    "claim_ceiling": "BY does not restore marginal p-value validity under distribution shift or contaminated calibration data."
+  },
+  "diagnostics": {
+    "retained_evidence": [
+      "each detector raw score",
+      "detector direction",
+      "empirical rank numerator and denominator",
+      "detector p-value",
+      "fixed weight",
+      "weighted contribution",
+      "fused nonconformity",
+      "outer p-value numerator and denominator",
+      "BY adjusted p-value",
+      "minimum p resolution",
+      "abstention reason"
+    ],
+    "disagreement": "Pairwise Spearman rank correlations for detector features are reported per task-family × model-regime group.",
+    "uncertainty": [
+      "one-sided 95% Clopper-Pearson upper bound for empirical FPR",
+      "one-sided 95% Clopper-Pearson lower bound for empirical TPR"
+    ],
+    "run_cost": "Report detector runtime, probe/generation count, tokens, GPU memory, model access and wall-clock cost in the run receipt."
+  },
+  "qualification_targets": {
+    "detector_registry_digest_mismatch": 0,
+    "cross_split_unit_id_overlap": 0,
+    "cross_split_source_cluster_digest_overlap": 0,
+    "missing_calibration_features": 0,
+    "missing_evaluation_features_silently_imputed": 0,
+    "direction_or_weight_mismatch": 0,
+    "by_applied_to_every_eligible_hypothesis": true,
+    "calibration_b_units_for_1pct_resolution": 99,
+    "clean_evaluation_units_for_one_sided_95pct_fpr_upper_below_1pct_at_zero_false_positives": 300,
+    "report_every_group": true
+  },
+  "claim_ceiling": [
+    "Conformal-style p-values are conditional on genuinely clean Calibration-A and Calibration-B cohorts and cluster-level exchangeability within each group.",
+    "The implementation does not authenticate clean-reference status, model identity or source-cluster custody; digests prove consistency, not truth.",
+    "BY controls FDR only if each null outer p-value is super-uniform; it does not protect against distribution shift.",
+    "A one-sided exact binomial bound quantifies uncertainty on the locked labelled test cohort; it does not imply population representativeness.",
+    "Abstention is a valid system outcome, not a successful detection.",
+    "No universal contamination guarantee, causal direct-effect claim, or SOTA superiority follows from the software implementation."
+  ]
+}
