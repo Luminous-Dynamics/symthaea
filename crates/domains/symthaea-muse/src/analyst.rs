@@ -329,7 +329,6 @@ fn assertion_envelope(
     }
 }
 
-
 fn typed_obligation_definition(
     kind: &ObligationKind,
     source_evidence: &[ScoreEventRef],
@@ -2313,8 +2312,6 @@ mod tests {
         );
     }
 
-
-
     #[test]
     fn period_sentence_return_definition_preserves_source_ids_across_protocol_boundary() {
         use symthaea_music_theory::{MusicalIntent, Style, compose_with_grammar_plan};
@@ -2344,6 +2341,10 @@ mod tests {
             .copied()
             .map(trace_event_id)
             .collect();
+        assert!(
+            expected_source_ids.len() >= 2,
+            "the fixed Period/Sentence fixture must expose an exact source motif"
+        );
         let Some(definition) = &public_source.definition else {
             panic!("typed period/sentence return definition must survive conversion");
         };
