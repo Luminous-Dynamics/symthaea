@@ -359,7 +359,7 @@ fn validate_policy_samples(
             ));
         }
         if let Some((support_digest, expected_size)) = reference_support {
-            if support_digest != sample.path_support_sha256 || expected_size != support_size {
+            if support_digest != sample.path_support_sha256.as_str() || expected_size != support_size {
                 return Err(FiniteTvCalibrationError::new(
                     format!("{row_path}.path_support"),
                     "support digest, size and category ordering must match across policies for one model",
@@ -436,15 +436,15 @@ fn validate_request_against_plan(
     }
 
     let expected_policy_ids = plan.policies.iter()
-        .map(|policy| policy.policy_id.as_str()).collect::<BTreeSet<_>>();
+        .map(|policy| policy.policy_id.clone()).collect::<BTreeSet<_>>();
     let expected_null_ids = plan.policies[0].null_models.iter()
-        .map(|row| row.model_id.as_str()).collect::<BTreeSet<_>>();
+        .map(|row| row.model_id.clone()).collect::<BTreeSet<_>>();
     let expected_alternative_ids = plan.policies[0].alternatives.iter()
-        .map(|row| row.model_id.as_str()).collect::<BTreeSet<_>>();
+        .map(|row| row.model_id.clone()).collect::<BTreeSet<_>>();
     let supplied_null_ids = request.null_models.iter()
-        .map(|model| model.model_id.as_str()).collect::<BTreeSet<_>>();
+        .map(|model| model.model_id.clone()).collect::<BTreeSet<_>>();
     let supplied_alternative_ids = request.alternatives.iter()
-        .map(|model| model.model_id.as_str()).collect::<BTreeSet<_>>();
+        .map(|model| model.model_id.clone()).collect::<BTreeSet<_>>();
     if expected_null_ids != supplied_null_ids {
         return Err(FiniteTvCalibrationError::new(
             "request.null_models",
@@ -501,10 +501,10 @@ fn validate_request_against_plan(
 
 fn validate_policy_coverage(
     samples: &[FiniteTvPathSample],
-    expected: &BTreeSet<&str>,
+    expected: &BTreeSet<String>,
     path: &str,
 ) -> Result<(), FiniteTvCalibrationError> {
-    let supplied = samples.iter().map(|sample| sample.policy_id.as_str()).collect::<BTreeSet<_>>();
+    let supplied = samples.iter().map(|sample| sample.policy_id.clone()).collect::<BTreeSet<_>>();
     if &supplied != expected {
         return Err(FiniteTvCalibrationError::new(
             path,
