@@ -106,7 +106,7 @@ pub struct CampaignTruthV1 {
     pub injected_leakage_modality: Option<LeakageModalityV1>,
     pub evaluation_target_indices: Vec<u8>,
     pub evaluation_target_ids: Vec<String>,
-    pub expected_protocol_valid: bool,
+    pub expected_chronology_valid: bool,
     pub claim_ceiling: String,
 }
 
@@ -435,7 +435,7 @@ pub fn generate_campaign_v1(
         evaluation_target_indices.push(target_index);
     }
 
-    let expected_protocol_valid = world != CampaignWorldV1::AdversarialMutation;
+    let expected_chronology_valid = world != CampaignWorldV1::AdversarialMutation;
 
     Ok(GeneratedCampaignV1 {
         public: PublicCampaignV1 {
@@ -453,7 +453,7 @@ pub fn generate_campaign_v1(
             injected_leakage_modality: leakage,
             evaluation_target_indices,
             evaluation_target_ids,
-            expected_protocol_valid,
+            expected_chronology_valid,
             claim_ceiling: "synthetic_only".to_owned(),
         },
     })
