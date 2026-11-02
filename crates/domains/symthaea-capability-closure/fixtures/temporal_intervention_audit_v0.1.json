@@ -1,0 +1,39 @@
+{
+  "schema": "luminous.temporal_intervention_audit.v0.1",
+  "tracking_issue": 9561,
+  "related_issues": [9557, 9872],
+  "package": "research/temporal-intervention-audit",
+  "randomization": {
+    "assignment": "independent_bernoulli_fair_coin_within_pair",
+    "treatment_probability_ppm": 500000,
+    "minimum_pairs": 2,
+    "maximum_exact_pairs": 20,
+    "enumeration": "gray_code_exact_sign_flip",
+    "complexity_per_axis": "O(2^n)"
+  },
+  "outcomes": [
+    "wrong_belief_exposure_us",
+    "abstention_exposure_us",
+    "missing_output_exposure_us"
+  ],
+  "missing_outcome_policy": {
+    "abstention": "full_episode_duration_as_abstention_exposure",
+    "timeout_invalid_or_missing": "full_episode_duration_as_missing_output_exposure",
+    "drop_failed_pairs": false
+  },
+  "inference": {
+    "null": "sharp_null_of_no_treatment_effect",
+    "one_sided": "positive_control_minus_treatment_exposure",
+    "two_sided": true,
+    "multiplicity": "bonferroni_over_preregistered_comparison_family",
+    "confidence_interval": false,
+    "arbitrary_temporal_drift_guarantee": false
+  },
+  "tests": {
+    "rust_test_functions_authored": 12,
+    "rust_tests_executed": false,
+    "benchmark_executed": false,
+    "assignment_receipts_verified": false,
+    "hardware_energy_measured": false
+  }
+}
