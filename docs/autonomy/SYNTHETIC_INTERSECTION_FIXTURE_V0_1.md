@@ -77,6 +77,27 @@ The execution result should record ego and actor pose/velocity traces, sensor-ob
 
 Run a fresh-process replay of each frozen candidate before treating its output as reproducible. Preserve incomplete, unsupported, timed-out and invalid runs with typed outcomes and exact exclusion reasons.
 
+## Scenario interchange target
+
+The internal candidate object remains the source-authored, typed experiment contract. The execution bridge should project it into a pinned ASAM representation where the required semantics are expressible:
+
+- OpenSCENARIO DSL 2.2.0 for parameterized/logical scenario descriptions and composition;
+- OpenSCENARIO XML 1.4.0 for concrete simulator-interchange scenarios where the selected backend supports the relevant constructs.
+
+The adapter must version the mapping profile and preserve the original candidate ID. It must report every loss, approximation and unsupported construct. Do not claim that DSL-to-XML, XML-to-engine or engine-to-internal-candidate round trips are semantically equivalent unless an explicit conformance suite proves the exact subset. A format conversion does not validate the physics or actor behavior.
+
+See [ASAM OpenSCENARIO DSL](https://www.asam.net/standards/detail/openscenario-dsl/) and [ASAM OpenSCENARIO XML](https://www.asam.net/standards/detail/openscenario-xml/).
+
+## Counterfactual outcome interpretation
+
+A candidate that produces contact in one executed rollout is not automatically a counterexample showing that the tested controller could have prevented it. The next classification layer is [SAM-AVOID-001 #10083](https://github.com/Luminous-Dynamics/symthaea/issues/10083), which must compose #6247 vehicle dynamics and #2022 kinodynamic reachability:
+
+- `avoidable-under-model` requires a concrete admissible evasive trajectory witness replayed under the same declared model/actor/actuator contract;
+- `unavoidable-under-model` requires complete enumeration, an analytic bound or a sound conservative reachability result covering the full declared admissible action set;
+- `indeterminate` is mandatory for incomplete search, unsupported semantics, OOD dynamics, missing actuator assumptions or exhausted budgets.
+
+Do not use a search reward or the tested controller's own confidence to label avoidability. Do not infer legal fault or real-world preventability from this model-relative label.
+
 ## Benchmark sequence
 
 1. Freeze this schema and the candidate generator revision.
