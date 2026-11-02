@@ -1,6 +1,6 @@
 # symthaea-dishwasher-design
 
-First-principles and calibration-bounded engineering primitives for Luminous InstantClean research.
+First-principles and calibration-bounded engineering primitives for Luminous InstantClean research. See [the hybrid system architecture](docs/system-architecture.md) for the appliance concept, resource-aware dispatch, fluid-quality partition and prototype gates.
 
 ## Modules
 
