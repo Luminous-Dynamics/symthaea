@@ -669,8 +669,8 @@ mod tests {
 
         for n in 1..=12 {
             for q in [0.0, 0.01, 0.2, 0.5, 0.99, 1.0] {
-                for d_opt in [0.0, 0.001, 0.1, 0.9, 1.0] {
-                    for d_myo in [0.0, 0.1, 0.5, 1.0] {
+                for d_opt in [0.0_f64, 0.001, 0.1, 0.9, 1.0] {
+                    for d_myo in [0.0_f64, 0.1, 0.5, 1.0] {
                         let mut explicit = [0.0_f64; 3];
                         for k_opt in 0..=n {
                             let pk = binomial_probability(n, k_opt, q);
