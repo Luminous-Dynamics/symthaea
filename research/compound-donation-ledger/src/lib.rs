@@ -1626,20 +1626,20 @@ mod tests {
         let mut account = ProcessOvershootRefundUncapped::with_initial_evidence_value(
             1, 20, 0
         ).unwrap();
-        let first = account.record(0, 0).unwrap();
+        let first = account.record(1, 0).unwrap();
         assert_eq!(first.effective_cost_numerator, 0);
         assert_eq!(first.cumulative_refund_numerator, 0);
 
         let before = account.clone();
         assert_eq!(
-            account.record(0, 1),
+            account.record(0, 0),
             Err(LedgerError::RoundDecreased)
         );
         assert_eq!(account, before);
         assert_eq!(
-            account.record(1, 0),
+            account.record(2, 0),
             Ok(OvershootRefundReceipt {
-                round: 1,
+                round: 2,
                 evidence_value: 0,
                 refund_increment_numerator: 0,
                 cumulative_refund_numerator: 0,
