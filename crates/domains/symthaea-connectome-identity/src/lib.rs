@@ -624,6 +624,58 @@ mod tests {
     }
 
     #[test]
+    fn invalid_target_identifier_rejects_without_normalization() {
+        let join = validate_identity_join(&input()).expect("join");
+        let error = resolve_targets(&join, &[" 100".to_string()])
+            .expect_err("whitespace-mutated identity must reject");
+        assert!(error.contains(ReasonCode::InvalidTargetId));
+    }
+
+    #[test]
+    fn extra_annotation_identity_rejects() {
+        let mut source = input();
+        source.annotation_ids[2] = "400".to_string();
+        let error = validate_identity_join(&source).expect_err("extra annotation must reject");
+        assert!(error.contains(ReasonCode::AnnotationIdMissingFromRows));
+    }
+
+    #[test]
+    fn matrix_orientation_is_part_of_canonical_identity() {
+        let first = validate_identity_join(&input()).expect("first orientation");
+        let mut source = input();
+        source.orientation = Some(MatrixOrientation::RowsPostsynapticColumnsPresynaptic);
+        let second = validate_identity_join(&source).expect("second orientation");
+        assert_ne!(first.canonical_identity_sha256, second.canonical_identity_sha256);
+    }
+
+    #[test]
+    fn artifact_release_changes_canonical_identity() {
+        let first = validate_identity_join(&input()).expect("first release");
+        let mut source = input();
+        source.artifact.release_id = "manc-v1.2.2".to_string();
+        let second = validate_identity_join(&source).expect("second release");
+        assert_ne!(first.canonical_identity_sha256, second.canonical_identity_sha256);
+    }
+
+    #[test]
+    fn unknown_keep_only_id_rejects() {
+        let join = validate_identity_join(&input()).expect("join");
+        let keep = vec!["999".to_string()];
+        let error = resolve_selection(&join, Some(&keep), &[])
+            .expect_err("unknown keep-only identity must reject");
+        assert!(error.contains(ReasonCode::UnknownTargetId));
+    }
+
+    #[test]
+    fn unknown_remove_id_rejects() {
+        let join = validate_identity_join(&input()).expect("join");
+        let remove = vec!["999".to_string()];
+        let error = resolve_selection(&join, None, &remove)
+            .expect_err("unknown remove identity must reject");
+        assert!(error.contains(ReasonCode::UnknownTargetId));
+    }
+
+    #[test]
     fn unknown_target_id_rejects() {
         let join = validate_identity_join(&input()).expect("join");
         let error = resolve_targets(&join, &["999".to_string()])
