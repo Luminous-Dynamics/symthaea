@@ -117,6 +117,15 @@ fn verify_overshoot_refund_transition_with_cap(
     let denominator = (alpha_denominator as u128)
         .checked_mul(EVIDENCE_ONE)
         .ok_or(VerifyError::Overflow)?;
+    let previous_scaled_evidence = (alpha_numerator as u128)
+        .checked_mul(previous_evidence_value)
+        .ok_or(VerifyError::Overflow)?;
+    let previous_raw_refund = previous_scaled_evidence.saturating_sub(denominator);
+    let expected_previous_refund = refund_cap_numerator
+        .map_or(previous_raw_refund, |cap| previous_raw_refund.min(cap));
+    if expected_previous_refund != previous_refund_numerator {
+        return Err(VerifyError::RefundReplayMismatch);
+    }
     let alpha_scaled_evidence = (alpha_numerator as u128)
         .checked_mul(receipt.evidence_value)
         .ok_or(VerifyError::Overflow)?;
@@ -786,6 +795,37 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn generic_refund_verifier_rejects_forged_previous_balance() {
+        let receipt = OvershootRefundReceipt {
+            round: 2,
+            evidence_value: 100 * EVIDENCE_ONE,
+            refund_increment_numerator: 80 * EVIDENCE_ONE,
+            cumulative_refund_numerator: 80 * EVIDENCE_ONE,
+            effective_cost_numerator: 20 * EVIDENCE_ONE,
+            denominator: 20 * EVIDENCE_ONE,
+            rejected: true,
+        };
+
+        // At the previous evidence value 21, the cumulative refund is exactly
+        // 1 evidence tick in the common numerator scale, not zero.
+        assert_eq!(
+            verify_full_overshoot_refund_transition(
+                1, 20, Some(1), 21 * EVIDENCE_ONE, 0, &receipt
+            ),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+
+        // Likewise, the capped account's previous balance must equal its
+        // policy-implied cumulative capped overshoot.
+        assert_eq!(
+            verify_overshoot_refund_transition(
+                1, 20, Some(1), 21 * EVIDENCE_ONE, 0, &receipt
+            ),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+    }
 
     #[test]
     fn independent_verifier_accepts_full_score_overshoot_receipt() {
