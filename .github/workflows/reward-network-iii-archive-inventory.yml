@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Syntax-check inventory helper
+        run: python -m py_compile research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py
+
       - name: Download exact Zenodo v2.0 archive
         shell: bash
         run: |
