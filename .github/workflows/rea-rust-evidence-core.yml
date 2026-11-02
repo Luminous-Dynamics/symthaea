@@ -83,10 +83,8 @@ jobs:
             "$RUNNER_TEMP/rea-evidence-upstream-v1"
           echo "REA_UPSTREAM_EVIDENCE_FIXTURE_DIR=$RUNNER_TEMP/rea-evidence-upstream-v1" >> "$GITHUB_ENV"
 
-      - name: Resolve isolated harness lockfile with pinned top-level dependencies
+      - name: Validate Cargo-generated isolated harness lockfile
         run: |
-          cargo generate-lockfile \
-            --manifest-path tools/rea-evidence-compat-harness/Cargo.toml
           cargo metadata \
             --manifest-path tools/rea-evidence-compat-harness/Cargo.toml \
             --locked --format-version 1 \
