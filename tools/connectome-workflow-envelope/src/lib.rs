@@ -215,6 +215,7 @@ pub struct QueryStopCalibrationReceipt {
     pub receipt_sha256: String,
     pub report_sha256: String,
     pub calibration_profile_sha256: String,
+    pub calibration_trajectory_manifest_sha256: String,
     pub group_disjointness_report_sha256: String,
     pub exchangeability_assessment_sha256: String,
     pub query_id: String,
@@ -222,6 +223,7 @@ pub struct QueryStopCalibrationReceipt {
     pub analysis_code_sha256: String,
     pub metric_id: String,
     pub unit_id: String,
+    pub materiality_threshold: f64,
     pub calibration_stratum_id: String,
     pub source_volume_id: String,
     pub target_independence_cluster_id: String,
@@ -1009,6 +1011,7 @@ fn validate_query_stop_calibration(
         ("query stop receipt", &receipt.receipt_sha256),
         ("query stop report", &receipt.report_sha256),
         ("query stop calibration profile", &receipt.calibration_profile_sha256),
+        ("query stop trajectory manifest", &receipt.calibration_trajectory_manifest_sha256),
         ("query stop group-disjointness report", &receipt.group_disjointness_report_sha256),
         ("query stop exchangeability assessment", &receipt.exchangeability_assessment_sha256),
         ("query stop definition", &receipt.query_definition_sha256),
@@ -1045,6 +1048,8 @@ fn validate_query_stop_calibration(
     if receipt.future_horizon_edits == 0
         || !receipt.alpha.is_finite()
         || receipt.alpha <= 0.0
+        || !receipt.materiality_threshold.is_finite()
+        || receipt.materiality_threshold <= 0.0
         || receipt.alpha >= 1.0
         || !receipt.observed_max_drift_ratio.is_finite()
         || receipt.observed_max_drift_ratio < 0.0
@@ -1370,6 +1375,7 @@ mod tests {
             receipt_sha256: SHA_A.to_owned(),
             report_sha256: SHA_B.to_owned(),
             calibration_profile_sha256: SHA_C.to_owned(),
+            calibration_trajectory_manifest_sha256: SHA_E.to_owned(),
             group_disjointness_report_sha256: SHA_D.to_owned(),
             exchangeability_assessment_sha256: SHA_A.to_owned(),
             query_id: "pathway-1".to_owned(),
@@ -1377,6 +1383,7 @@ mod tests {
             analysis_code_sha256: SHA_D.to_owned(),
             metric_id: "pathway-strength".to_owned(),
             unit_id: "normalized-strength".to_owned(),
+            materiality_threshold: 0.05,
             calibration_stratum_id: "human-volume-workflow-v1".to_owned(),
             source_volume_id: "volume-1".to_owned(),
             target_independence_cluster_id: "animal-1-session-1".to_owned(),
