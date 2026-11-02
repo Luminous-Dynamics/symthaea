@@ -41,6 +41,8 @@ The Rust source in research/adaptive-temporal-replay/src/lib.rs contains:
 
 This is intentionally a controller/replay substrate. The caller still constructs the actual interval and computes the miss/cover result. The controller does not silently invent an interval from a scalar.
 
+Each step receipt distinguishes the alpha used by the prediction now being scored (`alpha_used_ppm`) from the updated phase alpha used for the newly issued prediction (`updated_alpha_ppm`). During the initial tau-step warm-up there is no due feedback, so both fields equal the initial phase alpha.
+
 ### Numerical claim boundary
 
 The paper states its recursion over real-valued alpha. The Rust implementation stores alpha in integer parts-per-million and rounds each update to nearest PPM with ties away from zero. This makes the controller deterministic and auditable, but it is a numerical approximation. The paper's exact finite-sample theorem is **not automatically inherited** by this rounded implementation; a numerical error analysis or exact-rational implementation would be required before making that claim.
