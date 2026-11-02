@@ -38,6 +38,7 @@ pub struct ReviewBudget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AllocationMethod {
     GreedyExpectedAvoidedCostPerSecond,
+    ExactEnumerationOracle,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,6 +71,10 @@ pub enum PolicyError {
     ZeroReviewDuration(String),
     NonFiniteExpectedCost(String),
     ExpectedCostOverflow,
+    ExactOracleCandidateLimit {
+        candidates: usize,
+        maximum: usize,
+    },
 }
 
 impl fmt::Display for PolicyError {
@@ -91,6 +96,10 @@ impl fmt::Display for PolicyError {
                 write!(f, "expected cost is not finite for operation {id}")
             }
             Self::ExpectedCostOverflow => write!(f, "aggregate expected cost overflowed"),
+            Self::ExactOracleCandidateLimit { candidates, maximum } => write!(
+                f,
+                "exact oracle supports at most {maximum} candidates, got {candidates}"
+            ),
         }
     }
 }
@@ -247,6 +256,108 @@ pub fn plan_reviews(
         expected_residual_error_cost_units,
         allocation_method: AllocationMethod::GreedyExpectedAvoidedCostPerSecond,
     })
+}
+
+/// Maximum number of candidates accepted by the exhaustive exact oracle.
+pub const MAX_EXACT_ORACLE_CANDIDATES: usize = 20;
+
+/// Compute an exact review allocation for a small cohort by exhaustive subset enumeration.
+///
+/// This is intentionally a small-instance oracle, not the production-scale allocator.
+/// It maximizes total expected avoided error cost subject to the integer-second budget.
+/// Ties prefer lower time consumption, then the lexicographically smaller selected-ID list.
+/// The candidate limit bounds runtime at fewer than 2^20 subsets.
+///
+/// The function first invokes the primary planner with a zero-second budget, reusing its
+/// input validation and canonical expected-baseline-cost receipt.
+pub fn plan_reviews_exact_small(
+    candidates: &[ReviewCandidate],
+    budget: ReviewBudget,
+) -> Result<ReviewPlan, PolicyError> {
+    if candidates.len() > MAX_EXACT_ORACLE_CANDIDATES {
+        return Err(PolicyError::ExactOracleCandidateLimit {
+            candidates: candidates.len(),
+            maximum: MAX_EXACT_ORACLE_CANDIDATES,
+        });
+    }
+
+    let validated = plan_reviews(candidates, ReviewBudget { seconds: 0 })?;
+    let mut ordered: Vec<&ReviewCandidate> = candidates.iter().collect();
+    ordered.sort_by(|left, right| left.operation_id.cmp(&right.operation_id));
+
+    let subset_count = 1_u64 << ordered.len();
+    let mut best_mask = 0_u64;
+    let mut best_spent = 0_u64;
+    let mut best_benefit = 0.0_f64;
+    let mut best_ids: Vec<String> = Vec::new();
+
+    for mask in 1..subset_count {
+        let mut spent = 0_u64;
+        let mut benefit = 0.0_f64;
+        let mut feasible = true;
+
+        for (index, candidate) in ordered.iter().enumerate() {
+            if mask & (1_u64 << index) == 0 {
+                continue;
+            }
+            spent += u64::from(candidate.review_seconds);
+            if spent > u64::from(budget.seconds) {
+                feasible = false;
+                break;
+            }
+            benefit += candidate.error_probability
+                * candidate.missed_error_cost_units
+                * candidate.review_resolution_probability;
+        }
+
+        if !feasible {
+            continue;
+        }
+
+        let candidate_ids = selected_ids(mask, &ordered);
+        let better = benefit > best_benefit
+            || (benefit == best_benefit
+                && (spent < best_spent
+                    || (spent == best_spent && candidate_ids < best_ids)));
+
+        if better {
+            best_mask = mask;
+            best_spent = spent;
+            best_benefit = benefit;
+            best_ids = candidate_ids;
+        }
+    }
+
+    let selected_operation_ids = selected_ids(best_mask, &ordered);
+    let deferred_operation_ids = ordered
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| best_mask & (1_u64 << index) == 0)
+        .map(|(_, candidate)| candidate.operation_id.clone())
+        .collect();
+
+    let expected_residual_error_cost_units =
+        (validated.expected_baseline_error_cost_units - best_benefit).max(0.0);
+
+    Ok(ReviewPlan {
+        selected_operation_ids,
+        deferred_operation_ids,
+        spent_seconds: best_spent,
+        budget_seconds: budget.seconds,
+        expected_baseline_error_cost_units: validated.expected_baseline_error_cost_units,
+        expected_avoided_error_cost_units: best_benefit,
+        expected_residual_error_cost_units,
+        allocation_method: AllocationMethod::ExactEnumerationOracle,
+    })
+}
+
+fn selected_ids(mask: u64, ordered: &[&ReviewCandidate]) -> Vec<String> {
+    ordered
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| mask & (1_u64 << index) != 0)
+        .map(|(_, candidate)| candidate.operation_id.clone())
+        .collect()
 }
 
 fn validate_probability(
@@ -458,6 +569,53 @@ mod tests {
         assert!(plan.selected_operation_ids.is_empty());
         assert_eq!(plan.deferred_operation_ids, vec!["zero"]);
     }
+    #[test]
+    fn exact_small_oracle_beats_greedy_on_known_counterexample() {
+        let candidates = vec![
+            candidate("one-large", 1.0, 100.0, 1.0, 70),
+            candidate("two-small-a", 1.0, 60.0, 1.0, 40),
+            candidate("two-small-b", 1.0, 60.0, 1.0, 40),
+        ];
+
+        let greedy = plan_reviews(&candidates, ReviewBudget { seconds: 70 }).unwrap();
+        let exact = plan_reviews_exact_small(&candidates, ReviewBudget { seconds: 70 }).unwrap();
+
+        assert_eq!(greedy.expected_avoided_error_cost_units, 60.0);
+        assert_eq!(greedy.selected_operation_ids, vec!["two-small-a"]);
+        assert_eq!(exact.expected_avoided_error_cost_units, 100.0);
+        assert_eq!(exact.selected_operation_ids, vec!["one-large"]);
+        assert_eq!(exact.spent_seconds, 70);
+        assert_eq!(exact.allocation_method, AllocationMethod::ExactEnumerationOracle);
+    }
+
+    #[test]
+    fn exact_oracle_ties_are_deterministic_and_prefer_less_time() {
+        let candidates = vec![
+            candidate("long", 0.5, 10.0, 1.0, 60),
+            candidate("short", 0.5, 10.0, 1.0, 30),
+        ];
+
+        let plan = plan_reviews_exact_small(&candidates, ReviewBudget { seconds: 60 }).unwrap();
+
+        assert_eq!(plan.selected_operation_ids, vec!["short"]);
+        assert_eq!(plan.spent_seconds, 30);
+    }
+
+    #[test]
+    fn exact_oracle_rejects_cohorts_above_candidate_limit() {
+        let candidates: Vec<ReviewCandidate> = (0..=MAX_EXACT_ORACLE_CANDIDATES)
+            .map(|index| candidate(&format!("op-{index:02}"), 0.5, 1.0, 1.0, 1))
+            .collect();
+
+        assert_eq!(
+            plan_reviews_exact_small(&candidates, ReviewBudget { seconds: 20 }),
+            Err(PolicyError::ExactOracleCandidateLimit {
+                candidates: MAX_EXACT_ORACLE_CANDIDATES + 1,
+                maximum: MAX_EXACT_ORACLE_CANDIDATES,
+            })
+        );
+    }
+
     #[test]
     fn input_row_permutation_does_not_change_plan_or_cost_receipt() {
         let first = vec![
