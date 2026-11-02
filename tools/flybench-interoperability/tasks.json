@@ -1,0 +1,270 @@
+{
+  "upstream_repository": "brandoncho369/flybench",
+  "upstream_ref": "master",
+  "upstream_commit": "498ceb5d8b69d37ed1b5a3b83bc023e0d36234e8",
+  "package_version": "1.0.1",
+  "task_count": 37,
+  "core_task_count": 5,
+  "hard_task_count": 32,
+  "tasks": [
+    {
+      "name": "stability",
+      "path": "tasks/01_stability.yaml",
+      "blob_sha": "753743e868cc4a6ec429689e0acbc356a1260dcb",
+      "tier": "core",
+      "status": "active"
+    },
+    {
+      "name": "sugar_to_proboscis",
+      "path": "tasks/02_sugar_to_proboscis.yaml",
+      "blob_sha": "d442f546f0391bd2d0381c1cd5e93376bf559513",
+      "tier": "core",
+      "status": "active"
+    },
+    {
+      "name": "bitter_suppression",
+      "path": "tasks/03_bitter_suppression.yaml",
+      "blob_sha": "dd9492a7d42ad1738f4975cc7c2c79f2e88b74dc",
+      "tier": "core",
+      "status": "active"
+    },
+    {
+      "name": "looming_to_giant_fiber",
+      "path": "tasks/04_looming_to_giant_fiber.yaml",
+      "blob_sha": "fc5234a9698f019b1aaa4788593189884a5c8a51",
+      "tier": "core",
+      "status": "active"
+    },
+    {
+      "name": "taste_specificity",
+      "path": "tasks/05_taste_specificity.yaml",
+      "blob_sha": "342e573e58850f384372738b36ba65a2cd5d8038",
+      "tier": "core",
+      "status": "active"
+    },
+    {
+      "name": "dose_response",
+      "path": "tasks/06_dose_response.yaml",
+      "blob_sha": "b77c30c9ade68c7128c2413055b2c1d05bb225d0",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "adaptation",
+      "path": "tasks/07_adaptation.yaml",
+      "blob_sha": "89176b6a3ab629a9f1e35d43dcaa4e8af33969db",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "olfactory_sparse_coding",
+      "path": "tasks/08_olfactory_sparse_coding.yaml",
+      "blob_sha": "aa85a6c8cfd051d8bd20e9e6dd74eebf5e38189c",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "crosstalk",
+      "path": "tasks/09_crosstalk.yaml",
+      "blob_sha": "5b1d1a3ddd37eb11e97ea4dd68abee5923432e5e",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "looming_dn_ensemble",
+      "path": "tasks/10_looming_dn_ensemble.yaml",
+      "blob_sha": "8cded94d7f87377c9c9e88b9cedccba9323f54b9",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "flash_is_not_loom",
+      "path": "tasks/11_flash_is_not_loom.yaml",
+      "blob_sha": "01f0c5e9fac95590d59d62d5e3d9fce8dbd77839",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "return_to_rest",
+      "path": "tasks/12_return_to_rest.yaml",
+      "blob_sha": "c75fdc9ec334b5940b3bdc2c29d6d6638db6066a",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "physiological_rates",
+      "path": "tasks/13_physiological_rates.yaml",
+      "blob_sha": "9e88fcbfbd8fb84a5d2f808d965a5ea8945a7793",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "wiring_robustness",
+      "path": "tasks/14_wiring_robustness.yaml",
+      "blob_sha": "69899788bb52b480ddcea5cc121bf1564259ed63",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "looming_to_jump_muscle",
+      "path": "tasks/15_looming_to_jump_muscle.yaml",
+      "blob_sha": "fc6f7242a0286fea63eb66782e65e2ae6ef8d518",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "gf_azimuth_invariance",
+      "path": "tasks/16_gf_azimuth_invariance.yaml",
+      "blob_sha": "a60d3e4a50d1b37801df1cf541cf5942a7d913e6",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "pn_transfer_function",
+      "path": "tasks/17_pn_transfer_function.yaml",
+      "blob_sha": "d53cf2a8a730211167b35d5ca35ece088bdb4d15",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "da1_sparseness",
+      "path": "tasks/18_da1_sparseness.yaml",
+      "blob_sha": "40fea2846c7acd6b43ee6f8dcb0cbc81fad35459",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "gf_to_muscle_latency",
+      "path": "tasks/19_gf_to_muscle_latency.yaml",
+      "blob_sha": "a9c9f4160ea26699c866cbc9e7dba402b37cffe7",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "taste_modalities",
+      "path": "tasks/20_taste_modalities.yaml",
+      "blob_sha": "f661815aa7d2223095d31dcb3d2c71ff73c00f47",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "lc_dn_matrix",
+      "path": "tasks/21_lc_dn_matrix.yaml",
+      "blob_sha": "a8124336756ddc937d1a0dcda7c93af8df961625",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "courtship_song_chain",
+      "path": "tasks/22_courtship_song_chain.yaml",
+      "blob_sha": "2e8fe87da58490c748bad1bd820387a8dea7ca7f",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "leg_mn_size_principle",
+      "path": "tasks/23_leg_mn_size_principle.yaml",
+      "blob_sha": "659415f5573570c50142ed7297e1824804809a6c",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "optic_flow_rotation",
+      "path": "tasks/24_optic_flow_rotation.yaml",
+      "blob_sha": "cb5fb2b5662ae959aa5b4d9ea2db02d88674d784",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "antennal_grooming_vs_backward",
+      "path": "tasks/25_antennal_grooming_vs_backward.yaml",
+      "blob_sha": "63af07e3ad5b4434d208c4b39f68b1586c93edd0",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "mb_sparseness_apl",
+      "path": "tasks/26_mb_sparseness_apl.yaml",
+      "blob_sha": "accc66e8865c397826ea816eb96f7209493ae6d7",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "co2_pathway_specificity",
+      "path": "tasks/27_co2_pathway_specificity.yaml",
+      "blob_sha": "49e931f24690124571a122ebfe1a26cb1baa8b9b",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "steering_dna02_vs_dna01",
+      "path": "tasks/28_steering_dna02_vs_dna01.yaml",
+      "blob_sha": "aa012526788b6976c5c540ee5df3b0ae81942b84",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "epg_ring_attractor",
+      "path": "tasks/29_epg_ring_attractor.yaml",
+      "blob_sha": "7dba93c7fc3d6c261080d2247ec634b54151db59",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "egg_laying_ovidn",
+      "path": "tasks/30_egg_laying_ovidn.yaml",
+      "blob_sha": "2a9ff127b3f2ac17f75e7209aa8b146ad851b015",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "halt_walk_off",
+      "path": "tasks/31_halt_walk_off.yaml",
+      "blob_sha": "1a089c851866d099b6620c19a96034b8bc75e1fd",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "flyvis_loom_escape",
+      "path": "tasks/32_flyvis_loom_escape.yaml",
+      "blob_sha": "9b25b8790b016e0bdb8acfae57911e4b20abd3a9",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "embodied_loom_escape",
+      "path": "tasks/33_embodied_loom_escape.yaml",
+      "blob_sha": "e66e15857782d7627ef1668c5136cfc18ee65259",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "ttmn_without_gf",
+      "path": "tasks/34_ttmn_without_gf.yaml",
+      "blob_sha": "4a63fe33ebbe0c090039ea536b39924c3de9e968",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "gf_free_route_to_ttmn",
+      "path": "tasks/35_gf_free_route_to_ttmn.yaml",
+      "blob_sha": "9765143d937072de248d78d9d9ba460c68ed47fd",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "closed_loop_escape",
+      "path": "tasks/36_closed_loop_escape.yaml",
+      "blob_sha": "7d97ccb42442089e6d39cd7409cca2ec3e7d254c",
+      "tier": "hard",
+      "status": "active"
+    },
+    {
+      "name": "odor_valence_steering",
+      "path": "tasks/37_odor_valence_steering.yaml",
+      "blob_sha": "9261e45e0cfeda234cfbaf093ec76704489dbada",
+      "tier": "hard",
+      "status": "active"
+    }
+  ]
+}
