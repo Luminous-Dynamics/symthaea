@@ -27,7 +27,7 @@ impl CultureSignal {
     pub fn new(attributes: [f64; 4]) -> Result<Self, TransmissionError> {
         for (index, value) in attributes.iter().copied().enumerate() {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return Err(TransmissionError::InvalidAttribute { index, value });
+                return Err(TransmissionError::InvalidAttribute { index, value_bits: value.to_bits() });
             }
         }
         Ok(Self { attributes })
@@ -73,6 +73,7 @@ pub enum TransmissionError {
     InvalidOpenEndedness,
     ZeroSteps,
     EmptyChainSet,
+    InconsistentChainLengths,
 }
 
 impl fmt::Display for TransmissionError {
@@ -87,6 +88,7 @@ impl fmt::Display for TransmissionError {
             Self::InvalidOpenEndedness => write!(f, "open_endedness must be finite and in [0,1]"),
             Self::ZeroSteps => write!(f, "transmission chain must have at least one step"),
             Self::EmptyChainSet => write!(f, "population metrics require at least one chain"),
+            Self::InconsistentChainLengths => write!(f, "all transmission chains must have equal step counts"),
         }
     }
 }
@@ -215,6 +217,14 @@ pub fn simulate_chain(
     if steps == 0 {
         return Err(TransmissionError::ZeroSteps);
     }
+    for (index, value) in initial.attributes.iter().copied().enumerate() {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(TransmissionError::InvalidAttribute {
+                index,
+                value_bits: value.to_bits(),
+            });
+        }
+    }
     let mut rng = DeterministicRng::new(seed);
     let mut generations = Vec::with_capacity(steps + 1);
     generations.push(initial);
@@ -268,7 +278,7 @@ pub fn population_metrics(
     }
     let steps = chains[0].steps();
     if chains.iter().any(|chain| chain.steps() != steps) {
-        return Err(TransmissionError::ZeroSteps);
+        return Err(TransmissionError::InconsistentChainLengths);
     }
 
     let mut mean_signed_drift = [0.0; 4];
