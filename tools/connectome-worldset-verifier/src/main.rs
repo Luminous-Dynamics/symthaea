@@ -1042,7 +1042,11 @@ mod tests {
             .expect("worlds")
             .pop();
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("missing world");
         assert!(
             errors
@@ -1062,7 +1066,11 @@ mod tests {
             .expect("worlds")
             .push(duplicate);
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("duplicate world");
         assert!(
             errors
@@ -1077,7 +1085,11 @@ mod tests {
         let path = root.join("universe.json");
         let manifest = fixture(&root);
         fs::write(root.join("base.graph"), b"tampered").expect("mutate artifact");
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("artifact mismatch");
         assert!(
             errors
@@ -1093,7 +1105,11 @@ mod tests {
         let mut manifest = fixture(&root);
         manifest["paired_worlds"][0]["baseline_value"] = json!(2.0);
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("out of interval");
         assert!(
             errors
@@ -1109,7 +1125,11 @@ mod tests {
         let mut manifest = fixture(&root);
         manifest["freeze"]["unresolved_frontier_count"] = json!(1);
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("frontier remains");
         assert!(
             errors
@@ -1124,7 +1144,11 @@ mod tests {
         let path = root.join("universe.json");
         let mut manifest = fixture(&root);
         manifest["universe_id"] = json!("tampered-universe");
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("stale digest");
         assert!(errors.iter().any(|error| error.contains("manifest_sha256")));
     }
@@ -1135,7 +1159,11 @@ mod tests {
         let mut manifest = fixture(&root);
         manifest["artifact_files"][0]["relative_path"] = json!("../freeze.json");
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("path traversal");
         assert!(
             errors
@@ -1152,7 +1180,11 @@ mod tests {
         manifest["axes"][0]["alternatives"][0]["evidence_artifact_id"] =
             json!("base_graph_snapshot");
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("wrong evidence artifact");
         assert!(
             errors
@@ -1179,7 +1211,11 @@ mod tests {
         }
         manifest["axes"] = Value::Array(axes);
         manifest = seal_manifest(manifest);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("axis cap");
         assert!(
             errors
@@ -1187,5 +1223,4 @@ mod tests {
                 .any(|error| error.contains("exceed the V1 safety cap"))
         );
     }
-
 }
