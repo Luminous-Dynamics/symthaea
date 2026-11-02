@@ -252,3 +252,53 @@ A method/certificate fails qualification if:
 4. Runzhe Gu, Wenguang Sun, Bowen Gang & Xintao Xia (2026), *Anytime-Valid Inference for Online Ranking of Large Language Models*, ICML 2026, PMLR 306. https://proceedings.mlr.press/v306/gu26l.html
 5. Nick W. Koning & Sam van Meer (2026), *Anytime validity is free: inducing sequential tests*, JRSS-B. https://doi.org/10.1093/jrsssb/qkag050
 6. Spotify Confidence (14 July 2026), *Accurate Sample Size for Always-Valid Inference*. https://confidence.spotify.com/blog/accurate-sample-size-always-valid
+
+
+## 13. Exact orthogonal/aligned pilot fixtures
+
+These known-answer categorical fixtures make F01/F02 concrete. Categories are indexed 0 through 7.
+
+Nominal distribution:
+
+`P0 = (0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125)`
+
+Four bounded path functionals, in this order:
+
+- rejection A: `g1 = (0,0,1,1,0,0,1,1)`;
+- rejection B: `g2 = (0,1,0,1,0,1,0,1)`;
+- scaled cost: `g3 = (1,1,0,0,1,1,0,0)`;
+- scaled utility: `g4 = (0,0,0,0,1,1,1,1)`.
+
+Each functional has nominal expectation 0.5.
+
+### F01 orthogonal shift
+
+`Q_orth = (0.20, 0.05, 0.15, 0.10, 0.10, 0.15, 0.05, 0.20)`
+
+The total-variation distance (d_{TV}(P0,Q_{orth})=0.20), but all four expectations remain exactly ((0.5,0.5,0.5,0.5)). This is a distribution shift that is irrelevant to this declared functional family, not a claim that all omitted functions are unchanged.
+
+### F02 decision-aligned shift
+
+`Q_aligned = (0.10, 0.10, 0.15, 0.15, 0.10, 0.10, 0.15, 0.15)`
+
+Here (d_{TV}(P0,Q_{aligned})=0.10), and expectations become ((0.6,0.5,0.4,0.5)). Rejection A rises by 0.10 and scaled cost falls by 0.10. The method must report the decision-relevant shift rather than dismissing it as harmless.
+
+### Pilot calibration settings and formula checks
+
+For (K=8), (n=5{,}000), four functionals and family failure budget (delta=0.01), Bonferroni gives (delta_j=0.0025). Scalar Hoeffding gives:
+
+[
+r_j = sqrt{\frac{\ln(1/0.0025)}{2(5000)}}\approx 0.02447747.
+]
+
+Using the conservative Weissman slack with family failure 0.01:
+
+[
+r_{TV,slack}=\sqrt{\frac{8\ln 2+\ln(100)}{2(5000)}}\approx 0.03185961.
+]
+
+An independent NumPy formula-level pilot (seed 20261102, 20,000 IID multinomial replications per scenario) observed simultaneous DFCE coverage of 99.855% for F01 and 99.845% for F02. The corresponding exact 95% binomial intervals were approximately [99.792%, 99.903%] and [99.780%, 99.895%]. The sample-based Weissman radius (empirical TV to P0 plus slack) had mean/median/5th–95th percentiles:
+- F01: 0.23190 / 0.23186 / [0.22106, 0.24266].
+- F02: 0.13189 / 0.13186 / [0.12046, 0.14326].
+
+These are formula-level simulations, not Rust tests, a proof, a comprehensive coverage study, or an end-to-end Type-I result. The comparison has different guarantee scopes: TV protects arbitrary bounded path functionals, whereas DFCE protects only the four declared functions. Preserve that distinction in all reports.
