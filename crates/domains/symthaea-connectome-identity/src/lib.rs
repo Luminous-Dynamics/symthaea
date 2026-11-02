@@ -575,9 +575,9 @@ mod tests {
         source.column_ids = vec!["200".to_string(), "300".to_string(), "100".to_string()];
         source.annotation_ids = vec!["100".to_string(), "300".to_string(), "200".to_string()];
         let join = validate_identity_join(&source).expect("permuted identity join");
-        assert_eq!(join.row_to_canonical, vec![2, 0, 1]);
-        assert_eq!(join.column_to_canonical, vec![1, 2, 0]);
-        assert_eq!(join.annotation_to_canonical, vec![0, 2, 1]);
+        assert_eq!(join.row_to_canonical(), vec![2, 0, 1]);
+        assert_eq!(join.column_to_canonical(), vec![1, 2, 0]);
+        assert_eq!(join.annotation_to_canonical(), vec![0, 2, 1]);
     }
 
     #[test]
@@ -600,7 +600,7 @@ mod tests {
         source.annotation_ids[0] = "00100".to_string();
         let join = validate_identity_join(&source).expect("leading-zero identity is valid");
         assert!(join.canonical_ids().contains(&"00100".to_string()));
-        assert!(!join.canonical_ids.contains(&"100".to_string()));
+        assert!(!join.canonical_ids().contains(&"100".to_string()));
     }
 
     #[test]
@@ -775,7 +775,7 @@ mod tests {
         let mut source = input();
         source.artifact.release_id = "manc-v1.2.2".to_string();
         let second = validate_identity_join(&source).expect("second release");
-        assert_ne!(first.canonical_identity_sha256, second.canonical_identity_sha256);
+        assert_ne!(first.canonical_identity_sha256(), second.canonical_identity_sha256());
     }
 
     #[test]
