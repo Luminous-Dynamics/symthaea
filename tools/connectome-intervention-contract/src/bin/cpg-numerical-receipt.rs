@@ -169,7 +169,8 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
         applied,
         realized_mean,
         realized_stddev,
-    ) else {
+    )
+    else {
         errors.push(format!("{label}: missing or non-numeric noise declaration"));
         return;
     };
@@ -278,8 +279,18 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
             if str_at(value, &["source", "rights_state"]) != Some("documented_permitted") {
                 errors.push("in-silico source must declare documented_permitted rights".to_owned());
             }
-            push_missing_hash(value, &["source", "data_manifest_sha256"], "source.data_manifest_sha256", &mut errors);
-            push_missing_hash(value, &["source", "permission_receipt_sha256"], "source.permission_receipt_sha256", &mut errors);
+            push_missing_hash(
+                value,
+                &["source", "data_manifest_sha256"],
+                "source.data_manifest_sha256",
+                &mut errors,
+            );
+            push_missing_hash(
+                value,
+                &["source", "permission_receipt_sha256"],
+                "source.permission_receipt_sha256",
+                &mut errors,
+            );
         }
         _ => errors.push("evidence_tier: unsupported".to_owned()),
     }
@@ -898,7 +909,12 @@ mod tests {
         fixture["perturbation"]["weight_noise"]["requested_mean"] = json!(0.1);
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("non-zero requested noise")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("non-zero requested noise"))
+        );
     }
 
     #[test]
