@@ -278,13 +278,6 @@ pub struct PolicyRigidityControlsReportV1 {
     pub claim_boundary: String,
 }
 
-#[derive(Debug, Clone)]
-struct CleanGroupCalibration {
-    baseline_entropy: Vec<f64>,
-    global_rigidity: Vec<f64>,
-    response_excess: Vec<f64>,
-}
-
 fn valid_id(value: &str, max_len: usize) -> bool {
     !value.trim().is_empty()
         && value.len() <= max_len
@@ -447,7 +440,7 @@ fn lower_tail_p(reference: &[f64], candidate: f64) -> Result<f64, String> {
 
 fn canonical_probe_registry(specs: &[ProbeSpecV1]) -> Result<Vec<u8>, String> {
     let mut normalized = specs.to_vec();
-    normalized.sort_by(|left, right| left.intervention.cmp(&right.intervention));
+    normalized.sort_by_key(|spec| spec.intervention);
     serde_json::to_vec(&normalized)
         .map_err(|error| format!("cannot serialize policy-rigidity probe registry: {error}"))
 }
@@ -492,33 +485,42 @@ fn validate_probe_registry(specs: &[ProbeSpecV1]) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_record_common(
-    unit_id: &str,
-    source_cluster_sha256: &str,
-    task_family: &str,
-    difficulty_band: &str,
-    adjudication: &PathMultiplicityAdjudicationV1,
-    probe_receipt_manifest_sha256: &str,
-    task_recipe_sha256: &str,
-    scores: &RigidityProbeScoresV1,
-    label: &str,
-) -> Result<(), String> {
-    if !valid_id(unit_id, 128) || !valid_id(task_family, 64) || !valid_id(difficulty_band, 64) {
-        return Err(format!(
-            "{label} has invalid unit/family/difficulty identifiers"
-        ));
+struct RigidityRecordView<'a> {
+    unit_id: &'a str,
+    source_cluster_sha256: &'a str,
+    task_family: &'a str,
+    difficulty_band: &'a str,
+    path_multiplicity: &'a PathMultiplicityAdjudicationV1,
+    probe_receipt_manifest_sha256: &'a str,
+    task_recipe_sha256: &'a str,
+    scores: &'a RigidityProbeScoresV1,
+}
+
+fn validate_record_common(record: RigidityRecordView<'_>, label: &str) -> Result<(), String> {
+    if !valid_id(record.unit_id, 128)
+        || !valid_id(record.task_family, 64)
+        || !valid_id(record.difficulty_band, 64)
+    {
+        return Err(format!("{label} has invalid unit/family/difficulty identifiers"));
     }
     require_digest(
-        source_cluster_sha256,
+        record.source_cluster_sha256,
         &format!("{label} source_cluster_sha256"),
     )?;
     require_digest(
-        probe_receipt_manifest_sha256,
+        record.probe_receipt_manifest_sha256,
         &format!("{label} probe_receipt_manifest_sha256"),
     )?;
-    require_digest(task_recipe_sha256, &format!("{label} task_recipe_sha256"))?;
-    validate_adjudication(adjudication, label)?;
-    validate_scores(scores, adjudication.classification, label)
+    require_digest(
+        record.task_recipe_sha256,
+        &format!("{label} task_recipe_sha256"),
+    )?;
+    validate_adjudication(record.path_multiplicity, label)?;
+    validate_scores(
+        record.scores,
+        record.path_multiplicity.classification,
+        label,
+    )
 }
 
 fn canonical_clean_manifest(rows: &[CleanControlRecordV1]) -> Result<Vec<u8>, String> {
@@ -651,14 +653,16 @@ pub fn analyze_policy_rigidity_controls(
     let mut clean_by_group = BTreeMap::<RigidityGroupKey, Vec<DecomposedRigidity>>::new();
     for row in &request.clean_controls {
         validate_record_common(
-            &row.calibration_unit_id,
-            &row.source_cluster_sha256,
-            &row.task_family,
-            &row.difficulty_band,
-            &row.path_multiplicity,
-            &row.probe_receipt_manifest_sha256,
-            &row.task_recipe_sha256,
-            &row.scores,
+            RigidityRecordView {
+                unit_id: &row.calibration_unit_id,
+                source_cluster_sha256: &row.source_cluster_sha256,
+                task_family: &row.task_family,
+                difficulty_band: &row.difficulty_band,
+                path_multiplicity: &row.path_multiplicity,
+                probe_receipt_manifest_sha256: &row.probe_receipt_manifest_sha256,
+                task_recipe_sha256: &row.task_recipe_sha256,
+                scores: &row.scores,
+            },
             "clean-control row",
         )?;
         if row.exposure_label != ExposureLabelV1::KnownClean {
@@ -689,14 +693,16 @@ pub fn analyze_policy_rigidity_controls(
         BTreeMap::<RigidityGroupKey, Vec<&EvaluationControlRecordV1>>::new();
     for row in &request.evaluation {
         validate_record_common(
-            &row.evaluation_unit_id,
-            &row.source_cluster_sha256,
-            &row.task_family,
-            &row.difficulty_band,
-            &row.path_multiplicity,
-            &row.probe_receipt_manifest_sha256,
-            &row.task_recipe_sha256,
-            &row.scores,
+            RigidityRecordView {
+                unit_id: &row.evaluation_unit_id,
+                source_cluster_sha256: &row.source_cluster_sha256,
+                task_family: &row.task_family,
+                difficulty_band: &row.difficulty_band,
+                path_multiplicity: &row.path_multiplicity,
+                probe_receipt_manifest_sha256: &row.probe_receipt_manifest_sha256,
+                task_recipe_sha256: &row.task_recipe_sha256,
+                scores: &row.scores,
+            },
             "evaluation row",
         )?;
         if !seen_eval_ids.insert(row.evaluation_unit_id.as_str())
