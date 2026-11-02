@@ -23,9 +23,10 @@ target truth.
 
 ## Candidate/evaluator separation
 
-PublicCampaignV1 includes revealed calibration labels and evaluation rows with
-no target labels. It contains no seed, world label, leakage label, hidden target
-ID or expected outcome.
+PublicCampaignV1 includes an opaque caller-supplied campaign instance ID,
+revealed calibration labels and evaluation rows with no target labels. It
+contains no seed, world label, leakage label, hidden target ID or expected
+outcome. The campaign ID must be assigned independently of target/world truth.
 
 CampaignTruthV1 is a separate evaluator-only sidecar containing hidden labels
 and generator parameters. It must never be passed to a candidate or
