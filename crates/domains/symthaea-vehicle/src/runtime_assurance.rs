@@ -84,6 +84,9 @@ pub enum VehicleRtaReason {
     AdvancedCommandInvalid,
     BaselineCommandInvalid,
     BaselineNotAdmissible,
+    BaselineInputsUnhealthy,
+    BaselineControllerUnhealthy,
+    BaselineControlPathUnhealthy,
     EnvelopeMarginInsufficient,
     ControllabilityMarginInsufficient,
     CommandDisagreement,
@@ -101,6 +104,12 @@ pub struct VehicleRtaObservation {
     pub baseline_command: VehicleCommand,
     pub advanced_command_valid: bool,
     pub baseline_profile_admissible: bool,
+    /// Independently supplied health of the reversionary controller's inputs.
+    pub baseline_inputs_healthy: bool,
+    /// Health of the separately implemented reversionary controller.
+    pub baseline_controller_healthy: bool,
+    /// Health of the reversionary command execution path and scheduler.
+    pub baseline_control_path_healthy: bool,
     pub estimator_healthy: bool,
     pub realtime_healthy: bool,
     pub actuator_healthy: bool,
@@ -251,6 +260,15 @@ impl VehicleRuntimeAssurance {
         if !observation.baseline_profile_admissible {
             reasons.push(VehicleRtaReason::BaselineNotAdmissible);
         }
+        if !observation.baseline_inputs_healthy {
+            reasons.push(VehicleRtaReason::BaselineInputsUnhealthy);
+        }
+        if !observation.baseline_controller_healthy {
+            reasons.push(VehicleRtaReason::BaselineControllerUnhealthy);
+        }
+        if !observation.baseline_control_path_healthy {
+            reasons.push(VehicleRtaReason::BaselineControlPathUnhealthy);
+        }
 
         if !observation.envelope_margin.is_finite()
             || !observation.controllability_margin.is_finite()
@@ -276,6 +294,11 @@ impl VehicleRuntimeAssurance {
         let witness = witness_for(observation);
         let timestamp = valid_time.then_some(observation.timestamp_s);
         let fallback_admissible = observation.baseline_profile_admissible
+            && observation.baseline_inputs_healthy
+            && observation.baseline_controller_healthy
+            && observation.baseline_control_path_healthy
+            && observation.realtime_healthy
+            && observation.actuator_healthy
             && command_is_valid(&observation.baseline_command);
 
         if !fallback_admissible {
@@ -528,6 +551,9 @@ mod tests {
             baseline_command: VehicleCommand { steering: 0.05, throttle: 0.2, brake: 0.0 },
             advanced_command_valid: true,
             baseline_profile_admissible: true,
+            baseline_inputs_healthy: true,
+            baseline_controller_healthy: true,
+            baseline_control_path_healthy: true,
             estimator_healthy: true,
             realtime_healthy: true,
             actuator_healthy: true,
@@ -594,6 +620,33 @@ mod tests {
         let decision = monitor.evaluate(&bad);
         assert!(decision.selected_command.is_none());
         assert!(decision.reasons.contains(&VehicleRtaReason::BaselineCommandInvalid));
+    }
+
+    #[test]
+    fn refuses_fallback_when_its_independent_path_is_unhealthy() {
+        let mut monitor = monitor();
+        let mut bad = observation(0.0);
+        bad.baseline_inputs_healthy = false;
+        let decision = monitor.evaluate(&bad);
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.selected_command.is_none());
+        assert!(decision.reasons.contains(&VehicleRtaReason::BaselineInputsUnhealthy));
+
+        let mut monitor = monitor();
+        let mut bad = observation(0.0);
+        bad.baseline_controller_healthy = false;
+        let decision = monitor.evaluate(&bad);
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.selected_command.is_none());
+        assert!(decision.reasons.contains(&VehicleRtaReason::BaselineControllerUnhealthy));
+
+        let mut monitor = monitor();
+        let mut bad = observation(0.0);
+        bad.baseline_control_path_healthy = false;
+        let decision = monitor.evaluate(&bad);
+        assert_eq!(decision.mode, VehicleRtaMode::NoAdmissibleFallback);
+        assert!(decision.selected_command.is_none());
+        assert!(decision.reasons.contains(&VehicleRtaReason::BaselineControlPathUnhealthy));
     }
 
     #[test]
