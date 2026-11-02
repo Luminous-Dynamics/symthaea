@@ -771,7 +771,7 @@
           },
           {
             "operation_id": "test-op",
-            "sample_hash": "00000000000000000000000000000002",
+            "sample_hash": "00000000000000000000000000000001",
             "split": "Test",
             "task_route": "FalseSplitCorrection",
             "groups": {
@@ -791,7 +791,7 @@
             "views": [
               {
                 "view_id": "view-test-op",
-                "sample_hash": "00000000000000000000000000000002",
+                "sample_hash": "00000000000000000000000000000001",
                 "split": "Test",
                 "task_route": "FalseSplitCorrection",
                 "view_kind": "EmXy",
