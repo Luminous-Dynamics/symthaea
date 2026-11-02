@@ -101,6 +101,14 @@ Run:
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin paper-abm-sweep > paper-abm-sweep.csv
 ```
 
+## Cross-cultural situation and verifier evaluation
+
+The separate `src/cultural_situation.rs` module provides an adapter-neutral evaluation layer inspired by LiveCultureBench (Pham et al., ACL 2026). It accepts per-episode goal completion, norm violation, profile faithfulness, contextual awareness and coherence scores; aggregates them overall and by explicitly declared context ID; and computes per-context verifier Brier score, log loss, fixed-bin ECE, precision/recall/F1, human-audit coverage and abstention rate.
+
+The module keeps norm violation separate (lower is better) and exposes Pareto dominance rather than a single blended score. Missing human labels remain unaudited, not negative; a missing verifier prediction is recorded as abstention. Context IDs are declared task metadata and must not be inferred from sensitive person attributes.
+
+This is **not** the official LiveCultureBench runner or a reproduction. Its official repository currently contains only a README saying its data download link is still to be updated. The official environment, prompt/code/data schema, verifier definitions, calibration split and human annotations must be pinned before an adapter or comparative result is claimed. See [LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md](LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md).
+
 ## Run
 
 ```sh
