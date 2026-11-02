@@ -124,3 +124,65 @@ Do not report only the three exposure means. Include source-family worst cases a
 ## 9. Claim ceiling
 
 The implementation is an evaluator-side reference engine. Tests written in source do not establish that Rust compiles or that the tests pass. A valid exact p-value requires a real independently randomized design and verified assignment receipts. A statistically significant contrast is local to the experimental protocol. No population-wide causal effect, temporal competence, calibration guarantee, hardware efficiency, production readiness or SOTA superiority follows from this PR alone.
+
+
+## 10. Anytime-valid sequential paired inference
+
+### Why a second inference path exists
+
+The exact fixed-sample sign-flip p-value is valid for its preregistered sample, but repeatedly inspecting a fresh fixed-sample p-value and stopping at a favorable look does not preserve its nominal type-I error. The sequential module adds a separate time-uniform path for a particularly clear design: independently randomized fair-coin treatment orientation inside every matched pair.
+
+This is not a generic optional-stopping fix for arbitrary randomization designs. It is not a replacement for the exact fixed-sample permutation test, the general online e-process work (#8679), test induction (#9820), or finite-filtration continuation oracle (#9855).
+
+### Betting construction
+
+For one frozen policy contrast and one exposure axis, let (S_iin\{-1,+1\}) be the sign of control exposure minus treatment exposure for pair (i), omitting zero ties. Under Fisher's sharp no-effect null and fair-coin orientation, (S_i) is conditionally symmetric given the paired outcomes and past.
+
+Use the fixed betting fraction (\lambda=1/2):
+
+[
+E_t = \prod_{i=1}^{t}(1+\lambda S_i)
+= (3/2)^{W_t}(1/2)^{L_t},
+]
+
+where (W_t) and (L_t) count beneficial and harmful signs. A tie contributes one. Each factor is nonnegative and has conditional expectation one under the sharp null, so (E_t) is a nonnegative martingale. Ville's inequality therefore controls the probability that it ever crosses a fixed boundary, regardless of the stopping time.
+
+For a predeclared family of (M) contrasts/axes and familywise level (alpha), use the Bonferroni boundary (M/\alpha) for each process. Then
+
+[
+\Pr_{H_0}\left(\exists t, j: E_{j,t}\ge M/\alpha\right)\le\alpha.
+]
+
+The engine computes (E_t) as an exact integer numerator/denominator, not floating point. It reports current crossing and latches the first crossing look, since a martingale can later fall below its boundary. The integer representation is bounded to at most 64 pairs.
+
+### Required assumptions and excluded designs
+
+- Every pair's treatment orientation is independently randomized with probability exactly 0.5, conditional on the pre-assignment history.
+- The sharp null is no treatment effect for every randomized unit. This is not a test of a weak average-effect null.
+- Pair construction is valid; treatment does not interfere with other randomized units. If interference or common carryover exists, randomize and analyze at the independent cluster level.
+- Fixed-count/blocked assignment is not supported by this sign process. Use a design-specific assignment-space enumerator such as the blocked randomization work in #9670 instead.
+- Assignment receipts and randomization generation must be verified upstream. The module only checks the supplied design labels/digests.
+- All outcomes, including timeout, invalid, missing output and abstention, remain in the exposure record.
+- The append-only runner must persist each sequential state transition. The in-memory state alone does not resist rollback.
+
+The implementation deliberately ignores effect magnitude and uses a single fixed betting fraction. It is a transparent baseline, not a power-optimal test. A later comparison may test predeclared mixtures of betting fractions or design-induced test sequences, but must preserve exact small-case references and the same randomization assumptions.
+
+### Qualification tests and metrics
+
+The Rust module adds twelve authored tests: rational wealth under beneficial/harmful/tied signs; familywise threshold; latched first crossing; exact integer arithmetic at the 64-pair cap; non-fair assignment and design mismatch rejection; sequential-gap/replay/context failure controls; separate failure exposure; and exact dynamic-programming enumeration of crossing probability through a 20-look finite null tree.
+
+The finite-tree control checks that the probability of ever crossing under the fair-sign sharp null remains below the per-axis Bonferroni budget for every prefix. It is a mathematical regression test for this specific betting process, not empirical evidence about a real benchmark or a substitute for verifying the randomization receipts.
+
+Compare the sequential process with:
+1. the fixed-sample exact sign-flip p-value after the preregistered final look;
+2. a naive repeatedly inspected fixed-sample p-value as an invalid negative control;
+3. a predeclared betting mixture or a general bounded-value e-process where its null assumptions match;
+4. design-specific blocked inference when assignment is blocked.
+
+Report false-crossing probability, time to crossing, probability of no crossing by the declared maximum, paired effect magnitude, and all three exposure axes. Keep statistical evidence separate from the realized effect-size estimate and resource costs.
+
+### Literature and repository composition
+
+Koning & van Meer (2026), *Anytime validity is free: inducing sequential tests*, JRSSB 88(4), DOI [10.1093/jrsssb/qkag050](https://doi.org/10.1093/jrsssb/qkag050), show how to induce an anytime-valid sequence from a valid terminal test using conditional expectations. The implementation here uses a different forward betting construction specialized to independently randomized paired signs; it does not claim the paper's terminal-power-matching result.
+
+Compose with #8679 for general bounded value/risk e-processes, #9820 for finite fixed-horizon test induction, #9855 for the finite-filtration stopping/continuation oracle, and #9670 for blocked randomization designs. Do not merge their distinct assumptions into one generic "anytime-valid" label.
