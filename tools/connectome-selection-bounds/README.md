@@ -127,3 +127,8 @@ Known-answer examples:
 - One completely unknown marginal [0,1] and another [0.4,0.7] -> [0,0.7].
 
 The function accepts intervals, so it composes directly with separate source and target outputs from `latent_prevalence_bounds`. It does not recover the dependence structure. A joint-response model needs paired calibration observations, joint latent-state measurements, or explicitly defended structural assumptions.
+
+
+The joint-response layer also has strict contracts:
+- `schemas/joint-response-input.schema.json` defines source/target marginal-prevalence intervals.
+- `schemas/joint-response-fixture.schema.json` validates the input/expected wrapper for `fixtures/joint-response-known-answer.json`.
