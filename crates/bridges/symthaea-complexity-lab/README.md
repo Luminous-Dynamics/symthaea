@@ -62,9 +62,10 @@ Z[W0, ..., Ws-1] / (W0^N0, ..., Ws-1^Ns-1)
 
 It provides checked coefficient addition/multiplication, scalar scaling,
 monomial shifts, exact coefficient queries, maximum-coordinate extraction
-and Pareto-support extraction. Its bounded Boolean factor evaluator is a
-brute-force oracle capped at 24 variables. It is not the shared-measurement
-subexponential algorithm.
+and Pareto-support extraction. It includes bounded Boolean factor evaluators
+capped at 24 variables; the polynomial-valued form accepts sparse polynomial
+cells, not just one monomial per local assignment. These are brute-force
+oracles, not the shared-measurement subexponential algorithm.
 
 The current profile backend uses checked i128 coefficients. It is exact only
 when every intermediate fits; overflow is an explicit error. It is not the
@@ -76,6 +77,7 @@ declared lower bounds and shifted back at the output.
 Small unit fixtures include:
 - the triangle Max-Cut profile `2 + 6 W^2`;
 - a two-objective factor system with Pareto maxima `(1,0)` and `(0,1)`;
+- polynomial-valued local factors summing to `(2 + X)(2 + Y)`;
 - truncation, cancellation, ring mismatch and overflow cases.
 
 Run the crate tests with:
