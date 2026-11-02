@@ -606,6 +606,19 @@ mod tests {
     }
 
     #[test]
+    fn advanced_estimator_fault_uses_independently_healthy_baseline() {
+        let mut monitor = monitor();
+        let mut observation = observation(0.0);
+        observation.estimator_healthy = false;
+        observation.model_applicable = false;
+        let decision = monitor.evaluate(&observation);
+        assert_eq!(decision.mode, VehicleRtaMode::Baseline);
+        assert!(decision.selected_command.is_some());
+        assert!(decision.reasons.contains(&VehicleRtaReason::EstimatorUnhealthy));
+        assert!(decision.reasons.contains(&VehicleRtaReason::ModelNotApplicable));
+    }
+
+    #[test]
     fn refuses_to_select_an_inadmissible_or_invalid_baseline() {
         let mut monitor = monitor();
         let mut bad = observation(0.0);
