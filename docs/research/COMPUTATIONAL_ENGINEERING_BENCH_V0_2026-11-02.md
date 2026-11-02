@@ -204,3 +204,12 @@ Two repository-repair audit design documents currently describe Rust binaries un
 ## 15. Receipt-verifier implementation
 
 CEB task and run statements are now machine-readable in an in-toto Statement v1 + DSSE envelope. `.github/workflows/ceb-contract-validation-v0.yml` validates the Draft 2020-12 schemas, catalog and cross-field receipt invariants with pinned `jsonschema` and negative controls. The workflow has been authored but not run in this conversation. Cryptographic signature verification, trust-root policy and primary/regrade-pair adjudication remain implementation work under [issue #10167](https://github.com/Luminous-Dynamics/symthaea/issues/10167). A schema-valid statement is not proof of an authentic execution.
+
+
+## 16. Repository fixture and gold-label CI checks
+
+The CEB contract workflow now audits the static repository-twin fixture without compiling or executing it. It checks the fixed fixture revision shape (32 nodes, 37 edges, seven mutation scenarios), unique node and mutation IDs, graph count consistency, all edge endpoints, safe relative source paths, exact one-line source declaration anchors, valid mutation impact references and the explicit absence of compiler-verified claims.
+
+Negative controls inject a dangling edge, duplicate edge, invalid source line, anchor-text mismatch, unsafe path, semantic-authority inflation, forged edge count, unknown mutation impact and duplicate mutation ID. These controls are CI-authored and have not yet been run. They are checks on the gold artifact itself, not evidence that an agent has constructed the graph correctly.
+
+The workflow reports an authored negative-control count and runs only JSON/schema/static-file validation. It does not compile the synthetic workspace, execute tests/build scripts, or qualify the runner. The task remains design-only.
