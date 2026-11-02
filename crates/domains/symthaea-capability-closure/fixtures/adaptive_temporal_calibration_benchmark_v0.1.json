@@ -10,9 +10,20 @@
     "prng": "SplitMix64",
     "distribution_transform": "u=(next_u64+0.5)/2^64; symmetric residual z=2u-1; residual_milli=location_milli+round(scale_milli*z); all rounding ties away from zero",
     "covariate_stream": "independent SplitMix64 stream with a separate committed seed; x=2u-1",
-    "residual_equation": "location + scale*z + covariate_slope*x; tail-contamination scenarios replace z with signed tail_scale with probability tail_contamination_ppm/1000000",
+    "residual_equation": "ordinary residual = location_milli + round_away(scale_milli*z_ppm/1000000) + round_away(covariate_slope_milli*x_ppm/1000000); on a tail event replace the scale*z term with +/- tail_scale_milli",
     "seed_policy": "every scenario x seed is an independent stream; commit seed list before evaluation; no test-seed selection",
-    "candidate_visibility": "outcome labels only become visible at feedback_available_step; later revisions only after revision_available_step"
+    "candidate_visibility": "outcome labels only become visible at feedback_available_step; later revisions only after revision_available_step",
+    "substream_seed_derivation": "seed_id XOR FNV1A64(UTF8(scenario_id)) XOR stream_tag_u64",
+    "stream_tags": {
+      "residual": 1,
+      "covariate": 2,
+      "tail_decision": 3,
+      "tail_sign": 4,
+      "feedback_delay": 5
+    },
+    "uniform_integer_mapping": "u32=(next_u64>>32); signed_ppm=floor(2000000*u32/(2^32-1))-1000000; all mapping and residual arithmetic uses integer rational arithmetic with ties rounded away from zero",
+    "tail_draw": "tail occurs when next_u32*1000000 < tail_contamination_ppm*2^32; the separate tail_sign stream selects +/- tail_scale_milli",
+    "feedback_delay_draw": "uniform_integer modes use rejection sampling over the inclusive [minimum_steps,maximum_steps] range"
   },
   "window_lengths": {
     "feedback_count_steps": [
