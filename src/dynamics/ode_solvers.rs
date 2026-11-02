@@ -128,8 +128,9 @@ pub struct OdeConfig {
     pub tolerance: f64,
     /// Maximum allowed step size (adaptive methods).
     pub max_step: f64,
-    /// Minimum allowed step size (adaptive methods). If the solver needs a
-    /// smaller step than this, it proceeds anyway and flags a warning.
+    /// Minimum allowed step size (adaptive methods). If Dormand-Prince cannot
+    /// satisfy tolerance at this step, the checked API returns
+    /// `MinimumStepToleranceUnmet`; it never force-accepts the step.
     pub min_step: f64,
     /// Maximum iterations for Newton/fixed-point solves (implicit methods).
     pub max_iterations: usize,
