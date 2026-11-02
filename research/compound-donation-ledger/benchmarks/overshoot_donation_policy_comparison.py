@@ -163,6 +163,7 @@ def run_cell(
     # Cumulative outgoing weighted capital. Only candidate 0 has a committed
     # destination (candidate 1). Others are configured with destination=None.
     outgoing = {name: np.zeros(streams, dtype=np.float64) for name in METHODS}
+    previous_scores = {name: np.zeros((streams, m), dtype=np.float64) for name in METHODS}
     max_fdp = {name: np.zeros(streams, dtype=np.float64) for name in METHODS}
     terminal_fdp = {name: np.zeros(streams, dtype=np.float64) for name in METHODS}
     terminal_power = {name: np.zeros(streams, dtype=np.float64) for name in METHODS}
@@ -208,8 +209,13 @@ def run_cell(
             # Pathwise accounting checks for every simulation look.
             if np.any(next_outgoing < previous_outgoing - 1e-12):
                 raise AssertionError("outgoing reserve decreased")
-            if np.any(next_outgoing > gamma_donor * np.minimum(adjusted[:, 0], 1.0) + 1e-10):
+            donor_cap = gamma_donor * np.minimum(adjusted[:, 0], 1.0)
+            if np.any(next_outgoing > donor_cap + 1e-10):
                 raise AssertionError("donor cap exceeded")
+            donor_increment = next_outgoing - previous_outgoing
+            evidence_increment = adjusted[:, 0] - previous_adjusted[:, 0]
+            if np.any(donor_increment > gamma_donor * evidence_increment + 1e-10):
+                raise AssertionError("reserve exceeded donor's own evidence increment")
             if method == "capped_overshoot":
                 expected = np.minimum(
                     np.maximum(gamma_donor * adjusted[:, 0] - 1.0, 0.0),
@@ -218,10 +224,18 @@ def run_cell(
                 if not np.allclose(next_outgoing, expected, atol=1e-10, rtol=0):
                     raise AssertionError("capped overshoot target mismatch")
 
-            # Prefix budget for the only transfer: prefix 1 retains negative
-            # balance; every larger prefix contains both sides of the transfer.
-            if np.any(incoming[:, 0] - score[:, 0] + weights[0] * adjusted[:, 0] > next_outgoing + 1e-8):
-                raise AssertionError("unexpected donor accounting mismatch")
+            # Every finite prefix has nonpositive incoming-minus-outgoing
+            # transfer balance. The source is candidate 0 and destination 1.
+            outgoing_by_candidate = np.zeros_like(incoming)
+            outgoing_by_candidate[:, 0] = next_outgoing
+            prefix_balance = np.cumsum(incoming - outgoing_by_candidate, axis=1)
+            if np.any(prefix_balance > 1e-8):
+                raise AssertionError("prefix budget violated")
+            if np.any(np.abs(incoming.sum(axis=1) - outgoing_by_candidate.sum(axis=1)) > 1e-8):
+                raise AssertionError("escrow transfer conservation failed")
+
+            if np.any(score + 1e-10 < previous_scores[method]):
+                raise AssertionError("compound score decreased")
 
             rejected = weighted_e_bh(score, alpha)
             n_rejected = rejected.sum(axis=1)
@@ -243,6 +257,7 @@ def run_cell(
                         (rejected & truth[None, :]).sum(axis=1) / n_true
                     )
             outgoing[method] = next_outgoing
+            previous_scores[method] = score
 
         previous_adjusted = adjusted.copy()
 
