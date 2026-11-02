@@ -409,7 +409,7 @@ fn rank_recommender_candidates(
         .unwrap_or(0);
 
     for &index in candidates {
-        let agent = previous[index];
+        let agent = &previous[index];
         if agent.quality > 0 && agent.lineage_id != 0 {
             knowledgeable += 1;
             *lineage_counts.entry(agent.lineage_id).or_default() += 1;
@@ -417,7 +417,7 @@ fn rank_recommender_candidates(
     }
 
     let mut scored: Vec<(usize, f64)> = candidates.iter().copied().map(|index| {
-        let agent = previous[index];
+        let agent = &previous[index];
         let performance = if max_quality > 0 {
             f64::from(agent.quality) / f64::from(max_quality)
         } else {
