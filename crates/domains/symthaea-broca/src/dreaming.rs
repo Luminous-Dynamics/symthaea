@@ -15,7 +15,10 @@ use std::sync::Arc;
 pub struct DreamingService {
     scaffolder: EvolutionaryScaffolder,
     trainer: CompilerGroundedTrainer,
+    /// Syntax-accepted candidates awaiting independent task-level verification.
     proposal_pool: Arc<Mutex<TrainingDataset>>,
+    /// Only independently task-verified candidates may enter this pool.
+    /// The current built-in path intentionally does not populate it.
     dream_pool: Arc<Mutex<TrainingDataset>>,
 }
 
@@ -29,11 +32,11 @@ impl DreamingService {
         }
     }
 
-    /// Perform a single "dream cycle": mutate existing knowledge and verify.
+    /// Generate candidate mutations. Parser acceptance is not task verification.
     pub fn dream_cycle(&self, baseline_pairs: &[TrainingPair]) {
         for pair in baseline_pairs {
             if let Some(mutated) = self.scaffolder.scaffold_pair(pair) {
-                // Verify the dream with the compiler
+                // This checks Nix syntax, not preservation of task semantics.
                 let result = self.trainer.train_step("dream", &mutated.target_text);
                 if result.converged {
                     println!("Staged syntax-accepted proposal; independent task verification is required: reward={:.2}", result.reward);
