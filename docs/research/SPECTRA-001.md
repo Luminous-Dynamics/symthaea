@@ -119,44 +119,60 @@ The environmental telemetry is itself a measurement system and needs calibration
 
 ## 3. Behavioural protocol
 
-### 3.1 Keep paradigms separate
+### 3.1 Keep task families separate
 
-A hidden-target/remote-viewing task has no sender. A telepathy task has a sender and receiver with separate stimulus custody. A precognition task has a target generated after the response. These are different experimental propositions and must not share a pooled primary endpoint.
+The historical record does not justify one undifferentiated "ESP" task. The following propositions need distinct protocol IDs, chance models, primary endpoints, controls and replication records.
 
-The first human protocol should select exactly one paradigm. SPECTRA-001 begins with hidden-target acquisition because it directly tests the claim that information is acquired despite the receiver's physical isolation.
+**Puharich-inspired paired sender–receiver task.** A later memoir describes a receiver inside a copper-screen cage and a sender in another room attempting to communicate Zener-card symbols. The 1972 SRI proposal separately repeats a reported matching test involving one subject in a cage and another in a car about one mile away, but attributes the result to privately circulated material and does not provide the original protocol. Until the contemporaneous Puharich protocol and raw records are recovered, any new sender–receiver study is a *historically motivated modern reconstruction*, not a direct replication.
 
-### 3.2 Role separation
+**Puharich-inspired cage-state discrimination task.** The same later memoir separately describes a receiver guessing when an external random electrical charge was applied to the cage. This is not the same task as sender–receiver symbol transfer. Ordinary physical pathways—electrostatic, acoustic, optical, thermal, vibrational, timing, switching, procedural or instrument leakage—must be assessed first. No human study involving charged enclosures is authorized by this protocol; any future design would require an independent electrical-safety review and a separately approved, non-hazardous apparatus.
 
-Use four operational roles:
+**Hidden-target / receiver-only task.** This has no sender: a receiver produces a response to a target selected and held by an independent custodian. It is useful as a modern comparison benchmark, but it is not a Puharich paired-task replication.
 
-1. participant/receiver, who never sees the target or target pool during the session;
-2. session operator, who configures the room and apparatus but cannot access target selection;
-3. independent remote target custodian, who cannot communicate with the receiver or operator during the trial;
-4. independent scorer/evaluator, who receives sealed responses and candidate targets without knowing the true target or enclosure condition.
+**Precognition task.** The target is generated after the response. This is a different temporal proposition and requires a distinct protocol and chronology model.
 
-The target custodian should not be the scorer. The participant and operator should not have access to target selection services, logs, network credentials or target metadata.
+These task families must never be pooled into a common primary endpoint. The initial offline synthetic qualifier may implement hidden-target fixtures first because the assignment/response/target chronology is straightforward to specify. A separate paired sender–receiver fixture must be added before claiming that the synthetic benchmark covers the Puharich-inspired task family.
+
+### 3.2 Role separation by task
+
+For the paired sender–receiver task, define at least:
+1. sender, who alone receives the target during the stimulus interval;
+2. receiver, who produces the sealed response and has no communication channel to the sender;
+3. session operator, who configures the apparatus but cannot access target selection or sender display;
+4. independent target custodian/randomizer;
+5. independent scorer/evaluator, blind to target identity and experimental condition.
+
+The target custodian should not act as sender, operator or scorer. Sender and receiver must have no undeclared visual, acoustic, electrical, network, timing or human relay channel. Any permitted sensory path is part of the protocol and must be explicit.
+
+For the hidden-target task, there is no sender. Retain the target custodian, receiver, operator and scorer separation, but do not invent a sender role.
+
+For cage-state discrimination, the target is the randomized apparatus state, not a Zener-card symbol. The responsible instrument/safety staff must not expose condition to the receiver, operator or scorer. This protocol does not authorize applying an electrical charge to an enclosure or participant environment.
 
 ### 3.3 Target selection and chronology
 
 Before data collection, freeze and hash the target pool, candidate-matching procedure, software version and selection code.
 
-After the receiver and apparatus are locked, derive the target index from a future public randomness-beacon value. Record the exact beacon round, target-pool digest, selection-code digest and resulting target ID in a sealed custody record. The public commitment to the target-selection procedure and pool must predate the trial; the selected target remains undisclosed until the participant response and session record are sealed.
+For paired sender–receiver trials, select the target after sender, receiver and apparatus are locked. Only the sender receives it; the target remains unavailable to the receiver, operator and scorer until the receiver response and trial record are sealed. For hidden-target trials, no sender sees the target before response sealing. For cage-state trials, the apparatus condition is randomly selected under an independent, safe, predeclared allocation procedure.
 
-A cryptographic hash proves byte identity and can help expose later tampering. It does not prove that a target was selected randomly, that roles were independent, or that the chronology was honest. Those are separate procedural and custody claims.
+Record the exact randomization source/receipt, target-pool digest, selection-code digest, assignment, response-seal state and target-reveal state. Commit to the pool and selection code before the randomization event. Preserve the target identity under independent custody until reveal.
+
+A cryptographic hash proves byte identity and can help expose later tampering. It does not prove that a target was selected randomly, that roles were independent, or that chronology was honest. Those are separate procedural and custody claims.
 
 ### 3.4 Scoring
 
-For free-response remote viewing, use a small, frozen candidate set containing the true target and matched decoys. The participant response is written before target reveal. Independent judges rank candidate matches while blind to the target identity and enclosure condition.
+For paired sender–receiver Zener-card trials, use a frozen symbol set and an explicit trial-level scoring rule. The receiver records one symbol (or a predeclared ranked response) before reveal. Preserve all target/response pairs and analyze at the randomized unit. Do not replace the primary endpoint with a free-response rank score after seeing results.
 
-One workable primary endpoint is the mean rank assigned to the true target, with lower rank better and chance expectation fixed by the candidate-set size. Freeze the number of candidates, judge instructions, tie handling and aggregation before confirmation. Report inter-rater agreement and preserve each judge's ranking. Do not silently replace the rank endpoint with a binary hit rate or a neural endpoint.
+For hidden-target free-response trials, use a small, frozen candidate set containing the true target and matched decoys. Independent judges rank candidate matches while blind to target identity and condition. One possible endpoint is mean rank of the true target; freeze candidate count, judge instructions, ties and aggregation before confirmation.
 
-A forced-choice task may be useful as a separate paradigm, but it must have its own protocol, chance model and replication record.
+For cage-state discrimination, use a prespecified binary/forced-choice endpoint against independently randomized sham/active states. The randomization, instrumentation and physical stimulus must be independently verified; a nominal command to change the state is not proof that the physical state changed. No high-voltage or human-exposure method is defined here.
+
+A forced-choice, symbol-transfer, free-response matching or cage-state discrimination task each needs its own protocol, chance model and replication record.
 
 ### 3.5 Randomization, blocking and replication
 
-Randomize/counterbalance condition order. Block where appropriate by participant, session, day, operator, instrument and enclosure reassembly. Record the actual physical experimental unit, observation unit and analysis unit.
+Randomize/counterbalance condition order. Block where appropriate by participant, sender–receiver pair, session, day, operator, instrument and enclosure reassembly. Record the actual physical experimental unit, observation unit and analysis unit.
 
-Repeated sensor samples within a trial are not independent trials. Repeated trials within one participant are not independent participants. Multiple participants in one laboratory are not multiple independent laboratories. The model and confidence interval must reflect the declared hierarchy.
+Repeated sensor samples within a trial are not independent trials. Repeated trials within one receiver or sender–receiver pair are not independent participants/pairs. Multiple participants in one laboratory are not multiple independent laboratories. The model and confidence interval must reflect the declared hierarchy.
 
 Preserve all assigned trials, aborts, missing responses, exclusions, equipment failures, sensor dropouts and protocol deviations. Use a predeclared disposition for each.
 
@@ -164,7 +180,7 @@ Preserve all assigned trials, aborts, missing responses, exclusions, equipment f
 
 Before the confirmatory study:
 
-- define one primary contrast and endpoint;
+- define one task profile, primary contrast and endpoint;
 - specify the smallest effect of interest and an equivalence/null region;
 - plan sample size for at least 90% power under explicitly stated effect, variance and dependence assumptions;
 - freeze randomization, blocking, exclusions, scoring, stopping and multiplicity policy;
