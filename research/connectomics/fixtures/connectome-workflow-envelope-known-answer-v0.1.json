@@ -1511,7 +1511,9 @@
             "projected_future_drift_upper_ratio": 0.3,
             "group_disjoint": true,
             "exchangeability_supported": true,
-            "outcome": "ProjectedStableWithinHorizon"
+            "outcome": "ProjectedStableWithinHorizon",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
@@ -1667,7 +1669,9 @@
             "projected_future_drift_upper_ratio": null,
             "group_disjoint": true,
             "exchangeability_supported": true,
-            "outcome": "InsufficientCalibration"
+            "outcome": "InsufficientCalibration",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
@@ -1824,7 +1828,9 @@
             "projected_future_drift_upper_ratio": null,
             "group_disjoint": false,
             "exchangeability_supported": true,
-            "outcome": "NotCalibratedGroupOverlap"
+            "outcome": "NotCalibratedGroupOverlap",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
@@ -1981,7 +1987,9 @@
             "projected_future_drift_upper_ratio": null,
             "group_disjoint": true,
             "exchangeability_supported": false,
-            "outcome": "NotCalibratedExchangeability"
+            "outcome": "NotCalibratedExchangeability",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
@@ -2138,7 +2146,9 @@
             "projected_future_drift_upper_ratio": 1.1,
             "group_disjoint": true,
             "exchangeability_supported": true,
-            "outcome": "ProjectedUnstableWithinHorizon"
+            "outcome": "ProjectedUnstableWithinHorizon",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
@@ -2296,7 +2306,9 @@
             "projected_future_drift_upper_ratio": 0.3,
             "group_disjoint": true,
             "exchangeability_supported": true,
-            "outcome": "ProjectedStableWithinHorizon"
+            "outcome": "ProjectedStableWithinHorizon",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
@@ -2451,7 +2463,9 @@
             "projected_future_drift_upper_ratio": 0.3,
             "group_disjoint": true,
             "exchangeability_supported": true,
-            "outcome": "ProjectedStableWithinHorizon"
+            "outcome": "ProjectedStableWithinHorizon",
+            "calibration_trajectory_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "materiality_threshold": 0.05
           }
         }
       },
