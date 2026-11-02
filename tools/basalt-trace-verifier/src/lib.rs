@@ -1255,6 +1255,407 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
     results
 }
 
+
+#[derive(Clone, Debug, Serialize)]
+pub struct LinearizationReport {
+    pub report_version: u32,
+    pub status: String,
+    pub trace_id: String,
+    pub max_states: usize,
+    pub explored_states: usize,
+    pub semantic_prunes: usize,
+    pub linearization: Vec<String>,
+    pub counterexamples: Vec<String>,
+    pub claim_ceiling: String,
+}
+
+#[derive(Default)]
+struct LinearizationSearch {
+    explored_states: usize,
+    semantic_prunes: usize,
+    exhausted: bool,
+    solution: Option<Vec<String>>,
+    counterexamples: Vec<String>,
+}
+
+fn add_predecessor_edge(predecessors: &mut [u64], from: usize, to: usize) {
+    predecessors[to] |= 1u64 << from;
+}
+
+fn topological_reference_order(
+    trace: &Trace,
+    errors: &mut Vec<String>,
+) -> Option<(Vec<u64>, Vec<String>)> {
+    let count = trace.operations.len();
+    if count == 0 {
+        push_error(errors, "observed history contains no operations");
+        return None;
+    }
+    if count > 64 {
+        push_error(errors, "bounded v1 checker supports at most 64 completed operations");
+        return None;
+    }
+
+    let mut indices = HashMap::<String, usize>::new();
+    for (index, operation) in trace.operations.iter().enumerate() {
+        if operation.op_id.is_empty() || operation.runner_id.is_empty() || operation.client_id.is_empty() {
+            push_error(errors, format!("{} has empty operation identity", operation.op_id));
+        }
+        if operation.completed_at_ns < operation.invoked_at_ns {
+            push_error(errors, format!("{} completes before invocation", operation.op_id));
+        }
+        if indices.insert(operation.op_id.clone(), index).is_some() {
+            push_error(errors, format!("duplicate observed operation ID {}", operation.op_id));
+        }
+    }
+    if !errors.is_empty() {
+        return None;
+    }
+
+    let mut predecessors = vec![0u64; count];
+    for (index, operation) in trace.operations.iter().enumerate() {
+        for dependency in &operation.happens_after {
+            match indices.get(dependency) {
+                Some(previous) => add_predecessor_edge(&mut predecessors, *previous, index),
+                None => push_error(errors, format!("{} references missing happens_after operation {}", operation.op_id, dependency)),
+            }
+        }
+    }
+
+    let mut clients = BTreeMap::<&str, Vec<(u64, usize)>>::new();
+    for (index, operation) in trace.operations.iter().enumerate() {
+        clients.entry(&operation.client_id).or_default().push((operation.client_sequence, index));
+    }
+    for (client, operations) in &mut clients {
+        operations.sort_by_key(|entry| entry.0);
+        for (expected, (actual, index)) in operations.iter().enumerate() {
+            if *actual != expected as u64 {
+                push_error(errors, format!("client {client} has a sequence gap or duplicate at {}", trace.operations[*index].op_id));
+            }
+        }
+        for pair in operations.windows(2) {
+            add_predecessor_edge(&mut predecessors, pair[0].1, pair[1].1);
+        }
+    }
+
+    // Monotonic time has meaning only within a single runner process.
+    for (left_index, left) in trace.operations.iter().enumerate() {
+        for (right_index, right) in trace.operations.iter().enumerate() {
+            if left.runner_id == right.runner_id
+                && left_index != right_index
+                && left.completed_at_ns <= right.invoked_at_ns
+            {
+                add_predecessor_edge(&mut predecessors, left_index, right_index);
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        return None;
+    }
+
+    // Establish that causal constraints are acyclic before semantic search.
+    let mut done = 0u64;
+    let all_mask = if count == 64 { u64::MAX } else { (1u64 << count) - 1 };
+    let mut topo = Vec::with_capacity(count);
+    while done != all_mask {
+        let mut ready: Vec<usize> = (0..count)
+            .filter(|index| {
+                let bit = 1u64 << index;
+                done & bit == 0 && predecessors[*index] & !done == 0
+            })
+            .collect();
+        ready.sort_by_key(|index| trace.operations[*index].op_id.as_str());
+        let Some(next) = ready.first().copied() else {
+            push_error(errors, "observed happens-before graph contains a cycle");
+            return None;
+        };
+        done |= 1u64 << next;
+        topo.push(trace.operations[next].op_id.clone());
+    }
+    Some((predecessors, topo))
+}
+
+fn initial_model_state(trace: &Trace) -> ModelState {
+    ModelState {
+        revision: parse_revision(&trace.initial_state.authority_revision).unwrap_or(0),
+        policy_digest: trace.initial_state.policy_digest.clone(),
+        sources: trace.initial_state.source_cursors.iter().cloned()
+            .map(|cursor| (cursor.source_id.clone(), cursor)).collect(),
+        logs: trace.initial_state.log_cursors.iter()
+            .map(|cursor| (cursor.log_origin_id.clone(), cursor.checkpoint.clone())).collect(),
+        receipts: BTreeMap::new(),
+        indeterminate_receipts: BTreeSet::new(),
+    }
+}
+
+fn apply_observed_operation(
+    state: &mut ModelState,
+    trace: &Trace,
+    operation: &Operation,
+) -> ComputedResult {
+    match operation.kind.as_str() {
+        "advance" => advance(state, trace, operation),
+        "receipt_lookup" => {
+            let receipt_id = operation.request.receipt_id.as_deref().unwrap_or("");
+            let receipt_digest = operation.request.receipt_digest.as_deref().unwrap_or("");
+            match state.receipts.get(receipt_id) {
+                Some(receipt) if receipt.receipt_digest == receipt_digest => {
+                    let outcome = if state.indeterminate_receipts.contains(receipt_id) {
+                        "receipt_found"
+                    } else {
+                        "duplicate"
+                    };
+                    ComputedResult::new(outcome, Some(state.revision))
+                        .receipt(receipt_id, receipt.acceptance_revision)
+                }
+                _ => ComputedResult::new("compare_conflict", Some(state.revision)),
+            }
+        }
+        "policy_publish" => {
+            if operation.request.expected_policy_digest.as_deref() == Some(state.policy_digest.as_str()) {
+                if let Some(next_policy) = operation.request.next_policy_digest.as_ref() {
+                    if let Some(next_revision) = state.revision.checked_add(1) {
+                        state.policy_digest = next_policy.clone();
+                        state.revision = next_revision;
+                        ComputedResult::new("committed", Some(state.revision))
+                    } else {
+                        ComputedResult::new("compare_conflict", Some(state.revision))
+                    }
+                } else {
+                    ComputedResult::new("compare_conflict", Some(state.revision))
+                }
+            } else {
+                ComputedResult::new("compare_conflict", Some(state.revision))
+            }
+        }
+        "restore_verify" => {
+            let observed_revision = operation.request.restored_authority_revision.clone();
+            let observed_state = operation.request.restored_state_digest.as_deref();
+            match trace.witness_observations.last() {
+                None => {
+                    let mut result = ComputedResult::new("rejected_anti_rollback_unknown", None);
+                    result.observed_store_revision = observed_revision;
+                    result
+                }
+                Some(head) => {
+                    let fresh = operation.request.restored_incarnation_id.as_deref()
+                        == Some(head.incarnation_id.as_str())
+                        && observed_state == Some(head.state_digest.as_str())
+                        && observed_revision.as_deref() == Some(head.authority_revision.as_str())
+                        && operation.request.witness_sequence_seen == Some(head.sequence);
+                    let mut result = ComputedResult::new(
+                        if fresh { "restore_verified" } else { "rejected_anti_rollback" },
+                        parse_revision(&head.authority_revision),
+                    );
+                    result.observed_store_revision = observed_revision;
+                    result
+                }
+            }
+        }
+        _ => ComputedResult::new("compare_conflict", Some(state.revision)),
+    }
+}
+
+fn final_state_matches(trace: &Trace, state: &ModelState) -> bool {
+    let mut expected_sources = BTreeMap::<String, SourceCursor>::new();
+    for cursor in &trace.final_observation.source_cursors {
+        if expected_sources.insert(cursor.source_id.clone(), cursor.clone()).is_some() {
+            return false;
+        }
+    }
+    let mut expected_logs = BTreeMap::<String, String>::new();
+    for cursor in &trace.final_observation.log_cursors {
+        if expected_logs.insert(cursor.log_origin_id.clone(), cursor.checkpoint.clone()).is_some() {
+            return false;
+        }
+    }
+    let mut expected_receipts = BTreeMap::<String, ModelReceipt>::new();
+    for receipt in &trace.final_observation.accepted_receipts {
+        if expected_receipts.insert(receipt.receipt_id.clone(), ModelReceipt {
+            receipt_digest: receipt.receipt_digest.clone(),
+            acceptance_revision: parse_revision(&receipt.receipt_acceptance_revision).unwrap_or(u64::MAX),
+        }).is_some() {
+            return false;
+        }
+    }
+    state.revision == parse_revision(&trace.final_observation.authority_revision).unwrap_or(u64::MAX)
+        && state.policy_digest == trace.final_observation.policy_digest
+        && state.sources == expected_sources
+        && state.logs == expected_logs
+        && state.receipts == expected_receipts
+}
+
+fn search_linearizations(
+    trace: &Trace,
+    predecessors: &[u64],
+    all_mask: u64,
+    done: u64,
+    state: &ModelState,
+    order: &mut Vec<usize>,
+    max_states: usize,
+    search: &mut LinearizationSearch,
+) -> bool {
+    if search.explored_states >= max_states {
+        search.exhausted = true;
+        return false;
+    }
+    search.explored_states += 1;
+
+    if done == all_mask {
+        if final_state_matches(trace, state) {
+            search.solution = Some(order.iter().map(|index| trace.operations[*index].op_id.clone()).collect());
+            return true;
+        }
+        search.semantic_prunes += 1;
+        if search.counterexamples.len() < 8 {
+            search.counterexamples.push("candidate order reached a final state inconsistent with the observed final snapshot".to_string());
+        }
+        return false;
+    }
+
+    let mut ready: Vec<usize> = (0..trace.operations.len())
+        .filter(|index| {
+            let bit = 1u64 << index;
+            done & bit == 0 && predecessors[*index] & !done == 0
+        })
+        .collect();
+    ready.sort_by_key(|index| trace.operations[*index].op_id.as_str());
+
+    for index in ready {
+        if search.explored_states >= max_states {
+            search.exhausted = true;
+            return false;
+        }
+        let operation = &trace.operations[index];
+        let mut next_state = state.clone();
+        let computed = apply_observed_operation(&mut next_state, trace, operation);
+        if !expected_fields_match(&operation.expected_result, &computed) {
+            search.semantic_prunes += 1;
+            if search.counterexamples.len() < 8 {
+                search.counterexamples.push(format!(
+                    "{} cannot linearize here: observed {:?}, model produced {:?}",
+                    operation.op_id, operation.expected_result, computed
+                ));
+            }
+            continue;
+        }
+
+        order.push(index);
+        let found = search_linearizations(
+            trace,
+            predecessors,
+            all_mask,
+            done | (1u64 << index),
+            &next_state,
+            order,
+            max_states,
+            search,
+        );
+        order.pop();
+        if found {
+            return true;
+        }
+        if search.exhausted {
+            return false;
+        }
+    }
+    false
+}
+
+/// Search for any legal sequential interpretation of a fully completed history.
+///
+/// The declared reference order is deliberately ignored. Causal constraints are
+/// derived from per-client program order, explicit happens_after edges and
+/// same-runner real-time precedence. Cross-runner monotonic clocks are never
+/// compared. The search is bounded and reports inconclusive on exhaustion.
+pub fn check_linearizable_history(trace: &Trace, max_states: usize) -> LinearizationReport {
+    let mut evidence_errors = Vec::new();
+    let Some((predecessors, topo_order)) = topological_reference_order(trace, &mut evidence_errors) else {
+        return LinearizationReport {
+            report_version: 1,
+            status: "invalid_evidence".to_string(),
+            trace_id: trace.trace_id.clone(),
+            max_states,
+            explored_states: 0,
+            semantic_prunes: 0,
+            linearization: Vec::new(),
+            counterexamples: evidence_errors,
+            claim_ceiling: "Bounded checker for fully completed operations only; no live backend, incomplete-operation, cryptographic witness, or physical durability claim.".to_string(),
+        };
+    };
+
+    let mut validation_trace = trace.clone();
+    validation_trace.reference_linearization_order = topo_order;
+    validate_structure(&validation_trace, &mut evidence_errors);
+    validate_retry_groups(&validation_trace, &mut evidence_errors);
+    validate_witnesses(&validation_trace, &mut evidence_errors);
+    if !evidence_errors.is_empty() {
+        return LinearizationReport {
+            report_version: 1,
+            status: "invalid_evidence".to_string(),
+            trace_id: trace.trace_id.clone(),
+            max_states,
+            explored_states: 0,
+            semantic_prunes: 0,
+            linearization: Vec::new(),
+            counterexamples: evidence_errors,
+            claim_ceiling: "Bounded checker for fully completed operations only; no live backend, incomplete-operation, cryptographic witness, or physical durability claim.".to_string(),
+        };
+    }
+
+    let count = trace.operations.len();
+    if max_states == 0 {
+        return LinearizationReport {
+            report_version: 1,
+            status: "inconclusive".to_string(),
+            trace_id: trace.trace_id.clone(),
+            max_states,
+            explored_states: 0,
+            semantic_prunes: 0,
+            linearization: Vec::new(),
+            counterexamples: vec!["search budget is zero".to_string()],
+            claim_ceiling: "No pass/fail verdict: bounded search did not begin.".to_string(),
+        };
+    }
+    let all_mask = if count == 64 { u64::MAX } else { (1u64 << count) - 1 };
+    let mut search = LinearizationSearch::default();
+    let mut order = Vec::with_capacity(count);
+    let initial = initial_model_state(trace);
+    let found = search_linearizations(
+        trace,
+        &predecessors,
+        all_mask,
+        0,
+        &initial,
+        &mut order,
+        max_states,
+        &mut search,
+    );
+
+    LinearizationReport {
+        report_version: 1,
+        status: if found {
+            "pass"
+        } else if search.exhausted {
+            "inconclusive"
+        } else {
+            "fail"
+        }.to_string(),
+        trace_id: trace.trace_id.clone(),
+        max_states,
+        explored_states: search.explored_states,
+        semantic_prunes: search.semantic_prunes,
+        linearization: search.solution.unwrap_or_default(),
+        counterexamples: if search.exhausted && !found {
+            vec!["search bound reached before all legal histories were exhausted".to_string()]
+        } else {
+            search.counterexamples
+        },
+        claim_ceiling: "Bounded checker for fully completed operations only; no live backend, incomplete-operation, cryptographic witness, or physical durability claim.".to_string(),
+    }
+}
+
 pub fn verify_reference(trace: &Trace, trace_bytes: &[u8]) -> VerificationReport {
     let trace_hash = Sha256::digest(trace_bytes);
     let digest = format!("sha256:{}", hex_lower(&trace_hash));
