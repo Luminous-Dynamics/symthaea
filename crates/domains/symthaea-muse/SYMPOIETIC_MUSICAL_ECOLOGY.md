@@ -93,7 +93,7 @@ Sources for current product and research comparisons: Suno's official release no
 
 | Lane | Measurements | Initial qualification target |
 |---|---|---|
-| Functional recurrence | Required-component producer coverage; process-network connectivity; boundary-policy regeneration | 100% required components have producers; every declared core process belongs to the recurrent strongly connected network; negative controls fail closed |
+| Functional recurrence | Required-component producer coverage; process-network connectivity; boundary-policy regeneration | 100% required components have both producers and consumers; boundary components have both producers and consumers; every declared core process belongs to the recurrent strongly connected network; negative controls fail closed |
 | Degradation and repair | Recovery success, time-to-recovery, identity drift, provenance loss | Recover each registered fault from a verified checkpoint; zero silent identity or authorship changes |
 | Creative continuity | Motif/style identity, preference revision lineage, memory recall, novel-but-recognizable development | Every identity revision binds to its parent, profile digest and source evidence; controlled changes preserve protected properties |
 | Reciprocal influence | Partner-to-Melothaea and Melothaea-to-partner causal response; effect over sham | Matched interventions on one participant change the other's next musical action more than sham controls, replicated on a sealed set |
