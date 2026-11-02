@@ -3,21 +3,59 @@
   "version": "0.4",
   "status": "synthetic_exact_identifiability",
   "arithmetic": "fractions.Fraction",
-  "models": ["genuine_mechanism","latent_common_cause","primary_sensor_artefact","actuator_noncompliance","common_mode_reference_artefact","null_effect"],
-  "probes": ["observational_primary","randomized_primary","independent_reference","actuator_readback","sensor_self_test","blank_common_mode_control"],
+  "models": [
+    "genuine_mechanism",
+    "latent_common_cause",
+    "primary_sensor_artefact",
+    "actuator_noncompliance",
+    "common_mode_reference_artefact",
+    "null_effect"
+  ],
+  "probes": [
+    "observational_primary",
+    "randomized_primary",
+    "secondary_reference",
+    "actuator_readback",
+    "sensor_self_test",
+    "blank_common_mode_control"
+  ],
   "model_pairs": 15,
   "results": {
-    "observational_only": {"separated": 5, "unresolved": 10},
-    "randomized_primary": {"separated": 9, "unresolved": 6},
-    "independent_reference": {"separated": 12, "unresolved": 3},
-    "actuator_witness": {"separated": 14, "unresolved": 1},
-    "full_witness_suite": {"separated": 15, "unresolved": 0}
+    "observational_only": {
+      "separated": 5,
+      "unresolved": 10
+    },
+    "randomized_primary": {
+      "separated": 9,
+      "unresolved": 6
+    },
+    "independent_reference": {
+      "separated": 12,
+      "unresolved": 3
+    },
+    "actuator_witness": {
+      "separated": 14,
+      "unresolved": 1
+    },
+    "full_witness_suite": {
+      "separated": 15,
+      "unresolved": 0
+    }
   },
   "minimum_cost_probe_suite": {
     "cost_exact": "23/4",
     "arbitrary_cost_units": 5.75,
-    "probes": ["observational_primary","randomized_primary","actuator_readback","sensor_self_test","blank_common_mode_control"]
+    "probes": [
+      "observational_primary",
+      "randomized_primary",
+      "actuator_readback",
+      "sensor_self_test",
+      "blank_common_mode_control"
+    ]
   },
   "claim_ceiling": "identifiability within finite toy models and probe menu; not a physical causal result",
-  "implementation": {"language":"Python research reference", "rust_port":"tracked in #10081"}
+  "implementation": {
+    "language": "Python research reference",
+    "rust_port": "tracked in #10081"
+  }
 }
