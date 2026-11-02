@@ -1,0 +1,60 @@
+# Connectome structural-world verifier V0.1
+
+A standalone Rust verifier for a deliberately narrow, independently reproducible finite-universe contract. It is designed to supply the independently computed evidence required by `PairedWorldSetCoverage` in `connectome-query-impact`.
+
+## Paradigm shift
+
+Do not infer completeness from a boolean, a digest-shaped string, or equality between two author-supplied ID lists. Define a finite universe as a product of explicit axes and alternatives, then independently regenerate every admissible combination.
+
+V1 deliberately supports only:
+
+`cartesian_product_all_combinations_v1`
+
+Every combination of every declared axis is admissible. There are no arbitrary predicates, hidden filters, pruning rules, weights or post-hoc exclusions. This restriction makes closure independently checkable. The implementation caps the universe at 100,000 worlds to bound memory use.
+
+## What the executable verifies
+
+- canonical manifest digest using the pinned `SERDE_JSON_ORDERED_CANONICAL_V1` encoding;
+- actual SHA-256 bytes of local artifacts, with path traversal and symlink escape rejected;
+- pre-query freeze receipt, source-universe snapshot, base graph snapshot, hypothetical graph snapshot and candidate patch bindings;
+- exact query, scenario, candidate, operation, sample, task-route and threshold context;
+- each alternative's evidence digest against an artifact whose bytes were read and hashed;
+- deterministic world IDs generated from canonical assignment objects;
+- full Cartesian enumeration, exact expected/evaluated world-set equality, no duplicates and no unresolved frontier;
+- matched before/after values inside their corresponding marginal intervals and paired differences inside the supplied effect interval;
+- an adapter-ready receipt containing universe, policy, enumerator, expected-world-manifest, closure-proof and verification-receipt digests.
+
+## Run
+
+```sh
+cargo fmt --manifest-path tools/connectome-worldset-verifier/Cargo.toml -- --check
+cargo test --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked
+cargo clippy --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked --all-targets -- -D warnings
+cargo run --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked -- path/to/universe.json path/to/receipt.json
+```
+
+Artifact paths in the manifest are relative to the manifest's directory. The verifier never follows paths outside that directory. The optional second argument writes the same JSON receipt printed to stdout.
+
+## Receipt integration
+
+The output's `coverage` object maps to the `PairedWorldSetCoverage` fields in `tools/connectome-query-impact/src/lib.rs`. Before setting `closure_verified=true` in a production adapter, the adapter/operator must:
+
+1. independently pin the verifier binary SHA-256 in a trust policy outside the submitted manifest;
+2. hash and retain the emitted receipt bytes (the receipt includes its own canonical digest);
+3. authenticate the pre-query freeze receipt and verify it was logged before query outcomes were opened;
+4. check that the universe and admissibility policy were selected without using target labels or desired outcomes.
+
+A digest included only in the same untrusted manifest is not an authentication mechanism. A valid receipt proves exact coverage of the declared finite Cartesian universe and artifact lineage; it does not prove the universe contains every biologically possible connectome or that any alternative is anatomically correct.
+
+## Explicit limitations
+
+- The freeze booleans are assertions. Authentic pre-query timing/authorization requires a separately authenticated receipt and operator-pinned trust policy.
+- The verifier validates the declared alternatives and evidence digests; it does not decide whether an alternative is biologically admissible.
+- Cartesian worlds are not assigned probabilities.
+- The paired interval and graph endpoint values are inputs; this tool does not run connectome inference or apply edits.
+- No ConnectomeBench2 V2 dataset pin, Parquet rows, EM volume, or biological outcome is bundled.
+- Rust tests in this change are authored but must run on an exact reviewed head before the tool is called executable in production.
+
+## Tests
+
+Seven authored tests cover exact product closure, omitted-world rejection after resealing, duplicate worlds, byte-level artifact mutation, invalid paired values, unresolved frontiers, and stale manifest digests. They have not been compiled or executed in the authoring environment.
