@@ -1106,7 +1106,7 @@ pub mod pareto {
                     cycle_duration_s: 10.0,
                 },
             ];
-            let front = pareto_front(&candidates, 0.0);
+            let front = pareto_front(&candidates, 0.0).unwrap();
             assert_eq!(front.len(), 1);
             assert_eq!(front[0].id, "good");
         }
