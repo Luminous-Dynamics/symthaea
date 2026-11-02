@@ -472,6 +472,53 @@ mod tests {
         LocalMonomial::new(exponents.to_vec(), coefficient)
     }
 
+
+    #[test]
+    fn polynomial_valued_factor_entries_multiply_and_sum_exactly() {
+        let x_factor = BooleanPolynomialFactor::new(
+            vec![0],
+            vec![
+                LocalPolynomial::new(vec![
+                    local(&[0, 0], 1),
+                    local(&[1, 0], 1),
+                ]),
+                LocalPolynomial::constant(2, 1),
+            ],
+        );
+        let y_factor = BooleanPolynomialFactor::new(
+            vec![1],
+            vec![
+                LocalPolynomial::new(vec![
+                    local(&[0, 0], 1),
+                    local(&[0, 1], 1),
+                ]),
+                LocalPolynomial::constant(2, 1),
+            ],
+        );
+        let profile = enumerate_boolean_polynomial_profile(
+            2,
+            vec![3, 3],
+            &[x_factor, y_factor],
+        )
+        .unwrap();
+
+        // Sum over x0,x1 factors as (2 + X)(2 + Y).
+        assert_eq!(profile.coefficient(&[0, 0]).unwrap(), 4);
+        assert_eq!(profile.coefficient(&[1, 0]).unwrap(), 2);
+        assert_eq!(profile.coefficient(&[0, 1]).unwrap(), 2);
+        assert_eq!(profile.coefficient(&[1, 1]).unwrap(), 1);
+        assert_eq!(profile.checked_total().unwrap(), 9);
+    }
+
+    #[test]
+    fn checked_maximum_rejects_an_invalid_axis() {
+        let profile = WeightProfile::one(vec![2]).unwrap();
+        assert!(matches!(
+            profile.checked_count_at_maximum(1),
+            Err(ProfileError::AxisOutOfRange { axis: 1, dimensions: 1 })
+        ));
+    }
+
     #[test]
     fn triangle_max_cut_profile_is_exact() {
         let edge = |u: usize, v: usize| BooleanMonomialFactor::new(
