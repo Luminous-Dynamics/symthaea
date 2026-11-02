@@ -588,7 +588,7 @@ mod tests {
         source.column_ids = vec!["300".to_string(), "100".to_string(), "200".to_string()];
         source.annotation_ids = vec!["200".to_string(), "100".to_string(), "300".to_string()];
         let second = validate_identity_join(&source).expect("permuted join");
-        assert_eq!(first.canonical_identity_sha256(), second.canonical_identity_sha256);
+        assert_eq!(first.canonical_identity_sha256(), second.canonical_identity_sha256());
         assert_ne!(first.source_binding_sha256(), second.source_binding_sha256());
     }
 
@@ -686,6 +686,49 @@ mod tests {
     }
 
     #[test]
+    fn canonicalize_matrix_applies_both_source_axis_permutations() {
+        let mut source = input();
+        source.row_ids = vec!["300".to_string(), "100".to_string(), "200".to_string()];
+        source.column_ids = vec!["200".to_string(), "300".to_string(), "100".to_string()];
+        source.annotation_ids = vec!["100".to_string(), "300".to_string(), "200".to_string()];
+        let join = validate_identity_join(&source).expect("join");
+        let matrix = vec![
+            vec![1, 2, 0],
+            vec![11, 12, 10],
+            vec![21, 22, 20],
+        ];
+        let canonical = canonicalize_matrix(&matrix, &join).expect("canonical matrix");
+        assert_eq!(canonical, vec![vec![10, 11, 12], vec![20, 21, 22], vec![0, 1, 2]]);
+    }
+
+    #[test]
+    fn canonicalize_annotation_values_uses_annotation_permutation() {
+        let mut source = input();
+        source.annotation_ids = vec!["300".to_string(), "100".to_string(), "200".to_string()];
+        let join = validate_identity_join(&source).expect("join");
+        let source_values = vec!["C", "A", "B"];
+        let canonical = canonicalize_annotation_values(&source_values, &join).expect("values");
+        assert_eq!(canonical, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn canonicalize_matrix_rejects_wrong_payload_shape() {
+        let join = validate_identity_join(&input()).expect("join");
+        let error = canonicalize_matrix(&[vec![1, 2], vec![3, 4]], &join)
+            .expect_err("wrong shape must reject");
+        assert!(error.contains(ReasonCode::MatrixPayloadRowCountMismatch));
+        assert!(error.contains(ReasonCode::MatrixPayloadColumnCountMismatch));
+    }
+
+    #[test]
+    fn canonicalize_annotation_values_rejects_wrong_length() {
+        let join = validate_identity_join(&input()).expect("join");
+        let error = canonicalize_annotation_values(&[1, 2], &join)
+            .expect_err("wrong annotation length must reject");
+        assert!(error.contains(ReasonCode::AnnotationPayloadLengthMismatch));
+    }
+
+    #[test]
     fn stable_target_resolution_is_order_independent() {
         let mut source = input();
         source.row_ids.reverse();
@@ -723,7 +766,7 @@ mod tests {
         let mut source = input();
         source.orientation = Some(MatrixOrientation::RowsPostsynapticColumnsPresynaptic);
         let second = validate_identity_join(&source).expect("second orientation");
-        assert_ne!(first.canonical_identity_sha256, second.canonical_identity_sha256);
+        assert_ne!(first.canonical_identity_sha256(), second.canonical_identity_sha256());
     }
 
     #[test]
@@ -789,7 +832,7 @@ mod tests {
         let remove = vec!["200".to_string()];
         let result = resolve_selection(&join, Some(&keep), &remove).expect("disjoint selection");
         assert_eq!(result.keep().expect("keep set").canonical_indices(), vec![0, 2]);
-        assert_eq!(result.remove.canonical_indices, vec![1]);
+        assert_eq!(result.remove().canonical_indices(), vec![1]);
     }
 
     #[test]
