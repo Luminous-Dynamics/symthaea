@@ -1,0 +1,49 @@
+name: REA Rust Evidence Core
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/lib.rs"
+      - "src/rea_compat.rs"
+      - "crates/domains/symthaea-rea-compat/**"
+      - ".github/workflows/rea-rust-evidence-core.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/lib.rs"
+      - "src/rea_compat.rs"
+      - "crates/domains/symthaea-rea-compat/**"
+      - ".github/workflows/rea-rust-evidence-core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-rust-evidence-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Validate workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /tmp/symthaea-metadata.json
+      - name: Format check
+        run: cargo fmt --check --package symthaea-rea-compat
+      - name: Evidence identity and negative-control tests
+        run: cargo test --locked -p symthaea-rea-compat
