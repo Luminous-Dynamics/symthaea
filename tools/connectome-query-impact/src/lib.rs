@@ -1790,6 +1790,52 @@ mod tests {
     }
 
     #[test]
+    fn finite_world_receipt_rejects_candidate_operation_sample_task_and_scenario_replay() {
+        for field in ["candidate", "operation", "sample", "task", "scenario"] {
+            let mut item = evaluation(
+                "pathway", "h1", interval(0.1, 0.9), interval(0.1, 0.9), Some(0.5), 0.1,
+            );
+            item.paired_effect = Some(PairedEffectBounds {
+                effect_interval: interval(-0.1, 0.1),
+                evidence_sha256: SHA_C.to_owned(),
+                decision_worlds: Some(vec![PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.3,
+                }]),
+            });
+            item.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+            match field {
+                "candidate" => {
+                    item.paired_world_set_coverage.as_mut().unwrap().candidate_id =
+                        "other-candidate".to_owned();
+                }
+                "operation" => {
+                    item.paired_world_set_coverage.as_mut().unwrap().operation_id =
+                        "other-operation".to_owned();
+                }
+                "sample" => {
+                    item.paired_world_set_coverage.as_mut().unwrap().sample_hash =
+                        "fedcba9876543210fedcba9876543210".to_owned();
+                }
+                "task" => {
+                    item.paired_world_set_coverage.as_mut().unwrap().task_route =
+                        TaskRoute::FalseSplitCorrection;
+                }
+                "scenario" => {
+                    item.paired_world_set_coverage.as_mut().unwrap().scenario_id =
+                        "other-scenario".to_owned();
+                }
+                _ => unreachable!(),
+            }
+            assert!(matches!(
+                analyze_candidate(&candidate(vec![item])),
+                Err(QueryImpactError::PairedWorldCoverageBindingMismatch { .. })
+            ));
+        }
+    }
+
+    #[test]
     fn differing_scenario_scopes_are_preserved_as_mixed_at_query_level() {
         let mut supplied = evaluation(
             "pathway",
