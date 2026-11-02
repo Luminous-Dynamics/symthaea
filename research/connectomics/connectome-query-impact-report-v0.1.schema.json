@@ -81,8 +81,7 @@
         "effect_method",
         "decision_flip_method",
         "paired_decision_world_count",
-        "decision_flip_method",
-        "paired_decision_world_count"
+        "decision_flip_scope"
       ],
       "properties": {
         "scenario_id": {
@@ -137,6 +136,9 @@
         "paired_decision_world_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "decision_flip_scope": {
+          "$ref": "#/$defs/decision_flip_scope"
         }
       }
     },
@@ -154,7 +156,8 @@
         "worst_case_normalized_materiality",
         "materiality_exceeded_possible",
         "materiality_exceeded_guaranteed",
-        "aggregate_decision_flip"
+        "aggregate_decision_flip",
+        "aggregate_decision_flip_scope"
       ],
       "properties": {
         "query_id": {
@@ -196,6 +199,9 @@
         },
         "aggregate_decision_flip": {
           "$ref": "#/$defs/decision_flip"
+        },
+        "aggregate_decision_flip_scope": {
+          "$ref": "#/$defs/decision_flip_scope"
         }
       }
     },
@@ -210,6 +216,15 @@
         "NotConfigured",
         "MarginalIntervalOuterBound",
         "PairedSharedWorlds"
+      ]
+    },
+    "decision_flip_scope": {
+      "enum": [
+        "NotApplicable",
+        "MarginalRectangularProduct",
+        "SuppliedPairedWorldSet",
+        "DeclaredFiniteUniverse",
+        "Mixed"
       ]
     }
   },
