@@ -1,6 +1,6 @@
 # Connectome experiment design: finite-hypothesis EIG
 
-A standalone, dependency-free Rust 2024 reference crate for ranking candidate experiments by expected information gain (EIG) over a finite set of competing hypotheses.
+A standalone, dependency-free Rust 2024 reference crate for finite-hypothesis EIG, Gaussian Fisher D/A-optimal parameter identification and utility-aware EVSI experiment design.
 
 This crate is a small mathematical utility, **not** a neural simulator, causal estimator, continuous control-input optimizer, or biological model. The caller must provide the hypotheses, prior probabilities, conditional outcome likelihoods, and experiment costs. It does not infer or calibrate any of them. In particular, it complements rather than reproduces recent control-theoretic work on designing continuous perturbation waveforms for system identification: this implementation ranks a finite list of discrete candidate experiments under caller-supplied hypothesis likelihoods.
 
@@ -66,6 +66,51 @@ The analytical values are independently recorded in `fixtures/known-answers.json
 
 The fixture evidence class is `synthetic_known_answer` and claim ceiling is `SYNTHETIC_ONLY`. No empirical experiment ranking or biological result is claimed.
 
+
+## Parameter identification is not model discrimination
+
+The crate now supports a third, independent experiment-design objective: local Gaussian Fisher-information design.
+
+For a parameter prior with covariance `Sigma`, local observation sensitivity/Jacobian `J`, and measurement-noise covariance `R`:
+
+```
+F = J^T R^-1 J
+Sigma_post = (Sigma^-1 + F)^-1
+D_information_bits = 0.5 * log2(det(Sigma) / det(Sigma_post))
+A_variance_reduction = trace(Sigma) - trace(Sigma_post)
+```
+
+The API is:
+
+- `ParameterPrior { covariance }`: finite, symmetric, strictly positive-definite Gaussian prior covariance.
+- `LinearGaussianDesign { id, cost, sensitivities, noise_covariance }`: a finite candidate measurement design. Rows of `sensitivities` are observations; columns are parameters. `noise_covariance` may include correlated measurement noise.
+- `evaluate_parameter_design(...)`: returns posterior covariance trace, prior/posterior log determinants, D-optimal information in bits, A-optimal trace reduction and both cost-normalized scores.
+- `rank_parameter_candidates(..., ParameterObjective::DOptimal)`: ranks by D-optimal information per cost.
+- `rank_parameter_candidates(..., ParameterObjective::AOptimal)`: ranks by A-optimal trace reduction per cost.
+- `parameter_selection_regret(...)`: computes opportunity regret for either objective against the same finite candidate pool.
+
+The implementation uses Cholesky factorization and triangular solves; it does not explicitly form `R^-1`. Non-finite, ragged, asymmetric, singular or non-positive-definite prior/noise matrices fail closed. It rejects invalid costs and non-finite cost-normalized scores.
+
+**The assumptions are deliberately narrow.** This is a local linearization with Gaussian parameter prior and Gaussian measurement noise. The caller supplies the sensitivity matrix and noise covariance; the crate does not infer them, estimate biological parameters, optimize continuous waveforms, or guarantee that a local approximation remains valid under large perturbations. The output is conditional on the chosen parameterization, prior covariance, observation model and noise covariance.
+
+### D-optimal versus A-optimal is a real decision, not a naming difference
+
+The frozen two-parameter fixture uses an identity prior covariance and unit observation noise:
+
+- A concentrated observation with sensitivity `[10, 0]` yields **3.3291057414 D-information bits** but only **0.9900990099 trace reduction**.
+- A balanced two-observation design with sensitivities `[2, 0]` and `[0, 2]` yields **2.3219280949 D-information bits** but **1.6 trace reduction**.
+
+D-optimal selects the concentrated observation because it most reduces uncertainty volume. A-optimal selects the balanced design because it reduces the sum of marginal parameter variances more. Neither is universally best; the scientific estimand determines which parameter-uncertainty geometry matters.
+
+### The three objectives
+
+| Objective | Question | Output unit | Main failure mode |
+|---|---|---|---|
+| EIG | Which experiment separates the declared hypotheses? | bits | Hypothesis/likelihood misspecification |
+| Fisher D/A | Which experiment identifies the declared parameters? | bits / parameter-units squared | Local-linearization or parameterization dependence |
+| EVSI | Which experiment improves the declared action? | caller utility | Utility misspecification or actions omit real alternatives |
+
+Do not add these raw scores into one scalar: they have different meanings and units. Compare their Pareto front or choose an objective from a preregistered scientific estimand. A later constrained selector can combine them only after explicit utility normalization and safety/feasibility constraints are declared.
 
 ## Decision value is not information gain
 
