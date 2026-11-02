@@ -202,6 +202,7 @@ pub struct ItemOutcome {
     pub item_id: u64,
     pub lineage_id: u64,
     pub selected_for_transmission: bool,
+    pub attempted_individually: bool,
     pub observed: bool,
     pub acquired: bool,
     pub integrated: bool,
@@ -217,6 +218,7 @@ pub struct TeachingEpisode {
     pub mode: LearningMode,
     pub items: Vec<ItemOutcome>,
     pub offered_count: usize,
+    pub attempted_item_count: usize,
     pub observed_count: usize,
     pub acquired_count: usize,
     pub integrated_count: usize,
@@ -370,7 +372,8 @@ fn evaluate_one(
     let mut outcome = ItemOutcome {
         item_id: item.item_id,
         lineage_id: item.lineage_id,
-        selected_for_transmission: selected,
+        selected_for_transmission: matches!(mode, LearningMode::Social { .. }) && selected,
+        attempted_individually: matches!(mode, LearningMode::IndividualOnly) && selected,
         observed: false,
         acquired: false,
         integrated: false,
@@ -493,6 +496,9 @@ pub fn run_teaching_episode(
     }
 
     let offered_count = outcomes.iter().filter(|outcome| outcome.selected_for_transmission).count();
+    let attempted_item_count = outcomes.iter().filter(|outcome| {
+        outcome.selected_for_transmission || outcome.attempted_individually
+    }).count();
     let observed_count = outcomes.iter().filter(|outcome| outcome.observed).count();
     let acquired_count = outcomes.iter().filter(|outcome| outcome.acquired).count();
     let integrated_count = outcomes.iter().filter(|outcome| outcome.integrated).count();
@@ -506,8 +512,10 @@ pub fn run_teaching_episode(
     let realized_benefit: f64 = outcomes.iter().map(|outcome| outcome.realized_benefit).sum();
     let unique_lineages_offered = {
         let mut lineages = std::collections::BTreeSet::new();
-        for outcome in outcomes.iter().filter(|outcome| outcome.selected_for_transmission) {
-            lineages.insert(outcome.lineage_id);
+        if matches!(mode, LearningMode::Social { .. }) {
+            for outcome in outcomes.iter().filter(|outcome| outcome.selected_for_transmission) {
+                lineages.insert(outcome.lineage_id);
+            }
         }
         lineages.len()
     };
@@ -516,6 +524,7 @@ pub fn run_teaching_episode(
         mode,
         items: outcomes,
         offered_count,
+        attempted_item_count,
         observed_count,
         acquired_count,
         integrated_count,
@@ -671,6 +680,9 @@ mod tests {
             config,
             9,
         ).unwrap();
+        assert_eq!(episode.offered_count, 0);
+        assert_eq!(episode.attempted_item_count, episode.items.iter().filter(|item| item.attempted_individually).count());
+        assert!(episode.items.iter().all(|item| !item.selected_for_transmission));
         assert_eq!(episode.observed_count, 0);
         assert!(episode.total_learning_cost <= config.individual_learning_budget);
     }
