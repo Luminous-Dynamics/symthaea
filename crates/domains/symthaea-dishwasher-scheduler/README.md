@@ -6,9 +6,9 @@ Deterministic event-driven simulation of the proposed InstantClean QuickCell + F
 
 - `FullLoadOnly`: accumulate eligible jobs until full-load capacity or maximum batch wait.
 - `QuickCellOnly`: clean each eligible item individually as the single cell becomes available.
-- `HybridResourceAware`: use QuickCell for jobs that are ineligible for FullLoad, would miss their deadline in the next full batch, or belong to a timed-out partial batch that QuickCell Pareto-dominates on both modeled energy and fresh water per item.
+- `HybridResourceAware`: use QuickCell for jobs that are ineligible for FullLoad, would miss their deadline in the next full batch, or belong to a timed-out partial batch that QuickCell Pareto-dominates on per-item energy, fresh water and total serial queue service duration.
 
-The hybrid policy has no opaque weighted score. If QuickCell is better on both energy and water for a timed-out partial batch, it diverts the items to QuickCell. If the resource objectives conflict or FullLoad is no worse, it retains FullLoad and reports the resulting trade-off.
+The hybrid policy has no opaque weighted score. If QuickCell is no worse on energy, fresh water and total serial service duration for a timed-out partial batch, and strictly better on at least one, it diverts the items to QuickCell. If any objective conflicts or FullLoad is no worse, it retains FullLoad and reports the resulting trade-off.
 
 ## What is explicit
 
