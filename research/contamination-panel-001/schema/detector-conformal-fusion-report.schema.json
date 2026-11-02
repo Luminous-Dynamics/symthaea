@@ -11,6 +11,10 @@
     "study_id",
     "benchmark_id",
     "benchmark_version",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "prompt_harness_sha256",
+    "runtime_environment_sha256",
     "calibration_protocol_sha256",
     "detector_registry_sha256",
     "request_sha256",
@@ -542,6 +546,22 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "runtime_environment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
