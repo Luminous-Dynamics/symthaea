@@ -219,6 +219,30 @@ fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
+/// Resolve an artifact relative to the receipt and enforce the canonical
+/// parent boundary after symlink resolution. Lexically safe paths alone do
+/// not prevent a directory symlink from escaping the receipt's folder.
+fn resolve_artifact_path(manifest_path: &Path, relative: &str) -> Result<PathBuf, String> {
+    let relative_path = safe_relative_path(relative)?;
+    let parent = manifest_path
+        .parent()
+        .ok_or_else(|| "manifest path has no parent directory".to_owned())?;
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("cannot canonicalize manifest directory: {error}"))?;
+    let target = canonical_parent.join(relative_path);
+    let canonical_target = fs::canonicalize(&target)
+        .map_err(|error| format!("cannot canonicalize raw-state artifact: {error}"))?;
+    if !canonical_target.starts_with(&canonical_parent) {
+        return Err("raw-state artifact resolves outside the receipt directory".to_owned());
+    }
+    let metadata = fs::metadata(&canonical_target)
+        .map_err(|error| format!("cannot inspect raw-state artifact: {error}"))?;
+    if !metadata.is_file() {
+        return Err("raw-state artifact is not a regular file".to_owned());
+    }
+    Ok(canonical_target)
+}
+
 fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String> {
     let mut errors = Vec::new();
 
@@ -476,23 +500,20 @@ fn main() {
 
     let raw_state_bytes = if str_at(&value, &["run_state"]) == Some("complete") {
         let relative = match str_at(&value, &["numerics", "raw_state_artifact", "relative_path"]) {
-            Some(path) => match safe_relative_path(path) {
-                Ok(path) => path,
-                Err(error) => {
-                    eprintln!("unsafe raw-state path: {error}");
-                    std::process::exit(2);
-                }
-            },
+            Some(path) => path,
             None => {
                 eprintln!("complete receipt is missing raw-state artifact path");
                 std::process::exit(2);
             }
         };
-        let Some(parent) = manifest_path.parent() else {
-            eprintln!("manifest path has no parent directory");
-            std::process::exit(2);
+        let resolved = match resolve_artifact_path(&manifest_path, relative) {
+            Ok(path) => path,
+            Err(error) => {
+                eprintln!("unsafe or unavailable raw-state artifact: {error}");
+                std::process::exit(2);
+            }
         };
-        match fs::read(parent.join(relative)) {
+        match fs::read(&resolved) {
             Ok(bytes) => Some(bytes),
             Err(error) => {
                 eprintln!("cannot read raw-state artifact: {error}");
@@ -689,6 +710,32 @@ mod tests {
         assert!(safe_relative_path("../state.f64le").is_err());
         assert!(safe_relative_path("/tmp/state.f64le").is_err());
         assert!(safe_relative_path("raw/state.f64le").is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_escape_from_receipt_directory_is_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let root = std::env::temp_dir().join(format!(
+            "cpg-receipt-path-boundary-{}",
+            std::process::id()
+        ));
+        let receipt_dir = root.join("receipt");
+        let outside_dir = root.join("outside");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(receipt_dir.join("artifacts")).unwrap();
+        fs::create_dir_all(&outside_dir).unwrap();
+        fs::write(outside_dir.join("state.f64le"), [0u8; 8]).unwrap();
+        symlink(&outside_dir, receipt_dir.join("artifacts/escape")).unwrap();
+
+        let manifest = receipt_dir.join("receipt.json");
+        let rejected = resolve_artifact_path(&manifest, "artifacts/escape/state.f64le");
+        assert!(rejected.is_err());
+        let allowed = resolve_artifact_path(&manifest, "artifacts");
+        assert!(allowed.is_err()); // a directory is not a raw-state file
+
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
