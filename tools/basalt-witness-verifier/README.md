@@ -21,7 +21,11 @@ It currently:
 - reports exact envelope, payload and trust-store digests;
 - verifies complete write-quorum checkpoint chains from sequence-zero genesis, with strict sequence/predecessor linkage, authority-incarnation continuity, monotonic revisions and transition-bundle digest commitments;
 - verifies a fresh nonce-bound read-quorum response against the exact verified chain head;
-- compares a restored store's authority identity, incarnation, revision, state digest and policy head against the independently witnessed head.
+- compares a restored store's authority identity, incarnation, revision, state digest and policy head against the independently witnessed head;
+- loads an offline trust root only when its domain-separated JCS digest matches an out-of-band pin;
+- validates a signed successor trust root against both the previous-root threshold and the successor-root threshold, with exact version increments and predecessor linkage;
+- verifies root-signed witness-set metadata, exact initial set pin, subsequent metadata-version links, BFT quorum arithmetic and administrative-domain separation;
+- only allows a previously verified witness-set capability to authorize the next metadata rotation or checkpoint-chain/head verification.
 
 The verifier uses the `dsse` crate for DSSE PAE, Ed25519 signing/verification and distinct-key threshold verification; `serde_json_canonicalizer` for RFC 8785 JCS; and `ed25519-dalek` for public-key identity fixtures. See [DSSE crate documentation](https://docs.rs/dsse/latest/dsse/), [serde_json_canonicalizer](https://docs.rs/serde_json_canonicalizer/latest/serde_json_canonicalizer/), and [ed25519-dalek](https://docs.rs/ed25519-dalek/latest/ed25519_dalek/).
 
@@ -68,6 +72,12 @@ The trust-store shape is described in `benchmarks/basalt/schema/witness-verifier
 - Duplicate public-key identity under a second member ID fails.
 - Duplicate administrative failure domain fails.
 - Incorrect out-of-band trust-store pin fails.
+- Offline root pin and canonical root digest validate.
+- Trust-root rotation without both old and new thresholds fails.
+- Trust-root rotation with skipped version or broken predecessor fails.
+- Initial witness-set metadata must match the digest pinned in the trust root.
+- Witness-set rotation must increment exactly one version and link to a previously verified witness-set capability.
+- Witness and root signers cannot declare a shared administrative failure domain.
 - Two-record checkpoint chain with 3-of-4 write signatures verifies.
 - Broken predecessor digest and skipped sequence are rejected even when the checkpoint signatures are valid.
 - Non-genesis checkpoint without a transition-bundle digest is rejected.
@@ -81,7 +91,9 @@ These are authored tests. The initial DSSE/JCS/trust-store suite passed on the i
 
 A `pass` means only that a canonical payload was authenticated by the configured threshold of Ed25519 keys in the exact locally pinned trust-store bytes; the library verifier loads that trust store from the bytes itself, so callers cannot substitute a separately constructed key set. It does **not** establish:
 - that the trust-store pin was provisioned securely (the caller must supply that assurance);
-- that trust-root signatures, dual-threshold root rotation, revocation history or witness-set metadata chains are valid;
+- that production trust-root pins were provisioned securely (the verifier checks exact digests supplied by the separate bootstrap channel);
+- that production key revocation history or witness-set metadata is independently archived and governed correctly;
+- that the witness service durably persists before signing;
 - that the signers are independent in actual operations (the verifier checks only unique declared administrative-domain labels);
 - that the witness service durably persists before signing;
 - that a committed checkpoint is fresh or latest absent a successful live nonce-bound read-quorum response;
@@ -90,4 +102,4 @@ A `pass` means only that a canonical payload was authenticated by the configured
 - that any database snapshot is fresh or reconstructible;
 - that power-loss durability, replication or backend qualification passed.
 
-The remaining implementation slice must verify the offline trust-root and witness-set metadata signature chain and dual-threshold root rotation, replace the simple pinned trust-store bootstrap with signed metadata rotation, and retain independently retrievable transition-bundle content so that freshness detection can progress to reproducible recovery. The protocol is documented in `docs/research/BASALT_INDEPENDENT_WITNESS_PROTOCOL_2026-11-01.md`.
+The remaining implementation slice must deploy independent witness members, prove their operational failure-domain independence, retain independently retrievable transition-bundle content, and verify production nonce generation/response collection and projection rebuild so that freshness detection progresses to reproducible recovery. The protocol is documented in `docs/research/BASALT_INDEPENDENT_WITNESS_PROTOCOL_2026-11-01.md`.
