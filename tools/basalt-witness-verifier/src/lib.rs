@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{Engine as _, engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD}};
 use dsse::{
     Ed25519Verifier, Envelope, MAX_SIGNATURES, Signature, VerifiedPayload, Verifier, verify,
 };
@@ -919,6 +919,23 @@ fn canonical_decimal(value: &str, allow_zero: bool) -> bool {
     allow_zero || value != "0"
 }
 
+fn validate_challenge_nonce(value: &str) -> Result<(), String> {
+    if value.len() != 43
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+    {
+        return Err("challenge nonce must be 32-byte unpadded Base64URL".to_string());
+    }
+    let decoded = URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|error| format!("challenge nonce is invalid Base64URL: {error}"))?;
+    if decoded.len() != 32 || URL_SAFE_NO_PAD.encode(&decoded) != value {
+        return Err("challenge nonce is not canonical 32-byte Base64URL".to_string());
+    }
+    Ok(())
+}
+
 fn valid_digest_string(value: &str) -> bool {
     value.strip_prefix("sha256:")
         .is_some_and(is_lower_hex_64)
@@ -987,6 +1004,7 @@ pub fn verify_member_head_response(
     expected_incarnation_id: &str,
     expected_challenge_nonce: &str,
 ) -> Result<VerifiedHeadResponse, String> {
+    validate_challenge_nonce(expected_challenge_nonce)?;
     let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
     let prepared = prepare_trust_store(&trust, sha256_prefixed(trust_store_bytes))?;
     let strict: StrictEnvelope = serde_json::from_slice(envelope_bytes)
@@ -1104,6 +1122,7 @@ pub fn aggregate_witness_read(
     expected_incarnation_id: &str,
     expected_challenge_nonce: &str,
 ) -> Result<SelectedWitnessHead, String> {
+    validate_challenge_nonce(expected_challenge_nonce)?;
     let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
     let actual_trust_digest = sha256_prefixed(trust_store_bytes);
     if responses.len() < trust.read_quorum {
@@ -1280,6 +1299,212 @@ mod tests {
             .collect();
         let envelope = sign_with(payload_type, payload, &signer_refs).unwrap();
         envelope.to_json().unwrap()
+    }
+
+    fn test_nonce() -> String {
+        URL_SAFE_NO_PAD.encode([42_u8; 32])
+    }
+
+    fn checkpoint_fixture(sequence: &str, state_byte: u8) -> WitnessCheckpoint {
+        WitnessCheckpoint {
+            record_type: "basalt.authority.witness-checkpoint".to_string(),
+            schema_version: 1,
+            authority_id: "basalt-test-authority".to_string(),
+            authority_incarnation_id: "incarnation-1".to_string(),
+            authority_epoch: "1".to_string(),
+            sequence: sequence.to_string(),
+            authority_revision: (sequence.parse::<u64>().unwrap() + 7).to_string(),
+            state_schema: "basalt.authority-state.v1".to_string(),
+            state_digest: format!("sha256:{}", format!("{state_byte:02x}").repeat(32)),
+            policy_revision: "1".to_string(),
+            policy_digest: format!("sha256:{}", "ab".repeat(32)),
+            previous_checkpoint_digest: Some(format!("sha256:{}", "cd".repeat(32))),
+            witness_set_id: "basalt-test-witness-set".to_string(),
+            witness_set_version: "1".to_string(),
+            trust_root_version: "1".to_string(),
+            transition_bundle_digest: Some(format!("sha256:{}", "ef".repeat(32))),
+        }
+    }
+
+    fn sign_checkpoint_fixture(
+        checkpoint: &WitnessCheckpoint,
+        seeds: &[[u8; 32]],
+    ) -> Vec<u8> {
+        let canonical = serde_json_canonicalizer::to_vec(checkpoint).unwrap();
+        sign_payload(CHECKPOINT_PAYLOAD_TYPE, &canonical, seeds)
+    }
+
+    fn sign_head_response_fixture(
+        checkpoint: &WitnessCheckpoint,
+        nonce: &str,
+        seed: &[u8; 32],
+    ) -> Vec<u8> {
+        let response = WitnessHeadResponse {
+            record_type: "basalt.authority.witness-head-response".to_string(),
+            schema_version: 1,
+            challenge_nonce: nonce.to_string(),
+            authority_id: checkpoint.authority_id.clone(),
+            authority_incarnation_id: checkpoint.authority_incarnation_id.clone(),
+            authority_epoch: checkpoint.authority_epoch.clone(),
+            witness_set_id: checkpoint.witness_set_id.clone(),
+            witness_set_version: checkpoint.witness_set_version.clone(),
+            trust_root_version: checkpoint.trust_root_version.clone(),
+            head_sequence: checkpoint.sequence.clone(),
+            head_checkpoint_digest: checkpoint_digest(checkpoint).unwrap(),
+            head_authority_revision: checkpoint.authority_revision.clone(),
+            head_state_digest: checkpoint.state_digest.clone(),
+            head_policy_digest: checkpoint.policy_digest.clone(),
+        };
+        let canonical = serde_json_canonicalizer::to_vec(&response).unwrap();
+        sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, &canonical, std::slice::from_ref(seed))
+    }
+
+    fn verified_checkpoint_fixture(
+        checkpoint: &WitnessCheckpoint,
+        seeds: &[[u8; 32]],
+        trust_bytes: &[u8],
+        pin: &str,
+    ) -> VerifiedCheckpoint {
+        verify_write_checkpoint(
+            &sign_checkpoint_fixture(checkpoint, seeds),
+            trust_bytes,
+            pin,
+            "incarnation-1",
+        )
+        .unwrap()
+    }
+
+    fn verified_response_fixture(
+        checkpoint: &WitnessCheckpoint,
+        seed: &[u8; 32],
+        nonce: &str,
+        trust_bytes: &[u8],
+        pin: &str,
+    ) -> VerifiedHeadResponse {
+        verify_member_head_response(
+            &sign_head_response_fixture(checkpoint, nonce, seed),
+            trust_bytes,
+            pin,
+            "incarnation-1",
+            nonce,
+        )
+        .unwrap()
+    }
+
+    fn read_fixture() -> (
+        Vec<u8>,
+        String,
+        Vec<VerifiedHeadResponse>,
+        Vec<VerifiedCheckpoint>,
+    ) {
+        let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let trust_bytes = trust_bytes(&build_trust(&seeds));
+        let pin = sha256_prefixed(&trust_bytes);
+        let nonce = test_nonce();
+        let latest = checkpoint_fixture("5", 0x55);
+        let lagging = checkpoint_fixture("4", 0x44);
+        let checkpoints = vec![
+            verified_checkpoint_fixture(&latest, &seeds[..3], &trust_bytes, &pin),
+            verified_checkpoint_fixture(&lagging, &seeds[..3], &trust_bytes, &pin),
+        ];
+        let responses = vec![
+            verified_response_fixture(&latest, &seeds[0], &nonce, &trust_bytes, &pin),
+            verified_response_fixture(&lagging, &seeds[1], &nonce, &trust_bytes, &pin),
+            verified_response_fixture(&latest, &seeds[2], &nonce, &trust_bytes, &pin),
+        ];
+        (trust_bytes, pin, responses, checkpoints)
+    }
+
+    #[test]
+    fn nonce_bound_read_selects_highest_certified_head_with_lagging_replicas() {
+        let (trust_bytes, pin, responses, checkpoints) = read_fixture();
+        let selected = aggregate_witness_read(
+            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
+        )
+        .unwrap();
+        assert_eq!(selected.status, "highest_write_certified_head_selected");
+        assert_eq!(selected.sequence, "5");
+        assert_eq!(selected.read_quorum, 3);
+        assert_eq!(selected.response_member_key_ids.len(), 3);
+        assert_eq!(selected.checkpoint_signer_key_ids.len(), 3);
+    }
+
+    #[test]
+    fn read_quorum_shortfall_is_anti_rollback_unknown() {
+        let (trust_bytes, pin, mut responses, checkpoints) = read_fixture();
+        responses.truncate(2);
+        let error = aggregate_witness_read(
+            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
+        ).unwrap_err();
+        assert!(error.contains("anti_rollback_unknown"));
+    }
+
+    #[test]
+    fn repeated_member_response_never_counts_twice() {
+        let (trust_bytes, pin, mut responses, checkpoints) = read_fixture();
+        responses[2] = responses[0].clone();
+        let error = aggregate_witness_read(
+            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
+        ).unwrap_err();
+        assert!(error.contains("duplicate witness member response"));
+    }
+
+    #[test]
+    fn same_sequence_two_write_certified_digests_is_equivocation() {
+        let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let trust_bytes = trust_bytes(&build_trust(&seeds));
+        let pin = sha256_prefixed(&trust_bytes);
+        let nonce = test_nonce();
+        let first = checkpoint_fixture("5", 0x55);
+        let second = checkpoint_fixture("5", 0x66);
+        let checkpoints = vec![
+            verified_checkpoint_fixture(&first, &seeds[..3], &trust_bytes, &pin),
+            verified_checkpoint_fixture(&second, &seeds[..3], &trust_bytes, &pin),
+        ];
+        let responses = vec![
+            verified_response_fixture(&first, &seeds[0], &nonce, &trust_bytes, &pin),
+            verified_response_fixture(&second, &seeds[1], &nonce, &trust_bytes, &pin),
+            verified_response_fixture(&first, &seeds[2], &nonce, &trust_bytes, &pin),
+        ];
+        let error = aggregate_witness_read(
+            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &nonce,
+        ).unwrap_err();
+        assert!(error.contains("rejected_witness_equivocation"));
+    }
+
+    #[test]
+    fn response_replay_from_another_nonce_is_rejected() {
+        let (trust_bytes, pin, responses, _) = read_fixture();
+        let error = verify_member_head_response(
+            &sign_head_response_fixture(
+                &checkpoint_fixture("5", 0x55),
+                &test_nonce(),
+                &[7_u8; 32],
+            ),
+            &trust_bytes,
+            &pin,
+            "incarnation-1",
+            &URL_SAFE_NO_PAD.encode([43_u8; 32]),
+        ).unwrap_err();
+        assert!(error.contains("challenge nonce mismatch"));
+        assert_eq!(responses.len(), 3);
+    }
+
+    #[test]
+    fn member_response_must_reference_a_write_certified_checkpoint() {
+        let (trust_bytes, pin, responses, mut checkpoints) = read_fixture();
+        checkpoints.remove(0);
+        let error = aggregate_witness_read(
+            &responses, &checkpoints, &trust_bytes, &pin, "incarnation-1", &test_nonce(),
+        ).unwrap_err();
+        assert!(error.contains("missing write-quorum checkpoint"));
+    }
+
+    #[test]
+    fn malformed_or_padded_challenge_nonce_is_rejected() {
+        assert!(validate_challenge_nonce("not-a-nonce").is_err());
+        assert!(validate_challenge_nonce(&format!("{}=", test_nonce())).is_err());
+        assert!(validate_challenge_nonce(&test_nonce()).is_ok());
     }
 
     #[test]
