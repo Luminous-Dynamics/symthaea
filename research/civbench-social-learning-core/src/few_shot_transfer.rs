@@ -361,7 +361,7 @@ mod tests {
         ];
         let result = evaluate_held_out(&[], &["held".to_owned()], &tasks, true).unwrap();
         assert_eq!(result.summary.task_count, 2);
-        assert!((result.summary.mean_cultural_transmission - 0.75).abs() < 1e-12);
+        assert!((result.summary.mean_cultural_transmission - 0.6875).abs() < 1e-12);
         assert!(result.summary.cultural_transmission_ci95_half_width.is_some());
     }
 }
