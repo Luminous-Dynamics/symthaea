@@ -54,7 +54,7 @@ It excludes:
 
 Therefore, changing a display path must not change the Evidence ID. Changing a semantic field must change it. The raw-file digest is always a different identity over the exact input bytes.
 
-The canonicalizer dependency is pinned through the workspace to `serde_json_canonicalizer = 0.3.2`. Its JCS implementation sorts object property names by UTF-16 code units and applies ECMAScript-compatible number formatting. This is the right algorithmic fit for the upstream REA canonical digest implementation, but the full upstream golden corpus and operation-specific schema parity are still required before the compatibility claim is promoted.
+The canonicalizer dependency is pinned through the workspace to `serde_json_canonicalizer = 0.3.2`. The adapter wraps serde_json values in an ECMAScript number serializer so integer tokens retained by Rust are converted to IEEE-754 binary64 before JCS serialization. This is necessary because JavaScript JSON.parse converts every JSON number to a double before JSON.stringify: for example, 9007199254740993 becomes 9007199254740992. The JCS serializer sorts object property names by UTF-16 code units and applies ECMAScript-compatible number formatting. The full upstream differential corpus and operation-specific schema parity are still required before promotion.
 
 ## Raw-file admission versus parsed-object parity
 
