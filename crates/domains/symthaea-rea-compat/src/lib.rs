@@ -892,4 +892,22 @@ mod tests {
         evidence["evidence_id"] = json!(new_id);
         assert!(verify_evidence_value(&evidence).is_ok());
     }
+
+    #[test]
+    fn matches_zod_nullable_provider_version_and_nul_free_path_semantics() {
+        let mut evidence = golden();
+        evidence["analysis_profile"] = Value::Null;
+        evidence["provider"]["version"] = json!("");
+        evidence["subject"]["local_path"] = json!("");
+        evidence["caller_input_path"] = json!("");
+        let new_id = compute_evidence_id(&evidence).unwrap();
+        evidence["evidence_id"] = json!(new_id);
+        assert!(verify_evidence_value(&evidence).is_ok());
+
+        evidence["subject"]["local_path"] = json!("bad\\u0000path");
+        assert_eq!(
+            validate_evidence_schema(&evidence).unwrap_err().kind,
+            EvidenceErrorKind::SchemaViolation
+        );
+    }
 }
