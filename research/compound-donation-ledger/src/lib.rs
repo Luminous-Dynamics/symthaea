@@ -625,7 +625,26 @@ pub struct ProcessOvershootRefund {
 }
 
 impl ProcessOvershootRefund {
+    /// Constructs an account for the common normalized process V_0 = 1.
     pub fn new(alpha_numerator: u64, alpha_denominator: u64) -> Result<Self, LedgerError> {
+        Self::with_initial_evidence_value(
+            alpha_numerator,
+            alpha_denominator,
+            EVIDENCE_ONE,
+        )
+    }
+
+    /// Constructs an account with an explicit nonnegative initial process value.
+    ///
+    /// Some valid time-monotone e-process adjusters (including staircase
+    /// calibrators before their first threshold crossing) start at zero rather
+    /// than one. Their initial value must be supplied explicitly so that
+    /// subsequent decreases are still rejected.
+    pub fn with_initial_evidence_value(
+        alpha_numerator: u64,
+        alpha_denominator: u64,
+        initial_evidence_value: u128,
+    ) -> Result<Self, LedgerError> {
         if alpha_numerator == 0
             || alpha_denominator == 0
             || alpha_numerator >= alpha_denominator
@@ -645,7 +664,7 @@ impl ProcessOvershootRefund {
             denominator,
             refund_cap_numerator,
             last_round: None,
-            last_evidence_value: EVIDENCE_ONE,
+            last_evidence_value: initial_evidence_value,
             cumulative_refund_numerator: 0,
         })
     }
@@ -1449,6 +1468,26 @@ mod tests {
         let later = account.record(5, 40 * EVIDENCE_ONE).unwrap();
         assert_eq!(later.refund_increment_numerator, 0);
         assert_eq!(later.cumulative_refund_numerator, EVIDENCE_ONE);
+    }
+
+    #[test]
+    fn process_overshoot_refund_supports_zero_initialized_e_process() {
+        let mut account = ProcessOvershootRefund::with_initial_evidence_value(
+            1, 20, 0
+        ).unwrap();
+        let initial = account.record(0, 0).unwrap();
+        assert!(!initial.rejected);
+        assert_eq!(initial.refund_increment_numerator, 0);
+        assert_eq!(initial.effective_cost_numerator, 0);
+
+        let before = account.record(1, 19 * EVIDENCE_ONE).unwrap();
+        assert!(!before.rejected);
+        assert_eq!(before.effective_cost_numerator, 19 * EVIDENCE_ONE);
+
+        let crossed = account.record(2, 21 * EVIDENCE_ONE).unwrap();
+        assert!(crossed.rejected);
+        assert_eq!(crossed.cumulative_refund_numerator, EVIDENCE_ONE);
+        assert_eq!(crossed.effective_cost_numerator, crossed.denominator);
     }
 
     #[test]
