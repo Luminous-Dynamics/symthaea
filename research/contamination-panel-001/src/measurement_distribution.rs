@@ -1210,6 +1210,28 @@ mod tests {
         std::iter::repeat_n(ch, 64).collect()
     }
 
+    fn fixture_manifest() -> MeasurementInstanceManifestV1 {
+        MeasurementInstanceManifestV1 {
+            schema: "symthaea.measurement_distribution_instance_manifest.v1".to_owned(),
+            benchmark_id: "mad-fixture".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            instances: vec![
+                MeasurementInstanceV1 {
+                    item_id: "item-1".to_owned(),
+                    task_family: "math".to_owned(),
+                    source_cluster_id: "cluster-1".to_owned(),
+                    source_lineage_sha256: digest('6'),
+                },
+                MeasurementInstanceV1 {
+                    item_id: "item-2".to_owned(),
+                    task_family: "math".to_owned(),
+                    source_cluster_id: "cluster-2".to_owned(),
+                    source_lineage_sha256: digest('7'),
+                },
+            ],
+        }
+    }
+
     fn protocol() -> MeasurementProtocolV1 {
         MeasurementProtocolV1 {
             schema: MEASUREMENT_PROTOCOL_SCHEMA.to_owned(),
@@ -1231,7 +1253,7 @@ mod tests {
                 generator_version: "1".to_owned(),
                 generator_config_sha256: digest('a'),
                 source_dataset_sha256: digest('b'),
-                generated_manifest_sha256: digest('c'),
+                generated_manifest_sha256: compute_instance_manifest_sha256(&fixture_manifest()).unwrap(),
                 seed_commitment_sha256: digest('d'),
                 checkpoint_freeze_receipt_sha256: None,
                 fresh_instances_after_checkpoint_freeze: false,
@@ -1283,30 +1305,10 @@ mod tests {
     }
 
     fn bundle(protocol: &MeasurementProtocolV1) -> MeasurementRunBundleV1 {
-        let manifest = MeasurementInstanceManifestV1 {
-            schema: "symthaea.measurement_distribution_instance_manifest.v1".to_owned(),
-            benchmark_id: protocol.benchmark_id.clone(),
-            benchmark_version: protocol.benchmark_version.clone(),
-            instances: vec![
-                MeasurementInstanceV1 {
-                    item_id: "item-1".to_owned(),
-                    task_family: "math".to_owned(),
-                    source_cluster_id: "cluster-1".to_owned(),
-                    source_lineage_sha256: digest('6'),
-                },
-                MeasurementInstanceV1 {
-                    item_id: "item-2".to_owned(),
-                    task_family: "math".to_owned(),
-                    source_cluster_id: "cluster-2".to_owned(),
-                    source_lineage_sha256: digest('7'),
-                },
-            ],
-        };
-        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
-        let manifest_sha = hash_domain(
-            b"measurement-distribution-instance-manifest.v1",
-            &manifest_bytes,
-        );
+        let manifest = fixture_manifest();
+        assert_eq!(manifest.benchmark_id, protocol.benchmark_id);
+        assert_eq!(manifest.benchmark_version, protocol.benchmark_version);
+        let manifest_sha = compute_instance_manifest_sha256(&manifest).unwrap();
         let protocol_bytes = serde_json::to_vec(protocol).unwrap();
         let protocol_sha = hash_domain(
             b"measurement-distribution-protocol.v1",
@@ -1338,6 +1340,12 @@ mod tests {
                         source_cluster_id: item.source_cluster_id.clone(),
                         decision,
                         validation_receipt_sha256: receipt,
+                        perturbation_seed_commitment_sha256: if decision == ObservationDecisionV1::Baseline {
+                            None
+                        } else {
+                            Some(digest('f'))
+                        },
+                        external_egress_receipt_sha256: None,
                         score: Some(score),
                         runtime_milliseconds: 10,
                         input_tokens: 20,
