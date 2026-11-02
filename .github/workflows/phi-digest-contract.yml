@@ -297,6 +297,7 @@ jobs:
           assert all(p["mip_default_resolved_cut_sha256s"] == [p["mip_cut_sha256"]] for p in points)
           assert all(len(p["mip_tie_lex_key_hexes"]) == p["mip_tie_count"] for p in points)
           assert all(p["numeric_tie_contains_default_representative"] for p in points)
+          assert all(p["state_pair_tie_count"] >= 1 for p in points)
           assert all(isinstance(p["lex_resolution_matches_numeric_ties"], bool) for p in points)
           assert all(len(p["minimum_numeric_tie_lex_key_hex"]) > 0 for p in points)
           partition_counts = [len(p["partition_scores"]) for p in points]
