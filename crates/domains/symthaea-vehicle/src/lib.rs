@@ -101,7 +101,8 @@ pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_re
 pub use road::{Road, RoadSegment};
 pub use scenario_discovery::{
     CrossingActor, IntersectionGenerationError, IntersectionScenarioCandidate,
-    ScenarioRangeSemantics, generate_stratified_intersection_candidates,
+    ScenarioRangeSemantics, generate_seeded_random_intersection_candidates,
+    generate_stratified_intersection_candidates,
 };
 pub use runtime_assurance::{
     VehicleRtaConfig, VehicleRtaDecision, VehicleRtaError, VehicleRtaMode, VehicleRtaObservation,
