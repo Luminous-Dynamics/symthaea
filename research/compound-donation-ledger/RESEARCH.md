@@ -672,6 +672,18 @@ The benchmark must keep guarantee classes separate.
 - Dynamic e-closure: de Heide, arXiv:2608.09927 (August 2026). Compare
   future-extension coherence, stopping and time-monotone persistence under
   its global-filtration assumptions.
+- SCORE: Kuang, Gang and Xia, ICML 2026, *SCORE: A Unified Framework for
+  Overshoot Refund in Online FDR Control*. It introduces overshoot refunds
+  for e-LOND/e-LORD/e-SAFFRON by using
+  \(\mathbf1\{\alpha_j e_j\ge1\}\le\alpha_j e_j-
+  (\alpha_j e_j-1)_+\). The basic SCORE methods retain finite-sample FDR
+  control; SCORE+ allows retroactive past-cost updates under conditional
+  positive quadrant dependence (CPQD). Include the published method and
+  author code, if available, as a mandatory one-shot baseline. Do not assign
+  the CPQD assumption to ordinary SCORE, and do not reuse the one-shot theorem
+  for repeated evidence by refreshing old e-values.
+  Paper: https://proceedings.mlr.press/v306/kuang26c.html
+  Preprint: https://arxiv.org/abs/2601.20386
 - e-GAI: Zhang, Wei, Ren and Zou, ICML 2025. The framework introduces
   e-LORD and e-SAFFRON, with dynamic test-level allocation and strategies
   against alpha-death. Include their paper and author reference implementation
