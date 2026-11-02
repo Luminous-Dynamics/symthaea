@@ -409,8 +409,22 @@ pub fn simulate(
                 || oldest_arrival.is_some_and(|arrival| {
                     now_s >= arrival.saturating_add(max_batch_wait_s)
                 });
+            let defer_dominated_partial_to_quick = matches!(
+                policy,
+                Policy::HybridResourceAware { .. }
+            ) && eligible_count > 0
+                && eligible_count < full.capacity
+                && oldest_arrival.is_some_and(|arrival| {
+                    now_s >= arrival.saturating_add(max_batch_wait_s)
+                })
+                && pending
+                    .iter()
+                    .filter(|job| full.supports(job))
+                    .all(|job| quick.supports(job))
+                && quick_dominates_partial_batch(quick, full, eligible_count)
+                && quick_free_s > now_s;
 
-            if batch_ready {
+            if batch_ready && !defer_dominated_partial_to_quick {
                 let mut selected = Vec::with_capacity(full.capacity);
                 let mut remaining = Vec::with_capacity(pending.len());
                 for job in pending.drain(..) {
