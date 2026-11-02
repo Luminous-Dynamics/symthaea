@@ -34,14 +34,13 @@ pub struct QueryStopCalibrationInput {
     pub profile_id: String,
     pub calibration_profile_sha256: String,
     pub group_disjointness_report_sha256: String,
+    pub calibration_trajectory_manifest_sha256: String,
     pub exchangeability_assessment_sha256: String,
     pub query_id: String,
     pub query_definition_sha256: String,
     pub analysis_code_sha256: String,
     pub metric_id: String,
     pub unit_id: String,
-    /// Frozen pre-registered materiality tolerance in the original metric unit.
-    pub materiality_threshold: f64,
     /// Frozen stratum should encode all declared transport conditions (for example species,
     /// workflow and volume class). It is an identity, not an inferred embedding.
     pub calibration_stratum_id: String,
@@ -80,6 +79,7 @@ pub struct QueryStopCalibrationReport {
     pub profile_id: String,
     pub calibration_profile_sha256: String,
     pub group_disjointness_report_sha256: String,
+    pub calibration_trajectory_manifest_sha256: String,
     pub exchangeability_assessment_sha256: String,
     pub target_exchangeability_supported: bool,
     pub query_id: String,
@@ -257,6 +257,7 @@ fn report_base(
         profile_id: input.profile_id.clone(),
         calibration_profile_sha256: input.calibration_profile_sha256.clone(),
         group_disjointness_report_sha256: input.group_disjointness_report_sha256.clone(),
+        calibration_trajectory_manifest_sha256: input.calibration_trajectory_manifest_sha256.clone(),
         exchangeability_assessment_sha256: input.exchangeability_assessment_sha256.clone(),
         target_exchangeability_supported: input.target_exchangeability_supported,
         query_id: input.query_id.clone(),
@@ -295,6 +296,7 @@ fn validate_input(input: &QueryStopCalibrationInput) -> Result<(), StopCalibrati
     }
     validate_sha("calibration profile", &input.calibration_profile_sha256)?;
     validate_sha("group-disjointness report", &input.group_disjointness_report_sha256)?;
+    validate_sha("calibration trajectory manifest", &input.calibration_trajectory_manifest_sha256)?;
     validate_sha("exchangeability assessment", &input.exchangeability_assessment_sha256)?;
     validate_sha("query definition", &input.query_definition_sha256)?;
     validate_sha("analysis code", &input.analysis_code_sha256)?;
@@ -427,6 +429,7 @@ mod tests {
             profile_id: "profile-v1".to_owned(),
             calibration_profile_sha256: SHA_A.to_owned(),
             group_disjointness_report_sha256: SHA_B.to_owned(),
+            calibration_trajectory_manifest_sha256: SHA_D.to_owned(),
             exchangeability_assessment_sha256: SHA_C.to_owned(),
             query_id: "pathway-strength".to_owned(),
             query_definition_sha256: SHA_C.to_owned(),
