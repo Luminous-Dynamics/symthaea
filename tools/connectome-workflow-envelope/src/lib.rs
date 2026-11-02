@@ -1339,6 +1339,57 @@ mod tests {
         value
     }
 
+    fn stop_calibration_receipt(
+        outcome: QueryStopCalibrationOutcome,
+    ) -> QueryStopCalibrationReceipt {
+        let (group_disjoint, exchangeability_supported, quantile, upper, n, rank, width) =
+            match outcome {
+                QueryStopCalibrationOutcome::InsufficientCalibration => {
+                    (true, true, None, None, 18, 19, 0.30)
+                }
+                QueryStopCalibrationOutcome::NotCalibratedGroupOverlap => {
+                    (false, true, None, None, 19, 19, 0.30)
+                }
+                QueryStopCalibrationOutcome::NotCalibratedExchangeability => {
+                    (true, false, None, None, 19, 19, 0.30)
+                }
+                QueryStopCalibrationOutcome::ProjectedStableWithinHorizon => {
+                    (true, true, Some(0.10), Some(0.30), 19, 19, 0.30)
+                }
+                QueryStopCalibrationOutcome::ProjectedUnstableWithinHorizon => {
+                    (true, true, Some(0.90), Some(1.10), 19, 19, 0.30)
+                }
+            };
+        QueryStopCalibrationReceipt {
+            receipt_sha256: SHA_A.to_owned(),
+            report_sha256: SHA_B.to_owned(),
+            calibration_profile_sha256: SHA_C.to_owned(),
+            group_disjointness_report_sha256: SHA_D.to_owned(),
+            exchangeability_assessment_sha256: SHA_A.to_owned(),
+            query_id: "pathway-1".to_owned(),
+            query_definition_sha256: SHA_C.to_owned(),
+            analysis_code_sha256: SHA_D.to_owned(),
+            metric_id: "pathway-strength".to_owned(),
+            unit_id: "normalized-strength".to_owned(),
+            calibration_stratum_id: "human-volume-workflow-v1".to_owned(),
+            source_volume_id: "volume-1".to_owned(),
+            target_independence_cluster_id: "animal-1-session-1".to_owned(),
+            first_graph_snapshot_sha256: SHA_D.to_owned(),
+            latest_graph_snapshot_sha256: SHA_C.to_owned(),
+            future_horizon_edits: 100,
+            alpha: 0.05,
+            calibration_trajectory_count: n,
+            order_statistic_rank: rank,
+            residual_quantile_ratio: quantile,
+            observed_max_drift_ratio: 0.20,
+            current_uncertainty_width_ratio: width,
+            projected_future_drift_upper_ratio: upper,
+            group_disjoint,
+            exchangeability_supported,
+            outcome,
+        }
+    }
+
     #[test]
     fn empty_envelope_reports_split_audit_pending_not_success() {
         let report = audit_workflow(&envelope()).unwrap();
@@ -1496,6 +1547,157 @@ mod tests {
         assert_eq!(report.query_id.as_deref(), Some("pathway-1"));
         assert!(!report.future_stability_certified);
         assert!(!report.universal_connectome_completeness_claimed);
+    }
+
+    #[test]
+    fn finite_horizon_calibration_advances_only_to_projected_stability() {
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        value.query_stop_calibration = Some(stop_calibration_receipt(
+            QueryStopCalibrationOutcome::ProjectedStableWithinHorizon,
+        ));
+        let report = audit_workflow(&value).unwrap();
+        assert_eq!(report.status, WorkflowStatus::QueryProjectedStableWithinHorizon);
+        assert_eq!(report.projected_stop_horizon_edits, Some(100));
+        assert!((report.projected_future_drift_upper_ratio.unwrap() - 0.30).abs() < 1e-12);
+        assert!(report.completed_stages.contains(&"QUERY_FUTURE_STOP_CALIBRATION"));
+        // The projection applies only to the declared finite horizon.
+        assert!(!report.future_stability_certified);
+        assert!(!report.universal_connectome_completeness_claimed);
+    }
+
+    #[test]
+    fn insufficient_future_stop_calibration_preserves_observed_window_but_abstains() {
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        value.query_stop_calibration = Some(stop_calibration_receipt(
+            QueryStopCalibrationOutcome::InsufficientCalibration,
+        ));
+        let report = audit_workflow(&value).unwrap();
+        assert_eq!(report.status, WorkflowStatus::QueryStopCalibrationInsufficient);
+        assert_eq!(
+            report.unresolved_stages,
+            vec!["QUERY_FUTURE_STOP_CALIBRATION"]
+        );
+        assert_eq!(report.projected_future_drift_upper_ratio, None);
+    }
+
+    #[test]
+    fn future_stop_group_overlap_and_exchangeability_are_distinct_abstentions() {
+        for (outcome, expected, unresolved) in [
+            (
+                QueryStopCalibrationOutcome::NotCalibratedGroupOverlap,
+                WorkflowStatus::QueryStopCalibrationGroupOverlap,
+                "QUERY_FUTURE_STOP_GROUP_DISJOINTNESS",
+            ),
+            (
+                QueryStopCalibrationOutcome::NotCalibratedExchangeability,
+                WorkflowStatus::QueryStopCalibrationExchangeabilityUnsupported,
+                "QUERY_FUTURE_STOP_EXCHANGEABILITY",
+            ),
+        ] {
+            let mut value = through_edit();
+            value.query_stability = Some(query_receipt(
+                SHA_C,
+                QueryStabilityOutcome::StableOverObservedWindow,
+            ));
+            value.query_stop_calibration = Some(stop_calibration_receipt(outcome));
+            let report = audit_workflow(&value).unwrap();
+            assert_eq!(report.status, expected);
+            assert_eq!(report.unresolved_stages, vec![unresolved]);
+        }
+    }
+
+    #[test]
+    fn projected_future_instability_blocks_horizon_readiness() {
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        value.query_stop_calibration = Some(stop_calibration_receipt(
+            QueryStopCalibrationOutcome::ProjectedUnstableWithinHorizon,
+        ));
+        let report = audit_workflow(&value).unwrap();
+        assert_eq!(report.status, WorkflowStatus::QueryProjectedUnstableWithinHorizon);
+        assert_eq!(
+            report.unresolved_stages,
+            vec!["QUERY_FUTURE_STOP_READINESS"]
+        );
+        assert!((report.projected_future_drift_upper_ratio.unwrap() - 1.10).abs() < 1e-12);
+        assert!(!report.future_stability_certified);
+    }
+
+    #[test]
+    fn future_stop_receipt_must_bind_observed_query_and_snapshot_lineage() {
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        let mut stop = stop_calibration_receipt(
+            QueryStopCalibrationOutcome::ProjectedStableWithinHorizon,
+        );
+        stop.query_definition_sha256 = SHA_A.to_owned();
+        value.query_stop_calibration = Some(stop);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QueryStopQueryMismatch)
+        );
+
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        let mut stop = stop_calibration_receipt(
+            QueryStopCalibrationOutcome::ProjectedStableWithinHorizon,
+        );
+        stop.latest_graph_snapshot_sha256 = SHA_B.to_owned();
+        value.query_stop_calibration = Some(stop);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QueryStopSnapshotMismatch)
+        );
+    }
+
+    #[test]
+    fn future_stop_receipt_recomputes_rank_and_checks_status_consistency() {
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        let mut stop = stop_calibration_receipt(
+            QueryStopCalibrationOutcome::ProjectedStableWithinHorizon,
+        );
+        stop.order_statistic_rank = 18;
+        value.query_stop_calibration = Some(stop);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QueryStopRankMismatch)
+        );
+
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::StableOverObservedWindow,
+        ));
+        let mut stop = stop_calibration_receipt(
+            QueryStopCalibrationOutcome::ProjectedStableWithinHorizon,
+        );
+        stop.projected_future_drift_upper_ratio = Some(1.2);
+        value.query_stop_calibration = Some(stop);
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QueryStopOutcomeContradiction)
+        );
     }
 
     #[test]
