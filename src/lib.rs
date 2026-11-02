@@ -294,6 +294,9 @@ compile_error!(
 #[cfg(feature = "rea-compat")]
 pub mod rea_compat;
 
+#[cfg(feature = "rea-compat")]
+pub mod rea_mobile_policy;
+
 // Unified error types for cross-subsystem error handling.
 pub mod errors;
 pub use errors::{SymthaeaError, SymthaeaResult};
