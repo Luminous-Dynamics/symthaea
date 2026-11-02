@@ -47,7 +47,7 @@ The distinction between expressed and induced emotion is empirically important: 
 
 src/affective_appraisal.rs adds:
 
-- IndependentPerceptualObservationV1: versioned, bounded, audio-hash-bound perceptual observations. The schema intentionally has no composer-intended valence/arousal field.
+- IndependentPerceptualObservationV1: versioned, bounded perceptual observations tied to an audio SHA, analysis SHA, and named/versioned perception pipeline. The schema intentionally has no composer-intended valence/arousal field. The DTO validates digest syntax only; the upstream producer must hash and verify the exact source bytes and canonical analysis record.
 - AppraisalProfileV1: explicit, versioned weights and smoothing. The current default is named heuristic_v1; it is not described as a learned or human-calibrated prior.
 - MelothaeaAppraisalV1: a separate computational state for affect, curiosity, uncertainty, familiarity, tension, anticipation, resolution and confidence.
 - AppraisalTransitionV1: exact observation identity and profile version plus before/after state for a replayable journal.
