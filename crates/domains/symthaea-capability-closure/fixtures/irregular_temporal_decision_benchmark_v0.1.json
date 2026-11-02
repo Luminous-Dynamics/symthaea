@@ -164,6 +164,19 @@
       "status": "registered_not_downloaded_or_run"
     },
     {
+      "id": "time",
+      "role": "task_centric_zero_shot_forecasting_and_pattern_level_evaluation",
+      "url": "https://proceedings.mlr.press/v306/qiao26g.html",
+      "published_date": "2026-07-06",
+      "reported_dataset_count": 50,
+      "reported_task_count": 98,
+      "reported_domain_count": null,
+      "protocol_note": "TIME is distinct from BITS: it provides 50 fresh datasets and 98 forecasting tasks for strict zero-shot TSFM evaluation, with pattern-level temporal characterization. Pin the official code, leaderboard snapshot, dataset manifests, licenses and exact zero-shot protocol before execution. Do not assume TIME result rows share BITS or Time-IMM preprocessing/splits.",
+      "code_identity_status": "pin_official_software_and_leaderboard_snapshot_before_execution",
+      "license_and_data_checksums_status": "audit_each_dataset_license_and_digest_before_execution",
+      "status": "registered_not_reproduced"
+    },
+    {
       "id": "gift_eval",
       "registry_reference": "real_irregular_benchmark_registry_v0.1.json#gift_eval",
       "role": "general_forecasting_zero_shot_and_few_shot_context",
