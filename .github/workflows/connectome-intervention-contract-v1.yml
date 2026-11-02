@@ -41,8 +41,12 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
       - name: Validate Draft 2020-12 schema and adversarial examples
         run: python3 tools/connectome-intervention-contract/validate_schema.py
+      - name: Regenerate isolated lockfile in its actual feature context
+        run: cargo generate-lockfile --manifest-path tools/connectome-intervention-contract/Cargo.toml
+      - name: Report generated lockfile delta for pinning
+        run: git diff -- tools/connectome-intervention-contract/Cargo.lock
       - name: Run semantic verifier tests
-        run: cargo test --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked
+        run: cargo test --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked --all-targets
       - name: Run strict Clippy
         run: cargo clippy --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked --all-targets -- -D warnings
       - name: Verify the published example remains explicitly incomplete
