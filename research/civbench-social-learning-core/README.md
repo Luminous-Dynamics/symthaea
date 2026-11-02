@@ -30,15 +30,15 @@ The current 12-node/30-edge test graph is synthetic. It checks the published tas
 ## Generational cultural-transmission model
 
 The separate `src/cultural_evolution.rs` module is a parameterized reference ABM with:
-- individual discovery of optimal/myopic/none strategies;
-- different human/machine learning budgets and exploration biases;
-- noisy demonstration scores;
-- sampled teacher candidates and softmax performance-based teacher choice;
-- probabilistic social acquisition;
-- integration where optimal dominates myopic if acquired;
-- generation-by-generation strategy prevalence and acquisition metrics.
+- separate individual-learning budgets for the seed and later generations;
+- distinct human/machine search budgets and optimal-exploration biases;
+- noisy demonstration performance;
+- uniform or performance-softmax teacher selection from sampled candidates;
+- distinct demonstration observation, strategy acquisition, transmission corruption and active integration probabilities;
+- strategy downgrading under corrupted demonstrations;
+- generation-by-generation prevalence, acquisition, integration and teacher-selection metrics.
 
-It follows the broad mechanism sequence described in the 2026 Reward Network III paper but is **not** a reproduction of the authors' ABM. The published supplementary parameters and archived implementation must be ingested before claiming replication. A fixed-seed test checks reproducibility; synthetic tests check perfect transmission, no-transmission controls and the distinction between individual discovery and social acquisition.
+It follows the broad mechanism sequence described in the 2026 Reward Network III paper but is **not** a reproduction of the authors' ABM. The published supplementary parameters and archived implementation must be ingested before claiming replication. Tests cover fixed-seed reproducibility, perfect transmission, empty-teacher and no-transmission controls, observation without acquisition, acquisition without integration, corruption, and the distinction between individual discovery and social acquisition.
 
 ## Run
 
