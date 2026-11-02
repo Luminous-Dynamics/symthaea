@@ -19,6 +19,7 @@ pub const MAX_REFERENCE_VARIABLES: usize = 24;
 pub enum ProfileError {
     ZeroTruncationBound { axis: usize },
     ExponentDimensionMismatch { expected: usize, actual: usize },
+    AxisOutOfRange { axis: usize, dimensions: usize },
     IncompatibleTruncation { left: Vec<u32>, right: Vec<u32> },
     CoefficientOverflow { operation: &'static str },
     InvalidFactorScope { factor: usize, reason: &'static str },
@@ -33,6 +34,7 @@ impl fmt::Display for ProfileError {
         match self {
             Self::ZeroTruncationBound { axis } => write!(f, "truncation bound on axis {axis} must be positive"),
             Self::ExponentDimensionMismatch { expected, actual } => write!(f, "exponent has {actual} coordinates; expected {expected}"),
+            Self::AxisOutOfRange { axis, dimensions } => write!(f, "axis {axis} is outside profile dimension {dimensions}"),
             Self::IncompatibleTruncation { left, right } => write!(f, "incompatible profile rings: {left:?} versus {right:?}"),
             Self::CoefficientOverflow { operation } => write!(f, "coefficient overflow during {operation}"),
             Self::InvalidFactorScope { factor, reason } => write!(f, "factor {factor} has invalid scope: {reason}"),
@@ -163,9 +165,9 @@ impl WeightProfile {
 
     pub fn checked_count_at_maximum(&self, axis: usize) -> Result<Option<i128>, ProfileError> {
         if axis >= self.bounds.len() {
-            return Err(ProfileError::ExponentDimensionMismatch {
-                expected: self.bounds.len(),
-                actual: axis.saturating_add(1),
+            return Err(ProfileError::AxisOutOfRange {
+                axis,
+                dimensions: self.bounds.len(),
             });
         }
         let Some(maximum) = self.maximum_exponent(axis) else { return Ok(None); };
@@ -320,6 +322,147 @@ pub fn enumerate_boolean_weight_profile(
     }
 
     Ok(profile)
+}
+
+
+/// A local polynomial value as a finite sum of monomials with integer
+/// coefficients. Repeated exponents are permitted and are combined by the
+/// profile constructor during evaluation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocalPolynomial {
+    pub terms: Vec<LocalMonomial>,
+}
+
+impl LocalPolynomial {
+    pub fn new(terms: Vec<LocalMonomial>) -> Self {
+        Self { terms }
+    }
+
+    pub fn zero() -> Self {
+        Self { terms: Vec::new() }
+    }
+
+    pub fn constant(dimensions: usize, coefficient: i128) -> Self {
+        Self {
+            terms: vec![LocalMonomial::new(vec![0; dimensions], coefficient)],
+        }
+    }
+}
+
+/// A local Boolean factor whose truth-table entries are arbitrary sparse
+/// integer polynomials, rather than single monomials.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BooleanPolynomialFactor {
+    pub scope: Vec<usize>,
+    pub values: Vec<LocalPolynomial>,
+}
+
+impl BooleanPolynomialFactor {
+    pub fn new(scope: Vec<usize>, values: Vec<LocalPolynomial>) -> Self {
+        Self { scope, values }
+    }
+}
+
+/// Exhaustively evaluate a product of local polynomial factors and sum over
+/// all Boolean assignments. This is a small-instance oracle only; its running
+/// time is exponential in the number of variables.
+pub fn enumerate_boolean_polynomial_profile(
+    variable_count: usize,
+    bounds: Vec<u32>,
+    factors: &[BooleanPolynomialFactor],
+) -> Result<WeightProfile, ProfileError> {
+    if variable_count > MAX_REFERENCE_VARIABLES {
+        return Err(ProfileError::EnumerationLimitExceeded {
+            variables: variable_count,
+            maximum: MAX_REFERENCE_VARIABLES,
+        });
+    }
+
+    let zero = WeightProfile::zero(bounds.clone())?;
+    for (factor_index, factor) in factors.iter().enumerate() {
+        if factor.scope.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(ProfileError::InvalidFactorScope {
+                factor: factor_index,
+                reason: "scope must be strictly increasing",
+            });
+        }
+        for &variable in &factor.scope {
+            if variable >= variable_count {
+                return Err(ProfileError::VariableOutOfRange {
+                    factor: factor_index,
+                    variable,
+                    variable_count,
+                });
+            }
+        }
+        let shift = u32::try_from(factor.scope.len()).map_err(|_| {
+            ProfileError::FactorTableLengthOverflow { factor: factor_index }
+        })?;
+        let expected = 1usize.checked_shl(shift).ok_or(
+            ProfileError::FactorTableLengthOverflow { factor: factor_index },
+        )?;
+        if factor.values.len() != expected {
+            return Err(ProfileError::FactorTableLengthMismatch {
+                factor: factor_index,
+                expected,
+                actual: factor.values.len(),
+            });
+        }
+        for value in &factor.values {
+            for term in &value.terms {
+                if term.exponents.len() != bounds.len() {
+                    return Err(ProfileError::ExponentDimensionMismatch {
+                        expected: bounds.len(),
+                        actual: term.exponents.len(),
+                    });
+                }
+            }
+        }
+    }
+
+    let shift = u32::try_from(variable_count).map_err(|_| {
+        ProfileError::EnumerationLimitExceeded {
+            variables: variable_count,
+            maximum: MAX_REFERENCE_VARIABLES,
+        }
+    })?;
+    let assignments = 1usize.checked_shl(shift).ok_or(
+        ProfileError::EnumerationLimitExceeded {
+            variables: variable_count,
+            maximum: MAX_REFERENCE_VARIABLES,
+        },
+    )?;
+
+    let mut total = zero;
+    for assignment in 0..assignments {
+        let mut product = WeightProfile::one(bounds.clone())?;
+        for factor in factors {
+            let local_index = factor
+                .scope
+                .iter()
+                .enumerate()
+                .fold(0usize, |index, (axis, variable)| {
+                    index | (((assignment >> variable) & 1) << axis)
+                });
+            let value = &factor.values[local_index];
+            let mut local_profile = WeightProfile::zero(bounds.clone())?;
+            for term in &value.terms {
+                let monomial = WeightProfile::monomial(
+                    bounds.clone(),
+                    term.exponents.clone(),
+                    term.coefficient,
+                )?;
+                local_profile = local_profile.checked_add(&monomial)?;
+            }
+            product = product.checked_mul(&local_profile)?;
+            if product.is_zero() {
+                break;
+            }
+        }
+        total = total.checked_add(&product)?;
+    }
+
+    Ok(total)
 }
 
 #[cfg(test)]
