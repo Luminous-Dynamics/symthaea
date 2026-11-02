@@ -387,7 +387,17 @@
         "no_posthoc_case_exclusion": true,
         "separate_observation_and_inference": true
       },
-      "claim_ceiling": "Results apply only to the preregistered corpus, budgets, providers and named target configurations; they do not establish general causal reasoning superiority."
+      "claim_ceiling": "Results apply only to the preregistered corpus, budgets, providers and named target configurations; they do not establish general causal reasoning superiority.",
+      "implementation": {
+        "crate": "crates/domains/symthaea-rea-investigator",
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9977",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/10074",
+        "status": "implemented_draft_tests_pending",
+        "algorithm": "deterministic_Bayesian_expected_information_gain_in_bits",
+        "actions": "proposal_only_no_execution",
+        "provenance": "caller_declared_not_authenticated",
+        "claim_ceiling": "does_not_prove_causal_truth_or_likelihood_calibration"
+      }
     },
     {
       "id": "evidence_bundle_graph",
@@ -905,7 +915,13 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9969",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10026",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/10029"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10029",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9977",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9996",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/9910",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/10058",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/10074",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/9965"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
