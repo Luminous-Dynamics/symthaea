@@ -13,7 +13,13 @@ This is a research ledger, not a certified comparison. Labelled eco-programme da
 
 Official reference: https://webstore.iec.ch/en/publication/80459
 
-### United States qualification
+#### Household electrical safety — separate from performance
+
+IEC 60335-2-5:2025 is the seventh edition of the particular household-dishwasher safety requirements, published 18 December 2025. It replaces the 2012 edition plus Amendment 1:2018. The public IEC summary identifies relevant technical updates including surface-temperature limits, testing for leakage of the rinse-agent reservoir, requirements concerning simultaneous operation of multiple loads and updated detergent/rinse-agent references. Use it together with the applicable latest IEC 60335-1 edition and national adoption; obtain the licensed text and perform a clause-level compliance review before design freeze. IEC 60436 remains a performance-measurement method and is not a substitute for this safety assessment.
+
+Official reference: https://webstore.iec.ch/en/publication/101702
+
+## United States qualification
 
 ENERGY STAR's current published standard-dishwasher criteria remain <=240 kWh/year and <=3.2 US gallons/cycle; compact criteria are <=155 kWh/year and <=2.0 gallons/cycle. This is a qualification ceiling, not the best-product frontier, and US annual metrics must not be mixed directly with EU per-eco-cycle labels.
 
@@ -32,6 +38,20 @@ EU ecodesign rules also require access to certain spare parts (including hinges/
 Government Notice 7859, published 28 August 2026 in Gazette 55257, amends VC9008 and states phase 1 and phase 2 effective 12 and 24 months after publication. That implies 28 August 2027 and 28 August 2028 respectively. The public notice page reviewed here does not expose the complete schedule; obtain the full gazette and have NRCS/SANS applicability reviewed before product design freeze or market placement. Do not infer appliance-specific thresholds from the notice headline alone.
 
 Notice record: https://www.acts.co.za/national_/n7859_notice_no__7859_of_2026
+
+## Commercial architecture and sensor precedents
+
+The following are important incumbents, not novelty claims for InstantClean:
+
+- **Independent compartments are already commercial.** Fisher & Paykel's Series 7 Double DishDrawer quick reference guide dated 10 March 2026 describes two independently operated drawers, each a true half load, with simultaneous cycles possible and Quick, Sanitise and Dry+ options. The manufacturer states its Sanitise final-rinse option kills 99.9% of bacteria and is certified to NSF/ANSI 184; the precise model/market guide and certification scope must be checked before making any equivalent claim.
+  - 2026 guide: https://assets.fisherpaykel.com/product/2883_d000ae48-46ad-4dc7-ab83-8395baf534ca
+- **Single-drawer baseline.** Fisher & Paykel DD60SCX9 is listed as a 7-place-setting single DishDrawer with 136 kWh/year and 6.9 L/wash, plus Quick, Sanitise and Extra Dry options. Annual energy and per-wash water are different rating metrics and must not be combined into EU eco-cycle comparisons.
+  - 2026 quick reference: https://assets.fisherpaykel.com/product/2883_71bbf617-1ab5-4c91-8a6a-6cc9ed584e63
+- **Soil-sensing auto cycles are established.** ENERGY STAR describes auto-sensing cycles that detect whether water coming off dishes is dirty or clean and adjust operation to save water. GE's current CleanSensor/ExtraClean support documentation describes optical turbidity sensing, including a laser-based variant that adjusts wash time, water temperature, water amount and fills.
+  - ENERGY STAR: https://www.energystar.gov/products/dishwashers
+  - GE CleanSensor: https://products.geappliances.com/appliance/gea-support-search-content?contentId=22177
+
+Therefore, dual compartments and turbidity sensing alone are not InstantClean differentiators. The defensible wedge must be demonstrated on a matched basis: a genuine one-item / micro-batch cell, measured clean-and-rinse endpoints, per-successful-item resources, time-to-release, cross-contamination controls, repairability and robust fallback when sensors are degraded. Any patent novelty or freedom-to-operate claim requires a separate patent search and legal review.
 
 ## Exact-model market reference points
 
