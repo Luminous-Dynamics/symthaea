@@ -616,6 +616,59 @@ This is a conditional expected refund bound for one null process; it does
 not establish that the refund can be spent without limit or that an entire
 online FDR procedure is valid.
 
+### Uncapped SCORE refund versus bounded operational refund
+
+The first implementation uses a capped refund to bound individual exposure.
+The published SCORE algebra itself uses the **uncapped** overshoot
+\[
+O^{\mathrm{SCORE}}_{i,t}=(a_iV_{i,t}-1)_+,
+\qquad
+C^{\mathrm{SCORE}}_{i,t}
+=a_iV_{i,t}-O^{\mathrm{SCORE}}_{i,t}
+=\min\{a_iV_{i,t},1\}.
+\]
+This residual cost is nonnegative, pathwise nondecreasing when V is, and
+\[
+\mathbf1\{a_iV_{i,t}\ge1\}\le C^{\mathrm{SCORE}}_{i,t}\le a_iV_{i,t}.
+\]
+For a null e-process,
+\[
+\mathbb E[O^{\mathrm{SCORE}}_{i,\infty}\mid\mathcal F_{i,0}]
+\le
+a_i\mathbb E[V_{i,\infty}\mid\mathcal F_{i,0}]
+\le a_i.
+\]
+The uncapped refund is not bounded pathwise, but its conditional expectation
+is. The residual cost is capped at one, exactly matching the one-shot SCORE
+identity.
+
+The original capped design remains useful as an exposure-controlled variant:
+\[
+O^{\mathrm{cap}}_{i,t}
+=\min\{(a_iV_{i,t}-1)_+,a_i\},
+\qquad
+C^{\mathrm{cap}}_{i,t}=a_iV_{i,t}-O^{\mathrm{cap}}_{i,t}.
+\]
+Its refund is pathwise at most a_i and has the sharper expectation bound
+\[
+\mathbb E[O^{\mathrm{cap}}_{i,\infty}\mid\mathcal F_{i,0}]
+\le a_i\log(1+a_i)\le a_i^2,
+\]
+while its cost may exceed one for very large V. The uncapped variant offers
+more refund potential but larger realized tail exposure; the capped variant
+trades that potential for a deterministic exposure ceiling. Both are
+exactly-once processes, and neither is yet a complete global wealth-spending
+algorithm.
+
+The Rust reference now implements both variants separately:
+- \`ProcessOvershootRefundUncapped\`: full SCORE-style overshoot, with
+  residual cost min(aV,1);
+- \`ProcessOvershootRefund\`: capped overshoot, with residual cost aV-O_cap.
+
+The verifier has separate transition and sequence replay functions for the
+uncapped process, so the two definitions cannot be confused by a receipt
+consumer.
+
 ### Exactly-once fixed-point implementation
 
 The Rust reference exposes `ProcessOvershootRefund::new` for the normalized
