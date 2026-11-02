@@ -977,6 +977,51 @@ mod tests {
     }
 
     #[test]
+    fn rejects_hidden_mutable_partner_policy_state() {
+        use std::cell::Cell;
+
+        struct HiddenCounterPartner {
+            calls: Cell<u32>,
+        }
+
+        impl RmiPartnerPolicyV1 for HiddenCounterPartner {
+            fn policy_id(&self) -> &str { "hidden-counter-partner" }
+            fn policy_version(&self) -> &str { "1" }
+
+            fn respond(
+                &self,
+                _history: &[RmiHistoryEventV1],
+                agent_action: &RmiAgentActionV1,
+                _seed: u64,
+            ) -> RmiPartnerResponseV1 {
+                let next = self.calls.get() + 1;
+                self.calls.set(next);
+                let mut features = agent_action.features.clone();
+                features.tempo_milli_bpm += next;
+                RmiPartnerResponseV1 {
+                    response_id: format!("counter-{next}"),
+                    features,
+                }
+            }
+        }
+
+        let agent = FixedResponsePolicyV1 {
+            id: "fixed-agent".into(),
+            version: "1".into(),
+            response: fixed_action(),
+        };
+        let partner = HiddenCounterPartner { calls: Cell::new(0) };
+        assert!(matches!(
+            evaluate_rmi_reciprocal_pair(
+                &agent,
+                &partner,
+                &pair_for(RmiTargetFeatureV1::Role)
+            ),
+            Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput { .. })
+        ));
+    }
+
+    #[test]
     fn fixed_response_does_not_pass_targeted_input_sensitivity() {
         for target in [
             RmiTargetFeatureV1::Motif,
