@@ -30,7 +30,7 @@ All probabilities must be normalized and finite. Every view needs one likelihood
 
 - A view marked `leakage_safe = false` fails closed before likelihood evaluation.
 - Every candidate must list the current task route in `allowed_task_routes`. The upstream manifest must independently establish this compatibility; the boolean is not a cryptographic proof.
-- For CB2 merge-error identification, `em_best` must be rejected because its orientation depends on post-split masks. Split-error and other tasks need their own declared view policies.
+- For CB2 merge-error identification, `em_best` is hard-rejected by the core even when the caller sets `leakage_safe = true`, because its orientation depends on post-split masks. Split-error and other tasks need their own declared view policies.
 - Scenarios are an **unweighted uncertainty set**, not random draws from a known population. The planner uses worst-case lower net VOI; it does not average or silently assign weights.
 - VOI requires a declared action-loss matrix and calibrated likelihoods. If either is not supportable, the caller must not invent point values; the correct result is a bounded analysis elsewhere or `NOT_ESTIMABLE`.
 - Acquisition cost and decision loss must use the same declared unit; the Rust API rejects a unit-ID mismatch. Real inference, data I/O, reviewer time, and physical acquisition costs must be measured or explicitly converted before use.
@@ -45,7 +45,7 @@ Run in a Rust environment:
 cargo test --locked --manifest-path tools/connectome-view-voi/Cargo.toml
 ```
 
-Fourteen unit tests are authored for perfect information, redundant views, entropy/decision-utility divergence, scenario disagreement, robust selection, empty candidate sets, target-leak rejection, task-route rejection, malformed distributions, missing scenarios and deterministic order. They have **not** been compiled or executed in the current environment.
+Fifteen unit tests are authored for perfect information, redundant views, entropy/decision-utility divergence, scenario disagreement, robust selection, empty candidate sets, target-leak rejection, task-route rejection, malformed distributions, missing scenarios and deterministic order. They have **not** been compiled or executed in the current environment.
 
 ## Research plan
 
