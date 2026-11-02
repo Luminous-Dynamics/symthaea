@@ -347,6 +347,8 @@
           "false_negative_count",
           "empirical_fpr_permille",
           "empirical_tpr_permille",
+          "fpr_one_sided_95_upper_permille",
+          "tpr_one_sided_95_lower_permille",
           "decision_coverage_permille",
           "minimum_attainable_p_value",
           "minimum_detector_rank_p_value",
@@ -497,6 +499,22 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 500
+          },
+          "fpr_one_sided_95_upper_permille": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "tpr_one_sided_95_lower_permille": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000
           }
         }
       }
