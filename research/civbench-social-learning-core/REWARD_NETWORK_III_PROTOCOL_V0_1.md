@@ -56,3 +56,7 @@ Match the accumulated individual-learning time/trials in social-learning compari
 Before analysis, download Zenodo v2.0, record file digest and record/version metadata, inspect its README/data dictionary, preserve raw and processed tables separately, identify population/generation/participant/network/move/demo IDs, and reproduce the authors' exclusions and derived-variable pipeline. The Zenodo record says it contains de-identified participant- and move-level raw/processed data, strategy codings, networks, solutions, model weights and ABM outputs.
 
 The archive has not been ingested into this branch. No reanalysis or reproduction result is claimed. A small synthetic test fixture below must never be mistaken for one of the paper's original networks.
+
+## Implementation assumptions that require source verification
+
+The initial Rust V0 represents an action as a directed transition (from node to node) and resolves equal-reward/equal-loss choices by stable edge-index order. This is an explicit implementation choice for deterministic tests, not yet a verified property of the original experiment interface or network serialization. Before original-data replay, inspect the v2.0 network files and experiment code to establish whether source edges are directed or undirected, whether reverse traversal is available, how visited nodes/edges are treated, the legal-move rules, and the exact tie-breaking/randomization behavior. The importer must preserve the source representation and must not silently coerce undirected edges to directed arcs or vice versa.
