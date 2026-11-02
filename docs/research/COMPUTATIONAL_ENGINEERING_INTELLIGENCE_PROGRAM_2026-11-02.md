@@ -510,3 +510,21 @@ The task requires a typed multi-crate Rust graph, exact source/provenance spans,
 Proposed targets (not achieved): syntax node/edge precision and recall ≥0.95; supported compiler-resolved relationship precision and recall ≥0.90; change-impact recall ≥0.95 and precision ≥0.80; zero stale facts after a completed invalidation cycle; zero cases where syntax-only facts are labelled compiler-resolved. The gold-set and fixture design are tracked by [issue #10173](https://github.com/Luminous-Dynamics/symthaea/issues/10173).
 
 The CEB catalog now contains ten design-only tasks. The receipt workflow is authored but not run; all schema and task artifacts remain unqualified. The CEB branch is [draft PR #10115](https://github.com/Luminous-Dynamics/symthaea/pull/10115).
+
+
+### Static fixture progress
+
+The first development fixture is now committed on the CEB branch at
+`benchmarks/ceb/fixtures/repository-twin-synthetic-v0/`. It contains a
+five-crate workspace (domain, store, service, API and CLI), 32 graph nodes,
+37 expected edges, and seven deterministic edit scenarios. It covers module
+re-exports, generic trait bounds, trait implementations, cross-crate calls,
+integration tests, an optional audit feature and a Windows-only module /
+dependency.
+
+A static consistency pass fetched all 18 fixture files and checked unique node
+IDs, all graph-edge endpoints, all source paths, all mutation impact references
+and graph count consistency. The fixture has **not** been compiled; the expected
+semantic edges remain explicitly not compiler-verified. CEB-REPO-001 remains
+design-only until the fixture is frozen, independently reviewed, and equipped
+with compiler/LSP receipts and a hidden grader. See [issue #10173](https://github.com/Luminous-Dynamics/symthaea/issues/10173).
