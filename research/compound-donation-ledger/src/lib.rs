@@ -189,9 +189,7 @@ impl DonationLedger {
                     }
                 }
                 DonationReservePolicy::CappedOvershoot => {
-                    if spec.reserve_rate_numerator != 0
-                        || (spec.weight > 0 && spec.destination_id.is_none())
-                    {
+                    if spec.reserve_rate_numerator != 0 {
                         return Err(LedgerError::InvalidReserveRate);
                     }
                 }
@@ -327,7 +325,11 @@ impl DonationLedger {
                 let cap = (spec.weight as u128)
                     .checked_mul(EVIDENCE_ONE)
                     .ok_or(LedgerError::ArithmeticOverflow)?;
-                let target = raw.min(cap);
+                let target = if spec.destination_id.is_some() {
+                    raw.min(cap)
+                } else {
+                    0
+                };
                 let reserve = target
                     .checked_sub(state.outgoing)
                     .ok_or(LedgerError::InvariantViolation)?;
