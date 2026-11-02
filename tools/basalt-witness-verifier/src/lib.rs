@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{Engine as _, engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD}};
 use dsse::{
     Ed25519Verifier, Envelope, MAX_SIGNATURES, Signature, VerifiedPayload, Verifier, verify,
 };
@@ -377,6 +377,307 @@ pub fn verify_witness_envelope(
         accepted_key_ids: verified.accepted_keys,
         trust_store_sha256: prepared.trust_store_sha256,
     })
+}
+
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CheckpointPayload {
+    pub record_type: String,
+    pub schema_version: u32,
+    pub authority_id: String,
+    pub authority_incarnation_id: String,
+    pub authority_epoch: String,
+    pub sequence: String,
+    pub authority_revision: String,
+    pub state_schema: String,
+    pub state_digest: String,
+    pub policy_revision: String,
+    pub policy_digest: String,
+    pub previous_checkpoint_digest: Option<String>,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub trust_root_version: String,
+    pub transition_bundle_digest: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct HeadResponsePayload {
+    pub record_type: String,
+    pub schema_version: u32,
+    pub challenge_nonce: String,
+    pub authority_id: String,
+    pub authority_incarnation_id: String,
+    pub authority_epoch: String,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub trust_root_version: String,
+    pub head_sequence: String,
+    pub head_checkpoint_digest: String,
+    pub head_authority_revision: String,
+    pub head_state_digest: String,
+    pub head_policy_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedCheckpoint {
+    pub payload: CheckpointPayload,
+    pub digest: String,
+    pub accepted_key_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedCheckpointChain {
+    pub checkpoints: Vec<VerifiedCheckpoint>,
+    pub head: VerifiedCheckpoint,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RestoreObservation {
+    pub authority_id: String,
+    pub authority_incarnation_id: String,
+    pub authority_epoch: String,
+    pub authority_revision: String,
+    pub state_digest: String,
+    pub policy_revision: String,
+    pub policy_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RestoreVerdict {
+    Fresh,
+    RejectedAntiRollback { reason: String },
+}
+
+fn canonical_counter(value: &str, field: &str, allow_zero: bool) -> Result<u64, String> {
+    if value.is_empty()
+        || (value.len() > 1 && value.starts_with('0'))
+        || !value.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(format!("{field} is not a canonical decimal string"));
+    }
+    let parsed = value.parse::<u64>()
+        .map_err(|error| format!("{field} is outside the u64 range: {error}"))?;
+    if !allow_zero && parsed == 0 {
+        return Err(format!("{field} must be greater than zero"));
+    }
+    Ok(parsed)
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.strip_prefix("sha256:").is_some_and(is_lower_hex_64)
+}
+
+pub fn checkpoint_digest(payload: &CheckpointPayload) -> Result<String, String> {
+    let canonical = serde_json_canonicalizer::to_vec(payload)
+        .map_err(|error| format!("cannot canonicalize checkpoint payload: {error}"))?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"BASALT-WITNESS-CHECKPOINT-V1\0");
+    hasher.update(canonical);
+    Ok(format!("sha256:{}", hex_lower(&hasher.finalize())))
+}
+
+fn validate_checkpoint_payload(
+    payload: &CheckpointPayload,
+    trust: &TrustStore,
+) -> Result<(), String> {
+    if payload.record_type != "basalt.authority.witness-checkpoint" || payload.schema_version != 1 {
+        return Err("unsupported witness checkpoint record type or schema version".to_string());
+    }
+    if payload.authority_id != trust.authority_id
+        || payload.witness_set_id != trust.witness_set_id
+        || payload.witness_set_version != trust.witness_set_version.to_string()
+        || payload.trust_root_version != trust.trust_root_version.to_string()
+    {
+        return Err("checkpoint is not bound to the pinned authority, witness set and trust root".to_string());
+    }
+    if payload.authority_incarnation_id.is_empty() || payload.state_schema.is_empty() {
+        return Err("checkpoint incarnation and state schema must not be empty".to_string());
+    }
+    canonical_counter(&payload.authority_epoch, "authority_epoch", true)?;
+    canonical_counter(&payload.sequence, "sequence", true)?;
+    canonical_counter(&payload.authority_revision, "authority_revision", true)?;
+    canonical_counter(&payload.policy_revision, "policy_revision", true)?;
+    if !valid_sha256(&payload.state_digest) || !valid_sha256(&payload.policy_digest) {
+        return Err("checkpoint state or policy digest is malformed".to_string());
+    }
+    if payload.previous_checkpoint_digest.as_deref().is_some_and(|value| !valid_sha256(value))
+        || payload.transition_bundle_digest.as_deref().is_some_and(|value| !valid_sha256(value))
+    {
+        return Err("checkpoint predecessor or transition-bundle digest is malformed".to_string());
+    }
+    Ok(())
+}
+
+/// Verifies a complete sequence-zero-anchored checkpoint list using a pinned witness set.
+///
+/// This validates signatures, sequence continuity, predecessor links, authority incarnation,
+/// revision monotonicity, policy revision monotonicity and transition-bundle commitments.
+/// It does not prove that the transition-bundle content is available or independently retained.
+pub fn verify_checkpoint_chain(
+    envelopes: &[Vec<u8>],
+    trust_store_bytes: &[u8],
+    expected_trust_store_sha256: &str,
+) -> Result<VerifiedCheckpointChain, String> {
+    if envelopes.is_empty() {
+        return Err("checkpoint chain must include its sequence-zero genesis record".to_string());
+    }
+    if envelopes.len() > 100_000 {
+        return Err("checkpoint chain exceeds the 100000-record safety limit".to_string());
+    }
+    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
+    let mut checkpoints = Vec::with_capacity(envelopes.len());
+    let mut previous: Option<VerifiedCheckpoint> = None;
+
+    for envelope in envelopes {
+        let verified = verify_witness_envelope(
+            envelope,
+            trust_store_bytes,
+            expected_trust_store_sha256,
+            CHECKPOINT_PAYLOAD_TYPE,
+            QuorumKind::Write,
+        )?;
+        let payload: CheckpointPayload = serde_json::from_slice(&verified.payload)
+            .map_err(|error| format!("verified checkpoint payload has invalid shape: {error}"))?;
+        validate_checkpoint_payload(&payload, &trust)?;
+        let sequence = canonical_counter(&payload.sequence, "sequence", true)?;
+        match previous.as_ref() {
+            None => {
+                if sequence != 0
+                    || payload.previous_checkpoint_digest.is_some()
+                    || payload.transition_bundle_digest.is_some()
+                {
+                    return Err("genesis checkpoint must be sequence zero with null predecessor and transition bundle".to_string());
+                }
+            }
+            Some(prior) => {
+                let prior_payload = &prior.payload;
+                let expected_sequence = canonical_counter(&prior_payload.sequence, "prior sequence", true)?
+                    .checked_add(1)
+                    .ok_or_else(|| "witness sequence exhausted".to_string())?;
+                if sequence != expected_sequence {
+                    return Err(format!("checkpoint sequence gap: expected {expected_sequence}, got {sequence}"));
+                }
+                if payload.previous_checkpoint_digest.as_deref() != Some(prior.digest.as_str()) {
+                    return Err("checkpoint predecessor digest does not match the verified prior checkpoint".to_string());
+                }
+                if payload.transition_bundle_digest.is_none() {
+                    return Err("non-genesis checkpoint must commit a transition-bundle digest".to_string());
+                }
+                if payload.authority_incarnation_id != prior_payload.authority_incarnation_id
+                    || payload.authority_epoch != prior_payload.authority_epoch
+                {
+                    return Err("authority incarnation or epoch changed without a separately authorized re-provisioning ceremony".to_string());
+                }
+                if canonical_counter(&payload.authority_revision, "authority_revision", true)?
+                    <= canonical_counter(&prior_payload.authority_revision, "prior authority_revision", true)?
+                {
+                    return Err("authority revision did not increase strictly".to_string());
+                }
+                let prior_policy = canonical_counter(&prior_payload.policy_revision, "prior policy_revision", true)?;
+                let next_policy = canonical_counter(&payload.policy_revision, "policy_revision", true)?;
+                if next_policy < prior_policy {
+                    return Err("policy revision rolled back".to_string());
+                }
+                if next_policy == prior_policy && payload.policy_digest != prior_payload.policy_digest {
+                    return Err("policy digest changed without a policy revision increase".to_string());
+                }
+            }
+        }
+
+        let checkpoint = VerifiedCheckpoint {
+            digest: checkpoint_digest(&payload)?,
+            payload,
+            accepted_key_ids: verified.accepted_key_ids,
+        };
+        previous = Some(checkpoint.clone());
+        checkpoints.push(checkpoint);
+    }
+
+    let head = checkpoints.last().cloned()
+        .ok_or_else(|| "checkpoint chain unexpectedly empty".to_string())?;
+    Ok(VerifiedCheckpointChain { checkpoints, head })
+}
+
+/// Verifies a fresh, nonce-bound read-quorum response against an already verified chain head.
+pub fn verify_challenge_bound_head(
+    envelope: &[u8],
+    trust_store_bytes: &[u8],
+    expected_trust_store_sha256: &str,
+    challenge_nonce: &[u8; 32],
+    chain: &VerifiedCheckpointChain,
+) -> Result<Vec<String>, String> {
+    let verified = verify_witness_envelope(
+        envelope,
+        trust_store_bytes,
+        expected_trust_store_sha256,
+        HEAD_RESPONSE_PAYLOAD_TYPE,
+        QuorumKind::Read,
+    )?;
+    let response: HeadResponsePayload = serde_json::from_slice(&verified.payload)
+        .map_err(|error| format!("verified head response has invalid shape: {error}"))?;
+    let nonce = URL_SAFE_NO_PAD.encode(challenge_nonce);
+    if response.challenge_nonce != nonce {
+        return Err("head response does not bind the verifier's fresh 32-byte nonce".to_string());
+    }
+    let head = &chain.head.payload;
+    if response.record_type != "basalt.authority.witness-head-response" || response.schema_version != 1 {
+        return Err("unsupported witness head-response type or schema version".to_string());
+    }
+    let matches = response.authority_id == head.authority_id
+        && response.authority_incarnation_id == head.authority_incarnation_id
+        && response.authority_epoch == head.authority_epoch
+        && response.witness_set_id == head.witness_set_id
+        && response.witness_set_version == head.witness_set_version
+        && response.trust_root_version == head.trust_root_version
+        && response.head_sequence == head.sequence
+        && response.head_checkpoint_digest == chain.head.digest
+        && response.head_authority_revision == head.authority_revision
+        && response.head_state_digest == head.state_digest
+        && response.head_policy_digest == head.policy_digest;
+    if !matches {
+        return Err("challenge-bound quorum head disagrees with the verified checkpoint chain".to_string());
+    }
+    Ok(verified.accepted_key_ids)
+}
+
+pub fn assess_restored_store(
+    observed: &RestoreObservation,
+    witnessed_head: &CheckpointPayload,
+) -> Result<RestoreVerdict, String> {
+    if observed.authority_id != witnessed_head.authority_id {
+        return Ok(RestoreVerdict::RejectedAntiRollback {
+            reason: "restored store authority ID differs from the witnessed authority".to_string(),
+        });
+    }
+    if observed.authority_incarnation_id != witnessed_head.authority_incarnation_id
+        || observed.authority_epoch != witnessed_head.authority_epoch
+    {
+        return Ok(RestoreVerdict::RejectedAntiRollback {
+            reason: "restored store incarnation or epoch differs from the witnessed head".to_string(),
+        });
+    }
+    let store_revision = canonical_counter(&observed.authority_revision, "store authority revision", true)?;
+    let witness_revision = canonical_counter(&witnessed_head.authority_revision, "witness authority revision", true)?;
+    if store_revision != witness_revision {
+        return Ok(RestoreVerdict::RejectedAntiRollback {
+            reason: format!("store revision {} differs from witness revision {}", observed.authority_revision, witnessed_head.authority_revision),
+        });
+    }
+    if observed.state_digest != witnessed_head.state_digest {
+        return Ok(RestoreVerdict::RejectedAntiRollback {
+            reason: "restored state digest differs from witness head".to_string(),
+        });
+    }
+    if observed.policy_revision != witnessed_head.policy_revision
+        || observed.policy_digest != witnessed_head.policy_digest
+    {
+        return Ok(RestoreVerdict::RejectedAntiRollback {
+            reason: "restored policy head differs from witness head".to_string(),
+        });
+    }
+    Ok(RestoreVerdict::Fresh)
 }
 
 #[cfg(test)]
