@@ -666,6 +666,7 @@ mod tests {
     fn rejects_hidden_refusal_in_terminal_denominator() {
         let mut value = fixture();
         value["task_accounting"]["terminal_dispositions"]["refused"] = Value::from(0);
+        value["task_accounting"]["terminal_dispositions"]["ungraded"] = Value::from(1);
         assert!(validate_mutation(value).unwrap_err().to_string().contains("refused"));
     }
 
