@@ -443,19 +443,31 @@ impl FirstOrderDominanceState {
             // aggregating. This is an engineering guard, not a formal correctly-
             // rounded arithmetic proof; high-assurance replay should use a
             // higher-precision verifier.
-            let local_guard = 16.0 * f64::EPSILON * factor.abs().max(1.0);
+            let local_guard = if factor == 1.0 {
+                0.0
+            } else {
+                16.0 * f64::EPSILON * factor.abs().max(1.0)
+            };
             let lower_factor = (factor - local_guard).max(f64::MIN_POSITIVE);
             step_sum += lower_factor;
             step_guard += local_guard;
         }
 
         let mean_increment = step_sum / threshold_count as f64;
-        let aggregation_guard = 16.0 * f64::EPSILON * mean_increment.abs().max(1.0)
-            * (threshold_count as f64 + 2.0);
+        let aggregation_guard = if mean_increment == 1.0 && step_guard == 0.0 {
+            0.0
+        } else {
+            16.0 * f64::EPSILON * mean_increment.abs().max(1.0)
+                * (threshold_count as f64 + 2.0)
+        };
         let lower_increment = (mean_increment - aggregation_guard).max(f64::MIN_POSITIVE);
-        let log_increment = lower_increment.ln();
-        let log_guard = 16.0 * f64::EPSILON * log_increment.abs().max(1.0)
-            + step_guard / threshold_count as f64;
+        let log_increment = if lower_increment == 1.0 { 0.0 } else { lower_increment.ln() };
+        let log_guard = if log_increment == 0.0 && aggregation_guard == 0.0 {
+            0.0
+        } else {
+            16.0 * f64::EPSILON * log_increment.abs().max(1.0)
+                + step_guard / threshold_count as f64
+        };
         self.numerical_guard += aggregation_guard + log_guard;
         self.log_e_value += log_increment;
 
