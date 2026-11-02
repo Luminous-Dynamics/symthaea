@@ -41,3 +41,19 @@ Malformed JSON, file errors and INVALID reports exit nonzero. INCOMPLETE exits z
 ## HMAC limitation
 
 The secret HMAC key is never written to the manifest. This verifier checks token shape, set membership and digest consistency but cannot independently prove that the tokens were generated from the claimed raw identities using the committed secret. That requires a controlled tokenization authority or separate signed attestation. Raw identities must not be published in the manifest.
+
+
+## CPG numerical receipt verifier
+
+The second binary validates `CPG_NUMERICAL_RUN_RECEIPT_V1` and requires the raw state file for a complete run:
+
+```sh
+cargo run --bin cpg-numerical-receipt --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked
+cargo run --bin cpg-numerical-receipt --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked -- path/to/receipt.json
+```
+
+The receipt's `numerics.raw_state_artifact.relative_path` is resolved relative to the receipt file. The artifact is contiguous little-endian float32 or float64. The verifier recomputes SHA-256, checks that the byte count equals `state_dimension × actual_saved_timepoints × bytes_per_value`, scans every value for NaN/Inf, and reconciles the declared finite-state summary.
+
+A complete CPG receipt is rejected for any non-finite value, non-success solver status, missing saved output, post-solver sanitization, clipping, undocumented transformation, unapplied requested noise, digest mismatch or inconsistent tensor dimensions. The binary does not assume that `throw_on_failure=false` implies failure; it requires an explicit successful solver status and an independent raw-state scan.
+
+Thirteen Rust tests are authored for positive and adversarial controls. The receipt schema validation script also checks a complete synthetic-shaped receipt and rejects non-finite, sanitized, clipped, failed-solver and unapplied-noise variants. Their execution is a CI requirement, not claimed until an exact-head workflow completes. A passing numerical receipt establishes execution integrity only, not model validity or biological causality.
