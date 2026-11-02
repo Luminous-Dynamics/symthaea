@@ -178,7 +178,7 @@ impl ToolEffects {
 /// Equivalent of upstream's derived MCP hints. These values are presentation
 /// and routing metadata only; policy is evaluated against ToolEffects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DerivedToolAnnotations {
     pub read_only_hint: bool,
     pub destructive_hint: bool,
