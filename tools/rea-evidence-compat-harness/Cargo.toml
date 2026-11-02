@@ -15,6 +15,10 @@ path = "../../crates/domains/symthaea-rea-compat/src/lib.rs"
 name = "upstream_generated"
 path = "../../crates/domains/symthaea-rea-compat/tests/upstream_generated.rs"
 
+[[bin]]
+name = "rea-evidence-verify"
+path = "../../crates/domains/symthaea-rea-compat/src/bin/rea-evidence-verify.rs"
+
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["preserve_order"] }
