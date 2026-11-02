@@ -345,6 +345,110 @@ fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignm
     }
 }
 
+
+/// Declared algebraic capabilities of an exact coefficient domain.
+///
+/// This is a planner contract, not a proof that the laws hold. Each concrete
+/// domain must separately supply tests/formal obligations for its claims.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AlgebraCapabilities {
+    pub semiring_operations: bool,
+    pub commutative_multiplication: bool,
+    pub additive_inverses: bool,
+    pub rational_scalars: bool,
+    pub exact_scalar_embedding: bool,
+    pub final_coefficients_nonnegative: bool,
+    pub coefficient_bound_proven: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExactAlgorithm {
+    BucketVariableElimination,
+    SharedMeasurementInterpolation,
+    SignedNetworkSum,
+    CarryFreeScalarization,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompatibilityError {
+    SemiringRequired,
+    CommutativeMultiplicationRequired,
+    AdditiveInversesRequired,
+    RationalScalarsRequired,
+    ExactScalarEmbeddingRequired,
+    NonnegativeFinalCoefficientsRequired,
+    ProvenCoefficientBoundRequired,
+}
+
+impl fmt::Display for CompatibilityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SemiringRequired => write!(f, "algorithm requires semiring operations"),
+            Self::CommutativeMultiplicationRequired => write!(f, "algorithm requires commutative multiplication"),
+            Self::AdditiveInversesRequired => write!(f, "algorithm requires additive inverses"),
+            Self::RationalScalarsRequired => write!(f, "algorithm requires rational scalar multiplication"),
+            Self::ExactScalarEmbeddingRequired => write!(f, "algorithm requires an exact ordered scalar embedding"),
+            Self::NonnegativeFinalCoefficientsRequired => write!(f, "algorithm requires nonnegative final profile coefficients"),
+            Self::ProvenCoefficientBoundRequired => write!(f, "algorithm requires a proved coefficient upper bound"),
+        }
+    }
+}
+
+/// Fail-closed algorithm/domain compatibility check.
+///
+/// The caller must still prove or qualify the declared algebra laws; this
+/// function only prevents obvious category errors such as routing MaxCount
+/// through rational Hermite interpolation.
+pub fn check_algorithm_compatibility(
+    algorithm: ExactAlgorithm,
+    algebra: AlgebraCapabilities,
+) -> Result<(), CompatibilityError> {
+    match algorithm {
+        ExactAlgorithm::BucketVariableElimination => {
+            if !algebra.semiring_operations {
+                return Err(CompatibilityError::SemiringRequired);
+            }
+            if !algebra.commutative_multiplication {
+                return Err(CompatibilityError::CommutativeMultiplicationRequired);
+            }
+            Ok(())
+        }
+        ExactAlgorithm::SharedMeasurementInterpolation => {
+            if !algebra.commutative_multiplication {
+                return Err(CompatibilityError::CommutativeMultiplicationRequired);
+            }
+            if !algebra.additive_inverses {
+                return Err(CompatibilityError::AdditiveInversesRequired);
+            }
+            if !algebra.rational_scalars {
+                return Err(CompatibilityError::RationalScalarsRequired);
+            }
+            Ok(())
+        }
+        ExactAlgorithm::SignedNetworkSum => {
+            if !algebra.commutative_multiplication {
+                return Err(CompatibilityError::CommutativeMultiplicationRequired);
+            }
+            if !algebra.additive_inverses {
+                return Err(CompatibilityError::AdditiveInversesRequired);
+            }
+            Ok(())
+        }
+        ExactAlgorithm::CarryFreeScalarization => {
+            if !algebra.exact_scalar_embedding {
+                return Err(CompatibilityError::ExactScalarEmbeddingRequired);
+            }
+            if !algebra.final_coefficients_nonnegative {
+                return Err(CompatibilityError::NonnegativeFinalCoefficientsRequired);
+            }
+            if !algebra.coefficient_bound_proven {
+                return Err(CompatibilityError::ProvenCoefficientBoundRequired);
+            }
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
