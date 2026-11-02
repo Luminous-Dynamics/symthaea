@@ -611,6 +611,9 @@ pub fn simulate_transmission(
                 None
             };
             let strategy_integrated = strategy_acquisition_succeeded
+                && social_strategy
+                    .map(|strategy| strategy != Strategy::None)
+                    .unwrap_or(false)
                 && rng.bernoulli(config.strategy_integration_probability);
             let integrated_strategy = integrate_strategy(
                 individual_strategy,
@@ -774,6 +777,39 @@ mod tests {
             integrate_strategy(Strategy::None, Some(Strategy::Optimal), true),
             Strategy::Optimal
         );
+    }
+
+    #[test]
+    fn corrupted_demo_is_recorded_separately_from_teacher_strategy() {
+        let config = TransmissionConfig {
+            generations: 2,
+            demonstration_corruption_probability: 1.0,
+            ..high_transmission_config()
+        };
+        let run = simulate_transmission(config, 7).unwrap();
+        for agent in &run.generations[1].agents {
+            assert_eq!(agent.teacher_strategy, Some(Strategy::Optimal));
+            assert_eq!(agent.social_strategy, Some(Strategy::Myopic));
+            assert_eq!(agent.integrated_strategy, Strategy::Myopic);
+            assert!(agent.strategy_acquisition_succeeded);
+            assert!(agent.strategy_integrated);
+        }
+    }
+
+    #[test]
+    fn acquired_strategy_can_remain_unintegrated() {
+        let config = TransmissionConfig {
+            generations: 2,
+            strategy_integration_probability: 0.0,
+            ..high_transmission_config()
+        };
+        let run = simulate_transmission(config, 7).unwrap();
+        for agent in &run.generations[1].agents {
+            assert_eq!(agent.social_strategy, Some(Strategy::Optimal));
+            assert!(agent.strategy_acquisition_succeeded);
+            assert!(!agent.strategy_integrated);
+            assert_eq!(agent.integrated_strategy, Strategy::None);
+        }
     }
 
     #[test]
