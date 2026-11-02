@@ -548,14 +548,22 @@ def run(
 
             method_summary = {}
             for method, values in samples.items():
-                keys = values[0].keys()
-                method_summary[method] = {
-                    key: (
-                        statistics.mean(row[key] for row in values)
-                        if row_value_is_numeric(values[0][key]) else None
-                    )
-                    for key in keys
-                }
+                summary = {}
+                for key in values[0].keys():
+                    column = [row[key] for row in values]
+                    if key == "mean_first_true_discovery_look":
+                        observed = [value for value in column if value is not None]
+                        summary[key] = (
+                            statistics.mean(observed) if observed else None
+                        )
+                        summary["fraction_streams_with_true_discovery"] = (
+                            len(observed) / streams
+                        )
+                    elif row_value_is_numeric(values[0][key]):
+                        summary[key] = statistics.mean(column)
+                    else:
+                        summary[key] = None
+                method_summary[method] = summary
             delta_fixed = [pair[0] for pair in paired_power_diffs]
             delta_none = [pair[1] for pair in paired_power_diffs]
             rows.append({
