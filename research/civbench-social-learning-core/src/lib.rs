@@ -16,6 +16,7 @@ pub mod paper_abm;
 pub mod iterated_transmission;
 pub mod networked_mediation;
 pub mod reward_network;
+pub mod reward_network_abm_reference;
 
 use core::fmt;
 
