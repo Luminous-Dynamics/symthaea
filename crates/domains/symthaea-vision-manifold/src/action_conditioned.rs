@@ -211,7 +211,7 @@ impl ActionForecastBank {
             ));
         }
         let mut pairs = HashSet::with_capacity(expected);
-        let mut branches = HashSet::with_capacity(expected);
+        let mut branches: HashSet<String> = HashSet::with_capacity(expected);
         for sample in &self.samples {
             if !actions.contains(&sample.action_id) {
                 return Err(format!("sample has unknown action ID {}", sample.action_id));
@@ -225,7 +225,7 @@ impl ActionForecastBank {
                     sample.action_id, sample.joint_draw_id
                 ));
             }
-            if sample.branch_id.trim().is_empty() || !branches.insert(sample.branch_id.as_str()) {
+            if sample.branch_id.trim().is_empty() || !branches.insert(sample.branch_id.clone()) {
                 return Err("branch IDs must be non-empty and unique within a bank".into());
             }
             if sample.predicted_belief.len() != self.persistence_belief.len() {
@@ -438,8 +438,8 @@ impl ActionConditionedForecastEvaluator {
         if self.pending.len().saturating_add(bank.samples.len()) > self.max_pending {
             return Err("pending action forecast capacity would be exceeded".into());
         }
-        let existing: HashSet<&str> = self.pending.iter().map(|item| item.branch_id.as_str()).collect();
-        if bank.samples.iter().any(|sample| existing.contains(sample.branch_id.as_str())) {
+        let existing: HashSet<String> = self.pending.iter().map(|item| item.branch_id.clone()).collect();
+        if bank.samples.iter().any(|sample| existing.contains(&sample.branch_id)) {
             return Err("branch ID is already pending in the evaluator".into());
         }
         let mut staged = Vec::with_capacity(bank.samples.len());
