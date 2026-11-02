@@ -106,5 +106,98 @@
     ],
     "expected_first": "cheap_moderate_raw_eig"
   },
-  "notes": "Analytic finite-outcome cases only. Likelihoods are stipulated, not measured or calibrated from biological data."
+  "notes": "Analytic finite-outcome cases only. Likelihoods are stipulated, not measured or calibrated from biological data.",
+  "decision_value_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "priors": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ],
+    "actions": [
+      "choose_group_a",
+      "choose_group_b"
+    ],
+    "utilities_by_hypothesis": [
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "candidates": [
+      {
+        "id": "within_group_identity",
+        "outcomes": [
+          "member_0",
+          "member_1"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "expected_eig_bits": 1,
+        "expected_evsi_utility": 0
+      },
+      {
+        "id": "decision_relevant_group",
+        "outcomes": [
+          "group_a",
+          "group_b"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.2,
+            0.8
+          ],
+          [
+            0.2,
+            0.8
+          ]
+        ],
+        "expected_eig_bits": 0.2780719051126377,
+        "prior_best_expected_utility": 0.5,
+        "expected_best_utility_after_experiment": 0.8,
+        "expected_evsi_utility": 0.3
+      }
+    ],
+    "expected_rank_by_eig": "within_group_identity",
+    "expected_rank_by_evsi": "decision_relevant_group",
+    "expected_evsi_regret_if_within_group_selected": 0.3
+  }
 }
