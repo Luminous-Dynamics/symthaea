@@ -342,8 +342,8 @@ pub fn select_teaching_packet(
     bandwidth_budget: f64,
     seed: u64,
 ) -> Result<Vec<usize>, TeachingError> {
-    learner.validate(items)?;
     validate_item_set(items)?;
+    learner.validate(items)?;
     if !bandwidth_budget.is_finite() || bandwidth_budget < 0.0 {
         return Err(TeachingError::InvalidBudget);
     }
@@ -443,6 +443,9 @@ fn evaluate_one(
             outcome.acquired = rng.bernoulli(acquisition_probability);
         }
         LearningMode::IndividualOnly => {
+            if !selected {
+                return outcome;
+            }
             outcome.learning_cost_spent = item.learning_cost;
             let discovery_probability = (
                 config.individual_discovery_base_probability
@@ -484,8 +487,8 @@ pub fn run_teaching_episode(
     seed: u64,
 ) -> Result<TeachingEpisode, TeachingError> {
     config.validate()?;
-    learner.validate(items)?;
     validate_item_set(items)?;
+    learner.validate(items)?;
     let budget = match mode {
         LearningMode::Social { .. } => config.bandwidth_budget,
         LearningMode::IndividualOnly => config.individual_learning_budget,
@@ -722,6 +725,9 @@ mod tests {
         assert_eq!(episode.attempted_item_count, episode.items.iter().filter(|item| item.attempted_individually).count());
         assert!(episode.items.iter().all(|item| !item.selected_for_transmission));
         assert_eq!(episode.observed_count, 0);
+        assert!(episode.items.iter().all(|item| {
+            item.attempted_individually || item.learning_cost_spent == 0.0
+        }));
         assert!(episode.total_learning_cost <= config.individual_learning_budget);
     }
 
