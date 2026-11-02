@@ -1039,3 +1039,7 @@ mod tests {
 
 /// Anytime-valid sequential paired randomization inference under a fair-coin design.
 pub mod sequential;
+
+
+/// Exact finite-support CDF and upper-tail ordering diagnostics.
+pub mod distributional;
