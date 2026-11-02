@@ -275,13 +275,13 @@ Each functional has nominal expectation 0.5.
 
 `Q_orth = (0.20, 0.05, 0.15, 0.10, 0.10, 0.15, 0.05, 0.20)`
 
-The total-variation distance (d_{TV}(P0,Q_{orth})=0.20), but all four expectations remain exactly ((0.5,0.5,0.5,0.5)). This is a distribution shift that is irrelevant to this declared functional family, not a claim that all omitted functions are unchanged.
+The total-variation distance is `TV(P0, Q_orth) = 0.20`, but all four expectations remain exactly `(0.5, 0.5, 0.5, 0.5)`. This is a distribution shift that is irrelevant to this declared functional family, not a claim that all omitted functions are unchanged.
 
 ### F02 decision-aligned shift
 
 `Q_aligned = (0.10, 0.10, 0.15, 0.15, 0.10, 0.10, 0.15, 0.15)`
 
-Here (d_{TV}(P0,Q_{aligned})=0.10), and expectations become ((0.6,0.5,0.4,0.5)). Rejection A rises by 0.10 and scaled cost falls by 0.10. The method must report the decision-relevant shift rather than dismissing it as harmless.
+Here `TV(P0, Q_aligned) = 0.10`, and expectations become `(0.6, 0.5, 0.4, 0.5)`. Rejection A rises by 0.10 and scaled cost falls by 0.10. The method must report the decision-relevant shift rather than dismissing it as harmless.
 
 ### Pilot calibration settings and formula checks
 
