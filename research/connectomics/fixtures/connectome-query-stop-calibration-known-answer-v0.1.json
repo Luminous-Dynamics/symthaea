@@ -1573,7 +1573,7 @@
         "universal_connectome_completeness_claimed": false,
         "all_future_edits_certified": false,
         "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "target_exchangeability_supported": true
+        "target_exchangeability_supported": false
       }
     }
   ]
