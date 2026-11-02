@@ -80,6 +80,8 @@ At minimum, reproduce compatible versions of:
 6. Vaze's simultaneous coverage-and-efficiency approach, once its exact method and assumptions are implemented.
 7. Fixed sliding-window quantile calibration with predeclared windows.
 8. PACE heterogeneous-horizon ensemble as an empirical heuristic baseline.
+
+**UP-OCP source pin:** The ICML 2026 paper is https://proceedings.mlr.press/v306/liu26y.html. Its public reference repository https://github.com/AdaMLLab/up-for-ocp is pinned at main commit 3575f1f94a14620e089422f52cf9e1a6766ec7b1 and declares MIT. Source inspection of core/methods.py finds a UniversalPortfolio class with Dirichlet/uniform mixture options, a finite-sample alpha correction (alpha -= 0.015), wealth/betting updates and quantile-radius calculation. Treat this as a reproduction target; verify paper configurations and tests rather than assuming the repository HEAD is a formal theorem artifact.
 9. Fixed-horizon interleaved delayed ACI as specified by El Halabi & Brandt (2026).
 10. Multi-step Adaptive Conformal Prediction (MACP).
 11. Autocorrelation-aware Multi-step Conformal Prediction (AcMCP).
@@ -112,7 +114,11 @@ For nominal coverage 1-alpha, report all of the following.
 - compute/update time, memory and bytes per calibration update.
 
 ### Temporal metrics
-For every predeclared window length L (both number of feedback observations and elapsed time):
+For every predeclared window length L (both number of feedback observations and elapsed time), report the exact worst-case local coverage error:
+
+    LCE_k = max_j | alpha - (1/k) * sum(err_j ... err_(j+k-1)) |
+
+where err is the binary miscoverage indicator. The benchmark includes k=100 and k=250 to match the delayed-ACI study, plus 64, 256, 1,024 and 4,096 feedback observations. Also report:
 - minimum and maximum rolling coverage over all eligible contiguous windows;
 - maximum absolute rolling coverage deviation;
 - fraction of windows under-covering by more than epsilon;
@@ -125,7 +131,7 @@ Rolling-window extrema are descriptive benchmark statistics. Overlapping windows
 
 ### Feedback and revision metrics
 - feedback latency distribution (event-to-available and forecast-to-label);
-- delay-to-memory ratio r=tau/L only for processes with a defensible scalar memory timescale, alongside the memory estimator and estimation error. For GARCH report residual and squared-residual persistence separately; for Markov switching report transition persistence and state durations. This ratio is a diagnostic, not a universal invariant.
+- delay-to-memory ratio r=tau/L only for processes with a defensible scalar memory timescale, alongside the memory estimator and estimation error. For GARCH report residual and squared-residual persistence separately; for Markov switching report transition persistence and state durations. This ratio is a diagnostic, not a universal invariant. The feature whose persistence is measured must be specified: signed residual autocorrelation for AR(1), absolute/squared residual dependence for GARCH volatility, and transition-matrix eigenvalue/state duration for Markov switching. In variance-only Markov switching, signed residual autocorrelation can be zero while squared and absolute residuals remain dependent; signed-residual-only monitoring is an insufficient control.
 - number/share of outcomes unavailable at each decision time;
 - calibrator update lag after feedback arrival;
 - revision count and correction lag;
@@ -174,6 +180,6 @@ All numbers above are initial qualification targets. Freeze them on development 
 - Vaze (2026), arXiv:2607.26577: https://arxiv.org/abs/2607.26577
 - Shahbazi & Baheri (2026), PACE: https://www.mdpi.com/2571-9394/8/5/77
 - Qiao et al. (2026), TIME, ICML/PMLR: https://proceedings.mlr.press/v306/qiao26g.html
-- El Halabi & Brandt (2026), delayed ACI: https://arxiv.org/abs/2609.07251
+- El Halabi & Brandt (2026), delayed ACI: https://arxiv.org/abs/2609.07251 (reported within-bin interval-score scatter reductions from using delay-to-memory instead of raw delay: AR(1) residual 79%, GARCH squared residual 46%, Markov-switching mean 9%, variance 27%, joint 10%; these are that paper's experimental diagnostics, not universal constants)
 - Liu, Dobriban & Orabona (2026), UP-OCP: https://proceedings.mlr.press/v306/liu26y.html
 - Parent Symthaea temporal benchmark: #9954 / PR #9955.
