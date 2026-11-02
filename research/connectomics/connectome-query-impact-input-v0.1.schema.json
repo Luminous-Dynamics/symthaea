@@ -57,7 +57,8 @@
         "decision_threshold",
         "scenario_id",
         "baseline",
-        "hypothetical_after_edit"
+        "hypothetical_after_edit",
+        "paired_effect"
       ],
       "properties": {
         "query_id": {
@@ -93,6 +94,32 @@
         },
         "hypothetical_after_edit": {
           "$ref": "#/$defs/interval"
+        },
+        "paired_effect": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/paired_effect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "paired_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effect_interval",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "effect_interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha"
         }
       }
     }
