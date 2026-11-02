@@ -5,6 +5,9 @@ use serde_json::Value;
 use symthaea_rea_compat::{
     EvidenceErrorKind, analysis_profile_digest, sha256_hex, verify_evidence_json,
 };
+use symthaea_rea_compat::tool_policy::{
+    MOBILE_ADB_TOOL_AUDIT, UPSTREAM_REA_EFFECTS_COMMIT, ToolEffects, mobile_tool_effects,
+};
 
 fn fixture_file(directory: &Path, name: &str) -> Vec<u8> {
     assert!(
@@ -243,5 +246,64 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
     assert_eq!(stricter_importer_cases.len(), 1);
     for stricter in stricter_importer_cases {
         verify_stricter_importer_case(&directory, stricter);
+    }
+}
+
+
+/// Compare every selected mobile ADB effect against the pinned upstream REA
+/// TOOL_EFFECTS table. This is not a hand-copied snapshot.
+#[test]
+fn matches_pinned_upstream_mobile_adb_tool_effects() {
+    let directory = match std::env::var_os("REA_UPSTREAM_EVIDENCE_FIXTURE_DIR") {
+        Some(path) => PathBuf::from(path),
+        None => return,
+    };
+    let manifest_bytes =
+        fs::read(directory.join("manifest.json")).expect("read upstream corpus manifest");
+    let manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let receipt_bytes = fs::read(directory.join("manifest.provenance.json"))
+        .expect("read upstream corpus provenance receipt");
+    let receipt: Value = serde_json::from_slice(&receipt_bytes).unwrap();
+    assert_eq!(
+        sha256_hex(&manifest_bytes),
+        receipt["manifest_sha256"].as_str().unwrap()
+    );
+    assert_eq!(
+        manifest["producer"]["commit"],
+        UPSTREAM_REA_EFFECTS_COMMIT
+    );
+
+    let effect_manifest = &manifest["mobile_adb_tool_effects"];
+    assert_eq!(
+        effect_manifest["tool_count"].as_u64(),
+        Some(MOBILE_ADB_TOOL_AUDIT.len() as u64)
+    );
+    assert_eq!(
+        receipt["mobile_adb_tool_effects"],
+        *effect_manifest
+    );
+
+    let filename = effect_manifest["file"].as_str().unwrap();
+    let bytes = fixture_file(&directory, filename);
+    assert_eq!(
+        sha256_hex(&bytes),
+        effect_manifest["raw_file_sha256"].as_str().unwrap()
+    );
+    let upstream: Value = serde_json::from_slice(&bytes).unwrap();
+    let upstream_effects = upstream.as_object().expect("upstream effect object");
+    assert_eq!(upstream_effects.len(), MOBILE_ADB_TOOL_AUDIT.len());
+
+    for tool in MOBILE_ADB_TOOL_AUDIT {
+        let expected: ToolEffects = serde_json::from_value(
+            upstream[tool.name].clone()
+        ).unwrap_or_else(|error| {
+            panic!("invalid upstream effects for {}: {error}", tool.name)
+        });
+        let actual = mobile_tool_effects(tool.name).expect("audited Rust tool");
+        assert_eq!(
+            actual, expected,
+            "Rust mobile effect audit drifted from upstream for {}",
+            tool.name
+        );
     }
 }
