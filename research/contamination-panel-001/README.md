@@ -700,16 +700,16 @@ This complements existing fixed benchmarks; it does not replace them. The amount
 The module src/measurement_distribution.rs implements the protocol and a model-agnostic evaluator-output analysis kernel.
 
 - Strict protocol types and schema for C/G/Φ/E/R.
-- Instance manifest with source-cluster and source-lineage commitments.
+- Instance manifest with task-family, independently identified source-domain, source-cluster and source-lineage commitments.
 - Model/checkpoint/tokenizer identities and repeated evaluation runs with seed commitments.
 - Exact observation matrix: one explicit status for each model × run × base item × axis × condition. Missing/failed/rejected/indeterminate outcomes remain visible; no silent row dropping.
 - Independent uncertainty units are declared as model_pair_replicate, source_cluster, base_item or evaluation_run. Paired deltas aggregate within those units before computing 95% Student-t intervals. Perturbations and repeated model calls do not become independent training replicates.
 - Distribution summaries include mean, sample standard deviation and configured quantiles; per-axis validation acceptance, missingness, coverage, runtime, tokens and external calls are reported separately.
-- Paired score deltas compare each transformed result with the exact same model/run/base item under the baseline condition.
+- Paired score deltas compare each transformed result with the exact same model/run/base item under the baseline condition. The report orients deltas by the metric direction, so positive always means improvement.
 - Kendall's τ-b compares unperturbed and perturbed model rankings per primary axis/condition when at least three models are present. Ties are handled explicitly.
 - Prompt-sensitivity axes are auxiliary unless instruction following is the target construct.
 - Fixed-configuration Measurement-as-Instance can be represented as a baseline-only axis. The report labels it measurement_as_instance_restricted and never marks it as distributional evidence.
-- Cross-domain, model-family and deployment-distribution claim scopes have explicit population checks.
+- Profiles are stratified by model × task-family × axis × condition; pooled task-family means cannot hide a failing domain. Cross-domain and deployment-distribution claim scopes require at least two task families and two independent source-domain IDs, while model-family scope requires at least two model families.
 - The report records whether evidence thresholds support the requested claim scope. It does not assert that the registered distribution equals deployment.
 
 ### CLI
