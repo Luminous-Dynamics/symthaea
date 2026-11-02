@@ -237,7 +237,32 @@ fn verify_models<'a>(
     value: &'a Value,
     errors: &mut Vec<String>,
 ) -> (HashMap<String, &'a Value>, HashSet<String>) {
-    let hypotheses = id_map(arr_at(value, &["hypothesis_set"]), "hypothesis_id");
+    let hypothesis_items = arr_at(value, &["hypothesis_set"]);
+    let hypotheses = id_map(hypothesis_items, "hypothesis_id");
+    if hypotheses.len() < 2 || hypothesis_items.is_none_or(|items| items.len() != hypotheses.len()) {
+        errors.push("hypothesis_set: requires at least two uniquely identified hypotheses".to_owned());
+    }
+    let mut prior_sum = 0.0;
+    if let Some(items) = hypothesis_items {
+        for (index, hypothesis) in items.iter().enumerate() {
+            match hypothesis.get("prior_probability").and_then(Value::as_f64) {
+                Some(p) if p.is_finite() && (0.0..=1.0).contains(&p) => prior_sum += p,
+                _ => errors.push(format!("hypothesis_set[{index}].prior_probability: complete run requires a finite probability in [0,1]")),
+            }
+            if hypothesis.get("frozen_before_test").and_then(Value::as_bool) != Some(true) {
+                errors.push(format!("hypothesis_set[{index}].frozen_before_test: must be true"));
+            }
+            if hypothesis.get("prior_source").and_then(Value::as_str).is_none_or(str::is_empty) {
+                errors.push(format!("hypothesis_set[{index}].prior_source: missing"));
+            }
+            if hypothesis.get("prediction_manifest_sha256").and_then(Value::as_str).is_none_or(|s| !is_sha256(s)) {
+                errors.push(format!("hypothesis_set[{index}].prediction_manifest_sha256: missing/malformed"));
+            }
+        }
+    }
+    if !prior_sum.is_finite() || (prior_sum - 1.0).abs() > 1.0e-9 {
+        errors.push(format!("hypothesis_set: prior probabilities sum to {prior_sum}, expected 1"));
+    }
     let model_items = arr_at(value, &["models"]);
     let models = id_map(model_items, "model_id");
     if models.len() < 4 || model_items.is_none_or(|items| items.len() != models.len()) {
@@ -360,7 +385,7 @@ fn verify_models<'a>(
     (models, families)
 }
 
-fn verify_interventions(value: &Value, errors: &mut Vec<String>) {
+fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors: &mut Vec<String>) {
     if at(value, &["intervention_design", "preregistered_before_test"]).and_then(Value::as_bool) != Some(true) {
         errors.push("intervention_design.preregistered_before_test: must be true".to_owned());
     }
@@ -374,6 +399,8 @@ fn verify_interventions(value: &Value, errors: &mut Vec<String>) {
         errors.push("intervention_design.selected_interventions: at least one is required".to_owned());
     }
     let mut ids = HashSet::new();
+    let mut control_roles = HashSet::new();
+    let mut has_primary_intervention = false;
     if let Some(items) = selected {
         for (index, item) in items.iter().enumerate() {
             let id = item.get("intervention_id").and_then(Value::as_str);
@@ -384,6 +411,16 @@ fn verify_interventions(value: &Value, errors: &mut Vec<String>) {
             }
             if item.get("feasibility_status").and_then(Value::as_str) != Some("feasible") {
                 errors.push(format!("selected_interventions[{index}]: not marked feasible"));
+            }
+            match item.get("control_role").and_then(Value::as_str).unwrap_or("") {
+                "intervention" => has_primary_intervention = true,
+                role @ ("sham" | "single_target_control" | "combination_control" | "washout" | "other") => {
+                    control_roles.insert(role.to_owned());
+                }
+                _ => errors.push(format!("selected_interventions[{index}]: unknown control role")),
+            }
+            if item.get("safety_constraints_sha256").and_then(Value::as_str).is_none_or(|s| !is_sha256(s)) {
+                errors.push(format!("selected_interventions[{index}]: missing safety-constraint digest"));
             }
             let targets = item.get("target_ids").and_then(Value::as_array);
             if targets.map_or(true, Vec::is_empty) {
@@ -401,14 +438,40 @@ fn verify_interventions(value: &Value, errors: &mut Vec<String>) {
             errors.push(format!("intervention_design.required_controls: missing {control}"));
         }
     }
+    if !has_primary_intervention {
+        errors.push("selected_interventions: no entry has control_role intervention".to_owned());
+    }
+    for (declared, actual) in [
+        ("sham", "sham"),
+        ("single_target", "single_target_control"),
+        ("combined_target", "combination_control"),
+    ] {
+        if controls.contains(declared) && !control_roles.contains(actual) {
+            errors.push(format!("selected_interventions: declared {declared} control has no materialized {actual} entry"));
+        }
+    }
+    if controls.contains("activity_only") && !model_families.contains("activity_only") {
+        errors.push("required activity_only control has no activity_only model family".to_owned());
+    }
+    if controls.contains("rewired_graph")
+        && !model_families.contains("degree_type_rewired")
+        && !model_families.contains("spatial_rewired")
+    {
+        errors.push("required rewired_graph control has no rewired model family".to_owned());
+    }
 }
 
 fn verify_metrics_and_scores<'a>(
     value: &Value,
     models: &HashMap<String, &'a Value>,
     errors: &mut Vec<String>,
-) -> (HashMap<String, &'static str>, HashMap<(String, String, String), (f64, f64, f64)>) {
+) -> (
+    HashMap<String, &'static str>,
+    HashMap<String, String>,
+    HashMap<(String, String, String), (f64, f64, f64)>,
+) {
     let mut directions = HashMap::new();
+    let mut metric_families = HashMap::new();
     if let Some(metrics) = arr_at(value, &["evaluation", "metrics"]) {
         for metric in metrics {
             if let (Some(id), Some(direction)) = (
@@ -424,6 +487,11 @@ fn verify_metrics_and_scores<'a>(
                 };
                 if directions.insert(id.to_owned(), dir).is_some() {
                     errors.push(format!("evaluation.metrics: duplicate metric {id}"));
+                }
+                if let Some(family) = metric.get("metric_family").and_then(Value::as_str) {
+                    metric_families.insert(id.to_owned(), family.to_owned());
+                } else {
+                    errors.push(format!("evaluation.metrics.{id}.metric_family: missing"));
                 }
             }
         }
@@ -501,7 +569,7 @@ fn verify_metrics_and_scores<'a>(
             }
         }
     }
-    (directions, scores)
+    (directions, metric_families, scores)
 }
 
 fn verify_paired(
@@ -606,7 +674,12 @@ fn verify_paired(
     }
 }
 
-fn verify_calibration(value: &Value, models: &HashMap<String, &Value>, metrics: &HashMap<String, &'static str>, errors: &mut Vec<String>) {
+fn verify_calibration(
+    value: &Value,
+    models: &HashMap<String, &Value>,
+    metric_families: &HashMap<String, String>,
+    errors: &mut Vec<String>,
+) {
     let mut count = 0;
     if let Some(results) = arr_at(value, &["results", "calibration"]) {
         for (index, item) in results.iter().enumerate() {
@@ -616,8 +689,10 @@ fn verify_calibration(value: &Value, models: &HashMap<String, &Value>, metrics: 
             if !models.contains_key(model) {
                 errors.push(format!("calibration[{index}].model_id: unresolved"));
             }
-            if !metrics.contains_key(metric) {
+            if !metric_families.contains_key(metric) {
                 errors.push(format!("calibration[{index}].metric_id: unresolved"));
+            } else if metric_families.get(metric).map(String::as_str) != Some("predictive_interval_coverage") {
+                errors.push(format!("calibration[{index}].metric_id: metric is not predictive_interval_coverage"));
             }
             for field in ["nominal_coverage", "observed_coverage"] {
                 match item.get(field).and_then(Value::as_f64) {
@@ -646,8 +721,8 @@ fn verify_complete(value: &Value) -> Vec<String> {
     if str_at(value, &["results", "status"]) != Some("complete") {
         errors.push("results.status: run_state complete requires results.status complete".to_owned());
     }
-    let (models, _families) = verify_models(value, &mut errors);
-    verify_interventions(value, &mut errors);
+    let (models, families) = verify_models(value, &mut errors);
+    verify_interventions(value, &families, &mut errors);
     if str_at(value, &["budgets", "comparison_mode"]) == Some("matched_budget") {
         if str_at(value, &["budgets", "training_budget_policy"]) != Some("matched")
             || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched") {
@@ -660,9 +735,9 @@ fn verify_complete(value: &Value) -> Vec<String> {
     if at(value, &["evaluation", "uncertainty", "minimum_independent_units"]).and_then(Value::as_u64).is_none_or(|n| n < 2) {
         errors.push("evaluation.uncertainty.minimum_independent_units: requires at least two".to_owned());
     }
-    let (directions, scores) = verify_metrics_and_scores(value, &models, &mut errors);
+    let (directions, metric_families, scores) = verify_metrics_and_scores(value, &models, &mut errors);
     verify_paired(value, &models, &directions, &scores, &test_set, &mut errors);
-    verify_calibration(value, &models, &directions, &mut errors);
+    verify_calibration(value, &models, &metric_families, &mut errors);
     errors
 }
 
