@@ -26,8 +26,11 @@ on:
       - "validation/test_compare_iit4_landscape_reference.py"
       - "validation/generate_pyphi_iit4_2026_landscape_reference.py"
       - "validation/test_pyphi_iit4_2026_landscape_contract.py"
+      - "validation/generate_pyphi_iit4_dual_formalism_positive_anchor.py"
+      - "validation/test_pyphi_iit4_dual_formalism_positive_anchor.py"
       - "validation/fixtures/pyphi-iit4-2023-landscape-reference-v0.1.schema.json"
       - "validation/fixtures/pyphi-iit4-2026-landscape-reference-v0.1.schema.json"
+      - "validation/fixtures/pyphi-iit4-dual-formalism-positive-anchor-v0.1.schema.json"
       - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
       - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
       - ".github/workflows/phi-digest-contract.yml"
@@ -57,7 +60,7 @@ jobs:
           python-version: "3.13.17"
 
       - name: Run dependency-free contract and fixture tests
-        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract validation.test_compare_iit4_landscape_reference validation.test_pyphi_iit4_2026_landscape_contract -v
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract validation.test_pyphi_primitive_corpus_contract validation.test_pyphi_macro_mapping_corpus_contract validation.test_pyphi_gid_operator_corpus_contract validation.test_pyphi_landscape_reference_contract validation.test_compare_iit4_landscape_reference validation.test_pyphi_iit4_2026_landscape_contract validation.test_pyphi_iit4_dual_formalism_positive_anchor -v
 
   pyphi-reference:
     name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
@@ -339,6 +342,37 @@ jobs:
           assert all(p["qualification"] == "EXACT_SAMPLE_ONLY" for p in points)
           assert data["summary"]["computed_point_count"] == 13
           print("PASS: 13 paired IIT4-2026 points; same TPM/evaluation identities; phi2026 <= phi2023 and ii(s)")
+          PY
+
+      - name: Run positive-phi Fig. 1A dual-formalism fixed-state conformance
+        shell: bash
+        run: |
+          python validation/generate_pyphi_iit4_dual_formalism_positive_anchor.py \
+            --anchor target/pyphi-reference/PYPHI_IIT4_2023_REFERENCE_RUN.json \
+            --output target/pyphi-reference/PYPHI_IIT4_DUAL_FORMALISM_POSITIVE_ANCHOR.json
+
+      - name: Verify positive-phi dual-formalism fixed-state invariants
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("target/pyphi-reference/PYPHI_IIT4_DUAL_FORMALISM_POSITIVE_ANCHOR.json").read_text(encoding="utf-8"))
+          assert data["status"] == "PASS"
+          assert data["schema_version"] == "pyphi-iit4-dual-formalism-positive-anchor-v0.1"
+          assert data["provenance"]["version"] == "2.0.0rc4"
+          assert data["provenance"]["wheel_sha256"] == "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
+          fixed = data["fixed_state_comparison"]
+          assert fixed["same_specified_state"] is True
+          assert fixed["mip_unchanged"] is True
+          assert fixed["iit4_2023"]["phi_s"] > 0.0
+          assert fixed["iit4_2026"]["phi_s"] <= fixed["iit4_2023"]["phi_s"] + 1e-10
+          assert fixed["iit4_2026"]["phi_s"] <= fixed["iit4_2026"]["intrinsic_information"] + 1e-10
+          full = data["full_search"]
+          assert full["iit4_2023"]["phi_s"] > 0.0
+          assert full["iit4_2026"]["phi_s"] <= full["iit4_2023"]["phi_s"] + 1e-10
+          assert all(data["invariants"].values())
+          print("PASS: positive-phi Fig. 1A; fixed-state MIP unchanged; IIT4-2026 phi bounded by IIT4-2023 and ii(s)")
           PY
 
       - name: Upload pinned PyPhi reference evidence
