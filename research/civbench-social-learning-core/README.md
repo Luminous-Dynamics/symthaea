@@ -52,7 +52,7 @@ The example binary prints a small chain-network adoption trace.
 
 ## Multi-seed cultural-transmission sweep
 
-The `cultural-transmission-sweep` binary runs 256 fixed seeds per condition and writes per-generation means and 95% normal-approximation confidence half-widths for optimal prevalence, demonstration observation, strategy acquisition, optimal-strategy acquisition, integration and top-teacher selection. Conditions compare uniform vs performance-softmax teachers, 0/5/20% transmission corruption and a no-social-transmission control. The sweep is a sensitivity experiment over the simplified reference ABM, not published Reward Network III participant data or an exact replication of the authors' ABM. Configuration values and seeds must be frozen in any reported run receipt.
+The `cultural-transmission-sweep` binary runs 256 fixed seeds per condition and writes per-generation means and 95% normal-approximation confidence half-widths for independent optimal discovery, integrated optimal prevalence, demonstration observation, strategy acquisition, optimal-strategy acquisition, integration, optimal integration and top-teacher selection. Conditions compare uniform vs performance-softmax teachers, 0/5/20% transmission corruption and a no-social-transmission control. The two optimal-strategy metrics must remain separate: one measures individual discovery; the other measures the final integrated repertoire. The sweep is a sensitivity experiment over the simplified reference ABM, not published Reward Network III participant data or an exact replication of the authors' ABM. Configuration values and seeds must be frozen in any reported run receipt.
 
 ## Limitations
 
