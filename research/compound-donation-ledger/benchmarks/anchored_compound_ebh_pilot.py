@@ -197,7 +197,7 @@ def simulate_stream(
     full_weights = finite_envelope_weight_prefix(n, F(1))
 
     finite_delta = finite_envelope_slack(n, F(1))
-    method_names = ["full_mass_e_bh", "finite_envelope_anchored"]
+    method_names = ["finite_envelope_baseline_e_bh", "finite_envelope_anchored"]
     for delta in deltas:
         tag = f"scaled_e_bh_delta_{float(delta):.2f}"
         method_names.append(tag)
@@ -231,9 +231,9 @@ def simulate_stream(
         fdp, power, has_false = fdp_and_power(
             full_reject, tuple(range(n)), scenario["null"], total_alternatives
         )
-        fdp_paths["full_mass_e_bh"].append(fdp)
-        power_paths["full_mass_e_bh"].append(power)
-        any_false["full_mass_e_bh"] |= has_false
+        fdp_paths["finite_envelope_baseline_e_bh"].append(fdp)
+        power_paths["finite_envelope_baseline_e_bh"].append(power)
+        any_false["finite_envelope_baseline_e_bh"] |= has_false
 
         finite_anchor_start = time.perf_counter()
         finite_anchor = anchored_rejections(
@@ -414,6 +414,7 @@ def run(
             "null_lr_factors": "7/5 success, 3/5 failure; conditional mean one",
             "adjuster": "floor_1e6(sqrt(running_max_LR)-1)",
             "global_weight_sequence": "gamma_i=lambda/[i(i+1)], i>=1; fixed and not renormalized",
+            "finite_envelope_baseline": "gamma_i=1/[i(i+1)] for i=1..n; sum n/(n+1); fixed anchor slack 1/(n+1)",
             "delta_values": [str(delta) for delta in delta_values],
             "finite_envelope": {
                 "maximum_candidates_precommitted": hypotheses,
@@ -425,7 +426,7 @@ def run(
             "arrival_policy": "deterministic predictable staggered arrivals",
         },
         "methods": [
-            "full_mass_e_bh",
+            "finite_envelope_baseline_e_bh",
             "finite_envelope_anchored_same_weights",
             "scaled_e_bh_delta",
             "countable_global_slack_anchored",
