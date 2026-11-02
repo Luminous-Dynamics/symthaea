@@ -389,17 +389,6 @@ fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn read_file_bounded(path: &str, maximum_bytes: u64) -> Result<Vec<u8>, Box<dyn Error>> {
-    let file = fs::File::open(path)?;
-    let mut bytes = Vec::new();
-    file.take(maximum_bytes.saturating_add(1))
-        .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > maximum_bytes {
-        return Err(format!("{path} exceeds the {maximum_bytes}-byte input limit").into());
-    }
-    Ok(bytes)
-}
-
 fn calibrate_detector_panel_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 3 {
         return Err(
