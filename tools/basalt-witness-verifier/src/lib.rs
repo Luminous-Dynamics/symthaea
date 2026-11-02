@@ -983,6 +983,62 @@ mod tests {
     }
 
     #[test]
+    fn one_invalid_extra_response_does_not_veto_a_valid_read_quorum() {
+        let (trust_bytes, pin, mut evidence) = read_fixture();
+        let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
+        let nonce = test_nonce();
+        let latest = checkpoint_fixture("5", 0x55);
+        // This response is correctly signed but its key is absent from the pinned trust store.
+        evidence.push(evidence_fixture(
+            &latest,
+            &test_seed(12),
+            &nonce,
+            &seeds[..3],
+        ));
+
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "fresh_head_selected");
+        assert_eq!(selected.distinct_member_responses, 3);
+        assert_eq!(selected.sequence, "5");
+        assert_eq!(selected.counterexamples.len(), 1);
+        assert!(selected.counterexamples[0].contains("failed authentication"));
+    }
+
+    #[test]
+    fn invalid_extra_responses_are_reported_when_the_valid_quorum_is_short() {
+        let (trust_bytes, pin, mut evidence) = read_fixture();
+        evidence.truncate(2);
+        let nonce = test_nonce();
+        let latest = checkpoint_fixture("5", 0x55);
+        evidence.push(evidence_fixture(
+            &latest,
+            &test_seed(12),
+            &nonce,
+            &[test_seed(7), test_seed(8), test_seed(9)],
+        ));
+
+        let selected = verify_head_read_quorum(
+            &evidence,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            "incarnation-1",
+            "1",
+        );
+        assert_eq!(selected.status, "anti_rollback_unknown");
+        assert_eq!(selected.distinct_member_responses, 0);
+        assert!(selected.counterexamples.len() >= 1);
+        assert!(selected.counterexamples[0].contains("failed authentication"));
+    }
+
+    #[test]
     fn read_quorum_shortfall_is_anti_rollback_unknown() {
         let (trust_bytes, pin, mut evidence) = read_fixture();
         evidence.truncate(2);
