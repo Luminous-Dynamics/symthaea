@@ -187,6 +187,18 @@
       "name": "windows-sys",
       "scope": "target_os=windows",
       "optional_feature": "windows-native"
+    },
+    {
+      "id": "sym.Store.get_user",
+      "kind": "trait_method",
+      "path": "crates/store/src/lib.rs",
+      "name": "Store::get_user"
+    },
+    {
+      "id": "sym.Authorizer.can_read",
+      "kind": "trait_method",
+      "path": "crates/domain/src/lib.rs",
+      "name": "Authorizer::can_read"
     }
   ],
   "edges": [
@@ -389,15 +401,39 @@
       "relation": "target_dependency",
       "authority": "manifest_declared",
       "conditional": "target_os=windows && feature=windows-native"
+    },
+    {
+      "from": "sym.Store",
+      "to": "sym.Store.get_user",
+      "relation": "defines_trait_method",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.Authorizer",
+      "to": "sym.Authorizer.can_read",
+      "relation": "defines_trait_method",
+      "authority": "syntax_declared"
+    },
+    {
+      "from": "sym.MemoryStore.get_user",
+      "to": "sym.Store.get_user",
+      "relation": "implements_trait_method",
+      "authority": "expected_semantic"
+    },
+    {
+      "from": "sym.DefaultAuthorizer.can_read",
+      "to": "sym.Authorizer.can_read",
+      "relation": "implements_trait_method",
+      "authority": "expected_semantic"
     }
   ],
   "counts": {
     "package_nodes": 5,
-    "symbol_and_test_nodes": 21,
+    "symbol_and_test_nodes": 23,
     "feature_and_target_nodes": 3,
     "external_dependency_nodes": 1,
-    "total_nodes": 30,
-    "edges": 33
+    "total_nodes": 32,
+    "edges": 37
   },
   "limitations": [
     "Fixture has not been compiled.",
