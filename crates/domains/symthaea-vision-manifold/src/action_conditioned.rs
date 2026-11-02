@@ -809,8 +809,15 @@ mod tests {
         bad_manifest.action_manifest_sha256 = "not-a-digest";
         assert!(bad_manifest.validate().is_err());
 
-        let mut bad_action = request();
-        bad_action.actions[1].canonical_descriptor.clear();
+        let valid = request();
+        let bad_actions = Box::leak(Box::new([
+            valid.actions[0].clone(),
+            ActionDescriptor { action_id: 9, canonical_descriptor: String::new() },
+        ]));
+        let bad_action = ActionForecastRequest {
+            actions: bad_actions,
+            ..valid
+        };
         assert!(bad_action.validate().is_err());
     }
 
