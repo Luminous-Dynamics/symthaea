@@ -83,12 +83,23 @@ jobs:
             "$RUNNER_TEMP/rea-evidence-upstream-v1"
           echo "REA_UPSTREAM_EVIDENCE_FIXTURE_DIR=$RUNNER_TEMP/rea-evidence-upstream-v1" >> "$GITHUB_ENV"
 
-      - name: Validate isolated Evidence harness metadata
+      - name: Resolve isolated harness lockfile with pinned top-level dependencies
         run: |
+          cargo generate-lockfile \
+            --manifest-path tools/rea-evidence-compat-harness/Cargo.toml
           cargo metadata \
             --manifest-path tools/rea-evidence-compat-harness/Cargo.toml \
-            --locked --no-deps --format-version 1 \
+            --locked --format-version 1 \
             > "$RUNNER_TEMP/rea-evidence-harness-metadata.json"
+
+      - name: Archive Cargo-generated harness lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-evidence-harness-lockfile
+          path: tools/rea-evidence-compat-harness/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Rust format check
         run: cargo fmt --manifest-path tools/rea-evidence-compat-harness/Cargo.toml -- --check
