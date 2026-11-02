@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/witness-qualification-plan.v1.schema.json",
+  "title": "BASALT witness and projection qualification plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "version",
+    "claim_ceiling",
+    "commit_protocols",
+    "storage_backends",
+    "witness_profiles",
+    "workload_matrix",
+    "fault_scenarios",
+    "metrics",
+    "acceptance"
+  ],
+  "properties": {
+    "suite_id": { "const": "basalt-witness-projection-qualification" },
+    "version": { "const": 1 },
+    "claim_ceiling": { "type": "string", "minLength": 1 },
+    "commit_protocols": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["protocol_id", "authority_order", "authoritative_ack_condition", "failure_semantics"],
+        "properties": {
+          "protocol_id": { "enum": ["db_first_witness_after", "witness_first_projection_after", "quorum_serialized_transition"] },
+          "authority_order": { "type": "string", "minLength": 1 },
+          "authoritative_ack_condition": { "type": "string", "minLength": 1 },
+          "failure_semantics": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "storage_backends": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["backend_id", "engine", "profile", "version_policy", "role"],
+        "properties": {
+          "backend_id": { "type": "string", "minLength": 1 },
+          "engine": { "type": "string", "minLength": 1 },
+          "profile": { "type": "string", "minLength": 1 },
+          "version_policy": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["primary_candidate", "remote_candidate", "coordination_control", "experimental_candidate"] }
+        }
+      }
+    },
+    "witness_profiles": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profile_id", "member_count", "fault_tolerance", "write_quorum", "read_quorum", "failure_domains"],
+        "properties": {
+          "profile_id": { "type": "string", "minLength": 1 },
+          "member_count": { "type": "integer", "minimum": 1 },
+          "fault_tolerance": { "type": "integer", "minimum": 0 },
+          "write_quorum": { "type": "integer", "minimum": 1 },
+          "read_quorum": { "type": "integer", "minimum": 1 },
+          "failure_domains": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "workload_matrix": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workload_id", "concurrent_clients", "accepted_transitions", "transition_bytes", "scope_distribution"],
+        "properties": {
+          "workload_id": { "type": "string", "minLength": 1 },
+          "concurrent_clients": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 } },
+          "accepted_transitions": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 } },
+          "transition_bytes": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 } },
+          "scope_distribution": { "enum": ["single_hot_scope", "uniform_independent_scopes", "zipfian_skew", "mixed_policy_and_source"] }
+        }
+      }
+    },
+    "fault_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_id", "phase", "fault", "expected_classification", "must_not_ack_authoritative_success"],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "phase": { "type": "string", "minLength": 1 },
+          "fault": { "type": "string", "minLength": 1 },
+          "expected_classification": { "enum": ["pass", "rejected", "anti_rollback_unknown", "incomplete", "inconclusive", "recovery_required"] },
+          "must_not_ack_authoritative_success": { "type": "boolean" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric_id", "unit", "class", "required"],
+        "properties": {
+          "metric_id": { "type": "string", "minLength": 1 },
+          "unit": { "type": "string", "minLength": 1 },
+          "class": { "enum": ["safety", "latency", "throughput", "availability", "recovery", "resource", "reproducibility"] },
+          "required": { "type": "boolean" }
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_freshness_accepts",
+        "dual_accepts_same_sequence",
+        "oracle_disagreement",
+        "authoritative_ack_without_write_quorum",
+        "rebuild_digest_mismatches",
+        "search_exhaustion_as_pass"
+      ],
+      "properties": {
+        "false_freshness_accepts": { "const": 0 },
+        "dual_accepts_same_sequence": { "const": 0 },
+        "oracle_disagreement": { "const": 0 },
+        "authoritative_ack_without_write_quorum": { "const": 0 },
+        "rebuild_digest_mismatches": { "const": 0 },
+        "search_exhaustion_as_pass": { "const": 0 }
+      }
+    }
+  }
+}
