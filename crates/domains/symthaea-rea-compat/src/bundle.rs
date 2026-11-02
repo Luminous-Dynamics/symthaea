@@ -523,7 +523,12 @@ fn normalize_resolution(normalized: &mut Value, value: &Value) -> Result<(), Bun
         return Err(schema_error(format!("unsupported resolution disposition '{disposition}'")));
     };
     let rationale = trimmed_text(field(map, "rationale", "resolution")?, "resolution.rationale")?;
-    validate_id_array(field(map, "evidence_ids", "resolution")?, "resolution.evidence_ids", "ev_", require_nonempty)?;
+    validate_id_array_allow_duplicates(
+        field(map, "evidence_ids", "resolution")?,
+        "resolution.evidence_ids",
+        "ev_",
+        require_nonempty,
+    )?;
     normalized["resolution"]["rationale"] = Value::String(rationale);
     Ok(())
 }
@@ -548,6 +553,23 @@ fn validate_relationships(value: &Value, own_id: &str) -> Result<(), BundleError
         }
     }
     Ok(())
+}
+
+fn validate_id_array_allow_duplicates(
+    value: &Value,
+    context: &str,
+    prefix: &str,
+    nonempty: bool,
+) -> Result<Vec<String>, BundleError> {
+    let values = require_array(value, context)?;
+    if nonempty && values.is_empty() {
+        return Err(schema_error(format!("{context} must not be empty")));
+    }
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, item)| prefixed_digest(item, prefix, &format!("{context}[{index}]")))
+        .collect()
 }
 
 fn validate_id_array(value: &Value, context: &str, prefix: &str, nonempty: bool) -> Result<Vec<String>, BundleError> {
@@ -834,7 +856,7 @@ fn collapse_ecmascript_whitespace(value: &str) -> String {
 
 fn is_ecmascript_whitespace(ch: char) -> bool {
     matches!(ch,
-        '\u{0009}' | '\u{000B}' | '\u{000C}' | '\u{0020}' | '\u{00A0}' |
+        '\u{0009}' | '\u{000A}' | '\u{000B}' | '\u{000C}' | '\u{000D}' | '\u{0020}' |
         '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{2028}' | '\u{2029}' |
         '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}'
     )
