@@ -730,6 +730,25 @@ fn compute_report_digest(report: &RiskCompositionReport) -> Result<String, RiskL
     Ok(digest(REPORT_DOMAIN, &canonical_json(&copy, "report")?))
 }
 
+/// Verify the report's digest and its non-authoritative claim ceiling.
+/// This checks report integrity only; it does not verify component guarantees.
+pub fn verify_risk_composition_report(report: &RiskCompositionReport) -> Result<(), RiskLedgerError> {
+    if report.schema != "symthaea.risk_composition_report" {
+        return Err(fail("schema", "unsupported composition report schema"));
+    }
+    if report.formal_system_guarantee_claimed {
+        return Err(fail("formal_system_guarantee_claimed", "v0.1 report must never claim theorem-level authority"));
+    }
+    if !is_sha256(&report.plan_sha256) || !is_sha256(&report.ledger_sha256) || !is_sha256(&report.report_sha256) {
+        return Err(fail("report_digest", "plan, ledger, and report digests must be valid SHA-256 values"));
+    }
+    let expected = compute_report_digest(report)?;
+    if expected != report.report_sha256 {
+        return Err(fail("report_sha256", "does not match report contents"));
+    }
+    Ok(())
+}
+
 pub const BUILTIN_PLAN_JSON: &str = include_str!("../fixtures/compositional_risk_plan_v0.1.json");
 pub fn load_builtin_plan() -> Result<RiskBudgetPlan, RiskLedgerError> {
     let mut plan: RiskBudgetPlan = serde_json::from_str(BUILTIN_PLAN_JSON)
@@ -837,7 +856,7 @@ mod tests {
         contracts[2].action_id=Some(0);contracts[3].action_id=Some(1);
         contracts[2].action_support_sha256=Some(h('7'));contracts[3].action_support_sha256=Some(h('7'));
         contracts.sort_by(|a,b|a.claim_id.cmp(&b.claim_id));
-        let plan=plan_with(contracts,vec![marginal_group("marginal"),action_group("actions")],50,10);
+        let plan=plan_with(contracts,vec![action_group("actions"),marginal_group("marginal")],50,10);
         let mut ledger=create_risk_budget_ledger(plan).unwrap();append_all(&mut ledger).unwrap();
         let report=compose_risk_budget(&ledger).unwrap();
         assert_eq!(report.operational_alpha_bound_ppb,Some(45));
@@ -995,6 +1014,18 @@ mod tests {
         let clone=ledger.clone();
         verify_risk_budget_ledger(&clone).unwrap();
         assert_eq!(clone.ledger_sha256,ledger.ledger_sha256);
+    }
+
+    #[test]
+    fn composition_report_digest_detects_tampering(){
+        let c=contract("prediction","prediction_error","marginal",RiskGuaranteeKind::MarginalFiniteSample,10,1);
+        let plan=plan_with(vec![c],vec![marginal_group("marginal")],20,10);
+        let mut ledger=create_risk_budget_ledger(plan).unwrap();append_all(&mut ledger).unwrap();
+        let report=compose_risk_budget(&ledger).unwrap();
+        verify_risk_composition_report(&report).unwrap();
+        let mut changed=report.clone();
+        changed.operational_alpha_bound_ppb=Some(999);
+        assert!(verify_risk_composition_report(&changed).is_err());
     }
 
     #[test]
