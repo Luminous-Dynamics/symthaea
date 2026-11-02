@@ -1,0 +1,529 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/detector-conformal-fusion-report-v1.json",
+  "title": "Two-stage detector conformal fusion report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "fusion_method_id",
+    "detector_specs",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "calibration_protocol_sha256",
+    "detector_registry_sha256",
+    "request_sha256",
+    "calibration_a_manifest_sha256",
+    "calibration_b_manifest_sha256",
+    "evaluation_manifest_sha256",
+    "target_alpha_permille",
+    "multiple_testing_method",
+    "fdr_control_conditional_on_exchangeability",
+    "group_count",
+    "evaluation_unit_count",
+    "flagged_count",
+    "no_flag_count",
+    "abstained_count",
+    "score_rows",
+    "group_summaries",
+    "intervals_multiplicity_adjusted",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "assumptions",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.detector_conformal_fusion_report.v1"
+    },
+    "fusion_method_id": {
+      "const": "weighted_sum_negative_log_empirical_detector_pvalues_v2"
+    },
+    "detector_specs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detector_id",
+          "direction",
+          "weight_permille",
+          "feature_contract_sha256"
+        ],
+        "properties": {
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "higher_means_contaminated",
+              "lower_means_contaminated"
+            ]
+          },
+          "weight_permille": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "feature_contract_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "calibration_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "detector_registry_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_a_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_b_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluation_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_alpha_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "multiple_testing_method": {
+      "const": "benjamini_yekutieli"
+    },
+    "fdr_control_conditional_on_exchangeability": {
+      "const": true
+    },
+    "group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_unit_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "flagged_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "no_flag_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "score_rows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evaluation_unit_id",
+          "task_family",
+          "model_regime",
+          "detector_p_values",
+          "fused_nonconformity",
+          "final_p_rank_numerator",
+          "final_p_rank_denominator",
+          "final_p_value",
+          "by_adjusted_p_value",
+          "by_family_size",
+          "minimum_attainable_p_value",
+          "decision",
+          "ground_truth_contaminated"
+        ],
+        "properties": {
+          "evaluation_unit_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "model_regime": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detector_p_values": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "detector_id",
+                "direction",
+                "raw_score",
+                "rank_numerator",
+                "rank_denominator",
+                "p_value",
+                "weight_permille",
+                "weighted_contribution"
+              ],
+              "properties": {
+                "detector_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "higher_means_contaminated",
+                    "lower_means_contaminated"
+                  ]
+                },
+                "raw_score": {
+                  "type": "number"
+                },
+                "rank_numerator": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "rank_denominator": {
+                  "type": "integer",
+                  "minimum": 2
+                },
+                "p_value": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                },
+                "weight_permille": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "weighted_contribution": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "fused_nonconformity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "final_p_rank_numerator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "final_p_rank_denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 2
+          },
+          "final_p_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "by_adjusted_p_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "by_family_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "minimum_attainable_p_value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "flag_contaminated",
+              "no_contamination_flag",
+              "abstain_unsupported_group",
+              "abstain_detector_feature_mismatch",
+              "abstain_insufficient_calibration_resolution"
+            ]
+          },
+          "ground_truth_contaminated": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "group_summaries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_family",
+          "model_regime",
+          "detector_ids",
+          "calibration_a_unit_count",
+          "calibration_b_unit_count",
+          "evaluation_unit_count",
+          "labelled_evaluation_unit_count",
+          "flagged_count",
+          "no_flag_count",
+          "abstained_count",
+          "clean_labelled_count",
+          "contaminated_labelled_count",
+          "false_positive_count",
+          "true_positive_count",
+          "false_negative_count",
+          "empirical_fpr_permille",
+          "empirical_tpr_permille",
+          "decision_coverage_permille",
+          "minimum_attainable_p_value",
+          "minimum_detector_rank_p_value",
+          "pairwise_rank_correlations",
+          "target_alpha_permille"
+        ],
+        "properties": {
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "model_regime": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detector_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          },
+          "calibration_a_unit_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calibration_b_unit_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evaluation_unit_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "labelled_evaluation_unit_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "flagged_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "no_flag_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "abstained_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "clean_labelled_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contaminated_labelled_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_positive_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "true_positive_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_negative_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "empirical_fpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "empirical_tpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "decision_coverage_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "minimum_attainable_p_value": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "minimum_detector_rank_p_value": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "pairwise_rank_correlations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "left_detector_id",
+                "right_detector_id",
+                "paired_unit_count",
+                "spearman_rank_correlation"
+              ],
+              "properties": {
+                "left_detector_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "right_detector_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "paired_unit_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "spearman_rank_correlation": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": -1,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "target_alpha_permille": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        }
+      }
+    },
+    "intervals_multiplicity_adjusted": {
+      "const": false
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "const": "exploratory_conformal_calibration"
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
