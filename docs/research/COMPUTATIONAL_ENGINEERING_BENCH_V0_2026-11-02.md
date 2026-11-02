@@ -8,13 +8,13 @@
 
 CEB measures whether an agent can perform complete computational engineering work: understand a system, diagnose a problem, plan a bounded change, implement it, verify it independently, and produce reproducible evidence.
 
-It is deliberately broader than source-code completion. Its lanes include algorithms, Rust engineering, Nix/build reproducibility, Linux operations, distributed systems, database engineering, cybersecurity, performance, system design and reliability.
+It is deliberately broader than source-code completion. Its lanes include algorithms, Rust engineering, Nix/build reproducibility, Linux operations, distributed systems, database engineering, cybersecurity, performance, system design, reliability and benchmark-verifier integrity.
 
 CEB is a Symthaea-native evaluation and should complement—not replace—external benchmarks such as SWE-bench Pro V2 and Terminal-Bench 4.0.
 
 ## 2. Current status and claim ceiling
 
-The initial catalog contains eight **design-only** task records. They have no runnable fixtures, pinned images/toolchains, reference patches, independent graders, hidden test assets or qualification results.
+The initial catalog contains nine **design-only** task records. They have no runnable fixtures, pinned images/toolchains, reference patches, independent graders, hidden test assets or qualification results.
 
 Therefore:
 
@@ -58,6 +58,7 @@ Every task must pass all of the following before it can be used for a result:
 5. **Isolation controls:** network policy, filesystem boundary, environment/secret removal, process-tree termination and resource limits are tested independently.
 6. **Flakiness review:** tests are repeated and unstable checks are repaired or excluded with a recorded reason.
 7. **Scope review:** the task instructions and grader measure the same behavior; unrelated pass-to-pass regression tests remain active.
+8. **Verifier red-team:** attack the reward channel, grader files, test discovery, answer/oracle paths, caches, environment inheritance, network boundaries, symlinks, report serialization and benchmark-version pinning. Include both false-accept and false-reject controls. A valid reference patch must never be rejected solely because it uses an alternate permitted implementation.
 
 The grader should emit per-check results and a signed/digest-bound evidence receipt. A score is not accepted merely because the agent says its own tests passed.
 
@@ -89,6 +90,8 @@ Primary leaderboard metrics:
 
 A task with a critical security or isolation violation is failed regardless of its code tests. A task with incomplete evidence is unqualified, not successful.
 
+Benchmark-verifier correctness is reported on a separate denominator from agent task resolution. Publish false-accept rate (invalid candidate accepted / negative-control attempts), false-reject rate (valid reference or adjudicated equivalent rejected / positive-control attempts), attack-family coverage and fresh-run verdict agreement. Do not merge these into the agent's resolve rate. With zero false accepts in 1,000 independent negative controls, report the one-sided 95% upper confidence bound (approximately 0.3%), not a claim of zero underlying risk. Treat clustered or correlated attacks as such; 1,000 variants of one exploit are not 1,000 independent attack families.
+
 ## 6. Comparison protocol
 
 Compare four systems under the same task revision and evaluator:
@@ -116,8 +119,9 @@ The eight initial records in `catalog.v0.json` cover:
 | CEB-SEC-001 | Security | Shell/path injection hardening | Adversarial path and shell-metacharacter controls |
 | CEB-PERF-001 | Performance | Measured hot-path optimization | Before/after profiles and semantic equivalence |
 | CEB-SYS-001 | Systems design | Requirement-to-evidence traceability | Trace completeness, risk and review rubric |
+| CEB-VER-001 | Benchmark integrity | Audit and harden an adversarial benchmark verifier | Positive/negative controls, exploit resistance and independently reviewed task-level verdicts |
 
-All eight are `design_only`. The first qualification batch should contain 2–3 independently implemented fixture tasks per lane, not one cherry-picked demonstration.
+All nine are `design_only`. The first qualification batch should contain 2–3 independently implemented fixture tasks per lane, not one cherry-picked demonstration.
 
 ## 8. Recommended first qualification batch
 
@@ -156,11 +160,34 @@ Use synthetic or permissively licensed fixtures initially, with fresh names, hid
 7. Execute repeated runs only after qualification; publish raw per-task evidence and aggregate uncertainty.
 8. Add lanes only when their fixtures and graders meet the same standard.
 
-## 11. External references
+## 11. External benchmark integrity finding
+
+Terminal-Bench 4.0.0 remains useful as a version-pinned external comparison, but it must not be treated as an unquestioned ground-truth score. Epoch AI's review dated 2026-09-04 labels the release **Flawed** and reports publicly noted scoring defects in 30 of 66 tasks (45.5%), including a directly writable pass signal, answer leakage and false negatives. Terminal-Bench's maintainers say 4.0.0 removed eight tasks and fixed 19, and list verifier improvements such as tamper-resistant graders among the goals for 4.1. These sources describe distinct snapshots and review scopes; retain the exact release, task IDs, grader commit and exclusions with every result.
+
+Accordingly:
+
+- Use Terminal-Bench 4.0.0 as a diagnostic external reference, not a sole success target. Keep the official maintainer leaderboard and independent third-party harness results separate.
+- Do not publish a single aggregate as a trustworthy engineering result without task-level verifier review. Where defects are confirmed, report the raw benchmark score and an independently adjudicated clean-subset score separately; never silently delete tasks.
+- Add CEB-VER-001 plus rotating verifier attacks. Report false accepts and false rejects separately, by attack family, with one-sided confidence bounds and task-level evidence.
+- Prefer a corrected/pinned future release only after independently rechecking its verifier changes; a version bump alone is not proof of validity.
+
+### Current external score context (2026-11-02)
+
+The official Terminal-Bench 4.0 board currently lists Opus 5.5 with Claude Code at 64.8% ±3.1 and GPT-6 Astra with Codex at 58.2% ±2.8. Vals AI's separate Mini-SWE-agent evaluation, updated 2026-10-29, reports Opus 5.5 at 65.15% and GPT-6 Astra at 59.60%. These are different agent harnesses and scoring contexts; they are not interchangeable. The Epoch AI defect audit applies to the benchmark release itself, not to a claim that every run exploited a flaw.
+
+## 12. External references
 
 - [SWE-bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2): refreshed public task split, two-sided gates and pristine-image regrading.
 - [SWE-rebench V2 collection](https://huggingface.co/collections/nebius/swe-rebench-v2): continuously updated task collection; pin the exact dataset revision and leaderboard time window.
-- [Terminal-Bench 4.0](https://www.tbench.ai/?version=4.0): 66 frontier terminal tasks; pin the benchmark version.
+- [Terminal-Bench 4.0](https://www.tbench.ai/?version=4.0): 66 frontier terminal tasks; pin the exact release, audit task-level scoring defects, and separate raw from adjudicated-clean results.
+- [Epoch AI review of Terminal-Bench 4.0.0](https://epoch.ai/benchmarks/terminal-bench/review): reports publicly documented scoring defects in 30/66 tasks and labels this release flawed.
+- [Terminal-Bench 4.0 maintenance notes](https://www.tbench.ai/news/terminal-bench-4-0): documents task removals/fixes and the 4.1 verifier-hardening direction.
+- [Vals AI Terminal-Bench 4.0 results](https://vals.ai/benchmarks/terminal-bench-4): independent Mini-SWE-agent evaluation; keep separate from the official maintainer board.
 - [Vals AI Terminal-Bench 4.0 results](https://vals-ai.com/benchmarks/terminal-bench-4): an independent evaluation with model/harness, cost and duration reporting.
 
 **Claim ceiling:** CEB V0 currently defines a task schema and design catalog only. It does not establish Symthaea performance, superiority to commercial agents, security qualification or SOTA.
+
+
+## 13. Existing audit implementation caveat
+
+Two repository-repair audit design documents currently describe Rust binaries under `tools/rust-repair-benchmark-harness/`. A source check on `main` dated 2026-11-02 did not find that manifest or corresponding binary sources; repository code search found only the documentation references. Do not treat those auditors as reusable executable infrastructure until the source is restored and exact-head tests pass. This discrepancy is tracked in [issue #10138](https://github.com/Luminous-Dynamics/symthaea/issues/10138). The benchmark-integrity lane must not inherit unverified implementation claims from design prose.
