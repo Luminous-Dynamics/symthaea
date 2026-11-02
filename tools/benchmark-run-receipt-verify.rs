@@ -63,6 +63,25 @@ fn count_at(value: &Value, key: &str, context: &str) -> Result<u64, ValidationEr
     count(required(value, key, context)?, &format!("{context}.{key}"))
 }
 
+fn require_exact_keys(value: &Value, expected: &[&str], context: &str) -> Result<(), ValidationError> {
+    let object = value.as_object().ok_or_else(|| error(format!("{context} must be an object")))?;
+    for key in expected {
+        if !object.contains_key(*key) {
+            return Err(error(format!("{context}.{key} is required")));
+        }
+    }
+    for key in object.keys() {
+        if !expected.contains(&key.as_str()) {
+            return Err(error(format!("{context} contains unknown field '{key}'")));
+        }
+    }
+    Ok(())
+}
+
+fn checked_add(left: u64, right: u64, context: &str) -> Result<u64, ValidationError> {
+    left.checked_add(right).ok_or_else(|| error(format!("{context} count overflow")))
+}
+
 fn valid_sha256(value: &Value, context: &str) -> Result<(), ValidationError> {
     let digest = string(value, context)?;
     if digest.len() != 64
@@ -93,7 +112,25 @@ fn canonical_payload_digest(receipt: &Value) -> Result<String, ValidationError> 
 }
 
 fn validate_accounting(receipt: &Value) -> Result<Value, ValidationError> {
+    require_exact_keys(
+        receipt,
+        &[
+            "schema", "run_id", "created_at", "run_kind", "benchmark", "system",
+            "environment", "budget_caps", "actual_resources", "task_accounting",
+            "task_outcomes", "excluded_tasks", "official_score", "derived_metrics",
+            "comparison", "provenance", "integrity", "claim_ceiling",
+        ],
+        "receipt",
+    )?;
     let accounting = required(receipt, "task_accounting", "receipt")?;
+    require_exact_keys(
+        accounting,
+        &[
+            "universe", "eligible", "excluded", "attempted", "not_attempted",
+            "in_progress", "completed", "graded", "terminal_dispositions",
+        ],
+        "task_accounting",
+    )?;
     let universe = count_at(accounting, "universe", "task_accounting")?;
     let eligible = count_at(accounting, "eligible", "task_accounting")?;
     let excluded = count_at(accounting, "excluded", "task_accounting")?;
@@ -103,17 +140,25 @@ fn validate_accounting(receipt: &Value) -> Result<Value, ValidationError> {
     let completed = count_at(accounting, "completed", "task_accounting")?;
     let graded = count_at(accounting, "graded", "task_accounting")?;
 
-    if universe != eligible + excluded {
+    if universe != checked_add(eligible, excluded, "universe")? {
         return Err(error(format!("universe accounting mismatch: {universe} != {eligible} + {excluded}")));
     }
-    if eligible != attempted + not_attempted {
+    if eligible != checked_add(attempted, not_attempted, "eligible")? {
         return Err(error(format!("eligibility accounting mismatch: {eligible} != {attempted} + {not_attempted}")));
     }
-    if attempted != completed + in_progress {
+    if attempted != checked_add(completed, in_progress, "attempted")? {
         return Err(error(format!("attempt accounting mismatch: {attempted} != {completed} + {in_progress}")));
     }
 
     let terminal = required(accounting, "terminal_dispositions", "task_accounting")?;
+    require_exact_keys(
+        terminal,
+        &[
+            "passed", "failed", "refused", "abstained", "unsupported",
+            "timed_out", "tool_failed", "ungraded",
+        ],
+        "terminal_dispositions",
+    )?;
     let mut terminal_counts = HashMap::new();
     let mut terminal_total = 0u64;
     for disposition in TERMINAL {
@@ -126,7 +171,7 @@ fn validate_accounting(receipt: &Value) -> Result<Value, ValidationError> {
     }
     let passed = terminal_counts["passed"];
     let failed = terminal_counts["failed"];
-    if graded != passed + failed {
+    if graded != checked_add(passed, failed, "graded")? {
         return Err(error(format!("binary grading mismatch: graded {graded} != passed {passed} + failed {failed}")));
     }
 
@@ -149,6 +194,14 @@ fn validate_accounting(receipt: &Value) -> Result<Value, ValidationError> {
 
     for (index, row) in outcomes.iter().enumerate() {
         let context = format!("task_outcomes[{index}]");
+        require_exact_keys(
+            row,
+            &[
+                "task_id", "input_sha256", "disposition", "attempted", "graded",
+                "grade", "reason_code", "grader_result_sha256", "evidence_ids", "resources",
+            ],
+            &context,
+        )?;
         let task_id = nonempty_string(required(row, "task_id", &context)?, &format!("{context}.task_id"))?;
         if !task_ids.insert(task_id.to_owned()) {
             return Err(error(format!("duplicate task ID: {task_id}")));
@@ -210,6 +263,11 @@ fn validate_accounting(receipt: &Value) -> Result<Value, ValidationError> {
     }
 
     for (index, row) in excluded_rows.iter().enumerate() {
+        require_exact_keys(
+            row,
+            &["task_id", "input_sha256", "reason_code", "predeclared", "approval_reference"],
+            &format!("excluded_tasks[{index}]"),
+        )?;
         let context = format!("excluded_tasks[{index}]");
         let task_id = nonempty_string(required(row, "task_id", &context)?, &format!("{context}.task_id"))?;
         if !task_ids.insert(task_id.to_owned()) {
@@ -412,6 +470,17 @@ fn validate_receipt(value: &Value) -> Result<Value, ValidationError> {
     validate_comparison(value)?;
 
     let integrity = required(value, "integrity", "receipt")?;
+    let integrity_map = integrity.as_object().ok_or_else(|| error("integrity must be an object"))?;
+    for key in ["canonicalization", "payload_sha256_excludes_integrity"] {
+        if !integrity_map.contains_key(key) {
+            return Err(error(format!("integrity.{key} is required")));
+        }
+    }
+    for key in integrity_map.keys() {
+        if !["canonicalization", "payload_sha256_excludes_integrity", "signature"].contains(&key.as_str()) {
+            return Err(error(format!("integrity contains unknown field '{key}'")));
+        }
+    }
     if required(integrity, "canonicalization", "integrity")? != "RFC8785-JCS" {
         return Err(error("unsupported receipt canonicalization"));
     }
@@ -610,7 +679,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_task_ids() {
         let mut value = fixture();
-        value["task_outcomes"][1]["task_id"] = value["task_outcomes"][0]["task_id"].clone();
+        let first_id = value["task_outcomes"][0]["task_id"].clone();
+        value["task_outcomes"][1]["task_id"] = first_id;
         assert!(validate_mutation(value).unwrap_err().to_string().contains("duplicate task ID"));
     }
 
@@ -661,6 +731,13 @@ mod tests {
         let mut value = fixture();
         value["comparison"]["non_comparability_reasons"] = json!(["changed after sealing"]);
         assert!(validate_receipt(&value).unwrap_err().to_string().contains("payload digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_unaccounted_top_level_fields() {
+        let mut value = fixture();
+        value["unreviewed_metric"] = Value::Bool(true);
+        assert!(validate_receipt(&value).unwrap_err().to_string().contains("unknown field"));
     }
 
     #[test]
