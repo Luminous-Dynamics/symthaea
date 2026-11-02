@@ -1,22 +1,22 @@
 {
   "benchmark": "finite_envelope_slack_anchored_compound_ebh_pilot",
-  "scope": "Exploratory local simulation only; not a theorem proof, confirmatory FDR/SupFDR calibration, Rust benchmark, or SOTA comparison.",
-  "execution_note": "Reported values came from a separate local Python reimplementation of the committed pilot logic, using the same Bernoulli LR factors, downward A2 rounding, finite-envelope weights, exact closure deficit, scenario definitions and deterministic seed schedule. The checked-in pilot runner itself has not been executed from a connected checkout.",
+  "scope": "Exploratory local reimplementation only; not a theorem proof, confirmatory FDR/SupFDR calibration, Rust benchmark, or SOTA comparison.",
+  "execution_note": "A separate local Python reimplementation followed the committed pilot's LR process, A2 rounding, finite-envelope weights, exact closure solver, scenario definitions and seed schedule. The checked-in pilot runner itself was not executed from a connected checkout. Treat these values as exploratory and independently reproduce with the committed runner.",
   "configuration": {
     "streams_per_cell": 100,
-    "hypotheses_precommitted": 24,
+    "precommitted_maximum_hypotheses": 24,
     "looks": 40,
     "alpha": "1/10",
     "null_probability": "1/2",
     "betting_probability": "7/10",
-    "null_lr_factors": "7/5 on success; 3/5 on failure; conditional expectation exactly 1",
+    "null_lr_factors": "7/5 success; 3/5 failure; conditional mean one under p0=1/2",
     "adjuster": "floor_1000000(sqrt(running maximum LR)-1)",
     "finite_envelope_weights": "gamma_i=1/[i(i+1)] for i=1..24",
     "finite_envelope_weight_mass": "24/25",
     "fixed_anchor_slack": "1/25",
     "dependence_modes": ["independent", "shared-uniform", "balanced-negative"],
     "scenarios": ["all_null", "sparse_strong", "dense_weak", "late_cluster", "switching"],
-    "arrival_contract": "Predictable fixed roster of 24 candidates; late-cluster candidates 16..23 activate at look 20."
+    "arrival_policy": "Deterministic predictable block arrivals; late-cluster IDs 16..23 activate at look 20."
   },
   "late_cluster_terminal_power": {
     "independent": {
@@ -36,24 +36,24 @@
     }
   },
   "other_scenarios": {
-    "all_null": "No discoveries observed for ordinary or anchored methods in the 100-stream cells.",
-    "sparse_strong": "No additional discoveries observed from anchoring.",
-    "dense_weak": "No additional discoveries observed from anchoring.",
-    "switching": "No additional discoveries observed from anchoring."
+    "all_null": "No discoveries observed for ordinary or anchored methods in the 100-stream pilot cells.",
+    "sparse_strong": "No additional terminal discoveries observed from anchoring.",
+    "dense_weak": "No additional terminal discoveries observed from anchoring.",
+    "switching": "No additional terminal discoveries observed from anchoring."
   },
   "error_rate_observations": {
     "observed_false_discoveries": 0,
-    "interpretation": "Zero observed false discoveries in this pilot is not evidence of error-rate calibration or control.",
-    "confirmatory_status": false
+    "interpretation": "Zero observed false discoveries in 100 streams per cell is not an error-rate calibration result."
   },
   "uncertainty": {
     "one_sided_95pct_hoeffding_halfwidth_per_bounded_mean": 0.122386,
     "simultaneous_correction": "not applied",
-    "interpretation": "Observed 0.1-0.3 percentage-point power differences are much smaller than the uncertainty bound."
+    "interpretation": "The observed 0.1-0.3 percentage-point differences are far smaller than the 12.24 percentage-point half-width."
   },
   "claim_boundary": [
-    "The finite-envelope anchor retains the unscaled weights within the precommitted 24-candidate universe.",
-    "The observed power differences are exploratory and do not establish improvement.",
-    "No statistical superiority, SOTA, Rust execution, or CI result is claimed."
+    "The finite-envelope anchor retains the unscaled weights inside the precommitted 24-candidate universe.",
+    "The anchor is fixed at delta=1/25 and is not recalculated from the active roster.",
+    "Observed power differences are exploratory and do not establish improvement.",
+    "No statistical superiority, SOTA, Rust execution, CI, or confirmatory FDR/SupFDR claim is made."
   ]
 }
