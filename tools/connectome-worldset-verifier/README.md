@@ -18,7 +18,8 @@ Every combination of every declared axis is admissible. There are no arbitrary p
 - actual SHA-256 bytes of local artifacts, with path traversal and symlink escape rejected;
 - pre-query freeze receipt, source-universe snapshot, base graph snapshot, hypothetical graph snapshot and candidate patch bindings;
 - exact query, scenario, candidate, operation, sample, task-route and threshold context;
-- each alternative's explicit evidence-artifact ID and digest against the exact file whose bytes were read and hashed;\n- caps axis count at 64 before recursive enumeration to avoid hostile singleton-axis stack exhaustion;
+- each alternative's explicit evidence-artifact ID and digest against the exact file whose bytes were read and hashed;
+- caps axis count at 64 before recursive enumeration to avoid hostile singleton-axis stack exhaustion;
 - deterministic world IDs generated from canonical assignment objects;
 - full Cartesian enumeration, exact expected/evaluated world-set equality, no duplicates and no unresolved frontier;
 - matched before/after values inside their corresponding marginal intervals and paired differences inside the supplied effect interval;
