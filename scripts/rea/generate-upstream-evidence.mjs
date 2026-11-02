@@ -34,7 +34,7 @@ const importFromRea = async (relativePath) =>
 const [
   { createEvidence, withEvidenceCallerInputPath, parseEvidence },
   { createAnalysisProfile },
-  { TOOL_EFFECTS, toolReturnsTargetContent },
+  { TOOL_EFFECTS, toolReturnsTargetContent, annotationsFromEffects },
 ] = await Promise.all([
   importFromRea("domain/evidence.ts"),
   importFromRea("domain/analysisProfile.ts"),
@@ -469,6 +469,7 @@ for (const name of mobileToolEffectNames) {
   }
   mobileToolEffects[name] = {
     effects: TOOL_EFFECTS[name],
+    annotations: annotationsFromEffects(TOOL_EFFECTS[name]),
     returns_target_content: toolReturnsTargetContent(name),
   };
 }
