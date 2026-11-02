@@ -1,0 +1,278 @@
+{
+  "schema": "luminous.rea-rust-migration-benchmark.v0",
+  "status": "proposal_not_results",
+  "as_of": "2026-11-02",
+  "upstream": {
+    "repository": "https://github.com/morluto/rea",
+    "source_commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
+    "package": "rea-agents",
+    "package_version": "6.8.0",
+    "license": "MIT",
+    "node_engine": "^22.23.4 || ^24.22.1 || >=26.12.1",
+    "inventory": {
+      "src_typescript_files": 3550,
+      "src_test_ts_files": 1135,
+      "production_dependencies": 42,
+      "development_dependencies": 28,
+      "java_bridge_files": 16,
+      "swift_bridge_files": 5,
+      "python_bridge_files": 15
+    },
+    "evidence_contract_sources": [
+      "src/domain/evidence.ts",
+      "src/domain/canonicalDigest.ts",
+      "src/domain/analysisProfile.ts",
+      "src/domain/evidenceSubject.ts",
+      "src/domain/relationshipCoverage.ts",
+      "src/domain/evidenceBundle.ts"
+    ]
+  },
+  "decision": {
+    "strategy": "strangler_migration_with_exact_contract_parity",
+    "wholesale_rewrite": false,
+    "typescript_role": "pinned_reference_implementation_and_provider_until_each_operation_is_promoted",
+    "rust_role": "native_symthaea_contract_core_cli_mcp_and_selective_analyzers",
+    "external_provider_replacement": false,
+    "first_milestone": "rea_evidence_semantic_identity_and_schema_parity",
+    "promotion_mode": "shadow_then_exact_scope_gate"
+  },
+  "invariants": [
+    "Raw Evidence file digest and semantic Evidence ID are separate identities.",
+    "Rust Evidence IDs must exactly match the pinned upstream TypeScript implementation.",
+    "Subject local path and display name do not participate in semantic subject identity.",
+    "caller_input_path is non-semantic metadata and must not change Evidence ID.",
+    "Unknown, unavailable, unsupported and partial states are preserved exactly.",
+    "Native Rust results are non-authorizing during shadow execution.",
+    "Unknown tool effects are denied in read-only mobile profiles.",
+    "A provider wrapper is not an implementation of the provider's internal engine.",
+    "No operation is promoted without a frozen golden corpus, negative controls and independent review."
+  ],
+  "migration_stages": [
+    {
+      "id": "S0",
+      "name": "reference_capture",
+      "status": "proposed",
+      "deliverables": [
+        "pinned_upstream_revision",
+        "frozen_tool_catalog",
+        "Evidence_golden_corpus",
+        "provider_and_effect_matrix"
+      ],
+      "exit_criteria": [
+        "reference_results_and_source_digests_are_preserved"
+      ]
+    },
+    {
+      "id": "S1",
+      "name": "rust_evidence_core",
+      "status": "proposed",
+      "deliverables": [
+        "strict_evidence_parser",
+        "JCS_compatibility",
+        "profile_digest_validation",
+        "semantic_evidence_id_validation"
+      ],
+      "exit_criteria": [
+        "100_percent_id_parity",
+        "100_percent_accept_reject_parity",
+        "zero_negative_control_false_accepts"
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "rust_mcp_cli_facade",
+      "status": "proposed",
+      "deliverables": [
+        "canonical_tool_catalog",
+        "rmcp_server_client",
+        "read_only_effect_policy",
+        "CLI_MCP_shared_registration"
+      ],
+      "exit_criteria": [
+        "100_percent_schema_and_effect_parity_for_migrated_tools"
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "native_mobile_inventory",
+      "status": "proposed",
+      "deliverables": [
+        "bounded_APK_IPA_archive_inventory",
+        "artifact_graph",
+        "partial_unknown_semantics"
+      ],
+      "exit_criteria": [
+        "100_percent_supported_fixture_parity",
+        "zero_false_security_claims"
+      ]
+    },
+    {
+      "id": "S4",
+      "name": "selective_analyzer_migration",
+      "status": "proposed",
+      "deliverables": [
+        "per_operation_Rust_shadow",
+        "differential_fuzz_harness",
+        "promoted_scope_registry"
+      ],
+      "exit_criteria": [
+        "exact_scope_specific_parity_and_independent_review"
+      ]
+    }
+  ],
+  "benchmark_families": [
+    {
+      "id": "evidence_semantic_identity",
+      "status": "planned",
+      "metrics": [
+        "evidence_id_exact_match",
+        "analysis_profile_digest_exact_match",
+        "raw_file_digest_preservation",
+        "semantic_field_mutation_sensitivity"
+      ],
+      "target": "100_percent_parity_on_frozen_golden_corpus",
+      "negative_controls": [
+        "stale_evidence_id",
+        "subject_sha_substitution",
+        "provider_version_mutation",
+        "result_mutation",
+        "limitation_mutation",
+        "source_location_mutation",
+        "profile_digest_mismatch"
+      ]
+    },
+    {
+      "id": "schema_disposition",
+      "status": "planned",
+      "metrics": [
+        "accept_reject_parity",
+        "unknown_field_rejection",
+        "duplicate_key_rejection",
+        "null_omission_distinction",
+        "error_category_parity"
+      ],
+      "target": "100_percent_accept_reject_parity"
+    },
+    {
+      "id": "canonical_json",
+      "status": "planned",
+      "metrics": [
+        "canonical_byte_parity",
+        "sha256_parity",
+        "unicode_key_order_parity",
+        "number_serialization_parity"
+      ],
+      "target": "100_percent_parity_for_all_frozen_vectors",
+      "vectors": [
+        "supplementary_plane_property_names",
+        "control_character_escaping",
+        "non_ascii_strings",
+        "no_unicode_normalization",
+        "negative_zero",
+        "number_format_thresholds",
+        "safe_integer_boundaries",
+        "nested_large_payloads"
+      ]
+    },
+    {
+      "id": "tool_catalog_and_effects",
+      "status": "planned",
+      "metrics": [
+        "tool_name_set_parity",
+        "input_schema_parity",
+        "output_schema_parity",
+        "effect_metadata_parity",
+        "unknown_effect_denial"
+      ],
+      "target": "100_percent_parity_for_each_migrated_tool"
+    },
+    {
+      "id": "runtime_lifecycle",
+      "status": "planned",
+      "metrics": [
+        "startup_latency",
+        "cancellation_latency",
+        "timeout_correctness",
+        "owned_process_cleanup",
+        "cleanup_retry_integrity"
+      ],
+      "target": "zero_orphaned_owned_processes_and_zero_false_cleanup_success"
+    },
+    {
+      "id": "mobile_archive_inventory",
+      "status": "planned",
+      "metrics": [
+        "entry_path_precision_recall",
+        "size_type_accuracy",
+        "content_hash_accuracy",
+        "bundle_graph_edge_accuracy",
+        "coverage_state_accuracy"
+      ],
+      "target": "100_percent_exact_match_for_supported_fixture_fields_and_zero_false_security_claims",
+      "negative_controls": [
+        "path_traversal",
+        "duplicate_entries",
+        "zip64_malformed",
+        "truncated_central_directory",
+        "encrypted_member",
+        "unsupported_compression",
+        "decompression_budget_exhaustion"
+      ]
+    },
+    {
+      "id": "performance_and_resources",
+      "status": "planned",
+      "metrics": [
+        "cold_start_ms",
+        "p50_latency_ms",
+        "p95_latency_ms",
+        "throughput_ops_per_second",
+        "peak_rss_bytes",
+        "bytes_copied",
+        "energy_per_task"
+      ],
+      "target": "measure_first; stretch_goal_30_percent_improvement_on_selected_pure_rust_hot_path",
+      "reporting": [
+        "same_host",
+        "same_input",
+        "same_cache_state",
+        "same_tool_versions",
+        "confidence_intervals"
+      ]
+    }
+  ],
+  "promotion_policy": {
+    "required": [
+      "pinned_reference_source",
+      "frozen_known_answer_corpus",
+      "exact_semantic_evidence_parity",
+      "schema_and_error_parity",
+      "side_effect_and_effect_parity",
+      "negative_control_suite",
+      "resource_lifecycle_suite",
+      "independent_review"
+    ],
+    "shadow_is_authorizing": false,
+    "provider_missing_behavior": "explicit_unavailable_no_silent_fallback",
+    "partial_result_behavior": "preserve_partial_and_limitations",
+    "unknown_effect_behavior": "deny"
+  },
+  "work_items": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9887",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9888",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9889",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9890",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9836",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9838",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9839",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9840"
+  ],
+  "claim_ceiling": {
+    "rust_port_completed": false,
+    "evidence_parity_qualified": false,
+    "tool_catalog_parity_qualified": false,
+    "native_mobile_analyzer_qualified": false,
+    "performance_improvement_measured": false,
+    "industry_superiority_claim_allowed": false
+  }
+}
