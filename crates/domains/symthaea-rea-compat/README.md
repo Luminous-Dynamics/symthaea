@@ -83,3 +83,19 @@ The committed unit fixture is a source-derived reference vector; its semantic di
 ## Claim ceiling
 
 A matching Evidence ID proves that the supplied object is internally consistent with this implementation's semantic projection and canonicalization. It does not prove producer authorship, provenance authenticity, observation truth, hardware identity, runtime behavior, or security compliance. Use HARDSEC and independently trusted signed/anchored receipts for those claims.
+
+
+## Offline verifier CLI
+
+The crate includes the `rea-evidence-verify` binary for local, offline validation of saved single-record Evidence:
+
+```bash
+cargo run --locked --manifest-path tools/rea-evidence-compat-harness/Cargo.toml -- \
+  --json ./evidence.json
+```
+
+Use `--text` for a human-readable summary. The command performs a bounded read (64 MiB maximum), rejects duplicate JSON object keys, validates the Evidence envelope and profile commitment, and recomputes the semantic Evidence ID. It never launches REA, Node.js, ADB or any external provider.
+
+The report deliberately omits local paths and raw/normalized payload content. It emits the semantic Evidence ID, raw-file digest, artifact digest, provider identity, operation and coverage status. A successful result means `internally_consistent`, not authenticated or true. The report's claim ceiling always states that producer authentication, observation truth, hardware attestation and runtime integrity were not established.
+
+The binary is included in the isolated Cargo harness so it is compiled and tested without treating the unrelated root workspace metadata issue as fixed.
