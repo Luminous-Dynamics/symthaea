@@ -1,0 +1,129 @@
+{
+  "schema": "symthaea.spectra.corpus_known_answer.v0.1",
+  "generator_version": "splitmix64-fy-reject-v0.1",
+  "claim_ceiling": "synthetic_only",
+  "campaign_config": {
+    "calibration_trials": 512,
+    "evaluation_trials": 512,
+    "candidate_count": 4,
+    "signal_hit_rate_permille": 400,
+    "campaign_instance_id": 600000001
+  },
+  "scenarios": [
+    {
+      "scenario_id": "null-reference",
+      "world": "null",
+      "seed_hex": "0x5eed12349876abcd",
+      "expected": {
+        "top_rank_accuracy_permille": 271,
+        "channel_accuracies_permille": [
+          263,
+          265,
+          230,
+          250,
+          240,
+          261,
+          242,
+          240,
+          244
+        ],
+        "detected_modalities": []
+      }
+    },
+    {
+      "scenario_id": "signal-reference",
+      "world": "signal_injected",
+      "seed_hex": "0x1111222233334444",
+      "expected": {
+        "top_rank_accuracy_permille": 509,
+        "channel_accuracies_permille": [
+          234,
+          271,
+          269,
+          271,
+          261,
+          236,
+          251,
+          236,
+          263
+        ],
+        "detected_modalities": []
+      }
+    },
+    {
+      "scenario_id": "participant-assignment-confound",
+      "world": "confounded",
+      "seed_hex": "0x3333444455556666",
+      "expected": {
+        "top_rank_accuracy_permille": 253,
+        "channel_accuracies_permille": [
+          242,
+          255,
+          248,
+          232,
+          265,
+          251,
+          234,
+          263,
+          1000
+        ],
+        "detected_modalities": [
+          "procedural"
+        ]
+      }
+    }
+  ],
+  "leakage_scenarios": [
+    {
+      "modality": "rf",
+      "seed_hex": "0xface100000000001",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "low_frequency_magnetic",
+      "seed_hex": "0xface100000000002",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "acoustic",
+      "seed_hex": "0xface100000000003",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "optical",
+      "seed_hex": "0xface100000000004",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "vibration",
+      "seed_hex": "0xface100000000005",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "thermal_airflow",
+      "seed_hex": "0xface100000000006",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "power_conducted",
+      "seed_hex": "0xface100000000007",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "network_timing",
+      "seed_hex": "0xface100000000008",
+      "expected_accuracy_permille": 1000
+    },
+    {
+      "modality": "procedural",
+      "seed_hex": "0xface100000000009",
+      "expected_accuracy_permille": 1000
+    }
+  ],
+  "adversarial": {
+    "world": "adversarial_mutation",
+    "seed_hex": "0x777788889999aaaa",
+    "expected_valid_evaluation_trials": 0,
+    "expected_invalid_evaluation_trials": 512
+  }
+}
