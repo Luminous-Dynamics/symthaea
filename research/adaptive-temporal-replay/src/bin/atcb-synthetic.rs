@@ -19,6 +19,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     let scenario_id = args.get(0).map(String::as_str).unwrap_or("abrupt_location_shift");
     let seed = args.get(1).map(|x| x.parse::<u64>()).transpose()?.unwrap_or(20_261_102);
+    let code_commit = env::var("GIT_COMMIT_SHA")
+        .map_err(|_| "set GIT_COMMIT_SHA to the exact source commit before generating a receipt")?;
+    if code_commit.len() != 40
+        || !code_commit.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return Err("GIT_COMMIT_SHA must be a 40-character lowercase hexadecimal commit SHA".into());
+    }
     let (seeds, scenarios) = load_builtin_registry()?;
     if !seeds.contains(&seed) {
         return Err(format!("seed {seed} is not preregistered").into());
@@ -45,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "seed_id": seed,
         "generator_id": "splitmix64-uniform-residual-v1",
         "fixture_sha256": hex_sha256(REGISTRY_JSON.as_bytes()),
-        "code_commit": env::var("GIT_COMMIT_SHA").ok(),
+        "code_commit": code_commit,
         "outcome_count": outcomes.len(),
         "feedback_event_count": events.len(),
         "revision_count": revisions,
