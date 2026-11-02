@@ -12,7 +12,7 @@ Generate Cargo.lock on first dependency resolution, commit it, then rerun with -
 ## Implemented
 
 - Paper-faithful upper false-positive and lower farsighted false-negative losses.
-- Frozen finite grid of joint upper-threshold/lower-schedule policies.
+- Frozen finite grid of joint upper-threshold/lower-schedule policies (fixture contract: `fixture-v0.1.schema.json`).
 - Simultaneous one-sided Hoeffding UCBs across both risks and every candidate (2M bounds).
 - Exact rational record of delta/(2M) and conservative PPM loss/mean/radius rounding.
 - Feasibility against separate upper/lower risk budgets.
