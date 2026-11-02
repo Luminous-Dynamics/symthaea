@@ -510,6 +510,62 @@ mod tests {
     }
 
     #[test]
+    fn independently_verifies_hand_authored_receipt_without_writer_generation() {
+        let policy = vec![
+            CandidateSpec {
+                id: 10,
+                weight: 300_000_000,
+                reserve_rate_numerator: 1,
+                reserve_rate_denominator: 1,
+                destination_id: Some(20),
+            },
+            CandidateSpec {
+                id: 20,
+                weight: 300_000_000,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+                destination_id: Some(30),
+            },
+            CandidateSpec {
+                id: 30,
+                weight: 200_000_000,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+                destination_id: None,
+            },
+        ];
+        let receipt = vec![
+            AuditEvent::Activated { round: 0, candidate_id: 10 },
+            AuditEvent::Activated { round: 0, candidate_id: 20 },
+            AuditEvent::EvidenceUpdated {
+                round: 1,
+                candidate_id: 10,
+                new_value: EVIDENCE_ONE,
+            },
+            AuditEvent::Reserved {
+                round: 1,
+                token_id: 1,
+                donor_id: 10,
+                destination_id: 20,
+                amount: 300_000_000_000,
+            },
+            AuditEvent::Credited {
+                round: 2,
+                token_id: 1,
+                recipient_id: 20,
+                amount: 150_000_000_000,
+            },
+        ];
+
+        let verified = verify_receipt(&policy, &receipt, None).unwrap();
+        assert_eq!(verified.candidates[0].weighted_score, 0);
+        assert_eq!(verified.candidates[1].incoming, 150_000_000_000);
+        assert_eq!(verified.candidates[2].evidence_value, 0);
+        assert_eq!(verified.escrow[0].destination_id, 20);
+        assert_eq!(verified.escrow[0].remaining_amount, 150_000_000_000);
+    }
+
+    #[test]
     fn independently_replays_reference_receipt() {
         let policy = specs();
         let mut writer = DonationLedger::new(policy.clone()).unwrap();
