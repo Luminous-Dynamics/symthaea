@@ -257,6 +257,10 @@ pub fn audit_splits(
         }
         validate_sample_hash(&operation.sample_hash)?;
         validate_sha("label artifact", &operation.label_artifact_sha256)?;
+        validate_unique_ids(
+            "neuron root",
+            operation.groups.neuron_ids.iter().map(String::as_str),
+        )?;
 
         if !sample_task_pairs.insert((operation.sample_hash.clone(), operation.task_route)) {
             return Err(SplitAuditError::DuplicateOperationForTask {
@@ -848,6 +852,26 @@ mod tests {
         .unwrap();
 
         assert_eq!(report.status, SplitAuditStatus::GroupDisjoint);
+    }
+
+    #[test]
+    fn duplicate_neuron_root_ids_are_rejected_even_when_not_selected_as_a_group_key() {
+        let mut op = operation(
+            "op",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        op.groups.neuron_ids = vec!["root-1".to_owned(), "root-1".to_owned()];
+
+        assert!(matches!(
+            audit_splits(&policy(vec![GroupKey::SourceVolume]), &[op]),
+            Err(SplitAuditError::DuplicateIdentifier { kind: "neuron root", .. })
+        ));
     }
 
     #[test]
