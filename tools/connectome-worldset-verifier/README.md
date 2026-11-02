@@ -38,7 +38,7 @@ Artifact paths in the manifest are relative to the manifest's directory. The ver
 
 ## Receipt integration
 
-The output's `coverage` object maps to the `PairedWorldSetCoverage` fields in `tools/connectome-query-impact/src/lib.rs`. Before setting `closure_verified=true` in a production adapter, the adapter/operator must:
+The output's `coverage` object contains the structural fields consumed by `PairedWorldSetCoverage` in `tools/connectome-query-impact/src/lib.rs`, but **do not copy its `closure_verified` flag directly into a trusted report**. The receipt explicitly says pre-query freeze authentication and outcome-independent universe selection were not performed. Before propagating `closure_verified=true` in a production adapter, the adapter/operator must:
 
 1. independently pin the verifier binary SHA-256 in a trust policy outside the submitted manifest;
 2. hash and retain the emitted receipt bytes (the receipt includes its own canonical digest);
@@ -49,7 +49,7 @@ A digest included only in the same untrusted manifest is not an authentication m
 
 ## Explicit limitations
 
-- The freeze booleans are assertions. Authentic pre-query timing/authorization requires a separately authenticated receipt and operator-pinned trust policy.
+- The freeze booleans are assertions. The receipt reports `prequery_freeze_authentication=NOT_PERFORMED_EXTERNAL_TRUST_REQUIRED` and `universe_selection_independence=NOT_ASSESSED`. Authentic pre-query timing/authorization requires a separately authenticated receipt and operator-pinned trust policy.
 - The verifier validates the declared alternatives and evidence digests; it does not decide whether an alternative is biologically admissible.
 - Cartesian worlds are not assigned probabilities.
 - The paired interval and graph endpoint values are inputs; this tool does not run connectome inference or apply edits.
