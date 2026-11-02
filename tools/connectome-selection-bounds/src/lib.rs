@@ -1174,6 +1174,21 @@ mod tests {
     }
 
     #[test]
+    fn response_status_count_overflow_fails_closed() {
+        let counts = ResponseStatusCounts {
+            detected: usize::MAX,
+            not_detected: 1,
+            unobserved: 0,
+            classifier_invalid: 0,
+            registration_failed: 0,
+        };
+        assert_eq!(
+            observed_positive_fraction_bounds(counts, usize::MAX).unwrap_err(),
+            EvalError::ResponseStatusCountOverflow,
+        );
+    }
+
+    #[test]
     fn interval_detector_inversion_contains_point_api_and_handles_missingness() {
         let operating = DetectorOperatingBounds {
             sensitivity: ValueBounds { lower: 0.8, upper: 0.9 },
