@@ -19,12 +19,11 @@
         "operator_id": "operator-01",
         "target_custodian_id": "custodian-01",
         "evaluator_id": "evaluator-01",
-        "target_id": "target-01",
         "candidate_ids": [
-          "target-01",
-          "decoy-01",
-          "decoy-02",
-          "decoy-03"
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
         ],
         "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -54,40 +53,43 @@
           {
             "judge_id": "judge-1",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-2",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "target-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-01",
+              "candidate-02",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-3",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "decoy-02",
-              "target-01",
-              "decoy-03"
+              "candidate-01",
+              "candidate-03",
+              "candidate-02",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-4",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "decoy-02",
-              "decoy-03",
-              "target-01"
+              "candidate-01",
+              "candidate-03",
+              "candidate-04",
+              "candidate-02"
             ]
           }
         ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
       }
     },
     {
@@ -107,12 +109,11 @@
         "operator_id": "operator-01",
         "target_custodian_id": "custodian-01",
         "evaluator_id": "evaluator-01",
-        "target_id": "target-01",
         "candidate_ids": [
-          "target-01",
-          "decoy-01",
-          "decoy-02",
-          "decoy-03"
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
         ],
         "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -142,40 +143,43 @@
           {
             "judge_id": "judge-1",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-2",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-3",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-4",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           }
         ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
       }
     },
     {
@@ -195,12 +199,11 @@
         "operator_id": "operator-01",
         "target_custodian_id": "custodian-01",
         "evaluator_id": "evaluator-01",
-        "target_id": "target-01",
         "candidate_ids": [
-          "target-01",
-          "decoy-01",
-          "decoy-02",
-          "decoy-03"
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
         ],
         "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -230,40 +233,43 @@
           {
             "judge_id": "judge-1",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-2",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-3",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-4",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           }
         ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
       }
     },
     {
@@ -278,12 +284,11 @@
         "operator_id": "operator-01",
         "target_custodian_id": "custodian-01",
         "evaluator_id": "evaluator-01",
-        "target_id": "target-01",
         "candidate_ids": [
-          "target-01",
-          "decoy-01",
-          "decoy-02",
-          "decoy-03"
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
         ],
         "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -313,40 +318,43 @@
           {
             "judge_id": "judge-1",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-2",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "target-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-01",
+              "candidate-02",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-3",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "decoy-02",
-              "target-01",
-              "decoy-03"
+              "candidate-01",
+              "candidate-03",
+              "candidate-02",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-4",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "decoy-02",
-              "decoy-03",
-              "target-01"
+              "candidate-01",
+              "candidate-03",
+              "candidate-04",
+              "candidate-02"
             ]
           }
         ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
       }
     },
     {
@@ -361,12 +369,11 @@
         "operator_id": "custodian-01",
         "target_custodian_id": "custodian-01",
         "evaluator_id": "evaluator-01",
-        "target_id": "target-01",
         "candidate_ids": [
-          "target-01",
-          "decoy-01",
-          "decoy-02",
-          "decoy-03"
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
         ],
         "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -396,40 +403,43 @@
           {
             "judge_id": "judge-1",
             "ranked_candidate_ids": [
-              "target-01",
-              "decoy-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-2",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "target-01",
-              "decoy-02",
-              "decoy-03"
+              "candidate-01",
+              "candidate-02",
+              "candidate-03",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-3",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "decoy-02",
-              "target-01",
-              "decoy-03"
+              "candidate-01",
+              "candidate-03",
+              "candidate-02",
+              "candidate-04"
             ]
           },
           {
             "judge_id": "judge-4",
             "ranked_candidate_ids": [
-              "decoy-01",
-              "decoy-02",
-              "decoy-03",
-              "target-01"
+              "candidate-01",
+              "candidate-03",
+              "candidate-04",
+              "candidate-02"
             ]
           }
         ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
       }
     }
   ]
