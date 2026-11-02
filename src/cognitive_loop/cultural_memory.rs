@@ -50,9 +50,11 @@
 //!    decision for the project owner, not something to do unilaterally
 //!    here.
 //!
-//! Until both land, "culture" here means: one agent's own artistic history,
-//! ranked and retained by the same math that will rank cross-agent content
-//! once publishing goes live.
+//! Current boundary: the local canon remains per-agent and is ranked/retained
+//! locally. Outbound ContentAnnounce packets are emitted, but this module does
+//! not establish authenticated peer identity, shared graph state, successful
+//! remote acquisition, semantic understanding, or cross-generation retention.
+//! The receive-side CognitiveLoopService owns a separate SocialFabricManager.
 //!
 //! ## Embedding caveat
 //!
@@ -89,11 +91,12 @@ pub const DOMAIN_MUSIC: &str = "art:music";
 /// Domain tag for self-authored poetry (Broca creative_mode) artifacts.
 pub const DOMAIN_POETRY: &str = "art:poetry";
 
-/// Source-peer identity used for self-authored content.
+/// Local provenance label used when self-authored content is inserted into
+/// this manager's private resonance graph.
 ///
-/// Deliberately not a real peer ID — there is no live network send yet
-/// (see module docs), so "self" documents honestly that this content has
-/// never left the local agent.
+/// This is not the mesh sender identity and is not a cryptographic principal.
+/// Outbound packet identity is assigned by the mesh bridge; receiver-side
+/// identity authentication remains a separate, not-yet-qualified property.
 pub const SELF_PEER: &str = "self";
 
 /// Default path for the persisted lineage + canon file.
@@ -192,14 +195,15 @@ struct CulturalMemoryFile {
 /// private `SocialFabricManager`/`ResonanceGraph`, a seed-lineage table for
 /// imitation, and a persisted top-N "artistic canon".
 pub struct CulturalMemoryManager {
-    /// Private resonance graph + neuromod bridge for self-authored content.
+    /// Private resonance graph + neuromod bridge for locally authored content.
     ///
-    /// This is a **separate instance** from any `SocialFabricManager` the
-    /// wider `CognitiveLoopService` may run for real mesh peer content —
-    /// wiring the two together (so self-authored and peer content share one
-    /// graph) is natural future work once live mesh-send exists, but would
-    /// require threading a shared handle from `CognitiveLoopService` into
-    /// `CreativeManager`, a larger structural change than this pass's scope.
+    /// This is a **separate instance** from the receive-side
+    /// `SocialFabricManager` owned by `CognitiveLoopService`. Outbound mesh
+    /// announcements do not merge these two stores: local authoring/canon
+    /// state and peer-received content have separate graph state and lifecycle.
+    /// A future integration may use an explicitly shared, authenticated,
+    /// provenance-preserving store, but that must not be inferred from packet
+    /// transport alone.
     social: SocialFabricManager,
     /// content_hash -> (seed, domain), all tracked self-authored artifacts
     /// (bounded, FIFO-evicted).
