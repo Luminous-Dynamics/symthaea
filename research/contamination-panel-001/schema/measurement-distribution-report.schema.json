@@ -24,6 +24,7 @@
     "observation_count",
     "distributional_evidence_eligible",
     "claim_scope_eligible",
+    "paired_delta_positive_is_better",
     "independently_authenticated",
     "confirmatory_eligible",
     "rank_stability_status",
@@ -451,6 +452,9 @@
     "source_domain_count": {
       "type": "integer",
       "minimum": 1
+    },
+    "paired_delta_positive_is_better": {
+      "const": true
     }
   }
 }
