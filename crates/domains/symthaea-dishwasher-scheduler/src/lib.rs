@@ -100,7 +100,12 @@ impl ModeProfile {
 pub enum Policy {
     FullLoadOnly { max_batch_wait_s: u64 },
     QuickCellOnly,
+    /// Offline benchmark policy that may use the replay trace's known future arrivals.
+    /// This is an optimistic look-ahead reference, not a deployable controller.
     HybridResourceAware { max_batch_wait_s: u64 },
+    /// Conservative hybrid policy. It estimates full-load completion using only
+    /// currently pending work and the configured maximum batch wait.
+    HybridConservativeNoOracle { max_batch_wait_s: u64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -286,7 +291,8 @@ pub fn simulate(
             }
         }
         Policy::QuickCellOnly => quick.validate(Some(1))?,
-        Policy::HybridResourceAware { .. } => {
+        Policy::HybridResourceAware { .. }
+        | Policy::HybridConservativeNoOracle { .. } => {
             quick.validate(Some(1))?;
             full.validate(None)?;
             if full.capacity < 2 {
@@ -297,7 +303,8 @@ pub fn simulate(
 
     let max_batch_wait_s = match policy {
         Policy::FullLoadOnly { max_batch_wait_s }
-        | Policy::HybridResourceAware { max_batch_wait_s } => {
+        | Policy::HybridResourceAware { max_batch_wait_s }
+        | Policy::HybridConservativeNoOracle { max_batch_wait_s } => {
             if max_batch_wait_s == 0 {
                 return Err("max_batch_wait_s must be positive");
             }
@@ -361,13 +368,25 @@ pub fn simulate(
             }
         }
 
-        // Hybrid mode uses QuickCell for jobs that cannot safely enter FullLoad,
-        // or whose deadline would be missed by the next possible full batch.
-        if matches!(policy, Policy::HybridResourceAware { .. }) && quick_free_s <= now_s {
+        // Hybrid policies use QuickCell for jobs that cannot safely enter FullLoad,
+        // or whose deadline would be missed by the conservative next-full-batch estimate.
+        if matches!(
+            policy,
+            Policy::HybridResourceAware { .. } | Policy::HybridConservativeNoOracle { .. }
+        ) && quick_free_s <= now_s
+        {
+            // The original HybridResourceAware policy is an offline look-ahead
+            // benchmark. The conservative policy deliberately receives no future
+            // arrivals, so later jobs cannot influence an earlier dispatch choice.
+            let future_jobs_for_estimate: &[Job] = match policy {
+                Policy::HybridResourceAware { .. } => &ordered[next_job..],
+                Policy::HybridConservativeNoOracle { .. } => &[],
+                _ => &[],
+            };
             let predicted_finish = predicted_full_finish(
                 now_s,
                 &pending,
-                &ordered[next_job..],
+                future_jobs_for_estimate,
                 full,
                 full_free_s,
                 max_batch_wait_s,
@@ -431,7 +450,7 @@ pub fn simulate(
                 });
             let defer_dominated_partial_to_quick = matches!(
                 policy,
-                Policy::HybridResourceAware { .. }
+                Policy::HybridResourceAware { .. } | Policy::HybridConservativeNoOracle { .. }
             ) && eligible_count > 0
                 && eligible_count < full.capacity
                 && oldest_arrival.is_some_and(|arrival| {
@@ -818,6 +837,47 @@ mod tests {
         assert!(result.completions.iter().any(|completion| {
             completion.job_id == 0 && completion.mode == ModeKind::QuickCell
         }));
+    }
+
+    #[test]
+    fn conservative_hybrid_is_independent_of_future_arrival_oracle() {
+        let (quick, full) = profiles();
+        let first = sample_job(1, 0, 9_000);
+        let later = sample_job(2, 1, 20_000);
+        let policy = Policy::HybridConservativeNoOracle {
+            max_batch_wait_s: 3_600,
+        };
+
+        let one_job = simulate(&[first], &quick, &full, policy).unwrap();
+        let with_later_arrival = simulate(&[first, later], &quick, &full, policy).unwrap();
+        let offline_lookahead = simulate(
+            &[first, later],
+            &quick,
+            &full,
+            Policy::HybridResourceAware {
+                max_batch_wait_s: 3_600,
+            },
+        )
+        .unwrap();
+
+        let first_mode = |result: &SimulationResult| {
+            result
+                .completions
+                .iter()
+                .find(|completion| completion.job_id == 1)
+                .map(|completion| completion.mode)
+                .unwrap()
+        };
+
+        // With no observed second item, the conservative estimate assumes the
+        // full batch may wait until timeout and therefore protects the deadline.
+        // Appending a future arrival must not retroactively change that decision.
+        assert_eq!(first_mode(&one_job), ModeKind::QuickCell);
+        assert_eq!(first_mode(&with_later_arrival), ModeKind::QuickCell);
+
+        // The offline policy is intentionally an optimistic reference: it sees
+        // the item arriving at t=1 and batches both items into FullLoad.
+        assert_eq!(first_mode(&offline_lookahead), ModeKind::FullLoad);
     }
 
     #[test]
