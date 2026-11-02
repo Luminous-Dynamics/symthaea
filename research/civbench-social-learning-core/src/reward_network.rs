@@ -42,7 +42,6 @@ pub enum RewardNetworkError {
     EmptyNetwork,
     StartOutOfRange { start: usize, nodes: usize },
     StartNotLevelZero { start: usize, level: u8 },
-    InvalidLevel { node: usize, level: u8 },
     EndpointOutOfRange { edge: usize, node: usize, nodes: usize },
     SelfLoop { edge: usize, node: usize },
     DuplicateEdge { from: usize, to: usize },
@@ -60,7 +59,6 @@ impl fmt::Display for RewardNetworkError {
             Self::EmptyNetwork => write!(f, "network must contain at least one node"),
             Self::StartOutOfRange { start, nodes } => write!(f, "start {start} outside {nodes} nodes"),
             Self::StartNotLevelZero { start, level } => write!(f, "start node {start} has level {level}, expected 0"),
-            Self::InvalidLevel { node, level } => write!(f, "node {node} has level {level}, expected 0..=3"),
             Self::EndpointOutOfRange { edge, node, nodes } => write!(f, "edge {edge} endpoint {node} outside {nodes} nodes"),
             Self::SelfLoop { edge, node } => write!(f, "edge {edge} is a self-loop at {node}"),
             Self::DuplicateEdge { from, to } => write!(f, "duplicate directed edge {from}->{to}"),
@@ -164,7 +162,7 @@ impl RewardNetwork {
                 }
                 for &edge_index in &self.outgoing[node] {
                     let edge = self.edges[edge_index];
-                    let next_losses = (loss_count + usize::from(edge.reward < 0)).min(required_losses);
+                    let next_losses = (loss_count + if edge.reward < 0 { 1 } else { 0 }).min(required_losses);
                     if !visited[edge.to][next_losses] {
                         visited[edge.to][next_losses] = true;
                         queue.push_back((edge.to, next_losses));
