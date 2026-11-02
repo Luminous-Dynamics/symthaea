@@ -374,7 +374,7 @@ pub fn verify_fixture_suite_json_v1(json: &str) -> Result<FixtureVerificationV1,
             return Err(FixtureErrorV1::DuplicateScenarioId);
         }
 
-        let leakage_annotation_valid = match scenario.world {
+        let leakage_annotation_valid = match &scenario.world {
             SyntheticWorldV1::KnownLeakageInjected => scenario.injected_leakage_modality.is_some(),
             _ => scenario.injected_leakage_modality.is_none(),
         };
