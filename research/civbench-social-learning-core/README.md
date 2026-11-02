@@ -45,9 +45,14 @@ It follows the broad mechanism sequence described in the 2026 Reward Network III
 ```sh
 cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin cultural-transmission-sweep > cultural-transmission-sweep.csv
 ```
 
 The example binary prints a small chain-network adoption trace.
+
+## Multi-seed cultural-transmission sweep
+
+The `cultural-transmission-sweep` binary runs 256 fixed seeds per condition and writes per-generation means and 95% normal-approximation confidence half-widths for optimal prevalence, demonstration observation, strategy acquisition, optimal-strategy acquisition, integration and top-teacher selection. Conditions compare uniform vs performance-softmax teachers, 0/5/20% transmission corruption and a no-social-transmission control. The sweep is a sensitivity experiment over the simplified reference ABM, not published Reward Network III participant data or an exact replication of the authors' ABM. Configuration values and seeds must be frozen in any reported run receipt.
 
 ## Limitations
 
