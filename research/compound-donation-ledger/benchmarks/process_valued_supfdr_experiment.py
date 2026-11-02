@@ -288,10 +288,11 @@ def evaluate_method(
                     for offset in range(1, k + 1):
                         amount = dreserve[:, i] * q[:, offset - 1]
                         j = i + offset
-                        is_active = active[j]
-                        incoming[is_active, j] += amount[is_active]
-                        total_credited[is_active] += amount[is_active]
-                        escrow[~is_active, i, j] += amount[~is_active]
+                        if active[j]:
+                            incoming[:, j] += amount
+                            total_credited += amount
+                        else:
+                            escrow[:, i, j] += amount
                     tail_amount = dreserve[:, i] * q[:, -1]
                     outside_escrow += tail_amount
                     outgoing[:, i] += dreserve[:, i]
