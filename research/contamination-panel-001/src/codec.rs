@@ -690,6 +690,20 @@ mod tests {
     }
 
     #[test]
+    fn hand_computable_json_fixture_round_trips_and_scores() {
+        let request: CoDecDatasetRequestV1 = serde_json::from_str(include_str!(
+            "../fixtures/codec-dataset-request.hand.v1.json"
+        ))
+        .unwrap();
+        let report = score_codec_dataset(&request).unwrap();
+        assert_eq!(report.dataset_id, "codec-fixture-dataset");
+        assert_eq!(report.target_item_count, 2);
+        assert_eq!(report.negative_delta_count, 1);
+        assert_eq!(report.codec_score_permille, 500.0);
+        assert!(!report.confirmatory_eligible);
+    }
+
+    #[test]
     fn paper_score_is_fraction_of_strictly_negative_mean_deltas() {
         let report = score_codec_dataset(&fixture()).unwrap();
         assert_eq!(report.negative_delta_count, 1);
