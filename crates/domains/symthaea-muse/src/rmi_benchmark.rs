@@ -577,6 +577,8 @@ pub struct RmiReciprocalEvaluationPayloadV1 {
     pub partner_policy_id: String,
     pub partner_policy_version: String,
     pub target: RmiTargetFeatureV1,
+    /// Partner-to-agent input sensitivity from the first half of this pair.
+    pub agent_targeted_sensitivity: bool,
     pub control_partner_response: RmiPartnerResponseV1,
     pub treatment_partner_response: RmiPartnerResponseV1,
     pub partner_action_delta: RmiActionDeltaV1,
@@ -795,6 +797,7 @@ where
         partner_policy_id: partner_policy.policy_id().to_string(),
         partner_policy_version: partner_policy.policy_version().to_string(),
         target: pair.target,
+        agent_targeted_sensitivity: agent.payload.targeted_input_sensitivity,
         control_partner_response,
         treatment_partner_response,
         partner_action_delta,
@@ -913,6 +916,7 @@ mod tests {
             target: RmiTargetFeatureV1::Role,
         };
         let result = evaluate_rmi_reciprocal_pair(&agent, &partner, &pair).unwrap();
+        assert!(result.payload.agent_targeted_sensitivity);
         assert!(result.payload.targeted_partner_sensitivity);
         assert_eq!(result.payload.partner_collateral_changed_feature_count, 0);
         assert_eq!(result.payload.agent_evaluation_sha256.len(), 64);
