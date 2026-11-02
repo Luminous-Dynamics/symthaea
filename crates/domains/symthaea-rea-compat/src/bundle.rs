@@ -6,10 +6,10 @@
 //! It does not authenticate the producer or prove observations true.
 
 use crate::{
-    canonical_jcs_bytes, parse_strict_json_bytes, sha256_hex, verify_evidence_value,
-    EvidenceError, EvidenceErrorKind, MAX_EVIDENCE_JSON_BYTES,
+    EvidenceError, EvidenceErrorKind, MAX_EVIDENCE_JSON_BYTES, canonical_jcs_bytes,
+    parse_strict_json_bytes, sha256_hex, verify_evidence_value,
 };
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
@@ -17,32 +17,94 @@ pub const MAX_EVIDENCE_BUNDLE_JSON_BYTES: usize = MAX_EVIDENCE_JSON_BYTES;
 const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 
 const BUNDLE_KEYS: &[&str] = &[
-    "artifacts", "providers", "environments", "scenarios", "captures", "unknowns", "records",
+    "artifacts",
+    "providers",
+    "environments",
+    "scenarios",
+    "captures",
+    "unknowns",
+    "records",
 ];
 const UNKNOWN_REQUIRED_KEYS: &[&str] = &[
-    "unknown_id", "revision", "previous_revision_digest", "revision_digest",
-    "scope_digest", "question", "status", "severity", "domain",
-    "supporting_evidence_ids", "contradicting_evidence_ids", "required_authority",
-    "required_confidence", "required_environment", "recommended_probes",
-    "relationships", "resolution", "mutation_evidence_ids",
+    "unknown_id",
+    "revision",
+    "previous_revision_digest",
+    "revision_digest",
+    "scope_digest",
+    "question",
+    "status",
+    "severity",
+    "domain",
+    "supporting_evidence_ids",
+    "contradicting_evidence_ids",
+    "required_authority",
+    "required_confidence",
+    "required_environment",
+    "recommended_probes",
+    "relationships",
+    "resolution",
+    "mutation_evidence_ids",
 ];
 const UNKNOWN_OPTIONAL_KEYS: &[&str] = &["comparison_conclusion_scope"];
 const SUBJECT_FORMATS: &[&str] = &[
-    "hopper", "analysis-database", "mach-o", "elf", "pe", "dos-mz", "dos-com",
-    "raw-binary", "gamecube-dol", "zip", "ipa", "apk", "msix", "appx", "hap",
-    "hsp", "app-pack", "asar", "ines", "godot-pck", "unityfs", "uimage", "dmg",
-    "pkg", "plist", "javascript", "source-map", "directory", "file", "unknown",
-    "mach-o-universal", "javascript-bundle", "entitlements", "pyinstaller",
-    "node-sea", "dotnet-bundle", "bun-standalone", "intel-hex", "srec",
-    "esp-image", "uf2", "dfuse", "esp-flash-image", "fit",
+    "hopper",
+    "analysis-database",
+    "mach-o",
+    "elf",
+    "pe",
+    "dos-mz",
+    "dos-com",
+    "raw-binary",
+    "gamecube-dol",
+    "zip",
+    "ipa",
+    "apk",
+    "msix",
+    "appx",
+    "hap",
+    "hsp",
+    "app-pack",
+    "asar",
+    "ines",
+    "godot-pck",
+    "unityfs",
+    "uimage",
+    "dmg",
+    "pkg",
+    "plist",
+    "javascript",
+    "source-map",
+    "directory",
+    "file",
+    "unknown",
+    "mach-o-universal",
+    "javascript-bundle",
+    "entitlements",
+    "pyinstaller",
+    "node-sea",
+    "dotnet-bundle",
+    "bun-standalone",
+    "intel-hex",
+    "srec",
+    "esp-image",
+    "uf2",
+    "dfuse",
+    "esp-flash-image",
+    "fit",
 ];
 const ARCHITECTURES: &[&str] = &[
-    "x86", "x86_64", "arm", "arm64", "arm64_32", "mips", "6502", "riscv",
-    "powerpc", "m68k", "hexagon",
+    "x86", "x86_64", "arm", "arm64", "arm64_32", "mips", "6502", "riscv", "powerpc", "m68k",
+    "hexagon",
 ];
 const COMPARISON_DIMENSIONS: &[&str] = &[
-    "identity", "pseudocode", "assembly", "comments", "calls", "references",
-    "strings_names", "cfg",
+    "identity",
+    "pseudocode",
+    "assembly",
+    "comments",
+    "calls",
+    "references",
+    "strings_names",
+    "cfg",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +127,10 @@ pub struct BundleError {
 
 impl BundleError {
     fn new(kind: BundleErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into() }
+        Self {
+            kind,
+            message: message.into(),
+        }
     }
 }
 
@@ -116,10 +181,16 @@ pub fn verify_evidence_bundle_value(input: &Value) -> Result<VerifiedEvidenceBun
                 format!("records[{index}] failed Evidence verification: {error}"),
             )
         })?;
-        if records_by_id.insert(verified.evidence_id.clone(), verified.value).is_some() {
+        if records_by_id
+            .insert(verified.evidence_id.clone(), verified.value)
+            .is_some()
+        {
             return Err(BundleError::new(
                 BundleErrorKind::DuplicateEvidenceId,
-                format!("EvidenceBundle contains duplicate Evidence ID {}", verified.evidence_id),
+                format!(
+                    "EvidenceBundle contains duplicate Evidence ID {}",
+                    verified.evidence_id
+                ),
             ));
         }
     }
@@ -141,7 +212,10 @@ pub fn verify_evidence_bundle_value(input: &Value) -> Result<VerifiedEvidenceBun
     validate_unknown_graph(&normalized_unknowns, &records_by_id)?;
 
     if let Some(root) = parsed.as_object_mut() {
-        root.insert("unknowns".to_owned(), Value::Array(normalized_unknowns.clone()));
+        root.insert(
+            "unknowns".to_owned(),
+            Value::Array(normalized_unknowns.clone()),
+        );
     }
     validate_manifest_shapes(&parsed)?;
     let canonical = create_evidence_bundle(&records, &normalized_unknowns)?;
@@ -219,7 +293,8 @@ pub fn audit_evidence_link_closure(bundle: &Value) -> Result<Vec<(String, String
 fn create_evidence_bundle(records: &[Value], unknowns: &[Value]) -> Result<Value, BundleError> {
     let mut sorted_records = records.to_vec();
     sorted_records.sort_by(|a, b| {
-        string_field(a, "evidence_id").unwrap_or_default()
+        string_field(a, "evidence_id")
+            .unwrap_or_default()
             .cmp(string_field(b, "evidence_id").unwrap_or_default())
     });
 
@@ -268,10 +343,12 @@ fn create_evidence_bundle(records: &[Value], unknowns: &[Value]) -> Result<Value
 
     let mut sorted_unknowns = unknowns.to_vec();
     sorted_unknowns.sort_by(|a, b| {
-        string_field(a, "unknown_id").unwrap_or_default()
+        string_field(a, "unknown_id")
+            .unwrap_or_default()
             .cmp(string_field(b, "unknown_id").unwrap_or_default())
             .then_with(|| {
-                safe_integer_field(a, "revision").unwrap_or(0.0)
+                safe_integer_field(a, "revision")
+                    .unwrap_or(0.0)
                     .total_cmp(&safe_integer_field(b, "revision").unwrap_or(0.0))
             })
     });
@@ -303,11 +380,16 @@ fn unique_sorted_manifest_values(values: Vec<(String, Value)>) -> Vec<Value> {
 
 fn artifact_manifest_key(value: &Value) -> Result<String, BundleError> {
     let map = as_object(value, "artifact manifest")?;
-    let digest = as_object(field(map, "digest", "artifact manifest")?, "artifact digest")?;
+    let digest = as_object(
+        field(map, "digest", "artifact manifest")?,
+        "artifact digest",
+    )?;
     let sha = json_string(field(digest, "sha256", "artifact digest")?)?;
     let format = json_string(field(map, "format", "artifact manifest")?)?;
     let architecture = json_optional_string(field(map, "architecture", "artifact manifest")?)?;
-    Ok(format!("{{\"digest\":{{\"sha256\":{sha}}},\"format\":{format},\"architecture\":{architecture}}}"))
+    Ok(format!(
+        "{{\"digest\":{{\"sha256\":{sha}}},\"format\":{format},\"architecture\":{architecture}}}"
+    ))
 }
 
 fn provider_manifest_key(value: &Value) -> Result<String, BundleError> {
@@ -315,7 +397,9 @@ fn provider_manifest_key(value: &Value) -> Result<String, BundleError> {
     let id = json_string(field(map, "id", "provider manifest")?)?;
     let name = json_string(field(map, "name", "provider manifest")?)?;
     let version = json_optional_string(field(map, "version", "provider manifest")?)?;
-    Ok(format!("{{\"id\":{id},\"name\":{name},\"version\":{version}}}"))
+    Ok(format!(
+        "{{\"id\":{id},\"name\":{name},\"version\":{version}}}"
+    ))
 }
 
 fn environment_manifest_key(value: &Value) -> Result<String, BundleError> {
@@ -324,11 +408,15 @@ fn environment_manifest_key(value: &Value) -> Result<String, BundleError> {
     let platform = json_string(field(map, "platform", "environment manifest")?)?;
     let architecture = json_string(field(map, "architecture", "environment manifest")?)?;
     let isolation = json_string(field(map, "isolation", "environment manifest")?)?;
-    Ok(format!("{{\"id\":{id},\"platform\":{platform},\"architecture\":{architecture},\"isolation\":{isolation}}}"))
+    Ok(format!(
+        "{{\"id\":{id},\"platform\":{platform},\"architecture\":{architecture},\"isolation\":{isolation}}}"
+    ))
 }
 
 fn json_string(value: &Value) -> Result<String, BundleError> {
-    let text = value.as_str().ok_or_else(|| schema_error("manifest field must be a string"))?;
+    let text = value
+        .as_str()
+        .ok_or_else(|| schema_error("manifest field must be a string"))?;
     serde_json::to_string(text).map_err(|error| {
         BundleError::new(
             BundleErrorKind::Canonicalization,
@@ -338,12 +426,21 @@ fn json_string(value: &Value) -> Result<String, BundleError> {
 }
 
 fn json_optional_string(value: &Value) -> Result<String, BundleError> {
-    if value.is_null() { Ok("null".to_owned()) } else { json_string(value) }
+    if value.is_null() {
+        Ok("null".to_owned())
+    } else {
+        json_string(value)
+    }
 }
 
 fn normalize_and_verify_unknown(value: &Value) -> Result<Value, BundleError> {
     let map = as_object(value, "ResidualUnknown")?;
-    strict_keys(map, UNKNOWN_REQUIRED_KEYS, UNKNOWN_OPTIONAL_KEYS, "ResidualUnknown")?;
+    strict_keys(
+        map,
+        UNKNOWN_REQUIRED_KEYS,
+        UNKNOWN_OPTIONAL_KEYS,
+        "ResidualUnknown",
+    )?;
 
     let mut normalized = value.clone();
     let question = trimmed_text(field(map, "question", "ResidualUnknown")?, "question")?;
@@ -351,59 +448,122 @@ fn normalize_and_verify_unknown(value: &Value) -> Result<Value, BundleError> {
     normalized["question"] = Value::String(question.clone());
     normalized["domain"] = Value::String(domain.clone());
 
-    let unknown_id = prefixed_digest(field(map, "unknown_id", "ResidualUnknown")?, "unk_", "unknown_id")?;
+    let unknown_id = prefixed_digest(
+        field(map, "unknown_id", "ResidualUnknown")?,
+        "unk_",
+        "unknown_id",
+    )?;
     let revision = safe_integer(field(map, "revision", "ResidualUnknown")?, "revision")?;
     if revision < 1.0 {
         return Err(schema_error("ResidualUnknown.revision must be at least 1"));
     }
-    validate_optional_digest(field(map, "previous_revision_digest", "ResidualUnknown")?, "previous_revision_digest")?;
-    validate_sha256(field(map, "revision_digest", "ResidualUnknown")?, "revision_digest")?;
-    validate_optional_digest(field(map, "scope_digest", "ResidualUnknown")?, "scope_digest")?;
+    validate_optional_digest(
+        field(map, "previous_revision_digest", "ResidualUnknown")?,
+        "previous_revision_digest",
+    )?;
+    validate_sha256(
+        field(map, "revision_digest", "ResidualUnknown")?,
+        "revision_digest",
+    )?;
+    validate_optional_digest(
+        field(map, "scope_digest", "ResidualUnknown")?,
+        "scope_digest",
+    )?;
 
     let status = string_value(field(map, "status", "ResidualUnknown")?, "status")?;
-    if !["open", "investigating", "blocked", "contradicted", "resolved"].contains(&status) {
-        return Err(schema_error(format!("unsupported ResidualUnknown.status '{status}'")));
+    if ![
+        "open",
+        "investigating",
+        "blocked",
+        "contradicted",
+        "resolved",
+    ]
+    .contains(&status)
+    {
+        return Err(schema_error(format!(
+            "unsupported ResidualUnknown.status '{status}'"
+        )));
     }
     let severity = string_value(field(map, "severity", "ResidualUnknown")?, "severity")?;
     if !["low", "medium", "high", "critical"].contains(&severity) {
-        return Err(schema_error(format!("unsupported ResidualUnknown.severity '{severity}'")));
+        return Err(schema_error(format!(
+            "unsupported ResidualUnknown.severity '{severity}'"
+        )));
     }
 
     if let Some(comparison) = map.get("comparison_conclusion_scope") {
         validate_comparison_conclusion_scope(comparison)?;
     }
-    let supporting = validate_id_array(field(map, "supporting_evidence_ids", "ResidualUnknown")?, "supporting_evidence_ids", "ev_", false)?;
-    let contradicting = validate_id_array(field(map, "contradicting_evidence_ids", "ResidualUnknown")?, "contradicting_evidence_ids", "ev_", false)?;
-    validate_id_array(field(map, "mutation_evidence_ids", "ResidualUnknown")?, "mutation_evidence_ids", "ev_", true)?;
+    let supporting = validate_id_array(
+        field(map, "supporting_evidence_ids", "ResidualUnknown")?,
+        "supporting_evidence_ids",
+        "ev_",
+        false,
+    )?;
+    let contradicting = validate_id_array(
+        field(map, "contradicting_evidence_ids", "ResidualUnknown")?,
+        "contradicting_evidence_ids",
+        "ev_",
+        false,
+    )?;
+    validate_id_array(
+        field(map, "mutation_evidence_ids", "ResidualUnknown")?,
+        "mutation_evidence_ids",
+        "ev_",
+        true,
+    )?;
     let supporting_set: HashSet<&str> = supporting.iter().map(String::as_str).collect();
     let contradicting_set: HashSet<&str> = contradicting.iter().map(String::as_str).collect();
-    if supporting.iter().any(|id| contradicting_set.contains(id.as_str())) {
-        return Err(schema_error("Evidence cannot simultaneously support and contradict"));
+    if supporting
+        .iter()
+        .any(|id| contradicting_set.contains(id.as_str()))
+    {
+        return Err(schema_error(
+            "Evidence cannot simultaneously support and contradict",
+        ));
     }
 
     let required_authority = field(map, "required_authority", "ResidualUnknown")?;
     if !required_authority.is_null() {
         let authority = string_value(required_authority, "required_authority")?;
-        if !["shipped-artifact", "controlled-replay", "historical-reference", "external-service", "analyst-inference"].contains(&authority) {
+        if ![
+            "shipped-artifact",
+            "controlled-replay",
+            "historical-reference",
+            "external-service",
+            "analyst-inference",
+        ]
+        .contains(&authority)
+        {
             return Err(schema_error("unsupported required_authority"));
         }
     }
-    let required_confidence = string_value(field(map, "required_confidence", "ResidualUnknown")?, "required_confidence")?;
+    let required_confidence = string_value(
+        field(map, "required_confidence", "ResidualUnknown")?,
+        "required_confidence",
+    )?;
     if !["observed", "derived", "inferred"].contains(&required_confidence) {
         return Err(schema_error("unsupported required_confidence"));
     }
 
     validate_environment_requirement(field(map, "required_environment", "ResidualUnknown")?)?;
-    normalize_probes(&mut normalized, field(map, "recommended_probes", "ResidualUnknown")?)?;
+    normalize_probes(
+        &mut normalized,
+        field(map, "recommended_probes", "ResidualUnknown")?,
+    )?;
     validate_relationships(field(map, "relationships", "ResidualUnknown")?, &unknown_id)?;
 
     let resolution = field(map, "resolution", "ResidualUnknown")?;
     normalize_resolution(&mut normalized, resolution)?;
     if (status == "resolved") != !resolution.is_null() {
-        return Err(schema_error("Only resolved residual unknowns carry a resolution"));
+        return Err(schema_error(
+            "Only resolved residual unknowns carry a resolution",
+        ));
     }
     if status == "contradicted" && contradicting.is_empty() {
-        return Err(schema_error("Contradicted status requires contradicting evidence"));
+        return Err(schema_error(
+            "Contradicted status requires contradicting evidence",
+        ));
     }
 
     if revision == 1.0 {
@@ -411,46 +571,79 @@ fn normalize_and_verify_unknown(value: &Value) -> Result<Value, BundleError> {
             return Err(schema_error("Only revision 1 has no predecessor digest"));
         }
     } else if map["previous_revision_digest"].is_null() {
-        return Err(schema_error("Noninitial revisions require a predecessor digest"));
+        return Err(schema_error(
+            "Noninitial revisions require a predecessor digest",
+        ));
     }
 
     if let Some(comparison) = map.get("comparison_conclusion_scope") {
-        let evidence_id = comparison["comparison_evidence_id"].as_str().expect("validated comparison Evidence ID");
+        let evidence_id = comparison["comparison_evidence_id"]
+            .as_str()
+            .expect("validated comparison Evidence ID");
         if !supporting_set.contains(evidence_id) && !contradicting_set.contains(evidence_id) {
-            return Err(schema_error("Scoped comparison Evidence must support or contradict the unknown"));
+            return Err(schema_error(
+                "Scoped comparison Evidence must support or contradict the unknown",
+            ));
         }
         if domain != "function-comparison" {
-            return Err(schema_error("Comparison conclusion scope requires function-comparison domain"));
+            return Err(schema_error(
+                "Comparison conclusion scope requires function-comparison domain",
+            ));
         }
     }
 
     let mut identity = Map::new();
     identity.insert("domain".to_owned(), Value::String(domain));
-    identity.insert("question".to_owned(), Value::String(collapse_ecmascript_whitespace(&question)));
-    identity.insert("scope_digest".to_owned(), field(map, "scope_digest", "ResidualUnknown")?.clone());
+    identity.insert(
+        "question".to_owned(),
+        Value::String(collapse_ecmascript_whitespace(&question)),
+    );
+    identity.insert(
+        "scope_digest".to_owned(),
+        field(map, "scope_digest", "ResidualUnknown")?.clone(),
+    );
     if let Some(comparison) = map.get("comparison_conclusion_scope") {
         identity.insert("comparison_conclusion_scope".to_owned(), comparison.clone());
     }
     let expected_unknown_id = format!("unk_{}", hash_canonical(&Value::Object(identity))?);
     if expected_unknown_id != unknown_id {
-        return Err(graph_error("ResidualUnknown.unknown_id does not match its stable immutable identity"));
+        return Err(graph_error(
+            "ResidualUnknown.unknown_id does not match its stable immutable identity",
+        ));
     }
 
     let mut revision_payload = normalized.clone();
-    revision_payload.as_object_mut().expect("unknown is an object").remove("revision_digest");
+    revision_payload
+        .as_object_mut()
+        .expect("unknown is an object")
+        .remove("revision_digest");
     let expected_revision_digest = hash_canonical(&revision_payload)?;
     let actual_revision_digest = string_field(value, "revision_digest").unwrap_or_default();
     if expected_revision_digest != actual_revision_digest {
-        return Err(graph_error("ResidualUnknown.revision_digest does not match its canonical revision payload"));
+        return Err(graph_error(
+            "ResidualUnknown.revision_digest does not match its canonical revision payload",
+        ));
     }
     Ok(normalized)
 }
 
 fn validate_comparison_conclusion_scope(value: &Value) -> Result<(), BundleError> {
     let map = as_object(value, "comparison_conclusion_scope")?;
-    strict_keys(map, &["comparison_evidence_id", "dimensions"], &[], "comparison_conclusion_scope")?;
-    prefixed_digest(field(map, "comparison_evidence_id", "comparison_conclusion_scope")?, "ev_", "comparison_evidence_id")?;
-    let dimensions = require_array(field(map, "dimensions", "comparison_conclusion_scope")?, "dimensions")?;
+    strict_keys(
+        map,
+        &["comparison_evidence_id", "dimensions"],
+        &[],
+        "comparison_conclusion_scope",
+    )?;
+    prefixed_digest(
+        field(map, "comparison_evidence_id", "comparison_conclusion_scope")?,
+        "ev_",
+        "comparison_evidence_id",
+    )?;
+    let dimensions = require_array(
+        field(map, "dimensions", "comparison_conclusion_scope")?,
+        "dimensions",
+    )?;
     if dimensions.is_empty() {
         return Err(schema_error("comparison dimensions must not be empty"));
     }
@@ -459,10 +652,14 @@ fn validate_comparison_conclusion_scope(value: &Value) -> Result<(), BundleError
     for item in dimensions {
         let dimension = string_value(item, "comparison dimension")?;
         if dimension != "overall" && !COMPARISON_DIMENSIONS.contains(&dimension) {
-            return Err(schema_error(format!("unsupported comparison dimension '{dimension}'")));
+            return Err(schema_error(format!(
+                "unsupported comparison dimension '{dimension}'"
+            )));
         }
         if !seen.insert(dimension) || previous.is_some_and(|last| last >= dimension) {
-            return Err(schema_error("comparison dimensions must be sorted and unique"));
+            return Err(schema_error(
+                "comparison dimensions must be sorted and unique",
+            ));
         }
         previous = Some(dimension);
     }
@@ -474,7 +671,12 @@ fn validate_environment_requirement(value: &Value) -> Result<(), BundleError> {
         return Ok(());
     }
     let map = as_object(value, "required_environment")?;
-    strict_keys(map, &["id", "platform", "architecture", "isolation"], &[], "required_environment")?;
+    strict_keys(
+        map,
+        &["id", "platform", "architecture", "isolation"],
+        &[],
+        "required_environment",
+    )?;
     for key in ["id", "platform", "architecture"] {
         let value = field(map, key, "required_environment")?;
         if !value.is_null() {
@@ -498,8 +700,14 @@ fn normalize_probes(normalized: &mut Value, value: &Value) -> Result<(), BundleE
         let context = format!("recommended_probes[{index}]");
         let map = as_object(probe, &context)?;
         strict_keys(map, &["operation", "rationale"], &[], &context)?;
-        nonempty_string(field(map, "operation", &context)?, &format!("{context}.operation"))?;
-        let rationale = trimmed_text(field(map, "rationale", &context)?, &format!("{context}.rationale"))?;
+        nonempty_string(
+            field(map, "operation", &context)?,
+            &format!("{context}.operation"),
+        )?;
+        let rationale = trimmed_text(
+            field(map, "rationale", &context)?,
+            &format!("{context}.rationale"),
+        )?;
         let mut object = probe.clone();
         object["rationale"] = Value::String(rationale);
         result.push(object);
@@ -513,16 +721,29 @@ fn normalize_resolution(normalized: &mut Value, value: &Value) -> Result<(), Bun
         return Ok(());
     }
     let map = as_object(value, "resolution")?;
-    strict_keys(map, &["disposition", "rationale", "evidence_ids"], &[], "resolution")?;
-    let disposition = string_value(field(map, "disposition", "resolution")?, "resolution.disposition")?;
+    strict_keys(
+        map,
+        &["disposition", "rationale", "evidence_ids"],
+        &[],
+        "resolution",
+    )?;
+    let disposition = string_value(
+        field(map, "disposition", "resolution")?,
+        "resolution.disposition",
+    )?;
     let require_nonempty = if disposition == "verified" {
         true
     } else if disposition == "withdrawn" || disposition == "out-of-scope" {
         false
     } else {
-        return Err(schema_error(format!("unsupported resolution disposition '{disposition}'")));
+        return Err(schema_error(format!(
+            "unsupported resolution disposition '{disposition}'"
+        )));
     };
-    let rationale = trimmed_text(field(map, "rationale", "resolution")?, "resolution.rationale")?;
+    let rationale = trimmed_text(
+        field(map, "rationale", "resolution")?,
+        "resolution.rationale",
+    )?;
     validate_id_array_allow_duplicates(
         field(map, "evidence_ids", "resolution")?,
         "resolution.evidence_ids",
@@ -542,9 +763,15 @@ fn validate_relationships(value: &Value, own_id: &str) -> Result<(), BundleError
         strict_keys(map, &["type", "unknown_id"], &[], &context)?;
         let kind = string_value(field(map, "type", &context)?, &format!("{context}.type"))?;
         if !["depends-on", "related-to", "contradicts"].contains(&kind) {
-            return Err(schema_error(format!("unsupported relationship type '{kind}'")));
+            return Err(schema_error(format!(
+                "unsupported relationship type '{kind}'"
+            )));
         }
-        let id = prefixed_digest(field(map, "unknown_id", &context)?, "unk_", &format!("{context}.unknown_id"))?;
+        let id = prefixed_digest(
+            field(map, "unknown_id", &context)?,
+            "unk_",
+            &format!("{context}.unknown_id"),
+        )?;
         if id == own_id {
             return Err(schema_error("An unknown cannot relate to itself"));
         }
@@ -572,7 +799,12 @@ fn validate_id_array_allow_duplicates(
         .collect()
 }
 
-fn validate_id_array(value: &Value, context: &str, prefix: &str, nonempty: bool) -> Result<Vec<String>, BundleError> {
+fn validate_id_array(
+    value: &Value,
+    context: &str,
+    prefix: &str,
+    nonempty: bool,
+) -> Result<Vec<String>, BundleError> {
     let values = require_array(value, context)?;
     if nonempty && values.is_empty() {
         return Err(schema_error(format!("{context} must not be empty")));
@@ -589,108 +821,201 @@ fn validate_id_array(value: &Value, context: &str, prefix: &str, nonempty: bool)
     Ok(output)
 }
 
-fn validate_unknown_graph(unknowns: &[Value], evidence_by_id: &HashMap<String, Value>) -> Result<(), BundleError> {
+fn validate_unknown_graph(
+    unknowns: &[Value],
+    evidence_by_id: &HashMap<String, Value>,
+) -> Result<(), BundleError> {
     let mut histories = HashMap::<String, Vec<Value>>::new();
     for unknown in unknowns {
-        let id = string_field(unknown, "unknown_id").ok_or_else(|| schema_error("unknown_id is required"))?;
-        histories.entry(id.to_owned()).or_default().push(unknown.clone());
+        let id = string_field(unknown, "unknown_id")
+            .ok_or_else(|| schema_error("unknown_id is required"))?;
+        histories
+            .entry(id.to_owned())
+            .or_default()
+            .push(unknown.clone());
     }
 
     let mut heads = HashMap::<String, Value>::with_capacity(histories.len());
     for (id, history) in &mut histories {
         history.sort_by(|a, b| {
-            safe_integer_field(a, "revision").unwrap_or(0.0)
+            safe_integer_field(a, "revision")
+                .unwrap_or(0.0)
                 .total_cmp(&safe_integer_field(b, "revision").unwrap_or(0.0))
         });
         for (index, revision) in history.iter().enumerate() {
             if safe_integer_field(revision, "revision") != Some((index + 1) as f64) {
-                return Err(graph_error(format!("Residual unknown {id} revision history has a gap")));
+                return Err(graph_error(format!(
+                    "Residual unknown {id} revision history has a gap"
+                )));
             }
-            if index > 0 && revision.get("previous_revision_digest") != history[index - 1].get("revision_digest") {
-                return Err(graph_error(format!("Residual unknown {id} revision chain is broken")));
+            if index > 0
+                && revision.get("previous_revision_digest")
+                    != history[index - 1].get("revision_digest")
+            {
+                return Err(graph_error(format!(
+                    "Residual unknown {id} revision chain is broken"
+                )));
             }
         }
-        let head = history.last().ok_or_else(|| graph_error("Residual unknown history is empty"))?;
+        let head = history
+            .last()
+            .ok_or_else(|| graph_error("Residual unknown history is empty"))?;
         heads.insert(id.clone(), head.clone());
     }
 
     for unknown in unknowns {
         let id = string_field(unknown, "unknown_id").unwrap_or_default();
         let mut referenced = Vec::new();
-        for key in ["supporting_evidence_ids", "contradicting_evidence_ids", "mutation_evidence_ids"] {
+        for key in [
+            "supporting_evidence_ids",
+            "contradicting_evidence_ids",
+            "mutation_evidence_ids",
+        ] {
             if let Some(ids) = unknown.get(key).and_then(Value::as_array) {
                 referenced.extend(ids.iter().filter_map(Value::as_str));
             }
         }
-        if let Some(ids) = unknown.get("resolution").and_then(|r| r.get("evidence_ids")).and_then(Value::as_array) {
+        if let Some(ids) = unknown
+            .get("resolution")
+            .and_then(|r| r.get("evidence_ids"))
+            .and_then(Value::as_array)
+        {
             referenced.extend(ids.iter().filter_map(Value::as_str));
         }
         for evidence_id in referenced {
             if !evidence_by_id.contains_key(evidence_id) {
-                return Err(graph_error(format!("Residual unknown {id} references missing Evidence {evidence_id}")));
+                return Err(graph_error(format!(
+                    "Residual unknown {id} references missing Evidence {evidence_id}"
+                )));
             }
         }
         if let Some(relationships) = unknown.get("relationships").and_then(Value::as_array) {
             for relationship in relationships {
                 let related = string_field(relationship, "unknown_id").unwrap_or_default();
                 if !heads.contains_key(related) {
-                    return Err(graph_error(format!("Residual unknown {id} references missing unknown {related}")));
+                    return Err(graph_error(format!(
+                        "Residual unknown {id} references missing unknown {related}"
+                    )));
                 }
             }
         }
-        if unknown.get("resolution").and_then(|r| r.get("disposition")).and_then(Value::as_str) == Some("verified") {
+        if unknown
+            .get("resolution")
+            .and_then(|r| r.get("disposition"))
+            .and_then(Value::as_str)
+            == Some("verified")
+        {
             validate_verified_resolution(unknown, evidence_by_id)?;
         }
     }
     reject_dependency_cycles(&heads)
 }
 
-fn validate_verified_resolution(unknown: &Value, evidence_by_id: &HashMap<String, Value>) -> Result<(), BundleError> {
+fn validate_verified_resolution(
+    unknown: &Value,
+    evidence_by_id: &HashMap<String, Value>,
+) -> Result<(), BundleError> {
     let id = string_field(unknown, "unknown_id").unwrap_or_default();
-    if unknown.get("contradicting_evidence_ids").and_then(Value::as_array).is_some_and(|v| !v.is_empty()) {
-        return Err(graph_error(format!("Residual unknown {id} retains contradicting evidence")));
+    if unknown
+        .get("contradicting_evidence_ids")
+        .and_then(Value::as_array)
+        .is_some_and(|v| !v.is_empty())
+    {
+        return Err(graph_error(format!(
+            "Residual unknown {id} retains contradicting evidence"
+        )));
     }
-    let supporting: HashSet<&str> = unknown.get("supporting_evidence_ids").and_then(Value::as_array)
-        .map(|v| v.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let supporting: HashSet<&str> = unknown
+        .get("supporting_evidence_ids")
+        .and_then(Value::as_array)
+        .map(|v| v.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
     let required_authority = unknown.get("required_authority").and_then(Value::as_str);
-    let required_confidence = unknown.get("required_confidence").and_then(Value::as_str).unwrap_or("inferred");
-    let resolution_ids = unknown.get("resolution").and_then(|r| r.get("evidence_ids"))
-        .and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
-    let qualifies = resolution_ids.iter().filter_map(Value::as_str).any(|evidence_id| {
-        if !supporting.contains(evidence_id) { return false; }
-        let Some(evidence) = evidence_by_id.get(evidence_id) else { return false; };
-        if evidence.get("predicate_type").and_then(Value::as_str) == Some("rea.residual-unknown-mutation") { return false; }
-        if required_authority.is_some_and(|required| evidence.get("authority").and_then(Value::as_str) != Some(required)) { return false; }
-        let confidence = evidence.get("confidence").and_then(Value::as_str).unwrap_or("inferred");
-        confidence_rank(confidence) >= confidence_rank(required_confidence)
-            && environment_satisfies(unknown.get("required_environment"), evidence.get("environment"))
-    });
+    let required_confidence = unknown
+        .get("required_confidence")
+        .and_then(Value::as_str)
+        .unwrap_or("inferred");
+    let resolution_ids = unknown
+        .get("resolution")
+        .and_then(|r| r.get("evidence_ids"))
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let qualifies = resolution_ids
+        .iter()
+        .filter_map(Value::as_str)
+        .any(|evidence_id| {
+            if !supporting.contains(evidence_id) {
+                return false;
+            }
+            let Some(evidence) = evidence_by_id.get(evidence_id) else {
+                return false;
+            };
+            if evidence.get("predicate_type").and_then(Value::as_str)
+                == Some("rea.residual-unknown-mutation")
+            {
+                return false;
+            }
+            if required_authority.is_some_and(|required| {
+                evidence.get("authority").and_then(Value::as_str) != Some(required)
+            }) {
+                return false;
+            }
+            let confidence = evidence
+                .get("confidence")
+                .and_then(Value::as_str)
+                .unwrap_or("inferred");
+            confidence_rank(confidence) >= confidence_rank(required_confidence)
+                && environment_satisfies(
+                    unknown.get("required_environment"),
+                    evidence.get("environment"),
+                )
+        });
     if !qualifies {
-        return Err(graph_error(format!("Residual unknown {id} has no qualifying resolution Evidence")));
+        return Err(graph_error(format!(
+            "Residual unknown {id} has no qualifying resolution Evidence"
+        )));
     }
     Ok(())
 }
 
 fn confidence_rank(value: &str) -> u8 {
-    match value { "inferred" => 1, "derived" => 2, "observed" => 3, _ => 0 }
+    match value {
+        "inferred" => 1,
+        "derived" => 2,
+        "observed" => 3,
+        _ => 0,
+    }
 }
 
 fn environment_satisfies(requirement: Option<&Value>, actual: Option<&Value>) -> bool {
-    let Some(requirement) = requirement.filter(|v| !v.is_null()) else { return true; };
-    let Some(actual) = actual.filter(|v| !v.is_null()) else { return false; };
-    ["id", "platform", "architecture", "isolation"].into_iter().all(|key| {
-        requirement.get(key).is_none_or(Value::is_null)
-            || requirement.get(key) == actual.get(key)
-    })
+    let Some(requirement) = requirement.filter(|v| !v.is_null()) else {
+        return true;
+    };
+    let Some(actual) = actual.filter(|v| !v.is_null()) else {
+        return false;
+    };
+    ["id", "platform", "architecture", "isolation"]
+        .into_iter()
+        .all(|key| {
+            requirement.get(key).is_none_or(Value::is_null)
+                || requirement.get(key) == actual.get(key)
+        })
 }
 
 fn reject_dependency_cycles(unknowns: &HashMap<String, Value>) -> Result<(), BundleError> {
-    struct Frame { id: String, dependencies: Vec<String>, next: usize }
+    struct Frame {
+        id: String,
+        dependencies: Vec<String>,
+        next: usize,
+    }
     let mut visited = HashSet::<String>::new();
     let mut active = HashSet::<String>::new();
 
     for root in unknowns.keys() {
-        if visited.contains(root) { continue; }
+        if visited.contains(root) {
+            continue;
+        }
         active.insert(root.clone());
         let mut stack = vec![Frame {
             id: root.clone(),
@@ -707,20 +1032,33 @@ fn reject_dependency_cycles(unknowns: &HashMap<String, Value>) -> Result<(), Bun
             let dependency = frame.dependencies[frame.next].clone();
             frame.next += 1;
             if active.contains(&dependency) {
-                return Err(graph_error(format!("Residual unknown dependency cycle through {dependency}")));
+                return Err(graph_error(format!(
+                    "Residual unknown dependency cycle through {dependency}"
+                )));
             }
-            if visited.contains(&dependency) { continue; }
-            let value = unknowns.get(&dependency)
+            if visited.contains(&dependency) {
+                continue;
+            }
+            let value = unknowns
+                .get(&dependency)
                 .ok_or_else(|| graph_error(format!("Missing dependency {dependency}")))?;
             active.insert(dependency.clone());
-            stack.push(Frame { id: dependency, dependencies: dependency_ids(value), next: 0 });
+            stack.push(Frame {
+                id: dependency,
+                dependencies: dependency_ids(value),
+                next: 0,
+            });
         }
     }
     Ok(())
 }
 
 fn dependency_ids(unknown: &Value) -> Vec<String> {
-    unknown.get("relationships").and_then(Value::as_array).into_iter().flatten()
+    unknown
+        .get("relationships")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
         .filter(|r| r.get("type").and_then(Value::as_str) == Some("depends-on"))
         .filter_map(|r| string_field(r, "unknown_id").map(str::to_owned))
         .collect()
@@ -728,28 +1066,64 @@ fn dependency_ids(unknown: &Value) -> Vec<String> {
 
 fn validate_manifest_shapes(bundle: &Value) -> Result<(), BundleError> {
     let root = as_object(bundle, "EvidenceBundle")?;
-    for v in require_array(field(root, "artifacts", "EvidenceBundle")?, "artifacts")? { validate_artifact_manifest(v)?; }
-    for v in require_array(field(root, "providers", "EvidenceBundle")?, "providers")? { validate_provider_manifest(v)?; }
-    for v in require_array(field(root, "environments", "EvidenceBundle")?, "environments")? { validate_environment_manifest(v)?; }
-    for v in require_array(field(root, "scenarios", "EvidenceBundle")?, "scenarios")? { validate_scenario_manifest(v)?; }
-    for v in require_array(field(root, "captures", "EvidenceBundle")?, "captures")? { validate_capture_manifest(v)?; }
+    for v in require_array(field(root, "artifacts", "EvidenceBundle")?, "artifacts")? {
+        validate_artifact_manifest(v)?;
+    }
+    for v in require_array(field(root, "providers", "EvidenceBundle")?, "providers")? {
+        validate_provider_manifest(v)?;
+    }
+    for v in require_array(
+        field(root, "environments", "EvidenceBundle")?,
+        "environments",
+    )? {
+        validate_environment_manifest(v)?;
+    }
+    for v in require_array(field(root, "scenarios", "EvidenceBundle")?, "scenarios")? {
+        validate_scenario_manifest(v)?;
+    }
+    for v in require_array(field(root, "captures", "EvidenceBundle")?, "captures")? {
+        validate_capture_manifest(v)?;
+    }
     Ok(())
 }
 
 fn validate_artifact_manifest(value: &Value) -> Result<(), BundleError> {
     let map = as_object(value, "artifact manifest")?;
-    strict_keys(map, &["digest", "format", "architecture"], &[], "artifact manifest")?;
-    let digest = as_object(field(map, "digest", "artifact manifest")?, "artifact digest")?;
+    strict_keys(
+        map,
+        &["digest", "format", "architecture"],
+        &[],
+        "artifact manifest",
+    )?;
+    let digest = as_object(
+        field(map, "digest", "artifact manifest")?,
+        "artifact digest",
+    )?;
     strict_keys(digest, &["sha256"], &[], "artifact digest")?;
-    validate_sha256(field(digest, "sha256", "artifact digest")?, "artifact digest.sha256")?;
-    let format = string_value(field(map, "format", "artifact manifest")?, "artifact.format")?;
-    if !SUBJECT_FORMATS.contains(&format) { return Err(schema_error("unsupported artifact format")); }
+    validate_sha256(
+        field(digest, "sha256", "artifact digest")?,
+        "artifact digest.sha256",
+    )?;
+    let format = string_value(
+        field(map, "format", "artifact manifest")?,
+        "artifact.format",
+    )?;
+    if !SUBJECT_FORMATS.contains(&format) {
+        return Err(schema_error("unsupported artifact format"));
+    }
     let architecture = field(map, "architecture", "artifact manifest")?;
     if !architecture.is_null() {
         let architecture = string_value(architecture, "artifact.architecture")?;
-        if !ARCHITECTURES.contains(&architecture) { return Err(schema_error("unsupported artifact architecture")); }
-        if format == "gamecube-dol" && architecture != "powerpc" { return Err(schema_error("gamecube-dol requires powerpc")); }
-        if format != "raw-binary" && format != "gamecube-dol" && matches!(architecture, "6502" | "m68k") {
+        if !ARCHITECTURES.contains(&architecture) {
+            return Err(schema_error("unsupported artifact architecture"));
+        }
+        if format == "gamecube-dol" && architecture != "powerpc" {
+            return Err(schema_error("gamecube-dol requires powerpc"));
+        }
+        if format != "raw-binary"
+            && format != "gamecube-dol"
+            && matches!(architecture, "6502" | "m68k")
+        {
             return Err(schema_error("6502 and m68k are only valid for raw-binary"));
         }
     } else if format == "gamecube-dol" {
@@ -764,33 +1138,73 @@ fn validate_provider_manifest(value: &Value) -> Result<(), BundleError> {
     nonempty_string(field(map, "id", "provider manifest")?, "provider.id")?;
     nonempty_string(field(map, "name", "provider manifest")?, "provider.name")?;
     let version = field(map, "version", "provider manifest")?;
-    if !version.is_null() && version.as_str().is_none() { return Err(schema_error("provider.version must be string or null")); }
+    if !version.is_null() && version.as_str().is_none() {
+        return Err(schema_error("provider.version must be string or null"));
+    }
     Ok(())
 }
 
 fn validate_environment_manifest(value: &Value) -> Result<(), BundleError> {
     let map = as_object(value, "environment manifest")?;
-    strict_keys(map, &["id", "platform", "architecture", "isolation"], &[], "environment manifest")?;
-    for key in ["id", "platform", "architecture"] { nonempty_string(field(map, key, "environment manifest")?, key)?; }
-    let isolation = string_value(field(map, "isolation", "environment manifest")?, "isolation")?;
-    if !["none", "process", "container", "virtual-machine"].contains(&isolation) { return Err(schema_error("unsupported isolation")); }
+    strict_keys(
+        map,
+        &["id", "platform", "architecture", "isolation"],
+        &[],
+        "environment manifest",
+    )?;
+    for key in ["id", "platform", "architecture"] {
+        nonempty_string(field(map, key, "environment manifest")?, key)?;
+    }
+    let isolation = string_value(
+        field(map, "isolation", "environment manifest")?,
+        "isolation",
+    )?;
+    if !["none", "process", "container", "virtual-machine"].contains(&isolation) {
+        return Err(schema_error("unsupported isolation"));
+    }
     Ok(())
 }
 
 fn validate_scenario_manifest(value: &Value) -> Result<(), BundleError> {
     let map = as_object(value, "scenario manifest")?;
-    strict_keys(map, &["evidence_id", "operation", "authority"], &[], "scenario manifest")?;
-    prefixed_digest(field(map, "evidence_id", "scenario manifest")?, "ev_", "scenario.evidence_id")?;
-    nonempty_string(field(map, "operation", "scenario manifest")?, "scenario.operation")?;
-    if field(map, "authority", "scenario manifest")? != "controlled-replay" { return Err(schema_error("scenario authority must be controlled-replay")); }
+    strict_keys(
+        map,
+        &["evidence_id", "operation", "authority"],
+        &[],
+        "scenario manifest",
+    )?;
+    prefixed_digest(
+        field(map, "evidence_id", "scenario manifest")?,
+        "ev_",
+        "scenario.evidence_id",
+    )?;
+    nonempty_string(
+        field(map, "operation", "scenario manifest")?,
+        "scenario.operation",
+    )?;
+    if field(map, "authority", "scenario manifest")? != "controlled-replay" {
+        return Err(schema_error("scenario authority must be controlled-replay"));
+    }
     Ok(())
 }
 
 fn validate_capture_manifest(value: &Value) -> Result<(), BundleError> {
     let map = as_object(value, "capture manifest")?;
-    strict_keys(map, &["evidence_id", "predicate_type"], &[], "capture manifest")?;
-    prefixed_digest(field(map, "evidence_id", "capture manifest")?, "ev_", "capture.evidence_id")?;
-    nonempty_string(field(map, "predicate_type", "capture manifest")?, "capture.predicate_type")?;
+    strict_keys(
+        map,
+        &["evidence_id", "predicate_type"],
+        &[],
+        "capture manifest",
+    )?;
+    prefixed_digest(
+        field(map, "evidence_id", "capture manifest")?,
+        "ev_",
+        "capture.evidence_id",
+    )?;
+    nonempty_string(
+        field(map, "predicate_type", "capture manifest")?,
+        "capture.predicate_type",
+    )?;
     Ok(())
 }
 
@@ -800,45 +1214,73 @@ fn hash_canonical(value: &Value) -> Result<String, BundleError> {
 }
 
 fn as_object<'a>(value: &'a Value, context: &str) -> Result<&'a Map<String, Value>, BundleError> {
-    value.as_object().ok_or_else(|| schema_error(format!("{context} must be an object")))
+    value
+        .as_object()
+        .ok_or_else(|| schema_error(format!("{context} must be an object")))
 }
 
 fn require_array<'a>(value: &'a Value, context: &str) -> Result<&'a Vec<Value>, BundleError> {
-    value.as_array().ok_or_else(|| schema_error(format!("{context} must be an array")))
+    value
+        .as_array()
+        .ok_or_else(|| schema_error(format!("{context} must be an array")))
 }
 
-fn field<'a>(map: &'a Map<String, Value>, key: &str, context: &str) -> Result<&'a Value, BundleError> {
-    map.get(key).ok_or_else(|| schema_error(format!("{context}.{key} is required")))
+fn field<'a>(
+    map: &'a Map<String, Value>,
+    key: &str,
+    context: &str,
+) -> Result<&'a Value, BundleError> {
+    map.get(key)
+        .ok_or_else(|| schema_error(format!("{context}.{key} is required")))
 }
 
-fn strict_keys(map: &Map<String, Value>, required: &[&str], optional: &[&str], context: &str) -> Result<(), BundleError> {
-    for key in required { if !map.contains_key(*key) { return Err(schema_error(format!("{context}.{key} is required"))); } }
+fn strict_keys(
+    map: &Map<String, Value>,
+    required: &[&str],
+    optional: &[&str],
+    context: &str,
+) -> Result<(), BundleError> {
+    for key in required {
+        if !map.contains_key(*key) {
+            return Err(schema_error(format!("{context}.{key} is required")));
+        }
+    }
     for key in map.keys() {
         if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
-            return Err(schema_error(format!("{context} contains unknown field '{key}'")));
+            return Err(schema_error(format!(
+                "{context} contains unknown field '{key}'"
+            )));
         }
     }
     Ok(())
 }
 
 fn string_value<'a>(value: &'a Value, context: &str) -> Result<&'a str, BundleError> {
-    value.as_str().ok_or_else(|| schema_error(format!("{context} must be a string")))
+    value
+        .as_str()
+        .ok_or_else(|| schema_error(format!("{context} must be a string")))
 }
 
 fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, BundleError> {
     let value = string_value(value, context)?;
-    if value.is_empty() { return Err(schema_error(format!("{context} must not be empty"))); }
+    if value.is_empty() {
+        return Err(schema_error(format!("{context} must not be empty")));
+    }
     Ok(value)
 }
 
 fn trimmed_text<'a>(value: &'a Value, context: &str) -> Result<String, BundleError> {
     let value = string_value(value, context)?;
     let value = trim_ecmascript_whitespace(value);
-    if value.is_empty() { return Err(schema_error(format!("{context} must not be empty"))); }
+    if value.is_empty() {
+        return Err(schema_error(format!("{context} must not be empty")));
+    }
     Ok(value.to_owned())
 }
 
-fn trim_ecmascript_whitespace(value: &str) -> &str { value.trim_matches(is_ecmascript_whitespace) }
+fn trim_ecmascript_whitespace(value: &str) -> &str {
+    value.trim_matches(is_ecmascript_whitespace)
+}
 
 fn collapse_ecmascript_whitespace(value: &str) -> String {
     let mut output = String::new();
@@ -847,7 +1289,10 @@ fn collapse_ecmascript_whitespace(value: &str) -> String {
         if is_ecmascript_whitespace(ch) {
             pending = !output.is_empty();
         } else {
-            if pending { output.push(' '); pending = false; }
+            if pending {
+                output.push(' ');
+                pending = false;
+            }
             output.push(ch);
         }
     }
@@ -855,22 +1300,39 @@ fn collapse_ecmascript_whitespace(value: &str) -> String {
 }
 
 fn is_ecmascript_whitespace(ch: char) -> bool {
-    matches!(ch,
-        '\u{0009}' | '\u{000A}' | '\u{000B}' | '\u{000C}' | '\u{000D}' | '\u{0020}' |
-        '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{2028}' | '\u{2029}' |
-        '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}'
+    matches!(
+        ch,
+        '\u{0009}'
+            | '\u{000A}'
+            | '\u{000B}'
+            | '\u{000C}'
+            | '\u{000D}'
+            | '\u{0020}'
+            | '\u{1680}'
+            | '\u{2000}'
+            ..='\u{200A}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202F}'
+                | '\u{205F}'
+                | '\u{3000}'
+                | '\u{FEFF}'
     )
 }
 
 fn prefixed_digest(value: &Value, prefix: &str, context: &str) -> Result<String, BundleError> {
     let value = string_value(value, context)?;
-    let digest = value.strip_prefix(prefix).ok_or_else(|| schema_error(format!("{context} must start with '{prefix}'")))?;
+    let digest = value
+        .strip_prefix(prefix)
+        .ok_or_else(|| schema_error(format!("{context} must start with '{prefix}'")))?;
     validate_hex_digest(digest, context)?;
     Ok(value.to_owned())
 }
 
 fn validate_optional_digest(value: &Value, context: &str) -> Result<(), BundleError> {
-    if value.is_null() { return Ok(()); }
+    if value.is_null() {
+        return Ok(());
+    }
     validate_sha256(value, context)
 }
 
@@ -879,26 +1341,42 @@ fn validate_sha256(value: &Value, context: &str) -> Result<(), BundleError> {
 }
 
 fn validate_hex_digest(value: &str, context: &str) -> Result<(), BundleError> {
-    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
-        return Err(schema_error(format!("{context} must be 64 lowercase hexadecimal characters")));
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(schema_error(format!(
+            "{context} must be 64 lowercase hexadecimal characters"
+        )));
     }
     Ok(())
 }
 
 fn safe_integer(value: &Value, context: &str) -> Result<f64, BundleError> {
-    let n = value.as_f64().ok_or_else(|| schema_error(format!("{context} must be a safe integer")))?;
+    let n = value
+        .as_f64()
+        .ok_or_else(|| schema_error(format!("{context} must be a safe integer")))?;
     if !n.is_finite() || n.fract() != 0.0 || n < 0.0 || n > MAX_SAFE_INTEGER {
-        return Err(schema_error(format!("{context} must be a non-negative safe integer")));
+        return Err(schema_error(format!(
+            "{context} must be a non-negative safe integer"
+        )));
     }
     Ok(n)
 }
 
-fn safe_integer_field(value: &Value, name: &str) -> Option<f64> { value.get(name).and_then(Value::as_f64) }
-fn string_field<'a>(value: &'a Value, name: &str) -> Option<&'a str> { value.get(name).and_then(Value::as_str) }
-fn graph_error(message: impl Into<String>) -> BundleError { BundleError::new(BundleErrorKind::UnknownGraphInvalid, message) }
-fn schema_error(message: impl Into<String>) -> BundleError { BundleError::new(BundleErrorKind::SchemaViolation, message) }
-
-
+fn safe_integer_field(value: &Value, name: &str) -> Option<f64> {
+    value.get(name).and_then(Value::as_f64)
+}
+fn string_field<'a>(value: &'a Value, name: &str) -> Option<&'a str> {
+    value.get(name).and_then(Value::as_str)
+}
+fn graph_error(message: impl Into<String>) -> BundleError {
+    BundleError::new(BundleErrorKind::UnknownGraphInvalid, message)
+}
+fn schema_error(message: impl Into<String>) -> BundleError {
+    BundleError::new(BundleErrorKind::SchemaViolation, message)
+}
 
 #[cfg(test)]
 mod tests {
@@ -955,7 +1433,10 @@ mod tests {
             "mutation_evidence_ids": [evidence_id]
         });
         let mut revision_payload = unknown.clone();
-        revision_payload.as_object_mut().unwrap().remove("revision_digest");
+        revision_payload
+            .as_object_mut()
+            .unwrap()
+            .remove("revision_digest");
         unknown["revision_digest"] = json!(hash_canonical(&revision_payload).unwrap());
         unknown
     }
@@ -1049,15 +1530,14 @@ mod tests {
     #[test]
     fn rejects_missing_evidence_references_from_unknown_history() {
         let mut unknown = open_unknown("A claim with missing support", json!([]));
-        unknown["supporting_evidence_ids"] = json!([
-            "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-        ]);
+        unknown["supporting_evidence_ids"] =
+            json!(["ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"]);
         let mut payload = unknown.clone();
         payload.as_object_mut().unwrap().remove("revision_digest");
         unknown["revision_digest"] = json!(hash_canonical(&payload).unwrap());
 
-        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![unknown]))
-            .unwrap_err();
+        let error =
+            verify_evidence_bundle_value(&bundle(vec![record()], vec![unknown])).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
         assert!(error.message.contains("references missing Evidence"));
     }
@@ -1079,8 +1559,8 @@ mod tests {
             Value::Null,
             "inferred",
         );
-        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![first, third]))
-            .unwrap_err();
+        let error =
+            verify_evidence_bundle_value(&bundle(vec![record()], vec![first, third])).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
         assert!(error.message.contains("revision history has a gap"));
 
@@ -1098,8 +1578,8 @@ mod tests {
             Value::Null,
             "inferred",
         );
-        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![first, second]))
-            .unwrap_err();
+        let error =
+            verify_evidence_bundle_value(&bundle(vec![record()], vec![first, second])).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
         assert!(error.message.contains("revision chain is broken"));
     }
@@ -1113,8 +1593,8 @@ mod tests {
                 "unknown_id": format!("unk_{}", "f".repeat(64))
             }]),
         );
-        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![dangling]))
-            .unwrap_err();
+        let error =
+            verify_evidence_bundle_value(&bundle(vec![record()], vec![dangling])).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
         assert!(error.message.contains("references missing unknown"));
 
@@ -1128,8 +1608,8 @@ mod tests {
             "Right dependency",
             json!([{"type": "depends-on", "unknown_id": left_id}]),
         );
-        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![left, right]))
-            .unwrap_err();
+        let error =
+            verify_evidence_bundle_value(&bundle(vec![record()], vec![left, right])).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
         assert!(error.message.contains("dependency cycle"));
     }
@@ -1143,8 +1623,8 @@ mod tests {
             "A claim requiring a different authority",
             json!("controlled-replay"),
         );
-        let error = verify_evidence_bundle_value(&bundle(vec![record()], vec![invalid]))
-            .unwrap_err();
+        let error =
+            verify_evidence_bundle_value(&bundle(vec![record()], vec![invalid])).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::UnknownGraphInvalid);
         assert!(error.message.contains("no qualifying resolution Evidence"));
     }
@@ -1152,9 +1632,8 @@ mod tests {
     #[test]
     fn evidence_link_closure_is_a_separate_stricter_audit() {
         let mut evidence = record();
-        evidence["evidence_links"] = json!([
-            "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-        ]);
+        evidence["evidence_links"] =
+            json!(["ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"]);
         evidence["evidence_id"] = json!(compute_evidence_id(&evidence).unwrap());
         let input = bundle(vec![evidence], vec![]);
 
@@ -1171,8 +1650,7 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_keys_in_raw_bundle_json() {
-        let error = verify_evidence_bundle_json(br#"{"records":[],"records":[]}"#)
-            .unwrap_err();
+        let error = verify_evidence_bundle_json(br#"{"records":[],"records":[]}"#).unwrap_err();
         assert_eq!(error.kind, BundleErrorKind::InvalidJson);
     }
 }
