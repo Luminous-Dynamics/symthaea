@@ -735,6 +735,41 @@
       ],
       "target": "100_percent_selected_control_to_test_mapping_or_explicit_oracle_gap; zero automated_scanner_claims_as_full_control_verification",
       "constraint": "Automated tools alone do not complete MASVS verification; contextual/manual assessment is a separate evidence class."
+    },
+    {
+      "id": "benchmark_run_receipt_accounting",
+      "status": "contract_added_semantic_validator_pending",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10029",
+      "schema": "schemas/benchmark-run-receipt-v1.schema.json",
+      "example": "examples/benchmark-run-receipt-v1.synthetic.json",
+      "documentation": "docs/research/BENCHMARK_RUN_RECEIPT_V1.md",
+      "metrics": [
+        "eligible_coverage",
+        "graded_coverage",
+        "coverage_adjusted_task_yield",
+        "official_score_reproduction",
+        "attempted_terminal_disposition_accounting",
+        "refusal_and_abstention_visibility",
+        "budget_cap_compliance",
+        "actual_resource_completeness",
+        "matched_arm_task_set_equivalence",
+        "grader_and_runner_provenance",
+        "receipt_payload_digest_validity"
+      ],
+      "invariants": [
+        "universe_equals_eligible_plus_excluded",
+        "eligible_equals_attempted_plus_not_attempted",
+        "attempted_equals_completed_plus_in_progress",
+        "completed_equals_sum_of_eight_terminal_dispositions",
+        "binary_graded_equals_passed_plus_failed",
+        "task_rows_cover_every_eligible_task_exactly_once",
+        "excluded_tasks_are_predeclared_and_have_reasons",
+        "official_metric_is_preserved_and_derived_metrics_are_labelled_non_official",
+        "measured_resource_use_does_not_exceed_bounded_caps",
+        "matched_comparison_arms_share_identical_eligible_task_set_and_budget_protocol"
+      ],
+      "target": "zero_hidden_or_unaccounted_tasks; zero_refusal_or_unsupported_denominator_laundering; zero_budget_or_grader_version_mismatch_in_comparable_runs",
+      "claim_ceiling": "A valid receipt proves accounting and provenance consistency only; independent graders remain the source of task correctness."
     }
   ],
   "promotion_policy": {
@@ -767,7 +802,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/9909",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9969",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/10026"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10026",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10029"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
