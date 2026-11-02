@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime
 import hashlib
 import io
 import json
+import os
 import sys
 import zipfile
 from collections import Counter
@@ -149,6 +151,15 @@ def main() -> int:
 
     report = {
         "schema_version": "0.1.0",
+        "receipt": {
+            "retrieved_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+            "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "source_commit": os.environ.get("GITHUB_SHA"),
+            "inventory_tool": "inspect_reward_network_archive.py",
+            "inventory_tool_version": "0.1.0",
+            "python_version": sys.version.split()[0],
+        },
         "source": {
             "zenodo_record": "https://zenodo.org/records/18547122",
             "doi": "10.5281/zenodo.18547122",
