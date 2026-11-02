@@ -512,8 +512,52 @@
         "sqlstate": {
           "type": "string",
           "pattern": "^[0-9A-Z]{5}$"
+        },
+        "fault_id": {
+          "type": "string",
+          "minLength": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "fault"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "fault_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "not": {
+                  "const": "fault"
+                }
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "fault_id"
+              ]
+            }
+          }
+        }
+      ]
     },
     "request": {
       "type": "object",
