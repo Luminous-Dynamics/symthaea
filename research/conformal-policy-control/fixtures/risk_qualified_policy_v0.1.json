@@ -195,5 +195,29 @@
     "The loss profile is non-monotonic across action IDs: the specialist action has high reward and low loss, while the high_reward_hazard action has high reward and high loss.",
     "The calibration mixture is a declared discrete policy; its outcome records are synthetic and do not establish exchangeability or a CPC theorem.",
     "The beta grid is preregistered; evaluating many beta values on one calibration set is not a formally qualified selection rule without a simultaneous-validity argument."
+  ],
+  "external_baseline_references": [
+    {
+      "id": "cpc_reference_cbo",
+      "role": "marginal_policy_risk_control",
+      "paper_url": "https://proceedings.mlr.press/v306/prinster26a.html",
+      "code_url": "https://github.com/samuelstanton/conformal-policy-control",
+      "code_commit": "83ba982e14480f5e986cf7776de87a9b7e3d4245",
+      "code_commit_date": "2026-10-24",
+      "license": "MIT",
+      "status": "reference_implementation_pinned_reproduction_required",
+      "audit_note": "CBO source path uses Monte Carlo estimates for constrained-policy normalizers and proposal-sample maxima for the worst-case test weight. The finite-support Symthaea slice computes these discrete quantities exactly. Paper-matched reproduction remains required."
+    },
+    {
+      "id": "ac_rac_action_conditional",
+      "role": "action_conditional_risk_averse_decision",
+      "paper_url": "https://proceedings.mlr.press/v306/zhu26z.html",
+      "code_url": "https://github.com/Telvc/AC-RAC",
+      "code_commit": "df7194a6fa7b283108b96672833e3f85ecc25835",
+      "code_commit_date": "2026-05-20",
+      "license": "MIT",
+      "status": "reference_implementation_pinned_reproduction_required",
+      "audit_note": "Repository includes AC-RAC per-action lambda calibration, action-conditional coverage/FDR metrics, and tests comparing vectorized AC-RAC to a literal per-label loop. README documents fast mode using cached inputs and a full mode with paper-protocol COVID and three-seed MovieLens reruns. The pinned commit predates the July 2026 ICML proceedings; verify the final paper-to-code mapping before treating it as definitive."
+    }
   ]
 }
