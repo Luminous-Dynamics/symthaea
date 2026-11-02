@@ -18,15 +18,15 @@ testing implementation.
 
 The synthetic latent evidence is generated from:
 
-- noise: (X_0 \sim N(-d'/2, 1));
-- signal: (X_1 \sim N(+d'/2, 1));
-- response: signal when (X \ge c).
+- noise evidence: Normal with mean `-d-prime / 2` and variance `1`.
+- signal evidence: Normal with mean `+d-prime / 2` and variance `1`.
+- response: signal when evidence is greater than or equal to criterion `c`.
 
 The equal-variance model gives analytic expectations:
 
 - hit probability: standard-normal CDF at `d-prime / 2 - c`.
 - false-alarm probability: standard-normal CDF at `-d-prime / 2 - c`.
-- ROC AUC: (Phi(d'/\sqrt{2})).
+- ROC AUC: standard-normal CDF at `d-prime / sqrt(2)`.
 
 The model allows sensitivity (d') and response criterion (c) to vary
 independently. It is a deliberately simple reference family; its assumptions
@@ -71,16 +71,18 @@ cell (default 256). The grid contains d-prime values
 noise, and shuffle streams provide common random numbers across the sensitivity
 and criterion comparisons.
 
-The CSV contains one row per seed and cell. The campaign/seed is the replicate
-for metric-calibration summaries. Do not pool trial windows and pretend they
-are independent replicates.
+The CSV contains one row per seed and cell. The aggregate calibration report is
+written to stderr (so stdout remains directly redirectable as CSV) and reports
+per-cell bias/RMSE for d-prime, criterion and AUC, plus criterion-invariance and
+monotonicity diagnostics. The campaign/seed is the replicate for these summaries;
+do not pool trial windows and pretend they are independent replicates.
 
 ## Qualification properties
 
 Tests cover:
 
 1. exact replay under an identical model/design/seed;
-2. criterion shifts changing binary calls and criterion estimates without
+2. criterion shifts change binary calls and criterion estimates without changing the continuous-score ranking or AUC;
    changing continuous-score ranking or AUC;
 3. monotone AUC and recovered d-prime across the sensitivity ladder;
 4. agreement with analytic Gaussian operating characteristics;
