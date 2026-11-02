@@ -450,7 +450,8 @@
                 "lower": 0,
                 "upper": 0.2
               },
-              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": null
             }
           }
         ]
@@ -542,12 +543,575 @@
                 "lower": -1.1,
                 "upper": 0.2
               },
-              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": null
             }
           }
         ]
       },
       "expected_error": "PairedEffectOutsideConservativeBound"
+    },
+    {
+      "case_id": "paired_worlds_prove_no_flip_while_marginals_straddle",
+      "input": {
+        "candidate_id": "paired_worlds_prove_no_flip_while_marginals_straddle",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                },
+                {
+                  "world_id": "world-b",
+                  "baseline_value": 0.8,
+                  "after_edit_value": 0.7
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "paired_worlds_prove_no_flip_while_marginals_straddle",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_impacts": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "shared-worlds",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "effect_interval": {
+                  "lower": -0.1,
+                  "upper": 0.1
+                },
+                "minimum_absolute_effect": 0,
+                "maximum_absolute_effect": 0.1,
+                "normalized_materiality_lower": 0,
+                "normalized_materiality_upper": 1,
+                "baseline_decision": "Indeterminate",
+                "after_edit_decision": "Indeterminate",
+                "decision_flip": "Impossible",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": false,
+                "effect_method": "PairedSharedWorlds",
+                "decision_flip_method": "PairedSharedWorlds",
+                "paired_decision_world_count": 2
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.1,
+            "worst_case_normalized_materiality": 1,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": false,
+            "aggregate_decision_flip": "Impossible"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "paired_worlds_guarantee_threshold_flip",
+      "input": {
+        "candidate_id": "paired_worlds_guarantee_threshold_flip",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.6,
+                "upper": 0.6
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.8
+                },
+                {
+                  "world_id": "world-b",
+                  "baseline_value": 0.8,
+                  "after_edit_value": 0.2
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "paired_worlds_guarantee_threshold_flip",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_impacts": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "shared-worlds",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "effect_interval": {
+                  "lower": -0.6,
+                  "upper": 0.6
+                },
+                "minimum_absolute_effect": 0,
+                "maximum_absolute_effect": 0.6,
+                "normalized_materiality_lower": 0,
+                "normalized_materiality_upper": 5.999999999999999,
+                "baseline_decision": "Indeterminate",
+                "after_edit_decision": "Indeterminate",
+                "decision_flip": "Guaranteed",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": false,
+                "effect_method": "PairedSharedWorlds",
+                "decision_flip_method": "PairedSharedWorlds",
+                "paired_decision_world_count": 2
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.6,
+            "worst_case_normalized_materiality": 5.999999999999999,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": false,
+            "aggregate_decision_flip": "Guaranteed"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "paired_worlds_mixed_flip_outcomes",
+      "input": {
+        "candidate_id": "paired_worlds_mixed_flip_outcomes",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.6
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.8
+                },
+                {
+                  "world_id": "world-b",
+                  "baseline_value": 0.8,
+                  "after_edit_value": 0.7
+                },
+                {
+                  "world_id": "world-c",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "paired_worlds_mixed_flip_outcomes",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_impacts": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "shared-worlds",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "effect_interval": {
+                  "lower": -0.1,
+                  "upper": 0.6
+                },
+                "minimum_absolute_effect": 0,
+                "maximum_absolute_effect": 0.6,
+                "normalized_materiality_lower": 0,
+                "normalized_materiality_upper": 5.999999999999999,
+                "baseline_decision": "Indeterminate",
+                "after_edit_decision": "Indeterminate",
+                "decision_flip": "Possible",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": false,
+                "effect_method": "PairedSharedWorlds",
+                "decision_flip_method": "PairedSharedWorlds",
+                "paired_decision_world_count": 3
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.6,
+            "worst_case_normalized_materiality": 5.999999999999999,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": false,
+            "aggregate_decision_flip": "Possible"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "paired_worlds_duplicate_world_id_rejected",
+      "input": {
+        "candidate_id": "duplicate",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "dup",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                },
+                {
+                  "world_id": "dup",
+                  "baseline_value": 0.8,
+                  "after_edit_value": 0.7
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_error": "DuplicatePairedDecisionWorld"
+    },
+    {
+      "case_id": "paired_world_value_outside_marginal_rejected",
+      "input": {
+        "candidate_id": "outside-marginal",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.05,
+                  "after_edit_value": 0.1
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedDecisionValueOutsideMarginal"
+    },
+    {
+      "case_id": "paired_world_difference_outside_effect_rejected",
+      "input": {
+        "candidate_id": "outside-effect",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.5
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedDecisionDifferenceOutsideEffect"
+    },
+    {
+      "case_id": "paired_decision_worlds_without_threshold_rejected",
+      "input": {
+        "candidate_id": "no-threshold",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": null,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedDecisionWorldsRequireThreshold"
+    },
+    {
+      "case_id": "empty_paired_decision_worlds_rejected",
+      "input": {
+        "candidate_id": "empty-worlds",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "shared-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": []
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedDecisionWorldsEmpty"
     }
   ]
 }
