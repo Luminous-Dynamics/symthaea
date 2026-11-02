@@ -26,7 +26,7 @@ The currently rendered Hugging Face card reports:
 
 The September 29, 2026 VLM paper separately reports 531,734 train, 82,822 validation and 101,929 test **task-operation instances**, totalling 716,485. These are not assumed to be unique Parquet rows. The benchmark must materialize task_routing and reconcile operation instances by unique combined_sample_hash × task before comparing those numbers.
 
-This fixture deliberately records the row-count mismatch and leaves revision/digests/task expansion unmaterialized. It is a fail-closed audit fixture, not a pinned dataset release or a completed reproduction.
+This fixture deliberately records the row-count mismatch and labels these counts UNPINNED_RENDERED_CARD. They are values visible on the default Hugging Face page, which explicitly warns that main is V1; they are not asserted to be V2 counts. The V2 revision SHA and its own metadata counts remain unresolved. Revision/digests/task expansion are unmaterialized. This is a fail-closed audit fixture, not a pinned dataset release or completed reproduction.
 
 ## Artifact identity
 
