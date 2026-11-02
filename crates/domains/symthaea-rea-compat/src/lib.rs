@@ -1121,7 +1121,7 @@ mod tests {
         let canonical = String::from_utf8(canonical_jcs_bytes(&value).unwrap()).unwrap();
         assert_eq!(
             canonical,
-            r#"{"𐀀":2,"":1,"numbers":[0,333333333.3333333,1e+30,4.5,0.002,1e-27]}"#
+            r#"{"numbers":[0,0,333333333.3333333,1e+30,4.5,0.002,1e-27],"𐀀":2,"":1}"#
         );
     }
 
@@ -1195,7 +1195,7 @@ mod tests {
         evidence["evidence_id"] = json!(new_id);
         assert!(verify_evidence_value(&evidence).is_ok());
 
-        evidence["subject"]["local_path"] = json!("bad\\u0000path");
+        evidence["subject"]["local_path"] = json!("bad\0path");
         assert_eq!(
             validate_evidence_schema(&evidence).unwrap_err().kind,
             EvidenceErrorKind::SchemaViolation
