@@ -4,93 +4,108 @@ from fractions import Fraction as F
 
 from proof_carrying_evidence import (
     EvidenceWriter,
-    SCALE,
-    adjusted_integer,
-    build_spec,
-    digest,
-    generate_observations,
+    floor_a2,
     independent_verify,
+    make_spec,
     negative_controls,
+    sha256,
+    generate_round,
     validate_spec,
-    writer_factor,
 )
 
 
 class ProofCarryingEvidenceTests(unittest.TestCase):
-    def test_bernoulli_lr_factors_are_exact(self):
-        spec = build_spec(n=3, rounds=3)
-        c = spec.candidates[0]
-        self.assertEqual(writer_factor(c, 1), F(7, 5))
-        self.assertEqual(writer_factor(c, 0), F(3, 5))
-        self.assertEqual(F(1, 2) * writer_factor(c, 1) +
-                         F(1, 2) * writer_factor(c, 0), F(1))
+    def test_registered_bernoulli_factors_and_mean_one(self):
+        spec = make_spec(n=3)
+        p0, p1 = F(*spec["candidates"][0]["p0"]), F(*spec["candidates"][0]["p1"])
+        success = p1 / p0
+        failure = (1-p1) / (1-p0)
+        self.assertEqual(success, F(7, 5))
+        self.assertEqual(failure, F(3, 5))
+        self.assertEqual(p0*success + (1-p0)*failure, 1)
 
-    def test_adjuster_floor_is_exact_and_monotone(self):
-        values = [F(1), F(9, 4), F(4), F(16), F(25)]
-        adjusted = [adjusted_integer(x, SCALE) for x in values]
-        self.assertEqual(adjusted[0], 0)
-        self.assertEqual(adjusted, sorted(adjusted))
-        # Verify floor_S(sqrt(x)-1) with exact squared inequalities.
-        for x, value in zip(values, adjusted):
-            lower = F(value, SCALE) + 1
-            upper = F(value + 1, SCALE) + 1
-            self.assertLessEqual(lower * lower, x)
-            self.assertGreater(upper * upper, x)
+    def test_adjuster_floor_with_exact_square_bounds(self):
+        scale = 1_000_000
+        for maximum in (F(1), F(9, 4), F(4), F(16), F(25), F(7, 3)):
+            adjusted = floor_a2(maximum, scale)
+            lower = F(adjusted, scale) + 1
+            upper = F(adjusted + 1, scale) + 1
+            self.assertLessEqual(lower * lower, maximum)
+            self.assertGreater(upper * upper, maximum)
 
-    def test_complete_round_batches_replay(self):
-        spec = build_spec(n=9, rounds=12)
+    def test_writer_rounds_replay_independently_for_all_dependence_modes(self):
+        for mode in ("independent", "shared_uniform", "balanced_negative"):
+            with self.subTest(mode=mode):
+                spec = make_spec(n=9)
+                writer = EvidenceWriter(spec)
+                receipts = []
+                import random
+                rng = random.Random(20261102)
+                for t in range(20):
+                    observations = generate_round(spec, t, mode, rng)
+                    receipts.append(writer.append_round(t, observations))
+                result = independent_verify(spec, receipts)
+                self.assertTrue(result["verified"])
+                expected = sum(
+                    c["arrival_round"] <= t
+                    for t in range(20)
+                    for c in spec["candidates"]
+                )
+                self.assertEqual(result["evidence_updates"], expected)
+
+    def test_writer_rejects_incomplete_and_out_of_order_batches(self):
+        spec = make_spec(n=6)
+        writer = EvidenceWriter(spec)
+        active = [c["id"] for c in spec["candidates"] if c["arrival_round"] <= 0]
+        with self.assertRaises(ValueError):
+            writer.append_round(0, {i: 0 for i in active[:-1]})
+        with self.assertRaises(ValueError):
+            writer.append_round(1, {i: 0 for i in active})
+        with self.assertRaises(ValueError):
+            writer.append_round(0, {i: 0 for i in reversed(active)})
+
+    def test_process_spec_tampering_is_rejected(self):
+        spec = make_spec(n=4)
+        changed = copy.deepcopy(spec)
+        changed["candidates"][0]["p1"] = [3, 5]
+        with self.assertRaises(ValueError):
+            validate_spec(changed)
+
+    def test_claim_tampering_is_rejected_by_independent_replay(self):
+        spec = make_spec(n=6)
         writer = EvidenceWriter(spec)
         receipts = []
-        observations = generate_observations(spec, 12, "shared_uniform", 10146)
-        for round_no, batch in enumerate(observations):
-            receipts.append(writer.append_round(round_no, batch))
-        verified = independent_verify(spec, receipts)
-        self.assertTrue(verified["verified"])
-        self.assertEqual(verified["rounds"], 12)
-        self.assertEqual(verified["factor_updates"], sum(
-            sum(c.arrival_round <= t for c in spec.candidates)
-            for t in range(12)
-        ))
-
-    def test_incomplete_batch_and_round_gap_fail_closed(self):
-        spec = build_spec(n=6, rounds=5)
-        writer = EvidenceWriter(spec)
-        active = {
-            c.candidate_id: 0
-            for c in spec.candidates if c.arrival_round == 0
-        }
+        import random
+        rng = random.Random(4006)
+        for t in range(10):
+            receipts.append(writer.append_round(t, generate_round(spec, t, "independent", rng)))
+        altered = copy.deepcopy(receipts)
+        altered[0]["claims"][0]["factor"][0] += 1
         with self.assertRaises(ValueError):
-            writer.append_round(0, {next(iter(active)): 0})
-        with self.assertRaises(ValueError):
-            writer.append_round(1, active)
+            independent_verify(spec, altered)
 
-    def test_independent_verifier_rejects_all_tamper_controls(self):
-        spec = build_spec(n=9, rounds=10)
+    def test_seven_negative_controls_fail_closed(self):
+        spec = make_spec(n=9)
         writer = EvidenceWriter(spec)
         receipts = []
-        for t, batch in enumerate(generate_observations(spec, 10, "independent", 10147)):
-            receipts.append(writer.append_round(t, batch))
+        import random
+        rng = random.Random(4007)
+        for t in range(10):
+            receipts.append(writer.append_round(t, generate_round(spec, t, "shared_uniform", rng)))
         controls = negative_controls(spec, receipts)
         self.assertEqual(len(controls), 7)
         self.assertTrue(all(controls.values()))
 
-    def test_process_precommitment_change_is_rejected(self):
-        spec = build_spec(n=3, rounds=2)
-        mutated = copy.deepcopy(spec)
-        object.__setattr__(mutated.candidates[0], "p1_num", 3)
-        with self.assertRaises(ValueError):
-            validate_spec(mutated)
-
-    def test_every_receipt_claim_is_recomputed_from_observations(self):
-        spec = build_spec(n=6, rounds=8)
+    def test_hash_chain_detects_receipt_mutation(self):
+        spec = make_spec(n=6)
         writer = EvidenceWriter(spec)
-        receipts = [
-            writer.append_round(t, batch)
-            for t, batch in enumerate(generate_observations(spec, 8, "balanced_negative", 10148))
-        ]
-        # The independent verifier must reject a false exact LR numerator.
+        receipts = []
+        import random
+        rng = random.Random(4008)
+        for t in range(5):
+            receipts.append(writer.append_round(t, generate_round(spec, t, "balanced_negative", rng)))
         altered = copy.deepcopy(receipts)
-        altered[2]["claims"][0]["factor_num"] += 1
+        altered[2]["observations"][0]["value"] ^= 1
         with self.assertRaises(ValueError):
             independent_verify(spec, altered)
 
