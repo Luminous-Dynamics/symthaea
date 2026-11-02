@@ -80,6 +80,100 @@ jobs:
           if "isolated_microvm" not in str(task_schema["allOf"]):
               raise SystemExit("fixture-ready/qualified tasks must pin isolated runner profiles")
 
+          # The repository-twin gold graph is itself benchmark evidence: validate
+          # every node anchor and relationship before it can be used as an oracle.
+          fixture_root = root / "fixtures/repository-twin-synthetic-v0"
+          graph = json.loads((fixture_root / "gold-graph.v0.json").read_text())
+          mutations = json.loads((fixture_root / "mutations.v0.json").read_text())
+
+          def validate_repository_fixture(graph_value, mutations_value):
+              if graph_value["status"] != "design_only_unverified":
+                  raise ValueError("repository graph must remain explicitly unverified")
+              if graph_value["authority_policy"]["compiler_verified"] != "none":
+                  raise ValueError("fixture must not claim compiler-verified graph facts")
+              nodes = graph_value["nodes"]
+              ids = [node["id"] for node in nodes]
+              if len(ids) != len(set(ids)):
+                  raise ValueError("duplicate repository graph node IDs")
+              id_set = set(ids)
+              counts = graph_value["counts"]
+              actual = {
+                  "package_nodes": sum(node["kind"] == "package" for node in nodes),
+                  "symbol_and_test_nodes": sum(node["kind"] not in {"package", "feature", "target", "external_dependency"} for node in nodes),
+                  "feature_and_target_nodes": sum(node["kind"] in {"feature", "target"} for node in nodes),
+                  "external_dependency_nodes": sum(node["kind"] == "external_dependency" for node in nodes),
+                  "total_nodes": len(nodes),
+                  "edges": len(graph_value["edges"])
+              }
+              if counts != actual:
+                  raise ValueError("repository graph node/edge counts do not match its records")
+              for edge in graph_value["edges"]:
+                  if edge["from"] not in id_set or edge["to"] not in id_set:
+                      raise ValueError("repository graph edge has a dangling endpoint")
+                  if edge["authority"] == "compiler_verified":
+                      raise ValueError("unverified fixture cannot contain compiler_verified edges")
+              for node in nodes:
+                  rel = PurePosixPath(node["path"])
+                  if rel.is_absolute() or not rel.parts or ".." in rel.parts or "\\" in node["path"] or "\x00" in node["path"]:
+                      raise ValueError(f"unsafe source path in graph node {node['id']}")
+                  source_path = fixture_root / Path(*rel.parts)
+                  try:
+                      source_path.resolve().relative_to(fixture_root.resolve())
+                  except ValueError as error:
+                      raise ValueError(f"source anchor escapes fixture root: {node['id']}") from error
+                  lines = source_path.read_text().splitlines()
+                  anchor = node["source_anchor"]
+                  if anchor["line"] < 1 or anchor["line"] > len(lines):
+                      raise ValueError(f"source line is out of range for {node['id']}")
+                  if lines[anchor["line"] - 1].strip() != anchor["text"]:
+                      raise ValueError(f"source declaration anchor mismatch for {node['id']}")
+                  if anchor["authority"] != "source_text_anchor":
+                      raise ValueError(f"unexpected source-anchor authority for {node['id']}")
+              if mutations_value["fixture_id"] != graph_value["fixture_id"]:
+                  raise ValueError("mutation scenarios refer to a different fixture ID")
+              cases = mutations_value["mutations"]
+              case_ids = [case["id"] for case in cases]
+              if len(case_ids) != len(set(case_ids)):
+                  raise ValueError("duplicate repository mutation scenario IDs")
+              for case in cases:
+                  unknown = set(case["expected_impact"]) - id_set
+                  if unknown:
+                      raise ValueError(f"mutation {case['id']} references unknown graph nodes: {sorted(unknown)}")
+              if not ids:
+                  raise ValueError("repository graph contains no nodes")
+              return len(nodes), len(graph_value["edges"]), len(cases)
+
+          repo_node_count, repo_edge_count, repo_mutation_count = validate_repository_fixture(graph, mutations)
+          if repo_node_count != 32 or repo_edge_count != 37 or repo_mutation_count != 7:
+              raise SystemExit("repository-twin synthetic fixture changed without an explicit benchmark revision")
+
+          def expect_repo_reject(graph_value, mutations_value, label):
+              try:
+                  validate_repository_fixture(graph_value, mutations_value)
+              except (ValueError, OSError, KeyError):
+                  return
+              raise SystemExit(f"repository graph negative control unexpectedly passed: {label}")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["edges"][0]["to"] = "sym.not-present"
+          expect_repo_reject(mutant_graph, mutations, "dangling graph edge")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["nodes"][0]["source_anchor"]["line"] = 999999
+          expect_repo_reject(mutant_graph, mutations, "invalid source declaration anchor")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["edges"][0]["authority"] = "compiler_verified"
+          expect_repo_reject(mutant_graph, mutations, "semantic authority inflation")
+
+          mutant_graph = copy.deepcopy(graph)
+          mutant_graph["counts"]["edges"] += 1
+          expect_repo_reject(mutant_graph, mutations, "forged graph edge count")
+
+          mutant_mutations = copy.deepcopy(mutations)
+          mutant_mutations["mutations"][0]["expected_impact"].append("sym.not-present")
+          expect_repo_reject(graph, mutant_mutations, "mutation references unknown graph node")
+
           # Positive shape control: a design-only task is valid as a design record.
           task_validator.validate(catalog["tasks"][0])
 
@@ -269,7 +363,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=20"
+              "schemas=3 negative_controls=25"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
