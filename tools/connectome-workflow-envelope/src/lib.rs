@@ -670,6 +670,7 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
                     WorkflowStatus::QueryStopCalibrationExchangeabilityUnsupported
                 }
                 QueryStopCalibrationOutcome::ProjectedUnstableWithinHorizon => {
+                    completed_stages.push("QUERY_FUTURE_STOP_CALIBRATION");
                     unresolved_stages.push("QUERY_FUTURE_STOP_READINESS");
                     WorkflowStatus::QueryProjectedUnstableWithinHorizon
                 }
@@ -1001,6 +1002,9 @@ fn validate_query_stop_calibration(
     receipt: &QueryStopCalibrationReceipt,
     query: &QueryStabilityReceipt,
 ) -> Result<(), EnvelopeError> {
+    if query.outcome != QueryStabilityOutcome::StableOverObservedWindow {
+        return Err(EnvelopeError::QueryStopOutcomeContradiction);
+    }
     for (kind, digest) in [
         ("query stop receipt", &receipt.receipt_sha256),
         ("query stop report", &receipt.report_sha256),
@@ -1666,6 +1670,22 @@ mod tests {
         assert_eq!(
             audit_workflow(&value),
             Err(EnvelopeError::QueryStopSnapshotMismatch)
+        );
+    }
+
+    #[test]
+    fn future_stop_calibration_requires_observed_window_stability_first() {
+        let mut value = through_edit();
+        value.query_stability = Some(query_receipt(
+            SHA_C,
+            QueryStabilityOutcome::UnstableOverObservedWindow,
+        ));
+        value.query_stop_calibration = Some(stop_calibration_receipt(
+            QueryStopCalibrationOutcome::InsufficientCalibration,
+        ));
+        assert_eq!(
+            audit_workflow(&value),
+            Err(EnvelopeError::QueryStopOutcomeContradiction)
         );
     }
 
