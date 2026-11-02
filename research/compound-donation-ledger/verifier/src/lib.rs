@@ -1196,7 +1196,7 @@ mod tests {
         );
         assert_eq!(
             small_result.candidates[0].weighted_score,
-            0
+            1_000_000_000_000_000
         );
         assert_eq!(
             small_result.candidates[1].incoming,
