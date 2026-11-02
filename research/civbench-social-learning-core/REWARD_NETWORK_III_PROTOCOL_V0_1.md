@@ -65,6 +65,19 @@ The archive has not been ingested into this branch. No reanalysis or reproductio
 
 The initial Rust V0 represents an action as a directed transition (from node to node) and resolves equal-reward/equal-loss choices by stable edge-index order. This is an explicit implementation choice for deterministic tests, not yet a verified property of the original experiment interface or network serialization. Before original-data replay, inspect the v2.0 network files and experiment code to establish whether source edges are directed or undirected, whether reverse traversal is available, how visited nodes/edges are treated, the legal-move rules, and the exact tie-breaking/randomization behavior. The importer must preserve the source representation and must not silently coerce undirected edges to directed arcs or vice versa.
 
+
+## Three-axis cultural frontier implemented in this crate
+
+The paper argues that machine-originated cultural change requires discoveries that are non-trivial, learnable, and have a recognisable selective advantage. The reference ABM exposes these as separate controls:
+
+- **Discovery difficulty:** `optimal_discovery_probability_per_trial`, combined with human/machine exploration bias and their individual-learning budgets.
+- **Learnability:** `social_observation_probability`, `social_strategy_acquisition_probability`, `demonstration_corruption_probability`, and `strategy_integration_probability`.
+- **Selective advantage:** `optimal_demonstration_reward - myopic_demonstration_reward`, evaluated through noisy demonstrations and the configured teacher-selection mechanism.
+
+The new `cultural-frontier-sweep` binary evaluates a 3×3×3 grid (optimal discovery probability 0.0001/0.001/0.01, social acquisition probability 0.25/0.60/0.95, selective advantage 0/0.25/0.50) with 256 fixed seeds per condition. It reports independent optimal discovery, integrated prevalence, social-only optimal acquisition and integration, top-teacher selection, and cross-generation persistence. The same seed range is reused across conditions to support paired sensitivity comparisons; the model remains stochastic and the results are simulation-replicate estimates.
+
+This is a mechanism-level frontier exploration, not a fit to participant data and not a reproduction of the authors' ABM. Freeze the exact grid, seed range, code digest, model version and output digest before reporting results. The social-only metric counts optimal strategies acquired/integrated by agents that did not individually discover them; it avoids misclassifying independent rediscovery as cultural transmission.
+
 ## External AI cultural-transmission reference
 
 A second important comparison target is DeepMind's cultural-general-intelligence work:
