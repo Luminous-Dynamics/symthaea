@@ -1,8 +1,8 @@
 # Temporal candidate wire protocol v0.1
 
 Tracking: [#9939](https://github.com/Luminous-Dynamics/symthaea/issues/9939)  
-Implementation branch: `research/temporal-candidate-wire-v0.1`  
-Parent: [HARTH streaming ingestion PR #9847](https://github.com/Luminous-Dynamics/symthaea/pull/9847)
+Implementation branch: `research/temporal-candidate-wire-v0.3`  
+Parent: [HARTH streaming ingestion PR #9917](https://github.com/Luminous-Dynamics/symthaea/pull/9917)
 
 ## Purpose
 
