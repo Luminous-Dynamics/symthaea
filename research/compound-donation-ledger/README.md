@@ -17,8 +17,7 @@ The crate implements three bounded research primitives:
 2. A finite staircase calibrator. It evaluates the threshold-budget function
    A_pi(x) = sum_j pi_j K_j 1{x >= K_j} using integer arithmetic and a
    precommitted prior-mass budget. It also supplies a finite prefix of the
-   universal dyadic prior pi_j = 1/(j(j+1)), K_j = 2^j, and an
-   e-BH rank-geometric constructors: a family-size-specialized version and
+   universal dyadic prior pi_j = 1/(j(j+1)), K_j = 2^j, and e-BH rank-geometric constructors: a family-size-specialized version and
    a horizon-independent candidate-weighted rank prior that works across
    family-size growth without changing earlier candidates' calibrators.
 
@@ -174,10 +173,16 @@ is never credited again. The writer uses a common exact rational denominator
 for the refund and effective cost; it rejects evidence or round rollback and
 commits each update atomically.
 
-The separate verifier recomputes the update from the precommitted alpha,
-previous evidence/refund state and new evidence value. A sequence verifier
-starts at V_0=1 and independently checks all cumulative refunds, increments,
-costs and decisions. It rejects a forged or repeated refund increment.
+The writer provides `ProcessOvershootRefund::new` for the normalized initial
+value V_0=1 and `with_initial_evidence_value` for an explicitly precommitted
+initial value, including V_0=0 for staircase-calibrated processes. The initial
+value is supplied, not inferred from the first observation. The separate
+verifier recomputes the update from alpha, the explicit previous
+ evidence/refund state and the new evidence value. Sequence replay has both a
+normalized-one entry point and an explicit-initial-value entry point. It
+checks every cumulative refund, increment, cost and decision, and validates
+the previous cumulative refund against the previous evidence value before
+accepting the next transition.
 
 This is a primitive, not a completed online FDR algorithm. The process-level
 inequalities are documented in RESEARCH.md. A global alpha-wealth theorem is
