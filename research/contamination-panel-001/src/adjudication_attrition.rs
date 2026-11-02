@@ -966,13 +966,11 @@ pub fn analyze_adjudication_attrition(
             .map(|candidate| candidate.candidate_id.as_str())
             .collect();
         let per_replicate = pair_bounds.get(key).cloned().unwrap_or_default();
-        if per_replicate.len() != transfer_study.replicates.len() {
-            if !accepted_ids.is_empty() {
-                return Err(
-                    "accepted cell must have one scored outcome for every model-pair replicate"
-                        .to_owned(),
-                );
-            }
+        if per_replicate.len() != transfer_study.replicates.len() && !accepted_ids.is_empty() {
+            return Err(
+                "accepted cell must have one scored outcome for every model-pair replicate"
+                    .to_owned(),
+            );
         }
         let mut lower_values = Vec::new();
         let mut upper_values = Vec::new();
