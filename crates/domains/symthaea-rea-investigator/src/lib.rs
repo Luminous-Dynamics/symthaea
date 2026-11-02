@@ -775,7 +775,13 @@ pub fn plan_next_experiment(
             continue;
         }
 
-        let candidate = evaluate_experiment(experiment, &priors, config, &support_evidence_ids);
+        let candidate = evaluate_experiment(
+            experiment,
+            &priors,
+            config,
+            &support_evidence_ids,
+            &independent_root_evidence_ids,
+        );
         if candidate.expected_information_gain_bits <= config.minimum_information_gain_bits {
             rejected_experiments.push(rejected(
                 experiment,
