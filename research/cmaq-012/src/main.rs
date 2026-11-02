@@ -2,11 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
-const SCHEMA: &str = "cmaq-012-paired-aop-report-v0.2";
-const AUDITOR_VERSION: &str = "0.2.0";
+const SCHEMA: &str = "cmaq-012-paired-aop-report-v0.3";
+const AUDITOR_VERSION: &str = "0.3.0";
 const MIN_QUALIFICATION_PAIRS: usize = 20;
 const COMPUTE_WORK_TOLERANCE: f64 = 0.05;
 const LATENCY_TOLERANCE: f64 = 0.05;
@@ -186,6 +186,299 @@ impl Row {
     }
 }
 
+
+#[derive(Clone, Debug, PartialEq)]
+enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(String),
+    String(String),
+    Array(Vec<JsonValue>),
+    Object(BTreeMap<String, JsonValue>),
+}
+
+impl JsonValue {
+    fn get(&self, key: &str) -> Result<&JsonValue, String> {
+        match self {
+            Self::Object(values) => values.get(key).ok_or_else(|| format!("missing JSON field {key:?}")),
+            _ => Err("expected JSON object".into()),
+        }
+    }
+
+    fn as_str(&self, field: &str) -> Result<&str, String> {
+        match self {
+            Self::String(value) => Ok(value),
+            _ => Err(format!("JSON field {field:?} must be a string")),
+        }
+    }
+
+    fn as_bool(&self, field: &str) -> Result<bool, String> {
+        match self {
+            Self::Bool(value) => Ok(*value),
+            _ => Err(format!("JSON field {field:?} must be a boolean")),
+        }
+    }
+
+    fn as_u64(&self, field: &str) -> Result<u64, String> {
+        match self {
+            Self::Number(value) if !value.bytes().any(|byte| matches!(byte, b'.' | b'e' | b'E' | b'-')) => value.parse::<u64>()
+                .map_err(|_| format!("JSON field {field:?} must be a non-negative integer")),
+            _ => Err(format!("JSON field {field:?} must be a non-negative integer")),
+        }
+    }
+
+    fn as_f64(&self, field: &str) -> Result<f64, String> {
+        match self {
+            Self::Number(value) => {
+                let parsed = value.parse::<f64>().map_err(|_| format!("JSON field {field:?} is not numeric"))?;
+                if parsed.is_finite() { Ok(parsed) } else { Err(format!("JSON field {field:?} is not finite")) }
+            }
+            _ => Err(format!("JSON field {field:?} must be numeric")),
+        }
+    }
+
+    fn optional_u64(&self, field: &str) -> Result<Option<u64>, String> {
+        match self {
+            Self::Null => Ok(None),
+            value => value.as_u64(field).map(Some),
+        }
+    }
+
+    fn optional_f64(&self, field: &str) -> Result<Option<f64>, String> {
+        match self {
+            Self::Null => Ok(None),
+            value => value.as_f64(field).map(Some),
+        }
+    }
+
+    fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+}
+
+struct JsonParser<'a> {
+    bytes: &'a [u8],
+    position: usize,
+}
+
+impl<'a> JsonParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { bytes: input.as_bytes(), position: 0 }
+    }
+
+    fn whitespace(&mut self) {
+        while self.position < self.bytes.len()
+            && matches!(self.bytes[self.position], b' ' | b'\n' | b'\r' | b'\t')
+        {
+            self.position += 1;
+        }
+    }
+
+    fn consume(&mut self, expected: u8) -> Result<(), String> {
+        self.whitespace();
+        if self.bytes.get(self.position) == Some(&expected) {
+            self.position += 1;
+            Ok(())
+        } else {
+            Err(format!("expected {:?} at JSON byte {}", expected as char, self.position))
+        }
+    }
+
+    fn parse_string(&mut self) -> Result<String, String> {
+        self.consume(b'"')?;
+        let mut output = Vec::new();
+        while self.position < self.bytes.len() {
+            let byte = self.bytes[self.position];
+            self.position += 1;
+            match byte {
+                b'"' => {
+                    return String::from_utf8(output).map_err(|_| "JSON string is not valid UTF-8".into());
+                }
+                b'\\' => {
+                    let escaped = *self.bytes.get(self.position)
+                        .ok_or_else(|| "unterminated JSON escape".to_string())?;
+                    self.position += 1;
+                    match escaped {
+                        b'"' => output.push(b'"'),
+                        b'\\' => output.push(b'\\'),
+                        b'/' => output.push(b'/'),
+                        b'b' => output.push(0x08),
+                        b'f' => output.push(0x0c),
+                        b'n' => output.push(b'\n'),
+                        b'r' => output.push(b'\r'),
+                        b't' => output.push(b'\t'),
+                        b'u' => {
+                            let first = self.parse_hex_quad()?;
+                            let codepoint = if (0xD800..=0xDBFF).contains(&first) {
+                                if !self.bytes.get(self.position..self.position + 2)
+                                    .is_some_and(|bytes| bytes == b"\\u")
+                                {
+                                    return Err("high surrogate must be followed by a low surrogate".into());
+                                }
+                                self.position += 2;
+                                let second = self.parse_hex_quad()?;
+                                if !(0xDC00..=0xDFFF).contains(&second) {
+                                    return Err("invalid low surrogate in JSON string".into());
+                                }
+                                0x10000 + (((first - 0xD800) as u32) << 10) + (second - 0xDC00) as u32
+                            } else if (0xDC00..=0xDFFF).contains(&first) {
+                                return Err("unpaired low surrogate in JSON string".into());
+                            } else {
+                                first as u32
+                            };
+                            let character = char::from_u32(codepoint)
+                                .ok_or_else(|| "invalid Unicode scalar in JSON string".to_string())?;
+                            let mut buffer = [0u8; 4];
+                            output.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
+                        }
+                        _ => return Err(format!("invalid JSON escape byte {escaped:?}")),
+                    }
+                }
+                0x00..=0x1f => return Err("unescaped control byte in JSON string".into()),
+                other => output.push(other),
+            }
+        }
+        Err("unterminated JSON string".into())
+    }
+
+    fn parse_hex_quad(&mut self) -> Result<u16, String> {
+        if self.position + 4 > self.bytes.len() {
+            return Err("truncated Unicode escape".into());
+        }
+        let mut value = 0u16;
+        for byte in &self.bytes[self.position..self.position + 4] {
+            value = value.checked_mul(16).ok_or_else(|| "Unicode escape overflow".to_string())?;
+            value += match *byte {
+                b'0'..=b'9' => (*byte - b'0') as u16,
+                b'a'..=b'f' => (*byte - b'a' + 10) as u16,
+                b'A'..=b'F' => (*byte - b'A' + 10) as u16,
+                _ => return Err("invalid hexadecimal digit in Unicode escape".into()),
+            };
+        }
+        self.position += 4;
+        Ok(value)
+    }
+
+    fn parse_number(&mut self) -> Result<JsonValue, String> {
+        let start = self.position;
+        if self.bytes.get(self.position) == Some(&b'-') { self.position += 1; }
+        match self.bytes.get(self.position) {
+            Some(byte) if *byte == b'0' => self.position += 1,
+            Some(byte) if (b'1'..=b'9').contains(byte) => {
+                self.position += 1;
+                while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
+                    self.position += 1;
+                }
+            }
+            _ => return Err(format!("invalid JSON number at byte {start}")),
+        }
+        if self.bytes.get(self.position) == Some(&b'.') {
+            self.position += 1;
+            let fraction_start = self.position;
+            while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
+                self.position += 1;
+            }
+            if self.position == fraction_start {
+                return Err("JSON number has an empty fractional part".into());
+            }
+        }
+        if matches!(self.bytes.get(self.position), Some(&b'e') | Some(&b'E')) {
+            self.position += 1;
+            if matches!(self.bytes.get(self.position), Some(&b'+') | Some(&b'-')) { self.position += 1; }
+            let exponent_start = self.position;
+            while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
+                self.position += 1;
+            }
+            if self.position == exponent_start {
+                return Err("JSON number has an empty exponent".into());
+            }
+        }
+        let text = std::str::from_utf8(&self.bytes[start..self.position])
+            .map_err(|_| "invalid UTF-8 in JSON number".to_string())?;
+        let parsed = text.parse::<f64>().map_err(|_| format!("invalid JSON number {text:?}"))?;
+        if !parsed.is_finite() {
+            return Err("JSON number is outside finite f64 range".into());
+        }
+        Ok(JsonValue::Number(text.to_string()))
+    }
+
+    fn value(&mut self) -> Result<JsonValue, String> {
+        self.whitespace();
+        match self.bytes.get(self.position).copied() {
+            Some(b'"') => self.parse_string().map(JsonValue::String),
+            Some(b'{') => {
+                self.position += 1;
+                self.whitespace();
+                let mut values = BTreeMap::new();
+                if self.bytes.get(self.position) == Some(&b'}') {
+                    self.position += 1;
+                    return Ok(JsonValue::Object(values));
+                }
+                loop {
+                    self.whitespace();
+                    if self.bytes.get(self.position) != Some(&b'"') {
+                        return Err(format!("JSON object key must be a string at byte {}", self.position));
+                    }
+                    let key = self.parse_string()?;
+                    self.consume(b':')?;
+                    let value = self.value()?;
+                    if values.insert(key.clone(), value).is_some() {
+                        return Err(format!("duplicate JSON object key {key:?}"));
+                    }
+                    self.whitespace();
+                    match self.bytes.get(self.position) {
+                        Some(&b',') => self.position += 1,
+                        Some(&b'}') => { self.position += 1; break; }
+                        _ => return Err(format!("expected comma or closing brace at byte {}", self.position)),
+                    }
+                }
+                Ok(JsonValue::Object(values))
+            }
+            Some(b'[') => {
+                self.position += 1;
+                self.whitespace();
+                let mut values = Vec::new();
+                if self.bytes.get(self.position) == Some(&b']') {
+                    self.position += 1;
+                    return Ok(JsonValue::Array(values));
+                }
+                loop {
+                    values.push(self.value()?);
+                    self.whitespace();
+                    match self.bytes.get(self.position) {
+                        Some(&b',') => self.position += 1,
+                        Some(&b']') => { self.position += 1; break; }
+                        _ => return Err(format!("expected comma or closing bracket at byte {}", self.position)),
+                    }
+                }
+                Ok(JsonValue::Array(values))
+            }
+            Some(b't') if self.bytes.get(self.position..self.position + 4).is_some_and(|bytes| bytes == b"true") => {
+                self.position += 4; Ok(JsonValue::Bool(true))
+            }
+            Some(b'f') if self.bytes.get(self.position..self.position + 5).is_some_and(|bytes| bytes == b"false") => {
+                self.position += 5; Ok(JsonValue::Bool(false))
+            }
+            Some(b'n') if self.bytes.get(self.position..self.position + 4).is_some_and(|bytes| bytes == b"null") => {
+                self.position += 4; Ok(JsonValue::Null)
+            }
+            Some(b'-' | b'0'..=b'9') => self.parse_number(),
+            Some(other) => Err(format!("unexpected JSON byte {other:?} at {}", self.position)),
+            None => Err("unexpected end of JSON input".into()),
+        }
+    }
+}
+
+fn parse_json(input: &str) -> Result<JsonValue, String> {
+    let mut parser = JsonParser::new(input);
+    let value = parser.value()?;
+    parser.whitespace();
+    if parser.position != parser.bytes.len() {
+        return Err(format!("trailing bytes after JSON value at {}", parser.position));
+    }
+    Ok(value)
+}
+
 fn identifier(value: &str) -> Result<String, String> {
     if value.is_empty() || !value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.') {
         return Err(format!("identifier {value:?} is empty or contains unsupported characters"));
@@ -347,6 +640,7 @@ struct GroupReport {
 #[derive(Clone, Debug)]
 struct Report {
     input_sha256: String, bootstrap_replicates: usize, bootstrap_seed: u64,
+    artifact_verification: ArtifactVerification,
     groups: Vec<GroupReport>,
 }
 
@@ -412,7 +706,10 @@ fn pair_is_within_tolerance(delta: &ResourcePairDelta) -> bool {
     ].iter().all(|value| *value == Some(true))
 }
 
-fn evaluate_resource_match(episodes: &[BTreeMap<Arm, Row>]) -> ResourceMatch {
+fn evaluate_resource_match(
+    episodes: &[BTreeMap<Arm, Row>],
+    receipt_verification_status: &'static str,
+) -> ResourceMatch {
     let reference = &episodes[0][&Arm::D0];
     let method = reference.resource_measurement_method;
     let d1_role_valid = episodes.iter().all(|episode| {
@@ -493,7 +790,7 @@ fn evaluate_resource_match(episodes: &[BTreeMap<Arm, Row>]) -> ResourceMatch {
         status,
         resource_measurement_method: method.name(),
         resource_profile_sha256: reference.resource_profile_sha256.clone(),
-        receipt_verification_status: "digest_only_not_independently_verified",
+        receipt_verification_status,
         d1_role_valid,
         learned_model_role_valid,
         w2_workload_match_valid,
@@ -600,21 +897,42 @@ fn bootstrap_ci(values: &[f64], replicates: usize, seed: u64) -> (f64, f64) {
 }
 
 fn build_report(input: &str, replicates: usize, bootstrap_seed: u64) -> Result<Report, String> {
+    build_report_with_artifacts(input, replicates, bootstrap_seed, None, false)
+}
+
+fn build_report_with_artifacts(
+    input: &str,
+    replicates: usize,
+    bootstrap_seed: u64,
+    artifacts_dir: Option<&Path>,
+    allow_fixtures: bool,
+) -> Result<Report, String> {
     if replicates < 100 { return Err("bootstrap replicates must be at least 100".into()); }
+    if allow_fixtures && artifacts_dir.is_none() {
+        return Err("--allow-fixtures requires --artifacts-dir".into());
+    }
     let paired_groups = parse_and_pair(input)?;
+    let artifact_verification = match artifacts_dir {
+        Some(directory) => verify_artifacts(&paired_groups, directory, allow_fixtures)?,
+        None => unverified_artifacts(),
+    };
     let mut groups = Vec::with_capacity(paired_groups.len());
     for (group_index, ((task, capability, split), episodes)) in paired_groups.into_iter().enumerate() {
         let episode_count = episodes.len();
         let mut arms = BTreeMap::new();
         for arm in ARMS { arms.insert(arm, summarize_arm(&episodes, arm)); }
-        let resource_match = evaluate_resource_match(&episodes);
+        let resource_match = evaluate_resource_match(&episodes, artifact_verification.status);
         let eligibility = if split != "qualification" || episode_count < MIN_QUALIFICATION_PAIRS {
             "smoke_only"
+        } else if resource_match.status == "budget_unmatched" {
+            "budget_unmatched"
+        } else if resource_match.status == "resource_unmeasured" {
+            "resource_unmeasured"
         } else {
-            match resource_match.status {
-                "budget_matched" => "budget_match_unverified",
-                "budget_unmatched" => "budget_unmatched",
-                _ => "resource_unmeasured",
+            match artifact_verification.status {
+                "content_verified_origin_unattested" => "budget_match_receipts_verified",
+                "synthetic_fixture_content_verified_origin_unattested" => "synthetic_fixture_only",
+                _ => "budget_match_unverified",
             }
         };
         let mut contrasts = Vec::with_capacity(CONTRASTS.len());
@@ -643,7 +961,7 @@ fn build_report(input: &str, replicates: usize, bootstrap_seed: u64) -> Result<R
     }
     Ok(Report {
         input_sha256: sha256_hex(input.as_bytes()), bootstrap_replicates: replicates,
-        bootstrap_seed, groups,
+        bootstrap_seed, artifact_verification, groups,
     })
 }
 
@@ -673,6 +991,14 @@ fn render_report(report: &Report) -> String {
     writeln!(&mut out, "  \"bootstrap_replicates\": {},", report.bootstrap_replicates).unwrap();
     writeln!(&mut out, "  \"bootstrap_seed\": {},", report.bootstrap_seed).unwrap();
     writeln!(&mut out, "  \"minimum_qualification_pairs\": {MIN_QUALIFICATION_PAIRS},").unwrap();
+    writeln!(&mut out,
+        "  \"artifact_verification\": {{\"status\":\"{}\",\"profiles_verified\":{},\"receipts_verified\":{},\"fixture_only\":{},\"claim_ceiling\":\"{}\"}},",
+        report.artifact_verification.status,
+        report.artifact_verification.profiles_verified,
+        report.artifact_verification.receipts_verified,
+        report.artifact_verification.fixture_only,
+        report.artifact_verification.claim_ceiling
+    ).unwrap();
     writeln!(&mut out, "  \"groups\": [").unwrap();
     for (group_index, group) in report.groups.iter().enumerate() {
         let group_comma = if group_index + 1 == report.groups.len() { "" } else { "," };
@@ -696,30 +1022,30 @@ fn render_report(report: &Report) -> String {
         for (arm_index, arm) in ARMS.iter().enumerate() {
             let m = &group.arms[arm];
             let comma = if arm_index + 1 == ARMS.len() { "" } else { "," };
-            writeln!(&mut out,
-                concat!("        \"{}\": {{\"mean_return\": {}, \"success_rate\": {}, ",
-                "\"success_count\": {}, \"failed_count\": {}, \"timed_out_count\": {}, ",
-                "\"mean_latency_ms\": {}, \"p50_latency_ms\": {}, \"p95_latency_ms\": {}, ",
-                "\"resource_metrics\": {{\"mean_compute_work_units\": {}, \"p50_compute_work_units\": {}, \"p95_compute_work_units\": {}, ",
-                "\"p95_peak_memory_bytes\": {}, \"mean_energy_millijoules\": {}, \"energy_measured_episode_count\": {}, ",
-                "\"mean_direct_value_calls\": {}, \"mean_world_model_forward_calls\": {}, \"mean_world_model_transition_calls\": {}, ",
-                "\"mean_oracle_transition_calls\": {}, \"mean_environment_transition_calls\": {}, \"mean_optimizer_iterations\": {}}}}{}"),
-                arm.name(), number(m.mean_return), number(m.success_rate), m.success_count,
-                m.failed_count, m.timed_out_count, number(m.mean_latency_ms),
-                number(m.p50_latency_ms), number(m.p95_latency_ms),
-                optional_number(m.resources.mean_compute_work_units),
-                optional_number(m.resources.p50_compute_work_units),
-                optional_number(m.resources.p95_compute_work_units),
-                optional_number(m.resources.p95_peak_memory_bytes),
-                optional_number(m.resources.mean_energy_millijoules),
-                m.resources.energy_measured_episode_count,
-                number(m.resources.mean_direct_value_calls),
-                number(m.resources.mean_world_model_forward_calls),
-                number(m.resources.mean_world_model_transition_calls),
-                number(m.resources.mean_oracle_transition_calls),
-                number(m.resources.mean_environment_transition_calls),
-                number(m.resources.mean_optimizer_iterations), comma
-            ).unwrap();
+            writeln!(&mut out, "        \"{}\": {{", arm.name()).unwrap();
+            writeln!(&mut out, "          \"mean_return\": {},", number(m.mean_return)).unwrap();
+            writeln!(&mut out, "          \"success_rate\": {},", number(m.success_rate)).unwrap();
+            writeln!(&mut out, "          \"success_count\": {},", m.success_count).unwrap();
+            writeln!(&mut out, "          \"failed_count\": {},", m.failed_count).unwrap();
+            writeln!(&mut out, "          \"timed_out_count\": {},", m.timed_out_count).unwrap();
+            writeln!(&mut out, "          \"mean_latency_ms\": {},", number(m.mean_latency_ms)).unwrap();
+            writeln!(&mut out, "          \"p50_latency_ms\": {},", number(m.p50_latency_ms)).unwrap();
+            writeln!(&mut out, "          \"p95_latency_ms\": {},", number(m.p95_latency_ms)).unwrap();
+            writeln!(&mut out, "          \"resource_metrics\": {{").unwrap();
+            writeln!(&mut out, "            \"mean_compute_work_units\": {},", optional_number(m.resources.mean_compute_work_units)).unwrap();
+            writeln!(&mut out, "            \"p50_compute_work_units\": {},", optional_number(m.resources.p50_compute_work_units)).unwrap();
+            writeln!(&mut out, "            \"p95_compute_work_units\": {},", optional_number(m.resources.p95_compute_work_units)).unwrap();
+            writeln!(&mut out, "            \"p95_peak_memory_bytes\": {},", optional_number(m.resources.p95_peak_memory_bytes)).unwrap();
+            writeln!(&mut out, "            \"mean_energy_millijoules\": {},", optional_number(m.resources.mean_energy_millijoules)).unwrap();
+            writeln!(&mut out, "            \"energy_measured_episode_count\": {},", m.resources.energy_measured_episode_count).unwrap();
+            writeln!(&mut out, "            \"mean_direct_value_calls\": {},", number(m.resources.mean_direct_value_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_world_model_forward_calls\": {},", number(m.resources.mean_world_model_forward_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_world_model_transition_calls\": {},", number(m.resources.mean_world_model_transition_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_oracle_transition_calls\": {},", number(m.resources.mean_oracle_transition_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_environment_transition_calls\": {},", number(m.resources.mean_environment_transition_calls)).unwrap();
+            writeln!(&mut out, "            \"mean_optimizer_iterations\": {}", number(m.resources.mean_optimizer_iterations)).unwrap();
+            writeln!(&mut out, "          }},").unwrap();
+            writeln!(&mut out, "        }}{}", comma).unwrap();
         }
         writeln!(&mut out, "      }},").unwrap();
         writeln!(&mut out, "      \"contrasts\": [").unwrap();
@@ -790,36 +1116,364 @@ fn sha256_hex(input: &[u8]) -> String {
     output
 }
 
-fn parse_args() -> Result<(PathBuf, usize, u64), String> {
+
+const PROFILE_SCHEMA_VERSION: &str = "cmaq-012-resource-profile-v0.1";
+const RECEIPT_SCHEMA_VERSION: &str = "cmaq-012-profiling-receipt-v0.1";
+const PROFILE_CLAIM_CEILING: &str = "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified";
+const RECEIPT_CLAIM_CEILING: &str = "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested";
+const ARTIFACT_MAX_BYTES: u64 = 1_048_576;
+
+#[derive(Clone, Debug)]
+struct ArtifactVerification {
+    status: &'static str,
+    profiles_verified: usize,
+    receipts_verified: usize,
+    fixture_only: bool,
+    claim_ceiling: &'static str,
+}
+
+fn optional_fixture_only(value: &JsonValue) -> Result<bool, String> {
+    match value {
+        JsonValue::Object(fields) => match fields.get("fixture_only") {
+            None => Ok(false),
+            Some(value) => value.as_bool("fixture_only"),
+        },
+        _ => Err("artifact root must be a JSON object".into()),
+    }
+}
+
+fn require_nonempty_string(value: &JsonValue, field: &str) -> Result<(), String> {
+    let text = value.get(field)?.as_str(field)?;
+    if text.trim().is_empty() {
+        return Err(format!("JSON field {field:?} must not be empty"));
+    }
+    Ok(())
+}
+
+fn require_digest_field(value: &JsonValue, field: &str) -> Result<(), String> {
+    let text = value.get(field)?.as_str(field)?;
+    digest(text).map(|_| ()).map_err(|error| format!("JSON field {field:?}: {error}"))
+}
+
+fn approximately_equal(left: f64, right: f64) -> bool {
+    (left - right).abs() <= 1e-9 * (1.0 + left.abs().max(right.abs()))
+}
+
+fn artifact_path(root: &Path, subdirectory: &str, digest_value: &str) -> PathBuf {
+    root.join(subdirectory).join(format!("{digest_value}.json"))
+}
+
+fn validate_artifact_directory(root: &Path, subdirectory: &str) -> Result<(), String> {
+    let root_metadata = fs::symlink_metadata(root)
+        .map_err(|error| format!("cannot inspect artifact root {}: {error}", root.display()))?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(format!("artifact root {} must be a real directory, not a symlink", root.display()));
+    }
+    let child = root.join(subdirectory);
+    let child_metadata = fs::symlink_metadata(&child)
+        .map_err(|error| format!("cannot inspect artifact directory {}: {error}", child.display()))?;
+    if child_metadata.file_type().is_symlink() || !child_metadata.is_dir() {
+        return Err(format!("artifact directory {} must be a real directory, not a symlink", child.display()));
+    }
+    Ok(())
+}
+
+fn read_verified_artifact(
+    root: &Path,
+    subdirectory: &str,
+    expected_digest: &str,
+    kind: &str,
+) -> Result<Vec<u8>, String> {
+    let path = artifact_path(root, subdirectory, expected_digest);
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|error| format!("missing {kind} artifact {}: {error}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!("{kind} artifact {} must be a regular non-symlink file", path.display()));
+    }
+    if metadata.len() == 0 || metadata.len() > ARTIFACT_MAX_BYTES {
+        return Err(format!("{kind} artifact {} must be 1..={ARTIFACT_MAX_BYTES} bytes", path.display()));
+    }
+    let bytes = fs::read(&path)
+        .map_err(|error| format!("failed to read {kind} artifact {}: {error}", path.display()))?;
+    let actual = sha256_hex(&bytes);
+    if actual != expected_digest {
+        return Err(format!(
+            "{kind} artifact digest mismatch at {}: expected {expected_digest}, computed {actual}",
+            path.display()
+        ));
+    }
+    Ok(bytes)
+}
+
+fn validate_profile_artifact(
+    bytes: &[u8],
+    expected_digest: &str,
+    expected_method: ResourceMeasurementMethod,
+    allow_fixtures: bool,
+) -> Result<bool, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "resource profile is not UTF-8".to_string())?;
+    let profile = parse_json(text).map_err(|error| format!("invalid resource profile JSON: {error}"))?;
+    if profile.get("schema_version")?.as_str("schema_version")? != PROFILE_SCHEMA_VERSION {
+        return Err("resource profile schema_version mismatch".into());
+    }
+    if profile.get("resource_measurement_method")?.as_str("resource_measurement_method")?
+        != expected_method.name()
+    {
+        return Err("resource profile measurement method does not match TSV rows".into());
+    }
+    if profile.get("claim_ceiling")?.as_str("claim_ceiling")? != PROFILE_CLAIM_CEILING {
+        return Err("resource profile claim_ceiling mismatch".into());
+    }
+    if digest(expected_digest)? != expected_digest {
+        return Err("resource profile digest is not canonical lowercase hexadecimal".into());
+    }
+
+    let fixture_only = optional_fixture_only(&profile)?;
+    if fixture_only && !allow_fixtures {
+        return Err("synthetic fixture resource profile rejected without explicit --allow-fixtures".into());
+    }
+
+    let hardware = profile.get("hardware")?;
+    for field in ["os_arch", "cpu_model", "device_clock_policy"] {
+        require_nonempty_string(hardware, field)?;
+    }
+    if hardware.get("logical_cpu_count")?.as_u64("logical_cpu_count")? == 0
+        || hardware.get("memory_bytes")?.as_u64("memory_bytes")? == 0
+    {
+        return Err("resource profile hardware counts and memory must be positive".into());
+    }
+    for field in ["accelerator_model", "accelerator_driver"] {
+        let value = hardware.get(field)?;
+        if !value.is_null() { value.as_str(field)?; }
+    }
+
+    let software = profile.get("software")?;
+    require_nonempty_string(software, "source_commit")?;
+    require_nonempty_string(software, "compiler")?;
+    require_nonempty_string(software, "runtime")?;
+    require_digest_field(software, "binary_sha256")?;
+    require_digest_field(software, "dependency_lock_sha256")?;
+
+    let instrumentation = profile.get("instrumentation")?;
+    for field in ["profiler_name", "profiler_version", "measurement_scope",
+                  "synchronization_policy", "instrumentation_overhead_policy"] {
+        require_nonempty_string(instrumentation, field)?;
+    }
+    require_digest_field(instrumentation, "profiler_binary_sha256")?;
+    if instrumentation.get("measured_repetitions")?.as_u64("measured_repetitions")? == 0 {
+        return Err("resource profile measured_repetitions must be positive".into());
+    }
+
+    let compute_definition = profile.get("compute_work_unit_definition")?;
+    if compute_definition.get("unit_name")?.as_str("unit_name")? != "normalized_compute_work_unit" {
+        return Err("resource profile compute work unit name mismatch".into());
+    }
+    require_nonempty_string(compute_definition, "counting_semantics")?;
+    let accepted = match compute_definition.get("accepted_methods")? {
+        JsonValue::Array(values) => values,
+        _ => return Err("resource profile accepted_methods must be an array".into()),
+    };
+    if !accepted.iter().any(|value| value.as_str("accepted_methods[]").ok() == Some(expected_method.name())) {
+        return Err("resource profile does not declare the TSV measurement method as accepted".into());
+    }
+
+    if profile.get("latency_measurement")?.get("unit")?.as_str("latency_measurement.unit")? != "milliseconds"
+        || profile.get("memory_measurement")?.get("unit")?.as_str("memory_measurement.unit")? != "bytes"
+        || profile.get("energy_measurement")?.get("unit")?.as_str("energy_measurement.unit")? != "millijoules"
+    {
+        return Err("resource profile units must be milliseconds, bytes and millijoules".into());
+    }
+    for (section, field, expected) in [
+        ("tolerances", "compute_work_relative", COMPUTE_WORK_TOLERANCE),
+        ("tolerances", "latency_relative", LATENCY_TOLERANCE),
+        ("tolerances", "peak_memory_relative", MEMORY_TOLERANCE),
+    ] {
+        let value = profile.get(section)?.get(field)?.as_f64(field)?;
+        if !approximately_equal(value, expected) {
+            return Err(format!("resource profile tolerance {field} does not match auditor contract"));
+        }
+    }
+    Ok(fixture_only)
+}
+
+fn validate_receipt_row(
+    receipt: &JsonValue,
+    row: &Row,
+    profile_digest: &str,
+    profile_fixture_only: bool,
+    allow_fixtures: bool,
+) -> Result<(), String> {
+    if receipt.get("schema_version")?.as_str("schema_version")? != RECEIPT_SCHEMA_VERSION {
+        return Err("profiling receipt schema_version mismatch".into());
+    }
+    if receipt.get("claim_ceiling")?.as_str("claim_ceiling")? != RECEIPT_CLAIM_CEILING {
+        return Err("profiling receipt claim_ceiling mismatch".into());
+    }
+    if receipt.get("resource_profile_sha256")?.as_str("resource_profile_sha256")? != profile_digest {
+        return Err("profiling receipt resource profile digest does not match TSV row".into());
+    }
+    if receipt.get("task")?.as_str("task")? != row.task
+        || receipt.get("capability")?.as_str("capability")? != row.capability
+        || receipt.get("split")?.as_str("split")? != row.split
+        || receipt.get("seed")?.as_u64("seed")? != row.seed
+        || receipt.get("arm")?.as_str("arm")? != row.arm.name()
+    {
+        return Err("profiling receipt episode identity does not match TSV row".into());
+    }
+    if receipt.get("measurement_method")?.as_str("measurement_method")? != row.resource_measurement_method.name() {
+        return Err("profiling receipt measurement method does not match TSV row".into());
+    }
+    let latency = receipt.get("latency_ms")?.as_f64("latency_ms")?;
+    if !approximately_equal(latency, row.latency_ms) {
+        return Err("profiling receipt latency_ms does not match TSV row".into());
+    }
+    if receipt.get("compute_work_units")?.optional_u64("compute_work_units")? != row.compute_work_units
+        || receipt.get("peak_memory_bytes")?.optional_u64("peak_memory_bytes")? != row.peak_memory_bytes
+    {
+        return Err("profiling receipt compute or memory does not match TSV row".into());
+    }
+    let energy = receipt.get("energy_millijoules")?.optional_f64("energy_millijoules")?;
+    match (energy, row.energy_millijoules) {
+        (Some(a), Some(b)) if approximately_equal(a, b) => {}
+        (None, None) => {}
+        _ => return Err("profiling receipt energy does not match TSV row".into()),
+    }
+    for (field, expected) in [
+        ("direct_value_calls", row.direct_value_calls),
+        ("world_model_forward_calls", row.world_model_forward_calls),
+        ("world_model_transition_calls", row.world_model_transition_calls),
+        ("oracle_transition_calls", row.oracle_transition_calls),
+        ("environment_transition_calls", row.environment_transition_calls),
+        ("optimizer_iterations", row.optimizer_iterations),
+    ] {
+        if receipt.get(field)?.as_u64(field)? != expected {
+            return Err(format!("profiling receipt {field} does not match TSV row"));
+        }
+    }
+    require_nonempty_string(receipt, "recorder_id")?;
+    if receipt.get("profiling_receipt_sha256").is_ok() {
+        return Err("profiling receipt must not contain a self-referential digest field".into());
+    }
+    let fixture_only = optional_fixture_only(receipt)?;
+    if fixture_only != profile_fixture_only {
+        return Err("profiling receipt fixture_only flag differs from resource profile".into());
+    }
+    if fixture_only && !allow_fixtures {
+        return Err("synthetic profiling receipt rejected without explicit --allow-fixtures".into());
+    }
+    Ok(())
+}
+
+fn verify_artifacts(
+    groups: &[(ResultKey, Vec<BTreeMap<Arm, Row>>)],
+    artifacts_dir: &Path,
+    allow_fixtures: bool,
+) -> Result<ArtifactVerification, String> {
+    validate_artifact_directory(artifacts_dir, "profiles")?;
+    validate_artifact_directory(artifacts_dir, "receipts")?;
+    let mut verified_profiles = BTreeSet::new();
+    let mut verified_receipts = BTreeSet::new();
+    let mut fixture_mode: Option<bool> = None;
+
+    for ((task, capability, split), episodes) in groups {
+        let reference = &episodes[0][&Arm::D0];
+        let profile_digest = &reference.resource_profile_sha256;
+        let profile_bytes = read_verified_artifact(
+            artifacts_dir, "profiles", profile_digest, "resource profile"
+        )?;
+        let profile_fixture = validate_profile_artifact(
+            &profile_bytes, profile_digest, reference.resource_measurement_method, allow_fixtures
+        )?;
+        if fixture_mode.replace(profile_fixture).is_some_and(|previous| previous != profile_fixture) {
+            return Err("artifact set mixes fixture-only and non-fixture profiles".into());
+        }
+        verified_profiles.insert(profile_digest.clone());
+
+        for episode in episodes {
+            for arm in ARMS {
+                let row = &episode[&arm];
+                if row.resource_profile_sha256 != *profile_digest {
+                    return Err(format!("resource profile drift while verifying {task}/{capability}/{split}"));
+                }
+                let receipt_digest = &row.profiling_receipt_sha256;
+                let receipt_bytes = read_verified_artifact(
+                    artifacts_dir, "receipts", receipt_digest, "profiling receipt"
+                )?;
+                let receipt_text = std::str::from_utf8(&receipt_bytes)
+                    .map_err(|_| format!("profiling receipt {receipt_digest} is not UTF-8"))?;
+                let receipt = parse_json(receipt_text)
+                    .map_err(|error| format!("invalid profiling receipt {receipt_digest}: {error}"))?;
+                validate_receipt_row(&receipt, row, profile_digest, profile_fixture, allow_fixtures)
+                    .map_err(|error| format!("profiling receipt {receipt_digest}: {error}"))?;
+                verified_receipts.insert(receipt_digest.clone());
+            }
+        }
+    }
+
+    let fixture_only = fixture_mode.unwrap_or(false);
+    let (status, claim_ceiling) = if fixture_only {
+        ("synthetic_fixture_content_verified_origin_unattested",
+         "synthetic_fixture_content_integrity_verified_no_hardware_claim")
+    } else {
+        ("content_verified_origin_unattested",
+         "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested")
+    };
+    Ok(ArtifactVerification {
+        status,
+        profiles_verified: verified_profiles.len(),
+        receipts_verified: verified_receipts.len(),
+        fixture_only,
+        claim_ceiling,
+    })
+}
+
+fn unverified_artifacts() -> ArtifactVerification {
+    ArtifactVerification {
+        status: "digest_only_not_independently_verified",
+        profiles_verified: 0,
+        receipts_verified: 0,
+        fixture_only: false,
+        claim_ceiling: "tsv_digest_syntax_only_no_artifact_bytes_or_hardware_origin_verified",
+    }
+}
+
+fn parse_args() -> Result<(PathBuf, usize, u64, Option<PathBuf>, bool), String> {
     let mut input = None;
     let mut replicates = 2000usize;
     let mut seed = 0xC0A0_0012_2026_1030u64;
+    let mut artifacts_dir = None;
+    let mut allow_fixtures = false;
     let args: Vec<String> = env::args().skip(1).collect();
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--help" | "-h" => {
-                println!("CMAQ-012 paired advantage-of-prediction auditor\n\nUsage: cargo run -- --input FILE [--replicates N] [--bootstrap-seed N]\n\nReads a strict TSV result ledger and emits paired return/success contrasts as JSON.");
+                println!("CMAQ-012 paired advantage-of-prediction auditor\n\nUsage: cargo run -- --input FILE [--replicates N] [--bootstrap-seed N] [--artifacts-dir DIR] [--allow-fixtures]\n\nReads a strict TSV ledger. When --artifacts-dir is supplied, verifies exact profile and receipt bytes against every paired row. Fixture-only artifacts require the explicit --allow-fixtures flag.");
                 process::exit(0);
             }
             "--input" => { index += 1; input = Some(PathBuf::from(args.get(index).ok_or_else(|| "--input requires a path".to_string())?)); }
             "--replicates" => { index += 1; replicates = args.get(index).ok_or_else(|| "--replicates requires a number".to_string())?.parse().map_err(|_| "invalid --replicates value".to_string())?; }
             "--bootstrap-seed" => { index += 1; seed = args.get(index).ok_or_else(|| "--bootstrap-seed requires a number".to_string())?.parse().map_err(|_| "invalid --bootstrap-seed value".to_string())?; }
+            "--artifacts-dir" => { index += 1; artifacts_dir = Some(PathBuf::from(args.get(index).ok_or_else(|| "--artifacts-dir requires a directory".to_string())?)); }
+            "--allow-fixtures" => allow_fixtures = true,
             other => return Err(format!("unknown argument {other:?}; use --help")),
         }
         index += 1;
     }
-    Ok((input.ok_or_else(|| "--input is required".to_string())?, replicates, seed))
+    if allow_fixtures && artifacts_dir.is_none() {
+        return Err("--allow-fixtures requires --artifacts-dir".into());
+    }
+    Ok((input.ok_or_else(|| "--input is required".to_string())?, replicates, seed, artifacts_dir, allow_fixtures))
 }
 
 fn main() {
-    let (path, replicates, seed) = match parse_args() {
+    let (path, replicates, seed, artifacts_dir, allow_fixtures) = match parse_args() {
         Ok(args) => args, Err(error) => { eprintln!("{error}"); process::exit(2); }
     };
     let input = match fs::read_to_string(&path) {
         Ok(input) => input, Err(error) => { eprintln!("failed to read {}: {error}", path.display()); process::exit(2); }
     };
-    match build_report(&input, replicates, seed) {
+    match build_report_with_artifacts(&input, replicates, seed, artifacts_dir.as_deref(), allow_fixtures) {
         Ok(report) => print!("{}", render_report(&report)),
         Err(error) => { eprintln!("invalid CMAQ-012 input: {error}"); process::exit(1); }
     }
@@ -830,6 +1484,138 @@ mod tests {
     use super::*;
 
     fn test_digest(value: u64) -> String { format!("{value:064x}") }
+
+    fn artifact_fixture(input: &str) -> (PathBuf, String) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let root = env::temp_dir().join(format!(
+            "cmaq-012-artifact-fixture-{}-{}",
+            process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(root.join("profiles")).unwrap();
+        fs::create_dir_all(root.join("receipts")).unwrap();
+
+        let profile = r#"{
+  "schema_version": "cmaq-012-resource-profile-v0.1",
+  "resource_measurement_method": "operator_trace",
+  "hardware": {
+    "os_arch": "synthetic-fixture",
+    "cpu_model": "synthetic",
+    "logical_cpu_count": 1,
+    "accelerator_model": null,
+    "accelerator_driver": null,
+    "memory_bytes": 1048576,
+    "device_clock_policy": "fixed-fixture"
+  },
+  "software": {
+    "source_commit": "fixture-only",
+    "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "compiler": "fixture",
+    "runtime": "fixture",
+    "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "instrumentation": {
+    "profiler_name": "fixture-profiler",
+    "profiler_version": "1",
+    "profiler_binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "measurement_scope": "unit-test-only",
+    "synchronization_policy": "none",
+    "warmup_iterations": 0,
+    "measured_repetitions": 1,
+    "instrumentation_overhead_policy": "not-measured"
+  },
+  "compute_work_unit_definition": {
+    "unit_name": "normalized_compute_work_unit",
+    "counting_semantics": "synthetic unit-test counters",
+    "accepted_methods": ["operator_trace"],
+    "not_counted": []
+  },
+  "latency_measurement": {
+    "clock_source": "fixture",
+    "start_event": "start",
+    "end_event": "end",
+    "includes_synchronization": false,
+    "unit": "milliseconds"
+  },
+  "memory_measurement": {
+    "scope": "fixture",
+    "unit": "bytes",
+    "peak_policy": "synthetic"
+  },
+  "energy_measurement": {
+    "source": "unavailable",
+    "sampling_policy": "not measured",
+    "unit": "millijoules",
+    "calibration": "not measured"
+  },
+  "tolerances": {
+    "compute_work_relative": 0.05,
+    "latency_relative": 0.05,
+    "peak_memory_relative": 0.1
+  },
+  "claim_ceiling": "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified",
+  "fixture_only": true
+}
+"#;
+        let profile_digest = sha256_hex(profile.as_bytes());
+        fs::write(
+            root.join("profiles").join(format!("{profile_digest}.json")),
+            profile,
+        ).unwrap();
+
+        let mut output = Vec::new();
+        let mut lines = input.lines();
+        output.push(lines.next().unwrap_or_default().to_string());
+        for line in lines {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            fields[19] = profile_digest.clone();
+            let receipt = format!(
+                concat!(
+                    "{{\n",
+                    "  \"schema_version\": \"cmaq-012-profiling-receipt-v0.1\",\n",
+                    "  \"resource_profile_sha256\": \"{}\",\n",
+                    "  \"task\": \"{}\",\n",
+                    "  \"capability\": \"{}\",\n",
+                    "  \"split\": \"{}\",\n",
+                    "  \"seed\": {},\n",
+                    "  \"arm\": \"{}\",\n",
+                    "  \"measurement_method\": \"{}\",\n",
+                    "  \"latency_ms\": {},\n",
+                    "  \"compute_work_units\": {},\n",
+                    "  \"peak_memory_bytes\": {},\n",
+                    "  \"energy_millijoules\": {},\n",
+                    "  \"direct_value_calls\": {},\n",
+                    "  \"world_model_forward_calls\": {},\n",
+                    "  \"world_model_transition_calls\": {},\n",
+                    "  \"oracle_transition_calls\": {},\n",
+                    "  \"environment_transition_calls\": {},\n",
+                    "  \"optimizer_iterations\": {},\n",
+                    "  \"recorder_id\": \"synthetic-fixture-no-independent-recorder\",\n",
+                    "  \"claim_ceiling\": \"artifact_content_integrity_verified_profiler_and_hardware_origin_unattested\",\n",
+                    "  \"fixture_only\": true\n",
+                    "}}\n"
+                ),
+                profile_digest, fields[0], fields[1], fields[2], fields[3], fields[4], fields[21],
+                fields[18], fields[22], fields[23], fields[24], fields[25], fields[26],
+                fields[27], fields[28], fields[29], fields[30]
+            );
+            let receipt_digest = sha256_hex(receipt.as_bytes());
+            fs::write(
+                root.join("receipts").join(format!("{receipt_digest}.json")),
+                receipt,
+            ).unwrap();
+            fields[20] = receipt_digest;
+            output.push(fields.join("\t"));
+        }
+        (root, output.join("\n") + "\n")
+    }
+
+    fn cleanup_artifact_fixture(root: &Path) {
+        let _ = fs::remove_dir_all(root);
+    }
+
+
     fn synthetic_tsv(n: usize, d0: f64, d1: f64, w1: f64, w2: f64, w3: f64) -> String {
         let mut text = format!("{HEADER}\n");
         let values = [d0, d1, w1, w2, w3];
@@ -917,6 +1703,135 @@ mod tests {
     fn sha256_known_answer() {
         assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
+
+    #[test]
+    fn strict_json_parser_handles_nested_values_and_rejects_duplicate_keys() {
+        let parsed = parse_json(r#"{"s":"line\n\u263a","n":12,"a":[true,null,1.25]}"#).unwrap();
+        assert_eq!(parsed.get("s").unwrap().as_str("s").unwrap(), "line\n☺");
+        assert_eq!(parsed.get("n").unwrap().as_u64("n").unwrap(), 12);
+        assert!(matches!(parsed.get("a").unwrap(), JsonValue::Array(_)));
+        assert!(parse_json(r#"{"x":1,"x":2}"#).is_err());
+        assert!(parse_json("{} trailing").is_err());
+    }
+
+    #[test]
+    fn strict_json_parser_rejects_malformed_numbers_escapes_and_surrogates() {
+        assert!(parse_json(r#"{"n":01}"#).is_err());
+        assert!(parse_json(r#"{"n":1.}"#).is_err());
+        assert!(parse_json(r#"{"n":1e}"#).is_err());
+        assert!(parse_json(r#"{"n":1e9999}"#).is_err());
+        assert!(parse_json(r#"{"s":"\q"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\uD800"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\uDC00"}"#).is_err());
+        assert!(parse_json(r#"{"x":[1,]}"#).is_err());
+    }
+
+    #[test]
+    fn actual_profile_and_receipt_bytes_are_bound_to_each_paired_row() {
+        let input = synthetic_tsv(2,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let report = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap();
+        assert_eq!(report.artifact_verification.status, "synthetic_fixture_content_verified_origin_unattested");
+        assert_eq!(report.artifact_verification.profiles_verified, 1);
+        assert_eq!(report.artifact_verification.receipts_verified, 10);
+        assert!(report.artifact_verification.fixture_only);
+        assert_eq!(report.groups[0].resource_match.receipt_verification_status,
+            "synthetic_fixture_content_verified_origin_unattested");
+        assert_eq!(report.groups[0].eligibility, "smoke_only");
+        assert!(build_report_with_artifacts(&enriched,100,42,Some(&root),false)
+            .unwrap_err().contains("without explicit --allow-fixtures"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[test]
+    fn receipt_byte_tampering_is_rejected_even_when_tsv_digest_is_unchanged() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let first_row = enriched.lines().nth(1).unwrap();
+        let receipt_digest = first_row.split('\t').nth(20).unwrap();
+        let path = root.join("receipts").join(format!("{receipt_digest}.json"));
+        let mut bytes = fs::read(&path).unwrap();
+        bytes.push(b' ');
+        fs::write(&path, bytes).unwrap();
+        let error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(error.contains("artifact digest mismatch"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[test]
+    fn receipt_field_tampering_is_rejected_after_rehashing_bytes() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let mut lines: Vec<String> = enriched.lines().map(str::to_string).collect();
+        let mut fields: Vec<String> = lines[2].split('\t').map(str::to_string).collect();
+        let old_digest = fields[20].clone();
+        let path = root.join("receipts").join(format!("{old_digest}.json"));
+        let receipt = fs::read_to_string(&path).unwrap();
+        let mutated = receipt.replacen("\"compute_work_units\": 100000", "\"compute_work_units\": 999", 1);
+        assert_ne!(receipt, mutated);
+        let new_digest = sha256_hex(mutated.as_bytes());
+        fs::write(root.join("receipts").join(format!("{new_digest}.json")), mutated).unwrap();
+        fields[20] = new_digest;
+        lines[2] = fields.join("\t");
+        let modified_tsv = lines.join("\n") + "\n";
+        let error = build_report_with_artifacts(&modified_tsv,100,42,Some(&root),true).unwrap_err();
+        assert!(error.contains("compute or memory does not match TSV row"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifact_verifier_rejects_symlinked_root_directory_and_receipt_file() {
+        use std::os::unix::fs::symlink;
+
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+
+        let root_link = root.with_extension("root-link");
+        symlink(&root, &root_link).unwrap();
+        let root_error = build_report_with_artifacts(&enriched,100,42,Some(&root_link),true).unwrap_err();
+        assert!(root_error.contains("must be a real directory"));
+        fs::remove_file(&root_link).unwrap();
+
+        let receipts_dir = root.join("receipts");
+        let real_receipts_dir = root.join("receipts-real");
+        fs::rename(&receipts_dir, &real_receipts_dir).unwrap();
+        symlink(&real_receipts_dir, &receipts_dir).unwrap();
+        let directory_error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(directory_error.contains("must be a real directory"));
+        fs::remove_file(&receipts_dir).unwrap();
+        fs::rename(&real_receipts_dir, &receipts_dir).unwrap();
+
+        let first_row = enriched.lines().nth(1).unwrap();
+        let receipt_digest = first_row.split('\t').nth(20).unwrap();
+        let receipt_path = receipts_dir.join(format!("{receipt_digest}.json"));
+        let receipt_target = root.join("receipt-target.json");
+        fs::rename(&receipt_path, &receipt_target).unwrap();
+        symlink(&receipt_target, &receipt_path).unwrap();
+        let file_error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(file_error.contains("must be a regular non-symlink file"));
+        fs::remove_file(&receipt_path).unwrap();
+        fs::rename(&receipt_target, &receipt_path).unwrap();
+
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[test]
+    fn profile_bytes_are_hash_checked_and_referenced_by_every_receipt() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let row = enriched.lines().nth(1).unwrap();
+        let profile_digest = row.split('\t').nth(19).unwrap();
+        let path = root.join("profiles").join(format!("{profile_digest}.json"));
+        let mut profile = fs::read(&path).unwrap();
+        profile.push(b' ');
+        fs::write(&path, profile).unwrap();
+        let error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(error.contains("resource profile artifact digest mismatch"));
+        cleanup_artifact_fixture(&root);
+    }
+
+
     #[test]
     fn positive_null_and_negative_advantage_are_distinguished() {
         let positive = build_report(&synthetic_tsv(20,1.0,2.0,4.0,2.0,5.0),500,7).unwrap();
@@ -960,6 +1875,10 @@ mod tests {
         let missing = format!("{}\n{}\n",lines[0],lines[1]);
         assert!(parse_and_pair(&missing).unwrap_err().contains("expected D0,D1,W1,W2,W3"));
         let duplicate = format!("{}\n{}\n{}\n",lines[0],lines[1],lines[1]);
+        // A duplicate row must carry a distinct receipt digest so the
+        // duplicate-arm guard, rather than the earlier receipt-reuse guard,
+        // is the first failure.
+        let duplicate = alter_row_field(&duplicate,2,20,&test_digest(999));
         assert!(parse_and_pair(&duplicate).unwrap_err().contains("duplicate arm row"));
     }
     #[test]
@@ -1078,6 +1997,12 @@ mod tests {
         let input = synthetic_tsv(4,1.0,2.0,4.0,2.0,5.0);
         let report = build_report(&input,500,42).unwrap();
         assert_eq!(report.input_sha256,sha256_hex(input.as_bytes()));
-        assert_eq!(render_report(&report),render_report(&report));
+        let rendered = render_report(&report);
+        assert_eq!(rendered,render_report(&report));
+        assert!(
+            parse_json(&rendered).is_ok(),
+            "render_report produced invalid JSON: {:?}",
+            parse_json(&rendered).err()
+        );
     }
 }

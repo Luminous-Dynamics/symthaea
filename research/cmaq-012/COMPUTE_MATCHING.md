@@ -1,7 +1,7 @@
 # CMAQ-012 measured resource-vector and D1 qualification contract
 
-**Contract version:** v0.2  
-**Status:** executable ledger validation and comparison logic; not a real resource-profile measurement or verified D1 result.
+**Contract version:** v0.3  
+**Status:** executable paired resource-vector audit and exact profile/receipt content verifier; not a real hardware measurement, profiler attestation or verified D1 result.
 
 ## Why the scalar budget is insufficient
 
@@ -53,7 +53,7 @@ The measurement method must be `operator_trace` or `hardware_counter`. `static_e
 - `budget_unmatched`: a resource dimension is out of tolerance, D1's role is invalid, W1/W2/W3 workload semantics are invalid, or measured energy differs beyond tolerance.
 - `resource_unmeasured`: accepted measurements are absent or only static/unavailable resource methods are supplied.
 
-A group with at least 20 episodes and `budget_matched` is labelled **`budget_match_unverified`**, not `qualification_candidate`. The current CLI verifies digest syntax, uniqueness of per-run receipt digests, common resource-profile identity and ledger arithmetic; it does **not** read the resource-profile or profiling-receipt bytes and therefore cannot authenticate that the counters came from the claimed profiler or hardware. A later independent receipt verifier must hash and validate those artifacts before a group may be promoted to qualification eligibility.
+A group with at least 20 episodes and `budget_matched` is labelled `budget_match_unverified` without artifact inputs. With exact profile and receipt bytes successfully validated, it is labelled `budget_match_receipts_verified`. Fixture-only verification is labelled `synthetic_fixture_only`. None of these statuses is `qualification_candidate`: content hashes prove which bytes were analyzed, not that the claimed profiler ran, that the recorder is authentic, or that hardware meters were calibrated. These remain explicit attestation gates.
 
 This is deliberate. Equal self-reported counters are not independent evidence of equal compute.
 
@@ -61,9 +61,9 @@ This is deliberate. Equal self-reported counters are not independent evidence of
 
 - `resource-profile.schema.json`: the content-addressed host/runtime/profiler definition.
 - `profiling-receipt.schema.json`: a per-arm/episode record containing the measured vector and recorder identity.
-- `report.schema.json`: v0.2 report contract including the resource-match decision and per-arm resource summaries.
+- `report.schema.json`: v0.3 report contract including artifact-verification status, resource-match decision and per-arm resource summaries.
 
-The profile file bytes must be SHA-256 hashed exactly as stored; the digest is placed in every TSV row. Each receipt file must likewise be hashed exactly as stored and referenced by its row. The current CLI does not yet ingest those files. Do not promote this digest binding to authenticated provenance until the independent verifier exists.
+The profile bytes are SHA-256 hashed exactly as stored and named `profiles/<digest>.json` under the artifact directory. Each receipt is similarly named `receipts/<digest>.json`. The v0.3 CLI recomputes those hashes, parses the artifacts, rejects duplicate JSON keys, binds profile method/units/tolerances and compares each receipt's run identity, method, measurements and workload counters to its exact TSV row. Fixture-only files require explicit `--allow-fixtures`. A valid digest is content integrity—not proof of producer identity or trustworthy instrumentation.
 
 ## Statistical and systems discipline
 
@@ -76,6 +76,11 @@ The profile file bytes must be SHA-256 hashed exactly as stored; the digest is p
 7. If energy cannot be measured, report it as null/unmeasured. Do not manufacture joules from GPU utilisation, TDP or elapsed time.
 8. Keep W3 oracle work separate. Its runtime can be reported, but it is not a deployable contender and does not define the D1 budget.
 
-## Future extension
+## Remaining qualification work
 
-The next hardening step is an independent Rust verifier that consumes the profile and receipt artifacts, recomputes their SHA-256 digests, validates profile identity and compares the receipt measurements to the TSV row. Only after that should a measured D1/W1 resource match be called verified. A production adapter must then implement an actual direct-value D1 policy and generate these receipts on pinned Gymnasium/MuJoCo and DeepMind Control task versions.
+1. Independently attest the recorder and profiler binary, measurement scope, synchronization and calibration. Content hashes alone do not authenticate hardware origin.
+2. Generate real per-arm receipts from pinned Gymnasium/MuJoCo and DeepMind Control adapters; do not reuse synthetic fixture receipts.
+3. Implement a real direct-value D1 policy and preserve D1's zero learned-model calls.
+4. Reproduce the exact task, seeds, hardware/runtime profile and all five arms, including failed/timed-out episodes.
+
+Only after independent origin attestation and a reproducible real-environment run should the resource match be considered qualified.

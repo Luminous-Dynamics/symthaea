@@ -1,8 +1,8 @@
 # CMAQ-012: Paired Advantage-of-Prediction Result Auditor
 
-**Status:** executable Rust auditor v0.2; draft  
+**Status:** executable Rust auditor v0.3; draft  
 **Tracking issue:** [#9122](https://github.com/Luminous-Dynamics/symthaea/issues/9122)  
-**Claim ceiling:** result-ledger validation and paired estimand calculation only; no real environment result, competitive claim or SOTA claim
+**Claim ceiling:** paired ledger/resource audit plus exact profile/receipt content-integrity verification; profiler/hardware origin remains unattested; no real environment result, competitive claim or SOTA claim
 
 ## Why this is a paradigm shift
 
@@ -66,6 +66,9 @@ No results are pooled across tasks or capabilities. Do not use a single headline
     cargo test --locked
     cargo run --quiet --locked -- --input fixtures/qualification-smoke.tsv
 
+    # Explicitly allow only the checked-in synthetic artifact fixtures:
+    cargo run --quiet --locked -- --input fixtures/qualification-smoke.tsv --artifacts-dir fixtures/artifacts --allow-fixtures
+
 The checked-in fixture contains four paired episodes and is intentionally labelled smoke_only. It validates mechanics; it is not a qualification result.
 
 ## Next
@@ -90,3 +93,19 @@ The auditor accepts `operator_trace` and `hardware_counter` as measurement metho
 Report group eligibility now distinguishes `budget_unmatched`, `resource_unmeasured` and `budget_match_unverified`. The latter is intentional: the current CLI verifies receipt digest syntax and uniqueness but does not yet ingest the receipt bytes. Therefore a resource vector that passes its declared tolerances is not yet authenticated hardware evidence and is not a qualification candidate. See [COMPUTE_MATCHING.md](COMPUTE_MATCHING.md), [resource-profile.schema.json](resource-profile.schema.json) and [profiling-receipt.schema.json](profiling-receipt.schema.json).
 
 No static FLOP estimate, latency-derived energy estimate or dummy work is accepted as proof of compute parity. The normalized work-unit definition, hardware/runtime, profiler and measurement scope must be bound by the content-addressed resource profile. Failed and timed-out runs remain in the resource denominator.
+
+
+## v0.3 independent artifact-content verification
+
+The CLI now accepts `--artifacts-dir DIR`. It resolves each row's profile and receipt by content digest:
+
+- `DIR/profiles/<resource_profile_sha256>.json`
+- `DIR/receipts/<profiling_receipt_sha256>.json`
+
+The Rust verifier reads the exact bytes, rejects symlinks/non-regular files/oversized artifacts, recomputes SHA-256, parses JSON with a strict dependency-free parser (duplicate keys and trailing data rejected), checks the profile contract, and binds every receipt field to the corresponding paired TSV row: task/capability/split/seed/arm, resource-profile identity, measurement method, latency, compute, memory, energy, direct/model/oracle/environment call counts and optimizer iterations. Receipt files may not contain a self-referential receipt-digest field.
+
+Synthetic fixtures are rejected unless `--allow-fixtures` is explicitly supplied. The checked-in smoke fixture is intentionally synthetic and exercises 1 profile plus 20 unique per-arm/per-seed receipt files. It must report `synthetic_fixture_content_verified_origin_unattested`, never a hardware qualification. Without `--artifacts-dir`, the report remains `digest_only_not_independently_verified`.
+
+For non-fixture artifacts, successful byte/field checks report `content_verified_origin_unattested`. This proves exact artifact content and row binding—not the truthfulness of the counter, profiler identity at runtime, trusted execution, hardware meter calibration or physical provenance. Therefore a 20+ pair group can become `budget_match_receipts_verified`, but not `qualification_candidate` until recorder/profiler origin and hardware provenance are independently attested. The report carries this claim ceiling explicitly.
+
+The verifier tests include JSON duplicate-key/trailing-data rejection; successful fixture verification; rejecting fixture artifacts without opt-in; receipt-byte tampering; receipt-field tampering with a recomputed digest; and profile-byte tampering. The focused workflow validates report/profile/receipt schemas and runs the same artifact-bound smoke fixture.
