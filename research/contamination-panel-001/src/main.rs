@@ -2,9 +2,9 @@ use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    detector_conformal_fusion::{DetectorConformalFusionRequestV1, calibrate_detector_panel},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
-    detector_conformal_fusion::{DetectorConformalFusionRequestV1, calibrate_detector_panel},
     ftd::{
         FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
         empirical_reference_p_values, ftd_weighted_cauchy_bh,
