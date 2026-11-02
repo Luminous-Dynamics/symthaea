@@ -1,0 +1,34 @@
+name: Connectome Identity Verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-connectome-identity/**"
+      - "research/connectome-identity-verify-v0/**"
+      - ".github/workflows/connectome-identity-verify-v0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-identity-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-source-tests:
+    name: Isolated connectome identity contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/connectome-identity-verify-v0/Cargo.toml -- --check
+      - name: Run exact-source unit tests
+        run: cargo test --manifest-path research/connectome-identity-verify-v0/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/connectome-identity-verify-v0/Cargo.toml --locked --all-targets -- -D warnings
