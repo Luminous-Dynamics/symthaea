@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-detector-validation-counts-fixture-v1.schema.json",
+  "title": "Detector validation counts known-answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "https://luminousdynamics.io/schemas/connectome-detector-validation-counts-input-v1.schema.json"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sensitivity",
+        "specificity"
+      ],
+      "properties": {
+        "sensitivity": {
+          "$ref": "#/$defs/interval"
+        },
+        "specificity": {
+          "$ref": "#/$defs/interval"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

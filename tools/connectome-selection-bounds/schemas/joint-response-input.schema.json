@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-joint-response-input-v1.schema.json",
+  "title": "Joint response prevalence bounds input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_prevalence",
+    "target_prevalence"
+  ],
+  "properties": {
+    "source_prevalence": {
+      "$ref": "#/$defs/probabilityInterval"
+    },
+    "target_prevalence": {
+      "$ref": "#/$defs/probabilityInterval"
+    }
+  },
+  "$defs": {
+    "probabilityInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

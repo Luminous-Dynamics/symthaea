@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-joint-response-counts-fixture-v1.schema.json",
+  "title": "Full-cohort joint response bounds known-answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["input", "expected"],
+  "properties": {
+    "input": {
+      "$ref": "https://luminousdynamics.io/schemas/connectome-joint-response-counts-input-v1.schema.json"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_observed_positive_fraction_bounds",
+        "target_observed_positive_fraction_bounds",
+        "source_latent_prevalence_bounds",
+        "target_latent_prevalence_bounds",
+        "joint_response_prevalence_bounds",
+        "target_given_source_prevalence_bounds",
+        "independence_product_not_assumed",
+        "causal_effect_claimed"
+      ],
+      "properties": {
+        "source_observed_positive_fraction_bounds": { "$ref": "#/$defs/interval" },
+        "target_observed_positive_fraction_bounds": { "$ref": "#/$defs/interval" },
+        "source_latent_prevalence_bounds": { "$ref": "#/$defs/interval" },
+        "target_latent_prevalence_bounds": { "$ref": "#/$defs/interval" },
+        "joint_response_prevalence_bounds": { "$ref": "#/$defs/interval" },
+        "target_given_source_prevalence_bounds": {
+          "anyOf": [
+            { "$ref": "#/$defs/interval" },
+            { "type": "null" }
+          ]
+        },
+        "independence_product_not_assumed": { "const": true },
+        "causal_effect_claimed": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper"],
+      "properties": {
+        "lower": { "type": "number", "minimum": 0, "maximum": 1 },
+        "upper": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

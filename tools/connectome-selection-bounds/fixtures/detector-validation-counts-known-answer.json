@@ -1,0 +1,19 @@
+{
+  "input": {
+    "true_positive": 90,
+    "false_negative": 10,
+    "true_negative": 95,
+    "false_positive": 5,
+    "z_score": 1.959963984540054
+  },
+  "expected": {
+    "sensitivity": {
+      "lower": 0.8256343384950865,
+      "upper": 0.9447708629393249
+    },
+    "specificity": {
+      "lower": 0.8882495307680808,
+      "upper": 0.9784563208456319
+    }
+  }
+}

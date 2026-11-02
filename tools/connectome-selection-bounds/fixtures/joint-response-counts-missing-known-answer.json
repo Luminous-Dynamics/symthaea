@@ -1,0 +1,67 @@
+{
+  "input": {
+    "planned_units": 10,
+    "source_response_counts": {
+      "detected": 6,
+      "not_detected": 2,
+      "unobserved": 1,
+      "classifier_invalid": 1,
+      "registration_failed": 0
+    },
+    "target_response_counts": {
+      "detected": 3,
+      "not_detected": 5,
+      "unobserved": 2,
+      "classifier_invalid": 0,
+      "registration_failed": 0
+    },
+    "source_detector_operating_bounds": {
+      "sensitivity": {
+        "lower": 1,
+        "upper": 1
+      },
+      "specificity": {
+        "lower": 1,
+        "upper": 1
+      }
+    },
+    "target_detector_operating_bounds": {
+      "sensitivity": {
+        "lower": 1,
+        "upper": 1
+      },
+      "specificity": {
+        "lower": 1,
+        "upper": 1
+      }
+    }
+  },
+  "expected": {
+    "source_observed_positive_fraction_bounds": {
+      "lower": 0.6,
+      "upper": 0.8
+    },
+    "target_observed_positive_fraction_bounds": {
+      "lower": 0.3,
+      "upper": 0.5
+    },
+    "source_latent_prevalence_bounds": {
+      "lower": 0.6,
+      "upper": 0.8
+    },
+    "target_latent_prevalence_bounds": {
+      "lower": 0.3,
+      "upper": 0.5
+    },
+    "joint_response_prevalence_bounds": {
+      "lower": 0,
+      "upper": 0.5
+    },
+    "target_given_source_prevalence_bounds": {
+      "lower": 0,
+      "upper": 0.8333333333333334
+    },
+    "independence_product_not_assumed": true,
+    "causal_effect_claimed": false
+  }
+}

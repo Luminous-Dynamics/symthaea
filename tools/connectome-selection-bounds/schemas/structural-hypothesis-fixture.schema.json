@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-structural-hypothesis-fixture-v1.schema.json",
+  "title": "Structural hypothesis set known-answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "https://luminousdynamics.io/schemas/connectome-structural-hypothesis-input-v1.schema.json"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admissible_hypothesis_count",
+        "excluded_hypothesis_ids",
+        "joint_response_set",
+        "target_given_source_response_set",
+        "probability_weights_applied"
+      ],
+      "properties": {
+        "admissible_hypothesis_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "excluded_hypothesis_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "joint_response_set": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/interval"
+          }
+        },
+        "target_given_source_response_set": {
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/interval"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "probability_weights_applied": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-joint-response-counts-input-v1.schema.json",
+  "title": "Full-cohort joint response bounds input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "planned_units",
+    "source_response_counts",
+    "target_response_counts",
+    "source_detector_operating_bounds",
+    "target_detector_operating_bounds"
+  ],
+  "properties": {
+    "planned_units": { "type": "integer", "minimum": 1 },
+    "source_response_counts": { "$ref": "#/$defs/responseStatusCounts" },
+    "target_response_counts": { "$ref": "#/$defs/responseStatusCounts" },
+    "source_detector_operating_bounds": { "$ref": "#/$defs/detectorOperatingBounds" },
+    "target_detector_operating_bounds": { "$ref": "#/$defs/detectorOperatingBounds" }
+  },
+  "$defs": {
+    "responseStatusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detected", "not_detected", "unobserved", "classifier_invalid", "registration_failed"],
+      "properties": {
+        "detected": { "type": "integer", "minimum": 0 },
+        "not_detected": { "type": "integer", "minimum": 0 },
+        "unobserved": { "type": "integer", "minimum": 0 },
+        "classifier_invalid": { "type": "integer", "minimum": 0 },
+        "registration_failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "probabilityInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper"],
+      "properties": {
+        "lower": { "type": "number", "minimum": 0, "maximum": 1 },
+        "upper": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "detectorOperatingBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sensitivity", "specificity"],
+      "properties": {
+        "sensitivity": { "$ref": "#/$defs/probabilityInterval" },
+        "specificity": { "$ref": "#/$defs/probabilityInterval" }
+      }
+    }
+  }
+}
