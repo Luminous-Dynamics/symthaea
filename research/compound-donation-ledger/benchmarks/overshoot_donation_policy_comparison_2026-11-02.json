@@ -1,0 +1,417 @@
+{
+  "schema_version": 1,
+  "run_date": "2026-11-02",
+  "execution_method": "Executed in the private Python 3.13.5 / NumPy 2.3.5 environment with a direct reimplementation of the committed harness logic and pathwise accounting assertions. The GitHub-hosted script itself was not invoked from its checkout; independent reproduction by running the committed script remains required.",
+  "reference_harness": {
+    "path": "research/compound-donation-ledger/benchmarks/overshoot_donation_policy_comparison.py",
+    "blob_sha": "eabff2c8b6afee71772bb1d1b8d28d7807a7f475"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "private_run_seconds": 25.8366
+  },
+  "design": {
+    "streams_per_cell": 3000,
+    "family_size": 100,
+    "horizon_rounds": 100,
+    "alpha": 0.05,
+    "global_weights": "gamma_0=0.50, gamma_1=0.01, gamma_2..99=0.005; sum=1",
+    "route": "candidate 0 has a precommitted route to candidate 1; all others have no destination",
+    "evidence": "E_i,t is the product LR with factor 1.5 on success and 0.5 on failure; X_i,t=sqrt(max_{s<=t} E_i,s)-1",
+    "nulls": "p0=0.5; alternative p=0.9 for strong donor, p=0.71 for weak alternatives",
+    "reserve_policies": {
+      "none": "no outgoing reserve",
+      "fixed_rate": "precommitted donor reserve rate 1/20 of own weighted evidence increments, capped at gamma_i min(X_i,1)",
+      "capped_overshoot": "D_i,t=min(max(gamma_i X_i,t-1,0),gamma_i)"
+    },
+    "dependence_modes": [
+      "independent",
+      "shared_uniform_null",
+      "balanced_negative_null"
+    ],
+    "metrics": {
+      "fixed_time_fdr": "mean terminal FDP",
+      "sup_fdr": "mean over streams of max_t FDP_t",
+      "terminal_power": "fraction of true alternatives rejected at final look",
+      "probability_any_false": "Bernoulli probability any false rejection",
+      "mean_final_donor_outgoing_weighted": "mean amount transferred by donor 0"
+    },
+    "interval": "one-sided 95% Hoeffding bounds for fixed-time FDR and SupFDR means; probability-any-false reported separately"
+  },
+  "results": [
+    {
+      "dependence": "independent",
+      "alternative_pattern": "all_null",
+      "seed": 20261102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.0006666666666666666,
+          "sup_fdr": 0.0006666666666666666,
+          "sup_fdr_hoeffding_upper_95": 0.023011435903761028,
+          "terminal_power": 0,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.0003333333333333333,
+          "sup_fdr": 0.0003333333333333333,
+          "sup_fdr_hoeffding_upper_95": 0.022678102570427697,
+          "terminal_power": 0,
+          "probability_any_false": 0.0003333333333333333,
+          "mean_final_donor_outgoing_weighted": 0.01880753094589527
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.0003333333333333333,
+          "sup_fdr": 0.0003333333333333333,
+          "sup_fdr_hoeffding_upper_95": 0.022678102570427697,
+          "terminal_power": 0,
+          "probability_any_false": 0.0003333333333333333,
+          "mean_final_donor_outgoing_weighted": 0.029272817795842367
+        }
+      }
+    },
+    {
+      "dependence": "independent",
+      "alternative_pattern": "strong_to_many_weak",
+      "seed": 20262102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.00004115942028985508,
+          "sup_fdr": 0.00006130952380952381,
+          "sup_fdr_hoeffding_upper_95": 0.022406078760903884,
+          "terminal_power": 0.43339837398373987,
+          "probability_any_false": 0.001,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.00004115942028985508,
+          "sup_fdr": 0.00006130952380952381,
+          "sup_fdr_hoeffding_upper_95": 0.022406078760903884,
+          "terminal_power": 0.43772357723577243,
+          "probability_any_false": 0.001,
+          "mean_final_donor_outgoing_weighted": 0.5
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.00004115942028985508,
+          "sup_fdr": 0.00006130952380952381,
+          "sup_fdr_hoeffding_upper_95": 0.022406078760903884,
+          "terminal_power": 0.43772357723577243,
+          "probability_any_false": 0.001,
+          "mean_final_donor_outgoing_weighted": 0.5
+        }
+      }
+    },
+    {
+      "dependence": "independent",
+      "alternative_pattern": "weak_to_many_weak",
+      "seed": 20263102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.00003181818181818182,
+          "sup_fdr": 0.000047385620915032675,
+          "sup_fdr_hoeffding_upper_95": 0.022392154858009394,
+          "terminal_power": 0.42348333333333327,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.00003181818181818182,
+          "sup_fdr": 0.000049999999999999996,
+          "sup_fdr_hoeffding_upper_95": 0.022394769237094363,
+          "terminal_power": 0.4271,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0.44377054761663925
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.00003181818181818182,
+          "sup_fdr": 0.000049999999999999996,
+          "sup_fdr_hoeffding_upper_95": 0.022394769237094363,
+          "terminal_power": 0.427,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0.4810831060004466
+        }
+      }
+    },
+    {
+      "dependence": "independent",
+      "alternative_pattern": "strong_donor_only",
+      "seed": 20264102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.5
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.5
+        }
+      }
+    },
+    {
+      "dependence": "shared_uniform_null",
+      "alternative_pattern": "all_null",
+      "seed": 20361102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.018385167602409092
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.03274011920033161
+        }
+      }
+    },
+    {
+      "dependence": "shared_uniform_null",
+      "alternative_pattern": "strong_to_many_weak",
+      "seed": 20362102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.0004394923012900541,
+          "sup_fdr": 0.0005549814520402756,
+          "sup_fdr_hoeffding_upper_95": 0.022899750689134638,
+          "terminal_power": 0.43332520325203255,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.0004394923012900541,
+          "sup_fdr": 0.0005472463768115942,
+          "sup_fdr_hoeffding_upper_95": 0.022892015613905956,
+          "terminal_power": 0.43735772357723585,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0.5
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.0004394923012900541,
+          "sup_fdr": 0.0005472463768115942,
+          "sup_fdr_hoeffding_upper_95": 0.022892015613905956,
+          "terminal_power": 0.43735772357723585,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0.5
+        }
+      }
+    },
+    {
+      "dependence": "shared_uniform_null",
+      "alternative_pattern": "weak_to_many_weak",
+      "seed": 20363102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0.4250333333333333,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0.4288583333333333,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.44160299826346977
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0.42885833333333334,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.482069384313777
+        }
+      }
+    },
+    {
+      "dependence": "shared_uniform_null",
+      "alternative_pattern": "strong_donor_only",
+      "seed": 20364102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.00033,
+          "sup_fdr": 0.00033,
+          "sup_fdr_hoeffding_upper_95": 0.022674769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0.0003333333333333333,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.00033,
+          "sup_fdr": 0.00033,
+          "sup_fdr_hoeffding_upper_95": 0.022674769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0.0003333333333333333,
+          "mean_final_donor_outgoing_weighted": 0.5
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.00033,
+          "sup_fdr": 0.00033,
+          "sup_fdr_hoeffding_upper_95": 0.022674769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0.0003333333333333333,
+          "mean_final_donor_outgoing_weighted": 0.5
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_pattern": "all_null",
+      "seed": 20461102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.0003333333333333333,
+          "sup_fdr": 0.0003333333333333333,
+          "sup_fdr_hoeffding_upper_95": 0.022678102570427697,
+          "terminal_power": 0,
+          "probability_any_false": 0.0003333333333333333,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.018299611348838663
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 0,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.02971309406507029
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_pattern": "strong_to_many_weak",
+      "seed": 20462102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.000029040404040404042,
+          "sup_fdr": 0.000033333333333333335,
+          "sup_fdr_hoeffding_upper_95": 0.022378102570427695,
+          "terminal_power": 0.4311544715447155,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.000028484848484848483,
+          "sup_fdr": 0.000032539682539682536,
+          "sup_fdr_hoeffding_upper_95": 0.022377308919634045,
+          "terminal_power": 0.4355772357723578,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0.5
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.000028484848484848483,
+          "sup_fdr": 0.000032539682539682536,
+          "sup_fdr_hoeffding_upper_95": 0.022377308919634045,
+          "terminal_power": 0.4355772357723578,
+          "probability_any_false": 0.0006666666666666666,
+          "mean_final_donor_outgoing_weighted": 0.5
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_pattern": "weak_to_many_weak",
+      "seed": 20463102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0.00010756309966836282,
+          "sup_fdr": 0.00015133477633477632,
+          "sup_fdr_hoeffding_upper_95": 0.02249610401342914,
+          "terminal_power": 0.42732499999999995,
+          "probability_any_false": 0.002,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0.00010756309966836282,
+          "sup_fdr": 0.00015133477633477632,
+          "sup_fdr_hoeffding_upper_95": 0.02249610401342914,
+          "terminal_power": 0.43069999999999997,
+          "probability_any_false": 0.002,
+          "mean_final_donor_outgoing_weighted": 0.44087177616232465
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0.00010756309966836282,
+          "sup_fdr": 0.00015133477633477632,
+          "sup_fdr_hoeffding_upper_95": 0.02249610401342914,
+          "terminal_power": 0.4306,
+          "probability_any_false": 0.002,
+          "mean_final_donor_outgoing_weighted": 0.47843700898317304
+        }
+      }
+    },
+    {
+      "dependence": "balanced_negative_null",
+      "alternative_pattern": "strong_donor_only",
+      "seed": 20464102,
+      "methods": {
+        "none": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0
+        },
+        "fixed_rate": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.5
+        },
+        "capped_overshoot": {
+          "fixed_time_fdr": 0,
+          "sup_fdr": 0,
+          "sup_fdr_hoeffding_upper_95": 0.022344769237094362,
+          "terminal_power": 1,
+          "probability_any_false": 0,
+          "mean_final_donor_outgoing_weighted": 0.5
+        }
+      }
+    }
+  ],
+  "claim_boundary": "Exploratory only: 3,000 streams/cell, one family size, one alpha, one fixed weighted-routing topology, one LR model and three dependence generators. SupFDR bounds are very wide (~2.2 percentage point half-width). No confirmatory or SOTA claim; the observed power changes are under 0.5 percentage point in the main signal scenarios."
+}
