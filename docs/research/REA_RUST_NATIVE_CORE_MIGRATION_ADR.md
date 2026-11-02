@@ -608,3 +608,44 @@ The following work has moved beyond architecture-only status:
 - **ZIP metadata reader:** [PR #9965](https://github.com/Luminous-Dynamics/symthaea/pull/9965) separately implements a bounded std-only archive metadata reader and has a pending dedicated workflow. It remains distinct from full ArtifactReader parity.
 
 The Evidence core is the only one of these four implementation tracks with a completed passing dedicated workflow at this snapshot. Do not infer status from issue text or a parent PR; always bind a validation claim to the exact head SHA and completed run.
+
+
+## 14. Decision quality under likelihood misspecification
+
+The point-EIG experiment planner (#10074) and scenario-robust EIG extension (#10105) are deliberately separate. Robust EIG computes expected, worst-case and lower-tail information gain across a declared shared scenario ensemble. Its worst-case is only over the supplied finite set; no claim is made that the true data-generating process is in that set.
+
+A further paradigm shift is to make the final engineering decision the objective. Harikumar et al., *Robust Bayesian Decision Making under Adversarial Uncertainty*, UAI 2026 / PMLR 337:1983–2007, argues that nominal information gain can lead to high-confidence but fragile downstream decisions under hidden or weakly modeled effects. Their work motivates decision-stability-aware sequential design:
+https://proceedings.mlr.press/v337/harikumar26a.html
+
+Track [#10109 — decision-aware robust investigation](https://github.com/Luminous-Dynamics/symthaea/issues/10109) extends the planner with:
+- terminal decisions and explicit utility/loss across hypotheses;
+- expected value of sample information (EVSI);
+- scenario-specific posterior-optimal decisions;
+- shared-policy decision regret across plausible scenarios;
+- worst-case and lower-tail decision utility/regret;
+- abstention for incomplete/unsupported utility scope.
+
+Keep the metrics distinct:
+- **EIG** measures uncertainty reduction.
+- **EVSI** measures expected improvement in a decision under a declared utility function.
+- **Decision regret/stability** measures how badly the chosen policy performs across plausible worlds.
+
+The utility model must not be treated as objective truth. Record who authored it, which stakeholders/consequences it represents, what costs or harms are omitted, and which actions remain outside authorization. No action is executed by the planner.
+
+## 15. Latest external agentic RE baseline: AgentRE-Bench v3.1
+
+Add AgentRE-Bench v3.1 (October 2026) as a second independent, public source-free binary reasoning baseline:
+https://www.agentre-bench.ai/
+
+Its published Windows PE suite has 10 programs evaluated with and without symbols, 20 artifacts, five models and five attempts per artifact (500 episodes), and a 25-call budget. It records tool calls, evidence, time, coverage, failures and versioned ground truth; unsupported claims are penalized. The published v3.1 results show the top two overall scores close together (87.37 and 87.04), with 95% intervals and valid-answer counts.
+
+Keep AgentRE-Bench and SRE-Bench separate:
+- AgentRE-Bench v3.1 is a 20-artifact Windows PE protocol.
+- SRE-Bench spans 19 private programs, 262 binary instances, five reverse-engineering domains, four source languages and 44 anti-analysis mechanisms.
+- Their score units, artifact cohorts and budgets are incompatible; do not pool or compare headline percentages.
+
+For the Luminous evaluation, adopt AgentRE's 25-call budget as one constrained tool-use condition, and publish exact per-claim evidence/ground-truth results, invalid answers, abstentions, missing attempts and confidence intervals. A separate unconstrained condition may exist, but must never replace the fixed-budget leaderboard.
+
+Official references:
+- AgentRE-Bench: https://www.agentre-bench.ai/
+- SRE-Bench owner page: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
