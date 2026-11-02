@@ -20,6 +20,15 @@ const EXAMPLE: &str = concat!(
 );
 const TOLERANCE: f64 = 1.0e-8;
 
+type MetricScoreKey = (String, String, String);
+type MetricScoreRecord = (f64, f64, f64, usize, HashSet<String>);
+type MetricScoreMap = HashMap<MetricScoreKey, MetricScoreRecord>;
+type MetricScoreResult = (
+    HashMap<String, &'static str>,
+    HashMap<String, String>,
+    MetricScoreMap,
+);
+
 #[derive(Debug, Clone, PartialEq)]
 struct Report {
     disposition: &'static str,
@@ -424,12 +433,12 @@ fn verify_models<'a>(
         } else {
             errors.push(format!("models.{model_id}.model_family: missing"));
         }
-        if let Some(hypothesis_id) = model.get("hypothesis_id").and_then(Value::as_str) {
-            if !hypotheses.contains_key(hypothesis_id) {
-                errors.push(format!(
-                    "models.{model_id}.hypothesis_id: unresolved {hypothesis_id}"
-                ));
-            }
+        if let Some(hypothesis_id) = model.get("hypothesis_id").and_then(Value::as_str)
+            && !hypotheses.contains_key(hypothesis_id)
+        {
+            errors.push(format!(
+                "models.{model_id}.hypothesis_id: unresolved {hypothesis_id}"
+            ));
         }
         if model.get("observation_model_id").and_then(Value::as_str)
             != str_at(value, &["observation_model", "observation_model_id"])
@@ -596,7 +605,7 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
         errors,
     );
     let selected = arr_at(value, &["intervention_design", "selected_interventions"]);
-    if selected.map_or(true, Vec::is_empty) {
+    if selected.is_none_or( Vec::is_empty) {
         errors.push(
             "intervention_design.selected_interventions: at least one is required".to_owned(),
         );
@@ -607,7 +616,7 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
     if let Some(items) = selected {
         for (index, item) in items.iter().enumerate() {
             let id = item.get("intervention_id").and_then(Value::as_str);
-            if id.map_or(true, str::is_empty) {
+            if id.is_none_or( str::is_empty) {
                 errors.push(format!("selected_interventions[{index}]: missing ID"));
             } else if !ids.insert(id.unwrap().to_owned()) {
                 errors.push(format!("selected_interventions[{index}]: duplicate ID"));
@@ -644,13 +653,13 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
                 ));
             }
             let targets = item.get("target_ids").and_then(Value::as_array);
-            if targets.map_or(true, Vec::is_empty) {
+            if targets.is_none_or( Vec::is_empty) {
                 errors.push(format!("selected_interventions[{index}]: no target IDs"));
             }
             if item
                 .get("protocol_sha256")
                 .and_then(Value::as_str)
-                .map_or(true, |s| !is_sha256(s))
+                .is_none_or( |s| !is_sha256(s))
             {
                 errors.push(format!(
                     "selected_interventions[{index}]: missing protocol digest"
@@ -699,16 +708,12 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
     }
 }
 
-fn verify_metrics_and_scores<'a>(
+fn verify_metrics_and_scores(
     value: &Value,
-    models: &HashMap<String, &'a Value>,
+    models: &HashMap<String, &Value>,
     test_set: &HashSet<String>,
     errors: &mut Vec<String>,
-) -> (
-    HashMap<String, &'static str>,
-    HashMap<String, String>,
-    HashMap<(String, String, String), (f64, f64, f64, usize, HashSet<String>)>,
-) {
+) -> MetricScoreResult {
     let mut directions = HashMap::new();
     let mut metric_families = HashMap::new();
     if let Some(metrics) = arr_at(value, &["evaluation", "metrics"]) {
@@ -825,9 +830,9 @@ fn verify_metrics_and_scores<'a>(
                     if token_values.len() < 2 || declared_n != token_values.len() {
                         errors.push(format!("scorecards[{index}]: measured score token count must equal n_independent_units and be at least two"));
                     }
-                    if score.map_or(true, |x| !x.is_finite())
-                        || low.map_or(true, |x| !x.is_finite())
-                        || high.map_or(true, |x| !x.is_finite())
+                    if score.is_none_or( |x| !x.is_finite())
+                        || low.is_none_or( |x| !x.is_finite())
+                        || high.is_none_or( |x| !x.is_finite())
                     {
                         errors.push(format!(
                             "scorecards[{index}]: measured score requires finite score and CI"
@@ -930,7 +935,7 @@ fn verify_paired(
     value: &Value,
     models: &HashMap<String, &Value>,
     directions: &HashMap<String, &'static str>,
-    scores: &HashMap<(String, String, String), (f64, f64, f64, usize, HashSet<String>)>,
+    scores: &MetricScoreMap,
     test_set: &HashSet<String>,
     errors: &mut Vec<String>,
 ) {
@@ -1006,8 +1011,8 @@ fn verify_paired(
             }
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
-            if low.map_or(true, |x| !x.is_finite())
-                || high.map_or(true, |x| !x.is_finite())
+            if low.is_none_or( |x| !x.is_finite())
+                || high.is_none_or( |x| !x.is_finite())
                 || low.unwrap() > high.unwrap()
             {
                 errors.push(format!(
@@ -1207,17 +1212,17 @@ fn verify_failures(value: &Value, models: &HashMap<String, &Value>, errors: &mut
             .collect();
     if let Some(failures) = arr_at(value, &["results", "failures"]) {
         for (index, failure) in failures.iter().enumerate() {
-            if let Some(model_id) = failure.get("model_id").and_then(Value::as_str) {
-                if !models.contains_key(model_id) {
-                    errors.push(format!("results.failures[{index}].model_id: unresolved"));
-                }
+            if let Some(model_id) = failure.get("model_id").and_then(Value::as_str)
+                && !models.contains_key(model_id)
+            {
+                errors.push(format!("results.failures[{index}].model_id: unresolved"));
             }
-            if let Some(intervention_id) = failure.get("intervention_id").and_then(Value::as_str) {
-                if !intervention_ids.contains(intervention_id) {
-                    errors.push(format!(
-                        "results.failures[{index}].intervention_id: unresolved"
-                    ));
-                }
+            if let Some(intervention_id) = failure.get("intervention_id").and_then(Value::as_str)
+                && !intervention_ids.contains(intervention_id)
+            {
+                errors.push(format!(
+                    "results.failures[{index}].intervention_id: unresolved"
+                ));
             }
             if failure
                 .get("count")
@@ -1241,15 +1246,14 @@ fn verify_complete(value: &Value) -> Vec<String> {
     }
     let (models, families) = verify_models(value, &mut errors);
     verify_interventions(value, &families, &mut errors);
-    if str_at(value, &["budgets", "comparison_mode"]) == Some("matched_budget") {
-        if str_at(value, &["budgets", "training_budget_policy"]) != Some("matched")
-            || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched")
-        {
-            errors.push(
-                "budgets: matched comparison requires matched training/evaluation policies"
-                    .to_owned(),
-            );
-        }
+    if str_at(value, &["budgets", "comparison_mode"]) == Some("matched_budget")
+        && (str_at(value, &["budgets", "training_budget_policy"]) != Some("matched")
+            || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched"))
+    {
+        errors.push(
+            "budgets: matched comparison requires matched training/evaluation policies"
+                .to_owned(),
+        );
     }
     if str_at(value, &["evaluation", "uncertainty", "method_id"]) == Some("none_not_eligible") {
         errors
@@ -1515,7 +1519,7 @@ mod tests {
         assert_eq!(membership_digest(&a), membership_digest(&b));
         assert_ne!(
             membership_digest(&a),
-            sha256_hex(b.iter().cloned().collect::<Vec<_>>().join("\n").as_bytes())
+            sha256_hex(b.to_vec().join("\n").as_bytes())
         );
     }
 
