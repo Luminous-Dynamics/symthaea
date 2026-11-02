@@ -316,13 +316,20 @@ def evaluate_method(
                             ).copy()
                             weights[:, :k] *= utility
                             normalizer = weights.sum(axis=1, keepdims=True)
-                            q = np.where(
+                            target_q = np.where(
                                 normalizer > 0,
                                 weights / np.maximum(normalizer, 1e-300),
                                 np.broadcast_to(
                                     priors[i], (streams, len(priors[i]))
                                 ),
                             )
+                            no_previous_rejections = (
+                                previous_rejected.sum(axis=1) == 0
+                            )
+                            target_q[no_previous_rejections] = priors[i]
+                            # Retain a 50% projective-prior exploration floor;
+                            # the other half exploits the predictable boundary score.
+                            q = 0.5 * target_q + 0.5 * priors[i][None, :]
                         else:
                             q = np.ones((streams, 1), dtype=np.float64)
                     elif adaptive:
