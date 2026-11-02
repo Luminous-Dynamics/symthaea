@@ -76,14 +76,14 @@ These targets are intentionally stricter than broad ENERGY STAR thresholds and a
 
 | Metric | First prototype gate | Competitive target | Stretch target |
 |---|---:|---:|---:|
-| Capacity | 14 place settings under the applicable IEC loading method | 14 place settings | 14 place settings |
-| Eco-cycle electricity | <=0.53 kWh | <=0.39 kWh | <=0.35 kWh |
+| Capacity | 14 place settings under the applicable IEC loading method | 16 place settings | 16 place settings |
+| Eco-cycle electricity | <=0.53 kWh | <=0.39 kWh (market-frontier parity) | <=0.35 kWh (energy-leading target) |
 | Fresh water | <=6.7 L | <=6.0 L | <=5.5 L |
-| Programme duration | <=240 min | <=150 min | <=120 min |
+| Programme duration | <=240 min | <=180 min | <=120 min |
 | Cleaning / drying | pass the applicable IEC 60436 assessment | non-inferior to the best tested matched reference | statistically superior on pre-registered soil set without drying regression |
 | Noise | measure | <=38 dB(A) | <=36 dB(A) |
 
-Against the exact AS6T-41147 data sheet (14 place settings, 0.53 kWh, 6.7 L, 405 min, 38 dB(A)), the competitive target would nominally reduce energy by about 26%, water by about 10%, and duration by about 63%. These are arithmetic target comparisons, not achieved results. The model's declared data sheet uses its stated EU test basis; formal product claims must be checked using the current IEC 60436:2025 corrected method and matched loading/soil procedures. The 0.39 kWh energy target also matches the label value of the 13-place AS6T-41173 while targeting one additional place setting and materially lower water use.
+Against the exact AS6T-41147 data sheet (14 place settings, 0.53 kWh, 6.7 L, 405 min, 38 dB(A)), the 16-place competitive target would nominally reduce energy by about 26%, water by about 10%, and duration by about 56%. These are arithmetic target comparisons, not achieved results. Against the current Topten Haier listing, 0.39 kWh is energy parity, the 16-place target matches capacity, and 180 minutes would be about 43% shorter than its 315-minute Eco duration. The 0.35 kWh stretch target would be about 10% below the listed 0.39 kWh. None of these calculations proves cleaning or drying superiority. The model's declared data sheet uses its stated EU test basis; formal product claims must be checked using the current IEC 60436:2025 corrected method and matched loading/soil procedures.
 
 ### QuickCell (one item or micro-batch)
 
@@ -145,7 +145,16 @@ https://www.vzug.com/occ/v2/gb-site-spa/pdf/product/euDatasheet/V-ZUG-AS6T6GBHVI
 V-ZUG AS6T-41173 official label reports 39 kWh/100 cycles, 8.6 L/cycle, 13 place settings and 6 h 10 min. It is a lower-energy benchmark with higher water use and lower place-setting capacity than AS6T-41147:
 https://www.vzug.com/medias/sys_master/root/h97/h1b/11172887560222/1228067_1171426-00_AC/1228067-1171426-00-AC.pdf
 
+### 2026 market-frontier interpretation
+
+Topten's current selection (last updated 22 May 2026) lists two separate 0.39 kWh/eco-cycle frontier examples:
+- Haier XS 63A4M4B: 16 place settings, 39 kWh/100 cycles and 315-minute programme. The captured Topten listing does not provide its water value.
+- V-ZUG AdoraDish V6000 Heatpump: 13 place settings, 39 kWh/100 cycles and 370-minute programme. The exact AS6T-41173 label separately reports 8.6 L/cycle.
+
+Do not combine those figures into a fictional single competitor. The Haier is the current capacity/energy/time comparison; the V-ZUG is a separate low-energy and documented-water comparison. The 0.39 kWh target is **energy parity with this 2026 market frontier**, not an energy-beating claim. The <=0.35 kWh stretch target is the first target in this ladder that aims to beat the listed 0.39 kWh frontier on energy. The <=6.0 L water target is below the V-ZUG's 8.6 L figure, but must not be described as beating the Haier on water until its exact-model declaration or a matched test is obtained.
+
 Competitive implications:
-- The best energy and best water values in the market set belong to different exact models; do not combine them into a fictional competitor.
-- A full-load target of 0.39 kWh and 6.0-6.5 L would need to beat the 0.53 kWh / 6.7 L 14-place reference on both energy and water, while also substantially improving duration from its 405-minute eco programme.
-- A 120-150 minute target is a separate convenience objective and must retain the required IEC cleaning/drying performance. Do not infer that a shorter programme is equivalent because energy/water are lower.
+- Keep capacity at 16 place settings for the competitive and stretch targets if we claim parity with the 16-place Haier reference. The first prototype can target 14 while the loading system is being developed.
+- A 0.39 kWh / <=6.0 L / <=180 min 16-place target would match the captured market energy frontier, target lower water than the V-ZUG reference, and aim for a programme materially shorter than the 315-minute Haier and 370-minute V-ZUG programmes. None of those cross-model comparisons establishes matched cleaning/drying superiority.
+- A <=0.35 kWh / <=5.5 L / <=120 min target is an energy-leading stretch hypothesis, not an engineering prediction. It requires an efficient hydraulic architecture, low-loss heat management and verified soil/rinse endpoints.
+- A 120-180 minute programme is a distinct convenience objective and must retain the applicable IEC cleaning/drying result. A short programme is not equivalent merely because its energy or water is lower.
