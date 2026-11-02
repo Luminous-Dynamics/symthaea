@@ -36,7 +36,7 @@ name = "branching-culture-sweep"
 path = "src/bin/branching_culture_sweep.rs"
 
 [[bin]]
-name = "paper-abm-sweep"
+name = "simplified-strategy-abm-sweep"
 path = "src/bin/paper_abm_sweep.rs"
 
 [[bin]]
