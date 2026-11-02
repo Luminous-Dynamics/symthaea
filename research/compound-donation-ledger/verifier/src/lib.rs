@@ -153,8 +153,23 @@ pub fn verify_overshoot_refund_sequence(
     alpha_denominator: u64,
     receipts: &[OvershootRefundReceipt],
 ) -> Result<u128, VerifyError> {
+    verify_overshoot_refund_sequence_from(
+        alpha_numerator,
+        alpha_denominator,
+        EVIDENCE_ONE,
+        receipts,
+    )
+}
+
+/// Replays a full receipt sequence from an explicit initial process value.
+pub fn verify_overshoot_refund_sequence_from(
+    alpha_numerator: u64,
+    alpha_denominator: u64,
+    initial_evidence_value: u128,
+    receipts: &[OvershootRefundReceipt],
+) -> Result<u128, VerifyError> {
     let mut previous_round = None;
-    let mut previous_evidence = EVIDENCE_ONE;
+    let mut previous_evidence = initial_evidence_value;
     let mut previous_refund = 0_u128;
 
     for receipt in receipts {
@@ -538,6 +553,38 @@ mod tests {
 
 
 
+
+    #[test]
+    fn independent_verifier_replays_zero_initialized_refund_sequence() {
+        let receipts = vec![
+            OvershootRefundReceipt {
+                round: 0,
+                evidence_value: 0,
+                refund_increment_numerator: 0,
+                cumulative_refund_numerator: 0,
+                effective_cost_numerator: 0,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: false,
+            },
+            OvershootRefundReceipt {
+                round: 1,
+                evidence_value: 21 * EVIDENCE_ONE,
+                refund_increment_numerator: EVIDENCE_ONE,
+                cumulative_refund_numerator: EVIDENCE_ONE,
+                effective_cost_numerator: 20 * EVIDENCE_ONE,
+                denominator: 20 * EVIDENCE_ONE,
+                rejected: true,
+            },
+        ];
+        assert_eq!(
+            verify_overshoot_refund_sequence_from(1, 20, 0, &receipts),
+            Ok(EVIDENCE_ONE)
+        );
+        assert_eq!(
+            verify_overshoot_refund_sequence(1, 20, &receipts),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+    }
 
     #[test]
     fn independent_verifier_replays_complete_refund_sequence_exactly_once() {
