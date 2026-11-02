@@ -25,6 +25,8 @@ ConnectomeBench2 V2 provides expert-labelled operation decisions and matched con
 
 These are the published full-test balanced-accuracy results, not policy utility or editing safety. The VLM paper also reports small human/zebrafish merge-error test supports (60 and 54 operations), so those strata require explicit uncertainty and cannot support confident broad transfer claims by themselves.
 
+**Critical frontier distinction:** the ConnectomeBench2 paper separately reports its full multimodal (mesh geometry + EM) system on its own held-out test set: ViT-B 97.0% split / 93.0% merge (95% cluster-bootstrap CIs 96.9–97.2 / 92.7–93.2), and ViT-L 97.2% / 92.8% (97.1–97.4 / 92.5–93.0). Its human-expert reference is 93.0% / 84.1%, with wider CIs. The VLM paper's 94.2% / 91.1% ViT-B row is explicitly the **EM-only ablation**, not the full multimodal CB2 leader. These two papers' test protocols and model input conditions are not a head-to-head comparison; we must reproduce full ViT-B/ViT-L and VLMs on the same immutable V2 operation IDs and view contract before comparing them. This is now a required baseline gate, not an optional extra.
+
 The public dataset card states that `main` is V1 and V2 must be loaded via revision `v2`. Until the V2 revision resolves to an immutable commit SHA and artifacts are hashed, no run should claim pinned V2 reproduction. See the run manifest in PR #9962.
 
 **Important scope rule:** CB2 labels can support retrospective detection and review-triage evaluation. They do not, by themselves, provide arbitrary model-generated edit patches, post-edit graph state, reviewer-time logs, or downstream consequence labels. Therefore this protocol separates three tracks:
@@ -114,8 +116,8 @@ These are stretch gates for the research programme. They are not current perform
 
 The field already has strong components:
 
-- **ConnectomeBench2** supplies a large, multi-species label base and a multimodal ViT baseline.
-- **VLM LoRA baselines** are now approximately level with the CB2 EM-only ViT-B on the full test split; the advantage to test is cross-domain adaptability and multi-task reuse, not an assumed accuracy lead.
+- **ConnectomeBench2** supplies more than 716,000 expert-labelled proofreading decisions and over 4.5 million associated images across four species. Its full mesh+EM ViT-B/ViT-L reports 97.0/93.0 and 97.2/92.8 split/merge balanced accuracy on its held-out test. It also reports in-distribution calibration and that distribution distance predicts some out-of-domain degradation.
+- **VLM LoRA baselines** reach 94–95% split and ~90% merge on the VLM paper's full CB2 V2 operation split, approximately matching the EM-only ablation but not established as superior to the full multimodal ViT-B/ViT-L. Their opportunity is cross-species transfer, using a shared adapter across tasks, and flexible multimodal interaction—not an assumed in-domain accuracy lead. The cross-paper numbers require a common pinned evaluation before they can be directly ranked.
 - **NEURD** demonstrates graph-feature-based proofreading and reports roughly 150,000 high-confidence automatic edits in MICrONS, as well as more than threefold speed-up for a challenging manual splitting workflow when suggestions are used.
 - **CAVE** demonstrates the importance of versioned annotation state and reproducible edits at scale.
 - **SynAnno** demonstrates that guided workflows can improve expert throughput and reduce cognitive load; a seven-expert evaluation is an operational comparator, not a direct CB2 classifier leaderboard.
