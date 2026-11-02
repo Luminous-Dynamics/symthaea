@@ -117,35 +117,24 @@ impl TestGenerator {
 
     /// Generate conservative invocation smoke checks using known boundary inputs.
     ///
-    /// Every non-target argument must have an explicit, known literal constructor.
-    /// Unknown types are skipped rather than guessed with `Default::default()`.
-    /// These calls do not assert return-value semantics.
+    /// Generic functions are skipped because an empty/default argument may not
+    /// provide enough information to infer their type parameters. Every non-target
+    /// argument must also have a known literal constructor.
     fn generate_boundary_tests(fn_name: &str, signature: &str) -> Vec<GeneratedTest> {
-        let mut tests = Vec::new();
+        let Some(parsed_signature) = Self::parse_signature(signature) else {
+            return Vec::new();
+        };
+        if !parsed_signature.generics.params.is_empty() {
+            return Vec::new();
+        }
+
         let params = Self::extract_param_types(signature);
+        let mut tests = Vec::new();
 
         for (param_name, param_type) in &params {
-            let cases: &[(&str, &str)] = match param_type.as_str() {
-                "u8" | "u16" | "u32" | "u64" | "usize" => {
-                    &[("zero", "0"), ("one", "1")]
-                }
-                "i8" | "i16" | "i32" | "i64" | "isize" => {
-                    &[("negative", "-1"), ("zero", "0")]
-                }
-                "f32" => &[("zero", "0.0f32")],
-                "f64" => &[("zero", "0.0f64")],
-                "&str" => &[("empty", "\"\"")],
-                "&String" => &[("empty", "&String::new()")],
-                "String" => &[("empty", "String::new()")],
-                t if t.starts_with("&[") => &[("empty", "&[]")],
-                t if t.starts_with("&Vec<") => &[("empty", "&Vec::new()")],
-                t if t.starts_with("Vec<") => &[("empty", "vec![]")],
-                _ => continue,
-            };
-
-            for (suffix, value) in cases {
+            for (suffix, value) in Self::boundary_values_for_type(param_type) {
                 let Some(arguments) =
-                    Self::make_call_with_value(&params, param_name, value)
+                    Self::make_call_with_value(&params, param_name, &value)
                 else {
                     // At least one other parameter has no known safe constructor.
                     continue;
@@ -185,75 +174,128 @@ impl TestGenerator {
         source
     }
 
-    /// Extract parameter names and types from a Rust function signature.
-    fn extract_param_types(signature: &str) -> Vec<(String, String)> {
-        let mut params = Vec::new();
-
-        // Find the parameter list between ( and )
-        let open = match signature.find('(') {
-            Some(i) => i + 1,
-            None => return params,
-        };
-        let close = match signature.find(')') {
-            Some(i) => i,
-            None => return params,
-        };
-
-        let param_str = &signature[open..close];
-        if param_str.trim().is_empty() {
-            return params;
-        }
-
-        // Split by comma, handling generic angle brackets
-        for param in Self::split_params(param_str) {
-            let param = param.trim();
-            if param.is_empty() || param == "&self" || param == "&mut self" || param == "self" {
-                continue;
-            }
-
-            // Split by `: ` to get name and type
-            if let Some(colon_pos) = param.find(':') {
-                let name = param[..colon_pos].trim().to_string();
-                let typ = param[colon_pos + 1..].trim().to_string();
-                params.push((name, typ));
-            }
-        }
-
-        params
+    /// Parse a function signature through syn so nested function-pointer,
+    /// tuple and generic argument types are not split by string heuristics.
+    fn parse_signature(signature: &str) -> Option<syn::Signature> {
+        let signature = signature.trim().trim_end_matches('{').trim();
+        let item_source = format!("{signature} {{}}");
+        syn::parse_str::<syn::ItemFn>(&item_source)
+            .ok()
+            .map(|item| item.sig)
     }
 
-    /// Split parameter string by commas, respecting angle bracket nesting.
-    fn split_params(s: &str) -> Vec<String> {
-        let mut parts = Vec::new();
-        let mut current = String::new();
-        let mut depth = 0;
+    /// Extract simple identifier parameters with their parsed Rust types.
+    ///
+    /// Receiver arguments and destructuring patterns are intentionally omitted:
+    /// this generator does not guess how to construct them.
+    fn extract_param_types(signature: &str) -> Vec<(String, syn::Type)> {
+        let Some(signature) = Self::parse_signature(signature) else {
+            return Vec::new();
+        };
 
-        for ch in s.chars() {
-            match ch {
-                '<' => {
-                    depth += 1;
-                    current.push(ch);
+        signature
+            .inputs
+            .into_iter()
+            .filter_map(|argument| match argument {
+                syn::FnArg::Typed(argument) => match *argument.pat {
+                    syn::Pat::Ident(pattern)
+                        if pattern.by_ref.is_none() && pattern.subpat.is_none() =>
+                    {
+                        Some((pattern.ident.to_string(), *argument.ty))
+                    }
+                    _ => None,
+                },
+                syn::FnArg::Receiver(_) => None,
+            })
+            .collect()
+    }
+
+    /// Generate representative values only for a conservative set of concrete types.
+    fn boundary_values_for_type(typ: &syn::Type) -> Vec<(&'static str, String)> {
+        use syn::Type;
+
+        match typ {
+            Type::Reference(reference) if reference.mutability.is_none() => {
+                match reference.elem.as_ref() {
+                    Type::Path(_) if Self::path_type_ident(&reference.elem).as_deref() == Some("str") => {
+                        vec![("empty", "\"\"".to_string())]
+                    }
+                    Type::Path(_) if Self::path_type_ident(&reference.elem).as_deref() == Some("String") => {
+                        vec![("empty", "&String::new()".to_string())]
+                    }
+                    Type::Slice(slice) if Self::is_supported_element_type(&slice.elem) => {
+                        vec![("empty", "&[]".to_string())]
+                    }
+                    inner if Self::is_supported_vec_type(inner) => {
+                        vec![("empty", "&Vec::new()".to_string())]
+                    }
+                    _ => Vec::new(),
                 }
-                '>' => {
-                    depth -= 1;
-                    current.push(ch);
-                }
-                ',' if depth == 0 => {
-                    parts.push(current.clone());
-                    current.clear();
-                }
-                _ => current.push(ch),
             }
+            Type::Path(_) => match Self::path_type_ident(typ).as_deref() {
+                Some("u8" | "u16" | "u32" | "u64" | "usize" | "i8" | "i16" | "i32" | "i64" | "isize") => {
+                    vec![("zero", "0".to_string()), ("one", "1".to_string())]
+                }
+                Some("f32") => vec![("zero", "0.0f32".to_string())],
+                Some("f64") => vec![("zero", "0.0f64".to_string())],
+                Some("bool") => vec![
+                    ("false", "false".to_string()),
+                    ("true", "true".to_string()),
+                ],
+                Some("String") => vec![("empty", "String::new()".to_string())],
+                _ if Self::is_supported_vec_type(typ) => {
+                    vec![("empty", "vec![]".to_string())]
+                }
+                _ => Vec::new(),
+            },
+            _ => Vec::new(),
         }
-        if !current.is_empty() {
-            parts.push(current);
+    }
+
+    /// Return the final path identifier for a concrete path type.
+    fn path_type_ident(typ: &syn::Type) -> Option<String> {
+        match typ {
+            syn::Type::Path(path) if path.qself.is_none() => {
+                path.path.segments.last().map(|segment| segment.ident.to_string())
+            }
+            _ => None,
         }
-        parts
+    }
+
+    /// Keep empty collection construction to well-understood concrete element types.
+    fn is_supported_element_type(typ: &syn::Type) -> bool {
+        matches!(
+            Self::path_type_ident(typ).as_deref(),
+            Some(
+                "u8" | "u16" | "u32" | "u64" | "usize"
+                    | "i8" | "i16" | "i32" | "i64" | "isize"
+                    | "f32" | "f64" | "bool" | "char" | "String"
+            )
+        )
+    }
+
+    fn is_supported_vec_type(typ: &syn::Type) -> bool {
+        let syn::Type::Path(path) = typ else {
+            return false;
+        };
+        let Some(segment) = path.path.segments.last() else {
+            return false;
+        };
+        if segment.ident != "Vec" {
+            return false;
+        }
+        let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+            return false;
+        };
+        let Some(syn::GenericArgument::Type(element_type)) = arguments.args.first() else {
+            return false;
+        };
+        Self::is_supported_element_type(element_type)
     }
 
     /// Create a function call only when every argument can be constructed safely.
     fn make_call_with_value(
-        params: &[(String, String)],
+        params: &[(String, syn::Type)],
         target_param: &str,
         value: &str,
     ) -> Option<String> {
@@ -273,21 +315,40 @@ impl TestGenerator {
 
     /// Return a conservative literal for a small set of well-understood types.
     ///
-    /// Returning None is intentional: guessing that an arbitrary user type
-    /// implements Default can produce uncompilable tests and false confidence.
-    fn default_value_for_type(typ: &str) -> Option<String> {
-        match typ.trim() {
-            "u8" | "u16" | "u32" | "u64" | "usize"
-            | "i8" | "i16" | "i32" | "i64" | "isize" => Some("0".to_string()),
-            "f32" => Some("0.0f32".to_string()),
-            "f64" => Some("0.0f64".to_string()),
-            "bool" => Some("false".to_string()),
-            "&str" => Some("\"\"".to_string()),
-            "&String" => Some("&String::new()".to_string()),
-            "String" => Some("String::new()".to_string()),
-            t if t.starts_with("&[") => Some("&[]".to_string()),
-            t if t.starts_with("&Vec<") => Some("&Vec::new()".to_string()),
-            t if t.starts_with("Vec<") => Some("vec![]".to_string()),
+    /// Unknown, generic, mutable-reference and custom types return None. Guessing
+    /// that an arbitrary type implements Default would create invalid test calls.
+    fn default_value_for_type(typ: &syn::Type) -> Option<String> {
+        use syn::Type;
+
+        match typ {
+            Type::Reference(reference) if reference.mutability.is_none() => {
+                match reference.elem.as_ref() {
+                    Type::Path(_) if Self::path_type_ident(&reference.elem).as_deref() == Some("str") => {
+                        Some("\"\"".to_string())
+                    }
+                    Type::Path(_) if Self::path_type_ident(&reference.elem).as_deref() == Some("String") => {
+                        Some("&String::new()".to_string())
+                    }
+                    Type::Slice(slice) if Self::is_supported_element_type(&slice.elem) => {
+                        Some("&[]".to_string())
+                    }
+                    inner if Self::is_supported_vec_type(inner) => {
+                        Some("&Vec::new()".to_string())
+                    }
+                    _ => None,
+                }
+            }
+            Type::Path(_) => match Self::path_type_ident(typ).as_deref() {
+                Some("u8" | "u16" | "u32" | "u64" | "usize" | "i8" | "i16" | "i32" | "i64" | "isize") => {
+                    Some("0".to_string())
+                }
+                Some("f32") => Some("0.0f32".to_string()),
+                Some("f64") => Some("0.0f64".to_string()),
+                Some("bool") => Some("false".to_string()),
+                Some("String") => Some("String::new()".to_string()),
+                _ if Self::is_supported_vec_type(typ) => Some("vec![]".to_string()),
+                _ => None,
+            },
             _ => None,
         }
     }
