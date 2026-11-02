@@ -10,6 +10,10 @@ on:
       - ".github/workflows/basalt-history-search-validation.yml"
   workflow_dispatch:
 
+concurrency:
+  group: basalt-history-search-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
