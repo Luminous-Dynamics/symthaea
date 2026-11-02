@@ -651,6 +651,21 @@ pub fn verify_compute_risk_report(report: &ComputeRiskReport) -> Result<(), Comp
     if report.sample_count == 0 || report.candidate_evaluations.is_empty() {
         return Err(fail("report.counts", "sample and candidate counts must be positive"));
     }
+    if report.confidence_delta_ppm == 0 || report.confidence_delta_ppm >= PPM as u32 {
+        return Err(fail("confidence_delta_ppm", "must be in (0, 1,000,000) PPM"));
+    }
+    for (field, value) in [
+        ("risk_upper_budget_ppm", report.risk_upper_budget_ppm),
+        ("risk_lower_budget_ppm", report.risk_lower_budget_ppm),
+        ("risk_output_error_budget_ppm", report.risk_output_error_budget_ppm),
+    ] {
+        if value == 0 || value > PPM as u32 {
+            return Err(fail(field, "must be in 1..=1,000,000 PPM"));
+        }
+    }
+    if report.correction_ppm > PPM as u32 {
+        return Err(fail("correction_ppm", "must be in [0, 1,000,000] PPM"));
+    }
     let expected_claim_count = report.candidate_evaluations.len().checked_mul(3)
         .ok_or_else(|| fail("simultaneous_claim_count", "3G claim count overflow"))?;
     if report.simultaneous_claim_count != expected_claim_count {
@@ -673,6 +688,21 @@ pub fn verify_compute_risk_report(report: &ComputeRiskReport) -> Result<(), Comp
         if candidate.sample_count != report.sample_count
             || candidate.simultaneous_ucb_correction_ppm != report.correction_ppm {
             return Err(fail("candidate_evaluations", "candidate sample count or correction differs from report"));
+        }
+        for (field, value) in [
+            ("upper_mean_loss_ceil_ppm", candidate.upper_mean_loss_ceil_ppm),
+            ("lower_mean_loss_ceil_ppm", candidate.lower_mean_loss_ceil_ppm),
+            ("emitted_answer_error_mean_ceil_ppm", candidate.emitted_answer_error_mean_ceil_ppm),
+            ("emitted_answer_error_ucb_ppm", candidate.emitted_answer_error_ucb_ppm),
+            ("upper_risk_ucb_ppm", candidate.upper_risk_ucb_ppm),
+            ("lower_risk_ucb_ppm", candidate.lower_risk_ucb_ppm),
+            ("mean_tokens_used_ppm", candidate.mean_tokens_used_ppm),
+            ("mean_upper_efficiency_loss_ppm", candidate.mean_upper_efficiency_loss_ppm),
+            ("mean_lower_efficiency_loss_ppm", candidate.mean_lower_efficiency_loss_ppm),
+        ] {
+            if value > PPM as u32 {
+                return Err(fail(format!("candidate_evaluations.{field}"), "must be in [0, 1,000,000] PPM"));
+            }
         }
         if let Some(prior) = prior_id {
             if prior >= candidate.candidate_id.as_str() {
@@ -978,6 +1008,26 @@ mod tests {
         assert_eq!(report.confidence_failure_allocation.numerator_ppm,100_000);
         assert_eq!(report.confidence_failure_allocation.denominator,12);
         verify_compute_risk_report(&report).unwrap();
+    }
+
+    #[test]
+    fn verifier_rejects_invalid_report_alpha_and_risk_budget_ranges() {
+        let fixture=load_builtin_fixture().unwrap();
+        let traces=generate_synthetic_validation_panel(&fixture).unwrap();
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.confidence_delta_ppm=0;
+        assert!(verify_compute_risk_report(&report).is_err());
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.risk_output_error_budget_ppm=1_000_001;
+        assert!(verify_compute_risk_report(&report).is_err());
     }
 
     #[test]
