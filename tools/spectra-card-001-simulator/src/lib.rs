@@ -86,7 +86,8 @@ pub struct CardEvaluatorTruthV1 {
     pub target_indices: Vec<u8>,
     /// Array index is the public blinded_condition_code.
     pub condition_codebook: [CardConditionV1; CONDITIONS_PER_CYCLE],
-    pub expected_correct_permille_by_condition: [u16; CONDITIONS_PER_CYCLE],
+    /// World probability at period 1, indexed by blinded public condition code.
+    pub response_success_probability_permille_at_period_one_by_code: [u16; CONDITIONS_PER_CYCLE],
     pub claim_ceiling: String,
 }
 
@@ -347,7 +348,7 @@ pub fn generate_card_campaign_v1(
             seed,
             target_indices: targets,
             condition_codebook: codebook,
-            expected_correct_permille_by_condition: probabilities,
+            response_success_probability_permille_at_period_one_by_code: probabilities,
             claim_ceiling: "synthetic_only".to_owned(),
         },
     })
@@ -579,6 +580,49 @@ mod tests {
         let r = report(CardWorldV1::OrderConfounded, 0x1005);
         assert_eq!(r.design_diagnostic, DesignDiagnosticV1::ConditionOrderConfounded);
         assert!(r.active_minus_sham_mean_period_index > 0.5);
+    }
+
+
+    #[test]
+    fn six_world_known_answers_replay_exactly() {
+        let fixture: serde_json::Value = serde_json::from_str(
+            include_str!("../../../research/spectra-card-001/fixtures/known-answer-v0.1.json")
+        ).expect("card known-answer fixture");
+        for scenario in fixture["scenarios"].as_array().unwrap() {
+            let world = match scenario["world"].as_str().unwrap() {
+                "null" => CardWorldV1::Null,
+                "enclosure_context_only" => CardWorldV1::EnclosureContextOnly,
+                "electrical_increment_only" => CardWorldV1::ElectricalIncrementOnly,
+                "both_effects" => CardWorldV1::BothEffects,
+                "practice_only" => CardWorldV1::PracticeOnly,
+                "order_confounded" => CardWorldV1::OrderConfounded,
+                other => panic!("unknown card fixture world: {other}"),
+            };
+            let seed = u64::from_str_radix(
+                scenario["seed_hex"].as_str().unwrap().trim_start_matches("0x"), 16
+            ).unwrap();
+            let campaign = generate_card_campaign_v1(config(), seed, world).unwrap();
+            let report = evaluate_card_campaign_v1(&campaign.public, &campaign.evaluator_truth).unwrap();
+            let expected = &scenario["expected"];
+            assert_eq!(report.trial_count, expected["trial_count"].as_u64().unwrap());
+            assert_eq!(report.participant_count, expected["participant_count"].as_u64().unwrap());
+            assert!((report.mean_enclosure_context_effect_permille
+                - expected["enclosure_context_effect_permille"].as_f64().unwrap()).abs() < 1.0e-9);
+            assert!((report.mean_electrical_increment_effect_permille
+                - expected["electrical_increment_effect_permille"].as_f64().unwrap()).abs() < 1.0e-9);
+            assert!((report.active_minus_sham_mean_period_index
+                - expected["active_minus_sham_mean_period_index"].as_f64().unwrap()).abs() < 1.0e-9);
+            let expected_diagnostic = match expected["design_diagnostic"].as_str().unwrap() {
+                "counterbalanced" => DesignDiagnosticV1::Counterbalanced,
+                "condition_order_confounded" => DesignDiagnosticV1::ConditionOrderConfounded,
+                other => panic!("unknown card diagnostic: {other}"),
+            };
+            assert_eq!(report.design_diagnostic, expected_diagnostic);
+            for (index, condition) in report.condition_summaries.iter().enumerate() {
+                assert!((condition.mean_accuracy_permille
+                    - expected["condition_mean_accuracy_permille"][index].as_f64().unwrap()).abs() < 1.0e-9);
+            }
+        }
     }
 
     #[test]
