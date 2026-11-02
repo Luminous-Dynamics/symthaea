@@ -513,14 +513,35 @@ pub fn transport_bounded_expectation_interval(
         ));
     }
     let functional_range_width = functional_upper_bound - functional_lower_bound;
+    if !functional_range_width.is_finite() {
+        return Err(FiniteTvTransportError::new(
+            "functional_range",
+            "functional range width overflowed finite f64 arithmetic",
+        ));
+    }
     let maximum_absolute_expectation_shift =
         functional_range_width * report.total_variation_radius;
+    if !maximum_absolute_expectation_shift.is_finite() {
+        return Err(FiniteTvTransportError::new(
+            "transported_interval",
+            "transport shift overflowed finite f64 arithmetic",
+        ));
+    }
     let target_lower_confidence_bound = (calibration_lower_confidence_bound
         - maximum_absolute_expectation_shift)
         .max(functional_lower_bound);
     let target_upper_confidence_bound = (calibration_upper_confidence_bound
         + maximum_absolute_expectation_shift)
         .min(functional_upper_bound);
+    if !target_lower_confidence_bound.is_finite()
+        || !target_upper_confidence_bound.is_finite()
+        || target_lower_confidence_bound > target_upper_confidence_bound
+    {
+        return Err(FiniteTvTransportError::new(
+            "transported_interval",
+            "transported confidence interval is non-finite or inverted",
+        ));
+    }
     Ok(TransportedExpectationInterval {
         functional_lower_bound,
         functional_upper_bound,
@@ -670,6 +691,35 @@ mod tests {
         let mut reused = request(vec![80, 20], vec![50, 50]);
         reused.target_sample_pre_outcome_only = false;
         assert!(reused.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_nonindependent_calibration_target_samples() {
+        let mut request = request(vec![80, 20], vec![50, 50]);
+        request.independent_calibration_target_samples = false;
+        assert!(request.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_non_iid_calibration_sample() {
+        let mut request = request(vec![80, 20], vec![50, 50]);
+        request.iid_calibration_complete_path_draws = false;
+        assert!(request.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_overflowing_functional_range_instead_of_emitting_infinite_bounds() {
+        let request = request(vec![80, 20], vec![50, 50]);
+        let report = calibrate_finite_tv_two_sample_transport(&request).unwrap();
+        assert!(transport_bounded_expectation_interval(
+            &request,
+            &report,
+            -f64::MAX,
+            f64::MAX,
+            -1.0,
+            1.0,
+        )
+        .is_err());
     }
 
     #[test]
