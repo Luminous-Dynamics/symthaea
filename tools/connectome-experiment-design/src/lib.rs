@@ -48,6 +48,19 @@ pub enum DesignError {
     OutcomeIndexOutOfRange { index: usize, outcome_count: usize },
     ImpossibleObservedOutcome { outcome_index: usize },
     SelectedExperimentNotFound { experiment_id: String },
+    EmptyActionSet,
+    DuplicateActionLabel { label: String },
+    DecisionUtilityRowCountMismatch { expected: usize, actual: usize },
+    DecisionUtilityActionCountMismatch {
+        hypothesis_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidDecisionUtility {
+        hypothesis_index: usize,
+        action_index: usize,
+        value: f64,
+    },
     NumericalInstability,
 }
 
@@ -106,8 +119,32 @@ impl fmt::Display for DesignError {
             Self::SelectedExperimentNotFound { experiment_id } => {
                 write!(f, "selected experiment {experiment_id:?} is not in the candidate set")
             }
+            Self::EmptyActionSet => write!(f, "decision action set must not be empty"),
+            Self::DuplicateActionLabel { label } => {
+                write!(f, "duplicate decision action label {label:?}")
+            }
+            Self::DecisionUtilityRowCountMismatch { expected, actual } => write!(
+                f,
+                "expected {expected} decision-utility rows, received {actual}"
+            ),
+            Self::DecisionUtilityActionCountMismatch {
+                hypothesis_index,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "hypothesis {hypothesis_index} has {actual} action utilities; expected {expected}"
+            ),
+            Self::InvalidDecisionUtility {
+                hypothesis_index,
+                action_index,
+                value,
+            } => write!(
+                f,
+                "utility for hypothesis {hypothesis_index}, action {action_index} is invalid: {value}"
+            ),
             Self::NumericalInstability => {
-                write!(f, "entropy calculation exceeded its numerical tolerance")
+                write!(f, "information or decision-value calculation exceeded its numerical tolerance")
             }
         }
     }
@@ -154,6 +191,48 @@ pub struct SelectionRegret {
     pub selected_utility_bits_per_cost: f64,
     pub best_utility_bits_per_cost: f64,
     pub regret_bits_per_cost: f64,
+}
+
+/// Decision problem used to calculate expected value of sample information.
+///
+/// `utilities_by_hypothesis[h][a]` is the utility of selecting action `a`
+/// when hypothesis `h` is true. Utilities are caller-defined, finite values;
+/// they need not be probabilities or non-negative.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionProblem {
+    pub actions: Vec<String>,
+    pub utilities_by_hypothesis: Vec<Vec<f64>>,
+}
+
+/// Expected value of sample information (EVSI) for one candidate experiment.
+///
+/// EVSI is measured in the caller's utility units. It is deliberately distinct
+/// from EIG (bits): an experiment can distinguish hypotheses that imply the
+/// same action and therefore have high EIG but zero decision value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DecisionValueScore {
+    pub prior_best_expected_utility: f64,
+    pub expected_best_utility_after_experiment: f64,
+    pub expected_value_of_sample_information: f64,
+    pub cost: f64,
+    pub expected_value_per_cost: f64,
+}
+
+/// Candidate and decision-value score after deterministic ranking.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedDecisionExperiment {
+    pub experiment_id: String,
+    pub score: DecisionValueScore,
+}
+
+/// Decision regret relative to the best candidate in the supplied finite pool.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionSelectionRegret {
+    pub selected_experiment_id: String,
+    pub best_experiment_id: String,
+    pub selected_expected_value_per_cost: f64,
+    pub best_expected_value_per_cost: f64,
+    pub regret_per_cost: f64,
 }
 
 /// Shannon entropy in bits. Input probabilities must be non-negative and sum
@@ -427,6 +506,204 @@ pub fn selection_regret(
     })
 }
 
+
+fn validate_decision_problem(
+    priors: &[f64],
+    problem: &DecisionProblem,
+) -> Result<(), DesignError> {
+    validate_priors(priors)?;
+    if problem.actions.is_empty() {
+        return Err(DesignError::EmptyActionSet);
+    }
+    let mut action_labels = HashSet::with_capacity(problem.actions.len());
+    for label in &problem.actions {
+        if label.trim().is_empty() || !action_labels.insert(label.as_str()) {
+            return Err(DesignError::DuplicateActionLabel { label: label.clone() });
+        }
+    }
+    if problem.utilities_by_hypothesis.len() != priors.len() {
+        return Err(DesignError::DecisionUtilityRowCountMismatch {
+            expected: priors.len(),
+            actual: problem.utilities_by_hypothesis.len(),
+        });
+    }
+    for (hypothesis_index, row) in problem.utilities_by_hypothesis.iter().enumerate() {
+        if row.len() != problem.actions.len() {
+            return Err(DesignError::DecisionUtilityActionCountMismatch {
+                hypothesis_index,
+                expected: problem.actions.len(),
+                actual: row.len(),
+            });
+        }
+        for (action_index, &utility) in row.iter().enumerate() {
+            if !utility.is_finite() {
+                return Err(DesignError::InvalidDecisionUtility {
+                    hypothesis_index,
+                    action_index,
+                    value: utility,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn best_expected_utility(
+    probabilities: &[f64],
+    utilities_by_hypothesis: &[Vec<f64>],
+    action_count: usize,
+) -> Result<f64, DesignError> {
+    let mut best = f64::NEG_INFINITY;
+    for action_index in 0..action_count {
+        let expected = probabilities
+            .iter()
+            .enumerate()
+            .map(|(h, probability)| probability * utilities_by_hypothesis[h][action_index])
+            .sum::<f64>();
+        if !expected.is_finite() {
+            return Err(DesignError::NumericalInstability);
+        }
+        best = best.max(expected);
+    }
+    if best.is_finite() {
+        Ok(best)
+    } else {
+        Err(DesignError::NumericalInstability)
+    }
+}
+
+/// Evaluate the expected value of sample information for a candidate.
+///
+/// This computes the expected improvement in the best available action after
+/// observing the candidate's outcome, compared with choosing an action before
+/// running the experiment. It is not the same objective as EIG or EIG/cost.
+pub fn evaluate_decision_value(
+    priors: &[f64],
+    candidate: &CandidateExperiment,
+    problem: &DecisionProblem,
+) -> Result<DecisionValueScore, DesignError> {
+    let outcome_count = validate_candidate(priors, candidate)?;
+    validate_decision_problem(priors, problem)?;
+
+    let prior_best = best_expected_utility(
+        priors,
+        &problem.utilities_by_hypothesis,
+        problem.actions.len(),
+    )?;
+
+    let mut marginals = vec![0.0; outcome_count];
+    for (h, &prior) in priors.iter().enumerate() {
+        for (y, &likelihood) in candidate.likelihoods_by_hypothesis[h].iter().enumerate() {
+            marginals[y] += prior * likelihood;
+        }
+    }
+
+    let mut expected_post_experiment_best = 0.0;
+    for (outcome_index, &marginal) in marginals.iter().enumerate() {
+        if marginal <= 0.0 {
+            continue;
+        }
+        let posterior: Vec<f64> = priors
+            .iter()
+            .enumerate()
+            .map(|(h, &prior)| {
+                prior * candidate.likelihoods_by_hypothesis[h][outcome_index] / marginal
+            })
+            .collect();
+        let post_best = best_expected_utility(
+            &posterior,
+            &problem.utilities_by_hypothesis,
+            problem.actions.len(),
+        )?;
+        expected_post_experiment_best += marginal * post_best;
+    }
+
+    let mut evsi = expected_post_experiment_best - prior_best;
+    if evsi < 0.0 && evsi >= -ROUND_OFF_TOLERANCE {
+        evsi = 0.0;
+    }
+    if !evsi.is_finite() || evsi < 0.0 {
+        return Err(DesignError::NumericalInstability);
+    }
+
+    Ok(DecisionValueScore {
+        prior_best_expected_utility: prior_best,
+        expected_best_utility_after_experiment: expected_post_experiment_best,
+        expected_value_of_sample_information: evsi,
+        cost: candidate.cost,
+        expected_value_per_cost: evsi / candidate.cost,
+    })
+}
+
+/// Rank candidate experiments by EVSI per cost, then raw EVSI, then stable ID.
+pub fn rank_candidates_by_decision_value(
+    priors: &[f64],
+    candidates: &[CandidateExperiment],
+    problem: &DecisionProblem,
+) -> Result<Vec<RankedDecisionExperiment>, DesignError> {
+    validate_priors(priors)?;
+    validate_decision_problem(priors, problem)?;
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !ids.insert(candidate.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: candidate.id.clone(),
+            });
+        }
+        ranked.push(RankedDecisionExperiment {
+            experiment_id: candidate.id.clone(),
+            score: evaluate_decision_value(priors, candidate, problem)?,
+        });
+    }
+    ranked.sort_by(|left, right| {
+        right
+            .score
+            .expected_value_per_cost
+            .total_cmp(&left.score.expected_value_per_cost)
+            .then_with(|| {
+                right
+                    .score
+                    .expected_value_of_sample_information
+                    .total_cmp(&left.score.expected_value_of_sample_information)
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+    Ok(ranked)
+}
+
+/// Compute decision-value regret against the best candidate in the declared pool.
+///
+/// This is an EVSI-per-cost opportunity gap. It is distinct from EIG-selection
+/// regret and should not be presented as realized biological utility.
+pub fn decision_selection_regret(
+    priors: &[f64],
+    candidates: &[CandidateExperiment],
+    problem: &DecisionProblem,
+    selected_experiment_id: &str,
+) -> Result<DecisionSelectionRegret, DesignError> {
+    let ranked = rank_candidates_by_decision_value(priors, candidates, problem)?;
+    let best = ranked.first().ok_or(DesignError::NoCandidateExperiments)?;
+    let selected = ranked
+        .iter()
+        .find(|candidate| candidate.experiment_id == selected_experiment_id)
+        .ok_or_else(|| DesignError::SelectedExperimentNotFound {
+            experiment_id: selected_experiment_id.to_owned(),
+        })?;
+    let best_utility = best.score.expected_value_per_cost;
+    let selected_utility = selected.score.expected_value_per_cost;
+    Ok(DecisionSelectionRegret {
+        selected_experiment_id: selected.experiment_id.clone(),
+        best_experiment_id: best.experiment_id.clone(),
+        selected_expected_value_per_cost: selected_utility,
+        best_expected_value_per_cost: best_utility,
+        regret_per_cost: (best_utility - selected_utility).max(0.0),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -453,6 +730,101 @@ mod tests {
             (actual - expected).abs() <= tolerance,
             "actual {actual:.15}, expected {expected:.15}, tolerance {tolerance}"
         );
+    }
+
+    #[test]
+    fn eig_and_decision_value_are_distinct_experiment_objectives() {
+        let priors = [0.25, 0.25, 0.25, 0.25];
+        let problem = DecisionProblem {
+            actions: vec!["choose_group_a".into(), "choose_group_b".into()],
+            utilities_by_hypothesis: vec![
+                vec![1.0, 0.0],
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![0.0, 1.0],
+            ],
+        };
+
+        // This experiment reveals which member of each utility-equivalent
+        // pair is present, but never reveals which decision group is correct.
+        let within_group = CandidateExperiment {
+            id: "within-group-identity".into(),
+            cost: 1.0,
+            outcomes: vec!["member_0".into(), "member_1".into()],
+            likelihoods_by_hypothesis: vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+            ],
+        };
+
+        // This noisy experiment identifies the utility-relevant group with
+        // 80% probability but has less total information about H.
+        let group_signal = CandidateExperiment {
+            id: "decision-relevant-group".into(),
+            cost: 1.0,
+            outcomes: vec!["group_a".into(), "group_b".into()],
+            likelihoods_by_hypothesis: vec![
+                vec![0.8, 0.2],
+                vec![0.8, 0.2],
+                vec![0.2, 0.8],
+                vec![0.2, 0.8],
+            ],
+        };
+
+        let eig_ranked = rank_candidates(
+            &priors,
+            &[within_group.clone(), group_signal.clone()],
+        )
+        .unwrap();
+        assert_eq!(eig_ranked[0].experiment_id, "within-group-identity");
+        close(eig_ranked[0].score.information_gain_bits, 1.0, 1.0e-12);
+
+        let within_score = evaluate_decision_value(&priors, &within_group, &problem).unwrap();
+        let group_score = evaluate_decision_value(&priors, &group_signal, &problem).unwrap();
+        close(within_score.expected_value_of_sample_information, 0.0, 1.0e-12);
+        close(group_score.expected_value_of_sample_information, 0.3, 1.0e-12);
+
+        let decision_ranked = rank_candidates_by_decision_value(
+            &priors,
+            &[within_group.clone(), group_signal.clone()],
+            &problem,
+        )
+        .unwrap();
+        assert_eq!(decision_ranked[0].experiment_id, "decision-relevant-group");
+
+        let regret = decision_selection_regret(
+            &priors,
+            &[within_group, group_signal],
+            &problem,
+            "within-group-identity",
+        )
+        .unwrap();
+        assert_eq!(regret.best_experiment_id, "decision-relevant-group");
+        close(regret.regret_per_cost, 0.3, 1.0e-12);
+    }
+
+    #[test]
+    fn invalid_decision_utility_shape_and_non_finite_values_reject() {
+        let candidate = binary_experiment("candidate", 1.0, 0.9, 0.1);
+        let bad_shape = DecisionProblem {
+            actions: vec!["a".into(), "b".into()],
+            utilities_by_hypothesis: vec![vec![1.0, 0.0]],
+        };
+        assert!(matches!(
+            evaluate_decision_value(&[0.5, 0.5], &candidate, &bad_shape),
+            Err(DesignError::DecisionUtilityRowCountMismatch { .. })
+        ));
+
+        let bad_value = DecisionProblem {
+            actions: vec!["a".into()],
+            utilities_by_hypothesis: vec![vec![f64::NAN], vec![0.0]],
+        };
+        assert!(matches!(
+            evaluate_decision_value(&[0.5, 0.5], &candidate, &bad_value),
+            Err(DesignError::InvalidDecisionUtility { .. })
+        ));
     }
 
     #[test]
