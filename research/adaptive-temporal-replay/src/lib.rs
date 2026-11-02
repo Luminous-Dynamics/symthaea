@@ -460,6 +460,263 @@ pub fn replay_feedback_events(events: &[FeedbackEvent]) -> Result<BitemporalLabe
     Ok(ledger)
 }
 
+/// Interpretation of the level produced by the delayed-ACI recursion.
+/// The original method allows levels outside [0,1]: signed-residual intervals
+/// become all-real when alpha < 0 and empty when alpha > 1. Callers must map
+/// these regimes explicitly rather than silently clipping alpha.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AciSetRegime {
+    InUnitInterval,
+    AllReal,
+    Empty,
+}
+
+pub fn aci_set_regime(alpha_ppm: i64) -> AciSetRegime {
+    if alpha_ppm < 0 { AciSetRegime::AllReal }
+    else if alpha_ppm > SCALE_PPM { AciSetRegime::Empty }
+    else { AciSetRegime::InUnitInterval }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingDelayedAciPrediction {
+    origin_step: u64,
+    target_step: u64,
+    phase_index: usize,
+    alpha_used_ppm: i64,
+    prediction_set_sha256: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DelayedAciFeedbackReceipt {
+    pub target_step: u64,
+    pub prediction_origin_step: u64,
+    pub phase_index: usize,
+    pub alpha_used_ppm: i64,
+    pub prediction_set_sha256: [u8; 32],
+    pub miscovered: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DelayedAciStepReceipt {
+    pub origin_step: u64,
+    pub issued_target_step: u64,
+    pub phase_index: usize,
+    pub alpha_used_ppm: i64,
+    pub updated_alpha_ppm: i64,
+    pub prediction_set_sha256: [u8; 32],
+    pub consumed_feedback: Option<DelayedAciFeedbackReceipt>,
+}
+
+/// Fixed-horizon tau-delayed Adaptive Conformal Inference (tau-DACI).
+///
+/// One call corresponds to one consecutive forecast origin. At origin t:
+/// - if t < tau, no feedback is due and the phase starts at target alpha;
+/// - if t >= tau, the caller must supply the miss/cover result for target t;
+/// - the queued prediction issued at t-tau is consumed and its stored alpha
+///   is updated using alpha_next = alpha_used + gamma * (target_alpha - err);
+/// - the resulting phase-specific level is used for the new prediction t+tau.
+///
+/// This creates tau interleaved ACI recursions. It deliberately rejects missing,
+/// variable-delay, or out-of-order feedback: those are different methods and
+/// need a different filtration/validity analysis.
+///
+/// The arithmetic is integer PPM with nearest rounding (ties away from zero).
+/// This is a deterministic software approximation to the paper's real-valued
+/// recursion; rounding means this implementation alone does not inherit the
+/// paper's exact theorem. Alpha is not clipped to [0,1].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DelayedAciBank {
+    horizon_steps: u64,
+    target_alpha_ppm: i64,
+    gamma_ppm: i64,
+    phase_alpha_ppm: Vec<i64>,
+    pending: BTreeMap<u64, PendingDelayedAciPrediction>,
+    next_origin_step: u64,
+    history: Vec<DelayedAciStepReceipt>,
+}
+
+impl DelayedAciBank {
+    pub fn new(horizon_steps: u64, target_alpha_ppm: i64, gamma_ppm: i64) -> Result<Self, ReplayError> {
+        if horizon_steps == 0 { return Err(invalid("delayed-ACI horizon must be positive")); }
+        if horizon_steps > 1_000_000 { return Err(invalid("delayed-ACI horizon exceeds configured cap")); }
+        if !(1..SCALE_PPM).contains(&target_alpha_ppm) {
+            return Err(invalid("delayed-ACI target alpha must be in (0,1)"));
+        }
+        if !(1..=SCALE_PPM).contains(&gamma_ppm) {
+            return Err(invalid("delayed-ACI gamma must be in (0,1]"));
+        }
+        let phase_count = usize::try_from(horizon_steps)
+            .map_err(|_| invalid("delayed-ACI horizon does not fit usize"))?;
+        Ok(Self {
+            horizon_steps,
+            target_alpha_ppm,
+            gamma_ppm,
+            phase_alpha_ppm: vec![target_alpha_ppm; phase_count],
+            pending: BTreeMap::new(),
+            next_origin_step: 0,
+            history: Vec::new(),
+        })
+    }
+
+    pub fn horizon_steps(&self) -> u64 { self.horizon_steps }
+    pub fn next_origin_step(&self) -> u64 { self.next_origin_step }
+    pub fn pending_count(&self) -> usize { self.pending.len() }
+    pub fn phase_alpha_ppm(&self, phase_index: usize) -> Option<i64> {
+        self.phase_alpha_ppm.get(phase_index).copied()
+    }
+    pub fn history(&self) -> &[DelayedAciStepReceipt] { &self.history }
+
+    /// Process feedback for the current target (when due) and issue a new
+    /// prediction for origin_step + horizon_steps. Feedback is None only in
+    /// the initial horizon warm-up. The digest must bind the issued prediction
+    /// set and its target timestamp.
+    pub fn advance(
+        &mut self,
+        origin_step: u64,
+        miscovered: Option<bool>,
+        prediction_set_sha256: [u8; 32],
+    ) -> Result<DelayedAciStepReceipt, ReplayError> {
+        if origin_step != self.next_origin_step {
+            return Err(invalid(format!(
+                "delayed-ACI expected origin {}, received {}",
+                self.next_origin_step, origin_step
+            )));
+        }
+        if prediction_set_sha256 == [0; 32] {
+            return Err(invalid("prediction-set digest must be nonzero"));
+        }
+        let phase_index = usize::try_from(origin_step % self.horizon_steps)
+            .map_err(|_| invalid("delayed-ACI phase index overflow"))?;
+        let mut consumed_feedback = None;
+        let mut updated_alpha_ppm = self.phase_alpha_ppm[phase_index];
+
+        if origin_step < self.horizon_steps {
+            if miscovered.is_some() {
+                return Err(invalid("feedback supplied before first delayed target is due"));
+            }
+        } else {
+            let observed_miss = miscovered
+                .ok_or_else(|| invalid("fixed-horizon delayed-ACI feedback is missing"))?;
+            let pending = self.pending.get(&origin_step)
+                .ok_or_else(|| invalid("no queued prediction exists for the due target"))?;
+            let expected_origin = origin_step.checked_sub(self.horizon_steps)
+                .ok_or_else(|| invalid("delayed-ACI target underflow"))?;
+            if pending.origin_step != expected_origin
+                || pending.target_step != origin_step
+                || pending.phase_index != phase_index
+            {
+                return Err(invalid("queued prediction identity/phase does not match due target"));
+            }
+            let error_ppm = if observed_miss { SCALE_PPM } else { 0 };
+            let delta = div_round_away_from_zero(
+                i128::from(self.gamma_ppm) * i128::from(self.target_alpha_ppm - error_ppm),
+                i128::from(SCALE_PPM),
+            )?;
+            updated_alpha_ppm = i64::try_from(i128::from(pending.alpha_used_ppm) + delta)
+                .map_err(|_| invalid("delayed-ACI alpha update overflow"))?;
+            consumed_feedback = Some(DelayedAciFeedbackReceipt {
+                target_step: origin_step,
+                prediction_origin_step: pending.origin_step,
+                phase_index: pending.phase_index,
+                alpha_used_ppm: pending.alpha_used_ppm,
+                prediction_set_sha256: pending.prediction_set_sha256,
+                miscovered: observed_miss,
+            });
+        }
+
+        let issued_target_step = origin_step.checked_add(self.horizon_steps)
+            .ok_or_else(|| invalid("delayed-ACI target step overflow"))?;
+        if self.pending.contains_key(&issued_target_step) {
+            return Err(invalid("duplicate delayed-ACI pending target"));
+        }
+
+        // Commit only after every validation and arithmetic operation succeeds.
+        if consumed_feedback.is_some() { self.pending.remove(&origin_step); }
+        self.phase_alpha_ppm[phase_index] = updated_alpha_ppm;
+        self.pending.insert(issued_target_step, PendingDelayedAciPrediction {
+            origin_step,
+            target_step: issued_target_step,
+            phase_index,
+            alpha_used_ppm: updated_alpha_ppm,
+            prediction_set_sha256,
+        });
+        let receipt = DelayedAciStepReceipt {
+            origin_step,
+            issued_target_step,
+            phase_index,
+            alpha_used_ppm: updated_alpha_ppm,
+            updated_alpha_ppm,
+            prediction_set_sha256,
+            consumed_feedback,
+        };
+        self.history.push(receipt.clone());
+        self.next_origin_step = self.next_origin_step.checked_add(1)
+            .ok_or_else(|| invalid("delayed-ACI origin counter overflow"))?;
+        Ok(receipt)
+    }
+
+    /// Replay all ordered step receipts and compare the derived phase/pending
+    /// state. This is deterministic replay, not proof of external data truth.
+    pub fn verify(&self) -> Result<(), ReplayError> {
+        let mut replay = Self::new(self.horizon_steps, self.target_alpha_ppm, self.gamma_ppm)?;
+        for record in &self.history {
+            let feedback = record.consumed_feedback.as_ref().map(|x| x.miscovered);
+            let reconstructed = replay.advance(
+                record.origin_step,
+                feedback,
+                record.prediction_set_sha256,
+            )?;
+            if reconstructed != *record {
+                return Err(invalid("delayed-ACI receipt differs from deterministic replay"));
+            }
+        }
+        if replay.phase_alpha_ppm != self.phase_alpha_ppm
+            || replay.pending != self.pending
+            || replay.next_origin_step != self.next_origin_step
+        {
+            return Err(invalid("delayed-ACI phase or pending state differs from replay"));
+        }
+        Ok(())
+    }
+
+    /// SHA-256 over the domain-separated ordered step-receipt history.
+    pub fn history_sha256(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"SYMTHAEA-TAU-DELAYED-ACI-REPLAY-V1");
+        hasher.update(self.horizon_steps.to_le_bytes());
+        hasher.update(self.target_alpha_ppm.to_le_bytes());
+        hasher.update(self.gamma_ppm.to_le_bytes());
+        hasher.update((self.history.len() as u64).to_le_bytes());
+        for record in &self.history {
+            hasher.update(record.origin_step.to_le_bytes());
+            hasher.update(record.issued_target_step.to_le_bytes());
+            hasher.update((record.phase_index as u64).to_le_bytes());
+            hasher.update(record.alpha_used_ppm.to_le_bytes());
+            hasher.update(record.updated_alpha_ppm.to_le_bytes());
+            hasher.update(record.prediction_set_sha256);
+            match &record.consumed_feedback {
+                None => hasher.update([0]),
+                Some(feedback) => {
+                    hasher.update([1]);
+                    hasher.update(feedback.target_step.to_le_bytes());
+                    hasher.update(feedback.prediction_origin_step.to_le_bytes());
+                    hasher.update((feedback.phase_index as u64).to_le_bytes());
+                    hasher.update(feedback.alpha_used_ppm.to_le_bytes());
+                    hasher.update(feedback.prediction_set_sha256);
+                    hasher.update([u8::from(feedback.miscovered)]);
+                }
+            }
+        }
+        let digest = hasher.finalize();
+        let mut output = String::with_capacity(64);
+        for byte in digest {
+            use std::fmt::Write;
+            let _ = write!(output, "{byte:02x}");
+        }
+        output
+    }
+}
+
 /// Scalar ACI recursion applied only when feedback is delivered. This is a
 /// baseline update, not the fixed-horizon delayed-ACI theorem or SAOCP.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -674,6 +931,83 @@ mod tests {
         assert_ne!(original, ledger.sha256_hex());
         ledger.verify().unwrap();
     }
+    fn digest(byte: u8) -> [u8; 32] { [byte; 32] }
+
+    #[test]
+    fn delayed_aci_tau_one_matches_scalar_aci_without_boundary_clipping() {
+        let mut delayed = DelayedAciBank::new(1, 100_000, 50_000).unwrap();
+        let mut scalar = AciState::new(100_000, 50_000).unwrap();
+        let errors = [true, false, false, true, true, false];
+        for (step, error) in errors.iter().enumerate() {
+            let feedback = if step == 0 { None } else { Some(errors[step - 1]) };
+            let record = delayed.advance(step as u64, feedback, digest(step as u8 + 1)).unwrap();
+            if step > 0 { scalar.update_on_delivered_feedback(errors[step - 1]).unwrap(); }
+            assert_eq!(record.alpha_used_ppm, scalar.current_alpha_ppm());
+        }
+        delayed.verify().unwrap();
+    }
+
+    #[test]
+    fn delayed_aci_uses_tau_independent_phase_chains() {
+        let mut state = DelayedAciBank::new(3, 100_000, 50_000).unwrap();
+        for step in 0..3 {
+            let receipt = state.advance(step, None, digest(step as u8 + 1)).unwrap();
+            assert_eq!(receipt.alpha_used_ppm, 100_000);
+        }
+        let r3 = state.advance(3, Some(true), digest(4)).unwrap();
+        let r4 = state.advance(4, Some(false), digest(5)).unwrap();
+        let r5 = state.advance(5, Some(true), digest(6)).unwrap();
+        assert_eq!((r3.phase_index, r3.alpha_used_ppm), (0, 55_000));
+        assert_eq!((r4.phase_index, r4.alpha_used_ppm), (1, 105_000));
+        assert_eq!((r5.phase_index, r5.alpha_used_ppm), (2, 55_000));
+        let r6 = state.advance(6, Some(false), digest(7)).unwrap();
+        assert_eq!((r6.phase_index, r6.alpha_used_ppm), (0, 60_000));
+        assert_eq!(state.phase_alpha_ppm(1), Some(105_000));
+        assert_eq!(state.phase_alpha_ppm(2), Some(55_000));
+        state.verify().unwrap();
+    }
+
+    #[test]
+    fn delayed_aci_requires_fixed_horizon_feedback_and_is_transactional() {
+        let mut state = DelayedAciBank::new(2, 100_000, 20_000).unwrap();
+        state.advance(0, None, digest(1)).unwrap();
+        state.advance(1, None, digest(2)).unwrap();
+        let before = state.clone();
+        assert!(state.advance(2, None, digest(3)).is_err());
+        assert_eq!(state, before);
+        assert!(state.advance(4, Some(true), digest(3)).is_err());
+        assert_eq!(state, before);
+        state.advance(2, Some(true), digest(3)).unwrap();
+        state.verify().unwrap();
+    }
+
+    #[test]
+    fn delayed_aci_replay_detects_tampered_receipt_and_digest_binds_history() {
+        let mut state = DelayedAciBank::new(2, 100_000, 20_000).unwrap();
+        for step in 0..8 {
+            let feedback = if step < 2 { None } else { Some(step % 2 == 0) };
+            state.advance(step, feedback, digest(step as u8 + 1)).unwrap();
+        }
+        let original = state.history_sha256();
+        state.verify().unwrap();
+        let mut tampered = state.clone();
+        tampered.history[3].alpha_used_ppm += 1;
+        assert!(tampered.verify().is_err());
+        assert_ne!(original, tampered.history_sha256());
+    }
+
+    #[test]
+    fn delayed_aci_preserves_out_of_unit_levels_and_degenerate_set_semantics() {
+        let mut state = DelayedAciBank::new(1, 100_000, 1_000_000).unwrap();
+        state.advance(0, None, digest(1)).unwrap();
+        let r1 = state.advance(1, Some(true), digest(2)).unwrap();
+        assert_eq!(r1.alpha_used_ppm, -800_000);
+        assert_eq!(aci_set_regime(r1.alpha_used_ppm), AciSetRegime::AllReal);
+        let r2 = state.advance(2, Some(false), digest(3)).unwrap();
+        assert_eq!(r2.alpha_used_ppm, -700_000);
+        assert_eq!(aci_set_regime(1_000_001), AciSetRegime::Empty);
+    }
+
     #[test]
     fn complete_replay_builds_verified_bitemporal_ledger() {
         let (_, scenarios) = load_builtin_registry().unwrap();
