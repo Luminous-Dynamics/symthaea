@@ -19,6 +19,23 @@ cargo build --release --manifest-path tools/connectomics-intake-audit/Cargo.toml
 
 For reproducible CI, generate and commit this crate's `Cargo.lock`, then add `--locked` to both commands.
 
+## Exact ConnectomeBench2 source split replay
+
+The connectome_split_replay_audit binary replays the actual per-species split JSON files consumed by upstream postprocess_giga_parquet.py. Unlike a no-overlap-only test, it checks that each observed metadata row maps to the exact partition returned by the upstream key lookup.
+
+The input --split-root must be the directory passed as upstream --splits-root, with <species>/train.json, val.json, and test.json. A build-time manifest.json in each species directory is optional: when present its op_counts are checked against the JSON key arrays; when absent, the report records a warning because the upstream loader itself does not read that file.
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_split_replay_audit -- \
+  --sidecar-jsonl metadata-sidecars.jsonl \
+  --split-root /path/to/ConnectomeEnv/configs/cube_splits \
+  --dataset-revision-commit-sha <exact-40-character-HF-v2-commit> \
+  --output split-replay-report.json
+```
+
+The verifier derives species from source_archive exactly as the upstream split_archive function does, reconstructs operation-bank, junction-control and synapse-control keys, and rejects duplicate keys that would be overwritten by the upstream Python dictionary loader. It hashes all consumed split files with SHA-256. The 14 authored Rust tests are synthetic regression tests and have not been compiled or executed in the authoring environment.
+
+See docs/neuroscience/CONNECTOME_EXACT_SPLIT_REPLAY_AUDIT_V0.1.md for scope and limitations. This complements rather than replaces connectome_dataset_audit, which checks row identity, labels/routes/masks, operation-group and 50 µm cube separation, neuron-overlap warnings and modality cohorts.
 ## Query-specific stopping snapshot audit
 
 The `connectome-stopping-audit` binary validates a JSONL series against the initial versioned snapshot contract in `docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json`. It checks immutable dataset/query/profile identity, strictly increasing snapshot sequence, parent graph digest continuity, nondecreasing edit counts, operation-class totals, invariant names, query metric names/units, and digest formatting. It also emits a descriptive tail-range stability signal and walk-forward predictions for declared graph invariants and scientific-query metrics, comparing a fitted asymptotic curve with persistence and linear-trend baselines.
