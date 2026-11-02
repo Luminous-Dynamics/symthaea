@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/connectomics-intake-audit/**"
+      - "docs/neuroscience/CONNECTOMEBENCH2_V2_DATASET_AUDIT_REPORT_V2.schema.json"
       - "docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json"
       - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_STOPPING_FALSE_STOP_COUNTEREXAMPLE.example.jsonl"
@@ -61,6 +62,7 @@ on:
     branches: [main]
     paths:
       - "tools/connectomics-intake-audit/**"
+      - "docs/neuroscience/CONNECTOMEBENCH2_V2_DATASET_AUDIT_REPORT_V2.schema.json"
       - "docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json"
       - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_STOPPING_FALSE_STOP_COUNTEREXAMPLE.example.jsonl"
@@ -131,5 +133,9 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Validate dataset audit report Draft 2020-12 schema
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 -c 'import json, jsonschema; p="docs/neuroscience/CONNECTOMEBENCH2_V2_DATASET_AUDIT_REPORT_V2.schema.json"; s=json.load(open(p)); jsonschema.Draft202012Validator.check_schema(s)'
       - name: Test intake, dataset lineage/modality cohorts, frozen-prediction scoring, domain-shift calibration/OOD cluster-bootstrap, exact split-manifest membership/leakage and development-derived OOD threshold selection, query-impact, synaptic-completeness stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, physical-arclength co-linear-boundary, and finite query-ensemble audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
