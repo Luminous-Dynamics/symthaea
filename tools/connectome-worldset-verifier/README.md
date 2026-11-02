@@ -10,7 +10,7 @@ V1 deliberately supports only:
 
 `cartesian_product_all_combinations_v1`
 
-Every combination of every declared axis is admissible. There are no arbitrary predicates, hidden filters, pruning rules, weights or post-hoc exclusions. This restriction makes closure independently checkable. The implementation caps the universe at 100,000 worlds to bound memory use.
+Every combination of every declared axis is admissible. There are no arbitrary predicates, hidden filters, pruning rules, weights or post-hoc exclusions. This restriction makes closure independently checkable. The implementation caps the universe at 100,000 worlds and 64 axes to bound memory use and recursion depth.
 
 ## What the executable verifies
 
@@ -58,4 +58,16 @@ A digest included only in the same untrusted manifest is not an authentication m
 
 ## Tests
 
-Seven authored tests cover exact product closure, omitted-world rejection after resealing, duplicate worlds, byte-level artifact mutation, invalid paired values, unresolved frontiers, and stale manifest digests. They have not been compiled or executed in the authoring environment.
+Ten authored Rust tests cover:
+1. full Cartesian product closure and adapter-ready receipt emission;
+2. omission rejection even after the manifest is resealed;
+3. duplicate-world rejection;
+4. changed artifact-byte rejection;
+5. paired values outside marginal intervals;
+6. unresolved-frontier rejection;
+7. stale manifest-digest rejection;
+8. parent-directory traversal rejection;
+9. exact alternative-to-evidence-artifact ID/digest binding;
+10. the 64-axis recursion-safety cap.
+
+They have not been compiled or executed in the authoring environment.
