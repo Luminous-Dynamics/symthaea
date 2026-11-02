@@ -58,6 +58,15 @@ This is intentionally conservative. If structural alternatives disagree widely, 
 - It does not independently verify artifact bytes against the SHA fields; ingestion must do that.
 - It requires graph-builder configuration to remain fixed across the sequence; changing it requires a new query-stability run.
 
+## Reproducible input and report contracts
+
+- Input schema: `research/connectomics/connectome-query-stability-input-v0.1.schema.json`.
+- Report schema: `research/connectomics/connectome-query-stability-report-v0.1.schema.json`.
+- Synthetic input counterexample: `research/connectomics/fixtures/connectome-query-stability-known-answer-v0.1.json`.
+- Synthetic report receipt: `research/connectomics/fixtures/connectome-query-stability-report-known-answer-v0.1.json`.
+
+The report includes first/latest graph snapshot SHA-256, latest edit-history manifest digest, graph-builder configuration digest and structural-uncertainty manifest digest. Downstream workflow receipts can therefore bind a query-stability decision to the exact graph state and evidence set that were audited.
+
 ## Reproducible input schema and known-answer fixture
 
 - Input schema: `research/connectomics/connectome-query-stability-input-v0.1.schema.json`.
