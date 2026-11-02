@@ -180,7 +180,7 @@ impl DeterministicRng {
 
 /// Apply one transformation step. Each attribute has its own bias/noise so
 /// that aggregate similarity cannot hide attribute-specific drift.
-pub fn transmit_once(
+fn transmit_once(
     input: CultureSignal,
     config: TransmissionChannelConfig,
     rng: &mut impl TransmissionRandom,
@@ -196,7 +196,7 @@ pub fn transmit_once(
 }
 
 /// Random interface kept local and deterministic for this benchmark.
-pub trait TransmissionRandom {
+trait TransmissionRandom {
     fn normal(&mut self) -> f64;
 }
 
