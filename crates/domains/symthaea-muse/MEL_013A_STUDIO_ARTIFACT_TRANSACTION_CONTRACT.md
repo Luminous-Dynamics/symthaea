@@ -252,12 +252,44 @@ Do not widen the first slice to public federation, multi-device identity, global
 
 ## 12. Research and competitive context
 
-- MIT Media Lab's 2025 JAM_BOT paper demonstrates real-time LLM-supported free improvisation, role strategies, musician-specific conditioning and low-latency scheduling: https://doi.org/10.5281/zenodo.17811478
-- The 2026 JAM_BOT follow-up explicitly adds velocity, higher-throughput inference, free-form call-and-response across varying tempi and compensation for external MIDI latency: https://doi.org/10.5281/zenodo.20784228
-- Suno Studio 2.0 (13 August 2026) includes MIDI, built-in synths, effects, automation and a conversational production bar: https://suno.com/blog/studio-2
-- CHI 2026 experimental evidence on human-led versus model-led co-creation found that reflective human-led interactions could improve idea quality while preserving more diversity and perceived ownership than model-led rewriting: https://doi.org/10.1145/3772318.3791185
+The comparison must separate product capabilities, real-time performance systems and research claims. They are not interchangeable benchmarks.
 
-These systems set the bar for live responsiveness and convenient production. MEL-013A's differentiator is not another chat bar or shared workspace. It is an inspectable, plural, permission-aware chain from musical contribution to exact score, performance, sound and subsequent learning.
+| System / research | Demonstrated capability | Implication for Melothaea |
+|---|---|---|
+| Suno Studio 2.0 (13 Aug 2026) | Product-grade generative studio with MIDI editing/recording, built-in wavetable synth, effects, automation, plugin design and conversational song/track edits | Do not compete on “chat plus a timeline” or basic MIDI/DAW convenience. Match reliability and workflow integration, then differentiate on symbolic edit contracts, identity continuity and attributable co-creation. |
+| Google Lyria RealTime | Experimental low-latency bidirectional streaming music model; prompt weights and live controls for BPM, density, brightness, scale and playback; 48 kHz stereo PCM output with watermarking | Treat as a serious streaming-generation baseline. Compare controllability and response to interventions, not raw audio quality alone. Its weighted prompts and configuration changes are not equivalent to a persistent multi-participant consent/lineage graph. |
+| MIT JAM_BOT (ISMIR 2025) | Real-time symbolic music-language-model improvisation; role strategies, musician-specific conditioning and low-latency listen/prompt/schedule pipeline | Match live responsiveness, flexible roles and musician-specific interaction. A live demo is not evidence of long-term identity continuity or multi-party consent. |
+| JAM_BOT follow-up (NIME 2026) | Adds velocity, higher throughput, free-form call-and-response across varying tempi and external MIDI latency compensation | Tempo flexibility, expressive velocity and measured I/O latency are mandatory baseline dimensions; they cannot be treated as future differentiators. |
+| Somax2 / Agents in Concert (IUI 2026) | Corpus-driven multi-agent improvisation with influencer/player roles, self-listening and external listening; longitudinal codesign with jazz musicians and public performance | Compare against corpus-conditioned and multi-agent approaches, not only a static one-way LLM. Study how musicians anticipate, shape and negotiate system behavior in practice. |
+| MEL-013 / MEL-013A | Target: persistent but revisable creative identity, multiple contributor influences, branch-preserving score-level edits, exact artifact lineage, scoped permissions and restart-safe memory | This is a different proposed product/research axis. It becomes a differentiator only after end-to-end qualification and musician studies. |
+
+Primary sources:
+
+- Suno Studio 2.0 release: https://suno.com/blog/studio-2 and official feature notes: https://help.suno.com/en/articles/13670529
+- Google Lyria RealTime API: https://ai.google.dev/gemini-api/docs/realtime-music-generation
+- JAM_BOT (ISMIR 2025): https://doi.org/10.5281/zenodo.17811478
+- Enhancing Expressive Musical Conversation in JAM_BOT (NIME 2026): https://doi.org/10.5281/zenodo.20784228
+- Agents in Concert (IUI 2026): https://doi.org/10.1145/3742413.3789104
+
+### What the recent co-creation evidence warns us about
+
+- A 2026 CHI randomized study compared model-led rewriting with reflective human-led suggestion/question modes (main study N=486, separate validation N=640). In its non-musical idea-generation task, reflective human-led interaction improved idea quality while better preserving diversity and perceived ownership than model-led rewriting. This is cross-domain evidence, not a result about music, but it argues against optimizing Melothaea to take over the composition. https://doi.org/10.1145/3772318.3791185
+- A 2026 blind-listening study compared AI-generated, human–AI collaborative and human-composed excerpts. It had 71 participants and 18 selected excerpts. The result is useful as a reminder to separate perceived authorship, aesthetic judgment and actual contribution lineage; listener attribution was a weak proxy for who actually authored what. Its small stimulus set and screening process limit generalization. https://doi.org/10.3389/fpsyg.2026.1903971
+- Live-stage case studies show that interaction is also a rehearsal and interface-design problem. Musicians may constrain or anticipate a model's behavior; audiences may expect more spontaneity. Evaluate the actual musician-agent practice, not only the model's generated MIDI. https://doi.org/10.1145/3742413.3789104
+
+### Competitive positioning
+
+Do not claim that Melothaea will beat Suno or Lyria on raw full-song audio fidelity unless a matched listening benchmark demonstrates it. Do not claim to beat JAM_BOT on real-time improvisation before latency, tempo-following, role adaptation and expressive-performance tests are run.
+
+The nearer, defensible target is **proof-carrying reciprocal musical work**:
+
+1. The system understands a score-level musical object and can propose bounded, theory-valid edits.
+2. A collaborator can accept, reject, adapt, abstain or branch without losing the alternative.
+3. Every result is linked to exact source/result scores, performances and rendered audio.
+4. Every persistent or external use has its own authenticated purpose-specific permission.
+5. A blinded experiment shows that reciprocal adaptation changes both partners' subsequent actions and improves a musician-valued outcome relative to matched baselines.
+
+The strongest architecture is therefore hybrid: use symbolic score/constraint reasoning for inspectable musical intent and invariants; use expressive renderers or generative audio services as explicitly identified realization backends; and keep identity, consent, provenance and evaluation independent from whichever generator is fashionable. Pin every external model/version, API date, configuration and terms-of-use snapshot in any comparison.
 
 ## 13. Sequencing and exit conditions
 
