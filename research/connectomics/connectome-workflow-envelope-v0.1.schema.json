@@ -811,6 +811,12 @@
               },
               "projected_future_drift_upper_ratio": {
                 "type": "null"
+              },
+              "group_disjoint": {
+                "const": true
+              },
+              "exchangeability_supported": {
+                "const": true
               }
             }
           }
