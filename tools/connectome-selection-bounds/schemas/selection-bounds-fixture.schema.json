@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-selection-bounds-fixture-v1.schema.json",
+  "title": "Connectome selection bounds known-answer fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "https://luminousdynamics.io/schemas/connectome-selection-bounds-input-v1.schema.json"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "treatment_all_event_bounds",
+        "control_all_event_bounds",
+        "treatment_minus_control_arm_contrast",
+        "treatment_conditional_kernel_selected_bounds",
+        "control_conditional_kernel_selected_bounds",
+        "treatment_selection_rate_among_evaluable",
+        "treatment_selected_fraction_of_planned"
+      ],
+      "properties": {
+        "treatment_all_event_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "control_all_event_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "treatment_minus_control_arm_contrast": {
+          "$ref": "#/$defs/interval"
+        },
+        "treatment_conditional_kernel_selected_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "control_conditional_kernel_selected_bounds": {
+          "$ref": "#/$defs/interval"
+        },
+        "treatment_selection_rate_among_evaluable": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "treatment_selected_fraction_of_planned": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    }
+  }
+}
