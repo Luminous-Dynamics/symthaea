@@ -22,6 +22,9 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # This directory contains examples only; it is not a Cargo package.
+    # Exclude it from crates/core/* member discovery.
+    "crates/core/symthaea",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
