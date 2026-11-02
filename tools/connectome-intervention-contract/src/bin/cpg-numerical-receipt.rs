@@ -156,6 +156,7 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
     let realized_mean = number_at(value, &[path[0], path[1], "realized_mean"]);
     let realized_stddev = number_at(value, &[path[0], path[1], "realized_stddev"]);
     let sample = str_at(value, &[path[0], path[1], "sample_sha256"]);
+    let sample_count = uint_at(value, &[path[0], path[1], "sample_count"]);
 
     let (
         Some(requested_mean),
@@ -163,12 +164,14 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
         Some(applied),
         Some(realized_mean),
         Some(realized_stddev),
+        Some(sample_count),
     ) = (
         requested_mean,
         requested_stddev,
         applied,
         realized_mean,
         realized_stddev,
+        sample_count,
     )
     else {
         errors.push(format!("{label}: missing or non-numeric noise declaration"));
@@ -199,10 +202,15 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
             Some(hash) if is_sha256(hash) => {}
             _ => errors.push(format!("{label}: applied noise requires a sample SHA-256")),
         }
-        if requested_stddev > 0.0 && realized_stddev <= 0.0 {
-            errors.push(format!("{label}: requested non-zero standard deviation has zero realized standard deviation"));
+        if sample_count == 0 {
+            errors.push(format!("{label}: applied noise requires at least one realized sample"));
         }
-    } else if applied || realized_mean != 0.0 || realized_stddev != 0.0 || sample.is_some() {
+    } else if applied
+        || realized_mean != 0.0
+        || realized_stddev != 0.0
+        || sample.is_some()
+        || sample_count != 0
+    {
         errors.push(format!(
             "{label}: zero-noise request must not report an applied sample"
         ));
@@ -750,8 +758,8 @@ mod tests {
             },
             "perturbation":{
                 "protocol_sha256":digest("protocol"),"waveform_sha256":digest("waveform"),"stimulus_applied":true,
-                "input_noise":{"requested_mean":0.0,"requested_stddev":0.0,"applied":false,"realized_mean":0.0,"realized_stddev":0.0,"sample_sha256":null},
-                "weight_noise":{"requested_mean":0.0,"requested_stddev":0.0,"applied":false,"realized_mean":0.0,"realized_stddev":0.0,"sample_sha256":null}
+                "input_noise":{"requested_mean":0.0,"requested_stddev":0.0,"applied":false,"realized_mean":0.0,"realized_stddev":0.0,"sample_sha256":null,"sample_count":0},
+                "weight_noise":{"requested_mean":0.0,"requested_stddev":0.0,"applied":false,"realized_mean":0.0,"realized_stddev":0.0,"sample_sha256":null,"sample_count":0}
             },
             "numerics":{
                 "raw_state_sha256":hash,"raw_output_manifest_sha256":digest("raw-output-manifest"),
@@ -899,6 +907,19 @@ mod tests {
                 .iter()
                 .any(|error| error.contains("non-zero requested noise"))
         );
+    }
+
+    #[test]
+    fn one_sample_with_zero_empirical_spread_is_not_misclassified_as_unapplied() {
+        let values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let bytes = f64_bytes(&values);
+        let mut fixture = complete_fixture(&values);
+        fixture["perturbation"]["input_noise"]["requested_stddev"] = json!(0.1);
+        fixture["perturbation"]["input_noise"]["applied"] = json!(true);
+        fixture["perturbation"]["input_noise"]["sample_sha256"] = json!(digest("one noise sample"));
+        fixture["perturbation"]["input_noise"]["sample_count"] = json!(1);
+        let report = verify_manifest(&fixture, Some(&bytes));
+        assert_eq!(report.disposition, "COMPLETE", "{:?}", report.errors);
     }
 
     #[test]
