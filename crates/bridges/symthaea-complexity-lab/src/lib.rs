@@ -6,6 +6,7 @@ pub mod design;
 pub mod matrix;
 pub mod permutation_polynomial;
 pub mod profile;
+pub mod semiring;
 
 use std::error::Error;
 use std::fmt;
