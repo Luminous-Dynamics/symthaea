@@ -1,0 +1,171 @@
+name: CEB Contract Validation V0
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/ceb/**"
+      - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
+      - "docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md"
+      - ".github/workflows/ceb-contract-validation-v0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install pinned Draft 2020-12 validator
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned schema validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/ceb-jsonschema"
+          "$RUNNER_TEMP/ceb-jsonschema/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate CEB schemas, catalog, receipt sample and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path("benchmarks/ceb")
+          format_checker = FormatChecker()
+
+          def load_schema(name):
+              value = json.loads((root / name).read_text())
+              Draft202012Validator.check_schema(value)
+              return value
+
+          task_schema = load_schema("task.schema.json")
+          receipt_schema = load_schema("run-receipt.schema.json")
+          envelope_schema = load_schema("dsse-envelope.schema.json")
+          task_validator = Draft202012Validator(task_schema, format_checker=format_checker)
+          receipt_validator = Draft202012Validator(receipt_schema, format_checker=format_checker)
+          envelope_validator = Draft202012Validator(envelope_schema, format_checker=format_checker)
+
+          def expect_reject(validator, value, label):
+              if not list(validator.iter_errors(value)):
+                  raise SystemExit(f"negative control unexpectedly passed: {label}")
+
+          catalog = json.loads((root / "catalog.v0.json").read_text())
+          if catalog["status"] != "design_only":
+              raise SystemExit("catalog status must remain design_only until qualification")
+          if catalog["task_count"] != len(catalog["tasks"]):
+              raise SystemExit("catalog task_count disagrees with actual task rows")
+          task_ids = [task["task_id"] for task in catalog["tasks"]]
+          if len(task_ids) != len(set(task_ids)):
+              raise SystemExit("catalog has duplicate task IDs")
+          if not all(task["execution_status"] == "design_only" for task in catalog["tasks"]):
+              raise SystemExit("unqualified task is incorrectly marked executable")
+          for task in catalog["tasks"]:
+              task_validator.validate(task)
+              if task["lane"] not in task_schema["properties"]["lane"]["enum"]:
+                  raise SystemExit(f"unknown task lane: {task['lane']}")
+
+          if "benchmark_integrity" not in task_schema["properties"]["lane"]["enum"]:
+              raise SystemExit("benchmark_integrity lane missing from task schema")
+          if "isolated_microvm" not in str(task_schema["allOf"]):
+              raise SystemExit("fixture-ready/qualified tasks must pin isolated runner profiles")
+
+          # Positive shape control: a design-only task is valid as a design record.
+          task_validator.validate(catalog["tasks"][0])
+
+          # Negative control: host execution cannot be called fixture-ready.
+          fixture_ready = copy.deepcopy(catalog["tasks"][0])
+          fixture_ready["execution_status"] = "fixture_ready"
+          fixture_ready["source_snapshot"].update({
+              "uri": "fixture://synthetic",
+              "revision": "fixture-revision-1",
+              "tree_sha256": "a" * 64
+          })
+          fixture_ready["environment"].update({
+              "image": "oci://fixture@sha256:" + "b" * 64,
+              "toolchain_lock_sha256": "c" * 64,
+              "runner_profile": "trusted_host_development"
+          })
+          fixture_ready["acceptance"].update({
+              "reference_patch_sha256": "d" * 64,
+              "independent_grader": "isolated-grader",
+              "grader_sha256": "e" * 64,
+              "checks": [{
+                  "check_id": "hidden.correctness",
+                  "kind": "hidden_test",
+                  "authority": "independent_grader",
+                  "required": True,
+                  "description": "Hidden behavior contract is verified independently."
+              }]
+          })
+          expect_reject(task_validator, fixture_ready, "fixture_ready task on trusted host")
+
+          # Validate the explicitly unresolved example statement.
+          sample_path = root / "examples/design-only-unexecuted-example.statement.json"
+          statement = json.loads(sample_path.read_text())
+          receipt_validator.validate(statement)
+          if statement["predicate"]["result"]["verdict"] != "unresolved":
+              raise SystemExit("design-only statement example must be unresolved")
+          if statement["predicate"]["execution"]["runner_profile"] != "simulation":
+              raise SystemExit("design-only statement example must not claim isolation")
+
+          # Negative controls: a pass cannot be primary-only, host-executed,
+          # missing a pristine-regrade link, skipped, unsafe, or unsigned at envelope level.
+          for label, mutate in [
+              ("pass in primary stage", lambda p: p["execution"].update({"stage": "primary"})),
+              ("pass on simulation runner", lambda p: p["execution"].update({"runner_profile": "simulation"})),
+              ("pass without regrade link", lambda p: p["execution"].update({"regrade_of_receipt_sha256": None})),
+              ("pass with required check skipped", lambda p: p["result"].update({"required_skipped_count": 1})),
+              ("pass after safety violation", lambda p: p["result"].update({"safety_violation": True})),
+          ]:
+              mutant = copy.deepcopy(statement)
+              predicate = mutant["predicate"]
+              predicate["result"].update({
+                  "verdict": "pass",
+                  "required_check_count": 1,
+                  "required_pass_count": 1,
+                  "required_fail_count": 0,
+                  "required_error_count": 0,
+                  "required_skipped_count": 0,
+                  "safety_violation": False,
+                  "protocol_violation": False
+              })
+              predicate["execution"].update({
+                  "stage": "pristine_regrade",
+                  "runner_profile": "isolated_microvm",
+                  "image_digest": "sha256:" + "f" * 64,
+                  "network_policy": "disabled",
+                  "regrade_of_receipt_sha256": "a" * 64
+              })
+              predicate["grader"].update({
+                  "trust_domain": "separate_host_control_plane",
+                  "candidate_access": "read_only"
+              })
+              mutate(predicate)
+              expect_reject(receipt_validator, mutant, label)
+
+          envelope = {
+              "payloadType": "application/vnd.in-toto+json",
+              "payload": "e30=",
+              "signatures": [{"keyid": "schema-shape-only", "sig": "AA=="}]
+          }
+          envelope_validator.validate(envelope)
+          expect_reject(envelope_validator, {**envelope, "signatures": []}, "DSSE envelope without signatures")
+          expect_reject(envelope_validator, {**envelope, "payloadType": "application/json"}, "wrong authenticated payload type")
+          expect_reject(envelope_validator, {**envelope, "payload": "not base64!"}, "malformed base64 payload")
+
+          print(
+              "CEB_CONTRACT_SCHEMA_PASS: "
+              f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
+              "schemas=3 negative_controls=9"
+          )
+          print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
+          PY
