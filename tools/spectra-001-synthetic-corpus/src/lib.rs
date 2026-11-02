@@ -39,6 +39,8 @@ pub const LEAKAGE_MODALITIES_V1: [LeakageModalityV1; LEAKAGE_CHANNEL_COUNT] = [
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CampaignConfigV1 {
+    /// Caller-supplied opaque run identity. It must not encode target or world labels.
+    pub campaign_instance_id: u64,
     pub calibration_trials: u32,
     pub evaluation_trials: u32,
     pub candidate_count: u8,
@@ -120,6 +122,7 @@ pub struct GeneratedCampaignV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CorpusErrorV1 {
+    InvalidCampaignId,
     InvalidCampaignSize,
     InvalidCandidateCount,
     InvalidSignalRate,
@@ -226,6 +229,9 @@ fn validate_config(
     world: &CampaignWorldV1,
     leakage: &Option<LeakageModalityV1>,
 ) -> Result<(), CorpusErrorV1> {
+    if config.campaign_instance_id == 0 {
+        return Err(CorpusErrorV1::InvalidCampaignId);
+    }
     if !(MIN_CAMPAIGN_TRIALS..=MAX_CAMPAIGN_TRIALS).contains(&config.calibration_trials)
         || !(MIN_CAMPAIGN_TRIALS..=MAX_CAMPAIGN_TRIALS).contains(&config.evaluation_trials)
     {
@@ -441,7 +447,7 @@ pub fn generate_campaign_v1(
         public: PublicCampaignV1 {
             schema: CORPUS_SCHEMA_V0_1.to_owned(),
             generator_version: GENERATOR_VERSION_V0_1.to_owned(),
-            campaign_id: "spectra-campaign-v0-1".to_owned(),
+            campaign_id: format!("spectra-{0:016x}", config.campaign_instance_id),
             candidate_count: config.candidate_count,
             calibration_rows,
             evaluation_rows,
@@ -689,6 +695,7 @@ mod tests {
 
     fn config() -> CampaignConfigV1 {
         CampaignConfigV1 {
+            campaign_instance_id: 0x5350_4543_5452_4131,
             calibration_trials: 512,
             evaluation_trials: 512,
             candidate_count: 4,
