@@ -1,0 +1,329 @@
+{
+  "schema": "symthaea.irregular_temporal_decision_benchmark.v0.1",
+  "version": "0.1.0",
+  "status": "protocol_and_fixture_only_no_results",
+  "tracking_issue": 9954,
+  "base_contract": {
+    "pull_request": 9701,
+    "required_fields": [
+      "event_time_us",
+      "available_at_us",
+      "recorded_at_us",
+      "entity_id",
+      "modality_id",
+      "source_id",
+      "source_sequence",
+      "source_sha256"
+    ],
+    "candidate_visibility": "available_at_us_lte_forecast_origin_and_revision_recorded_at_lte_knowledge_cutoff",
+    "future_covariates": "separate_type_published_no_later_than_origin_and_valid_for_target",
+    "preprocessing": "train_only_versioned_and_charged",
+    "data_repair": "no_implicit_sort_interpolate_resample_fill_or_impute"
+  },
+  "research_components": {
+    "intervention_family_ledger_pr": 9932,
+    "empirical_distribution_reference_pr": 9933,
+    "anytime_fsd_prototype_pr": 9938,
+    "anytime_fsd_hardening_issue": 9941,
+    "temporal_controller_convergence_issue": 9882
+  },
+  "tracks": [
+    {
+      "id": "F",
+      "name": "forecast_quality",
+      "metrics": [
+        "mae",
+        "rmse",
+        "benchmark_native_shape_trend_information_metrics",
+        "pinball_loss_or_crps_when_probabilistic",
+        "interval_coverage_50_80_90_95",
+        "interval_width"
+      ],
+      "claim_types": [
+        "predictive",
+        "empirical"
+      ]
+    },
+    {
+      "id": "D",
+      "name": "decision_quality",
+      "metrics": [
+        "realized_utility",
+        "utility_per_resource",
+        "absolute_oracle_regret",
+        "normalized_oracle_regret",
+        "wrong_belief_exposure",
+        "abstention_exposure",
+        "missing_output_exposure",
+        "action_feasibility",
+        "decision_latency"
+      ],
+      "claim_types": [
+        "causal_randomized_only_when_assignment_supports_it",
+        "empirical"
+      ]
+    },
+    {
+      "id": "R",
+      "name": "distributional_risk",
+      "metrics": [
+        "mean",
+        "p50",
+        "p90",
+        "p95",
+        "p99",
+        "cvar95",
+        "empirical_cdf",
+        "upper_tail_stop_loss"
+      ],
+      "claim_types": [
+        "empirical",
+        "anytime_evidence_only_after_issue_9941"
+      ]
+    },
+    {
+      "id": "C",
+      "name": "source_completeness",
+      "metrics": [
+        "false_complete_rate",
+        "false_incomplete_rate",
+        "completeness_lag",
+        "late_event_breach_recall",
+        "late_event_detection_latency",
+        "watermark_skew",
+        "unknown_withholding_rate"
+      ],
+      "claim_types": [
+        "source_contract_measured",
+        "synthetic_adversarial"
+      ]
+    },
+    {
+      "id": "S",
+      "name": "systems_efficiency",
+      "metrics": [
+        "latency_p50_p95_p99_us",
+        "joules_per_decision",
+        "peak_resident_memory_bytes",
+        "model_bytes",
+        "io_bytes_per_decision",
+        "sustainable_throughput"
+      ],
+      "claim_types": [
+        "systems_measured"
+      ]
+    }
+  ],
+  "dataset_lanes": [
+    {
+      "id": "time_imm",
+      "registry_reference": "real_irregular_benchmark_registry_v0.1.json#time_imm",
+      "role": "primary_irregular_multimodal",
+      "protocol_modes": [
+        "official_reproduction",
+        "causality_controlled"
+      ],
+      "pinned_repository_commit": "e934cef23d526817dcf0d1a66c6f82274c96c04b",
+      "caveat": "CSV date_time is not observed physical arrival time; availability policy must remain explicitly assumed unless real arrival metadata is obtained.",
+      "status": "adapter_authored_not_executed"
+    },
+    {
+      "id": "imm_tsf",
+      "registry_reference": "real_irregular_benchmark_registry_v0.1.json#imm_tsf",
+      "role": "official_irregular_benchmark_library",
+      "pinned_repository_commit": "b9e245f2238a9c35d241dbc5bd943c28193a5b90",
+      "caveat": "Keep released normalization/windowing behavior separate from leakage-controlled results.",
+      "status": "source_audit_authored_not_executed"
+    },
+    {
+      "id": "bits_2026",
+      "role": "external_multi_domain_irregular_forecasting",
+      "paper_url": "https://arxiv.org/abs/2609.33303",
+      "published_date": "2026-09-27",
+      "reported_dataset_count": 11,
+      "reported_domain_count": 9,
+      "irregularity_dimensions": [
+        "missing_rate",
+        "missing_pattern_complexity",
+        "sampling_irregularity",
+        "skewness"
+      ],
+      "reported_domains": [
+        "healthcare",
+        "activity",
+        "climate",
+        "cybersecurity",
+        "environment",
+        "engineering",
+        "finance",
+        "social",
+        "nature"
+      ],
+      "code_identity_status": "pin_immutable_release_before_execution",
+      "license_and_data_checksums_status": "audit_before_execution",
+      "status": "registered_not_downloaded_or_run"
+    },
+    {
+      "id": "gift_eval",
+      "registry_reference": "real_irregular_benchmark_registry_v0.1.json#gift_eval",
+      "role": "general_forecasting_zero_shot_and_few_shot_context",
+      "protocol_note": "Preserve benchmark split, zero-shot/few-shot and test-leakage metadata.",
+      "status": "registered_not_reproduced"
+    },
+    {
+      "id": "neurobench",
+      "role": "separate_neuromorphic_system_track",
+      "url": "https://neurobench.ai/",
+      "protocol_note": "Algorithm and system track results are separate from irregular-forecast accuracy leaderboards.",
+      "status": "external_reference_only"
+    },
+    {
+      "id": "mlperf_tiny",
+      "role": "separate_edge_efficiency_methodology",
+      "url": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/",
+      "protocol_note": "Use fixed workload, quality target, latency and calibrated energy discipline where an edge workload is compatible; do not compare unlike tasks.",
+      "status": "methodology_reference_only"
+    }
+  ],
+  "baseline_families": [
+    {
+      "family": "sanity",
+      "methods": [
+        "last_observation_carried_forward",
+        "training_mean",
+        "seasonal_naive",
+        "causal_interpolation"
+      ],
+      "required": "all_eligible_numeric_tasks"
+    },
+    {
+      "family": "missingness_aware_continuous_time",
+      "methods": [
+        "GRU-D",
+        "mTAN",
+        "CRU",
+        "Neural_CDE",
+        "ODE_RNN"
+      ],
+      "required": "where_official_task_adapter_exists"
+    },
+    {
+      "family": "irregular_specialist",
+      "methods": [
+        "APN_TAPA",
+        "KAFNet_CPA",
+        "QuITE",
+        "QuITE_plus_plus"
+      ],
+      "required": "where_task_and_release_are_compatible"
+    },
+    {
+      "family": "general_forecasting",
+      "methods": [
+        "DLinear",
+        "Informer",
+        "PatchTST",
+        "TimesNet",
+        "TimeMixer",
+        "TTM",
+        "TimeLLM"
+      ],
+      "required": "where_input_and_compute_requirements_are_compatible"
+    },
+    {
+      "family": "symthaea_ablations",
+      "methods": [
+        "event_only",
+        "event_plus_availability_time",
+        "event_plus_bitemporal_revision",
+        "full_irregular_model",
+        "full_model_plus_decision_controller"
+      ],
+      "required": "all_candidate_runs"
+    }
+  ],
+  "evaluation_modes": [
+    {
+      "id": "official_reproduction",
+      "description": "Reproduce published/released data split, preprocessing, defaults, and code as closely as possible; log deviations and known defects."
+    },
+    {
+      "id": "causality_controlled",
+      "description": "Use as-known availability, purged chronological split, train-only scaling and full validation/test coverage while preserving official test provenance."
+    }
+  ],
+  "stress_suite": [
+    "late_arrivals_below_exclusive_watermark",
+    "burst_delays_and_measured_delay_distribution",
+    "MCAR_MAR_event_dependent_missingness",
+    "censored_and_withheld_observations",
+    "asynchronous_modalities_and_bursty_sampling",
+    "append_supersede_retract_after_decision",
+    "entity_and_temporal_distribution_shift",
+    "source_outage_and_missing_source",
+    "watermark_rollback_and_duplicate_source_sequence",
+    "future_covariate_published_after_origin",
+    "target_label_injection_and_split_boundary_leakage",
+    "cpu_ram_energy_contention_and_cold_start"
+  ],
+  "qualification_targets": {
+    "target_view_leakage_exposures": 0,
+    "target_crossing_windows_after_purge": 0,
+    "false_complete_rate_adversarial_suite": 0,
+    "historical_as_known_view_mutation_after_later_revision": 0,
+    "normalized_oracle_regret_max": 0.05,
+    "cvar95_reduction_stretch_fraction": 0.1,
+    "median_exposure_regression_max_fraction": 0.02,
+    "matched_quality_forecast_metric_regression_max_fraction": 0.01,
+    "joules_per_decision_reduction_stretch_fraction": 0.2,
+    "nominal_interval_coverage_absolute_tolerance": 0.025,
+    "minimum_training_seeds_target": 5,
+    "qualification_target_status": "targets_not_results"
+  },
+  "statistical_protocol": {
+    "uncertainty_resampling_unit": "entity_or_contiguous_temporal_block",
+    "overlapping_windows_as_independent": "prohibited",
+    "publish_per_dataset_before_aggregate": true,
+    "publish_all_seeds": true,
+    "report_paired_effects_and_95_percent_intervals": true,
+    "multiple_comparison_family_preregistered": true,
+    "aggregate_score_default": "none_pareto_frontier_preferred",
+    "closed_and_open_tracks_separate": true
+  },
+  "result_receipt_required_fields": [
+    "schema_version_run_id_status_seed_utc_times",
+    "dataset_source_commit_source_file_digests_license",
+    "evaluation_mode_split_manifest_embargo_purge",
+    "timezone_availability_policy_knowledge_cutoff",
+    "model_commit_config_digest_parameter_count_training_budget",
+    "evaluator_commit_config_digest_task_horizon_metric_definitions",
+    "hardware_runtime_compiler_precision_measurement_boundary",
+    "sample_counts_per_stratum_metrics_uncertainty_exclusions",
+    "latency_distribution_energy_memory_model_bytes_io_bytes",
+    "candidate_prediction_action_ledger_digest",
+    "evaluator_outcome_ledger_digest",
+    "explicit_claim_type_labels"
+  ],
+  "external_references": [
+    {
+      "name": "BITS",
+      "url": "https://arxiv.org/abs/2609.33303"
+    },
+    {
+      "name": "QuITE",
+      "url": "https://proceedings.mlr.press/v306/lim26b.html"
+    },
+    {
+      "name": "KAFNet",
+      "url": "https://ojs.aaai.org/index.php/AAAI/article/view/40149"
+    },
+    {
+      "name": "MLPerf_Tiny_v1_4",
+      "url": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/"
+    },
+    {
+      "name": "NeuroBench",
+      "url": "https://neurobench.ai/"
+    }
+  ]
+}
