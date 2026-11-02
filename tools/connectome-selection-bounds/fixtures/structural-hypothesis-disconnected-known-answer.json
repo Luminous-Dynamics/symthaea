@@ -1,0 +1,74 @@
+{
+  "input": {
+    "hypotheses": [
+      {
+        "hypothesis_id": "segment-assignment-low",
+        "source_entity_id": "neuron-A",
+        "target_entity_id": "neuron-B",
+        "evidence_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "admissible": true,
+        "source_prevalence": {
+          "lower": 0.1,
+          "upper": 0.1
+        },
+        "target_prevalence": {
+          "lower": 0.1,
+          "upper": 0.1
+        }
+      },
+      {
+        "hypothesis_id": "segment-assignment-high",
+        "source_entity_id": "neuron-C",
+        "target_entity_id": "neuron-B",
+        "evidence_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "admissible": true,
+        "source_prevalence": {
+          "lower": 0.9,
+          "upper": 0.9
+        },
+        "target_prevalence": {
+          "lower": 0.9,
+          "upper": 0.9
+        }
+      },
+      {
+        "hypothesis_id": "rejected-by-frozen-rule",
+        "source_entity_id": "neuron-D",
+        "target_entity_id": "neuron-B",
+        "evidence_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "admissible": false,
+        "source_prevalence": {
+          "lower": 0.8,
+          "upper": 0.8
+        },
+        "target_prevalence": {
+          "lower": 0.6,
+          "upper": 0.6
+        }
+      }
+    ]
+  },
+  "expected": {
+    "admissible_hypothesis_count": 2,
+    "excluded_hypothesis_ids": [
+      "rejected-by-frozen-rule"
+    ],
+    "joint_response_set": [
+      {
+        "lower": 0,
+        "upper": 0.1
+      },
+      {
+        "lower": 0.8,
+        "upper": 0.9
+      }
+    ],
+    "target_given_source_response_set": [
+      {
+        "lower": 0,
+        "upper": 1
+      }
+    ],
+    "probability_weights_applied": false
+  }
+}
