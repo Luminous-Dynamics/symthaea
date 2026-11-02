@@ -1,56 +1,205 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 use symthaea_rea_compat::{
-    analysis_profile_digest, verify_evidence_json, EvidenceErrorKind,
+    analysis_profile_digest, sha256_hex, verify_evidence_json, EvidenceErrorKind,
 };
 
-/// When the dedicated upstream differential workflow supplies a fixture,
-/// verify the complete record emitted by the pinned TypeScript REA runtime.
-/// Without that workflow variable this test is intentionally inert; the
-/// source-derived unit vector remains a separate, clearly labelled baseline.
+fn fixture_file(directory: &Path, name: &str) -> Vec<u8> {
+    assert!(
+        !name.contains('/') && !name.contains('\\') && !name.contains(".."),
+        "fixture manifest may only contain a simple filename"
+    );
+    fs::read(directory.join(name)).expect("read upstream-generated fixture")
+}
+
+fn verify_display_only_mutation(
+    directory: &Path,
+    file: &str,
+    expected_id: &str,
+    expected_raw_sha256: &str,
+) {
+    let bytes = fixture_file(directory, file);
+    assert_eq!(sha256_hex(&bytes), expected_raw_sha256);
+
+    let mut value: Value = serde_json::from_slice(&bytes).unwrap();
+    if let Some(subject) = value.get_mut("subject").and_then(Value::as_object_mut) {
+        subject.insert(
+            "name".to_owned(),
+            Value::String("renamed-display-only.apk".to_owned()),
+        );
+        subject.insert(
+            "local_path".to_owned(),
+            Value::String("/relocated/display-only.apk".to_owned()),
+        );
+    }
+    value["caller_input_path"] =
+        Value::String("/relocated/caller-display-only.json".to_owned());
+
+    let relocated = serde_json::to_vec(&value).unwrap();
+    let verified = verify_evidence_json(&relocated)
+        .unwrap_or_else(|error| panic!("display-only mutation changed Evidence identity: {error}"));
+    assert_eq!(verified.evidence_id, expected_id);
+    assert_ne!(
+        verified.raw_file_sha256.as_deref(),
+        Some(expected_raw_sha256),
+        "raw-file digest must reflect display-only byte changes"
+    );
+}
+
+fn verify_negative_control(
+    directory: &Path,
+    fixture: &Value,
+) {
+    let filename = fixture["file"].as_str().expect("negative fixture file");
+    let expected_hash = fixture["raw_file_sha256"]
+        .as_str()
+        .expect("negative fixture raw hash");
+    let bytes = fixture_file(directory, filename);
+    assert_eq!(sha256_hex(&bytes), expected_hash);
+
+    let error = verify_evidence_json(&bytes)
+        .expect_err("upstream-rejected negative control must not verify");
+    let expected_kind = match fixture["expected_error"].as_str() {
+        Some("identity-mismatch") => EvidenceErrorKind::IdentityMismatch,
+        Some("schema-violation") => EvidenceErrorKind::SchemaViolation,
+        other => panic!("unsupported expected error category: {other:?}"),
+    };
+    assert_eq!(
+        error.kind,
+        expected_kind,
+        "negative control {} had an unexpected Rust disposition",
+        fixture["name"]
+    );
+}
+
+/// This test is activated only when the pinned upstream REA workflow supplies
+/// an independently generated fixture corpus. The source-derived unit vector
+/// remains a separate baseline and is not relabelled as upstream output.
 #[test]
-fn verifies_evidence_emitted_by_pinned_upstream_rea_runtime() {
-    let path = match std::env::var_os("REA_UPSTREAM_EVIDENCE_FIXTURE") {
+fn matches_pinned_upstream_rea_evidence_corpus() {
+    let directory = match std::env::var_os("REA_UPSTREAM_EVIDENCE_FIXTURE_DIR") {
         Some(path) => PathBuf::from(path),
         None => return,
     };
 
-    let bytes = fs::read(&path).expect("read upstream-generated Evidence fixture");
-    let upstream: Value =
-        serde_json::from_slice(&bytes).expect("upstream REA emits valid JSON");
-    let upstream_id = upstream["evidence_id"]
-        .as_str()
-        .expect("upstream fixture includes evidence_id");
-    let upstream_profile_digest = upstream["analysis_profile"]["digest"]
-        .as_str()
-        .expect("upstream fixture includes analysis-profile digest");
+    let manifest_bytes =
+        fs::read(directory.join("manifest.json")).expect("read upstream corpus manifest");
+    let manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+    let receipt_bytes = fs::read(directory.join("manifest.provenance.json"))
+        .expect("read upstream corpus provenance receipt");
+    let receipt: Value = serde_json::from_slice(&receipt_bytes).unwrap();
 
-    let verified = verify_evidence_json(&bytes)
-        .unwrap_or_else(|error| panic!("Rust rejected upstream Evidence: {error}"));
-
-    assert_eq!(verified.evidence_id, upstream_id);
     assert_eq!(
-        analysis_profile_digest(&upstream["analysis_profile"]).unwrap(),
-        upstream_profile_digest
+        sha256_hex(&manifest_bytes),
+        receipt["manifest_sha256"].as_str().unwrap(),
+        "corpus manifest must match its provenance receipt"
     );
-    let expected_raw_sha256 = symthaea_rea_compat::sha256_hex(&bytes);
     assert_eq!(
-        verified.raw_file_sha256.as_deref(),
-        Some(expected_raw_sha256.as_str())
+        manifest["producer"]["commit"],
+        "8250bf2320ea57aab4e664db4b4d44b8abd2004e"
     );
-    assert_ne!(verified.raw_file_sha256.as_deref(), Some(verified.semantic_sha256.as_str()));
-    assert!(!verified.evidence_id.is_empty());
     assert_eq!(
-        verified.value["relationship_coverage"],
-        Value::Null,
-        "upstream omission must remain explicit null in Evidence",
+        manifest["producer"]["node_version"],
+        "v22.23.4",
+        "the upstream producer runtime must match the pinned CI runtime"
+    );
+    assert_eq!(
+        manifest["producer"]["npm_version"],
+        "11.16.0"
     );
 
-    let mut tampered = upstream;
-    tampered["normalized_result"]["entries"][0]["size"] = Value::from(43);
-    let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
-    let error = verify_evidence_json(&tampered_bytes).unwrap_err();
-    assert_eq!(error.kind, EvidenceErrorKind::IdentityMismatch);
+    let fixtures = manifest["fixtures"]
+        .as_array()
+        .expect("manifest fixtures array");
+    assert_eq!(
+        manifest["fixture_count"].as_u64(),
+        Some(fixtures.len() as u64)
+    );
+    assert!(fixtures.len() >= 8, "the upstream corpus must cover multiple schema families");
+
+    for fixture in fixtures {
+        let filename = fixture["file"].as_str().expect("fixture filename");
+        let expected_sha256 = fixture["raw_file_sha256"]
+            .as_str()
+            .expect("fixture raw digest");
+        let expected_id = fixture["evidence_id"]
+            .as_str()
+            .expect("upstream Evidence ID");
+        let bytes = fixture_file(&directory, filename);
+        assert_eq!(bytes.len() as u64, fixture["bytes"].as_u64().unwrap());
+        assert_eq!(sha256_hex(&bytes), expected_sha256);
+
+        let upstream: Value = serde_json::from_slice(&bytes).unwrap();
+        let upstream_id = upstream["evidence_id"].as_str().unwrap();
+        assert_eq!(upstream_id, expected_id);
+
+        let verified = verify_evidence_json(&bytes)
+            .unwrap_or_else(|error| panic!("Rust rejected upstream case {filename}: {error}"));
+        assert_eq!(verified.evidence_id, upstream_id);
+        assert_eq!(
+            verified.raw_file_sha256.as_deref(),
+            Some(expected_sha256)
+        );
+        assert_ne!(
+            verified.raw_file_sha256.as_deref(),
+            Some(verified.semantic_sha256.as_str())
+        );
+
+        if let Some(profile) = upstream.get("analysis_profile").filter(|value| !value.is_null()) {
+            let expected_profile_digest = fixture["analysis_profile_digest"]
+                .as_str()
+                .expect("profile digest in manifest");
+            assert_eq!(profile["digest"], expected_profile_digest);
+            assert_eq!(
+                analysis_profile_digest(profile).unwrap(),
+                expected_profile_digest
+            );
+        } else {
+            assert!(fixture["analysis_profile_digest"].is_null());
+        }
+
+        assert_eq!(
+            upstream["relationship_coverage"],
+            fixture["relationship_coverage"],
+            "coverage state must be retained for {filename}"
+        );
+
+        let mut tampered = upstream.clone();
+        tampered["predicate_type"] = Value::String(format!(
+            "{}.tampered",
+            tampered["predicate_type"].as_str().unwrap()
+        ));
+        let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
+        assert_eq!(
+            verify_evidence_json(&tampered_bytes).unwrap_err().kind,
+            EvidenceErrorKind::IdentityMismatch,
+            "semantic mutation must invalidate Evidence ID for {filename}"
+        );
+    }
+
+    let display_mutations = manifest["display_only_mutations"]
+        .as_array()
+        .expect("display-only mutations array");
+    assert_eq!(display_mutations.len(), fixtures.len());
+    for mutation in display_mutations {
+        verify_display_only_mutation(
+            &directory,
+            mutation["file"].as_str().unwrap(),
+            mutation["expected_evidence_id"].as_str().unwrap(),
+            mutation["raw_file_sha256"].as_str().unwrap(),
+        );
+    }
+
+    let negative_controls = manifest["negative_controls"]
+        .as_array()
+        .expect("negative controls array");
+    assert!(
+        negative_controls.len() >= 4,
+        "upstream rejected negative-control corpus is required"
+    );
+    for negative in negative_controls {
+        verify_negative_control(&directory, negative);
+    }
 }
