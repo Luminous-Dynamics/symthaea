@@ -159,6 +159,8 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "count_source_status",
+        "count_source_url",
         "declared_total_rows",
         "split_rows",
         "sample_type_rows",
@@ -219,6 +221,15 @@
             "null"
           ],
           "minimum": 0
+        },
+        "count_source_status": {
+          "enum": [
+            "UNPINNED_RENDERED_CARD",
+            "PINNED_V2_PARQUET_AUDIT"
+          ]
+        },
+        "count_source_url": {
+          "const": "https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2"
         }
       }
     },
