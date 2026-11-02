@@ -136,7 +136,8 @@
               "SampleAppearsInMultipleSplits",
               "MissingGroupKey",
               "TargetLeakingView",
-              "DuplicateOperationForTask"
+              "DuplicateOperationForTask",
+              "SampleGroupIdentityMismatch"
             ]
           }
         },
