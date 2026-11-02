@@ -73,12 +73,6 @@ impl AgentState {
         }
     }
 
-    /// Attach an independently acquired private signal to an informed state.
-    pub const fn with_private_signal(mut self, signal: bool, confidence_bp: u16) -> Self {
-        self.private_signal = Some(signal);
-        self.private_signal_confidence_bp = confidence_bp;
-        self
-    }
 }
 
 /// An undirected, deterministic communication/observation graph.
