@@ -117,3 +117,35 @@ Report total and per-item energy/water, programme duration, flow stability, pres
 4. Report medians, spread and confidence intervals across independent runs; do not report only the best run.
 5. Keep market-label data, internal measurements, simulation outputs and aspirations in separate columns.
 6. Freeze protocol, data, firmware, geometry and analysis commits before confirmatory runs.
+
+
+## Regulatory update checked 2026-11-02
+
+### United States — distinguish ENERGY STAR from federal minimum standards
+
+- ENERGY STAR's currently published Version 7.0 dishwasher criteria remain effective from 19 July 2023: standard models (>=8 place settings + 6 serving pieces) <=240 kWh/year and <=3.2 US gal/cycle; compact models <=155 kWh/year and <=2.0 US gal/cycle. The certified-products dataset was last updated 27 October 2026.
+- Separately, US DOE federal minimum conservation standards apply to products manufactured on or after 23 April 2027: standard-size <=223 kWh/year and <=3.3 US gal/cycle; compact <=174 kWh/year and <=3.1 US gal/cycle.
+- The DOE 2027 rule states that the standard-size **energy** limit does not apply to normal cycles of 60 minutes or less. Do not read this exception as removing the per-cycle water limit.
+- ENERGY STAR's 240 kWh / 3.2 gal qualification and the DOE 2027 federal 223 kWh / 3.3 gal minimum are different programmes and must not be merged.
+
+Sources:
+- ENERGY STAR criteria: https://www.energystar.gov/products/dishwashers/key_product_criteria
+- ENERGY STAR product list (updated 2026-10-27): https://data.energystar.gov/Active-Specifications/ENERGY-STAR-Certified-Residential-Dishwashers/q8py-6w3f
+- DOE consumer dishwasher page: https://www.energy.gov/cmei/buildings/consumer-dishwashers
+- DOE compliance date / standard table: https://www.law.cornell.edu/cfr/text/10/430.32
+- Federal Register confirmation of 2027 date: https://www.federalregister.gov/documents/2024/10/17/2024-23908/energy-conservation-program-energy-conservation-standards-for-dishwashers
+
+### V-ZUG product-level correction / comparison
+
+The exact V-ZUG AS6T-41147 product data sheet reports 14 place settings, 0.53 kWh and 6.7 L per standard cleaning cycle, 6 h 45 min, cleaning index 1.12, drying index 1.065 and 38 dB(A). This makes it a strong water-use and cleaning/drying reference, but not the lowest-energy model in the current Topten comparison.
+
+Official product data sheet:
+https://www.vzug.com/occ/v2/gb-site-spa/pdf/product/euDatasheet/V-ZUG-AS6T6GBHVI-4114700009.pdf?lang=en_GB&productCode=4114700009
+
+V-ZUG AS6T-41173 official label reports 39 kWh/100 cycles, 8.6 L/cycle, 13 place settings and 6 h 10 min. It is a lower-energy benchmark with higher water use and lower place-setting capacity than AS6T-41147:
+https://www.vzug.com/medias/sys_master/root/h97/h1b/11172887560222/1228067_1171426-00_AC/1228067-1171426-00-AC.pdf
+
+Competitive implications:
+- The best energy and best water values in the market set belong to different exact models; do not combine them into a fictional competitor.
+- A full-load target of 0.39 kWh and 6.0-6.5 L would need to beat the 0.53 kWh / 6.7 L 14-place reference on both energy and water, while also substantially improving duration from its 405-minute eco programme.
+- A 120-150 minute target is a separate convenience objective and must retain the required IEC cleaning/drying performance. Do not infer that a shorter programme is equivalent because energy/water are lower.
