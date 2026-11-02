@@ -132,6 +132,8 @@ The function accepts intervals, so it composes directly with separate source and
 The joint-response layer also has strict contracts:
 - `schemas/joint-response-input.schema.json` defines source/target marginal-prevalence intervals.
 - `schemas/joint-response-fixture.schema.json` validates the input/expected wrapper for `fixtures/joint-response-known-answer.json`.
+- `schemas/joint-response-counts-input.schema.json` defines full-cohort source/target response-status counts and separate detector operating ranges.
+- `schemas/joint-response-counts-fixture.schema.json` validates integrated known-answer fixtures in `fixtures/joint-response-counts-known-answer.json` and `fixtures/joint-response-counts-missing-known-answer.json`.
 
 
 ## Building detector ranges from validation counts
