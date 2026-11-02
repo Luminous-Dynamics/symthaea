@@ -1,7 +1,10 @@
 {
   "schema": "luminous.temporal_intervention_audit.v0.1",
   "tracking_issue": 9561,
-  "related_issues": [9557, 9872],
+  "related_issues": [
+    9557,
+    9872
+  ],
   "package": "research/temporal-intervention-audit",
   "randomization": {
     "assignment": "independent_bernoulli_fair_coin_within_pair",
@@ -30,10 +33,28 @@
     "arbitrary_temporal_drift_guarantee": false
   },
   "tests": {
-    "rust_test_functions_authored": 14,
+    "rust_test_functions_authored": 26,
     "rust_tests_executed": false,
     "benchmark_executed": false,
     "assignment_receipts_verified": false,
     "hardware_energy_measured": false
+  },
+  "anytime_sequential": {
+    "module": "research/temporal-intervention-audit/src/sequential.rs",
+    "method": "fixed_fraction_paired_sign_betting",
+    "process": "E_t=(3/2)^beneficial_signs*(1/2)^harmful_signs",
+    "tie_factor": "1",
+    "assignment": "independently_randomized_fair_coin_orientation_within_each_pair",
+    "null": "Fisher_sharp_no_treatment_effect",
+    "threshold": "comparison_family_size/familywise_alpha",
+    "validity": "Ville_anytime_crossing_bound_plus_Bonferroni",
+    "exact_arithmetic": "u128_rational_numerator_denominator",
+    "maximum_pairs": 64,
+    "supports_blocked_or_clustered_assignment": false,
+    "first_crossing_latched": true,
+    "storage_rollback_protected": false,
+    "rust_test_functions_authored": 12,
+    "rust_tests_executed": false,
+    "finite_null_tree_horizon_test_authored": 20
   }
 }
