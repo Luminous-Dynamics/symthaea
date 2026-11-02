@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-query-impact-input-v0.1.schema.json",
+  "title": "Connectome proofreading query-impact input v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "operation_id",
+    "sample_hash",
+    "task_route",
+    "source_volume_id",
+    "base_graph_snapshot_sha256",
+    "hypothetical_result_graph_snapshot_sha256",
+    "candidate_patch_sha256",
+    "query_evaluations"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "upper": {
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_definition_sha256",
+        "pre_registered",
+        "metric_id",
+        "unit_id",
+        "materiality_threshold",
+        "decision_threshold",
+        "scenario_id",
+        "baseline",
+        "hypothetical_after_edit"
+      ],
+      "properties": {
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "pre_registered": {
+          "const": true
+        },
+        "metric_id": {
+          "$ref": "#/$defs/id"
+        },
+        "unit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "materiality_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "decision_threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/id"
+        },
+        "baseline": {
+          "$ref": "#/$defs/interval"
+        },
+        "hypothetical_after_edit": {
+          "$ref": "#/$defs/interval"
+        }
+      }
+    }
+  },
+  "properties": {
+    "candidate_id": {
+      "$ref": "#/$defs/id"
+    },
+    "operation_id": {
+      "$ref": "#/$defs/id"
+    },
+    "sample_hash": {
+      "$ref": "#/$defs/sample_hash"
+    },
+    "task_route": {
+      "enum": [
+        "FalseSplitCorrection",
+        "FalseMergeIdentification",
+        "SplitMaskGeneration"
+      ]
+    },
+    "source_volume_id": {
+      "$ref": "#/$defs/id"
+    },
+    "base_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "hypothetical_result_graph_snapshot_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "candidate_patch_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "query_evaluations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evaluation"
+      }
+    }
+  }
+}
