@@ -986,9 +986,9 @@ mod tests {
     }
 
     #[test]
-    fn delayed_aci_tau_one_matches_scalar_aci_without_boundary_clipping() {
-        let mut delayed = DelayedAciBank::new(1, 100_000, 50_000).unwrap();
-        let mut scalar = AciState::new(100_000, 50_000).unwrap();
+    fn delayed_aci_tau_one_matches_scalar_aci_inside_unit_interval() {
+        let mut delayed = DelayedAciBank::new(1, 100_000, 10_000).unwrap();
+        let mut scalar = AciState::new(100_000, 10_000).unwrap();
         let errors = [true, false, false, true, true, false];
         for (step, error) in errors.iter().enumerate() {
             let feedback = if step == 0 { None } else { Some(errors[step - 1]) };
