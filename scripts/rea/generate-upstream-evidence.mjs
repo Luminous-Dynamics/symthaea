@@ -402,16 +402,23 @@ for (const invalid of invalidInputs) {
   });
 }
 
-const surrogateSource = JSON.parse(
-  await readFile(
-    resolve(
-      outputDirectory,
-      fixtureRecords.find((item) => item.name === "apk-profile-complete").file,
-    ),
-    "utf8",
+const surrogateCase = cases.find((item) => item.name === "apk-profile-complete");
+if (!surrogateCase) throw new Error("Missing source case for surrogate boundary");
+const surrogateObservation = {
+  ...surrogateCase.observation,
+  result: {
+    ...surrogateCase.observation.result,
+    surrogate_probe: String.fromCharCode(0xd800),
+  },
+};
+const surrogateSource = withEvidenceCallerInputPath(
+  createEvidence(
+    surrogateCase.target,
+    surrogateCase.provider,
+    surrogateObservation,
   ),
+  surrogateCase.callerPath,
 );
-surrogateSource.normalized_result.surrogate_probe = String.fromCharCode(0xd800);
 parseEvidence(surrogateSource);
 const surrogateBytes = Buffer.from(JSON.stringify(surrogateSource, null, 2) + "\n");
 const surrogateFile = "stricter-unpaired-surrogate.json";
