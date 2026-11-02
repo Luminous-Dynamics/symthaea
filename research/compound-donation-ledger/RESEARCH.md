@@ -706,13 +706,22 @@ The benchmark must keep guarantee classes separate.
   e-values via martingales. Include as a matched baseline only when the
   order in which same-round coordinate observations are revealed preserves
   the required conditional validity.
-- P-value/e-value software: Bioconductor onlineFDR 2.20.0 (Bioconductor
-  3.23 release) documents LOND, LORD, SAFFRON, ADDIS and supLORD. The Python
-  online-fdr package exposes sequential/batch p-value methods, e-BH/e-LOND
-  and e-process utilities. Its live parity suite currently targets
-  onlineFDR 2.18.0, so do not silently describe that as parity with current
-  2.20.0. Both package versions, commit hashes, method defaults and guarantee
-  assumptions must be pinned in the benchmark manifest.
+- P-value/e-value software: Bioconductor onlineFDR stable 2.20.0
+  (Bioconductor 3.23) and development 2.21.2 (Bioconductor 3.24) both matter.
+  The package supports online FDR/FWER procedures for sequential hypothesis
+  arrivals. Pin the exact release/devel source commit, R version, package
+  version and method defaults. Do not benchmark only the stable release when
+  the devel line has advanced.
+- Python online-fdr: its maintained package exposes sequential/batch
+  procedures and e-process utilities; its parity tests have historically
+  targeted an older onlineFDR release. Pin its exact commit and run parity
+  against both stable 2.20.0 and devel 2.21.2. A passing older parity suite is
+  not evidence of parity with current Bioconductor versions.
+- e-GAI reference software: the paper authors publish an R repository with
+  e-LORD, e-SAFFRON, pL-RAI and pS-RAI implementations and simulation drivers:
+  https://github.com/zijianwei01/e-GAI . Include this repository as a
+  reproducibility baseline, and preserve its theorem assumptions and exact
+  version/commit.
 
 ## 7. Confirmatory benchmark protocol
 
