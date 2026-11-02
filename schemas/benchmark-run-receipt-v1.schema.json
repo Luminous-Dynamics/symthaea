@@ -1,0 +1,1212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/benchmark-run-receipt-v1.schema.json",
+  "title": "Symthaea Benchmark Run Receipt v1",
+  "description": "A provenance-bound benchmark result envelope. Structural validation is necessary but semantic accounting equations, cross-arm comparability and score provenance require the accompanying validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "created_at",
+    "run_kind",
+    "benchmark",
+    "system",
+    "environment",
+    "budget_caps",
+    "actual_resources",
+    "task_accounting",
+    "task_outcomes",
+    "excluded_tasks",
+    "official_score",
+    "derived_metrics",
+    "comparison",
+    "provenance",
+    "integrity",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.benchmark-run-receipt.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "run_kind": {
+      "enum": [
+        "synthetic_fixture",
+        "internal_holdout",
+        "public_benchmark",
+        "private_challenge",
+        "production_evaluation"
+      ]
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark_id",
+        "version",
+        "revision",
+        "access_class",
+        "dataset_manifest_sha256",
+        "eligible_task_set_sha256",
+        "split_id",
+        "scoring_protocol_id",
+        "scoring_protocol_version"
+      ],
+      "properties": {
+        "benchmark_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "access_class": {
+          "enum": [
+            "internal",
+            "public",
+            "authorized_private",
+            "restricted",
+            "synthetic"
+          ]
+        },
+        "dataset_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "eligible_task_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "scoring_protocol_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "scoring_protocol_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "licence_or_access_terms": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        },
+        "official_documentation_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "arm_kind",
+        "system_id",
+        "system_version",
+        "source_revision",
+        "configuration_sha256",
+        "prompt_or_policy_sha256",
+        "model",
+        "tools"
+      ],
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "arm_kind": {
+          "enum": [
+            "rea_only",
+            "symthaea_only",
+            "rea_plus_symthaea",
+            "specialist_tool",
+            "specialist_stack",
+            "human_expert",
+            "other"
+          ]
+        },
+        "system_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "system_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "prompt_or_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "provider",
+                "model_id",
+                "model_version",
+                "configuration_sha256"
+              ],
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "model_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "model_version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "configuration_sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            }
+          ]
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tool_id",
+              "version",
+              "executable_sha256",
+              "configuration_sha256"
+            ],
+            "properties": {
+              "tool_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "executable_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "configuration_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        "adapter_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_os",
+        "host_architecture",
+        "runtime",
+        "container_image_sha256",
+        "network_policy",
+        "instrumentation",
+        "target_cohort"
+      ],
+      "properties": {
+        "host_os": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "host_architecture": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "container_image_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "network_policy": {
+          "enum": [
+            "disabled",
+            "allowlisted",
+            "benchmark_defined",
+            "unrestricted",
+            "unknown"
+          ]
+        },
+        "instrumentation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "target_cohort": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "hardware": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "gpu",
+            "memory_bytes",
+            "device_class"
+          ],
+          "properties": {
+            "cpu": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 160
+            },
+            "gpu": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 160
+            },
+            "memory_bytes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "device_class": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 120
+            }
+          }
+        }
+      }
+    },
+    "budget_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "gpu_time_ms",
+        "peak_rss_bytes",
+        "model_calls",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls",
+        "cost_microusd",
+        "energy_microjoules"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "cpu_time_ms": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "gpu_time_ms": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "peak_rss_bytes": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "model_calls": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "input_tokens": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "output_tokens": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "tool_calls": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "cost_microusd": {
+          "$ref": "#/$defs/budgetCap"
+        },
+        "energy_microjoules": {
+          "$ref": "#/$defs/budgetCap"
+        }
+      }
+    },
+    "actual_resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "gpu_time_ms",
+        "peak_rss_bytes",
+        "model_calls",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls",
+        "cost_microusd",
+        "energy_microjoules"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "$ref": "#/$defs/measurement"
+        },
+        "cpu_time_ms": {
+          "$ref": "#/$defs/measurement"
+        },
+        "gpu_time_ms": {
+          "$ref": "#/$defs/measurement"
+        },
+        "peak_rss_bytes": {
+          "$ref": "#/$defs/measurement"
+        },
+        "model_calls": {
+          "$ref": "#/$defs/measurement"
+        },
+        "input_tokens": {
+          "$ref": "#/$defs/measurement"
+        },
+        "output_tokens": {
+          "$ref": "#/$defs/measurement"
+        },
+        "tool_calls": {
+          "$ref": "#/$defs/measurement"
+        },
+        "cost_microusd": {
+          "$ref": "#/$defs/measurement"
+        },
+        "energy_microjoules": {
+          "$ref": "#/$defs/measurement"
+        }
+      }
+    },
+    "task_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universe",
+        "eligible",
+        "excluded",
+        "attempted",
+        "not_attempted",
+        "in_progress",
+        "completed",
+        "graded",
+        "terminal_dispositions"
+      ],
+      "properties": {
+        "universe": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eligible": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_attempted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "in_progress": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "graded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "terminal_dispositions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "passed",
+            "failed",
+            "refused",
+            "abstained",
+            "unsupported",
+            "timed_out",
+            "tool_failed",
+            "ungraded"
+          ],
+          "properties": {
+            "passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "refused": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "abstained": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unsupported": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timed_out": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ungraded": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "task_outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "input_sha256",
+          "disposition",
+          "attempted",
+          "graded",
+          "grade",
+          "reason_code",
+          "resources"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "input_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "disposition": {
+            "enum": [
+              "passed",
+              "failed",
+              "refused",
+              "abstained",
+              "unsupported",
+              "timed_out",
+              "tool_failed",
+              "ungraded",
+              "not_attempted",
+              "in_progress"
+            ]
+          },
+          "attempted": {
+            "type": "boolean"
+          },
+          "graded": {
+            "type": "boolean"
+          },
+          "grade": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 160
+          },
+          "grader_result_sha256": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^ev_[0-9a-f]{64}$"
+            },
+            "uniqueItems": true
+          },
+          "resources": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "wall_time_ms",
+              "model_calls",
+              "input_tokens",
+              "output_tokens",
+              "tool_calls",
+              "cost_microusd"
+            ],
+            "properties": {
+              "wall_time_ms": {
+                "$ref": "#/$defs/measurement"
+              },
+              "model_calls": {
+                "$ref": "#/$defs/measurement"
+              },
+              "input_tokens": {
+                "$ref": "#/$defs/measurement"
+              },
+              "output_tokens": {
+                "$ref": "#/$defs/measurement"
+              },
+              "tool_calls": {
+                "$ref": "#/$defs/measurement"
+              },
+              "cost_microusd": {
+                "$ref": "#/$defs/measurement"
+              }
+            }
+          }
+        }
+      }
+    },
+    "excluded_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "input_sha256",
+          "reason_code",
+          "predeclared"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "input_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "reason_code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "predeclared": {
+            "type": "boolean"
+          },
+          "approval_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "official_score": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_applicable"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "metric_id",
+            "formula_version",
+            "value",
+            "unit",
+            "numerator",
+            "denominator",
+            "grader_result_sha256"
+          ],
+          "properties": {
+            "status": {
+              "const": "reported_by_official_grader"
+            },
+            "metric_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "formula_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "numerator": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "denominator": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "grader_result_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            }
+          }
+        }
+      ]
+    },
+    "derived_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "classification",
+          "formula",
+          "value",
+          "numerator",
+          "denominator",
+          "zero_denominator_reason"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "classification": {
+            "const": "derived_non_official"
+          },
+          "formula": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "numerator": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "denominator": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "zero_denominator_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_group_id",
+        "matched",
+        "comparable",
+        "eligible_task_set_sha256",
+        "budget_protocol_sha256",
+        "matched_arm_ids",
+        "non_comparability_reasons"
+      ],
+      "properties": {
+        "comparison_group_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "matched": {
+          "type": "boolean"
+        },
+        "comparable": {
+          "type": "boolean"
+        },
+        "eligible_task_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "budget_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "matched_arm_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "non_comparability_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_id",
+        "runner_revision",
+        "grader_id",
+        "grader_version",
+        "grader_sha256",
+        "result_artifact_sha256",
+        "reproduction_recipe_sha256"
+      ],
+      "properties": {
+        "runner_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "runner_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "grader_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "grader_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "grader_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "result_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reproduction_recipe_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "preregistration_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalization",
+        "payload_sha256_excludes_integrity"
+      ],
+      "properties": {
+        "canonicalization": {
+          "const": "RFC8785-JCS"
+        },
+        "payload_sha256_excludes_integrity": {
+          "$ref": "#/$defs/sha256"
+        },
+        "signature": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "algorithm",
+                "key_id",
+                "signature_base64"
+              ],
+              "properties": {
+                "algorithm": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "key_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "signature_base64": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic_fixture",
+        "official_score_is_official",
+        "grader_independence_verified",
+        "system_superiority_established"
+      ],
+      "properties": {
+        "synthetic_fixture": {
+          "type": "boolean"
+        },
+        "official_score_is_official": {
+          "type": "boolean"
+        },
+        "grader_independence_verified": {
+          "type": "boolean"
+        },
+        "system_superiority_established": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "unit"
+          ],
+          "properties": {
+            "status": {
+              "const": "measured"
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unavailable",
+                "not_applicable"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        }
+      ]
+    },
+    "budgetCap": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "maximum",
+            "unit"
+          ],
+          "properties": {
+            "status": {
+              "const": "bounded"
+            },
+            "maximum": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unbounded",
+                "not_applicable"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "run_kind": {
+            "const": "synthetic_fixture"
+          }
+        },
+        "required": [
+          "run_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "benchmark": {
+            "properties": {
+              "access_class": {
+                "const": "synthetic"
+              }
+            }
+          },
+          "official_score": {
+            "properties": {
+              "status": {
+                "const": "not_applicable"
+              }
+            }
+          },
+          "claim_ceiling": {
+            "properties": {
+              "synthetic_fixture": {
+                "const": true
+              },
+              "official_score_is_official": {
+                "const": false
+              },
+              "system_superiority_established": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_kind": {
+            "enum": [
+              "public_benchmark",
+              "private_challenge"
+            ]
+          }
+        },
+        "required": [
+          "run_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "benchmark": {
+            "properties": {
+              "access_class": {
+                "enum": [
+                  "public",
+                  "authorized_private",
+                  "restricted"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
