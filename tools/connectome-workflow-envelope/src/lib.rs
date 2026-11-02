@@ -201,6 +201,45 @@ pub struct QueryStabilityReceipt {
     pub universal_connectome_completeness_claimed: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueryStopCalibrationOutcome {
+    InsufficientCalibration,
+    NotCalibratedGroupOverlap,
+    NotCalibratedExchangeability,
+    ProjectedStableWithinHorizon,
+    ProjectedUnstableWithinHorizon,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct QueryStopCalibrationReceipt {
+    pub receipt_sha256: String,
+    pub report_sha256: String,
+    pub calibration_profile_sha256: String,
+    pub group_disjointness_report_sha256: String,
+    pub exchangeability_assessment_sha256: String,
+    pub query_id: String,
+    pub query_definition_sha256: String,
+    pub analysis_code_sha256: String,
+    pub metric_id: String,
+    pub unit_id: String,
+    pub calibration_stratum_id: String,
+    pub source_volume_id: String,
+    pub target_independence_cluster_id: String,
+    pub first_graph_snapshot_sha256: String,
+    pub latest_graph_snapshot_sha256: String,
+    pub future_horizon_edits: u64,
+    pub alpha: f64,
+    pub calibration_trajectory_count: usize,
+    pub order_statistic_rank: usize,
+    pub residual_quantile_ratio: Option<f64>,
+    pub observed_max_drift_ratio: f64,
+    pub current_uncertainty_width_ratio: f64,
+    pub projected_future_drift_upper_ratio: Option<f64>,
+    pub group_disjoint: bool,
+    pub exchangeability_supported: bool,
+    pub outcome: QueryStopCalibrationOutcome,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowEnvelope {
     pub envelope_id: String,
@@ -213,6 +252,7 @@ pub struct WorkflowEnvelope {
     pub review: Option<ReviewReceipt>,
     pub edit_transaction: Option<EditTransactionReceipt>,
     pub query_stability: Option<QueryStabilityReceipt>,
+    pub query_stop_calibration: Option<QueryStopCalibrationReceipt>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,6 +274,11 @@ pub enum WorkflowStatus {
     QueryInsufficientHistory,
     QueryUnstable,
     QueryReadyObservedWindow,
+    QueryStopCalibrationInsufficient,
+    QueryStopCalibrationGroupOverlap,
+    QueryStopCalibrationExchangeabilityUnsupported,
+    QueryProjectedUnstableWithinHorizon,
+    QueryProjectedStableWithinHorizon,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,7 +290,9 @@ pub struct WorkflowAudit {
     pub base_graph_snapshot_sha256: String,
     pub canonical_graph_snapshot_sha256: String,
     pub query_id: Option<String>,
-    /// Always false: observed query stability is not a future forecast.
+    pub projected_stop_horizon_edits: Option<u64>,
+    pub projected_future_drift_upper_ratio: Option<f64>,
+    /// Always false: even a finite-horizon projection is not an all-future guarantee.
     pub future_stability_certified: bool,
     /// Always false: one query's stability does not imply universal graph completeness.
     pub universal_connectome_completeness_claimed: bool,
@@ -275,6 +322,12 @@ pub enum EnvelopeError {
     QuerySnapshotMismatch,
     QueryFutureClaimForbidden,
     QueryUniversalClaimForbidden,
+    QueryStopQueryMismatch,
+    QueryStopSourceVolumeMismatch,
+    QueryStopSnapshotMismatch,
+    QueryStopRankMismatch,
+    QueryStopOutcomeContradiction,
+    QueryStopNonFiniteMetric,
 }
 
 impl fmt::Display for EnvelopeError {
@@ -331,6 +384,24 @@ impl fmt::Display for EnvelopeError {
             }
             Self::QueryUniversalClaimForbidden => {
                 write!(f, "query-specific report cannot claim universal connectome completeness")
+            }
+            Self::QueryStopQueryMismatch => {
+                write!(f, "future-stop calibration does not bind the observed query definition")
+            }
+            Self::QueryStopSourceVolumeMismatch => {
+                write!(f, "future-stop calibration source volume differs from query report")
+            }
+            Self::QueryStopSnapshotMismatch => {
+                write!(f, "future-stop calibration does not bind the observed graph snapshot window")
+            }
+            Self::QueryStopRankMismatch => {
+                write!(f, "future-stop calibration order-statistic rank is inconsistent")
+            }
+            Self::QueryStopOutcomeContradiction => {
+                write!(f, "future-stop calibration status contradicts its finite-sample evidence")
+            }
+            Self::QueryStopNonFiniteMetric => {
+                write!(f, "future-stop calibration contains an invalid ratio or threshold")
             }
         }
     }
@@ -546,6 +617,9 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
         &envelope.base_graph_snapshot_sha256,
         &resulting_snapshot,
     )?;
+    if let Some(stop) = &envelope.query_stop_calibration {
+        validate_query_stop_calibration(stop, query)?;
+    }
     completed_stages.push("QUERY_STABILITY_AUDIT");
 
     match query.outcome {
@@ -571,14 +645,51 @@ pub fn audit_workflow(envelope: &WorkflowEnvelope) -> Result<WorkflowAudit, Enve
                 Some(query.query_id.clone()),
             ))
         }
-        QueryStabilityOutcome::StableOverObservedWindow => Ok(build_audit(
-            envelope,
-            WorkflowStatus::QueryReadyObservedWindow,
-            completed_stages,
-            unresolved_stages,
-            resulting_snapshot,
-            Some(query.query_id.clone()),
-        )),
+        QueryStabilityOutcome::StableOverObservedWindow => {
+            let Some(stop) = &envelope.query_stop_calibration else {
+                return Ok(build_audit(
+                    envelope,
+                    WorkflowStatus::QueryReadyObservedWindow,
+                    completed_stages,
+                    unresolved_stages,
+                    resulting_snapshot,
+                    Some(query.query_id.clone()),
+                ));
+            };
+            let status = match stop.outcome {
+                QueryStopCalibrationOutcome::InsufficientCalibration => {
+                    unresolved_stages.push("QUERY_FUTURE_STOP_CALIBRATION");
+                    WorkflowStatus::QueryStopCalibrationInsufficient
+                }
+                QueryStopCalibrationOutcome::NotCalibratedGroupOverlap => {
+                    unresolved_stages.push("QUERY_FUTURE_STOP_GROUP_DISJOINTNESS");
+                    WorkflowStatus::QueryStopCalibrationGroupOverlap
+                }
+                QueryStopCalibrationOutcome::NotCalibratedExchangeability => {
+                    unresolved_stages.push("QUERY_FUTURE_STOP_EXCHANGEABILITY");
+                    WorkflowStatus::QueryStopCalibrationExchangeabilityUnsupported
+                }
+                QueryStopCalibrationOutcome::ProjectedUnstableWithinHorizon => {
+                    unresolved_stages.push("QUERY_FUTURE_STOP_READINESS");
+                    WorkflowStatus::QueryProjectedUnstableWithinHorizon
+                }
+                QueryStopCalibrationOutcome::ProjectedStableWithinHorizon => {
+                    completed_stages.push("QUERY_FUTURE_STOP_CALIBRATION");
+                    WorkflowStatus::QueryProjectedStableWithinHorizon
+                }
+            };
+            let mut audit = build_audit(
+                envelope,
+                status,
+                completed_stages,
+                unresolved_stages,
+                resulting_snapshot,
+                Some(query.query_id.clone()),
+            );
+            audit.projected_stop_horizon_edits = Some(stop.future_horizon_edits);
+            audit.projected_future_drift_upper_ratio = stop.projected_future_drift_upper_ratio;
+            Ok(audit)
+        }
     }
 }
 
@@ -598,6 +709,8 @@ fn build_audit(
         base_graph_snapshot_sha256: envelope.base_graph_snapshot_sha256.clone(),
         canonical_graph_snapshot_sha256,
         query_id,
+        projected_stop_horizon_edits: None,
+        projected_future_drift_upper_ratio: None,
         future_stability_certified: false,
         universal_connectome_completeness_claimed: false,
     }
@@ -884,6 +997,132 @@ fn validate_query_receipt(
     Ok(())
 }
 
+fn validate_query_stop_calibration(
+    receipt: &QueryStopCalibrationReceipt,
+    query: &QueryStabilityReceipt,
+) -> Result<(), EnvelopeError> {
+    for (kind, digest) in [
+        ("query stop receipt", &receipt.receipt_sha256),
+        ("query stop report", &receipt.report_sha256),
+        ("query stop calibration profile", &receipt.calibration_profile_sha256),
+        ("query stop group-disjointness report", &receipt.group_disjointness_report_sha256),
+        ("query stop exchangeability assessment", &receipt.exchangeability_assessment_sha256),
+        ("query stop definition", &receipt.query_definition_sha256),
+        ("query stop analysis", &receipt.analysis_code_sha256),
+        ("query stop first snapshot", &receipt.first_graph_snapshot_sha256),
+        ("query stop latest snapshot", &receipt.latest_graph_snapshot_sha256),
+    ] {
+        validate_sha(kind, digest)?;
+    }
+    for (kind, value) in [
+        ("query stop query", &receipt.query_id),
+        ("query stop metric", &receipt.metric_id),
+        ("query stop unit", &receipt.unit_id),
+        ("query stop stratum", &receipt.calibration_stratum_id),
+        ("query stop source volume", &receipt.source_volume_id),
+        ("query stop target independence cluster", &receipt.target_independence_cluster_id),
+    ] {
+        validate_id(kind, value)?;
+    }
+    if receipt.query_id != query.query_id
+        || receipt.query_definition_sha256 != query.query_definition_sha256
+        || receipt.analysis_code_sha256 != query.analysis_code_sha256
+    {
+        return Err(EnvelopeError::QueryStopQueryMismatch);
+    }
+    if receipt.source_volume_id != query.source_volume_id {
+        return Err(EnvelopeError::QueryStopSourceVolumeMismatch);
+    }
+    if receipt.first_graph_snapshot_sha256 != query.first_graph_snapshot_sha256
+        || receipt.latest_graph_snapshot_sha256 != query.latest_graph_snapshot_sha256
+    {
+        return Err(EnvelopeError::QueryStopSnapshotMismatch);
+    }
+    if receipt.future_horizon_edits == 0
+        || !receipt.alpha.is_finite()
+        || receipt.alpha <= 0.0
+        || receipt.alpha >= 1.0
+        || !receipt.observed_max_drift_ratio.is_finite()
+        || receipt.observed_max_drift_ratio < 0.0
+        || !receipt.current_uncertainty_width_ratio.is_finite()
+        || receipt.current_uncertainty_width_ratio < 0.0
+    {
+        return Err(EnvelopeError::QueryStopNonFiniteMetric);
+    }
+    let rank_float = ((receipt.calibration_trajectory_count as f64) + 1.0)
+        * (1.0 - receipt.alpha);
+    if !rank_float.is_finite()
+        || rank_float.ceil() < 1.0
+        || rank_float.ceil() > usize::MAX as f64
+        || receipt.order_statistic_rank != rank_float.ceil() as usize
+    {
+        return Err(EnvelopeError::QueryStopRankMismatch);
+    }
+    let quantile = receipt.residual_quantile_ratio;
+    let upper = receipt.projected_future_drift_upper_ratio;
+    let quantile_valid = quantile.is_some_and(|value| value.is_finite() && value >= 0.0);
+    let upper_valid = upper.is_some_and(|value| value.is_finite() && value >= 0.0);
+
+    match receipt.outcome {
+        QueryStopCalibrationOutcome::InsufficientCalibration => {
+            if receipt.order_statistic_rank <= receipt.calibration_trajectory_count
+                || quantile.is_some()
+                || upper.is_some()
+            {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            }
+        }
+        QueryStopCalibrationOutcome::NotCalibratedGroupOverlap => {
+            if receipt.group_disjoint || quantile.is_some() || upper.is_some() {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            }
+        }
+        QueryStopCalibrationOutcome::NotCalibratedExchangeability => {
+            if !receipt.group_disjoint
+                || receipt.exchangeability_supported
+                || quantile.is_some()
+                || upper.is_some()
+            {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            }
+        }
+        QueryStopCalibrationOutcome::ProjectedStableWithinHorizon => {
+            let (Some(q), Some(bound)) = (quantile, upper) else {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            };
+            if !receipt.group_disjoint
+                || !receipt.exchangeability_supported
+                || receipt.order_statistic_rank > receipt.calibration_trajectory_count
+                || !quantile_valid
+                || !upper_valid
+                || (bound - (receipt.observed_max_drift_ratio + q)).abs() > 1e-9
+                || receipt.current_uncertainty_width_ratio > 1.0
+                || bound > 1.0
+                || query.outcome != QueryStabilityOutcome::StableOverObservedWindow
+            {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            }
+        }
+        QueryStopCalibrationOutcome::ProjectedUnstableWithinHorizon => {
+            let (Some(q), Some(bound)) = (quantile, upper) else {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            };
+            if !receipt.group_disjoint
+                || !receipt.exchangeability_supported
+                || receipt.order_statistic_rank > receipt.calibration_trajectory_count
+                || !quantile_valid
+                || !upper_valid
+                || (bound - (receipt.observed_max_drift_ratio + q)).abs() > 1e-9
+                || (receipt.current_uncertainty_width_ratio <= 1.0 && bound <= 1.0)
+                || query.outcome != QueryStabilityOutcome::StableOverObservedWindow
+            {
+                return Err(EnvelopeError::QueryStopOutcomeContradiction);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_sample_hash(value: &str) -> Result<(), EnvelopeError> {
     if value.len() != 32
         || !value
@@ -975,6 +1214,7 @@ mod tests {
             review: None,
             edit_transaction: None,
             query_stability: None,
+            query_stop_calibration: None,
         }
     }
 
