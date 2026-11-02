@@ -274,6 +274,13 @@ def simulate_policy(
         fdp, true_count, has_false, rejected_count = score_and_fdp(
             active_ids, gamma, x, incoming, outgoing, null, alpha
         )
+        current_scores = [
+            gamma[i] * x[i] + incoming[i] - outgoing[i]
+            for i in range(n)
+        ]
+        if any(new < old for new, old in zip(current_scores, previous_scores)):
+            raise AssertionError("score decreased at a reporting checkpoint")
+        previous_scores[:] = current_scores
         power = (
             true_count / int((~null).sum())
             if int((~null).sum()) else Fraction(0)
