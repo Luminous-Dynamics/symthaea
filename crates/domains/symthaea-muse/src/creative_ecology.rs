@@ -517,14 +517,21 @@ impl CoCreationSessionV1 {
     pub fn revoke_consent(
         &mut self,
         revocation_id: impl Into<String>,
+        participant_id: &str,
         grant_id: &str,
     ) -> Result<ConsentRevocationV1, CreativeEcologyError> {
         self.validate_snapshot()?;
         let revocation_id = revocation_id.into();
         non_empty("revocation_id", &revocation_id)?;
+        non_empty("participant_id", participant_id)?;
         non_empty("grant_id", grant_id)?;
-        if !self.grants.iter().any(|grant| grant.grant_id == grant_id) {
-            return Err(CreativeEcologyError::UnknownConsentGrant);
+        let grant = self
+            .grants
+            .iter()
+            .find(|grant| grant.grant_id == grant_id)
+            .ok_or(CreativeEcologyError::UnknownConsentGrant)?;
+        if grant.participant_id != participant_id {
+            return Err(CreativeEcologyError::ConsentOwnerMismatch);
         }
         if self.revocations.iter().any(|item| item.grant_id == grant_id) {
             return Err(CreativeEcologyError::ConsentAlreadyRevoked);
@@ -860,6 +867,25 @@ impl CreativeIdentityRevisionV1 {
         unique_strings("influence_event_id", &self.influence_event_ids)?;
         Ok(())
     }
+
+    /// Validate that every claimed influence belongs to the exact source
+    /// session, rather than merely checking that the event identifiers exist.
+    pub fn validate_against_session(
+        &self,
+        session: &CoCreationSessionV1,
+    ) -> Result<(), CreativeEcologyError> {
+        self.validate()?;
+        session.validate_snapshot()?;
+        if self.source_session_id.as_deref() != Some(session.session_id.as_str()) {
+            return Err(CreativeEcologyError::IdentitySessionMismatch);
+        }
+        for event_id in &self.influence_event_ids {
+            if !session.events.iter().any(|event| &event.event_id == event_id) {
+                return Err(CreativeEcologyError::UnknownLineageEvent(event_id.clone()));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -894,6 +920,7 @@ pub enum CreativeEcologyError {
     TargetHasNoArtifact,
     InvalidIdentityLineage,
     MissingInfluenceEvidence,
+    IdentitySessionMismatch,
 }
 
 impl fmt::Display for CreativeEcologyError {
@@ -960,6 +987,9 @@ impl fmt::Display for CreativeEcologyError {
             }
             Self::MissingInfluenceEvidence => {
                 write!(f, "session-derived identity revision requires influence evidence")
+            }
+            Self::IdentitySessionMismatch => {
+                write!(f, "identity revision references a different co-creation session")
             }
         }
     }
@@ -1087,6 +1117,26 @@ mod tests {
             .boundary_components_without_producer
             .contains(&"boundary_policy".to_string()));
         assert!(!report.process_network_strongly_connected);
+    }
+
+    #[test]
+    fn disconnected_maintenance_process_is_detected() {
+        let mut organization = organization();
+        organization.components.push(OrganizationComponentV1 {
+            component_id: "isolated_audit".into(),
+            required_for_operation: true,
+            boundary_component: false,
+        });
+        organization.processes.push(ProductionProcessV1 {
+            process_id: "isolated_audit_process".into(),
+            consumes: vec!["perceptual_state".into()],
+            produces: vec!["isolated_audit".into()],
+            external_inputs: vec![],
+        });
+        let report = organization.assess_functional_recurrence().unwrap();
+        assert!(!report.process_network_strongly_connected);
+        assert!(!report.functionally_recurrent);
+        assert!(report.required_components_without_producer.is_empty());
     }
 
     #[test]
@@ -1243,7 +1293,7 @@ mod tests {
             )
             .unwrap();
         let revocation = session
-            .revoke_consent("revoke-1", "artist-contribute")
+            .revoke_consent("revoke-1", "artist", "artist-contribute")
             .unwrap();
         assert_eq!(revocation.effective_sequence, 2);
         let result = session.append_action(
@@ -1259,6 +1309,25 @@ mod tests {
         assert_eq!(session.events().len(), 1);
         assert_eq!(session.revocations().len(), 1);
         assert!(session.validate_snapshot().is_ok());
+    }
+
+    #[test]
+    fn only_the_grant_owner_can_revoke_consent() {
+        let mut session = session_with_participants();
+        session
+            .grant_consent(
+                "artist-contribute",
+                "artist",
+                vec![ConsentPurposeV1::Contribute],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            session.revoke_consent("revoke-1", "melothaea", "artist-contribute"),
+            Err(CreativeEcologyError::ConsentOwnerMismatch)
+        );
+        assert!(session.events().is_empty());
+        assert!(session.revocations().is_empty());
     }
 
     #[test]
