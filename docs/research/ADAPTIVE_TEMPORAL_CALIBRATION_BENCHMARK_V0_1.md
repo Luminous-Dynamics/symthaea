@@ -19,6 +19,8 @@ This is a calibration benchmark. To isolate calibration behavior, all calibratio
 - Gibbs & Candès, *Conformal Inference for Online Prediction with Arbitrary Distribution Shifts*, JMLR 2024. It adapts the learning rate of ACI and develops regret control over local intervals without requiring the drift rate in advance. The theorem and exact update order must be reproduced from the paper: https://jmlr.org/beta/papers/v25/22-1218.html
 - Bhatnagar et al., *Improved Online Conformal Prediction via Strongly Adaptive Online Learning*, ICML 2023. SAOCP/SF-OGD target strongly adaptive regret across intervals of multiple lengths and approximate coverage: https://proceedings.mlr.press/v202/bhatnagar23a.html
 - Vaze, *Simultaneous Coverage and Efficiency Guarantee in Online Conformal Prediction*, 2026 preprint. It explicitly targets non-cancelling absolute coverage violation together with efficiency against dynamic benchmarks; its adversarial, stochastic and covariate-dependent results must be compared under their individual assumptions: https://arxiv.org/abs/2607.26577
+- El Halabi & Brandt, *Adaptive Conformal Inference Under Delayed Feedback: Coverage Guarantees and a Delay-to-Memory Diagnostic* (2026-09-07). For fixed-horizon delay tau, it decomposes the delayed ACI recursion into tau interleaved ACI-like sequences and derives a finite-sample bound with explicit delay dependence. It proposes r=tau/L, but reports that this diagnostic organizes AR(1) experiments better than GARCH(1,1) or Markov switching: https://arxiv.org/abs/2609.07251
+- Liu, Dobriban & Orabona, *Online Conformal Prediction via Universal Portfolio Algorithms*, ICML/PMLR 2026. UP-OCP uses a parameter-free two-asset universal-portfolio reduction and a regret-to-coverage theory, with finite-time miscoverage bounds: https://proceedings.mlr.press/v306/liu26y.html
 - Amiri Shahbazi & Baheri, *Heterogeneous-Horizon Conformal Ensembles for Online Prediction Under Distribution Shift* (PACE), 2026. PACE is a useful multi-horizon empirical comparator, but the paper explicitly describes it as heuristic and does not claim an SAOCP-like formal guarantee: https://www.mdpi.com/2571-9394/8/5/77
 - Gibbs & Candès, *Adaptive Conformal Inference Under Distribution Shift*, 2021, remains the simple ACI reference; FACI is a further adaptive baseline.
 
@@ -78,6 +80,10 @@ At minimum, reproduce compatible versions of:
 6. Vaze's simultaneous coverage-and-efficiency approach, once its exact method and assumptions are implemented.
 7. Fixed sliding-window quantile calibration with predeclared windows.
 8. PACE heterogeneous-horizon ensemble as an empirical heuristic baseline.
+9. Fixed-horizon interleaved delayed ACI as specified by El Halabi & Brandt (2026).
+10. Multi-step Adaptive Conformal Prediction (MACP).
+11. Autocorrelation-aware Multi-step Conformal Prediction (AcMCP).
+12. UP-OCP as a parameter-free universal-portfolio comparator.
 
 ### Symthaea candidate: Bitemporal Multi-Horizon Adaptive Calibration (BMAC)
 
@@ -119,6 +125,7 @@ Rolling-window extrema are descriptive benchmark statistics. Overlapping windows
 
 ### Feedback and revision metrics
 - feedback latency distribution (event-to-available and forecast-to-label);
+- delay-to-memory ratio r=tau/L only for processes with a defensible scalar memory timescale, alongside the memory estimator and estimation error. For GARCH report residual and squared-residual persistence separately; for Markov switching report transition persistence and state durations. This ratio is a diagnostic, not a universal invariant.
 - number/share of outcomes unavailable at each decision time;
 - calibrator update lag after feedback arrival;
 - revision count and correction lag;
@@ -154,7 +161,7 @@ All numbers above are initial qualification targets. Freeze them on development 
 1. Validate the registry JSON against its Draft 2020-12 schema and commit deterministic generator semantics.
 2. Implement the synthetic residual and delayed-feedback replay runner in Rust as an evaluator-only crate.
 3. Add exact negative controls for future feedback consumption, revision backdating and overlap-as-independent inference.
-4. Reproduce static conformal, ACI/FACI, SAOCP and fixed sliding-window baselines.
+4. Reproduce static conformal, ACI/FACI, SAOCP, fixed-horizon delayed ACI, MACP, AcMCP, UP-OCP and fixed sliding-window baselines.
 5. Add the recent simultaneous coverage-and-efficiency comparator with a reviewed theorem-to-code map.
 6. Implement BMAC as a separate candidate arm; initially mark it heuristic unless a complete proof supports the delayed-feedback aggregation rule.
 7. Evaluate on TIME/BITS/Time-IMM only where compatible outcome feedback semantics are available; do not fabricate real label-arrival times.
@@ -167,4 +174,6 @@ All numbers above are initial qualification targets. Freeze them on development 
 - Vaze (2026), arXiv:2607.26577: https://arxiv.org/abs/2607.26577
 - Shahbazi & Baheri (2026), PACE: https://www.mdpi.com/2571-9394/8/5/77
 - Qiao et al. (2026), TIME, ICML/PMLR: https://proceedings.mlr.press/v306/qiao26g.html
+- El Halabi & Brandt (2026), delayed ACI: https://arxiv.org/abs/2609.07251
+- Liu, Dobriban & Orabona (2026), UP-OCP: https://proceedings.mlr.press/v306/liu26y.html
 - Parent Symthaea temporal benchmark: #9954 / PR #9955.

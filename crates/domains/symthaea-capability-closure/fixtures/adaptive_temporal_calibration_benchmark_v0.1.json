@@ -622,6 +622,26 @@
       "id": "symthaea_bmac",
       "class": "bitemporal_multi_horizon_candidate",
       "status": "research_candidate_not_implemented"
+    },
+    {
+      "id": "delayed_aci_interleaved_tau",
+      "class": "fixed_horizon_interleaved_delayed_aci",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "macp_multi_step_adaptive_conformal",
+      "class": "multi_step_adaptive_conformal_prediction",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "acmcp_autocorrelated_multistep",
+      "class": "autocorrelation_aware_multistep_conformal_prediction",
+      "status": "reproduction_required"
+    },
+    {
+      "id": "up_ocp_universal_portfolio",
+      "class": "parameter_free_universal_portfolio_online_conformal",
+      "status": "reproduction_required"
     }
   ],
   "metrics": {
@@ -654,7 +674,10 @@
       "calibrator_update_lag",
       "revision_count",
       "correction_lag",
-      "historical_receipt_mutation_count"
+      "historical_receipt_mutation_count",
+      "delay_to_memory_ratio_r",
+      "residual_memory_timescale_estimate",
+      "memory_estimation_error"
     ],
     "systems": [
       "calibration_update_latency_p50_p95_p99",
