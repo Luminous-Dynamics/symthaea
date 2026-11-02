@@ -14,10 +14,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONFORMAL_FUSION_REQUEST_SCHEMA: &str =
-    "symthaea.detector_conformal_fusion_request.v1";
-pub const CONFORMAL_FUSION_REPORT_SCHEMA: &str =
-    "symthaea.detector_conformal_fusion_report.v1";
+pub const CONFORMAL_FUSION_REQUEST_SCHEMA: &str = "symthaea.detector_conformal_fusion_request.v1";
+pub const CONFORMAL_FUSION_REPORT_SCHEMA: &str = "symthaea.detector_conformal_fusion_report.v1";
 pub const FUSION_METHOD_ID: &str = "weighted_sum_negative_log_empirical_detector_pvalues_v2";
 pub const MAX_CALIBRATION_ROWS: usize = 1_000_000;
 pub const MAX_EVALUATION_ROWS: usize = 1_000_000;
@@ -260,9 +258,7 @@ fn valid_id(value: &str, max_len: usize) -> bool {
 }
 
 fn validate_features(features: &[DetectorFeatureV1], label: &str) -> Result<(), String> {
-    if features.len() < MIN_DETECTORS_PER_GROUP
-        || features.len() > MAX_DETECTORS_PER_ROW
-    {
+    if features.len() < MIN_DETECTORS_PER_GROUP || features.len() > MAX_DETECTORS_PER_ROW {
         return Err(format!(
             "{label} requires {MIN_DETECTORS_PER_GROUP}..={MAX_DETECTORS_PER_ROW} detector features"
         ));
@@ -284,7 +280,9 @@ fn validate_features(features: &[DetectorFeatureV1], label: &str) -> Result<(), 
 
 fn validate_evaluation_features(features: &[DetectorFeatureV1], label: &str) -> Result<(), String> {
     if features.len() > MAX_DETECTORS_PER_ROW {
-        return Err(format!("{label} exceeds {MAX_DETECTORS_PER_ROW} detector features"));
+        return Err(format!(
+            "{label} exceeds {MAX_DETECTORS_PER_ROW} detector features"
+        ));
     }
     let mut ids = BTreeSet::new();
     for feature in features {
@@ -302,20 +300,23 @@ fn validate_evaluation_features(features: &[DetectorFeatureV1], label: &str) -> 
 }
 
 /// Canonical domain-separated digest for the pinned detector registry.
-pub fn compute_detector_registry_sha256(
-    specs: &[DetectorSpecV1],
-) -> Result<String, String> {
+pub fn compute_detector_registry_sha256(specs: &[DetectorSpecV1]) -> Result<String, String> {
     validate_detector_specs(specs)?;
     let mut normalized = specs.to_vec();
     normalized.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
     let bytes = serde_json::to_vec(&normalized)
         .map_err(|error| format!("cannot serialize detector registry: {error}"))?;
-    Ok(crate::hash_domain(b"detector-conformal-registry.v1", &bytes))
+    Ok(crate::hash_domain(
+        b"detector-conformal-registry.v1",
+        &bytes,
+    ))
 }
 
 fn validate_detector_specs(specs: &[DetectorSpecV1]) -> Result<(), String> {
     if !(MIN_DETECTORS_PER_GROUP..=MAX_DETECTORS_PER_ROW).contains(&specs.len()) {
-        return Err(format!("detector registry requires {MIN_DETECTORS_PER_GROUP}..={MAX_DETECTORS_PER_ROW} specs"));
+        return Err(format!(
+            "detector registry requires {MIN_DETECTORS_PER_GROUP}..={MAX_DETECTORS_PER_ROW} specs"
+        ));
     }
     let mut ids = BTreeSet::new();
     let mut total_weight = 0_u32;
@@ -339,7 +340,8 @@ fn canonical_calibration_manifest(rows: &[CalibrationFeatureRowV1]) -> Result<Ve
     let mut normalized = rows.to_vec();
     normalized.sort_by(|left, right| left.calibration_unit_id.cmp(&right.calibration_unit_id));
     for row in &mut normalized {
-        row.features.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
+        row.features
+            .sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
     }
     serde_json::to_vec(&normalized)
         .map_err(|error| format!("cannot serialize calibration manifest: {error}"))
@@ -349,7 +351,8 @@ fn canonical_evaluation_manifest(rows: &[EvaluationFeatureRowV1]) -> Result<Vec<
     let mut normalized = rows.to_vec();
     normalized.sort_by(|left, right| left.evaluation_unit_id.cmp(&right.evaluation_unit_id));
     for row in &mut normalized {
-        row.features.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
+        row.features
+            .sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
     }
     serde_json::to_vec(&normalized)
         .map_err(|error| format!("cannot serialize evaluation manifest: {error}"))
@@ -369,10 +372,7 @@ fn validate_calibration_row(
     features: &[DetectorFeatureV1],
     label: &str,
 ) -> Result<(), String> {
-    if !valid_id(unit_id, 128)
-        || !valid_id(task_family, 64)
-        || !valid_id(model_regime, 128)
-    {
+    if !valid_id(unit_id, 128) || !valid_id(task_family, 64) || !valid_id(model_regime, 128) {
         return Err(format!("{label} has invalid unit/group IDs"));
     }
     validate_features(features, label)
@@ -395,7 +395,11 @@ fn detector_rank_p_value(
         .count() as u64;
     let numerator = 1 + extreme_count;
     let denominator = calibration_scores.len() as u64 + 1;
-    Ok((numerator, denominator, numerator as f64 / denominator as f64))
+    Ok((
+        numerator,
+        denominator,
+        numerator as f64 / denominator as f64,
+    ))
 }
 
 fn fused_nonconformity(
@@ -403,12 +407,17 @@ fn fused_nonconformity(
     calibration: &GroupCalibrationA,
 ) -> Result<Vec<DetectorEmpiricalPValueV1>, String> {
     let feature_ids: Vec<String> = {
-        let mut ids: Vec<String> = features.iter().map(|feature| feature.detector_id.clone()).collect();
+        let mut ids: Vec<String> = features
+            .iter()
+            .map(|feature| feature.detector_id.clone())
+            .collect();
         ids.sort();
         ids
     };
     if feature_ids != calibration.detector_ids {
-        return Err("evaluation detector feature set does not match calibration contract".to_owned());
+        return Err(
+            "evaluation detector feature set does not match calibration contract".to_owned(),
+        );
     }
 
     let mut p_values = Vec::with_capacity(features.len());
@@ -433,8 +442,7 @@ fn fused_nonconformity(
             .weights_permille
             .get(&feature.detector_id)
             .ok_or_else(|| "detector weight missing from fixed registry".to_owned())?;
-        let weighted_contribution =
-            f64::from(weight_permille) / 1_000.0 * -p_value.ln();
+        let weighted_contribution = f64::from(weight_permille) / 1_000.0 * -p_value.ln();
         p_values.push(DetectorEmpiricalPValueV1 {
             detector_id: feature.detector_id.clone(),
             direction: feature.direction,
@@ -454,7 +462,10 @@ fn combine_detector_p_values(p_values: &[DetectorEmpiricalPValueV1]) -> Result<f
     if p_values.len() < MIN_DETECTORS_PER_GROUP {
         return Err("fused statistic requires at least two detector p-values".to_owned());
     }
-    let result = p_values.iter().map(|value| value.weighted_contribution).sum::<f64>();
+    let result = p_values
+        .iter()
+        .map(|value| value.weighted_contribution)
+        .sum::<f64>();
     if result.is_finite() {
         Ok(result)
     } else {
@@ -462,13 +473,11 @@ fn combine_detector_p_values(p_values: &[DetectorEmpiricalPValueV1]) -> Result<f
     }
 }
 
-fn unique_unit_id(
-    set: &mut BTreeSet<String>,
-    value: &str,
-    label: &str,
-) -> Result<(), String> {
+fn unique_unit_id(set: &mut BTreeSet<String>, value: &str, label: &str) -> Result<(), String> {
     if !set.insert(value.to_owned()) {
-        return Err(format!("calibration/evaluation unit ID {value} is repeated across {label} splits"));
+        return Err(format!(
+            "calibration/evaluation unit ID {value} is repeated across {label} splits"
+        ));
     }
     Ok(())
 }
@@ -486,7 +495,11 @@ fn outer_conformal_p_value(
         .count() as u64;
     let numerator = 1 + extreme_count;
     let denominator = calibration_b_fused_scores.len() as u64 + 1;
-    Ok((numerator, denominator, numerator as f64 / denominator as f64))
+    Ok((
+        numerator,
+        denominator,
+        numerator as f64 / denominator as f64,
+    ))
 }
 
 fn ln_gamma_lanczos(value: f64) -> f64 {
@@ -564,23 +577,23 @@ fn regularized_incomplete_beta(x: f64, a: f64, b: f64) -> f64 {
     if x >= 1.0 {
         return 1.0;
     }
-    let log_beta_factor = ln_gamma_lanczos(a + b)
-        - ln_gamma_lanczos(a)
-        - ln_gamma_lanczos(b)
+    let log_beta_factor = ln_gamma_lanczos(a + b) - ln_gamma_lanczos(a) - ln_gamma_lanczos(b)
         + a * x.ln()
         + b * (-x).ln_1p();
     let beta_factor = log_beta_factor.exp();
     if x < (a + 1.0) / (a + b + 2.0) {
         (beta_factor * beta_continued_fraction(a, b, x) / a).clamp(0.0, 1.0)
     } else {
-        (1.0 - beta_factor * beta_continued_fraction(b, a, 1.0 - x) / b)
-            .clamp(0.0, 1.0)
+        (1.0 - beta_factor * beta_continued_fraction(b, a, 1.0 - x) / b).clamp(0.0, 1.0)
     }
 }
 
 fn inverse_regularized_beta(probability: f64, a: f64, b: f64) -> Result<f64, String> {
-    if !(0.0..=1.0).contains(&probability) || a <= 0.0 || b <= 0.0
-        || !a.is_finite() || !b.is_finite()
+    if !(0.0..=1.0).contains(&probability)
+        || a <= 0.0
+        || b <= 0.0
+        || !a.is_finite()
+        || !b.is_finite()
     {
         return Err("invalid beta quantile parameters".to_owned());
     }
@@ -616,11 +629,7 @@ fn exact_binomial_upper_95(successes: u64, trials: u64) -> Result<f64, String> {
     if successes == trials {
         return Ok(1.0);
     }
-    inverse_regularized_beta(
-        0.95,
-        successes as f64 + 1.0,
-        (trials - successes) as f64,
-    )
+    inverse_regularized_beta(0.95, successes as f64 + 1.0, (trials - successes) as f64)
 }
 
 /// One-sided 95% Clopper-Pearson lower confidence bound for a binomial rate.
@@ -631,11 +640,7 @@ fn exact_binomial_lower_95(successes: u64, trials: u64) -> Result<f64, String> {
     if successes == 0 {
         return Ok(0.0);
     }
-    inverse_regularized_beta(
-        0.05,
-        successes as f64,
-        (trials - successes) as f64 + 1.0,
-    )
+    inverse_regularized_beta(0.05, successes as f64, (trials - successes) as f64 + 1.0)
 }
 
 fn benjamini_yekutieli_adjusted_p_values(
@@ -644,12 +649,17 @@ fn benjamini_yekutieli_adjusted_p_values(
     if values.is_empty() {
         return Ok(BTreeMap::new());
     }
-    if values.iter().any(|(_, p)| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+    if values
+        .iter()
+        .any(|(_, p)| !p.is_finite() || !(0.0..=1.0).contains(p))
+    {
         return Err("BY adjustment requires finite p-values in [0, 1]".to_owned());
     }
     let mut sorted = values.to_vec();
     sorted.sort_by(|left, right| {
-        left.1.total_cmp(&right.1).then_with(|| left.0.cmp(&right.0))
+        left.1
+            .total_cmp(&right.1)
+            .then_with(|| left.0.cmp(&right.0))
     });
     let m = sorted.len();
     let harmonic = (1..=m).map(|rank| 1.0 / rank as f64).sum::<f64>();
@@ -672,9 +682,7 @@ fn average_ranks(values: &[f64]) -> Vec<f64> {
     let mut start = 0;
     while start < order.len() {
         let mut end = start + 1;
-        while end < order.len()
-            && values[order[end]].total_cmp(&values[order[start]]).is_eq()
-        {
+        while end < order.len() && values[order[end]].total_cmp(&values[order[start]]).is_eq() {
             end += 1;
         }
         let average_rank = ((start + 1) as f64 + end as f64) / 2.0;
@@ -687,7 +695,8 @@ fn average_ranks(values: &[f64]) -> Vec<f64> {
 }
 
 fn spearman_rank_correlation(left: &[f64], right: &[f64]) -> Option<f64> {
-    if left.len() != right.len() || left.len() < 3
+    if left.len() != right.len()
+        || left.len() < 3
         || left.iter().chain(right).any(|value| !value.is_finite())
     {
         return None;
@@ -746,10 +755,7 @@ fn pairwise_detector_spearman(
                 left_detector_id: left_id.clone(),
                 right_detector_id: right_id.clone(),
                 paired_unit_count: left_scores.len() as u64,
-                spearman_rank_correlation: spearman_rank_correlation(
-                    &left_scores,
-                    &right_scores,
-                ),
+                spearman_rank_correlation: spearman_rank_correlation(&left_scores, &right_scores),
             });
         }
     }
@@ -764,8 +770,9 @@ fn apply_by_adjustment(
     for summary in group_summaries.iter_mut() {
         let family_values: Vec<(String, f64)> = score_rows
             .iter()
-            .filter(|row| row.task_family == summary.task_family
-                && row.model_regime == summary.model_regime)
+            .filter(|row| {
+                row.task_family == summary.task_family && row.model_regime == summary.model_regime
+            })
             .filter_map(|row| {
                 if row.decision == SelectiveDecisionV1::NoContaminationFlag {
                     row.final_p_value
@@ -793,23 +800,42 @@ fn apply_by_adjustment(
 
         let rows: Vec<&SelectiveFusionScoreV1> = score_rows
             .iter()
-            .filter(|row| row.task_family == summary.task_family
-                && row.model_regime == summary.model_regime)
+            .filter(|row| {
+                row.task_family == summary.task_family && row.model_regime == summary.model_regime
+            })
             .collect();
-        let flagged = rows.iter().filter(|row| row.decision == SelectiveDecisionV1::FlagContaminated).count() as u64;
-        let no_flag = rows.iter().filter(|row| row.decision == SelectiveDecisionV1::NoContaminationFlag).count() as u64;
+        let flagged = rows
+            .iter()
+            .filter(|row| row.decision == SelectiveDecisionV1::FlagContaminated)
+            .count() as u64;
+        let no_flag = rows
+            .iter()
+            .filter(|row| row.decision == SelectiveDecisionV1::NoContaminationFlag)
+            .count() as u64;
         let abstained = rows.len() as u64 - flagged - no_flag;
-        let clean = rows.iter().filter(|row| row.ground_truth_contaminated == Some(false)).count() as u64;
-        let contaminated = rows.iter().filter(|row| row.ground_truth_contaminated == Some(true)).count() as u64;
+        let clean = rows
+            .iter()
+            .filter(|row| row.ground_truth_contaminated == Some(false))
+            .count() as u64;
+        let contaminated = rows
+            .iter()
+            .filter(|row| row.ground_truth_contaminated == Some(true))
+            .count() as u64;
         let labelled = clean + contaminated;
-        let fp = rows.iter().filter(|row| {
-            row.ground_truth_contaminated == Some(false)
-                && row.decision == SelectiveDecisionV1::FlagContaminated
-        }).count() as u64;
-        let tp = rows.iter().filter(|row| {
-            row.ground_truth_contaminated == Some(true)
-                && row.decision == SelectiveDecisionV1::FlagContaminated
-        }).count() as u64;
+        let fp = rows
+            .iter()
+            .filter(|row| {
+                row.ground_truth_contaminated == Some(false)
+                    && row.decision == SelectiveDecisionV1::FlagContaminated
+            })
+            .count() as u64;
+        let tp = rows
+            .iter()
+            .filter(|row| {
+                row.ground_truth_contaminated == Some(true)
+                    && row.decision == SelectiveDecisionV1::FlagContaminated
+            })
+            .count() as u64;
         let fn_count = contaminated - tp;
         summary.labelled_evaluation_unit_count = labelled;
         summary.flagged_count = flagged;
@@ -820,8 +846,7 @@ fn apply_by_adjustment(
         summary.false_positive_count = fp;
         summary.true_positive_count = tp;
         summary.false_negative_count = fn_count;
-        summary.empirical_fpr_permille =
-            (clean > 0).then_some(fp as f64 * 1_000.0 / clean as f64);
+        summary.empirical_fpr_permille = (clean > 0).then_some(fp as f64 * 1_000.0 / clean as f64);
         summary.empirical_tpr_permille =
             (contaminated > 0).then_some(tp as f64 * 1_000.0 / contaminated as f64);
         summary.fpr_one_sided_95_upper_permille = if clean > 0 {
@@ -844,7 +869,9 @@ pub fn calibrate_detector_panel(
     request: &DetectorConformalFusionRequestV1,
 ) -> Result<DetectorConformalFusionReportV1, String> {
     if request.schema != CONFORMAL_FUSION_REQUEST_SCHEMA {
-        return Err(format!("request schema must be {CONFORMAL_FUSION_REQUEST_SCHEMA}"));
+        return Err(format!(
+            "request schema must be {CONFORMAL_FUSION_REQUEST_SCHEMA}"
+        ));
     }
     if !valid_id(&request.study_id, 128)
         || !valid_id(&request.benchmark_id, 128)
@@ -862,9 +889,18 @@ pub fn calibrate_detector_panel(
     validate_digest(&request.model_checkpoint_sha256, "model_checkpoint_sha256")?;
     validate_digest(&request.tokenizer_sha256, "tokenizer_sha256")?;
     validate_digest(&request.prompt_harness_sha256, "prompt_harness_sha256")?;
-    validate_digest(&request.runtime_environment_sha256, "runtime_environment_sha256")?;
-    validate_digest(&request.calibration_protocol_sha256, "calibration_protocol_sha256")?;
-    validate_digest(&request.detector_registry_sha256, "detector_registry_sha256")?;
+    validate_digest(
+        &request.runtime_environment_sha256,
+        "runtime_environment_sha256",
+    )?;
+    validate_digest(
+        &request.calibration_protocol_sha256,
+        "calibration_protocol_sha256",
+    )?;
+    validate_digest(
+        &request.detector_registry_sha256,
+        "detector_registry_sha256",
+    )?;
     validate_detector_specs(&request.detector_specs)?;
     if compute_detector_registry_sha256(&request.detector_specs)?
         != request.detector_registry_sha256
@@ -878,20 +914,22 @@ pub fn calibrate_detector_panel(
         || request.evaluation.is_empty()
         || request.evaluation.len() > MAX_EVALUATION_ROWS
     {
-        return Err("calibration A/B and evaluation cohorts must be nonempty and bounded".to_owned());
+        return Err(
+            "calibration A/B and evaluation cohorts must be nonempty and bounded".to_owned(),
+        );
     }
 
     let mut all_unit_ids = BTreeSet::new();
-    let mut group_a_rows =
-        BTreeMap::<GroupKey, Vec<&CalibrationFeatureRowV1>>::new();
-    let mut group_b_rows =
-        BTreeMap::<GroupKey, Vec<&CalibrationFeatureRowV1>>::new();
-    let mut evaluation_rows =
-        BTreeMap::<GroupKey, Vec<&EvaluationFeatureRowV1>>::new();
+    let mut group_a_rows = BTreeMap::<GroupKey, Vec<&CalibrationFeatureRowV1>>::new();
+    let mut group_b_rows = BTreeMap::<GroupKey, Vec<&CalibrationFeatureRowV1>>::new();
+    let mut evaluation_rows = BTreeMap::<GroupKey, Vec<&EvaluationFeatureRowV1>>::new();
 
     let mut source_cluster_digests = BTreeSet::new();
     for row in &request.calibration_a {
-        validate_digest(&row.source_cluster_sha256, "calibration-A source_cluster_sha256")?;
+        validate_digest(
+            &row.source_cluster_sha256,
+            "calibration-A source_cluster_sha256",
+        )?;
         if !source_cluster_digests.insert(row.source_cluster_sha256.as_str()) {
             return Err("source cluster digests must be disjoint across all splits".to_owned());
         }
@@ -909,7 +947,10 @@ pub fn calibrate_detector_panel(
             .push(row);
     }
     for row in &request.calibration_b {
-        validate_digest(&row.source_cluster_sha256, "calibration-B source_cluster_sha256")?;
+        validate_digest(
+            &row.source_cluster_sha256,
+            "calibration-B source_cluster_sha256",
+        )?;
         if !source_cluster_digests.insert(row.source_cluster_sha256.as_str()) {
             return Err("source cluster digests must be disjoint across all splits".to_owned());
         }
@@ -927,7 +968,10 @@ pub fn calibrate_detector_panel(
             .push(row);
     }
     for row in &request.evaluation {
-        validate_digest(&row.source_cluster_sha256, "evaluation source_cluster_sha256")?;
+        validate_digest(
+            &row.source_cluster_sha256,
+            "evaluation source_cluster_sha256",
+        )?;
         if !source_cluster_digests.insert(row.source_cluster_sha256.as_str()) {
             return Err("source cluster digests must be disjoint across all splits".to_owned());
         }
@@ -945,8 +989,7 @@ pub fn calibrate_detector_panel(
             .push(row);
     }
 
-    if group_a_rows.keys().collect::<BTreeSet<_>>()
-        != group_b_rows.keys().collect::<BTreeSet<_>>()
+    if group_a_rows.keys().collect::<BTreeSet<_>>() != group_b_rows.keys().collect::<BTreeSet<_>>()
     {
         return Err("calibration-A and calibration-B must cover the same groups".to_owned());
     }
@@ -956,16 +999,16 @@ pub fn calibrate_detector_panel(
         let rows_b = group_b_rows
             .get(key)
             .ok_or_else(|| "calibration-B group missing".to_owned())?;
-        if rows_a.len() < MIN_CALIBRATION_A_UNITS
-            || rows_b.len() < MIN_CALIBRATION_B_UNITS
-        {
-            return Err("each group requires at least two independent units in calibration A and B".to_owned());
+        if rows_a.len() < MIN_CALIBRATION_A_UNITS || rows_b.len() < MIN_CALIBRATION_B_UNITS {
+            return Err(
+                "each group requires at least two independent units in calibration A and B"
+                    .to_owned(),
+            );
         }
 
         let mut specs = request.detector_specs.clone();
         specs.sort_by(|left, right| left.detector_id.cmp(&right.detector_id));
-        let detector_ids: Vec<String> =
-            specs.iter().map(|spec| spec.detector_id.clone()).collect();
+        let detector_ids: Vec<String> = specs.iter().map(|spec| spec.detector_id.clone()).collect();
         let expected: BTreeSet<&str> = detector_ids.iter().map(String::as_str).collect();
         let mut directions = BTreeMap::new();
         let mut weights_permille = BTreeMap::new();
@@ -977,14 +1020,23 @@ pub fn calibrate_detector_panel(
         }
 
         for row in rows_a {
-            let ids: BTreeSet<&str> =
-                row.features.iter().map(|feature| feature.detector_id.as_str()).collect();
+            let ids: BTreeSet<&str> = row
+                .features
+                .iter()
+                .map(|feature| feature.detector_id.as_str())
+                .collect();
             if ids != expected {
-                return Err("calibration-A detector feature sets must exactly match the pinned registry".to_owned());
+                return Err(
+                    "calibration-A detector feature sets must exactly match the pinned registry"
+                        .to_owned(),
+                );
             }
             for feature in &row.features {
                 if directions.get(&feature.detector_id) != Some(&feature.direction) {
-                    return Err("calibration-A detector directions must match the pinned registry".to_owned());
+                    return Err(
+                        "calibration-A detector directions must match the pinned registry"
+                            .to_owned(),
+                    );
                 }
                 a_scores
                     .get_mut(&feature.detector_id)
@@ -1006,18 +1058,30 @@ pub fn calibrate_detector_panel(
             b_fused.push(combine_detector_p_values(&p_values)?);
         }
         group_calibrations_a.insert(key.clone(), calibration_a);
-        group_calibrations_b.insert(key.clone(), GroupCalibrationB {
-            fused_scores: b_fused,
-        });
+        group_calibrations_b.insert(
+            key.clone(),
+            GroupCalibrationB {
+                fused_scores: b_fused,
+            },
+        );
     }
 
     let mut score_rows = Vec::with_capacity(request.evaluation.len());
     let mut group_summaries = Vec::new();
     for (key, rows) in &evaluation_rows {
         let Some(calibration_a) = group_calibrations_a.get(key) else {
-            let labelled = rows.iter().filter(|row| row.ground_truth_contaminated.is_some()).count() as u64;
-            let clean = rows.iter().filter(|row| row.ground_truth_contaminated == Some(false)).count() as u64;
-            let contaminated = rows.iter().filter(|row| row.ground_truth_contaminated == Some(true)).count() as u64;
+            let labelled = rows
+                .iter()
+                .filter(|row| row.ground_truth_contaminated.is_some())
+                .count() as u64;
+            let clean = rows
+                .iter()
+                .filter(|row| row.ground_truth_contaminated == Some(false))
+                .count() as u64;
+            let contaminated = rows
+                .iter()
+                .filter(|row| row.ground_truth_contaminated == Some(true))
+                .count() as u64;
             for row in rows {
                 score_rows.push(SelectiveFusionScoreV1 {
                     evaluation_unit_id: row.evaluation_unit_id.clone(),
@@ -1062,9 +1126,18 @@ pub fn calibrate_detector_panel(
             continue;
         };
         let Some(calibration_b) = group_calibrations_b.get(key) else {
-            let labelled = rows.iter().filter(|row| row.ground_truth_contaminated.is_some()).count() as u64;
-            let clean = rows.iter().filter(|row| row.ground_truth_contaminated == Some(false)).count() as u64;
-            let contaminated = rows.iter().filter(|row| row.ground_truth_contaminated == Some(true)).count() as u64;
+            let labelled = rows
+                .iter()
+                .filter(|row| row.ground_truth_contaminated.is_some())
+                .count() as u64;
+            let clean = rows
+                .iter()
+                .filter(|row| row.ground_truth_contaminated == Some(false))
+                .count() as u64;
+            let contaminated = rows
+                .iter()
+                .filter(|row| row.ground_truth_contaminated == Some(true))
+                .count() as u64;
             for row in rows {
                 score_rows.push(SelectiveFusionScoreV1 {
                     evaluation_unit_id: row.evaluation_unit_id.clone(),
@@ -1107,8 +1180,7 @@ pub fn calibrate_detector_panel(
         let b_count = calibration_b.fused_scores.len() as u64;
         let min_p = 1.0 / (b_count as f64 + 1.0);
         let b_denominator = u128::from(b_count) + 1;
-        let alpha_resolvable =
-            u128::from(request.target_alpha_permille) * b_denominator >= 1_000;
+        let alpha_resolvable = u128::from(request.target_alpha_permille) * b_denominator >= 1_000;
 
         let mut flagged = 0_u64;
         let mut no_flag = 0_u64;
@@ -1121,52 +1193,57 @@ pub fn calibrate_detector_panel(
         let mut fn_count = 0_u64;
 
         for row in rows {
-            let ids: BTreeSet<&str> =
-                row.features.iter().map(|feature| feature.detector_id.as_str()).collect();
-            let expected: BTreeSet<&str> =
-                calibration_a.detector_ids.iter().map(String::as_str).collect();
+            let ids: BTreeSet<&str> = row
+                .features
+                .iter()
+                .map(|feature| feature.detector_id.as_str())
+                .collect();
+            let expected: BTreeSet<&str> = calibration_a
+                .detector_ids
+                .iter()
+                .map(String::as_str)
+                .collect();
             let matching_features = ids == expected
                 && row.features.iter().all(|feature| {
                     calibration_a.directions.get(&feature.detector_id) == Some(&feature.direction)
                 });
 
-            let (p_values, fused_score, final_rank, final_p, decision) =
-                if !matching_features {
+            let (p_values, fused_score, final_rank, final_p, decision) = if !matching_features {
+                abstained += 1;
+                (
+                    Vec::new(),
+                    None,
+                    None,
+                    None,
+                    SelectiveDecisionV1::AbstainDetectorFeatureMismatch,
+                )
+            } else {
+                let p_values = fused_nonconformity(&row.features, calibration_a)?;
+                let fused_score = combine_detector_p_values(&p_values)?;
+                let (numerator, denominator, p_value) =
+                    outer_conformal_p_value(&calibration_b.fused_scores, fused_score)?;
+                if !alpha_resolvable {
                     abstained += 1;
                     (
-                        Vec::new(),
-                        None,
-                        None,
-                        None,
-                        SelectiveDecisionV1::AbstainDetectorFeatureMismatch,
+                        p_values,
+                        Some(fused_score),
+                        Some((numerator, denominator)),
+                        Some(p_value),
+                        SelectiveDecisionV1::AbstainInsufficientCalibrationResolution,
                     )
                 } else {
-                    let p_values = fused_nonconformity(&row.features, calibration_a)?;
-                    let fused_score = combine_detector_p_values(&p_values)?;
-                    let (numerator, denominator, p_value) =
-                        outer_conformal_p_value(&calibration_b.fused_scores, fused_score)?;
-                    if !alpha_resolvable {
-                        abstained += 1;
-                        (
-                            p_values,
-                            Some(fused_score),
-                            Some((numerator, denominator)),
-                            Some(p_value),
-                            SelectiveDecisionV1::AbstainInsufficientCalibrationResolution,
-                        )
-                    } else {
-                        // Final decisions are assigned after BY correction across
-                        // all eligible test units in this group.
-                        no_flag += 1;
-                        (
-                            p_values,
-                            Some(fused_score),
-                            Some((numerator, denominator)),
-                            Some(p_value),
-                            SelectiveDecisionV1::NoContaminationFlag,
-                        )
-                    }
-                };
+                    // Final decisions are assigned after BY correction across
+                    // all eligible test units in this group.
+                    no_flag += 1;
+                    (
+                        p_values,
+                        Some(fused_score),
+                        Some((numerator, denominator)),
+                        Some(p_value),
+                        SelectiveDecisionV1::NoContaminationFlag,
+                    )
+                }
+            };
 
             if let Some(label) = row.ground_truth_contaminated {
                 labelled += 1;
@@ -1201,8 +1278,14 @@ pub fn calibrate_detector_panel(
             });
         }
 
-        let fpr = if clean == 0 { None } else { Some(fp as f64 * 1_000.0 / clean as f64) };
-        let tpr = if contaminated == 0 { None } else {
+        let fpr = if clean == 0 {
+            None
+        } else {
+            Some(fp as f64 * 1_000.0 / clean as f64)
+        };
+        let tpr = if contaminated == 0 {
+            None
+        } else {
             // Abstained and no-flag positive units are both not detected.
             Some((contaminated - fn_count) as f64 * 1_000.0 / contaminated as f64)
         };
@@ -1242,8 +1325,16 @@ pub fn calibrate_detector_panel(
     )?;
 
     score_rows.sort_by(|left, right| {
-        (&left.task_family, &left.model_regime, &left.evaluation_unit_id)
-            .cmp(&(&right.task_family, &right.model_regime, &right.evaluation_unit_id))
+        (
+            &left.task_family,
+            &left.model_regime,
+            &left.evaluation_unit_id,
+        )
+            .cmp(&(
+                &right.task_family,
+                &right.model_regime,
+                &right.evaluation_unit_id,
+            ))
     });
     group_summaries.sort_by(|left, right| {
         (&left.task_family, &left.model_regime).cmp(&(&right.task_family, &right.model_regime))
@@ -1344,8 +1435,16 @@ mod tests {
             task_family: family.to_owned(),
             model_regime: regime.to_owned(),
             features: vec![
-                feature("ftd", score_a, DetectorScoreDirectionV1::HigherMeansContaminated),
-                feature("dvd", score_b, DetectorScoreDirectionV1::HigherMeansContaminated),
+                feature(
+                    "ftd",
+                    score_a,
+                    DetectorScoreDirectionV1::HigherMeansContaminated,
+                ),
+                feature(
+                    "dvd",
+                    score_b,
+                    DetectorScoreDirectionV1::HigherMeansContaminated,
+                ),
             ],
         }
     }
@@ -1362,8 +1461,16 @@ mod tests {
             task_family: "mathematics".to_owned(),
             model_regime: "qwen-rlvr".to_owned(),
             features: vec![
-                feature("ftd", score_a, DetectorScoreDirectionV1::HigherMeansContaminated),
-                feature("dvd", score_b, DetectorScoreDirectionV1::HigherMeansContaminated),
+                feature(
+                    "ftd",
+                    score_a,
+                    DetectorScoreDirectionV1::HigherMeansContaminated,
+                ),
+                feature(
+                    "dvd",
+                    score_b,
+                    DetectorScoreDirectionV1::HigherMeansContaminated,
+                ),
             ],
             ground_truth_contaminated: label,
         }
@@ -1384,8 +1491,7 @@ mod tests {
                 feature_contract_sha256: "d".repeat(64),
             },
         ];
-        let detector_registry_sha256 =
-            compute_detector_registry_sha256(&detector_specs).unwrap();
+        let detector_registry_sha256 = compute_detector_registry_sha256(&detector_specs).unwrap();
         DetectorConformalFusionRequestV1 {
             schema: CONFORMAL_FUSION_REQUEST_SCHEMA.to_owned(),
             study_id: "study-001".to_owned(),
@@ -1495,9 +1601,17 @@ mod tests {
         let report = calibrate_detector_panel(&sample_request()).unwrap();
         for row in &report.score_rows {
             if row.detector_p_values.len() == 2 {
-                let total_weight: u16 = row.detector_p_values.iter().map(|p| p.weight_permille).sum();
+                let total_weight: u16 = row
+                    .detector_p_values
+                    .iter()
+                    .map(|p| p.weight_permille)
+                    .sum();
                 assert_eq!(total_weight, 1_000);
-                let sum: f64 = row.detector_p_values.iter().map(|p| p.weighted_contribution).sum();
+                let sum: f64 = row
+                    .detector_p_values
+                    .iter()
+                    .map(|p| p.weighted_contribution)
+                    .sum();
                 assert!((sum - row.fused_nonconformity.unwrap()).abs() < 1.0e-12);
             }
         }
