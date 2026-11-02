@@ -2269,32 +2269,35 @@ mod tests {
 
     #[test]
     fn evsi_rejects_invalid_probabilities_costs_and_action_shapes() {
-        let bad_probability = info_option(
+        let mut bad_probability = info_option(
             "bad",
             0.0,
-            vec![0.4, 0.4],
+            vec![0.5, 0.5],
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         );
+        bad_probability.outcome_probabilities = vec![0.4, 0.4];
         assert_eq!(
             evaluate_information_acquisition(&[bad_probability]),
             Err(IntervalError::InvalidOutcomeProbabilities)
         );
-        let bad_cost = info_option(
+        let mut bad_cost = info_option(
             "bad_cost",
-            -1.0,
+            0.0,
             vec![0.5, 0.5],
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         );
+        bad_cost.acquisition_cost = -1.0;
         assert_eq!(
             evaluate_information_acquisition(&[bad_cost]),
             Err(IntervalError::InvalidInformationOption)
         );
-        let bad_shape = info_option(
+        let mut bad_shape = info_option(
             "bad_shape",
             0.0,
             vec![0.5, 0.5],
-            vec![vec![1.0], vec![0.0, 1.0]],
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]],
         );
+        bad_shape.conditional_action_utilities[0].pop();
         assert_eq!(
             evaluate_information_acquisition(&[bad_shape]),
             Err(IntervalError::InvalidInformationOption)
