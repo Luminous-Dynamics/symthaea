@@ -814,6 +814,25 @@ mod tests {
     }
 
     #[test]
+    fn cost_normalized_scores_reject_overflow() {
+        let tiny_cost = f64::from_bits(1);
+        let candidate = binary_experiment("tiny-cost", tiny_cost, 0.9, 0.1);
+        assert_eq!(
+            evaluate_candidate(&[0.5, 0.5], &candidate),
+            Err(DesignError::NumericalInstability)
+        );
+
+        let problem = DecisionProblem {
+            actions: vec!["a".into(), "b".into()],
+            utilities_by_hypothesis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        assert_eq!(
+            evaluate_decision_value(&[0.5, 0.5], &candidate, &problem),
+            Err(DesignError::NumericalInstability)
+        );
+    }
+
+    #[test]
     fn invalid_decision_utility_shape_and_non_finite_values_reject() {
         let candidate = binary_experiment("candidate", 1.0, 0.9, 0.1);
         let bad_shape = DecisionProblem {
