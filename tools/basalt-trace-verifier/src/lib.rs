@@ -33,14 +33,14 @@ pub struct Generator {
     pub ordering_rule: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Authority {
     pub authority_id: String,
     pub incarnation_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct InitialState {
     pub authority_revision: String,
@@ -85,14 +85,14 @@ pub struct Operation {
     pub expected_result: ExpectedResult,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Scope {
     pub source_id: String,
     pub log_origin_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub expected_source_generation: Option<u64>,
@@ -133,7 +133,7 @@ pub struct Fault {
     pub action: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WitnessObservation {
     pub witness_id: String,
@@ -146,7 +146,7 @@ pub struct WitnessObservation {
     pub signed_record_digest: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FinalObservation {
     pub authority_revision: String,
@@ -157,7 +157,7 @@ pub struct FinalObservation {
     pub accepted_receipts: Vec<AcceptedReceipt>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AcceptedReceipt {
     pub receipt_id: String,
