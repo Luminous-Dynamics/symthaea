@@ -233,7 +233,7 @@ fn ceil_div(numerator: u128, denominator: u128) -> Result<u128, ComputeRiskError
     }
     let quotient = numerator / denominator;
     let remainder = numerator % denominator;
-    quotient.checked_add(u128::from(remainder != 0))
+    quotient.checked_add(if remainder != 0 { 1 } else { 0 })
         .ok_or_else(|| fail("division", "ceiling division overflow"))
 }
 
