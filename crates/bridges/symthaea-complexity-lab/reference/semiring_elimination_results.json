@@ -1,0 +1,53 @@
+{
+  "suite": "Exact semiring variable elimination oracle",
+  "passed": 6,
+  "total": 6,
+  "cases": [
+    {
+      "name": "boolean_feasibility",
+      "value": true,
+      "orders_checked": 3,
+      "passed": true
+    },
+    {
+      "name": "triangle_independent_set_count",
+      "value": 4,
+      "orders_checked": 3,
+      "passed": true
+    },
+    {
+      "name": "triangle_maxcut_maxcount",
+      "value": [
+        2,
+        6
+      ],
+      "orders_checked": 3,
+      "passed": true
+    },
+    {
+      "name": "two_objective_pareto_count",
+      "value": {
+        "(0, 1)": 1,
+        "(1, 0)": 1
+      },
+      "orders_checked": 2,
+      "passed": true
+    },
+    {
+      "name": "triangle_maxcut_full_profile",
+      "value": {
+        "(0,)": 2,
+        "(2,)": 6
+      },
+      "orders_checked": 3,
+      "passed": true
+    },
+    {
+      "name": "unconstrained_variables",
+      "value": 24,
+      "orders_checked": 1,
+      "passed": true
+    }
+  ],
+  "claim_boundary": "Independent Python direct-enumeration and bucket-elimination comparison only; does not compile Rust or establish asymptotic performance."
+}
