@@ -80,6 +80,15 @@ pub struct PairedEffectBounds {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PairedWorldSetCoverage {
     pub universe_id: String,
+    pub query_definition_sha256: String,
+    pub metric_id: String,
+    pub unit_id: String,
+    pub decision_threshold: f64,
+    pub materiality_threshold: f64,
+    pub source_volume_id: String,
+    pub base_graph_snapshot_sha256: String,
+    pub hypothetical_result_graph_snapshot_sha256: String,
+    pub candidate_patch_sha256: String,
     pub universe_manifest_sha256: String,
     pub admissibility_policy_sha256: String,
     pub enumeration_input_sha256: String,
@@ -257,6 +266,11 @@ pub enum QueryImpactError {
     DuplicateExpectedWorldId { query_id: String, scenario_id: String, world_id: String },
     ExpectedWorldSetMismatch { query_id: String, scenario_id: String },
     WorldSetCoverageNotVerified { query_id: String, scenario_id: String },
+    PairedWorldCoverageBindingMismatch {
+        query_id: String,
+        scenario_id: String,
+        field: &'static str,
+    },
     NoQueryScenarios,
 }
 
@@ -342,6 +356,9 @@ impl fmt::Display for QueryImpactError {
             Self::WorldSetCoverageNotVerified { query_id, scenario_id } => {
                 write!(f, "query {query_id} scenario {scenario_id} world-set closure receipt is not independently verified")
             }
+            Self::PairedWorldCoverageBindingMismatch { query_id, scenario_id, field } => {
+                write!(f, "query {query_id} scenario {scenario_id} world-set closure receipt is not bound to {field}")
+            }
             Self::NoQueryScenarios => write!(f, "candidate has no query scenario evaluations"),
         }
     }
@@ -382,6 +399,22 @@ pub fn analyze_candidate(
 
     for evaluation in &input.query_evaluations {
         validate_evaluation(evaluation)?;
+        if let Some(coverage) = &evaluation.paired_world_set_coverage {
+            for (field, covered, actual) in [
+                ("source volume", coverage.source_volume_id.as_str(), input.source_volume_id.as_str()),
+                ("base graph snapshot", coverage.base_graph_snapshot_sha256.as_str(), input.base_graph_snapshot_sha256.as_str()),
+                ("hypothetical graph snapshot", coverage.hypothetical_result_graph_snapshot_sha256.as_str(), input.hypothetical_result_graph_snapshot_sha256.as_str()),
+                ("candidate patch", coverage.candidate_patch_sha256.as_str(), input.candidate_patch_sha256.as_str()),
+            ] {
+                if covered != actual {
+                    return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                        query_id: evaluation.query_id.clone(),
+                        scenario_id: evaluation.scenario_id.clone(),
+                        field,
+                    });
+                }
+            }
+        }
         if !query_scenario_pairs.insert((
             evaluation.query_id.clone(),
             evaluation.scenario_id.clone(),
@@ -778,6 +811,56 @@ fn validate_evaluation(
         evaluation.hypothetical_after_edit.upper,
     )?;
     if let Some(coverage) = &evaluation.paired_world_set_coverage {
+        validate_sha("coverage query definition", &coverage.query_definition_sha256)?;
+        validate_id("coverage metric", &coverage.metric_id)?;
+        validate_id("coverage metric unit", &coverage.unit_id)?;
+        validate_id("coverage source volume", &coverage.source_volume_id)?;
+        for (kind, digest) in [
+            ("coverage base graph snapshot", &coverage.base_graph_snapshot_sha256),
+            ("coverage hypothetical graph snapshot", &coverage.hypothetical_result_graph_snapshot_sha256),
+            ("coverage candidate patch", &coverage.candidate_patch_sha256),
+        ] {
+            validate_sha(kind, digest)?;
+        }
+        if coverage.query_definition_sha256 != evaluation.query_definition_sha256 {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "query definition",
+            });
+        }
+        if coverage.metric_id != evaluation.metric_id {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "metric",
+            });
+        }
+        if coverage.unit_id != evaluation.unit_id {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "metric unit",
+            });
+        }
+        if !coverage.decision_threshold.is_finite()
+            || evaluation.decision_threshold != Some(coverage.decision_threshold)
+        {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "decision threshold",
+            });
+        }
+        if !coverage.materiality_threshold.is_finite()
+            || coverage.materiality_threshold.to_bits() != evaluation.materiality_threshold.to_bits()
+        {
+            return Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                query_id: evaluation.query_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                field: "materiality threshold",
+            });
+        }
         if !coverage.closure_verified {
             return Err(QueryImpactError::WorldSetCoverageNotVerified {
                 query_id: evaluation.query_id.clone(),
@@ -1042,6 +1125,15 @@ mod tests {
     fn world_set_coverage(expected_world_ids: &[&str]) -> PairedWorldSetCoverage {
         PairedWorldSetCoverage {
             universe_id: "finite-universe-v1".to_owned(),
+            query_definition_sha256: SHA_A.to_owned(),
+            metric_id: "pathway-metric".to_owned(),
+            unit_id: "normalized-strength".to_owned(),
+            decision_threshold: 0.5,
+            materiality_threshold: 0.1,
+            source_volume_id: "volume-1".to_owned(),
+            base_graph_snapshot_sha256: SHA_B.to_owned(),
+            hypothetical_result_graph_snapshot_sha256: SHA_C.to_owned(),
+            candidate_patch_sha256: SHA_A.to_owned(),
             universe_manifest_sha256: SHA_A.to_owned(),
             admissibility_policy_sha256: SHA_B.to_owned(),
             enumeration_input_sha256: SHA_C.to_owned(),
