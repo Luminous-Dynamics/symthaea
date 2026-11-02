@@ -45,7 +45,9 @@ pub use action_conditioned::{
     ActionConditionedVisualPredictor, ActionDrawCoupling, ActionForecastBank,
     ActionForecastRequest, ActionForecastSample, ActionVisualForecastScore,
     ActionDescriptor, BranchVisualObservation, ForecastExpiryReason,
-    ForecastObservationResult, ObservedVisualBelief,
+    ForecastObservationResult, ObservedVisualBelief, UnobservedForecastExpiry,
+    compute_action_forecast_bank_sha256, compute_action_manifest_sha256,
+    compute_joint_draw_manifest_sha256,
 };
 pub use attention::SurpriseMap;
 pub use bridge::{
