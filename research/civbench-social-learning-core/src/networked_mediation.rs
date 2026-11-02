@@ -230,6 +230,11 @@ pub struct NetworkedAgent {
     /// Stable family identifier. Zero means no non-zero skill is held.
     pub lineage_id: u64,
     pub source: KnowledgeSource,
+    pub individual_innovated: bool,
+    pub demonstration_observed: bool,
+    pub strategy_acquisition_succeeded: bool,
+    pub acquisition_source: Option<KnowledgeSource>,
+    /// Selected teacher, even when acquired skill did not improve active quality.
     pub parent_index: Option<usize>,
 }
 
@@ -245,6 +250,7 @@ pub struct NetworkedGenerationMetrics {
     pub mean_quality: f64,
     pub max_quality: u16,
     pub seed_lineage_prevalence: f64,
+    pub knowledge_coverage: f64,
     pub unique_nonzero_lineages: usize,
     pub lineage_hhi: f64,
     pub effective_lineage_diversity: f64,
@@ -253,6 +259,7 @@ pub struct NetworkedGenerationMetrics {
     pub mediated_adoptions: usize,
     pub observations: usize,
     pub successful_acquisitions: usize,
+    pub individual_innovations: usize,
 }
 
 impl NetworkedGeneration {
@@ -262,14 +269,15 @@ impl NetworkedGeneration {
         let max_quality = self.agents.iter().map(|agent| agent.quality).max().unwrap_or(0);
         let seed_count = self.agents.iter().filter(|agent| agent.lineage_id == 1).count();
         let individual_innovations = self.agents.iter()
-            .filter(|agent| agent.source == KnowledgeSource::IndividualInnovation).count();
+            .filter(|agent| agent.individual_innovated).count();
         let peer_adoptions = self.agents.iter()
             .filter(|agent| agent.source == KnowledgeSource::PeerSocial).count();
         let mediated_adoptions = self.agents.iter()
             .filter(|agent| agent.source == KnowledgeSource::AlgorithmicMediation).count();
         let observations = self.agents.iter()
-            .filter(|agent| agent.parent_index.is_some()).count();
-        let successful_acquisitions = peer_adoptions + mediated_adoptions;
+            .filter(|agent| agent.demonstration_observed).count();
+        let successful_acquisitions = self.agents.iter()
+            .filter(|agent| agent.strategy_acquisition_succeeded).count();
 
         let mut lineage_counts = BTreeMap::<u64, usize>::new();
         for agent in &self.agents {
@@ -278,12 +286,13 @@ impl NetworkedGeneration {
             }
         }
         let unique_nonzero_lineages = lineage_counts.len();
-        let lineage_hhi = if n == 0 {
+        let knowledge_count = self.agents.iter().filter(|agent| agent.quality > 0).count();
+        let lineage_hhi = if knowledge_count == 0 {
             0.0
         } else {
             lineage_counts.values()
                 .map(|count| {
-                    let share = *count as f64 / n as f64;
+                    let share = *count as f64 / knowledge_count as f64;
                     share * share
                 })
                 .sum()
@@ -294,6 +303,7 @@ impl NetworkedGeneration {
             mean_quality: if n == 0 { 0.0 } else { total_quality as f64 / n as f64 },
             max_quality,
             seed_lineage_prevalence: if n == 0 { 0.0 } else { seed_count as f64 / n as f64 },
+            knowledge_coverage: if n == 0 { 0.0 } else { knowledge_count as f64 / n as f64 },
             unique_nonzero_lineages,
             lineage_hhi,
             effective_lineage_diversity: if lineage_hhi > 0.0 { 1.0 / lineage_hhi } else { 0.0 },
@@ -302,6 +312,7 @@ impl NetworkedGeneration {
             mediated_adoptions,
             observations,
             successful_acquisitions,
+            individual_innovations,
         }
     }
 }
@@ -355,17 +366,27 @@ impl DeterministicRng {
     }
 }
 
-fn pick_highest_scoring(
-    candidates: &[usize],
-    previous: &[NetworkedAgent],
-    noise_std: f64,
+fn choose_softmax_candidate(
+    scored: &[(usize, f64)],
+    temperature: f64,
     rng: &mut DeterministicRng,
 ) -> Option<usize> {
-    candidates.iter().copied().max_by(|&a, &b| {
-        let score_a = f64::from(previous[a].quality) + noise_std * rng.normal();
-        let score_b = f64::from(previous[b].quality) + noise_std * rng.normal();
-        score_a.total_cmp(&score_b).then_with(|| b.cmp(&a))
-    })
+    let maximum = scored.iter().map(|(_, score)| *score).fold(f64::NEG_INFINITY, f64::max);
+    let weights: Vec<f64> = scored.iter()
+        .map(|(_, score)| ((*score - maximum) / temperature).exp())
+        .collect();
+    let total: f64 = weights.iter().sum();
+    if !total.is_finite() || total <= 0.0 {
+        return scored.first().map(|(index, _)| *index);
+    }
+    let mut draw = rng.uniform() * total;
+    for ((index, _), weight) in scored.iter().zip(weights) {
+        if draw < weight {
+            return Some(*index);
+        }
+        draw -= weight;
+    }
+    scored.last().map(|(index, _)| *index)
 }
 
 /// Run a fixed social graph over successive generations. The recommender sees
@@ -390,6 +411,10 @@ pub fn simulate_networked_mediation(
             quality: 0,
             lineage_id: 0,
             source: KnowledgeSource::None,
+            individual_innovated: false,
+            demonstration_observed: false,
+            strategy_acquisition_succeeded: false,
+            acquisition_source: None,
             parent_index: None,
         };
         config.population_size
@@ -430,6 +455,10 @@ pub fn simulate_networked_mediation(
             } else {
                 KnowledgeSource::None
             };
+            let mut individual_innovated = innovates;
+            let mut demonstration_observed = false;
+            let mut strategy_acquisition_succeeded = false;
+            let mut acquisition_source = None;
             let mut parent_index = None;
 
             let uses_recommender = rng.bernoulli(config.mediation_fraction);
@@ -442,7 +471,10 @@ pub fn simulate_networked_mediation(
                 )
             };
 
-            if !candidate_pool.is_empty() && rng.bernoulli(config.observation_probability) {
+            if !candidate_pool.is_empty() {
+                demonstration_observed = rng.bernoulli(config.observation_probability);
+            }
+            if demonstration_observed {
                 let mut scored: Vec<(usize, f64)> = candidate_pool.iter().copied()
                     .map(|candidate| {
                         (
@@ -456,13 +488,19 @@ pub fn simulate_networked_mediation(
                 if uses_recommender {
                     scored.truncate(config.recommender_candidate_count);
                 }
-                // Select the highest-scoring candidate in the available local
-                // or recommender shortlist. The shortlist exposes rank pressure
-                // separately from downstream acquisition and corruption.
-                if let Some((teacher_index, _)) = scored.first().copied() {
+
+                let teacher_index = if uses_recommender {
+                    choose_softmax_candidate(&scored, config.recommender_temperature, &mut rng)
+                } else {
+                    scored.first().map(|(index, _)| *index)
+                };
+                if let Some(teacher_index) = teacher_index {
                     if previous[teacher_index].quality > 0
                         && rng.bernoulli(config.acquisition_probability)
                     {
+                        strategy_acquisition_succeeded = true;
+                        acquisition_source = Some(selected_source);
+                        parent_index = Some(teacher_index);
                         let transmitted_quality = if rng.bernoulli(config.corruption_probability) {
                             previous[teacher_index].quality.saturating_sub(config.corruption_loss)
                         } else {
@@ -472,7 +510,6 @@ pub fn simulate_networked_mediation(
                             quality = transmitted_quality;
                             lineage_id = previous[teacher_index].lineage_id;
                             source = selected_source;
-                            parent_index = Some(teacher_index);
                         }
                     }
                 }
@@ -482,6 +519,10 @@ pub fn simulate_networked_mediation(
                 quality,
                 lineage_id,
                 source,
+                individual_innovated,
+                demonstration_observed,
+                strategy_acquisition_succeeded,
+                acquisition_source,
                 parent_index,
             });
         }
