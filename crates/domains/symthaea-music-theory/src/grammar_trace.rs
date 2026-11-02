@@ -561,9 +561,9 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "compact-fugue-planner".into(),
                 transformation: None,
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
             obligations.push(ObligationAssertion {
                 obligation_id: "subject-transformation-and-final-combination".into(),
                 from: Some(AssertedObligationState::Created),
@@ -574,9 +574,9 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "compact-fugue-engine".into(),
                 transformation: Some("inversion-stretto-augmentation".into()),
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
         }
         GrammarPlanEvidence::GrooveCycle(plan) => {
             for item in &plan.obligations {
@@ -587,9 +587,9 @@ pub fn build_grammar_trace(
                     evidence: Vec::new(),
                     responsible_pass: "groove-cycle-planner".into(),
                     transformation: None,
-                
-                definition: None,
-                source_evidence: Vec::new(),});
+                    definition: None,
+                    source_evidence: Vec::new(),
+                });
                 obligations.push(ObligationAssertion {
                     obligation_id: item.code.clone(),
                     from: Some(AssertedObligationState::Created),
@@ -604,9 +604,9 @@ pub fn build_grammar_trace(
                         .collect(),
                     responsible_pass: "groove-cycle-realizer".into(),
                     transformation: None,
-                
-                definition: None,
-                source_evidence: Vec::new(),});
+                    definition: None,
+                    source_evidence: Vec::new(),
+                });
             }
         }
         GrammarPlanEvidence::AdditiveProcess(_) => {
@@ -617,9 +617,9 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "additive-process-planner".into(),
                 transformation: None,
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
             obligations.push(ObligationAssertion {
                 obligation_id: "audible-grow-shrink-rule".into(),
                 from: Some(AssertedObligationState::Created),
@@ -630,9 +630,9 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "additive-process-realizer".into(),
                 transformation: Some("prefix-trajectory-realized".into()),
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
         }
         GrammarPlanEvidence::ModalArc(_) => {
             obligations.push(ObligationAssertion {
@@ -642,9 +642,9 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "modal-arc-planner".into(),
                 transformation: None,
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
             obligations.push(ObligationAssertion {
                 obligation_id: "ordered-modal-stages".into(),
                 from: Some(AssertedObligationState::Created),
@@ -655,9 +655,9 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "modal-arc-realizer".into(),
                 transformation: Some("exposition-pulse-intensification".into()),
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
         }
         GrammarPlanEvidence::CallResponse(_) => {
             obligations.push(ObligationAssertion {
@@ -667,9 +667,9 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "call-response-planner".into(),
                 transformation: None,
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
             obligations.push(ObligationAssertion {
                 obligation_id: "call-answered-by-response".into(),
                 from: Some(AssertedObligationState::Created),
@@ -680,9 +680,9 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "call-response-engine".into(),
                 transformation: Some("inverted-response-per-call".into()),
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
         }
         GrammarPlanEvidence::JazzChorus(_) => {
             obligations.push(ObligationAssertion {
@@ -692,9 +692,9 @@ pub fn build_grammar_trace(
                 evidence: Vec::new(),
                 responsible_pass: "jazz-chorus-planner".into(),
                 transformation: None,
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
             obligations.push(ObligationAssertion {
                 obligation_id: "chorus-trajectory-develops".into(),
                 from: Some(AssertedObligationState::Created),
@@ -705,9 +705,9 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "jazz-chorus-engine".into(),
                 transformation: Some("role-transformed-theme-per-chorus".into()),
-            
                 definition: None,
-                source_evidence: Vec::new(),});
+                source_evidence: Vec::new(),
+            });
         }
         GrammarPlanEvidence::Compatibility { .. } => {}
     }
