@@ -4,7 +4,7 @@
 //! artifact. The verifier checks its byte count, SHA-256, finiteness and
 //! summary statistics. It does not establish biological validity.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
@@ -89,12 +89,7 @@ fn near(left: f64, right: f64) -> bool {
     (left - right).abs() <= NUMERIC_TOLERANCE * left.abs().max(right.abs()).max(1.0)
 }
 
-fn push_missing_hash(
-    value: &Value,
-    path: &[&str],
-    label: &str,
-    errors: &mut Vec<String>,
-) {
+fn push_missing_hash(value: &Value, path: &[&str], label: &str, errors: &mut Vec<String>) {
     match str_at(value, path) {
         Some(hash) if is_sha256(hash) => {}
         Some(_) => errors.push(format!("{label}: expected lowercase 64-hex SHA-256")),
@@ -129,8 +124,7 @@ fn scan_raw_state(bytes: &[u8], encoding: &str) -> Result<ScanSummary, String> {
             f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as f64
         } else {
             f64::from_le_bytes([
-                chunk[0], chunk[1], chunk[2], chunk[3],
-                chunk[4], chunk[5], chunk[6], chunk[7],
+                chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
             ])
         };
         if !value.is_finite() {
@@ -163,10 +157,19 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
     let realized_stddev = number_at(value, &[path[0], path[1], "realized_stddev"]);
     let sample = str_at(value, &[path[0], path[1], "sample_sha256"]);
 
-    let (Some(requested_mean), Some(requested_stddev), Some(applied),
-        Some(realized_mean), Some(realized_stddev)) =
-        (requested_mean, requested_stddev, applied, realized_mean, realized_stddev)
-    else {
+    let (
+        Some(requested_mean),
+        Some(requested_stddev),
+        Some(applied),
+        Some(realized_mean),
+        Some(realized_stddev),
+    ) = (
+        requested_mean,
+        requested_stddev,
+        applied,
+        realized_mean,
+        realized_stddev,
+    ) else {
         errors.push(format!("{label}: missing or non-numeric noise declaration"));
         return;
     };
@@ -178,13 +181,17 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
         || !realized_stddev.is_finite()
         || realized_stddev < 0.0
     {
-        errors.push(format!("{label}: noise statistics must be finite and standard deviations non-negative"));
+        errors.push(format!(
+            "{label}: noise statistics must be finite and standard deviations non-negative"
+        ));
         return;
     }
 
     let requested = requested_mean != 0.0 || requested_stddev > 0.0;
     if requested && !applied {
-        errors.push(format!("{label}: non-zero requested noise is marked unapplied"));
+        errors.push(format!(
+            "{label}: non-zero requested noise is marked unapplied"
+        ));
     }
     if requested {
         match sample {
@@ -194,12 +201,10 @@ fn verify_noise_channel(value: &Value, path: &[&str], label: &str, errors: &mut 
         if requested_stddev > 0.0 && realized_stddev <= 0.0 {
             errors.push(format!("{label}: requested non-zero standard deviation has zero realized standard deviation"));
         }
-    } else if applied
-        || realized_mean != 0.0
-        || realized_stddev != 0.0
-        || sample.is_some()
-    {
-        errors.push(format!("{label}: zero-noise request must not report an applied sample"));
+    } else if applied || realized_mean != 0.0 || realized_stddev != 0.0 || sample.is_some() {
+        errors.push(format!(
+            "{label}: zero-noise request must not report an applied sample"
+        ));
     }
 }
 
@@ -210,7 +215,9 @@ fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
     }
     for component in path.components() {
         if !matches!(component, Component::Normal(_)) {
-            return Err("raw-state path may not contain '.', '..', root or prefix components".to_owned());
+            return Err(
+                "raw-state path may not contain '.', '..', root or prefix components".to_owned(),
+            );
         }
     }
     if value.trim().is_empty() {
@@ -252,7 +259,10 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     match tier {
         Some("synthetic_known_answer") => {
             if ceiling != Some("synthetic_only") || source_kind != Some("synthetic") {
-                errors.push("synthetic evidence requires synthetic source and synthetic_only claim ceiling".to_owned());
+                errors.push(
+                    "synthetic evidence requires synthetic source and synthetic_only claim ceiling"
+                        .to_owned(),
+                );
             }
             if str_at(value, &["source", "rights_state"]) != Some("synthetic") {
                 errors.push("synthetic source must declare rights_state=synthetic".to_owned());
@@ -260,7 +270,10 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
         }
         Some("in_silico_intervention") => {
             if ceiling != Some("model_counterfactual_only") || source_kind != Some("in_silico") {
-                errors.push("in-silico evidence requires model_counterfactual_only claim ceiling and in_silico source".to_owned());
+                errors.push(
+                    "in-silico evidence requires model_counterfactual_only claim ceiling and in_silico source"
+                        .to_owned(),
+                );
             }
             if str_at(value, &["source", "rights_state"]) != Some("documented_permitted") {
                 errors.push("in-silico source must declare documented_permitted rights".to_owned());
@@ -273,38 +286,107 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
 
     match str_at(value, &["source", "code_commit_sha"]) {
         Some(commit) if is_git_sha(commit) => {}
-        _ => errors.push("source.code_commit_sha: missing or malformed immutable source commit".to_owned()),
+        _ => errors.push(
+            "source.code_commit_sha: missing or malformed immutable source commit".to_owned(),
+        ),
     }
-    push_missing_hash(value, &["source", "source_file_sha256"], "source.source_file_sha256", &mut errors);
-    push_missing_hash(value, &["simulator", "equation_manifest_sha256"], "simulator.equation_manifest_sha256", &mut errors);
-    push_missing_hash(value, &["simulator", "parameter_manifest_sha256"], "simulator.parameter_manifest_sha256", &mut errors);
-    push_missing_hash(value, &["solver", "dependency_lock_sha256"], "solver.dependency_lock_sha256", &mut errors);
-    push_missing_hash(value, &["numerics", "raw_output_manifest_sha256"], "numerics.raw_output_manifest_sha256", &mut errors);
-    push_missing_hash(value, &["perturbation", "protocol_sha256"], "perturbation.protocol_sha256", &mut errors);
-    push_missing_hash(value, &["perturbation", "waveform_sha256"], "perturbation.waveform_sha256", &mut errors);
-    push_missing_hash(value, &["artifacts", "resolved_config_sha256"], "artifacts.resolved_config_sha256", &mut errors);
-    push_missing_hash(value, &["artifacts", "environment_sha256"], "artifacts.environment_sha256", &mut errors);
-    push_missing_hash(value, &["artifacts", "logs_sha256"], "artifacts.logs_sha256", &mut errors);
+    push_missing_hash(
+        value,
+        &["source", "source_file_sha256"],
+        "source.source_file_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["simulator", "equation_manifest_sha256"],
+        "simulator.equation_manifest_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["simulator", "parameter_manifest_sha256"],
+        "simulator.parameter_manifest_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["solver", "dependency_lock_sha256"],
+        "solver.dependency_lock_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["numerics", "raw_output_manifest_sha256"],
+        "numerics.raw_output_manifest_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["perturbation", "protocol_sha256"],
+        "perturbation.protocol_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["perturbation", "waveform_sha256"],
+        "perturbation.waveform_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["artifacts", "resolved_config_sha256"],
+        "artifacts.resolved_config_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["artifacts", "environment_sha256"],
+        "artifacts.environment_sha256",
+        &mut errors,
+    );
+    push_missing_hash(
+        value,
+        &["artifacts", "logs_sha256"],
+        "artifacts.logs_sha256",
+        &mut errors,
+    );
 
     if at(value, &["perturbation", "stimulus_applied"]).and_then(Value::as_bool) != Some(true) {
         errors.push("perturbation.stimulus_applied: complete run requires the declared stimulus to be applied".to_owned());
     }
-    verify_noise_channel(value, &["perturbation", "input_noise"], "perturbation.input_noise", &mut errors);
-    verify_noise_channel(value, &["perturbation", "weight_noise"], "perturbation.weight_noise", &mut errors);
+    verify_noise_channel(
+        value,
+        &["perturbation", "input_noise"],
+        "perturbation.input_noise",
+        &mut errors,
+    );
+    verify_noise_channel(
+        value,
+        &["perturbation", "weight_noise"],
+        "perturbation.weight_noise",
+        &mut errors,
+    );
 
     let solver_status = str_at(value, &["simulation", "solver_status"]);
     if solver_status != Some("success") {
-        errors.push(format!("simulation.solver_status: expected success, found {solver_status:?}"));
+        errors.push(format!(
+            "simulation.solver_status: expected success, found {solver_status:?}"
+        ));
     }
     let start = number_at(value, &["simulation", "start_time_seconds"]);
     let end = number_at(value, &["simulation", "end_time_seconds"]);
-    if start.zip(end).is_none_or(|(a, b)| !a.is_finite() || !b.is_finite() || b <= a) {
+    if start
+        .zip(end)
+        .is_none_or(|(a, b)| !a.is_finite() || !b.is_finite() || b <= a)
+    {
         errors.push("simulation time interval must be finite and end after start".to_owned());
     }
     let expected_saved = uint_at(value, &["simulation", "expected_saved_timepoints"]);
     let actual_saved = uint_at(value, &["simulation", "actual_saved_timepoints"]);
     if expected_saved.is_none() || actual_saved != expected_saved {
-        errors.push("simulation.actual_saved_timepoints must equal expected_saved_timepoints".to_owned());
+        errors.push(
+            "simulation.actual_saved_timepoints must equal expected_saved_timepoints".to_owned(),
+        );
     }
     let state_dimension = uint_at(value, &["simulation", "state_dimension"]);
     if state_dimension.is_none_or(|count| count == 0) {
@@ -326,8 +408,12 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     }
 
     let dtype = str_at(value, &["solver", "dtype"]);
-    let artifact = value.get("numerics").and_then(|v| v.get("raw_state_artifact"));
-    let encoding = artifact.and_then(|v| v.get("encoding")).and_then(Value::as_str);
+    let artifact = value
+        .get("numerics")
+        .and_then(|v| v.get("raw_state_artifact"));
+    let encoding = artifact
+        .and_then(|v| v.get("encoding"))
+        .and_then(Value::as_str);
     match (dtype, encoding) {
         (Some("float32"), Some("f32le")) | (Some("float64"), Some("f64le")) => {}
         _ => errors.push("solver.dtype and numerics.raw_state_artifact.encoding must agree (float32/f32le or float64/f64le)".to_owned()),
@@ -335,7 +421,10 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     if str_at(value, &["numerics", "raw_state_artifact", "capture_stage"])
         != Some("direct_solver_output_before_postprocessing")
     {
-        errors.push("raw_state_artifact.capture_stage must be direct_solver_output_before_postprocessing".to_owned());
+        errors.push(
+            "raw_state_artifact.capture_stage must be direct_solver_output_before_postprocessing"
+                .to_owned(),
+        );
     }
     if !str_at(value, &["numerics", "raw_state_artifact", "relative_path"])
         .is_some_and(|p| safe_relative_path(p).is_ok())
@@ -344,7 +433,10 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     }
 
     let Some(bytes) = raw_state_bytes else {
-        errors.push("raw pre-postprocessing state artifact bytes were not supplied to the verifier".to_owned());
+        errors.push(
+            "raw pre-postprocessing state artifact bytes were not supplied to the verifier"
+                .to_owned(),
+        );
         return errors;
     };
 
@@ -358,15 +450,26 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
         &["numerics", "raw_state_sha256"][..],
     ] {
         if str_at(value, path) != Some(computed_sha.as_str()) {
-            errors.push(format!("{}: digest does not match raw state bytes", path.join(".")));
+            errors.push(format!(
+                "{}: digest does not match raw state bytes",
+                path.join(".")
+            ));
         }
     }
 
     if let (Some(state_dim), Some(timepoints), Some(encoding)) =
         (state_dimension, actual_saved, encoding)
     {
-        let item_size = if encoding == "f32le" { 4u64 } else if encoding == "f64le" { 8u64 } else { 0u64 };
-        let expected_bytes = state_dim.checked_mul(timepoints).and_then(|n| n.checked_mul(item_size));
+        let item_size = if encoding == "f32le" {
+            4u64
+        } else if encoding == "f64le" {
+            8u64
+        } else {
+            0u64
+        };
+        let expected_bytes = state_dim
+            .checked_mul(timepoints)
+            .and_then(|n| n.checked_mul(item_size));
         if expected_bytes != Some(bytes.len() as u64) {
             errors.push("raw-state byte count does not equal state_dimension × actual_saved_timepoints × bytes_per_value".to_owned());
         }
@@ -375,23 +478,46 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
     if let Some(encoding) = encoding {
         match scan_raw_state(bytes, encoding) {
             Ok(scan) => {
-                if uint_at(value, &["numerics", "non_finite_value_count"]) != Some(scan.non_finite_count as u64) {
-                    errors.push("numerics.non_finite_value_count does not match raw-state scan".to_owned());
+                if uint_at(value, &["numerics", "non_finite_value_count"])
+                    != Some(scan.non_finite_count as u64)
+                {
+                    errors.push(
+                        "numerics.non_finite_value_count does not match raw-state scan".to_owned(),
+                    );
                 }
                 if scan.non_finite_count != 0 {
-                    errors.push(format!("raw state contains {} non-finite values", scan.non_finite_count));
+                    errors.push(format!(
+                        "raw state contains {} non-finite values",
+                        scan.non_finite_count
+                    ));
                 }
-                if at(value, &["numerics", "raw_state_finite_scan_performed"]).and_then(Value::as_bool) != Some(true) {
+                if at(value, &["numerics", "raw_state_finite_scan_performed"])
+                    .and_then(Value::as_bool)
+                    != Some(true)
+                {
                     errors.push("numerics.raw_state_finite_scan_performed must be true".to_owned());
                 }
-                if !number_at(value, &["numerics", "minimum_raw_value"]).is_some_and(|x| near(x, scan.minimum)) {
-                    errors.push("numerics.minimum_raw_value does not match raw-state scan".to_owned());
+                if !number_at(value, &["numerics", "minimum_raw_value"])
+                    .is_some_and(|x| near(x, scan.minimum))
+                {
+                    errors.push(
+                        "numerics.minimum_raw_value does not match raw-state scan".to_owned(),
+                    );
                 }
-                if !number_at(value, &["numerics", "maximum_raw_value"]).is_some_and(|x| near(x, scan.maximum)) {
-                    errors.push("numerics.maximum_raw_value does not match raw-state scan".to_owned());
+                if !number_at(value, &["numerics", "maximum_raw_value"])
+                    .is_some_and(|x| near(x, scan.maximum))
+                {
+                    errors.push(
+                        "numerics.maximum_raw_value does not match raw-state scan".to_owned(),
+                    );
                 }
-                if !number_at(value, &["numerics", "maximum_absolute_raw_value"]).is_some_and(|x| near(x, scan.maximum_absolute)) {
-                    errors.push("numerics.maximum_absolute_raw_value does not match raw-state scan".to_owned());
+                if !number_at(value, &["numerics", "maximum_absolute_raw_value"])
+                    .is_some_and(|x| near(x, scan.maximum_absolute))
+                {
+                    errors.push(
+                        "numerics.maximum_absolute_raw_value does not match raw-state scan"
+                            .to_owned(),
+                    );
                 }
                 if let (Some(state_dim), Some(timepoints)) = (state_dimension, actual_saved) {
                     if scan.count as u64 != state_dim.saturating_mul(timepoints) {
@@ -413,7 +539,9 @@ fn verify_complete(value: &Value, raw_state_bytes: Option<&[u8]>) -> Vec<String>
         }
     }
 
-    if number_at(value, &["resources", "wall_time_seconds"]).is_none_or(|n| !n.is_finite() || n <= 0.0) {
+    if number_at(value, &["resources", "wall_time_seconds"])
+        .is_none_or(|n| !n.is_finite() || n <= 0.0)
+    {
         errors.push("resources.wall_time_seconds must be positive".to_owned());
     }
     if uint_at(value, &["resources", "peak_memory_bytes"]).is_none_or(|n| n == 0) {
@@ -438,7 +566,10 @@ fn verify_manifest(value: &Value, raw_state_bytes: Option<&[u8]>) -> Report {
             let correct = matches!(
                 (tier, ceiling),
                 (Some("synthetic_known_answer"), Some("synthetic_only"))
-                    | (Some("in_silico_intervention"), Some("model_counterfactual_only"))
+                    | (
+                        Some("in_silico_intervention"),
+                        Some("model_counterfactual_only")
+                    )
             );
             if !correct {
                 return Report {
@@ -450,7 +581,10 @@ fn verify_manifest(value: &Value, raw_state_bytes: Option<&[u8]>) -> Report {
             Report {
                 disposition: "INCOMPLETE",
                 errors: Vec::new(),
-                warnings: vec!["Incomplete solver receipt is not a numerical pass or biological result.".to_owned()],
+                warnings: vec![
+                    "Incomplete solver receipt is not a numerical pass or biological result."
+                        .to_owned(),
+                ],
             }
         }
         Some("failed" | "invalid") => Report {
@@ -469,7 +603,11 @@ fn verify_manifest(value: &Value, raw_state_bytes: Option<&[u8]>) -> Report {
                     warnings: vec!["Numerical execution contract passed; model and biological validity are not established.".to_owned()],
                 }
             } else {
-                Report { disposition: "INVALID", errors, warnings: Vec::new() }
+                Report {
+                    disposition: "INVALID",
+                    errors,
+                    warnings: Vec::new(),
+                }
             }
         }
         _ => Report {
@@ -482,7 +620,10 @@ fn verify_manifest(value: &Value, raw_state_bytes: Option<&[u8]>) -> Report {
 
 fn main() {
     let default_manifest = PathBuf::from(EXAMPLE);
-    let manifest_path = env::args_os().nth(1).map(PathBuf::from).unwrap_or(default_manifest);
+    let manifest_path = env::args_os()
+        .nth(1)
+        .map(PathBuf::from)
+        .unwrap_or(default_manifest);
     let manifest_text = match fs::read_to_string(&manifest_path) {
         Ok(text) => text,
         Err(error) => {
@@ -536,7 +677,10 @@ mod tests {
     use super::*;
 
     fn f64_bytes(values: &[f64]) -> Vec<u8> {
-        values.iter().flat_map(|value| value.to_le_bytes()).collect()
+        values
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect()
     }
 
     fn digest(label: &str) -> String {
@@ -611,7 +755,8 @@ mod tests {
     fn incomplete_public_example_is_not_promoted() {
         let example: Value = serde_json::from_str(include_str!(
             "../../../../docs/neuroscience/CPG_NUMERICAL_RUN_RECEIPT_EXAMPLE_V1.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let report = verify_manifest(&example, None);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.errors.is_empty());
@@ -625,7 +770,12 @@ mod tests {
         fixture["numerics"]["non_finite_value_count"] = json!(0);
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("non-finite")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("non-finite"))
+        );
     }
 
     #[test]
@@ -636,7 +786,12 @@ mod tests {
         fixture["numerics"]["post_solver_sanitized_value_count"] = json!(1);
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("post_solver_sanitized")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("post_solver_sanitized"))
+        );
     }
 
     #[test]
@@ -647,7 +802,12 @@ mod tests {
         fixture["numerics"]["post_solver_clipped_value_count"] = json!(1);
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("post_solver_clipped")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("post_solver_clipped"))
+        );
     }
 
     #[test]
@@ -658,7 +818,12 @@ mod tests {
         fixture["simulation"]["solver_status"] = json!("max_steps_reached");
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("solver_status")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("solver_status"))
+        );
     }
 
     #[test]
@@ -669,7 +834,12 @@ mod tests {
         fixture["perturbation"]["input_noise"]["requested_stddev"] = json!(0.1);
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("non-zero requested noise")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("non-zero requested noise"))
+        );
     }
 
     #[test]
@@ -691,7 +861,12 @@ mod tests {
         fixture["numerics"]["raw_state_artifact"]["sha256"] = json!(digest("wrong"));
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("digest does not match")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("digest does not match"))
+        );
     }
 
     #[test]
@@ -702,7 +877,12 @@ mod tests {
         fixture["simulation"]["state_dimension"] = json!(4);
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("state_dimension")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("state_dimension"))
+        );
     }
 
     #[test]
@@ -717,10 +897,8 @@ mod tests {
     fn symlink_escape_from_receipt_directory_is_rejected() {
         use std::os::unix::fs::symlink;
 
-        let root = std::env::temp_dir().join(format!(
-            "cpg-receipt-path-boundary-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("cpg-receipt-path-boundary-{}", std::process::id()));
         let receipt_dir = root.join("receipt");
         let outside_dir = root.join("outside");
         let _ = fs::remove_dir_all(&root);
@@ -746,7 +924,12 @@ mod tests {
         fixture["numerics"]["raw_state_artifact"]["encoding"] = json!("f32le");
         let report = verify_manifest(&fixture, Some(&bytes));
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("dtype and")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("dtype and"))
+        );
     }
 
     #[test]
