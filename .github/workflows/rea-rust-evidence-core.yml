@@ -71,6 +71,8 @@ jobs:
         working-directory: rea-upstream
         run: |
           npm install --global "npm@$REA_NPM_VERSION"
+          test "$(node --version)" = "v$REA_NODE_VERSION"
+          test "$(npm --version)" = "$REA_NPM_VERSION"
           npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Execute the pinned upstream Evidence source
