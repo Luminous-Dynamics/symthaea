@@ -58,7 +58,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Stationary negative/control stream for nominal behavior and false adaptation."
+      "notes": "Stationary negative/control stream for nominal behavior and false adaptation.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "abrupt_location_shift",
@@ -102,7 +105,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Exact change at step 6000; tests immediate undercoverage and recalibration lag."
+      "notes": "Exact change at step 6000; tests immediate undercoverage and recalibration lag.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "piecewise_gradual_drift",
@@ -174,7 +180,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Piecewise-linear location transition; change points mark drift phase boundaries, not necessarily abrupt jumps."
+      "notes": "Piecewise-linear location transition; change points mark drift phase boundaries, not necessarily abrupt jumps.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "recurring_regimes",
@@ -260,7 +269,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Tests remembering and forgetting when an earlier regime reappears."
+      "notes": "Tests remembering and forgetting when an earlier regime reappears.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "variance_only_shift",
@@ -304,7 +316,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Mean stays fixed while scale increases 2.5x."
+      "notes": "Mean stays fixed while scale increases 2.5x.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "tail_contamination_shift",
@@ -348,7 +363,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Tests tail coverage separately from mean and variance summaries."
+      "notes": "Tests tail coverage separately from mean and variance summaries.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "covariate_conditional_drift",
@@ -392,7 +410,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Marginal residual scale is similar, but a conditional feature relationship reverses; report subgroup coverage."
+      "notes": "Marginal residual scale is similar, but a conditional feature relationship reverses; report subgroup coverage.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "delayed_outcome_feedback",
@@ -436,7 +457,10 @@
       ],
       "label_revisions": [],
       "source_outages": [],
-      "notes": "Every outcome is hidden for 25 decision steps; the candidate must update only when feedback arrives."
+      "notes": "Every outcome is hidden for 25 decision steps; the candidate must update only when feedback arrives.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "superseded_outcome_feedback",
@@ -493,7 +517,10 @@
         }
       ],
       "source_outages": [],
-      "notes": "Later feedback supersedes or retracts prior target assertions; only future calibration state may react after revision knowledge time."
+      "notes": "Later feedback supersedes or retracts prior target assertions; only future calibration state may react after revision knowledge time.",
+      "required_source_ids": [
+        1
+      ]
     },
     {
       "id": "asynchronous_source_outage",
@@ -532,7 +559,11 @@
           "recovery_delay_steps": 40
         }
       ],
-      "notes": "Two required asynchronous sources; source 1 is unavailable during a fixed interval and resumes with a 40-step delay."
+      "notes": "Two required asynchronous sources; source 1 is unavailable during a fixed interval and resumes with a 40-step delay.",
+      "required_source_ids": [
+        1,
+        2
+      ]
     }
   ],
   "methods": [
@@ -652,5 +683,12 @@
       "name": "TIME_ICML_2026",
       "url": "https://proceedings.mlr.press/v306/qiao26g.html"
     }
+  ],
+  "seed_ids": [
+    11,
+    23,
+    47,
+    83,
+    20261102
   ]
 }
