@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-rea-investigation-planner"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Fail-closed, evidence-grounded Bayesian next-experiment selection"
+
+[lib]
+path = "src/lib.rs"
