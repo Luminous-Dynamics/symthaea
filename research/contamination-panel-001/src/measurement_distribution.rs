@@ -1049,9 +1049,10 @@ pub fn analyze_measurement_distribution(
         runs_by_model.get(&model.model_id).copied().unwrap_or(0)
             >= protocol.evaluation.minimum_runs_per_model as u64
     });
-    let primary_cells: Vec<&DistributionProfileCellV1> = profile_cells
+    let primary_cells: Vec<DistributionProfileCellV1> = profile_cells
         .iter()
         .filter(|cell| !axes[cell.axis_id.as_str()].auxiliary_only)
+        .cloned()
         .collect();
     let coverage_met = primary_cells.iter().all(|cell| {
         cell.coverage_permille >= protocol.reporting.minimum_coverage_permille as f64
@@ -1144,7 +1145,7 @@ pub fn analyze_measurement_distribution(
         rank_stability_status: if rank_met { "qualified_or_not_required" } else { "non_estimable" }.to_owned(),
         profile_cells,
         rank_stability,
-        model_summaries: build_model_summaries(&models, &primary_cells.iter().map(|cell| (*cell).clone()).collect::<Vec<_>>()),
+        model_summaries: build_model_summaries(&models, &primary_cells),
         issues,
         claim_boundary: "This report describes score distributions and paired robustness deltas only over the supplied, digest-bound measurement protocol, instance manifest, models, runs and observations. It does not prove that generated items or perturbations preserve the intended construct, that the declared model/evaluator identities are authenticated, or that the registered distribution equals deployment. Confidence intervals are computed over the declared independent-unit means; items, perturbation variants and repeated calls do not create independent training replicates. This analysis performs no hypothesis tests; the declared Holm policy applies if a separate registered test family reports p-values.".to_owned(),
     })
