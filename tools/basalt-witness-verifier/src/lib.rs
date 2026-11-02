@@ -1244,6 +1244,72 @@ mod tests {
         ).is_err());
     }
 
+
+    #[test]
+    fn checkpoint_chain_rejects_incarnation_substitution_and_policy_rollback() {
+        let seeds = [test_seed(91), test_seed(92), test_seed(93), test_seed(94)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let digest = checkpoint_digest(&genesis).unwrap();
+
+        let mut changed_incarnation = checkpoint_fixture(
+            "1",
+            "1",
+            state1,
+            Some(digest.clone()),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        changed_incarnation.authority_incarnation_id = "incarnation-rollback".to_string();
+        assert!(verify_checkpoint_chain(
+            &[signed_checkpoint(&genesis, &seeds[..3]), signed_checkpoint(&changed_incarnation, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).is_err());
+
+        let mut policy_rollback = checkpoint_fixture(
+            "1",
+            "1",
+            state1,
+            Some(digest),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        policy_rollback.policy_revision = "0".to_string();
+        assert!(verify_checkpoint_chain(
+            &[signed_checkpoint(&genesis, &seeds[..3]), signed_checkpoint(&policy_rollback, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).is_err());
+    }
+
+    #[test]
+    fn checkpoint_policy_digest_cannot_change_without_revision_advance() {
+        let seeds = [test_seed(101), test_seed(102), test_seed(103), test_seed(104)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let digest = checkpoint_digest(&genesis).unwrap();
+        let mut next = checkpoint_fixture(
+            "1",
+            "1",
+            state1,
+            Some(digest),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        next.policy_digest = "sha256:9999999999999999999999999999999999999999999999999999999999999999".to_string();
+        assert!(verify_checkpoint_chain(
+            &[signed_checkpoint(&genesis, &seeds[..3]), signed_checkpoint(&next, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).is_err());
+    }
+
     #[test]
     fn checkpoint_sequence_gaps_and_missing_transition_bundles_are_rejected() {
         let seeds = [test_seed(81), test_seed(82), test_seed(83), test_seed(84)];
