@@ -45,8 +45,10 @@ pub struct ScenarioViewLikelihood {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewOption {
     pub view_id: String,
-    /// Evidence-acquisition cost expressed in the same loss units as DecisionAction.
+    /// Evidence-acquisition cost expressed in cost_unit_id.
     pub cost_units: f64,
+    /// Must exactly match DecisionProblem.loss_unit_id.
+    pub cost_unit_id: String,
     /// The upstream manifest must attest task compatibility before including this view.
     pub allowed_task_routes: Vec<String>,
     pub leakage_safe: bool,
@@ -57,6 +59,8 @@ pub struct ViewOption {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DecisionProblem {
     pub task_route: String,
+    /// Declared unit for DecisionAction losses and ViewOption acquisition costs.
+    pub loss_unit_id: String,
     /// Stable state IDs. All probability and loss vectors use this ordering.
     pub state_ids: Vec<String>,
     pub actions: Vec<DecisionAction>,
@@ -138,6 +142,11 @@ pub enum VoiError {
         state_index: usize,
     },
     InvalidCost(String),
+    UnitMismatch {
+        view_id: String,
+        expected_unit: String,
+        actual_unit: String,
+    },
     LeakageForbidden(String),
     ViewForbiddenForTask {
         view_id: String,
@@ -194,6 +203,14 @@ impl fmt::Display for VoiError {
                 "invalid loss for action {action_id} at state index {state_index}"
             ),
             Self::InvalidCost(id) => write!(f, "invalid acquisition cost for view {id}"),
+            Self::UnitMismatch {
+                view_id,
+                expected_unit,
+                actual_unit,
+            } => write!(
+                f,
+                "cost unit mismatch for view {view_id}: expected {expected_unit}, got {actual_unit}"
+            ),
             Self::LeakageForbidden(id) => {
                 write!(f, "view {id} is not certified leakage-safe for this task")
             }
@@ -308,6 +325,7 @@ pub fn choose_next_view(problem: &DecisionProblem) -> Result<ViewDecision, VoiEr
 
 fn validate_problem(problem: &DecisionProblem) -> Result<(), VoiError> {
     validate_id("task route", &problem.task_route)?;
+    validate_id("loss unit", &problem.loss_unit_id)?;
     if problem.state_ids.is_empty() {
         return Err(VoiError::EmptyCollection("state_ids"));
     }
@@ -374,6 +392,14 @@ fn validate_problem(problem: &DecisionProblem) -> Result<(), VoiError> {
 
     for view in &problem.view_options {
         validate_id("view", &view.view_id)?;
+        validate_id("view cost unit", &view.cost_unit_id)?;
+        if view.cost_unit_id != problem.loss_unit_id {
+            return Err(VoiError::UnitMismatch {
+                view_id: view.view_id.clone(),
+                expected_unit: problem.loss_unit_id.clone(),
+                actual_unit: view.cost_unit_id.clone(),
+            });
+        }
         if !view.cost_units.is_finite() || view.cost_units < 0.0 {
             return Err(VoiError::InvalidCost(view.view_id.clone()));
         }
@@ -682,6 +708,7 @@ mod tests {
     ) -> DecisionProblem {
         DecisionProblem {
             task_route: "false_merge_identification".to_owned(),
+            loss_unit_id: "risk_units".to_owned(),
             state_ids: vec!["error".to_owned(), "no_error".to_owned()],
             actions: vec![
                 DecisionAction {
@@ -708,6 +735,7 @@ mod tests {
         ViewOption {
             view_id: view_id.to_owned(),
             cost_units: cost,
+            cost_unit_id: "risk_units".to_owned(),
             allowed_task_routes: allowed_tasks.iter().map(|value| (*value).to_owned()).collect(),
             leakage_safe: safe,
             scenario_likelihoods,
@@ -937,6 +965,34 @@ mod tests {
         assert_eq!(
             choose_next_view(&problem),
             Err(VoiError::LeakageForbidden("em_best".to_owned()))
+        );
+    }
+
+    #[test]
+    fn rejects_costs_expressed_in_a_different_unit_than_decision_loss() {
+        let mut problem = standard_problem(
+            vec![scenario("base", 0.5)],
+            vec![view(
+                "perfect",
+                0.1,
+                true,
+                &["false_merge_identification"],
+                vec![likelihood(
+                    "base",
+                    &["yes", "no"],
+                    vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                )],
+            )],
+        );
+        problem.view_options[0].cost_unit_id = "milliseconds".to_owned();
+
+        assert_eq!(
+            choose_next_view(&problem),
+            Err(VoiError::UnitMismatch {
+                view_id: "perfect".to_owned(),
+                expected_unit: "risk_units".to_owned(),
+                actual_unit: "milliseconds".to_owned(),
+            })
         );
     }
 
