@@ -1,0 +1,242 @@
+{
+  "schema": "symthaea.policy_rigidity_controls_request.v1",
+  "study_id": "study-001",
+  "benchmark_id": "rigidity-controls-v1",
+  "benchmark_version": "v1",
+  "model_regime": "qwen-rlvr",
+  "model_checkpoint_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+  "tokenizer_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "prompt_harness_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+  "runtime_environment_sha256": "3535353535353535353535353535353535353535353535353535353535353535",
+  "calibration_protocol_sha256": "3636363636363636363636363636363636363636363636363636363636363636",
+  "probe_registry_sha256": "33a52df821122d2d9396ff5e59d5e6362ee0e245694937070d4fa8f283776cab",
+  "target_alpha_permille": 500,
+  "probe_specs": [
+    {
+      "probe_id": "response_conditioned_self_critique",
+      "intervention": "response_conditioned_self_critique",
+      "prompt_contract_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+      "generation_contract_sha256": "1414141414141414141414141414141414141414141414141414141414141414"
+    },
+    {
+      "probe_id": "prompt_only_unfamiliar_method",
+      "intervention": "prompt_only_unfamiliar_method",
+      "prompt_contract_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+      "generation_contract_sha256": "1515151515151515151515151515151515151515151515151515151515151515"
+    },
+    {
+      "probe_id": "semantic_preserving_paraphrase",
+      "intervention": "semantic_preserving_paraphrase",
+      "prompt_contract_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+      "generation_contract_sha256": "1616161616161616161616161616161616161616161616161616161616161616"
+    },
+    {
+      "probe_id": "constraint_preserving_reparameterization",
+      "intervention": "constraint_preserving_reparameterization",
+      "prompt_contract_sha256": "0404040404040404040404040404040404040404040404040404040404040404",
+      "generation_contract_sha256": "1717171717171717171717171717171717171717171717171717171717171717"
+    },
+    {
+      "probe_id": "alternate_valid_method",
+      "intervention": "alternate_valid_method",
+      "prompt_contract_sha256": "0505050505050505050505050505050505050505050505050505050505050505",
+      "generation_contract_sha256": "1818181818181818181818181818181818181818181818181818181818181818"
+    }
+  ],
+  "clean_controls": [
+    {
+      "calibration_unit_id": "c1",
+      "source_cluster_sha256": "4141414141414141414141414141414141414141414141414141414141414141",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "single_or_few_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "task_recipe_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.30000000000000004,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": null
+      }
+    },
+    {
+      "calibration_unit_id": "c2",
+      "source_cluster_sha256": "4242424242424242424242424242424242424242424242424242424242424242",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "single_or_few_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "task_recipe_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.4,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": null
+      }
+    },
+    {
+      "calibration_unit_id": "c3",
+      "source_cluster_sha256": "4343434343434343434343434343434343434343434343434343434343434343",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "single_or_few_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "task_recipe_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.5,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": null
+      }
+    },
+    {
+      "calibration_unit_id": "m1",
+      "source_cluster_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "multiple_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "task_recipe_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.30000000000000004,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": 0.4
+      }
+    },
+    {
+      "calibration_unit_id": "m2",
+      "source_cluster_sha256": "4545454545454545454545454545454545454545454545454545454545454545",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "multiple_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "task_recipe_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.4,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": 0.4
+      }
+    },
+    {
+      "calibration_unit_id": "m3",
+      "source_cluster_sha256": "4646464646464646464646464646464646464646464646464646464646464646",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "multiple_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "task_recipe_sha256": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.5,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": 0.4
+      }
+    }
+  ],
+  "evaluation": [
+    {
+      "evaluation_unit_id": "e1",
+      "source_cluster_sha256": "5151515151515151515151515151515151515151515151515151515151515151",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "single_or_few_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c",
+      "task_recipe_sha256": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d",
+      "exposure_label": "known_clean",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.9,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": null
+      }
+    },
+    {
+      "evaluation_unit_id": "e2",
+      "source_cluster_sha256": "5252525252525252525252525252525252525252525252525252525252525252",
+      "task_family": "mathematics",
+      "difficulty_band": "medium",
+      "path_multiplicity": {
+        "classification": "multiple_valid_paths",
+        "adjudication_report_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+        "reviewer_panel_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+        "reviewer_count": 3,
+        "agreement_permille": 1000
+      },
+      "probe_receipt_manifest_sha256": "2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c",
+      "task_recipe_sha256": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d",
+      "exposure_label": "known_exposed",
+      "scores": {
+        "baseline_mean_entropy_nats": 0.8,
+        "response_conditioned_similarity": 0.9,
+        "prompt_only_similarity": 0.4,
+        "semantic_paraphrase_similarity": 0.4,
+        "constraint_reparameterization_similarity": 0.4,
+        "alternate_valid_method_similarity": 0.4
+      }
+    }
+  ]
+}
