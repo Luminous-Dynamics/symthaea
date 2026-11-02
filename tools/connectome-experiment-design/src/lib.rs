@@ -381,12 +381,16 @@ pub fn evaluate_candidate(
         return Err(DesignError::NumericalInstability);
     }
 
+    let information_gain_bits_per_cost = information_gain / candidate.cost;
+    if !information_gain_bits_per_cost.is_finite() {
+        return Err(DesignError::NumericalInstability);
+    }
     Ok(InformationGainScore {
         prior_entropy_bits: prior_entropy,
         expected_posterior_entropy_bits: expected_posterior_entropy,
         information_gain_bits: information_gain,
         cost: candidate.cost,
-        information_gain_bits_per_cost: information_gain / candidate.cost,
+        information_gain_bits_per_cost,
     })
 }
 
@@ -626,12 +630,16 @@ pub fn evaluate_decision_value(
         return Err(DesignError::NumericalInstability);
     }
 
+    let expected_value_per_cost = evsi / candidate.cost;
+    if !expected_value_per_cost.is_finite() {
+        return Err(DesignError::NumericalInstability);
+    }
     Ok(DecisionValueScore {
         prior_best_expected_utility: prior_best,
         expected_best_utility_after_experiment: expected_post_experiment_best,
         expected_value_of_sample_information: evsi,
         cost: candidate.cost,
-        expected_value_per_cost: evsi / candidate.cost,
+        expected_value_per_cost,
     })
 }
 
