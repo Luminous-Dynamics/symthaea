@@ -344,7 +344,7 @@ pub fn simulate(
                 };
 
                 let is_missing = if world == StressWorld::OutcomeDependentMissingness {
-                    let probability = if is_signal && response { 0.95 } else { 0.05 };
+                    let probability = if is_signal && response { 0.99 } else { 0.05 };
                     missing_rng.uniform() < probability
                 } else {
                     false
