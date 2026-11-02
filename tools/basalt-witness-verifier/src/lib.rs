@@ -1038,4 +1038,241 @@ mod tests {
             .is_err()
         );
     }
+
+    fn checkpoint_fixture(
+        sequence: &str,
+        revision: &str,
+        state_digest: &str,
+        previous: Option<String>,
+        bundle: Option<String>,
+    ) -> CheckpointPayload {
+        CheckpointPayload {
+            record_type: "basalt.authority.witness-checkpoint".to_string(),
+            schema_version: 1,
+            authority_id: "basalt-test-authority".to_string(),
+            authority_incarnation_id: "incarnation-1".to_string(),
+            authority_epoch: "1".to_string(),
+            sequence: sequence.to_string(),
+            authority_revision: revision.to_string(),
+            state_schema: "basalt.authority-state.v1".to_string(),
+            state_digest: state_digest.to_string(),
+            policy_revision: "1".to_string(),
+            policy_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            previous_checkpoint_digest: previous,
+            witness_set_id: "basalt-test-witness-set".to_string(),
+            witness_set_version: "1".to_string(),
+            trust_root_version: "1".to_string(),
+            transition_bundle_digest: bundle,
+        }
+    }
+
+    fn signed_checkpoint(payload: &CheckpointPayload, seeds: &[[u8; 32]]) -> Vec<u8> {
+        let canonical = serde_json_canonicalizer::to_vec(payload).unwrap();
+        sign_payload(CHECKPOINT_PAYLOAD_TYPE, &canonical, seeds)
+    }
+
+    #[test]
+    fn checkpoint_chain_and_challenge_bound_fresh_head_verify_end_to_end() {
+        let seeds = [test_seed(31), test_seed(32), test_seed(33), test_seed(34)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let genesis_digest = checkpoint_digest(&genesis).unwrap();
+        let next = checkpoint_fixture(
+            "1",
+            "1",
+            state1,
+            Some(genesis_digest),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        let envelopes = vec![
+            signed_checkpoint(&genesis, &seeds[..3]),
+            signed_checkpoint(&next, &seeds[..3]),
+        ];
+        let chain = verify_checkpoint_chain(&envelopes, &trust_bytes, &pin).unwrap();
+        assert_eq!(chain.checkpoints.len(), 2);
+        assert_eq!(chain.head.payload, next);
+
+        let nonce = [42u8; 32];
+        let response = HeadResponsePayload {
+            record_type: "basalt.authority.witness-head-response".to_string(),
+            schema_version: 1,
+            challenge_nonce: URL_SAFE_NO_PAD.encode(nonce),
+            authority_id: next.authority_id.clone(),
+            authority_incarnation_id: next.authority_incarnation_id.clone(),
+            authority_epoch: next.authority_epoch.clone(),
+            witness_set_id: next.witness_set_id.clone(),
+            witness_set_version: next.witness_set_version.clone(),
+            trust_root_version: next.trust_root_version.clone(),
+            head_sequence: next.sequence.clone(),
+            head_checkpoint_digest: chain.head.digest.clone(),
+            head_authority_revision: next.authority_revision.clone(),
+            head_state_digest: next.state_digest.clone(),
+            head_policy_digest: next.policy_digest.clone(),
+        };
+        let response_bytes = serde_json_canonicalizer::to_vec(&response).unwrap();
+        let response_envelope = sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, &response_bytes, &seeds[..3]);
+        let accepted = verify_challenge_bound_head(
+            &response_envelope,
+            &trust_bytes,
+            &pin,
+            &nonce,
+            &chain,
+        )
+        .unwrap();
+        assert_eq!(accepted.len(), 3);
+
+        let observation = RestoreObservation {
+            authority_id: next.authority_id.clone(),
+            authority_incarnation_id: next.authority_incarnation_id.clone(),
+            authority_epoch: next.authority_epoch.clone(),
+            authority_revision: next.authority_revision.clone(),
+            state_digest: next.state_digest.clone(),
+            policy_revision: next.policy_revision.clone(),
+            policy_digest: next.policy_digest.clone(),
+        };
+        assert_eq!(
+            assess_restored_store(&observation, &chain.head.payload).unwrap(),
+            RestoreVerdict::Fresh
+        );
+    }
+
+    #[test]
+    fn old_snapshot_is_rejected_against_newer_witness_head() {
+        let seeds = [test_seed(41), test_seed(42), test_seed(43), test_seed(44)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let genesis_digest = checkpoint_digest(&genesis).unwrap();
+        let head = checkpoint_fixture(
+            "1",
+            "9",
+            state1,
+            Some(genesis_digest),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        let chain = verify_checkpoint_chain(
+            &[signed_checkpoint(&genesis, &seeds[..3]), signed_checkpoint(&head, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).unwrap();
+
+        let old = RestoreObservation {
+            authority_id: head.authority_id.clone(),
+            authority_incarnation_id: head.authority_incarnation_id.clone(),
+            authority_epoch: head.authority_epoch.clone(),
+            authority_revision: "2".to_string(),
+            state_digest: state0.to_string(),
+            policy_revision: "1".to_string(),
+            policy_digest: head.policy_digest.clone(),
+        };
+        assert!(matches!(
+            assess_restored_store(&old, &chain.head.payload).unwrap(),
+            RestoreVerdict::RejectedAntiRollback { .. }
+        ));
+    }
+
+    #[test]
+    fn checkpoint_chain_rejects_a_broken_predecessor_even_with_valid_signatures() {
+        let seeds = [test_seed(51), test_seed(52), test_seed(53), test_seed(54)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let broken = checkpoint_fixture(
+            "1",
+            "1",
+            state1,
+            Some("sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string()),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        let envelopes = vec![
+            signed_checkpoint(&genesis, &seeds[..3]),
+            signed_checkpoint(&broken, &seeds[..3]),
+        ];
+        assert!(verify_checkpoint_chain(&envelopes, &trust_bytes, &pin).is_err());
+    }
+
+    #[test]
+    fn challenge_bound_head_response_cannot_be_replayed_for_another_nonce() {
+        let seeds = [test_seed(61), test_seed(62), test_seed(63), test_seed(64)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let checkpoint = checkpoint_fixture("0", "0", state, None, None);
+        let chain = verify_checkpoint_chain(
+            &[signed_checkpoint(&checkpoint, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).unwrap();
+        let nonce = [71u8; 32];
+        let response = HeadResponsePayload {
+            record_type: "basalt.authority.witness-head-response".to_string(),
+            schema_version: 1,
+            challenge_nonce: URL_SAFE_NO_PAD.encode(nonce),
+            authority_id: checkpoint.authority_id.clone(),
+            authority_incarnation_id: checkpoint.authority_incarnation_id.clone(),
+            authority_epoch: checkpoint.authority_epoch.clone(),
+            witness_set_id: checkpoint.witness_set_id.clone(),
+            witness_set_version: checkpoint.witness_set_version.clone(),
+            trust_root_version: checkpoint.trust_root_version.clone(),
+            head_sequence: checkpoint.sequence.clone(),
+            head_checkpoint_digest: chain.head.digest.clone(),
+            head_authority_revision: checkpoint.authority_revision.clone(),
+            head_state_digest: checkpoint.state_digest.clone(),
+            head_policy_digest: checkpoint.policy_digest.clone(),
+        };
+        let response_bytes = serde_json_canonicalizer::to_vec(&response).unwrap();
+        let envelope = sign_payload(HEAD_RESPONSE_PAYLOAD_TYPE, &response_bytes, &seeds[..3]);
+        let mut replay_nonce = nonce;
+        replay_nonce[0] ^= 1;
+        assert!(verify_challenge_bound_head(
+            &envelope,
+            &trust_bytes,
+            &pin,
+            &replay_nonce,
+            &chain,
+        ).is_err());
+    }
+
+    #[test]
+    fn checkpoint_sequence_gaps_and_missing_transition_bundles_are_rejected() {
+        let seeds = [test_seed(81), test_seed(82), test_seed(83), test_seed(84)];
+        let trust = build_trust(&seeds);
+        let trust_bytes = trust_bytes(&trust);
+        let pin = sha256_prefixed(&trust_bytes);
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let genesis_digest = checkpoint_digest(&genesis).unwrap();
+        let gap = checkpoint_fixture(
+            "2",
+            "2",
+            state1,
+            Some(genesis_digest.clone()),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        assert!(verify_checkpoint_chain(
+            &[signed_checkpoint(&genesis, &seeds[..3]), signed_checkpoint(&gap, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).is_err());
+
+        let missing_bundle = checkpoint_fixture("1", "1", state1, Some(genesis_digest), None);
+        assert!(verify_checkpoint_chain(
+            &[signed_checkpoint(&genesis, &seeds[..3]), signed_checkpoint(&missing_bundle, &seeds[..3])],
+            &trust_bytes,
+            &pin,
+        ).is_err());
+    }
+
 }
