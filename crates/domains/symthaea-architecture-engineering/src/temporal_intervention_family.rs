@@ -492,6 +492,25 @@ fn temporal_stream_id(contrast_id: &str, contrast_digest: &str, axis: TemporalIn
     format!("temporal-intervention-v1/{contrast_id}/{contrast_digest}/{}", axis.as_str())
 }
 
+/// Derive the preregistered stream ID for a known contrast and exposure axis.
+/// The family is revalidated before any stream reference is returned.
+pub fn temporal_intervention_stream_id(
+    family: &TemporalInterventionFamily,
+    contrast_id: &str,
+    axis: TemporalInterventionAxis,
+) -> Result<String, TemporalInterventionLedgerError> {
+    verify_temporal_intervention_family(family)?;
+    let contrast = family.contrasts
+        .binary_search_by(|item| item.contrast_id.as_str().cmp(contrast_id))
+        .ok()
+        .and_then(|index| family.contrasts.get(index))
+        .ok_or_else(|| TemporalInterventionLedgerError::new(
+            "contrast_id", format!("contrast {contrast_id:?} was not preregistered"),
+        ))?;
+    let digest = contrast_sha256(contrast)?;
+    Ok(temporal_stream_id(contrast_id, &digest, axis))
+}
+
 fn encode_pair_outcomes(
     stream_id: &str,
     pairs: &[TemporalInterventionPairOutcome],

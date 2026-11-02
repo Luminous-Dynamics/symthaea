@@ -1,0 +1,50 @@
+{
+  "schema": "symthaea.temporal-first-order-dominance-eprocess",
+  "version": "0.1.0",
+  "tracking_issue": 9930,
+  "implementation": "crates/domains/symthaea-architecture-engineering/src/temporal_stochastic_dominance.rs",
+  "method": "fixed_uniform_finite_threshold_mixture_with_predictable_gro_plugin",
+  "estimand": {
+    "x": "negative_control_exposure",
+    "y": "negative_treatment_exposure",
+    "null": "treatment_reward_is_first_order_stochastically_dominated_by_control_reward",
+    "alternative": "at_least_one_threshold_with_F_control_greater_than_F_treatment",
+    "interpretation": "evidence_of_some_treatment_distributional_upside_not_global_dominance"
+  },
+  "thresholds": {
+    "support": "predeclared_strictly_increasing_finite_exposure_support",
+    "use": "all_reward_support_values_except_maximum",
+    "mixture": "fixed_uniform",
+    "bet": "lambda_t(z)=min(1-c, positive_part((prior_positive_crossings-prior_negative_crossings)/(prior_positive_crossings+prior_negative_crossings)))"
+  },
+  "sampling_assumptions": {
+    "paired_observations_iid_across_episodes": true,
+    "arbitrary_within_pair_dependence": true,
+    "nonstationary_or_dependent_across_episodes_supported": false,
+    "independent_fair_coin_pair_assignment_required_by_adapter": true
+  },
+  "multiplicity": {
+    "generic_manifest_owner": "anytime_confidence_ledger",
+    "family_size": "derived_from_all_preregistered_contrast_axis_streams",
+    "stream_alpha": "family_alpha/family_size"
+  },
+  "numerical": {
+    "accumulator": "f64_log_wealth",
+    "guard": "conservative_engineering_guard",
+    "formal_correct_rounding_proof": false,
+    "high_precision_replay_required_for_authoritative_receipt": true
+  },
+  "tests": {
+    "rust_test_functions_authored": 12,
+    "rust_tests_executed": false,
+    "benchmark_executed": false
+  },
+  "replay": {
+    "canonical_owner": "temporal_intervention_evidence_ledger",
+    "verifies_generic_family_look_chain": true,
+    "verifies_pair_identity_and_assignment_binding": true,
+    "replays_pair_outcomes_in_stream_look_order": true,
+    "report_binds_evidence_ledger_sha256": true,
+    "separate_fsd_history_ledger": false
+  }
+}
