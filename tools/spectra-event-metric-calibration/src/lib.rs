@@ -436,6 +436,31 @@ mod tests {
     }
 
     #[test]
+    fn fixed_seed_counts_match_independent_reference() {
+        let model = GaussianSignalModel::new(1.0, 0.5).unwrap();
+        let bundle = simulate(
+            model,
+            SimulationDesign {
+                signal_trials: 8_000,
+                noise_trials: 8_000,
+                seed: 0x5EED_2026,
+            },
+        )
+        .unwrap();
+        let report = evaluate(&bundle.candidate, &bundle.evaluator).unwrap();
+
+        assert_eq!(
+            report.counts,
+            SignalDetectionCounts {
+                hits: 4_007,
+                misses: 3_993,
+                false_alarms: 1_276,
+                correct_rejections: 6_724,
+            }
+        );
+    }
+
+    #[test]
     fn criterion_changes_binary_calls_not_score_ranking_or_auc() {
         let loose_model = GaussianSignalModel::new(1.0, -1.0).unwrap();
         let strict_model = GaussianSignalModel::new(1.0, 1.0).unwrap();
