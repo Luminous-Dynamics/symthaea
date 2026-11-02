@@ -105,6 +105,16 @@ impl std::error::Error for DecisionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecisionRejectionReason {
+    AuthorizationUnknown,
+    NotAuthorized,
+    Irreversible,
+    Destructive,
+    TargetImpactExceeded,
+    TimeBudgetExceeded,
+    EnergyBudgetExceeded,
+    RiskBudgetExceeded,
+    InvalidOutcomeSpace,
+    NoPositiveEigCandidate,
     NoPositiveValueOfInformation,
     DecisionUnstableAcrossScenarios,
     WorstCaseRegretExceeded,
@@ -713,6 +723,26 @@ pub fn plan_next_experiment_decision_aware(
     let mut ranked = Vec::new();
     let mut rejected = Vec::new();
 
+    for item in &robust.rejected_experiments {
+        let reason = match item.reason {
+            super::robust::RobustRejectionReason::AuthorizationUnknown => DecisionRejectionReason::AuthorizationUnknown,
+            super::robust::RobustRejectionReason::NotAuthorized => DecisionRejectionReason::NotAuthorized,
+            super::robust::RobustRejectionReason::Irreversible => DecisionRejectionReason::Irreversible,
+            super::robust::RobustRejectionReason::Destructive => DecisionRejectionReason::Destructive,
+            super::robust::RobustRejectionReason::TargetImpactExceeded => DecisionRejectionReason::TargetImpactExceeded,
+            super::robust::RobustRejectionReason::TimeBudgetExceeded => DecisionRejectionReason::TimeBudgetExceeded,
+            super::robust::RobustRejectionReason::EnergyBudgetExceeded => DecisionRejectionReason::EnergyBudgetExceeded,
+            super::robust::RobustRejectionReason::RiskBudgetExceeded => DecisionRejectionReason::RiskBudgetExceeded,
+            super::robust::RobustRejectionReason::InvalidOutcomeSpace => DecisionRejectionReason::InvalidOutcomeSpace,
+            super::robust::RobustRejectionReason::NoRobustInformationGain => DecisionRejectionReason::NoPositiveEigCandidate,
+            super::robust::RobustRejectionReason::RankingUnstable => DecisionRejectionReason::DecisionUnstableAcrossScenarios,
+        };
+        rejected.push(RejectedDecisionExperiment {
+            experiment_id: item.experiment_id.clone(),
+            reasons: vec![reason],
+        });
+    }
+
     for candidate in &robust.ranked_experiments {
         let experiment = experiment_lookup[candidate.experiment_id.as_str()];
         let cost = normalized_cost(
@@ -773,7 +803,15 @@ pub fn plan_next_experiment_decision_aware(
         item.reasons.contains(&DecisionRejectionReason::WorstCaseRegretExceeded)
     }) {
         Some(DecisionAbstentionReason::WorstCaseRegretExceeded)
-    } else if !rejected.is_empty() {
+    } else if !rejected.is_empty()
+        && rejected.iter().all(|item| {
+            item.reasons.iter().all(|reason| matches!(
+                reason,
+                DecisionRejectionReason::NoPositiveEIGCandidate
+                    | DecisionRejectionReason::NoPositiveValueOfInformation
+            ))
+        })
+    {
         Some(DecisionAbstentionReason::NoPositiveValueOfInformation)
     } else {
         Some(DecisionAbstentionReason::NoEligibleExperiment)
