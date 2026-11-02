@@ -1,127 +1,129 @@
 {
-  "protocol_id": "synthetic-selection-bounds-v1",
-  "estimand_id": "finite-cohort-all-event-functional-outcome",
-  "selection_rule_id": "source-and-target-response-detected-v1",
-  "all_event_outcome_definition": "Independent bounded endpoint in [0,1] for every planned unit",
-  "conditional_kernel_definition": "Kernel in [-1,1] among selected units",
-  "all_event_outcome_bounds": {
-    "lower": 0,
-    "upper": 1
-  },
-  "conditional_kernel_bounds": {
-    "lower": -1,
-    "upper": 1
-  },
-  "arms": [
-    {
-      "arm_id": "treatment",
-      "role": "treatment",
-      "units": [
-        {
-          "unit_id": "t1",
-          "selection_status": "selected",
-          "all_event_outcome": 0.9,
-          "conditional_kernel": 0.8,
-          "source_response_status": "detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "t2",
-          "selection_status": "selected",
-          "all_event_outcome": 0.8,
-          "conditional_kernel": 0.5,
-          "source_response_status": "detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "t3",
-          "selection_status": "selected",
-          "all_event_outcome": 0.7,
-          "conditional_kernel": null,
-          "source_response_status": "detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "t4",
-          "selection_status": "selected",
-          "all_event_outcome": 0.6,
-          "conditional_kernel": 0.7,
-          "source_response_status": "detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "t5",
-          "selection_status": "not_selected",
-          "all_event_outcome": null,
-          "conditional_kernel": null,
-          "source_response_status": "not_detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "t6",
-          "selection_status": "unobserved",
-          "all_event_outcome": null,
-          "conditional_kernel": null,
-          "source_response_status": "unobserved",
-          "target_response_status": "detected"
-        }
-      ]
+  "input": {
+    "protocol_id": "synthetic-selection-bounds-v1",
+    "estimand_id": "finite-cohort-all-event-functional-outcome",
+    "selection_rule_id": "source-and-target-response-detected-v1",
+    "all_event_outcome_definition": "Independent bounded endpoint in [0,1] for every planned unit",
+    "conditional_kernel_definition": "Kernel in [-1,1] among selected units",
+    "all_event_outcome_bounds": {
+      "lower": 0,
+      "upper": 1
     },
-    {
-      "arm_id": "control",
-      "role": "control",
-      "units": [
-        {
-          "unit_id": "c1",
-          "selection_status": "selected",
-          "all_event_outcome": 0.4,
-          "conditional_kernel": 0.1,
-          "source_response_status": "detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "c2",
-          "selection_status": "selected",
-          "all_event_outcome": 0.3,
-          "conditional_kernel": -0.2,
-          "source_response_status": "detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "c3",
-          "selection_status": "not_selected",
-          "all_event_outcome": 0.5,
-          "conditional_kernel": null,
-          "source_response_status": "not_detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "c4",
-          "selection_status": "not_selected",
-          "all_event_outcome": 0.2,
-          "conditional_kernel": null,
-          "source_response_status": "not_detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "c5",
-          "selection_status": "not_selected",
-          "all_event_outcome": 0.4,
-          "conditional_kernel": null,
-          "source_response_status": "not_detected",
-          "target_response_status": "detected"
-        },
-        {
-          "unit_id": "c6",
-          "selection_status": "classifier_invalid",
-          "all_event_outcome": null,
-          "conditional_kernel": null,
-          "source_response_status": "classifier_invalid",
-          "target_response_status": "detected"
-        }
-      ]
-    }
-  ],
+    "conditional_kernel_bounds": {
+      "lower": -1,
+      "upper": 1
+    },
+    "arms": [
+      {
+        "arm_id": "treatment",
+        "role": "treatment",
+        "units": [
+          {
+            "unit_id": "t1",
+            "selection_status": "selected",
+            "all_event_outcome": 0.9,
+            "conditional_kernel": 0.8,
+            "source_response_status": "detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "t2",
+            "selection_status": "selected",
+            "all_event_outcome": 0.8,
+            "conditional_kernel": 0.5,
+            "source_response_status": "detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "t3",
+            "selection_status": "selected",
+            "all_event_outcome": 0.7,
+            "conditional_kernel": null,
+            "source_response_status": "detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "t4",
+            "selection_status": "selected",
+            "all_event_outcome": 0.6,
+            "conditional_kernel": 0.7,
+            "source_response_status": "detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "t5",
+            "selection_status": "not_selected",
+            "all_event_outcome": null,
+            "conditional_kernel": null,
+            "source_response_status": "not_detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "t6",
+            "selection_status": "unobserved",
+            "all_event_outcome": null,
+            "conditional_kernel": null,
+            "source_response_status": "unobserved",
+            "target_response_status": "detected"
+          }
+        ]
+      },
+      {
+        "arm_id": "control",
+        "role": "control",
+        "units": [
+          {
+            "unit_id": "c1",
+            "selection_status": "selected",
+            "all_event_outcome": 0.4,
+            "conditional_kernel": 0.1,
+            "source_response_status": "detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "c2",
+            "selection_status": "selected",
+            "all_event_outcome": 0.3,
+            "conditional_kernel": -0.2,
+            "source_response_status": "detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "c3",
+            "selection_status": "not_selected",
+            "all_event_outcome": 0.5,
+            "conditional_kernel": null,
+            "source_response_status": "not_detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "c4",
+            "selection_status": "not_selected",
+            "all_event_outcome": 0.2,
+            "conditional_kernel": null,
+            "source_response_status": "not_detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "c5",
+            "selection_status": "not_selected",
+            "all_event_outcome": 0.4,
+            "conditional_kernel": null,
+            "source_response_status": "not_detected",
+            "target_response_status": "detected"
+          },
+          {
+            "unit_id": "c6",
+            "selection_status": "classifier_invalid",
+            "all_event_outcome": null,
+            "conditional_kernel": null,
+            "source_response_status": "classifier_invalid",
+            "target_response_status": "detected"
+          }
+        ]
+      }
+    ]
+  },
   "expected": {
     "treatment_all_event_bounds": [
       0.5,
