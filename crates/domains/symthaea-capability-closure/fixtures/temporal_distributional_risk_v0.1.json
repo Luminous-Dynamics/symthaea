@@ -1,0 +1,46 @@
+{
+  "schema": "symthaea.temporal-distributional-risk-reference",
+  "version": "0.1.0",
+  "tracking_issue": 9930,
+  "implementation": "research/temporal-intervention-audit/src/distributional.rs",
+  "support_unit": "microseconds",
+  "required_common_support": true,
+  "support_order": "strictly_increasing_unique",
+  "max_support_bins": 100000,
+  "max_observations_per_arm": 1000000,
+  "comparisons": [
+    {
+      "id": "first_order_lower_cost",
+      "treatment_condition": "cdf_treatment_ge_cdf_control_at_every_support_point",
+      "requires_strict_point": true,
+      "direction_reversed_for_control": true
+    },
+    {
+      "id": "upper_tail_stop_loss",
+      "treatment_condition": "E[(T-t)+] <= E[(C-t)+] at every support threshold",
+      "requires_strict_threshold": true,
+      "direction_reversed_for_control": true
+    }
+  ],
+  "summaries": {
+    "mean": true,
+    "empirical_cdf": true,
+    "nearest_rank_quantiles": [
+      "p50",
+      "p90",
+      "p95",
+      "p99"
+    ],
+    "stop_loss_curve": true
+  },
+  "inference": {
+    "population_claim": false,
+    "anytime_valid": false,
+    "sequential_stochastic_dominance_follow_on": true
+  },
+  "tests": {
+    "rust_test_functions_authored": 8,
+    "rust_tests_executed": false,
+    "benchmark_executed": false
+  }
+}
