@@ -83,6 +83,28 @@ def json_shape(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> dict[str, Any
         return {"inspection": "unreadable_or_nonstandard_json"}
 
 
+def read_lfs_pointer(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> dict[str, Any] | None:
+    """Return Git LFS pointer metadata, or None for a normal archive blob."""
+    if info.file_size > 1024:
+        return None
+    try:
+        raw = archive.read(info)
+        lines = raw.decode("ascii").splitlines()
+    except (OSError, UnicodeError):
+        return None
+    if not lines or lines[0].strip() != "version https://git-lfs.github.com/spec/v1":
+        return None
+    fields = {}
+    for line in lines[1:]:
+        key, separator, value = line.partition(" ")
+        if separator:
+            fields[key.strip()] = value.strip()
+    oid = fields.get("oid", "")
+    size = fields.get("size", "")
+    if not oid.startswith("sha256:") or len(oid) != 71 or not size.isdigit():
+        raise ValueError(f"malformed Git LFS pointer at {info.filename}")
+    return {"oid_sha256": oid.removeprefix("sha256:"), "declared_size_bytes": int(size)}
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--archive", required=True)
@@ -118,6 +140,7 @@ def main() -> int:
         csv_schemas: list[dict[str, Any]] = []
         json_schemas: list[dict[str, Any]] = []
         readmes: list[str] = []
+        lfs_objects: list[dict[str, Any]] = []
 
         for info in sorted(infos, key=lambda item: item.filename):
             entry = {
@@ -125,12 +148,21 @@ def main() -> int:
                 "size_bytes": info.file_size,
                 "compressed_size_bytes": info.compress_size,
             }
+            pointer = read_lfs_pointer(archive, info)
+            if pointer is not None:
+                entry["storage_kind"] = "git_lfs_pointer"
+                entry["lfs_oid_sha256"] = pointer["oid_sha256"]
+                entry["lfs_declared_size_bytes"] = pointer["declared_size_bytes"]
+                lfs_objects.append({"path": info.filename, **pointer})
+            else:
+                entry["storage_kind"] = "archive_blob"
+
             suffix = PurePosixPath(info.filename).suffix.lower()
-            if suffix in {".csv", ".tsv"}:
+            if pointer is None and suffix in {".csv", ".tsv"}:
                 headers = csv_header(archive, info)
                 if headers is not None:
                     csv_schemas.append({"path": info.filename, "headers": headers})
-            elif suffix == ".json":
+            elif pointer is None and suffix == ".json":
                 shape = json_shape(archive, info)
                 if shape is not None:
                     json_schemas.append({"path": info.filename, **shape})
@@ -178,10 +210,13 @@ def main() -> int:
             "csv_tsv_headers": csv_schemas,
             "json_shapes": json_schemas,
             "readme_headings": readmes,
+            "git_lfs_pointer_count": len(lfs_objects),
+            "git_lfs_objects": lfs_objects,
         },
         "limitations": [
             "This report inventories archive structure and field names; it is not a reproduction of the paper's analysis.",
             "CSV headers and JSON keys are metadata only; no participant or move-level row values are exported.",
+            "Git LFS pointer files are identified by OID and declared size but are not hydrated by this inventory step; underlying LFS data rows are not inspected.",
             "Network orientation, tie-breaking, path legality and hidden-level constraints still require source-code review.",
             "The archive license and per-file data-use terms must be preserved from the source metadata before any redistribution.",
         ],
@@ -199,6 +234,7 @@ def main() -> int:
         f"- SHA-256: `{file_digest['sha256']}`.",
         f"- Files: {len(entries)}.",
         "- Raw participant/move rows exported: **no**.",
+        f"- Git LFS pointer files: {len(lfs_objects)} (objects not hydrated by this inventory step).",
         "",
         "## Top-level entries",
         "",
@@ -236,6 +272,7 @@ def main() -> int:
         "md5": file_digest["md5"],
         "csv_schema_count": len(csv_schemas),
         "json_schema_count": len(json_schemas),
+        "git_lfs_pointer_count": len(lfs_objects),
     }, sort_keys=True))
     return 0
 
