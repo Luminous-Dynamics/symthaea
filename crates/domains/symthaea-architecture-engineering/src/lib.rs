@@ -27,6 +27,7 @@ pub mod multi_resource_budget;
 pub mod anytime_qmc_confidence;
 pub mod anytime_confidence_ledger;
 pub mod temporal_intervention_family;
+pub mod temporal_stochastic_dominance;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
