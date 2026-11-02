@@ -36,9 +36,19 @@ impl DreamingService {
                 let result = self.trainer.train_step("dream", &mutated.target_text);
                 if result.converged {
                     println!("Staged syntax-accepted proposal; independent task verification is required: reward={:.2}", result.reward);
-                    self.proposal_pool.lock().push(mutated);
+                    self.stage_proposal(mutated);
                 }
             }
+        }
+    }
+
+    fn stage_proposal(&self, candidate: TrainingPair) {
+        let mut proposals = self.proposal_pool.lock();
+        let duplicate = proposals.pairs.iter().any(|existing| {
+            existing.target_text == candidate.target_text && existing.channels == candidate.channels
+        });
+        if !duplicate {
+            proposals.push(candidate);
         }
     }
 
