@@ -28,6 +28,30 @@ const MAX_NULL_MODELS: usize = 4;
 const MAX_ALTERNATIVE_MODELS: usize = 4;
 const MAX_BASIS_COUNT: usize = 100_000;
 
+/// Frozen settings for the bounded exact-reference frontier implementation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrontierSolverSettings {
+    pub algorithm_id: String,
+    pub max_policy_count: usize,
+    pub max_active_basis_count: usize,
+    pub feasibility_tolerance: f64,
+    pub pivot_tolerance: f64,
+    pub objective_tolerance: f64,
+}
+
+/// Return the immutable solver settings used by the reference LP implementation.
+pub fn frontier_solver_settings() -> FrontierSolverSettings {
+    FrontierSolverSettings {
+        algorithm_id: "EXHAUSTIVE_ACTIVE_BASIS_PARTIAL_PIVOT_GAUSSIAN_V1".into(),
+        max_policy_count: MAX_POLICIES,
+        max_active_basis_count: MAX_BASIS_COUNT,
+        feasibility_tolerance: FEASIBILITY_TOLERANCE,
+        pivot_tolerance: PIVOT_TOLERANCE,
+        objective_tolerance: OBJECTIVE_TOLERANCE,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyFrontierError {
     pub path: String,
