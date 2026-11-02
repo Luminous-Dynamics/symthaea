@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const SCALE_PPM: i64 = 1_000_000;
+pub const ALPHA_DENOMINATOR_1E12: i128 = 1_000_000_000_000;
 pub const REGISTRY_JSON: &str = include_str!("../../../crates/domains/symthaea-capability-closure/fixtures/adaptive_temporal_calibration_benchmark_v0.1.json");
 
 const SPLITMIX_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
@@ -471,9 +472,9 @@ pub enum AciSetRegime {
     Empty,
 }
 
-pub fn aci_set_regime(alpha_ppm: i64) -> AciSetRegime {
-    if alpha_ppm < 0 { AciSetRegime::AllReal }
-    else if alpha_ppm > SCALE_PPM { AciSetRegime::Empty }
+pub fn aci_set_regime(alpha_numerator_1e12: i128) -> AciSetRegime {
+    if alpha_numerator_1e12 < 0 { AciSetRegime::AllReal }
+    else if alpha_numerator_1e12 > ALPHA_DENOMINATOR_1E12 { AciSetRegime::Empty }
     else { AciSetRegime::InUnitInterval }
 }
 
@@ -482,7 +483,7 @@ struct PendingDelayedAciPrediction {
     origin_step: u64,
     target_step: u64,
     phase_index: usize,
-    alpha_used_ppm: i64,
+    alpha_used_numerator_1e12: i128,
     prediction_set_sha256: [u8; 32],
 }
 
@@ -529,7 +530,7 @@ pub struct DelayedAciBank {
     horizon_steps: u64,
     target_alpha_ppm: i64,
     gamma_ppm: i64,
-    phase_alpha_ppm: Vec<i64>,
+    phase_alpha_numerator_1e12: Vec<i128>,
     pending: BTreeMap<u64, PendingDelayedAciPrediction>,
     next_origin_step: u64,
     history: Vec<DelayedAciStepReceipt>,
@@ -551,7 +552,7 @@ impl DelayedAciBank {
             horizon_steps,
             target_alpha_ppm,
             gamma_ppm,
-            phase_alpha_ppm: vec![target_alpha_ppm; phase_count],
+            phase_alpha_numerator_1e12: vec![i128::from(target_alpha_ppm) * i128::from(SCALE_PPM); phase_count],
             pending: BTreeMap::new(),
             next_origin_step: 0,
             history: Vec::new(),
@@ -561,8 +562,15 @@ impl DelayedAciBank {
     pub fn horizon_steps(&self) -> u64 { self.horizon_steps }
     pub fn next_origin_step(&self) -> u64 { self.next_origin_step }
     pub fn pending_count(&self) -> usize { self.pending.len() }
-    pub fn phase_alpha_ppm(&self, phase_index: usize) -> Option<i64> {
-        self.phase_alpha_ppm.get(phase_index).copied()
+    pub fn phase_alpha_numerator_1e12(&self, phase_index: usize) -> Option<i128> {
+        self.phase_alpha_numerator_1e12.get(phase_index).copied()
+    }
+
+    pub fn phase_alpha_ppm_rounded(&self, phase_index: usize) -> Result<Option<i64>, ReplayError> {
+        self.phase_alpha_numerator_1e12.get(phase_index).map(|value| {
+            let rounded = div_round_away_from_zero(*value, i128::from(SCALE_PPM))?;
+            i64::try_from(rounded).map_err(|_| invalid("rounded alpha PPM exceeds i64"))
+        }).transpose()
     }
     pub fn history(&self) -> &[DelayedAciStepReceipt] { &self.history }
 
@@ -588,8 +596,8 @@ impl DelayedAciBank {
         let phase_index = usize::try_from(origin_step % self.horizon_steps)
             .map_err(|_| invalid("delayed-ACI phase index overflow"))?;
         let mut consumed_feedback = None;
-        let mut alpha_used_ppm = self.phase_alpha_ppm[phase_index];
-        let mut updated_alpha_ppm = self.phase_alpha_ppm[phase_index];
+        let mut alpha_used_numerator_1e12 = self.phase_alpha_numerator_1e12[phase_index];
+        let mut updated_alpha_numerator_1e12 = self.phase_alpha_numerator_1e12[phase_index];
 
         if origin_step < self.horizon_steps {
             if miscovered.is_some() {
@@ -608,22 +616,23 @@ impl DelayedAciBank {
             {
                 return Err(invalid("queued prediction identity/phase does not match due target"));
             }
-            if self.phase_alpha_ppm[phase_index] != pending.alpha_used_ppm {
+            if self.phase_alpha_numerator_1e12[phase_index] != pending.alpha_used_numerator_1e12 {
                 return Err(invalid("phase alpha state differs from alpha stored with due prediction"));
             }
-            alpha_used_ppm = pending.alpha_used_ppm;
+            alpha_used_numerator_1e12 = pending.alpha_used_numerator_1e12;
             let error_ppm = if observed_miss { SCALE_PPM } else { 0 };
-            let delta = div_round_away_from_zero(
-                i128::from(self.gamma_ppm) * i128::from(self.target_alpha_ppm - error_ppm),
-                i128::from(SCALE_PPM),
-            )?;
-            updated_alpha_ppm = i64::try_from(i128::from(pending.alpha_used_ppm) + delta)
-                .map_err(|_| invalid("delayed-ACI alpha update overflow"))?;
+            // Exact rational update: alpha and gamma are PPM rationals, so
+            // denominator 10^12 is fixed and no per-step rounding is needed.
+            let delta_numerator = i128::from(self.gamma_ppm)
+                * i128::from(self.target_alpha_ppm - error_ppm);
+            updated_alpha_numerator_1e12 = pending.alpha_used_numerator_1e12
+                .checked_add(delta_numerator)
+                .ok_or_else(|| invalid("delayed-ACI exact rational alpha overflow"))?;
             consumed_feedback = Some(DelayedAciFeedbackReceipt {
                 target_step: origin_step,
                 prediction_origin_step: pending.origin_step,
                 phase_index: pending.phase_index,
-                alpha_used_ppm: pending.alpha_used_ppm,
+                alpha_used_numerator_1e12: pending.alpha_used_numerator_1e12,
                 prediction_set_sha256: pending.prediction_set_sha256,
                 miscovered: observed_miss,
             });
@@ -637,20 +646,20 @@ impl DelayedAciBank {
 
         // Commit only after every validation and arithmetic operation succeeds.
         if consumed_feedback.is_some() { self.pending.remove(&origin_step); }
-        self.phase_alpha_ppm[phase_index] = updated_alpha_ppm;
+        self.phase_alpha_numerator_1e12[phase_index] = updated_alpha_numerator_1e12;
         self.pending.insert(issued_target_step, PendingDelayedAciPrediction {
             origin_step,
             target_step: issued_target_step,
             phase_index,
-            alpha_used_ppm: updated_alpha_ppm,
+            alpha_used_numerator_1e12: updated_alpha_numerator_1e12,
             prediction_set_sha256,
         });
         let receipt = DelayedAciStepReceipt {
             origin_step,
             issued_target_step,
             phase_index,
-            alpha_used_ppm,
-            updated_alpha_ppm,
+            alpha_used_numerator_1e12,
+            updated_alpha_numerator_1e12,
             prediction_set_sha256,
             consumed_feedback,
         };
@@ -675,7 +684,7 @@ impl DelayedAciBank {
                 return Err(invalid("delayed-ACI receipt differs from deterministic replay"));
             }
         }
-        if replay.phase_alpha_ppm != self.phase_alpha_ppm
+        if replay.phase_alpha_numerator_1e12 != self.phase_alpha_numerator_1e12
             || replay.pending != self.pending
             || replay.next_origin_step != self.next_origin_step
         {
@@ -696,8 +705,8 @@ impl DelayedAciBank {
             hasher.update(record.origin_step.to_le_bytes());
             hasher.update(record.issued_target_step.to_le_bytes());
             hasher.update((record.phase_index as u64).to_le_bytes());
-            hasher.update(record.alpha_used_ppm.to_le_bytes());
-            hasher.update(record.updated_alpha_ppm.to_le_bytes());
+            hasher.update(record.alpha_used_numerator_1e12.to_le_bytes());
+            hasher.update(record.updated_alpha_numerator_1e12.to_le_bytes());
             hasher.update(record.prediction_set_sha256);
             match &record.consumed_feedback {
                 None => hasher.update([0]),
@@ -706,7 +715,7 @@ impl DelayedAciBank {
                     hasher.update(feedback.target_step.to_le_bytes());
                     hasher.update(feedback.prediction_origin_step.to_le_bytes());
                     hasher.update((feedback.phase_index as u64).to_le_bytes());
-                    hasher.update(feedback.alpha_used_ppm.to_le_bytes());
+                    hasher.update(feedback.alpha_used_numerator_1e12.to_le_bytes());
                     hasher.update(feedback.prediction_set_sha256);
                     hasher.update([u8::from(feedback.miscovered)]);
                 }
@@ -992,11 +1001,14 @@ mod tests {
         let errors = [true, false, false, true, true, false];
         for (step, error) in errors.iter().enumerate() {
             let feedback = if step == 0 { None } else { Some(errors[step - 1]) };
-            let alpha_used = scalar.current_alpha_ppm();
+            let alpha_used = i128::from(scalar.current_alpha_ppm()) * i128::from(SCALE_PPM);
             let record = delayed.advance(step as u64, feedback, digest(step as u8 + 1)).unwrap();
-            assert_eq!(record.alpha_used_ppm, alpha_used);
+            assert_eq!(record.alpha_used_numerator_1e12, alpha_used);
             if step > 0 { scalar.update_on_delivered_feedback(errors[step - 1]).unwrap(); }
-            assert_eq!(record.updated_alpha_ppm, scalar.current_alpha_ppm());
+            assert_eq!(
+                record.updated_alpha_numerator_1e12,
+                i128::from(scalar.current_alpha_ppm()) * i128::from(SCALE_PPM)
+            );
         }
         delayed.verify().unwrap();
     }
@@ -1011,13 +1023,17 @@ mod tests {
         let r3 = state.advance(3, Some(true), digest(4)).unwrap();
         let r4 = state.advance(4, Some(false), digest(5)).unwrap();
         let r5 = state.advance(5, Some(true), digest(6)).unwrap();
-        assert_eq!((r3.phase_index, r3.alpha_used_ppm, r3.updated_alpha_ppm), (0, 100_000, 55_000));
-        assert_eq!((r4.phase_index, r4.alpha_used_ppm, r4.updated_alpha_ppm), (1, 100_000, 105_000));
-        assert_eq!((r5.phase_index, r5.alpha_used_ppm, r5.updated_alpha_ppm), (2, 100_000, 55_000));
+        assert_eq!((r3.phase_index, r3.alpha_used_numerator_1e12, r3.updated_alpha_numerator_1e12),
+            (0, 100_000_000_000, 55_000_000_000));
+        assert_eq!((r4.phase_index, r4.alpha_used_numerator_1e12, r4.updated_alpha_numerator_1e12),
+            (1, 100_000_000_000, 105_000_000_000));
+        assert_eq!((r5.phase_index, r5.alpha_used_numerator_1e12, r5.updated_alpha_numerator_1e12),
+            (2, 100_000_000_000, 55_000_000_000));
         let r6 = state.advance(6, Some(false), digest(7)).unwrap();
-        assert_eq!((r6.phase_index, r6.alpha_used_ppm, r6.updated_alpha_ppm), (0, 55_000, 60_000));
-        assert_eq!(state.phase_alpha_ppm(1), Some(105_000));
-        assert_eq!(state.phase_alpha_ppm(2), Some(55_000));
+        assert_eq!((r6.phase_index, r6.alpha_used_numerator_1e12, r6.updated_alpha_numerator_1e12),
+            (0, 55_000_000_000, 60_000_000_000));
+        assert_eq!(state.phase_alpha_numerator_1e12(1), Some(105_000_000_000));
+        assert_eq!(state.phase_alpha_numerator_1e12(2), Some(55_000_000_000));
         state.verify().unwrap();
     }
 
@@ -1055,11 +1071,13 @@ mod tests {
         let mut state = DelayedAciBank::new(1, 100_000, 1_000_000).unwrap();
         state.advance(0, None, digest(1)).unwrap();
         let r1 = state.advance(1, Some(true), digest(2)).unwrap();
-        assert_eq!((r1.alpha_used_ppm, r1.updated_alpha_ppm), (100_000, -800_000));
-        assert_eq!(aci_set_regime(r1.updated_alpha_ppm), AciSetRegime::AllReal);
+        assert_eq!((r1.alpha_used_numerator_1e12, r1.updated_alpha_numerator_1e12),
+            (100_000_000_000, -800_000_000_000));
+        assert_eq!(aci_set_regime(r1.updated_alpha_numerator_1e12), AciSetRegime::AllReal);
         let r2 = state.advance(2, Some(false), digest(3)).unwrap();
-        assert_eq!((r2.alpha_used_ppm, r2.updated_alpha_ppm), (-800_000, -700_000));
-        assert_eq!(aci_set_regime(1_000_001), AciSetRegime::Empty);
+        assert_eq!((r2.alpha_used_numerator_1e12, r2.updated_alpha_numerator_1e12),
+            (-800_000_000_000, -700_000_000_000));
+        assert_eq!(aci_set_regime(ALPHA_DENOMINATOR_1E12 + 1), AciSetRegime::Empty);
     }
 
     #[test]
