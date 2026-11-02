@@ -7,7 +7,7 @@
 //! It intentionally does not fetch data, authenticate permission authorities,
 //! or verify HMAC token derivation (the secret key must not be published).
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -89,10 +89,18 @@ fn require_sha(value: &Value, path: &[&str], label: &str, errors: &mut Vec<Strin
     }
 }
 
-fn check_digest(value: &Value, path: &[&str], label: &str, expected: &str, errors: &mut Vec<String>) {
+fn check_digest(
+    value: &Value,
+    path: &[&str],
+    label: &str,
+    expected: &str,
+    errors: &mut Vec<String>,
+) {
     match str_at(value, path) {
         Some(actual) if actual == expected => {}
-        Some(actual) => errors.push(format!("{label}: digest mismatch; declared {actual}, recomputed {expected}")),
+        Some(actual) => errors.push(format!(
+            "{label}: digest mismatch; declared {actual}, recomputed {expected}"
+        )),
         None => errors.push(format!("{label}: missing digest")),
     }
 }
@@ -103,9 +111,13 @@ fn verify_claim_ceiling(value: &Value, errors: &mut Vec<String>) {
     let source_kind = str_at(value, &["source", "source_kind"]);
     let expected = match tier {
         Some("synthetic_known_answer") => Some(("synthetic_only", "synthetic")),
-        Some("observational_structure_function") => Some(("observational_prediction_only", "observational")),
+        Some("observational_structure_function") => {
+            Some(("observational_prediction_only", "observational"))
+        }
         Some("in_silico_intervention") => Some(("model_counterfactual_only", "")),
-        Some("measured_intervention") => Some(("measured_intervention_prediction", "measured_intervention")),
+        Some("measured_intervention") => {
+            Some(("measured_intervention_prediction", "measured_intervention"))
+        }
         _ => {
             errors.push("evidence_tier: missing or unsupported".to_owned());
             None
@@ -113,17 +125,28 @@ fn verify_claim_ceiling(value: &Value, errors: &mut Vec<String>) {
     };
     if let Some((expected_ceiling, expected_source)) = expected {
         if ceiling != Some(expected_ceiling) {
-            errors.push(format!("claim_ceiling: evidence tier requires {expected_ceiling}"));
+            errors.push(format!(
+                "claim_ceiling: evidence tier requires {expected_ceiling}"
+            ));
         }
         if !expected_source.is_empty() && source_kind != Some(expected_source) {
-            errors.push(format!("source.source_kind: evidence tier requires {expected_source}"));
+            errors.push(format!(
+                "source.source_kind: evidence tier requires {expected_source}"
+            ));
         }
     }
     if tier == Some("measured_intervention") {
         if str_at(value, &["source", "rights_state"]) != Some("documented_permitted") {
-            errors.push("measured_intervention: rights_state must be documented_permitted".to_owned());
+            errors.push(
+                "measured_intervention: rights_state must be documented_permitted".to_owned(),
+            );
         }
-        require_sha(value, &["source", "permission_receipt_sha256"], "source.permission_receipt_sha256", errors);
+        require_sha(
+            value,
+            &["source", "permission_receipt_sha256"],
+            "source.permission_receipt_sha256",
+            errors,
+        );
     }
 }
 
@@ -139,7 +162,10 @@ fn read_tokens(
         return Vec::new();
     };
     if items.len() < minimum {
-        errors.push(format!("{label}: requires at least {minimum} tokens, found {}", items.len()));
+        errors.push(format!(
+            "{label}: requires at least {minimum} tokens, found {}",
+            items.len()
+        ));
     }
     let mut seen = HashSet::new();
     let mut tokens = Vec::with_capacity(items.len());
@@ -165,20 +191,51 @@ fn verify_split(value: &Value, errors: &mut Vec<String>) -> HashSet<String> {
     if str_at(value, &["split", "unit_tokenization", "algorithm"]) != Some("HMAC-SHA256") {
         errors.push("split.unit_tokenization.algorithm: expected HMAC-SHA256".to_owned());
     }
-    if str_at(value, &["split", "unit_tokenization", "canonicalization_version"]) != Some("UNIT-TOKEN-V1") {
-        errors.push("split.unit_tokenization.canonicalization_version: expected UNIT-TOKEN-V1".to_owned());
+    if str_at(
+        value,
+        &["split", "unit_tokenization", "canonicalization_version"],
+    ) != Some("UNIT-TOKEN-V1")
+    {
+        errors.push(
+            "split.unit_tokenization.canonicalization_version: expected UNIT-TOKEN-V1".to_owned(),
+        );
     }
-    require_sha(value, &["split", "unit_tokenization", "key_commitment_sha256"], "split.unit_tokenization.key_commitment_sha256", errors);
+    require_sha(
+        value,
+        &["split", "unit_tokenization", "key_commitment_sha256"],
+        "split.unit_tokenization.key_commitment_sha256",
+        errors,
+    );
 
-    let train = read_tokens(value, &["split", "train_unit_tokens"], "split.train_unit_tokens", 2, errors);
-    let validation = read_tokens(value, &["split", "validation_unit_tokens"], "split.validation_unit_tokens", 1, errors);
-    let test = read_tokens(value, &["split", "test_unit_tokens"], "split.test_unit_tokens", 2, errors);
+    let train = read_tokens(
+        value,
+        &["split", "train_unit_tokens"],
+        "split.train_unit_tokens",
+        2,
+        errors,
+    );
+    let validation = read_tokens(
+        value,
+        &["split", "validation_unit_tokens"],
+        "split.validation_unit_tokens",
+        1,
+        errors,
+    );
+    let test = read_tokens(
+        value,
+        &["split", "test_unit_tokens"],
+        "split.test_unit_tokens",
+        2,
+        errors,
+    );
     let train_set: HashSet<String> = train.iter().cloned().collect();
     let validation_set: HashSet<String> = validation.iter().cloned().collect();
     let test_set: HashSet<String> = test.iter().cloned().collect();
 
     for token in train_set.intersection(&validation_set) {
-        errors.push(format!("split leakage: train/validation overlap at {token}"));
+        errors.push(format!(
+            "split leakage: train/validation overlap at {token}"
+        ));
     }
     for token in train_set.intersection(&test_set) {
         errors.push(format!("split leakage: train/test overlap at {token}"));
@@ -187,9 +244,27 @@ fn verify_split(value: &Value, errors: &mut Vec<String>) -> HashSet<String> {
         errors.push(format!("split leakage: validation/test overlap at {token}"));
     }
 
-    check_digest(value, &["split", "train_membership_sha256"], "split.train_membership_sha256", &membership_digest(&train), errors);
-    check_digest(value, &["split", "validation_membership_sha256"], "split.validation_membership_sha256", &membership_digest(&validation), errors);
-    check_digest(value, &["split", "test_membership_sha256"], "split.test_membership_sha256", &membership_digest(&test), errors);
+    check_digest(
+        value,
+        &["split", "train_membership_sha256"],
+        "split.train_membership_sha256",
+        &membership_digest(&train),
+        errors,
+    );
+    check_digest(
+        value,
+        &["split", "validation_membership_sha256"],
+        "split.validation_membership_sha256",
+        &membership_digest(&validation),
+        errors,
+    );
+    check_digest(
+        value,
+        &["split", "test_membership_sha256"],
+        "split.test_membership_sha256",
+        &membership_digest(&test),
+        errors,
+    );
     for field in [
         "preprocessing_fit_on_train_only",
         "feature_selection_fit_on_train_only",
@@ -200,8 +275,18 @@ fn verify_split(value: &Value, errors: &mut Vec<String>) -> HashSet<String> {
             errors.push(format!("split.{field}: must be true"));
         }
     }
-    require_sha(value, &["split", "split_manifest_sha256"], "split.split_manifest_sha256", errors);
-    require_sha(value, &["split", "overlap_audit_sha256"], "split.overlap_audit_sha256", errors);
+    require_sha(
+        value,
+        &["split", "split_manifest_sha256"],
+        "split.split_manifest_sha256",
+        errors,
+    );
+    require_sha(
+        value,
+        &["split", "overlap_audit_sha256"],
+        "split.overlap_audit_sha256",
+        errors,
+    );
     test_set
 }
 
@@ -209,7 +294,9 @@ fn id_map<'a>(items: Option<&'a Vec<Value>>, id_key: &str) -> HashMap<String, &'
     let mut result = HashMap::new();
     if let Some(items) = items {
         for item in items {
-            if let (Some(id), Some(_)) = (item.get(id_key).and_then(Value::as_str), item.as_object()) {
+            if let (Some(id), Some(_)) =
+                (item.get(id_key).and_then(Value::as_str), item.as_object())
+            {
                 result.insert(id.to_owned(), item);
             }
         }
@@ -219,15 +306,42 @@ fn id_map<'a>(items: Option<&'a Vec<Value>>, id_key: &str) -> HashMap<String, &'
 
 fn verify_artifacts(value: &Value, errors: &mut Vec<String>) {
     for (path, label) in [
-        (&["source", "source_manifest_sha256"][..], "source.source_manifest_sha256"),
-        (&["connectome", "canonical_identity_sha256"][..], "connectome.canonical_identity_sha256"),
-        (&["connectome", "structural_edge_manifest_sha256"][..], "connectome.structural_edge_manifest_sha256"),
-        (&["observation_model", "observation_kernel_parameters_sha256"][..], "observation_model.observation_kernel_parameters_sha256"),
-        (&["observation_model", "preprocessing_manifest_sha256"][..], "observation_model.preprocessing_manifest_sha256"),
-        (&["artifacts", "run_receipt_sha256"][..], "artifacts.run_receipt_sha256"),
-        (&["artifacts", "resolved_config_sha256"][..], "artifacts.resolved_config_sha256"),
-        (&["artifacts", "environment_sha256"][..], "artifacts.environment_sha256"),
-        (&["artifacts", "raw_output_manifest_sha256"][..], "artifacts.raw_output_manifest_sha256"),
+        (
+            &["source", "source_manifest_sha256"][..],
+            "source.source_manifest_sha256",
+        ),
+        (
+            &["connectome", "canonical_identity_sha256"][..],
+            "connectome.canonical_identity_sha256",
+        ),
+        (
+            &["connectome", "structural_edge_manifest_sha256"][..],
+            "connectome.structural_edge_manifest_sha256",
+        ),
+        (
+            &["observation_model", "observation_kernel_parameters_sha256"][..],
+            "observation_model.observation_kernel_parameters_sha256",
+        ),
+        (
+            &["observation_model", "preprocessing_manifest_sha256"][..],
+            "observation_model.preprocessing_manifest_sha256",
+        ),
+        (
+            &["artifacts", "run_receipt_sha256"][..],
+            "artifacts.run_receipt_sha256",
+        ),
+        (
+            &["artifacts", "resolved_config_sha256"][..],
+            "artifacts.resolved_config_sha256",
+        ),
+        (
+            &["artifacts", "environment_sha256"][..],
+            "artifacts.environment_sha256",
+        ),
+        (
+            &["artifacts", "raw_output_manifest_sha256"][..],
+            "artifacts.raw_output_manifest_sha256",
+        ),
     ] {
         require_sha(value, path, label, errors);
     }
@@ -239,8 +353,11 @@ fn verify_models<'a>(
 ) -> (HashMap<String, &'a Value>, HashSet<String>) {
     let hypothesis_items = arr_at(value, &["hypothesis_set"]);
     let hypotheses = id_map(hypothesis_items, "hypothesis_id");
-    if hypotheses.len() < 2 || hypothesis_items.is_none_or(|items| items.len() != hypotheses.len()) {
-        errors.push("hypothesis_set: requires at least two uniquely identified hypotheses".to_owned());
+    if hypotheses.len() < 2 || hypothesis_items.is_none_or(|items| items.len() != hypotheses.len())
+    {
+        errors.push(
+            "hypothesis_set: requires at least two uniquely identified hypotheses".to_owned(),
+        );
     }
     let mut prior_sum = 0.0;
     if let Some(items) = hypothesis_items {
@@ -249,19 +366,37 @@ fn verify_models<'a>(
                 Some(p) if p.is_finite() && (0.0..=1.0).contains(&p) => prior_sum += p,
                 _ => errors.push(format!("hypothesis_set[{index}].prior_probability: complete run requires a finite probability in [0,1]")),
             }
-            if hypothesis.get("frozen_before_test").and_then(Value::as_bool) != Some(true) {
-                errors.push(format!("hypothesis_set[{index}].frozen_before_test: must be true"));
+            if hypothesis
+                .get("frozen_before_test")
+                .and_then(Value::as_bool)
+                != Some(true)
+            {
+                errors.push(format!(
+                    "hypothesis_set[{index}].frozen_before_test: must be true"
+                ));
             }
-            if hypothesis.get("prior_source").and_then(Value::as_str).is_none_or(str::is_empty) {
+            if hypothesis
+                .get("prior_source")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+            {
                 errors.push(format!("hypothesis_set[{index}].prior_source: missing"));
             }
-            if hypothesis.get("prediction_manifest_sha256").and_then(Value::as_str).is_none_or(|s| !is_sha256(s)) {
-                errors.push(format!("hypothesis_set[{index}].prediction_manifest_sha256: missing/malformed"));
+            if hypothesis
+                .get("prediction_manifest_sha256")
+                .and_then(Value::as_str)
+                .is_none_or(|s| !is_sha256(s))
+            {
+                errors.push(format!(
+                    "hypothesis_set[{index}].prediction_manifest_sha256: missing/malformed"
+                ));
             }
         }
     }
     if !prior_sum.is_finite() || (prior_sum - 1.0).abs() > 1.0e-9 {
-        errors.push(format!("hypothesis_set: prior probabilities sum to {prior_sum}, expected 1"));
+        errors.push(format!(
+            "hypothesis_set: prior probabilities sum to {prior_sum}, expected 1"
+        ));
     }
     let model_items = arr_at(value, &["models"]);
     let models = id_map(model_items, "model_id");
@@ -269,7 +404,8 @@ fn verify_models<'a>(
         errors.push("models: require at least four uniquely identified model entries".to_owned());
     }
 
-    let roles: HashSet<&str> = models.values()
+    let roles: HashSet<&str> = models
+        .values()
         .filter_map(|model| model.get("role").and_then(Value::as_str))
         .collect();
     for role in ["candidate", "baseline", "negative_control"] {
@@ -290,17 +426,27 @@ fn verify_models<'a>(
         }
         if let Some(hypothesis_id) = model.get("hypothesis_id").and_then(Value::as_str) {
             if !hypotheses.contains_key(hypothesis_id) {
-                errors.push(format!("models.{model_id}.hypothesis_id: unresolved {hypothesis_id}"));
+                errors.push(format!(
+                    "models.{model_id}.hypothesis_id: unresolved {hypothesis_id}"
+                ));
             }
         }
         if model.get("observation_model_id").and_then(Value::as_str)
-            != str_at(value, &["observation_model", "observation_model_id"]) {
+            != str_at(value, &["observation_model", "observation_model_id"])
+        {
             errors.push(format!("models.{model_id}.observation_model_id: mismatch"));
         }
         if role == "candidate" || role == "baseline" || role == "negative_control" {
-            match model.get("training_data_scope_sha256").and_then(Value::as_str) {
-                Some(hash) if is_sha256(hash) => { training_scopes.insert(hash.to_owned()); }
-                _ => errors.push(format!("models.{model_id}.training_data_scope_sha256: missing/malformed")),
+            match model
+                .get("training_data_scope_sha256")
+                .and_then(Value::as_str)
+            {
+                Some(hash) if is_sha256(hash) => {
+                    training_scopes.insert(hash.to_owned());
+                }
+                _ => errors.push(format!(
+                    "models.{model_id}.training_data_scope_sha256: missing/malformed"
+                )),
             }
             let budget = model.get("training_budget").unwrap_or(&Value::Null);
             let signature = json!([
@@ -309,22 +455,35 @@ fn verify_models<'a>(
                 budget.get("energy_joules"),
                 budget.get("memory_bytes"),
                 budget.get("training_samples")
-            ]).to_string();
+            ])
+            .to_string();
             budget_signatures.insert(signature);
             let has_resource = [
-                "compute_units", "wall_time_seconds", "energy_joules",
-                "memory_bytes", "training_samples"
-            ].iter().any(|key| budget.get(*key).is_some_and(|v| !v.is_null()));
+                "compute_units",
+                "wall_time_seconds",
+                "energy_joules",
+                "memory_bytes",
+                "training_samples",
+            ]
+            .iter()
+            .any(|key| budget.get(*key).is_some_and(|v| !v.is_null()));
             if !has_resource {
-                errors.push(format!("models.{model_id}.training_budget: no declared resource field"));
+                errors.push(format!(
+                    "models.{model_id}.training_budget: no declared resource field"
+                ));
             }
         }
         let code = model.get("code_commit_sha").and_then(Value::as_str);
         if code.is_none_or(|s| s.len() != 40 || !s.bytes().all(|b| b.is_ascii_hexdigit())) {
-            errors.push(format!("models.{model_id}.code_commit_sha: missing/malformed"));
+            errors.push(format!(
+                "models.{model_id}.code_commit_sha: missing/malformed"
+            ));
         }
         for field in ["config_sha256", "model_artifact_sha256"] {
-            let valid = model.get(field).and_then(Value::as_str).is_some_and(is_sha256);
+            let valid = model
+                .get(field)
+                .and_then(Value::as_str)
+                .is_some_and(is_sha256);
             if !valid {
                 errors.push(format!("models.{model_id}.{field}: missing/malformed"));
             }
@@ -333,70 +492,114 @@ fn verify_models<'a>(
 
     if str_at(value, &["budgets", "comparison_mode"]) == Some("matched_budget") {
         if str_at(value, &["budgets", "training_budget_policy"]) != Some("matched")
-            || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched") {
-            errors.push("budgets: matched comparison requires matched training/evaluation policies".to_owned());
+            || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched")
+        {
+            errors.push(
+                "budgets: matched comparison requires matched training/evaluation policies"
+                    .to_owned(),
+            );
         }
         if training_scopes.len() > 1 {
-            errors.push("budgets: matched comparison uses different training-data scopes".to_owned());
+            errors
+                .push("budgets: matched comparison uses different training-data scopes".to_owned());
         }
         if budget_signatures.len() > 1 {
-            errors.push("budgets: matched comparison uses different training resource budgets".to_owned());
+            errors.push(
+                "budgets: matched comparison uses different training resource budgets".to_owned(),
+            );
         }
-    } else if str_at(value, &["budgets", "comparison_mode"]) != Some("declared_unequal_budget_tradeoff") {
+    } else if str_at(value, &["budgets", "comparison_mode"])
+        != Some("declared_unequal_budget_tradeoff")
+    {
         errors.push("budgets.comparison_mode: complete run cannot be not_comparable".to_owned());
     }
 
     let mut unavailable = HashMap::new();
-    if let Some(items) = arr_at(value, &["evaluation", "baseline_matrix", "unavailable_families"]) {
+    if let Some(items) = arr_at(
+        value,
+        &["evaluation", "baseline_matrix", "unavailable_families"],
+    ) {
         for item in items {
             if let (Some(family), Some(reason)) = (
                 item.get("family").and_then(Value::as_str),
                 item.get("reason").and_then(Value::as_str),
             ) {
                 if reason.trim().is_empty() {
-                    errors.push(format!("baseline_matrix.unavailable_families.{family}: empty reason"));
+                    errors.push(format!(
+                        "baseline_matrix.unavailable_families.{family}: empty reason"
+                    ));
                 } else {
                     unavailable.insert(family.to_owned(), reason.to_owned());
                 }
             }
         }
     }
-    let required = arr_at(value, &["evaluation", "baseline_matrix", "required_families"]);
+    let required = arr_at(
+        value,
+        &["evaluation", "baseline_matrix", "required_families"],
+    );
     if let Some(required) = required {
         let mut seen = HashSet::new();
         if required.len() < 5 {
-            errors.push("baseline_matrix.required_families: requires at least five families".to_owned());
+            errors.push(
+                "baseline_matrix.required_families: requires at least five families".to_owned(),
+            );
         }
         for family in required.iter().filter_map(Value::as_str) {
             if !seen.insert(family.to_owned()) {
-                errors.push(format!("baseline_matrix: duplicate required family {family}"));
+                errors.push(format!(
+                    "baseline_matrix: duplicate required family {family}"
+                ));
             }
             if !families.contains(family) && !unavailable.contains_key(family) {
-                errors.push(format!("baseline_matrix: {family} is neither implemented nor explicitly unavailable"));
+                errors.push(format!(
+                    "baseline_matrix: {family} is neither implemented nor explicitly unavailable"
+                ));
             }
             if families.contains(family) && unavailable.contains_key(family) {
-                errors.push(format!("baseline_matrix: {family} is both implemented and unavailable"));
+                errors.push(format!(
+                    "baseline_matrix: {family} is both implemented and unavailable"
+                ));
             }
         }
     } else {
         errors.push("baseline_matrix.required_families: missing".to_owned());
     }
-    require_sha(value, &["evaluation", "baseline_matrix", "coverage_sha256"], "baseline_matrix.coverage_sha256", errors);
+    require_sha(
+        value,
+        &["evaluation", "baseline_matrix", "coverage_sha256"],
+        "baseline_matrix.coverage_sha256",
+        errors,
+    );
     (models, families)
 }
 
 fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors: &mut Vec<String>) {
-    if at(value, &["intervention_design", "preregistered_before_test"]).and_then(Value::as_bool) != Some(true) {
+    if at(value, &["intervention_design", "preregistered_before_test"]).and_then(Value::as_bool)
+        != Some(true)
+    {
         errors.push("intervention_design.preregistered_before_test: must be true".to_owned());
     }
     if str_at(value, &["intervention_design", "selector"]) == Some("not_selected") {
         errors.push("intervention_design.selector: complete run requires a selector".to_owned());
     }
-    require_sha(value, &["intervention_design", "candidate_pool_sha256"], "intervention_design.candidate_pool_sha256", errors);
-    require_sha(value, &["intervention_design", "feasibility_audit_sha256"], "intervention_design.feasibility_audit_sha256", errors);
+    require_sha(
+        value,
+        &["intervention_design", "candidate_pool_sha256"],
+        "intervention_design.candidate_pool_sha256",
+        errors,
+    );
+    require_sha(
+        value,
+        &["intervention_design", "feasibility_audit_sha256"],
+        "intervention_design.feasibility_audit_sha256",
+        errors,
+    );
     let selected = arr_at(value, &["intervention_design", "selected_interventions"]);
     if selected.map_or(true, Vec::is_empty) {
-        errors.push("intervention_design.selected_interventions: at least one is required".to_owned());
+        errors.push(
+            "intervention_design.selected_interventions: at least one is required".to_owned(),
+        );
     }
     let mut ids = HashSet::new();
     let mut control_roles = HashSet::new();
@@ -410,32 +613,67 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
                 errors.push(format!("selected_interventions[{index}]: duplicate ID"));
             }
             if item.get("feasibility_status").and_then(Value::as_str) != Some("feasible") {
-                errors.push(format!("selected_interventions[{index}]: not marked feasible"));
+                errors.push(format!(
+                    "selected_interventions[{index}]: not marked feasible"
+                ));
             }
-            match item.get("control_role").and_then(Value::as_str).unwrap_or("") {
+            match item
+                .get("control_role")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+            {
                 "intervention" => has_primary_intervention = true,
-                role @ ("sham" | "single_target_control" | "combination_control" | "washout" | "other") => {
+                role @ ("sham"
+                | "single_target_control"
+                | "combination_control"
+                | "washout"
+                | "other") => {
                     control_roles.insert(role.to_owned());
                 }
-                _ => errors.push(format!("selected_interventions[{index}]: unknown control role")),
+                _ => errors.push(format!(
+                    "selected_interventions[{index}]: unknown control role"
+                )),
             }
-            if item.get("safety_constraints_sha256").and_then(Value::as_str).is_none_or(|s| !is_sha256(s)) {
-                errors.push(format!("selected_interventions[{index}]: missing safety-constraint digest"));
+            if item
+                .get("safety_constraints_sha256")
+                .and_then(Value::as_str)
+                .is_none_or(|s| !is_sha256(s))
+            {
+                errors.push(format!(
+                    "selected_interventions[{index}]: missing safety-constraint digest"
+                ));
             }
             let targets = item.get("target_ids").and_then(Value::as_array);
             if targets.map_or(true, Vec::is_empty) {
                 errors.push(format!("selected_interventions[{index}]: no target IDs"));
             }
-            if item.get("protocol_sha256").and_then(Value::as_str).map_or(true, |s| !is_sha256(s)) {
-                errors.push(format!("selected_interventions[{index}]: missing protocol digest"));
+            if item
+                .get("protocol_sha256")
+                .and_then(Value::as_str)
+                .map_or(true, |s| !is_sha256(s))
+            {
+                errors.push(format!(
+                    "selected_interventions[{index}]: missing protocol digest"
+                ));
             }
         }
     }
     let controls: HashSet<&str> = arr_at(value, &["intervention_design", "required_controls"])
-        .into_iter().flatten().filter_map(Value::as_str).collect();
-    for control in ["sham", "single_target", "combined_target", "rewired_graph", "activity_only"] {
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    for control in [
+        "sham",
+        "single_target",
+        "combined_target",
+        "rewired_graph",
+        "activity_only",
+    ] {
         if !controls.contains(control) {
-            errors.push(format!("intervention_design.required_controls: missing {control}"));
+            errors.push(format!(
+                "intervention_design.required_controls: missing {control}"
+            ));
         }
     }
     if !has_primary_intervention {
@@ -498,14 +736,24 @@ fn verify_metrics_and_scores<'a>(
         }
     }
     let primary: HashSet<String> = arr_at(value, &["evaluation", "primary_metric_ids"])
-        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
     for metric in &primary {
         if !directions.contains_key(metric) {
-            errors.push(format!("evaluation.primary_metric_ids: unresolved metric {metric}"));
+            errors.push(format!(
+                "evaluation.primary_metric_ids: unresolved metric {metric}"
+            ));
         }
     }
     let strata: HashSet<String> = arr_at(value, &["evaluation", "strata"])
-        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
     let mut scores = HashMap::new();
     let mut score_count = 0;
     if let Some(items) = arr_at(value, &["results", "scorecards"]) {
@@ -518,12 +766,17 @@ fn verify_metrics_and_scores<'a>(
                 errors.push(format!("scorecards[{index}].model_id: unresolved {model}"));
             }
             if !directions.contains_key(metric) {
-                errors.push(format!("scorecards[{index}].metric_id: unresolved {metric}"));
+                errors.push(format!(
+                    "scorecards[{index}].metric_id: unresolved {metric}"
+                ));
             }
             if !strata.contains(stratum) {
                 errors.push(format!("scorecards[{index}].stratum: undeclared {stratum}"));
             }
-            let state = item.get("score_state").and_then(Value::as_str).unwrap_or("");
+            let state = item
+                .get("score_state")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             let score = item.get("score").and_then(Value::as_f64);
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
@@ -543,8 +796,12 @@ fn verify_metrics_and_scores<'a>(
                             }
                             token_values.push(token.to_owned());
                         }
-                        Some(_) => errors.push(format!("scorecards[{index}].unit_tokens[{unit_index}]: malformed token")),
-                        None => errors.push(format!("scorecards[{index}].unit_tokens[{unit_index}]: token must be a string")),
+                        Some(_) => errors.push(format!(
+                            "scorecards[{index}].unit_tokens[{unit_index}]: malformed token"
+                        )),
+                        None => errors.push(format!(
+                            "scorecards[{index}].unit_tokens[{unit_index}]: token must be a string"
+                        )),
                     }
                 }
             } else {
@@ -561,27 +818,43 @@ fn verify_metrics_and_scores<'a>(
             }
             match state {
                 "measured" => {
-                    let declared_n = item.get("n_independent_units").and_then(Value::as_u64).unwrap_or(0) as usize;
+                    let declared_n = item
+                        .get("n_independent_units")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0) as usize;
                     if token_values.len() < 2 || declared_n != token_values.len() {
                         errors.push(format!("scorecards[{index}]: measured score token count must equal n_independent_units and be at least two"));
                     }
                     if score.map_or(true, |x| !x.is_finite())
                         || low.map_or(true, |x| !x.is_finite())
-                        || high.map_or(true, |x| !x.is_finite()) {
-                        errors.push(format!("scorecards[{index}]: measured score requires finite score and CI"));
-                    } else if low.unwrap() > high.unwrap() || score.unwrap() < low.unwrap() || score.unwrap() > high.unwrap() {
-                        errors.push(format!("scorecards[{index}]: score/CI interval is inconsistent"));
-                    } else if scores.insert(
-                        key,
-                        (
-                            score.unwrap(),
-                            low.unwrap(),
-                            high.unwrap(),
-                            declared_n,
-                            unit_tokens,
-                        ),
-                    ).is_some() {
-                        errors.push(format!("scorecards[{index}]: duplicate model/metric/stratum"));
+                        || high.map_or(true, |x| !x.is_finite())
+                    {
+                        errors.push(format!(
+                            "scorecards[{index}]: measured score requires finite score and CI"
+                        ));
+                    } else if low.unwrap() > high.unwrap()
+                        || score.unwrap() < low.unwrap()
+                        || score.unwrap() > high.unwrap()
+                    {
+                        errors.push(format!(
+                            "scorecards[{index}]: score/CI interval is inconsistent"
+                        ));
+                    } else if scores
+                        .insert(
+                            key,
+                            (
+                                score.unwrap(),
+                                low.unwrap(),
+                                high.unwrap(),
+                                declared_n,
+                                unit_tokens,
+                            ),
+                        )
+                        .is_some()
+                    {
+                        errors.push(format!(
+                            "scorecards[{index}]: duplicate model/metric/stratum"
+                        ));
                     }
                 }
                 "abstained" | "failed" | "not_assessed" | "incomplete" => {
@@ -589,17 +862,29 @@ fn verify_metrics_and_scores<'a>(
                         errors.push(format!("scorecards[{index}]: non-measured state cannot carry a numeric score/CI"));
                     }
                 }
-                _ => errors.push(format!("scorecards[{index}].score_state: unsupported state")),
+                _ => errors.push(format!(
+                    "scorecards[{index}].score_state: unsupported state"
+                )),
             }
         }
     }
     if score_count == 0 {
         errors.push("results.scorecards: at least one scorecard is required".to_owned());
     }
-    let required_families: HashSet<String> = arr_at(value, &["evaluation", "baseline_matrix", "required_families"])
-        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+    let required_families: HashSet<String> = arr_at(
+        value,
+        &["evaluation", "baseline_matrix", "required_families"],
+    )
+    .into_iter()
+    .flatten()
+    .filter_map(Value::as_str)
+    .map(str::to_owned)
+    .collect();
     for (model_id, model) in models {
-        let family = model.get("model_family").and_then(Value::as_str).unwrap_or("");
+        let family = model
+            .get("model_family")
+            .and_then(Value::as_str)
+            .unwrap_or("");
         if required_families.contains(family) {
             for metric in &primary {
                 for stratum in &strata {
@@ -613,12 +898,22 @@ fn verify_metrics_and_scores<'a>(
     for metric in &primary {
         for stratum in &strata {
             let has_candidate = scores.keys().any(|(model_id, metric_id, stratum_id)| {
-                metric_id == metric && stratum_id == stratum
-                    && models.get(model_id).and_then(|m| m.get("role")).and_then(Value::as_str) == Some("candidate")
+                metric_id == metric
+                    && stratum_id == stratum
+                    && models
+                        .get(model_id)
+                        .and_then(|m| m.get("role"))
+                        .and_then(Value::as_str)
+                        == Some("candidate")
             });
             let has_baseline = scores.keys().any(|(model_id, metric_id, stratum_id)| {
-                metric_id == metric && stratum_id == stratum
-                    && models.get(model_id).and_then(|m| m.get("role")).and_then(Value::as_str) == Some("baseline")
+                metric_id == metric
+                    && stratum_id == stratum
+                    && models
+                        .get(model_id)
+                        .and_then(|m| m.get("role"))
+                        .and_then(Value::as_str)
+                        == Some("baseline")
             });
             if !has_candidate {
                 errors.push(format!("primary metric {metric}, stratum {stratum}: missing measured candidate scorecard"));
@@ -644,39 +939,80 @@ fn verify_paired(
     if let Some(comparisons) = arr_at(value, &["results", "paired_comparisons"]) {
         for (index, item) in comparisons.iter().enumerate() {
             count += 1;
-            let candidate = item.get("candidate_model_id").and_then(Value::as_str).unwrap_or("");
-            let baseline = item.get("baseline_model_id").and_then(Value::as_str).unwrap_or("");
+            let candidate = item
+                .get("candidate_model_id")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let baseline = item
+                .get("baseline_model_id")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             let metric = item.get("metric_id").and_then(Value::as_str).unwrap_or("");
             let stratum = item.get("stratum").and_then(Value::as_str).unwrap_or("");
-            if !paired_keys.insert((candidate.to_owned(), baseline.to_owned(), metric.to_owned(), stratum.to_owned())) {
+            if !paired_keys.insert((
+                candidate.to_owned(),
+                baseline.to_owned(),
+                metric.to_owned(),
+                stratum.to_owned(),
+            )) {
                 errors.push(format!("paired_comparisons[{index}]: duplicate candidate/baseline/metric/stratum comparison"));
             }
-            if models.get(candidate).and_then(|m| m.get("role")).and_then(Value::as_str) != Some("candidate") {
-                errors.push(format!("paired_comparisons[{index}]: candidate model ref/role invalid"));
+            if models
+                .get(candidate)
+                .and_then(|m| m.get("role"))
+                .and_then(Value::as_str)
+                != Some("candidate")
+            {
+                errors.push(format!(
+                    "paired_comparisons[{index}]: candidate model ref/role invalid"
+                ));
             }
-            let baseline_role = models.get(baseline).and_then(|m| m.get("role")).and_then(Value::as_str);
-            if !matches!(baseline_role, Some("baseline" | "negative_control" | "oracle_reference")) {
-                errors.push(format!("paired_comparisons[{index}]: baseline model ref/role invalid"));
+            let baseline_role = models
+                .get(baseline)
+                .and_then(|m| m.get("role"))
+                .and_then(Value::as_str);
+            if !matches!(
+                baseline_role,
+                Some("baseline" | "negative_control" | "oracle_reference")
+            ) {
+                errors.push(format!(
+                    "paired_comparisons[{index}]: baseline model ref/role invalid"
+                ));
             }
-            let candidate_score = scores.get(&(candidate.to_owned(), metric.to_owned(), stratum.to_owned()));
-            let baseline_score = scores.get(&(baseline.to_owned(), metric.to_owned(), stratum.to_owned()));
-            let (Some(candidate_score), Some(baseline_score)) = (candidate_score, baseline_score) else {
-                errors.push(format!("paired_comparisons[{index}]: paired candidate/baseline scorecards missing"));
+            let candidate_score =
+                scores.get(&(candidate.to_owned(), metric.to_owned(), stratum.to_owned()));
+            let baseline_score =
+                scores.get(&(baseline.to_owned(), metric.to_owned(), stratum.to_owned()));
+            let (Some(candidate_score), Some(baseline_score)) = (candidate_score, baseline_score)
+            else {
+                errors.push(format!(
+                    "paired_comparisons[{index}]: paired candidate/baseline scorecards missing"
+                ));
                 continue;
             };
-            match item.get("mean_candidate_minus_baseline").and_then(Value::as_f64) {
+            match item
+                .get("mean_candidate_minus_baseline")
+                .and_then(Value::as_f64)
+            {
                 Some(observed) if observed.is_finite() => {
                     let expected = candidate_score.0 - baseline_score.0;
                     if (observed - expected).abs() > TOLERANCE * expected.abs().max(1.0) {
                         errors.push(format!("paired_comparisons[{index}]: mean delta does not reconcile with scorecards"));
                     }
                 }
-                _ => errors.push(format!("paired_comparisons[{index}]: missing finite mean delta")),
+                _ => errors.push(format!(
+                    "paired_comparisons[{index}]: missing finite mean delta"
+                )),
             }
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
-            if low.map_or(true, |x| !x.is_finite()) || high.map_or(true, |x| !x.is_finite()) || low.unwrap() > high.unwrap() {
-                errors.push(format!("paired_comparisons[{index}]: CI missing, non-finite or reversed"));
+            if low.map_or(true, |x| !x.is_finite())
+                || high.map_or(true, |x| !x.is_finite())
+                || low.unwrap() > high.unwrap()
+            {
+                errors.push(format!(
+                    "paired_comparisons[{index}]: CI missing, non-finite or reversed"
+                ));
             }
             let tokens = item.get("paired_unit_tokens").and_then(Value::as_array);
             let mut token_values = Vec::new();
@@ -685,40 +1021,58 @@ fn verify_paired(
                 for token_value in tokens {
                     if let Some(token) = token_value.as_str() {
                         if !is_sha256(token) {
-                            errors.push(format!("paired_comparisons[{index}]: malformed unit token"));
+                            errors
+                                .push(format!("paired_comparisons[{index}]: malformed unit token"));
                         }
                         if !unique.insert(token.to_owned()) {
-                            errors.push(format!("paired_comparisons[{index}]: duplicate paired unit token"));
+                            errors.push(format!(
+                                "paired_comparisons[{index}]: duplicate paired unit token"
+                            ));
                         }
                         if !test_set.contains(token) {
                             errors.push(format!("paired_comparisons[{index}]: unit token is outside held-out test membership"));
                         }
                         token_values.push(token.to_owned());
                     } else {
-                        errors.push(format!("paired_comparisons[{index}]: unit token must be string"));
+                        errors.push(format!(
+                            "paired_comparisons[{index}]: unit token must be string"
+                        ));
                     }
                 }
             } else {
-                errors.push(format!("paired_comparisons[{index}]: missing paired_unit_tokens"));
+                errors.push(format!(
+                    "paired_comparisons[{index}]: missing paired_unit_tokens"
+                ));
             }
             if token_values.len() < 2 {
-                errors.push(format!("paired_comparisons[{index}]: requires at least two paired units"));
+                errors.push(format!(
+                    "paired_comparisons[{index}]: requires at least two paired units"
+                ));
             }
-            check_digest(item, &["paired_unit_manifest_sha256"], &format!("paired_comparisons[{index}].paired_unit_manifest_sha256"), &membership_digest(&token_values), errors);
-            if item.get("n_independent_units").and_then(Value::as_u64) != Some(token_values.len() as u64) {
+            check_digest(
+                item,
+                &["paired_unit_manifest_sha256"],
+                &format!("paired_comparisons[{index}].paired_unit_manifest_sha256"),
+                &membership_digest(&token_values),
+                errors,
+            );
+            if item.get("n_independent_units").and_then(Value::as_u64)
+                != Some(token_values.len() as u64)
+            {
                 errors.push(format!("paired_comparisons[{index}]: declared independent count differs from token count"));
             }
             if candidate_score.3 != token_values.len() || baseline_score.3 != token_values.len() {
                 errors.push(format!("paired_comparisons[{index}]: paired token count must equal both scorecard independent-unit counts"));
             }
-            if candidate_score.4 != baseline_score.4
-                || candidate_score.4 != unique {
+            if candidate_score.4 != baseline_score.4 || candidate_score.4 != unique {
                 errors.push(format!("paired_comparisons[{index}]: paired units must exactly match the candidate and baseline scorecard cohorts"));
             }
 
             let outcome = item.get("outcome").and_then(Value::as_str).unwrap_or("");
             let direction = directions.get(metric).copied().unwrap_or("unknown");
-            let min_effect = item.get("minimum_meaningful_effect").and_then(Value::as_f64);
+            let min_effect = item
+                .get("minimum_meaningful_effect")
+                .and_then(Value::as_f64);
             let margin = item.get("non_inferiority_margin").and_then(Value::as_f64);
             if let (Some(lo), Some(hi)) = (low, high) {
                 match (outcome, direction, min_effect, margin) {
@@ -740,23 +1094,46 @@ fn verify_paired(
         }
     }
     if count == 0 {
-        errors.push("results.paired_comparisons: at least one paired comparison required".to_owned());
+        errors
+            .push("results.paired_comparisons: at least one paired comparison required".to_owned());
     }
-    let candidates: Vec<String> = models.iter()
+    let candidates: Vec<String> = models
+        .iter()
         .filter(|(_, model)| model.get("role").and_then(Value::as_str) == Some("candidate"))
-        .map(|(id, _)| id.clone()).collect();
-    let baselines: Vec<String> = models.iter()
-        .filter(|(_, model)| matches!(model.get("role").and_then(Value::as_str), Some("baseline" | "negative_control" | "oracle_reference")))
-        .map(|(id, _)| id.clone()).collect();
+        .map(|(id, _)| id.clone())
+        .collect();
+    let baselines: Vec<String> = models
+        .iter()
+        .filter(|(_, model)| {
+            matches!(
+                model.get("role").and_then(Value::as_str),
+                Some("baseline" | "negative_control" | "oracle_reference")
+            )
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
     let metrics: Vec<String> = arr_at(value, &["evaluation", "primary_metric_ids"])
-        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
     let strata: Vec<String> = arr_at(value, &["evaluation", "strata"])
-        .into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
     for candidate in &candidates {
         for baseline in &baselines {
             for metric in &metrics {
                 for stratum in &strata {
-                    if !paired_keys.contains(&(candidate.clone(), baseline.clone(), metric.clone(), stratum.clone())) {
+                    if !paired_keys.contains(&(
+                        candidate.clone(),
+                        baseline.clone(),
+                        metric.clone(),
+                        stratum.clone(),
+                    )) {
                         errors.push(format!("paired_comparisons: missing paired comparison {candidate} vs {baseline} for {metric}/{stratum}"));
                     }
                 }
@@ -782,20 +1159,36 @@ fn verify_calibration(
             }
             if !metric_families.contains_key(metric) {
                 errors.push(format!("calibration[{index}].metric_id: unresolved"));
-            } else if metric_families.get(metric).map(String::as_str) != Some("predictive_interval_coverage") {
-                errors.push(format!("calibration[{index}].metric_id: metric is not predictive_interval_coverage"));
+            } else if metric_families.get(metric).map(String::as_str)
+                != Some("predictive_interval_coverage")
+            {
+                errors.push(format!(
+                    "calibration[{index}].metric_id: metric is not predictive_interval_coverage"
+                ));
             }
             for field in ["nominal_coverage", "observed_coverage"] {
                 match item.get(field).and_then(Value::as_f64) {
                     Some(x) if (0.0..=1.0).contains(&x) => {}
-                    _ => errors.push(format!("calibration[{index}].{field}: expected a proportion in [0,1]")),
+                    _ => errors.push(format!(
+                        "calibration[{index}].{field}: expected a proportion in [0,1]"
+                    )),
                 }
             }
-            if item.get("interval_sharpness").and_then(Value::as_f64).is_none_or(|x| !x.is_finite() || x < 0.0) {
+            if item
+                .get("interval_sharpness")
+                .and_then(Value::as_f64)
+                .is_none_or(|x| !x.is_finite() || x < 0.0)
+            {
                 errors.push(format!("calibration[{index}].interval_sharpness: invalid"));
             }
-            if item.get("n_independent_units").and_then(Value::as_u64).is_none_or(|n| n < 2) {
-                errors.push(format!("calibration[{index}]: requires at least two independent units"));
+            if item
+                .get("n_independent_units")
+                .and_then(Value::as_u64)
+                .is_none_or(|n| n < 2)
+            {
+                errors.push(format!(
+                    "calibration[{index}]: requires at least two independent units"
+                ));
             }
         }
     }
@@ -805,12 +1198,13 @@ fn verify_calibration(
 }
 
 fn verify_failures(value: &Value, models: &HashMap<String, &Value>, errors: &mut Vec<String>) {
-    let intervention_ids: HashSet<String> = arr_at(value, &["intervention_design", "selected_interventions"])
-        .into_iter()
-        .flatten()
-        .filter_map(|item| item.get("intervention_id").and_then(Value::as_str))
-        .map(str::to_owned)
-        .collect();
+    let intervention_ids: HashSet<String> =
+        arr_at(value, &["intervention_design", "selected_interventions"])
+            .into_iter()
+            .flatten()
+            .filter_map(|item| item.get("intervention_id").and_then(Value::as_str))
+            .map(str::to_owned)
+            .collect();
     if let Some(failures) = arr_at(value, &["results", "failures"]) {
         for (index, failure) in failures.iter().enumerate() {
             if let Some(model_id) = failure.get("model_id").and_then(Value::as_str) {
@@ -820,10 +1214,16 @@ fn verify_failures(value: &Value, models: &HashMap<String, &Value>, errors: &mut
             }
             if let Some(intervention_id) = failure.get("intervention_id").and_then(Value::as_str) {
                 if !intervention_ids.contains(intervention_id) {
-                    errors.push(format!("results.failures[{index}].intervention_id: unresolved"));
+                    errors.push(format!(
+                        "results.failures[{index}].intervention_id: unresolved"
+                    ));
                 }
             }
-            if failure.get("count").and_then(Value::as_u64).is_none_or(|count| count == 0) {
+            if failure
+                .get("count")
+                .and_then(Value::as_u64)
+                .is_none_or(|count| count == 0)
+            {
                 errors.push(format!("results.failures[{index}].count: must be positive"));
             }
         }
@@ -836,23 +1236,38 @@ fn verify_complete(value: &Value) -> Vec<String> {
     verify_artifacts(value, &mut errors);
     let test_set = verify_split(value, &mut errors);
     if str_at(value, &["results", "status"]) != Some("complete") {
-        errors.push("results.status: run_state complete requires results.status complete".to_owned());
+        errors
+            .push("results.status: run_state complete requires results.status complete".to_owned());
     }
     let (models, families) = verify_models(value, &mut errors);
     verify_interventions(value, &families, &mut errors);
     if str_at(value, &["budgets", "comparison_mode"]) == Some("matched_budget") {
         if str_at(value, &["budgets", "training_budget_policy"]) != Some("matched")
-            || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched") {
-            errors.push("budgets: matched comparison requires matched training/evaluation policies".to_owned());
+            || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched")
+        {
+            errors.push(
+                "budgets: matched comparison requires matched training/evaluation policies"
+                    .to_owned(),
+            );
         }
     }
     if str_at(value, &["evaluation", "uncertainty", "method_id"]) == Some("none_not_eligible") {
-        errors.push("evaluation.uncertainty: complete run requires an uncertainty method".to_owned());
+        errors
+            .push("evaluation.uncertainty: complete run requires an uncertainty method".to_owned());
     }
-    if at(value, &["evaluation", "uncertainty", "minimum_independent_units"]).and_then(Value::as_u64).is_none_or(|n| n < 2) {
-        errors.push("evaluation.uncertainty.minimum_independent_units: requires at least two".to_owned());
+    if at(
+        value,
+        &["evaluation", "uncertainty", "minimum_independent_units"],
+    )
+    .and_then(Value::as_u64)
+    .is_none_or(|n| n < 2)
+    {
+        errors.push(
+            "evaluation.uncertainty.minimum_independent_units: requires at least two".to_owned(),
+        );
     }
-    let (directions, metric_families, scores) = verify_metrics_and_scores(value, &models, &test_set, &mut errors);
+    let (directions, metric_families, scores) =
+        verify_metrics_and_scores(value, &models, &test_set, &mut errors);
     verify_paired(value, &models, &directions, &scores, &test_set, &mut errors);
     verify_calibration(value, &models, &metric_families, &mut errors);
     verify_failures(value, &models, &mut errors);
@@ -870,13 +1285,20 @@ fn verify_manifest(value: &Value) -> Report {
     let mut claim_errors = Vec::new();
     verify_claim_ceiling(value, &mut claim_errors);
     if !claim_errors.is_empty() {
-        return Report { disposition: "INVALID", errors: claim_errors, warnings: Vec::new() };
+        return Report {
+            disposition: "INVALID",
+            errors: claim_errors,
+            warnings: Vec::new(),
+        };
     }
     match str_at(value, &["run_state"]) {
         Some("incomplete" | "planned" | "running") => Report {
             disposition: "INCOMPLETE",
             errors: Vec::new(),
-            warnings: vec!["Planning/incomplete manifests are not completion passes or biological results.".to_owned()],
+            warnings: vec![
+                "Planning/incomplete manifests are not completion passes or biological results."
+                    .to_owned(),
+            ],
         },
         Some("failed" | "invalid") => Report {
             disposition: "NOT_COMPLETE",
@@ -891,10 +1313,17 @@ fn verify_manifest(value: &Value) -> Report {
                 Report {
                     disposition: "COMPLETE",
                     errors,
-                    warnings: vec!["Semantic contract passed; biological validity is not established.".to_owned()],
+                    warnings: vec![
+                        "Semantic contract passed; biological validity is not established."
+                            .to_owned(),
+                    ],
                 }
             } else {
-                Report { disposition: "INVALID", errors, warnings: Vec::new() }
+                Report {
+                    disposition: "INVALID",
+                    errors,
+                    warnings: Vec::new(),
+                }
             }
         }
         _ => Report {
@@ -906,7 +1335,10 @@ fn verify_manifest(value: &Value) -> Report {
 }
 
 fn main() {
-    let path = env::args_os().nth(1).map(PathBuf::from).unwrap_or_else(|| PathBuf::from(EXAMPLE));
+    let path = env::args_os()
+        .nth(1)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(EXAMPLE));
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
         Err(error) => {
@@ -968,7 +1400,12 @@ mod tests {
         })
     }
 
-    fn fixture_paired_comparison(baseline_id: &str, baseline_score: f64, low: f64, high: f64) -> Value {
+    fn fixture_paired_comparison(
+        baseline_id: &str,
+        baseline_score: f64,
+        low: f64,
+        high: f64,
+    ) -> Value {
         let pair = vec![token(4), token(5)];
         json!({
             "candidate_model_id":"candidate","baseline_model_id":baseline_id,"metric_id":"nll","stratum":"overall",
@@ -994,13 +1431,17 @@ mod tests {
             json!({"model_id":"candidate","role":"candidate","model_family":"graph_constrained_state_space","hypothesis_id":"H_GRAPH","code_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","config_sha256":config,"parameter_count":10,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("structural"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"candidate"}),
             json!({"model_id":"activity","role":"baseline","model_family":"activity_only","hypothesis_id":null,"code_commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","config_sha256":config,"parameter_count":8,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"activity baseline"}),
             json!({"model_id":"linear","role":"baseline","model_family":"linear_lds_var_glm","hypothesis_id":"H_LINEAR","code_commit_sha":"cccccccccccccccccccccccccccccccccccccccc","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"linear baseline"}),
-            json!({"model_id":"rewired","role":"negative_control","model_family":"degree_type_rewired","hypothesis_id":null,"code_commit_sha":"dddddddddddddddddddddddddddddddddddddddd","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("rewired"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"negative control"})
+            json!({"model_id":"rewired","role":"negative_control","model_family":"degree_type_rewired","hypothesis_id":null,"code_commit_sha":"dddddddddddddddddddddddddddddddddddddddd","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("rewired"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"negative control"}),
         ];
         let selected_interventions = vec![
             fixture_intervention("primary", "intervention", &["n-1"]),
             fixture_intervention("sham", "sham", &["n-1"]),
             fixture_intervention("single-control", "single_target_control", &["n-1"]),
-            fixture_intervention("combination-control", "combination_control", &["n-1", "n-2"]),
+            fixture_intervention(
+                "combination-control",
+                "combination_control",
+                &["n-1", "n-2"],
+            ),
         ];
         let scorecards = vec![
             fixture_scorecard("candidate", 0.8, 0.7, 0.9),
@@ -1072,14 +1513,18 @@ mod tests {
         let a = vec![token(2), token(1)];
         let b = vec![token(1), token(2)];
         assert_eq!(membership_digest(&a), membership_digest(&b));
-        assert_ne!(membership_digest(&a), sha256_hex(b.iter().cloned().collect::<Vec<_>>().join("\n").as_bytes()));
+        assert_ne!(
+            membership_digest(&a),
+            sha256_hex(b.iter().cloned().collect::<Vec<_>>().join("\n").as_bytes())
+        );
     }
 
     #[test]
     fn incomplete_public_example_is_not_promoted_to_complete() {
         let value: Value = serde_json::from_str(include_str!(
             "../../../docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_EXAMPLE_V1.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.errors.is_empty());
@@ -1096,12 +1541,21 @@ mod tests {
         let mut value = complete_fixture();
         let overlap = value["split"]["train_unit_tokens"][0].clone();
         value["split"]["test_unit_tokens"][0] = overlap;
-        let test = value["split"]["test_unit_tokens"].as_array().unwrap().iter()
-            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        let test = value["split"]["test_unit_tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
         value["split"]["test_membership_sha256"] = json!(membership_digest(&test));
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("train/test overlap")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("train/test overlap"))
+        );
     }
 
     #[test]
@@ -1117,52 +1571,96 @@ mod tests {
     fn paired_units_must_be_members_of_test_split() {
         let mut value = complete_fixture();
         value["results"]["paired_comparisons"][0]["paired_unit_tokens"][0] = json!(token(99));
-        let pair = value["results"]["paired_comparisons"][0]["paired_unit_tokens"].as_array().unwrap().iter()
-            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
-        value["results"]["paired_comparisons"][0]["paired_unit_manifest_sha256"] = json!(membership_digest(&pair));
+        let pair = value["results"]["paired_comparisons"][0]["paired_unit_tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        value["results"]["paired_comparisons"][0]["paired_unit_manifest_sha256"] =
+            json!(membership_digest(&pair));
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("outside held-out test membership")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("outside held-out test membership"))
+        );
     }
 
     #[test]
     fn paired_scorecards_must_use_the_identical_unit_cohort() {
         let mut value = complete_fixture();
-        value["split"]["test_unit_tokens"].as_array_mut().unwrap().push(json!(token(6)));
-        let test = value["split"]["test_unit_tokens"].as_array().unwrap().iter()
-            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        value["split"]["test_unit_tokens"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(token(6)));
+        let test = value["split"]["test_unit_tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
         value["split"]["test_membership_sha256"] = json!(membership_digest(&test));
 
         // Candidate cohort is [4,5]; baseline cohort becomes [4,6]. Both have
         // n=2, both are in the declared test split, but they are not paired.
         value["results"]["scorecards"][1]["unit_tokens"][1] = json!(token(6));
-        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"].as_array().unwrap().iter()
-            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
-        value["results"]["scorecards"][1]["unit_manifest_sha256"] = json!(membership_digest(&baseline_units));
+        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        value["results"]["scorecards"][1]["unit_manifest_sha256"] =
+            json!(membership_digest(&baseline_units));
 
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("paired units must exactly match")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("paired units must exactly match"))
+        );
     }
 
     #[test]
     fn paired_scorecards_must_use_the_identical_unit_cohort() {
         let mut value = complete_fixture();
-        value["split"]["test_unit_tokens"].as_array_mut().unwrap().push(json!(token(6)));
-        let test = value["split"]["test_unit_tokens"].as_array().unwrap().iter()
-            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        value["split"]["test_unit_tokens"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(token(6)));
+        let test = value["split"]["test_unit_tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
         value["split"]["test_membership_sha256"] = json!(membership_digest(&test));
 
         // Both candidate and baseline have n=2 and remain within the test set,
         // but the baseline cohort differs by one pseudonymous unit.
         value["results"]["scorecards"][1]["unit_tokens"][1] = json!(token(6));
-        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"].as_array().unwrap().iter()
-            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
-        value["results"]["scorecards"][1]["unit_manifest_sha256"] = json!(membership_digest(&baseline_units));
+        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        value["results"]["scorecards"][1]["unit_manifest_sha256"] =
+            json!(membership_digest(&baseline_units));
 
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("paired units must exactly match")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("paired units must exactly match"))
+        );
     }
 
     #[test]
@@ -1171,7 +1669,12 @@ mod tests {
         value["hypothesis_set"][0]["prior_probability"] = json!(0.9);
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("prior probabilities sum")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("prior probabilities sum"))
+        );
     }
 
     #[test]
@@ -1180,17 +1683,30 @@ mod tests {
         value["intervention_design"]["selected_interventions"][1]["control_role"] = json!("other");
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("declared sham control has no materialized")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("declared sham control has no materialized"))
+        );
     }
 
     #[test]
     fn duplicate_paired_comparison_is_rejected() {
         let mut value = complete_fixture();
         let duplicate = value["results"]["paired_comparisons"][0].clone();
-        value["results"]["paired_comparisons"].as_array_mut().unwrap().push(duplicate);
+        value["results"]["paired_comparisons"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("duplicate candidate/baseline/metric/stratum")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("duplicate candidate/baseline/metric/stratum"))
+        );
     }
 
     #[test]
@@ -1199,7 +1715,12 @@ mod tests {
         value["results"]["paired_comparisons"][0]["mean_candidate_minus_baseline"] = json!(-0.8);
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("mean delta does not reconcile")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("mean delta does not reconcile"))
+        );
     }
 
     #[test]
@@ -1208,7 +1729,12 @@ mod tests {
         value["evaluation"]["baseline_matrix"]["unavailable_families"] = json!([]);
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("neither implemented nor explicitly unavailable")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("neither implemented nor explicitly unavailable"))
+        );
     }
 
     #[test]
@@ -1217,7 +1743,12 @@ mod tests {
         value["results"]["scorecards"][0]["model_id"] = json!("unresolved");
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("unresolved unresolved")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("unresolved unresolved"))
+        );
     }
 
     #[test]
@@ -1229,7 +1760,17 @@ mod tests {
         value["source"]["rights_state"] = json!("unknown");
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|e| e.contains("documented_permitted")));
-        assert!(report.errors.iter().any(|e| e.contains("permission_receipt_sha256")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("documented_permitted"))
+        );
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("permission_receipt_sha256"))
+        );
     }
 }
