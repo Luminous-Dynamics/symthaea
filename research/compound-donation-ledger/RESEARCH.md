@@ -283,7 +283,7 @@ For any actual e-BH rejection rank \(k\), choose the largest power of two
 \[
 K_r/P_E
 \le
-\frac{2Q}{1-Q/P}\,h_k+O(P_E^{-1}).
+\frac{2Q}{1-Q/P}\,h_k+O(Q/P_E).
 \]
 Thus the raw-evidence penalty relative to the e-BH boundary is
 \(O(\log m)\), while the square-root adjuster requires raw supremum
