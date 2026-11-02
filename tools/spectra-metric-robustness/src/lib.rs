@@ -40,6 +40,8 @@ pub enum StressWorld {
     SensitivityDrift,
     CriterionDrift,
     ParticipantHeterogeneity,
+    MissingCompletelyAtRandom,
+    MissingAtRandomBySession,
     OutcomeDependentMissingness,
     CovariateLeakage,
 }
@@ -54,6 +56,8 @@ impl StressWorld {
         Self::SensitivityDrift,
         Self::CriterionDrift,
         Self::ParticipantHeterogeneity,
+        Self::MissingCompletelyAtRandom,
+        Self::MissingAtRandomBySession,
         Self::OutcomeDependentMissingness,
         Self::CovariateLeakage,
     ];
@@ -68,6 +72,8 @@ impl StressWorld {
             Self::SensitivityDrift => "sensitivity_drift",
             Self::CriterionDrift => "criterion_drift",
             Self::ParticipantHeterogeneity => "participant_heterogeneity",
+            Self::MissingCompletelyAtRandom => "missing_completely_at_random",
+            Self::MissingAtRandomBySession => "missing_at_random_by_session",
             Self::OutcomeDependentMissingness => "outcome_dependent_missingness",
             Self::CovariateLeakage => "covariate_leakage",
         }
@@ -187,6 +193,7 @@ pub enum DiagnosticFlag {
     TemporalCriterionDrift,
     ParticipantHeterogeneity,
     DifferentialMissingness,
+    TemporalMissingness,
     AuxiliaryChannelLeakage,
 }
 
@@ -200,6 +207,7 @@ impl DiagnosticFlag {
             Self::TemporalCriterionDrift => "temporal_criterion_drift",
             Self::ParticipantHeterogeneity => "participant_heterogeneity",
             Self::DifferentialMissingness => "differential_missingness",
+            Self::TemporalMissingness => "temporal_missingness",
             Self::AuxiliaryChannelLeakage => "auxiliary_channel_leakage",
         }
     }
@@ -251,6 +259,7 @@ pub struct RobustnessReport {
     pub participant_d_prime_sd: Option<f64>,
     pub signal_missing_rate: f64,
     pub noise_missing_rate: f64,
+    pub session_missingness_range: f64,
     pub auxiliary_channel_auc: f64,
     pub flags: Vec<DiagnosticFlag>,
     pub disposition: MetricDisposition,
@@ -343,12 +352,16 @@ pub fn simulate(
                     auxiliary_rng.standard_normal()
                 };
 
-                let is_missing = if world == StressWorld::OutcomeDependentMissingness {
-                    let probability = if is_signal && response { 1.0 } else { 0.05 };
-                    missing_rng.uniform() < probability
-                } else {
-                    false
+                let missing_probability = match world {
+                    StressWorld::MissingCompletelyAtRandom => 0.15,
+                    StressWorld::MissingAtRandomBySession => 0.05 + 0.45 * session_fraction,
+                    StressWorld::OutcomeDependentMissingness => {
+                        if is_signal && response { 1.0 } else { 0.05 }
+                    }
+                    _ => 0.0,
                 };
+                let is_missing = missing_probability > 0.0
+                    && missing_rng.uniform() < missing_probability;
 
                 let participant_id =
                     u32::try_from(participant).map_err(|_| RobustnessError::CountOverflow)?;
@@ -412,6 +425,7 @@ pub fn evaluate(
     let mut main_observations = Vec::new();
     let mut observed_by_class = [0usize; 2];
     let mut missing_by_class = [0usize; 2];
+    let mut missing_by_session: BTreeMap<u32, (usize, usize)> = BTreeMap::new();
 
     for index in 0..n {
         let row = candidate.trials[index];
@@ -433,8 +447,10 @@ pub fn evaluate(
             score: row.auxiliary_score,
             is_signal,
         });
-
+        let session_counts = missing_by_session.entry(row.session_id).or_default();
+        session_counts.1 += 1;
         if truth.missing[index] {
+            session_counts.0 += 1;
             if row.evidence_score.is_some() {
                 return Err(RobustnessError::MisalignedRecords);
             }
@@ -511,6 +527,17 @@ pub fn evaluate(
     let noise_missing_rate =
         missing_by_class[0] as f64 / (missing_by_class[0] + observed_by_class[0]) as f64;
     let overall_missing_rate = (missing_by_class[0] + missing_by_class[1]) as f64 / n as f64;
+    let session_rates: Vec<f64> = missing_by_session
+        .values()
+        .filter(|(_, total)| *total > 0)
+        .map(|(missing, total)| *missing as f64 / *total as f64)
+        .collect();
+    let session_missingness_range = if session_rates.is_empty() {
+        0.0
+    } else {
+        session_rates.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+            - session_rates.iter().copied().fold(f64::INFINITY, f64::min)
+    };
 
     let mut flags = Vec::new();
     if !(VARIANCE_RATIO_LOW..=VARIANCE_RATIO_HIGH).contains(&variance_ratio) {
@@ -536,6 +563,9 @@ pub fn evaluate(
     }
     if (signal_missing_rate - noise_missing_rate).abs() > MISSINGNESS_GAP_LIMIT {
         flags.push(DiagnosticFlag::DifferentialMissingness);
+    }
+    if session_missingness_range > 0.15 {
+        flags.push(DiagnosticFlag::TemporalMissingness);
     }
     if !(AUXILIARY_AUC_LOW..=AUXILIARY_AUC_HIGH).contains(&aux_roc.auc) {
         flags.push(DiagnosticFlag::AuxiliaryChannelLeakage);
@@ -578,6 +608,7 @@ pub fn evaluate(
         participant_d_prime_sd: participant_sd,
         signal_missing_rate,
         noise_missing_rate,
+        session_missingness_range,
         auxiliary_channel_auc: aux_roc.auc,
         flags,
         disposition,
@@ -855,6 +886,21 @@ mod tests {
     fn participant_heterogeneity_is_reported() {
         let result = report(StressWorld::ParticipantHeterogeneity, 0x5EED_2026);
         assert!(result.flags.contains(&DiagnosticFlag::ParticipantHeterogeneity));
+    }
+
+    #[test]
+    fn missing_completely_at_random_is_not_mislabelled_as_differential_or_temporal() {
+        let result = report(StressWorld::MissingCompletelyAtRandom, 0x5EED_2026);
+        assert!(result.missing_trials > 0);
+        assert!(!result.flags.contains(&DiagnosticFlag::DifferentialMissingness));
+        assert!(!result.flags.contains(&DiagnosticFlag::TemporalMissingness));
+    }
+
+    #[test]
+    fn observed_session_related_missingness_is_flagged_separately() {
+        let result = report(StressWorld::MissingAtRandomBySession, 0x5EED_2026);
+        assert!(result.session_missingness_range > 0.15);
+        assert!(result.flags.contains(&DiagnosticFlag::TemporalMissingness));
     }
 
     #[test]
