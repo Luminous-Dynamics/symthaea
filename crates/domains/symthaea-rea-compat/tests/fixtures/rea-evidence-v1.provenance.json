@@ -1,0 +1,39 @@
+{
+  "schema": "luminous.rea-evidence-reference-vector.v1",
+  "status": "source_derived_reference_vector_not_upstream_package_execution",
+  "source": {
+    "repository": "https://github.com/morluto/rea",
+    "commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
+    "evidence_source": "src/domain/evidence.ts",
+    "canonical_digest_source": "src/domain/canonicalDigest.ts",
+    "analysis_profile_source": "src/domain/analysisProfile.ts"
+  },
+  "generator": {
+    "runtime": "Node.js 22.16.0",
+    "method": "independent source-derived projection using ECMAScript JSON.stringify primitive serialization and JavaScript Object.keys(...).sort() ordering",
+    "upstream_rea_package_executed": false,
+    "notes": "This is a deterministic known-answer vector derived from the pinned source contract. The next parity stage must add vectors emitted by running upstream REA itself."
+  },
+  "expected": {
+    "analysis_profile_digest": "ff7fbe668a874e8ad9cf87ca1bd96201dacd8bf83fbcbee44cd37b2a5c8c8db4",
+    "evidence_id": "ev_a4e49bdca4cbf80c2ec8e4d7eba116af403bc33a4937ffb7fca00b6aab6590c4",
+    "subject_identity": {
+      "digest": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "format": "apk",
+      "architecture": null
+    },
+    "non_semantic_fields": [
+      "subject.name",
+      "subject.local_path",
+      "caller_input_path"
+    ]
+  },
+  "canonicalization": {
+    "format": "RFC 8785 JCS / ECMAScript JSON primitive serialization",
+    "semantic_object_keys_are_sorted": true,
+    "unicode_key_order": "UTF-16 code units",
+    "number_format": "ECMAScript-compatible IEEE-754 binary64"
+  }
+}
