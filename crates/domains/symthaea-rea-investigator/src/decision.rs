@@ -384,6 +384,150 @@ struct CandidateDecisionData {
     worst_regret: f64,
 }
 
+/// Find the deterministic outcome-to-decision policy with minimum maximum
+/// expected regret over the supplied finite scenario set.
+///
+/// This is an exact finite search, not a guarantee over environments outside
+/// the supplied scenario set. The checked policy-count cap prevents accidental
+/// exponential work; the caller receives an explicit rejection on overflow or
+/// budget exhaustion. Ties resolve lexicographically by decision IDs in the
+/// declared outcome order.
+fn minimax_shared_policy(
+    outcomes: &[String],
+    scenario_results: &[super::robust::ScenarioInformationGain],
+    decisions: &[TerminalDecision],
+    utility_maps: &[BTreeMap<String, f64>],
+    prior_distribution: &BTreeMap<String, f64>,
+    max_policy_evaluations: usize,
+) -> Result<HashMap<String, String>, DecisionError> {
+    if outcomes.is_empty() || decisions.is_empty() || scenario_results.is_empty() {
+        return Err(DecisionError::new(
+            DecisionErrorKind::InconsistentScenarioOutput,
+            "minimax-regret search requires outcomes, decisions and scenarios",
+        ));
+    }
+
+    let outcome_count = u32::try_from(outcomes.len()).map_err(|_| {
+        DecisionError::new(
+            DecisionErrorKind::PolicySearchBudgetExceeded,
+            "outcome count exceeds exact minimax policy-search indexing",
+        )
+    })?;
+    let policy_count = decisions
+        .len()
+        .checked_pow(outcome_count)
+        .ok_or_else(|| {
+            DecisionError::new(
+                DecisionErrorKind::PolicySearchBudgetExceeded,
+                "minimax-regret policy count overflowed usize",
+            )
+        })?;
+    if policy_count > max_policy_evaluations {
+        return Err(DecisionError::new(
+            DecisionErrorKind::PolicySearchBudgetExceeded,
+            format!(
+                "exact minimax-regret search requires {policy_count} policies; configured cap is {max_policy_evaluations}"
+            ),
+        ));
+    }
+
+    let mut decision_order: Vec<usize> = (0..decisions.len()).collect();
+    decision_order.sort_by(|left, right| decisions[*left].id.cmp(&decisions[*right].id));
+
+    let mut best_worst_regret = f64::INFINITY;
+    let mut best_policy_key: Option<Vec<String>> = None;
+    let mut best_policy: Option<HashMap<String, String>> = None;
+
+    for ordinal in 0..policy_count {
+        // Decode with the final outcome as the least-significant digit. With
+        // decisions sorted by ID this visits policies in lexical order.
+        let mut remainder = ordinal;
+        let mut selected_indices = vec![0usize; outcomes.len()];
+        for outcome_index in (0..outcomes.len()).rev() {
+            let digit = remainder % decisions.len();
+            remainder /= decisions.len();
+            selected_indices[outcome_index] = decision_order[digit];
+        }
+
+        let policy_key: Vec<String> = selected_indices
+            .iter()
+            .map(|index| decisions[*index].id.clone())
+            .collect();
+
+        let mut worst_regret = 0.0f64;
+        for scenario in scenario_results {
+            if scenario.predicted_outcomes.len() != outcomes.len()
+                || scenario
+                    .predicted_outcomes
+                    .iter()
+                    .zip(outcomes)
+                    .any(|(item, expected)| item.outcome != *expected)
+            {
+                return Err(DecisionError::new(
+                    DecisionErrorKind::InconsistentScenarioOutput,
+                    "scenario outcome labels/order differ during minimax-regret search",
+                ));
+            }
+
+            let mut expected_regret = 0.0;
+            for (outcome_index, predicted) in
+                scenario.predicted_outcomes.iter().enumerate()
+            {
+                let posterior: BTreeMap<String, f64> =
+                    predicted.posterior.iter().cloned().collect();
+                if posterior.keys().ne(prior_distribution.keys()) {
+                    return Err(DecisionError::new(
+                        DecisionErrorKind::InconsistentScenarioOutput,
+                        "scenario posterior hypothesis set differs from planner prior",
+                    ));
+                }
+
+                let (_, optimal_utility) =
+                    best_decision(decisions, utility_maps, &posterior);
+                let selected_index = selected_indices[outcome_index];
+                let selected_utility = posterior
+                    .iter()
+                    .map(|(hypothesis_id, probability)| {
+                        probability * utility_maps[selected_index][hypothesis_id]
+                    })
+                    .sum::<f64>();
+                expected_regret +=
+                    predicted.probability * (optimal_utility - selected_utility).max(0.0);
+            }
+            worst_regret = worst_regret.max(expected_regret);
+        }
+
+        let replace = match best_policy_key.as_ref() {
+            None => true,
+            Some(current_key) => {
+                worst_regret.total_cmp(&best_worst_regret).is_lt()
+                    || (worst_regret.total_cmp(&best_worst_regret).is_eq()
+                        && policy_key < *current_key)
+            }
+        };
+        if replace {
+            best_worst_regret = worst_regret;
+            best_policy_key = Some(policy_key);
+            best_policy = Some(
+                outcomes
+                    .iter()
+                    .zip(&selected_indices)
+                    .map(|(outcome, index)| {
+                        (outcome.clone(), decisions[*index].id.clone())
+                    })
+                    .collect(),
+            );
+        }
+    }
+
+    best_policy.ok_or_else(|| {
+        DecisionError::new(
+            DecisionErrorKind::InconsistentScenarioOutput,
+            "minimax-regret search produced no deterministic policy",
+        )
+    })
+}
+
 fn evaluate_candidate(
     experiment_id: &str,
     scenario_results: &[super::robust::ScenarioInformationGain],
