@@ -1040,6 +1040,22 @@ mod tests {
     }
 
     #[test]
+    fn rejects_path_outcomes_that_do_not_reconstruct_nominal_receipts() {
+        let plan = nominal_plan();
+        let mut wrong_null = request(&plan);
+        wrong_null.null_models[0].policy_samples[0].path_rejection_probabilities = vec![0.2, 0.2];
+        assert!(calibrate_finite_tv_ambiguity_envelope(&plan, &wrong_null).is_err());
+
+        let mut wrong_alternative = request(&plan);
+        wrong_alternative.alternatives[0].policy_samples[0].path_decision_utilities = vec![1.0, 1.0];
+        assert!(calibrate_finite_tv_ambiguity_envelope(&plan, &wrong_alternative).is_err());
+
+        let mut wrong_cost = request(&plan);
+        wrong_cost.alternatives[0].policy_samples[0].path_evaluator_costs = vec![5.0, 5.0];
+        assert!(calibrate_finite_tv_ambiguity_envelope(&plan, &wrong_cost).is_err());
+    }
+
+    #[test]
     fn rejects_invalid_counts_probabilities_and_support_bounds() {
         let plan = nominal_plan();
         let mut bad_counts = request(&plan);
