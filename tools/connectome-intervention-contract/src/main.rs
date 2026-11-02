@@ -605,7 +605,7 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
         errors,
     );
     let selected = arr_at(value, &["intervention_design", "selected_interventions"]);
-    if selected.is_none_or( Vec::is_empty) {
+    if selected.is_none_or(Vec::is_empty) {
         errors.push(
             "intervention_design.selected_interventions: at least one is required".to_owned(),
         );
@@ -616,7 +616,7 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
     if let Some(items) = selected {
         for (index, item) in items.iter().enumerate() {
             let id = item.get("intervention_id").and_then(Value::as_str);
-            if id.is_none_or( str::is_empty) {
+            if id.is_none_or(str::is_empty) {
                 errors.push(format!("selected_interventions[{index}]: missing ID"));
             } else if !ids.insert(id.unwrap().to_owned()) {
                 errors.push(format!("selected_interventions[{index}]: duplicate ID"));
@@ -653,13 +653,13 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
                 ));
             }
             let targets = item.get("target_ids").and_then(Value::as_array);
-            if targets.is_none_or( Vec::is_empty) {
+            if targets.is_none_or(Vec::is_empty) {
                 errors.push(format!("selected_interventions[{index}]: no target IDs"));
             }
             if item
                 .get("protocol_sha256")
                 .and_then(Value::as_str)
-                .is_none_or( |s| !is_sha256(s))
+                .is_none_or(|s| !is_sha256(s))
             {
                 errors.push(format!(
                     "selected_interventions[{index}]: missing protocol digest"
@@ -830,9 +830,9 @@ fn verify_metrics_and_scores(
                     if token_values.len() < 2 || declared_n != token_values.len() {
                         errors.push(format!("scorecards[{index}]: measured score token count must equal n_independent_units and be at least two"));
                     }
-                    if score.is_none_or( |x| !x.is_finite())
-                        || low.is_none_or( |x| !x.is_finite())
-                        || high.is_none_or( |x| !x.is_finite())
+                    if score.is_none_or(|x| !x.is_finite())
+                        || low.is_none_or(|x| !x.is_finite())
+                        || high.is_none_or(|x| !x.is_finite())
                     {
                         errors.push(format!(
                             "scorecards[{index}]: measured score requires finite score and CI"
@@ -1011,8 +1011,8 @@ fn verify_paired(
             }
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
-            if low.is_none_or( |x| !x.is_finite())
-                || high.is_none_or( |x| !x.is_finite())
+            if low.is_none_or(|x| !x.is_finite())
+                || high.is_none_or(|x| !x.is_finite())
                 || low.unwrap() > high.unwrap()
             {
                 errors.push(format!(
@@ -1251,8 +1251,7 @@ fn verify_complete(value: &Value) -> Vec<String> {
             || str_at(value, &["budgets", "evaluation_budget_policy"]) != Some("matched"))
     {
         errors.push(
-            "budgets: matched comparison requires matched training/evaluation policies"
-                .to_owned(),
+            "budgets: matched comparison requires matched training/evaluation policies".to_owned(),
         );
     }
     if str_at(value, &["evaluation", "uncertainty", "method_id"]) == Some("none_not_eligible") {
