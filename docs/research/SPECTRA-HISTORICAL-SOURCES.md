@@ -279,6 +279,53 @@ https://www.kirkusreviews.com/book-reviews/a/-146/beyond-telepathy/
 5. Mark where Puharich's published account is incomplete, inconsistent or differs from the later sources; do not silently harmonize discrepancies.
 6. Seek the underlying journals/raw trial logs separately. A first-person published account is not the same as a complete raw dataset or independent replication.
 
+## PH-019 — Stone–Hurkos cage / negative-ion factorial-confounding account
+
+**Document:** Andrija Puharich, Beyond Telepathy, original text ©1962; 1973 Anchor Press reprint, Appendix A / Garrett and Hurkos experimental discussion. The accessible scan is a third-party OCR copy, not an authenticated original-edition page image:
+https://pdfcoffee.com/beyond-telepathy-pdf-free.html
+
+**Source locators:** web sources turn703852view0, turn703852view3 and turn176380view0. The OCR table layout is corrupted/interleaved in parts; original page images and the complete appendix must be checked before treating every table entry as exact.
+
+**Classification:** P1 for Puharich's own published narrative; not raw trial data, independent verification or source-image-authenticated table extraction.
+
+### What Puharich reports
+
+- Harry Stone is described as sender and Peter Hurkos as receiver.
+- Room control without ion generator: 140 trials, 30 hits.
+- Floating-cage control without ion generator: 100 trials, 24 hits.
+- Test condition: cage walls described as -10 kV DC or higher relative to ground, with a negative-ion generator operating; the account reports 570 trials and 246 hits.
+- A summary reports average hits per ten trials of 2.25 for the combined control series and 4.31 for the test series.
+
+These counts and table alignments require original-page-image verification. They are published historical claims, not raw logs. Do not derive a modern p-value, effect prior, sample-size assumption or acceptance threshold from the OCR summary.
+
+### Main causal limitation
+
+The historical test condition bundles at least two interventions:
+1. negative electric potential applied to the cage wall;
+2. negative-ion generation inside the cage.
+
+The report therefore cannot separate an electric-field effect, an air-ion effect, a field×ion interaction, enclosure context, expectancy, order/practice, or ordinary sensory/procedural leakage. The room and floating-cage controls also differ in physical context and trial count.
+
+The high-voltage/ion-generator arrangement is historical only. It is not a modern apparatus recipe and must not be reproduced around a human participant.
+
+### Task identity and modern treatment
+
+Assign separate profile PH-ION-STONE-HURKOS:
+- sender/receiver matching task (exact stimulus and scoring method must be recovered);
+- room and floating-cage controls without ion generation;
+- bundled charged-cage plus negative-ion test condition.
+
+This is distinct from:
+- Garrett 1952 cage-charge event detection (PH-017 / #10079);
+- Hurkos sender footplate/role reversal (PH-018 / #10082);
+- card-colour identification (PH-015 / #10070);
+- Hurkos hidden-object identification (PH-011);
+- hidden-target remote viewing.
+
+A modern synthetic factorial should independently vary cage context, electric state and ion condition; include context-only, field-only, ion-only, interaction, order/practice, expectancy, target leakage and confounding worlds. The first physical characterization is non-human only and must use qualified metrology. Any future human study requires separate ethics, electrical-safety and occupational-hygiene approval and must not recreate the historical high-voltage setup.
+
+Dedicated modern source-reconstruction / synthetic factorial work: https://github.com/Luminous-Dynamics/symthaea/issues/10080.
+
 ## PH-018 — Hurkos sender / charged-footplate experiment and role reversal
 
 **Document:** Andrija Puharich, *Beyond Telepathy*, original text ©1962; 1973 Anchor Press reprint, Chapter 2, "The Telepathic Sender," printed pp.21–25 in the reprint.
