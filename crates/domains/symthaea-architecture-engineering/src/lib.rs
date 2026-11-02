@@ -44,6 +44,7 @@ pub mod two_policy_convexification;
 pub mod policy_frontier_lp;
 pub mod tv_robust_policy_frontier;
 pub mod finite_tv_radius_calibration;
+pub mod decision_functional_confidence;
 pub mod pareto_robust_decision;
 pub mod pareto_wasserstein_decision;
 pub mod correlated_noise_benchmark;
