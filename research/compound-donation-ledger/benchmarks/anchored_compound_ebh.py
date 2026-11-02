@@ -69,6 +69,10 @@ def closure_deficit(
 ) -> Fraction:
     z = [as_fraction(v) for v in scores]
     a = as_fraction(alpha)
+    if not 0 < a <= 1:
+        raise ValueError("alpha must be in (0,1]")
+    if any(v < 0 for v in z):
+        raise ValueError("compound scores must be nonnegative")
     selected = tuple(sorted(set(rejection_set)))
     if len(selected) != len(rejection_set):
         raise ValueError("rejection set must have unique IDs")
@@ -93,8 +97,10 @@ def is_closure_certified(
     z = [as_fraction(v) for v in scores]
     a = as_fraction(alpha)
     d = as_fraction(delta)
-    if d < 0 or not 0 < a <= 1:
-        raise ValueError("invalid alpha/delta")
+    if not 0 < a <= 1 or not 0 <= d <= 1:
+        raise ValueError("alpha must be in (0,1] and delta in [0,1]")
+    if any(v < 0 for v in z):
+        raise ValueError("compound scores must be nonnegative")
     selected = set(rejection_set)
     if not selected:
         return True
