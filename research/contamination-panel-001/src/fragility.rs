@@ -357,7 +357,7 @@ fn wilson_interval(successes: u64, total: u64) -> Result<WilsonIntervalV1, Strin
 
 fn validate_score_vector(
     observations: &[FragilityItemObservationV1],
-) -> Result<BTreeMap<String, DetectorDirectionV1>, String> {
+) -> Result<BTreeMap<String, (DetectorDirectionV1, String)>, String> {
     if observations.is_empty() || observations.len() > MAX_ITEMS_PER_CHECKPOINT {
         return Err("checkpoint observation count is empty or exceeds the configured maximum".to_owned());
     }
@@ -373,7 +373,13 @@ fn validate_score_vector(
         if !valid_id(&score.detector_id, 128) || !score.raw_score.is_finite() {
             return Err("detector IDs must be valid and scores finite".to_owned());
         }
-        if directions.insert(score.detector_id.clone(), score.direction).is_some() {
+        if directions
+            .insert(
+                score.detector_id.clone(),
+                (score.direction, score.detector_spec_sha256.clone()),
+            )
+            .is_some()
+        {
             return Err("detector IDs must be unique within an item".to_owned());
         }
     }
@@ -392,16 +398,11 @@ fn validate_score_vector(
             if !observed_ids.insert(score.detector_id.as_str()) {
                 return Err("detector scores contain duplicate IDs".to_owned());
             }
-            if directions.get(&score.detector_id) != Some(&score.direction) {
-                return Err("detector IDs/directions must be identical across all items".to_owned());
-            }
-            let reference_digest = first
-                .detector_scores
-                .iter()
-                .find(|first_score| first_score.detector_id == score.detector_id)
-                .map(|first_score| first_score.detector_spec_sha256.as_str());
-            if reference_digest != Some(score.detector_spec_sha256.as_str()) {
-                return Err("detector specification digests must be identical across all items".to_owned());
+            let contract = directions
+                .get(&score.detector_id)
+                .ok_or_else(|| "detector ID is not in the checkpoint contract".to_owned())?;
+            if contract.0 != score.direction || contract.1 != score.detector_spec_sha256 {
+                return Err("detector IDs, directions and specification digests must be identical across all items".to_owned());
             }
         }
     }
@@ -487,7 +488,7 @@ fn auc_and_auprc(
 
 fn checkpoint_detector_metrics(
     checkpoint: &FragilityCheckpointV1,
-    directions: &BTreeMap<String, DetectorDirectionV1>,
+    directions: &BTreeMap<String, (DetectorDirectionV1, String)>,
     target_fpr_permille: u16,
     minimum_calibration_negatives: u64,
     minimum_test_negatives: u64,
@@ -520,7 +521,7 @@ fn checkpoint_detector_metrics(
     }
 
     let mut output = Vec::with_capacity(directions.len());
-    for (detector_id, direction) in directions {
+    for (detector_id, (direction, detector_spec_sha256)) in directions {
         let mut calibration_scores: Vec<f64> = calibration_negatives
             .iter()
             .map(|item| {
@@ -558,15 +559,9 @@ fn checkpoint_detector_metrics(
             }
         }
         let (auroc, auprc) = auc_and_auprc(&test_scores)?;
-        let detector_spec_sha256 = checkpoint
-            .observations
-            .first()
-            .and_then(|item| item.detector_scores.iter().find(|score| score.detector_id == *detector_id))
-            .map(|score| score.detector_spec_sha256.clone())
-            .ok_or_else(|| "detector specification digest is missing".to_owned())?;
         output.push(DetectorCheckpointMetricsV1 {
             detector_id: detector_id.clone(),
-            detector_spec_sha256,
+            detector_spec_sha256: detector_spec_sha256.clone(),
             direction: *direction,
             auroc,
             auprc,
@@ -876,7 +871,9 @@ pub fn analyze_detector_fragility(
     let mut replicate_ids = BTreeSet::new();
     let mut pair_reports = Vec::with_capacity(study.model_pair_replicates.len());
     let mut reference_item_contract: Option<BTreeMap<String, (EvaluationSplitV1, bool)>> = None;
-    let mut reference_detector_contract: Option<BTreeMap<String, DetectorDirectionV1>> = None;
+    let mut reference_detector_contract: Option<
+        BTreeMap<String, (DetectorDirectionV1, String)>,
+    > = None;
 
     for pair in &study.model_pair_replicates {
         if !valid_id(&pair.replicate_id, 128) || !replicate_ids.insert(pair.replicate_id.as_str()) {
@@ -895,15 +892,23 @@ pub fn analyze_detector_fragility(
             return Err("every model pair must contain all ten predeclared training stages".to_owned());
         }
         let mut checkpoints = BTreeMap::new();
-        let mut pair_detector_contract: Option<BTreeMap<String, DetectorDirectionV1>> = None;
+        let mut pair_detector_contract: Option<
+            BTreeMap<String, (DetectorDirectionV1, String)>,
+        > = None;
         let mut pair_item_contract: Option<BTreeMap<String, (EvaluationSplitV1, bool)>> = None;
         for checkpoint in &pair.checkpoints {
             if checkpoints.insert(checkpoint.stage, checkpoint).is_some() {
                 return Err("training stage occurs more than once in one model pair".to_owned());
             }
             require_digest(&checkpoint.checkpoint_sha256, "checkpoint_sha256")?;
+            require_digest(&checkpoint.parent_checkpoint_sha256, "parent_checkpoint_sha256")?;
             require_digest(&checkpoint.training_receipt_sha256, "training_receipt_sha256")?;
             require_digest(&checkpoint.training_config_sha256, "training_config_sha256")?;
+            require_digest(&checkpoint.objective_config_sha256, "objective_config_sha256")?;
+            require_digest(
+                &checkpoint.training_data_manifest_sha256,
+                "training_data_manifest_sha256",
+            )?;
             let directions = validate_score_vector(&checkpoint.observations)?;
             let item_contract: BTreeMap<String, (EvaluationSplitV1, bool)> = checkpoint
                 .observations
@@ -1082,6 +1087,7 @@ mod tests {
     fn score(id: &str, raw: f64) -> DetectorScoreV1 {
         DetectorScoreV1 {
             detector_id: id.to_owned(),
+            detector_spec_sha256: digest('a'),
             direction: DetectorDirectionV1::HigherIsMember,
             raw_score: raw,
         }
