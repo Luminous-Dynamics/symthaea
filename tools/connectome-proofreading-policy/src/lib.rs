@@ -308,6 +308,9 @@ pub fn plan_reviews_exact_small(
             benefit += candidate.error_probability
                 * candidate.missed_error_cost_units
                 * candidate.review_resolution_probability;
+            if !benefit.is_finite() {
+                return Err(PolicyError::ExpectedCostOverflow);
+            }
         }
 
         if !feasible {
@@ -551,12 +554,19 @@ mod tests {
     }
 
     #[test]
-    fn rejects_expected_cost_overflow() {
-        let candidates = vec![candidate("overflow", 1.0, f64::MAX, 1.0, 1)];
+    fn rejects_aggregate_expected_cost_overflow() {
+        let candidates = vec![
+            candidate("overflow-a", 1.0, f64::MAX, 1.0, 1),
+            candidate("overflow-b", 1.0, f64::MAX, 1.0, 1),
+        ];
 
         assert_eq!(
-            plan_reviews(&candidates, ReviewBudget { seconds: 1 }),
-            Err(PolicyError::NonFiniteExpectedCost("overflow".to_owned()))
+            plan_reviews(&candidates, ReviewBudget { seconds: 2 }),
+            Err(PolicyError::ExpectedCostOverflow)
+        );
+        assert_eq!(
+            plan_reviews_exact_small(&candidates, ReviewBudget { seconds: 2 }),
+            Err(PolicyError::ExpectedCostOverflow)
         );
     }
 
@@ -614,6 +624,23 @@ mod tests {
                 maximum: MAX_EXACT_ORACLE_CANDIDATES,
             })
         );
+    }
+
+    #[test]
+    fn exact_oracle_is_invariant_to_input_row_permutation() {
+        let first = vec![
+            candidate("a", 0.333333333333, 3.0, 0.91, 37),
+            candidate("b", 0.777777777777, 2.0, 0.83, 41),
+            candidate("c", 0.111111111111, 9.0, 0.75, 19),
+        ];
+        let second = vec![first[2].clone(), first[0].clone(), first[1].clone()];
+
+        let first_plan =
+            plan_reviews_exact_small(&first, ReviewBudget { seconds: 60 }).unwrap();
+        let second_plan =
+            plan_reviews_exact_small(&second, ReviewBudget { seconds: 60 }).unwrap();
+
+        assert_eq!(first_plan, second_plan);
     }
 
     #[test]
