@@ -306,6 +306,40 @@ mod tests {
         RewardNetwork::new(vec![0,0,0,1,1,1,2,2,2,3,3,3], edges, 0).unwrap()
     }
 
+    /// Synthetic compatibility profile for the older public GitHub snapshot:
+    /// 10 nodes, 20 directed edges, levels 0..=4 and an 8-transition trial.
+    /// It is not copied from the historical 841-network file.
+    fn synthetic_legacy_profile_network() -> RewardNetwork {
+        let edges = vec![
+            RewardEdge { from: 0, to: 1, reward: 100 },
+            RewardEdge { from: 1, to: 0, reward: 100 },
+            RewardEdge { from: 2, to: 3, reward: 100 },
+            RewardEdge { from: 3, to: 2, reward: 100 },
+            RewardEdge { from: 4, to: 5, reward: 0 },
+            RewardEdge { from: 5, to: 4, reward: 0 },
+            RewardEdge { from: 6, to: 7, reward: 100 },
+            RewardEdge { from: 7, to: 6, reward: 100 },
+            RewardEdge { from: 8, to: 9, reward: 400 },
+            RewardEdge { from: 9, to: 8, reward: 400 },
+            RewardEdge { from: 0, to: 2, reward: -50 },
+            RewardEdge { from: 1, to: 3, reward: -50 },
+            RewardEdge { from: 0, to: 3, reward: -50 },
+            RewardEdge { from: 2, to: 4, reward: -50 },
+            RewardEdge { from: 3, to: 5, reward: -50 },
+            RewardEdge { from: 2, to: 5, reward: -50 },
+            RewardEdge { from: 4, to: 6, reward: -50 },
+            RewardEdge { from: 5, to: 7, reward: -50 },
+            RewardEdge { from: 6, to: 8, reward: 200 },
+            RewardEdge { from: 7, to: 9, reward: 200 },
+        ];
+        assert_eq!(edges.len(), LEGACY_GITHUB_EDGE_COUNT);
+        RewardNetwork::new(
+            vec![0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
+            edges,
+            0,
+        ).unwrap()
+    }
+
     #[test]
     fn synthetic_fixture_obeys_its_declared_test_profile() {
         let n = synthetic_network();
@@ -344,7 +378,7 @@ mod tests {
         assert_eq!(play_episode(&n, RewardPolicy::Random { seed: 42 }, 10), play_episode(&n, RewardPolicy::Random { seed: 42 }, 10));
     }
     #[test]
-    fn published_constraint_rejects_shortcut_to_level_three() {
+    fn task_constraint_rejects_shortcut_to_terminal_level() {
         let n = synthetic_network();
         let mut edges = n.edges().to_vec();
         edges.push(RewardEdge { from: 0, to: 9, reward: 200 });
@@ -361,6 +395,33 @@ mod tests {
                 start: 0, reached: 9, losses: 0, required_losses: 3,
             })
         ));
+    }
+
+    #[test]
+    fn legacy_github_profile_fixture_is_valid_but_remains_synthetic() {
+        let network = synthetic_legacy_profile_network();
+        assert!(network.validate_shape(LEGACY_GITHUB_NODE_COUNT, LEGACY_GITHUB_EDGE_COUNT).is_ok());
+        assert!(network.validate_level_range(LEGACY_GITHUB_MAX_NODE_LEVEL - 1).is_ok());
+        assert!(network.validate_terminal_strategy(4, 3).is_ok());
+    }
+
+    #[test]
+    fn legacy_profile_fixture_reproduces_its_own_eight_transition_score_envelope() {
+        let network = synthetic_legacy_profile_network();
+        let loss = play_episode(&network, RewardPolicy::LossSeeking, LEGACY_GITHUB_MOVE_BUDGET);
+        let myopic = play_episode(&network, RewardPolicy::ImmediateGreedy, LEGACY_GITHUB_MOVE_BUDGET);
+        assert_eq!(loss.total_reward, 1_650);
+        assert_eq!(loss.losses, 3);
+        assert_eq!(myopic.total_reward, 800);
+        assert_eq!(myopic.losses, 0);
+    }
+
+    #[test]
+    fn legacy_profile_full_information_oracle_matches_loss_path() {
+        assert_eq!(
+            full_information_oracle(&synthetic_legacy_profile_network(), LEGACY_GITHUB_MOVE_BUDGET),
+            1_650
+        );
     }
 
     #[test]
