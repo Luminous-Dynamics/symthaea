@@ -23,6 +23,10 @@ pub struct AgentState {
     ///
     /// This is a supplied experimental signal, not verified source quality.
     pub declared_reliability_bp: u16,
+    /// Optional private/individual evidence observed independently of peers.
+    pub private_signal: Option<bool>,
+    /// Confidence assigned to the private signal, basis points (0..=10_000).
+    pub private_signal_confidence_bp: u16,
 }
 
 impl AgentState {
@@ -32,7 +36,17 @@ impl AgentState {
             confidence_bp: 0,
             prestige,
             declared_reliability_bp,
+            private_signal: None,
+            private_signal_confidence_bp: 0,
         }
+    }
+
+    /// Attach an independently acquired private signal for the IndividualLearning
+    /// baseline. The signal is experiment input; it is not shared with peers.
+    pub const fn with_private_signal(mut self, signal: bool, confidence_bp: u16) -> Self {
+        self.private_signal = Some(signal);
+        self.private_signal_confidence_bp = confidence_bp;
+        self
     }
 
     pub const fn informed(
@@ -46,7 +60,16 @@ impl AgentState {
             confidence_bp,
             prestige,
             declared_reliability_bp,
+            private_signal: None,
+            private_signal_confidence_bp: 0,
         }
+    }
+
+    /// Attach an independently acquired private signal to an informed state.
+    pub const fn with_private_signal(mut self, signal: bool, confidence_bp: u16) -> Self {
+        self.private_signal = Some(signal);
+        self.private_signal_confidence_bp = confidence_bp;
+        self
     }
 }
 
@@ -128,8 +151,10 @@ impl Network {
 /// Transparent learning rules used as benchmark baselines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LearningRule {
-    /// No social update; controls for spontaneous change.
+    /// No social or private update; controls for spontaneous change.
     NoLearning,
+    /// Use only an independently acquired private signal; ignores neighbours.
+    IndividualLearning,
     /// Strict majority of informed neighbours; ties preserve current belief.
     MajorityImitation,
     /// Majority imitation only after a minimum number of informed neighbours.
@@ -222,6 +247,20 @@ impl Population {
                     agent_id,
                     field: "declared reliability",
                     value: agent.declared_reliability_bp,
+                });
+            }
+            if agent.private_signal_confidence_bp > 10_000 {
+                return Err(LearningError::InvalidAgentValue {
+                    agent_id,
+                    field: "private signal confidence",
+                    value: agent.private_signal_confidence_bp,
+                });
+            }
+            if agent.private_signal.is_none() && agent.private_signal_confidence_bp != 0 {
+                return Err(LearningError::InvalidAgentValue {
+                    agent_id,
+                    field: "confidence without private signal",
+                    value: agent.private_signal_confidence_bp,
                 });
             }
         }
@@ -337,6 +376,13 @@ fn update_agent(
 
     match rule {
         LearningRule::NoLearning => current,
+        LearningRule::IndividualLearning => current.private_signal.map_or(current, |signal| {
+            AgentState {
+                belief: Some(signal),
+                confidence_bp: current.private_signal_confidence_bp,
+                ..current
+            }
+        }),
         LearningRule::MajorityImitation => {
             majority_update(current, previous, neighbors, 1)
         }
@@ -531,6 +577,35 @@ mod tests {
         assert_eq!(history[3].informed_agents, 4);
         assert_eq!(history[4].informed_agents, 5);
         assert_eq!(history[4].accuracy_among_informed, Some(1.0));
+    }
+
+    #[test]
+    fn individual_learning_uses_private_signal_and_ignores_neighbours() {
+        let network = Network::from_edges(3, &[(0, 2), (1, 2)]).unwrap();
+        let mut population = Population::new(vec![
+            AgentState::informed(false, 10_000, 1, 10_000),
+            AgentState::informed(false, 10_000, 1, 10_000),
+            AgentState::uninformed(0, 0).with_private_signal(true, 7_500),
+        ]);
+
+        population
+            .step(&network, LearningRule::IndividualLearning)
+            .unwrap();
+        assert_eq!(population.agents()[2].belief, Some(true));
+        assert_eq!(population.agents()[2].confidence_bp, 7_500);
+    }
+
+    #[test]
+    fn individual_learning_without_private_signal_does_not_copy_neighbours() {
+        let network = Network::from_edges(2, &[(0, 1)]).unwrap();
+        let mut population = Population::new(vec![
+            AgentState::informed(true, 10_000, 10, 10_000),
+            AgentState::uninformed(0, 0),
+        ]);
+        population
+            .step(&network, LearningRule::IndividualLearning)
+            .unwrap();
+        assert_eq!(population.agents()[1].belief, None);
     }
 
     #[test]
