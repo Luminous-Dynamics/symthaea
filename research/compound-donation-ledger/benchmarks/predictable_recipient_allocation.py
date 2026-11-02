@@ -164,6 +164,11 @@ def exact_accounting_screen(traces: int = 1000, donors: int = 8,
         for _t in range(rounds):
             # Stable donor order; every recipient index is strictly later.
             for i in range(donors):
+                # Draw/commit the route before exposing this round's increment.
+                weights = [Fraction(rng.randint(0, 100), 100)
+                           for _j in range(i + 1, donors)]
+                mass = sum(weights, Fraction(0))
+                shares = ([w / mass for w in weights] if mass else weights)
                 dx = Fraction(rng.randint(0, 1_000_000), 1_000_000)
                 x[i] += dx
                 gamma = gammas[i]
@@ -171,11 +176,6 @@ def exact_accounting_screen(traces: int = 1000, donors: int = 8,
                 delta_reserve = target - prior_reserve[i]
                 assert delta_reserve >= 0
                 assert delta_reserve <= gamma * dx
-                # Predictable shares are fixed before this donor increment.
-                weights = [Fraction(rng.randint(0, 100), 100)
-                           for _j in range(i + 1, donors)]
-                mass = sum(weights, Fraction(0))
-                shares = ([w / mass for w in weights] if mass else weights)
                 if shares:
                     assert sum(shares, Fraction(0)) == 1
                 allocated = Fraction(0)
