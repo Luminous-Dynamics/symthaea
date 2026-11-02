@@ -110,6 +110,45 @@ Random scenario generation is insufficient. Build a search process that delibera
 
 Include multi-fault cases: an occluded pedestrian plus stale localization; black ice plus brake degradation; roadworks plus contradictory map; emergency vehicle plus communication loss; camera saturation plus radar dropout; and a monitor or fallback fault.
 
+## 6A. Operational safety evidence: a realistic comparator
+
+Waymo's public Safety Impact dashboard reports 271.3 million rider-only miles through June 2026 across five operating geographies, with location-adjusted human benchmark comparisons. The dashboard reports 0.67 injury-reported crashes per million rider-only miles versus 3.77 per million benchmark miles, and 0.01 serious-injury-or-worse crashes per million rider-only miles versus 0.21 per million benchmark miles. Waymo's September 24, 2026 publication describes these as 82% fewer injury-causing crashes and 95% fewer serious-injury-or-worse crashes than its human benchmarks.
+
+These are company-published, methodology-dependent estimates. They are useful for understanding the scale and statistical design of an operational evidence programme, not as a direct performance target for a simulator-only research controller.
+
+For a defensible comparison, preserve:
+- geography / road network and operating-time matching;
+- rider-only (not supervised) exposure and precise ODD;
+- vehicle miles and time-of-day / weather strata where available;
+- crash severity, vulnerable-road-user and fault definitions;
+- exposure denominator and confidence intervals;
+- dynamic human baseline adjustment and source data vintages;
+- incident-report completeness and access asymmetry;
+- selection effects, under-reporting and uncertainty.
+
+NHTSA's Standing General Order data are an additional source, not a simple leaderboard. The current NHTSA page describes amended reporting rules and records through September 15, 2026, while warning that reporting entities differ in telemetry, access and classification quality. Do not rank operators by raw crash counts without exposure, reporting and ODD adjustment.
+
+Primary references:
+- https://waymo.com/safety/impact/
+- https://blog.waymo.com/blog/shorts/safetydata-september26/
+- https://www.nhtsa.gov/laws-regulations/standing-general-order-crash-reporting
+
+## 6B. Standards and evaluation-method watchlist
+
+- SAE J3016_202609 is the current driving-automation taxonomy version identified in the September 20, 2026 SAE catalogue revision. Freeze that exact revision in programme material; do not cite J3016_202104 as current.
+- ISO 21448:2022 (SOTIF) remains the published first edition shown by ISO's catalogue; verify status at each safety-case update.
+- ISO 26262:2018 remains the published series listed in ISO's catalogue, with parts entering revision work in 2026. Track DIS/CD revisions, but do not treat a draft as a published requirement.
+- NIST's 2026 TEVV-Athlon framework is useful for structuring measurement concepts, methods, tools, observations and outcomes. NIST AI 800-3 (February 2026) gives a complementary distinction between benchmark-conditional accuracy and generalized performance over an item superpopulation. Apply that lesson to scenario-family sampling: benchmark success is not automatically ODD-generalized performance.
+
+Primary references:
+- https://saemobilus.sae.org/standards/j3016_202609
+- https://www.iso.org/standard/77490.html
+- https://www.iso.org/standard/68383.html
+- https://www.nist.gov/artificial-intelligence/ai-research/tevv-athlon-framework-evaluating-ai-systems
+- https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.800-3.pdf
+
+For any future South African physical testing, complete a current legal and authority review before selecting a site or vehicle. A Department of Transport 2024/25–2026/27 planning document discusses development of an autonomous-vehicle legislative framework; that policy statement is not itself test authorization or a definitive 2026 legal-status opinion. Do not infer public-road testing permission from it.
+
 ## 7. Proposed initial engineering gates
 
 These are research targets to preregister, not achieved results or standards requirements.
