@@ -28,7 +28,9 @@
       "split_edit": 77213
     },
     "em_rows": 251499,
-    "geometry_rows": 401170
+    "geometry_rows": 401170,
+    "count_source_status": "UNPINNED_RENDERED_CARD",
+    "count_source_url": "https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2"
   },
   "task_operation_counts": {
     "status": "NOT_MATERIALIZED",
