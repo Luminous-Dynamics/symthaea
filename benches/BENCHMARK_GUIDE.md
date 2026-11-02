@@ -26,15 +26,32 @@ cargo bench --bench ethics
 
 ## External Benchmarks
 
-External evaluation suites (ARC-AGI-2, GAIA, OSWorld-Verified, SWE-bench Verified, HELM)
-are registered in `benchmarks/manifest.json` and executed via:
+**Registry status (checked 2026-11-02):** the paths historically referenced below
+(`benchmarks/manifest.json`, `benchmarks/external/run_external.py`, and
+`benchmarks/REPRO.md`) are not present at those paths on the current `main`
+branch. The commands from the earlier version of this guide are therefore not
+reproducible from this checkout. Do not report these external suites as currently
+registered or runnable until the registry, adapters, data licenses and reviewer
+path are restored and independently validated.
 
-```bash
-python benchmarks/external/run_external.py --list
-python benchmarks/external/run_external.py --bench arc-agi-2
-```
+Recommended current evaluation references:
 
-See `benchmarks/REPRO.md` for the reviewer path.
+| Benchmark | Intended use | Versioning / reporting rule |
+|---|---|---|
+| [SWE-bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2) | Primary long-horizon repository-repair comparison | Pin public/held-out split, model, agent harness, effort, turn limit and cost policy |
+| [SWE-rebench V2](https://huggingface.co/collections/nebius/swe-rebench-v2) | Fresh issue-derived repository tasks | Pin dataset revision, collection time window, language and contamination policy |
+| [Terminal-Bench 4.0](https://www.tbench.ai/?version=4.0) | Terminal, systems, operations and tool-use tasks | Pin exact release and harness; report repeated-run uncertainty and cost |
+| [CRUST-bench](https://crust-bench.github.io/) | C-to-Rust translation and repair | Keep as a focused language-semantics lane |
+| SWE-bench Verified | Historical reference only | Do not use as the sole or primary frontier-coding metric |
+
+Third-party evaluations must be distinguished from the benchmark maintainer's
+own leaderboard. Never compare different benchmark versions, agent scaffolds,
+effort settings, task splits or resource budgets as though they were the same
+experiment.
+
+The Symthaea-native [Computational Engineering Bench V0](../docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md)
+is currently design-only. Its task catalog does not yet constitute a runnable
+benchmark or produce a score.
 
 ---
 
