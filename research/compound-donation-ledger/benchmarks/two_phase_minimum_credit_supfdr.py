@@ -354,6 +354,7 @@ def simulate_policy(
                     total_credited_local = token["remaining"]
                     token["credited"] += total_credited_local
                     token["remaining"] = Fraction(0)
+                    total_credited += total_credited_local
                 if token["remaining"]:
                     remaining_pending.append(token)
             fixed_pending = remaining_pending
