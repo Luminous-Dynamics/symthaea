@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/policy-rigidity-controls-request-v1.json",
+  "title": "Matched policy rigidity controls request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_regime",
+    "model_checkpoint_sha256",
+    "tokenizer_sha256",
+    "prompt_harness_sha256",
+    "runtime_environment_sha256",
+    "calibration_protocol_sha256",
+    "probe_registry_sha256",
+    "target_alpha_permille",
+    "probe_specs",
+    "clean_controls",
+    "evaluation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.policy_rigidity_controls_request.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "model_regime": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tokenizer_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "runtime_environment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "calibration_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "probe_registry_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_alpha_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "probe_specs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "probe_id",
+          "intervention",
+          "prompt_contract_sha256",
+          "generation_contract_sha256"
+        ],
+        "properties": {
+          "probe_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "intervention": {
+            "type": "string",
+            "enum": [
+              "response_conditioned_self_critique",
+              "prompt_only_unfamiliar_method",
+              "semantic_preserving_paraphrase",
+              "constraint_preserving_reparameterization",
+              "alternate_valid_method"
+            ]
+          },
+          "prompt_contract_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "generation_contract_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "clean_controls": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_unit_id",
+          "source_cluster_sha256",
+          "task_family",
+          "difficulty_band",
+          "path_multiplicity",
+          "probe_receipt_manifest_sha256",
+          "task_recipe_sha256",
+          "exposure_label",
+          "scores"
+        ],
+        "properties": {
+          "calibration_unit_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "source_cluster_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "difficulty_band": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "path_multiplicity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "classification",
+              "adjudication_report_sha256",
+              "reviewer_panel_sha256",
+              "reviewer_count",
+              "agreement_permille"
+            ],
+            "properties": {
+              "classification": {
+                "type": "string",
+                "enum": [
+                  "single_or_few_valid_paths",
+                  "multiple_valid_paths",
+                  "indeterminate"
+                ]
+              },
+              "adjudication_report_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "reviewer_panel_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "reviewer_count": {
+                "type": "integer",
+                "minimum": 3,
+                "maximum": 20
+              },
+              "agreement_permille": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          },
+          "probe_receipt_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "task_recipe_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "exposure_label": {
+            "const": "known_clean"
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "baseline_mean_entropy_nats",
+              "response_conditioned_similarity",
+              "prompt_only_similarity",
+              "semantic_paraphrase_similarity",
+              "constraint_reparameterization_similarity",
+              "alternate_valid_method_similarity"
+            ],
+            "properties": {
+              "baseline_mean_entropy_nats": {
+                "type": "number",
+                "minimum": 0
+              },
+              "response_conditioned_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "prompt_only_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "semantic_paraphrase_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "constraint_reparameterization_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "alternate_valid_method_similarity": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evaluation_unit_id",
+          "source_cluster_sha256",
+          "task_family",
+          "difficulty_band",
+          "path_multiplicity",
+          "probe_receipt_manifest_sha256",
+          "task_recipe_sha256",
+          "exposure_label",
+          "scores"
+        ],
+        "properties": {
+          "evaluation_unit_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "source_cluster_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "difficulty_band": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "path_multiplicity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "classification",
+              "adjudication_report_sha256",
+              "reviewer_panel_sha256",
+              "reviewer_count",
+              "agreement_permille"
+            ],
+            "properties": {
+              "classification": {
+                "type": "string",
+                "enum": [
+                  "single_or_few_valid_paths",
+                  "multiple_valid_paths",
+                  "indeterminate"
+                ]
+              },
+              "adjudication_report_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "reviewer_panel_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "reviewer_count": {
+                "type": "integer",
+                "minimum": 3,
+                "maximum": 20
+              },
+              "agreement_permille": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          },
+          "probe_receipt_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "task_recipe_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "exposure_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "known_clean",
+                  "known_exposed",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "baseline_mean_entropy_nats",
+              "response_conditioned_similarity",
+              "prompt_only_similarity",
+              "semantic_paraphrase_similarity",
+              "constraint_reparameterization_similarity",
+              "alternate_valid_method_similarity"
+            ],
+            "properties": {
+              "baseline_mean_entropy_nats": {
+                "type": "number",
+                "minimum": 0
+              },
+              "response_conditioned_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "prompt_only_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "semantic_paraphrase_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "constraint_reparameterization_similarity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "alternate_valid_method_similarity": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
