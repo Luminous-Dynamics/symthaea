@@ -356,3 +356,111 @@ pub fn verify_receipt(
     }
     Ok(result)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_compound_donation_ledger::{
+        CandidateSpec, DonationLedger, InputEvent,
+    };
+
+    fn specs() -> Vec<CandidateSpec> {
+        vec![
+            CandidateSpec {
+                id: 10,
+                weight: 300_000_000,
+                reserve_rate_numerator: 1,
+                reserve_rate_denominator: 1,
+                destination_id: Some(20),
+            },
+            CandidateSpec {
+                id: 20,
+                weight: 300_000_000,
+                reserve_rate_numerator: 1,
+                reserve_rate_denominator: 1,
+                destination_id: Some(30),
+            },
+            CandidateSpec {
+                id: 30,
+                weight: 200_000_000,
+                reserve_rate_numerator: 1,
+                reserve_rate_denominator: 1,
+                destination_id: None,
+            },
+        ]
+    }
+
+    #[test]
+    fn independently_replays_reference_receipt() {
+        let policy = specs();
+        let mut writer = DonationLedger::new(policy.clone()).unwrap();
+        writer.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+        writer.apply(InputEvent::Activate { round: 0, candidate_id: 20 }).unwrap();
+        writer.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: EVIDENCE_ONE,
+        }).unwrap();
+        let token_amount = writer.snapshot().unwrap().escrow[0].original_amount;
+        writer.apply(InputEvent::Credit {
+            round: 2,
+            token_id: 1,
+            recipient_id: 20,
+            amount: token_amount,
+        }).unwrap();
+
+        let verified = verify_receipt(
+            &policy,
+            writer.audit_log(),
+            Some(&writer.snapshot().unwrap()),
+        ).unwrap();
+        assert_eq!(verified.candidates.len(), 3);
+        assert_eq!(verified.escrow[0].remaining_amount, 0);
+        assert_eq!(verified.candidates[1].incoming, token_amount);
+    }
+
+    #[test]
+    fn independent_verifier_rejects_modified_reservation_and_credit() {
+        let policy = specs();
+        let mut writer = DonationLedger::new(policy.clone()).unwrap();
+        writer.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+        writer.apply(InputEvent::Activate { round: 0, candidate_id: 20 }).unwrap();
+        writer.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: EVIDENCE_ONE,
+        }).unwrap();
+        let token_amount = writer.snapshot().unwrap().escrow[0].original_amount;
+        writer.apply(InputEvent::Credit {
+            round: 2,
+            token_id: 1,
+            recipient_id: 20,
+            amount: token_amount,
+        }).unwrap();
+
+        let mut tampered = writer.audit_log().to_vec();
+        let reservation = tampered.iter_mut()
+            .find(|event| matches!(event, AuditEvent::Reserved { .. }))
+            .unwrap();
+        if let AuditEvent::Reserved { amount, .. } = reservation {
+            *amount += 1;
+        }
+        assert_eq!(
+            verify_receipt(&policy, &tampered, None),
+            Err(VerifyError::ReceiptMismatch)
+        );
+
+        let mut tampered = writer.audit_log().to_vec();
+        let credit = tampered.iter_mut()
+            .find(|event| matches!(event, AuditEvent::Credited { .. }))
+            .unwrap();
+        if let AuditEvent::Credited { amount, .. } = credit {
+            *amount += 1;
+        }
+        assert_eq!(
+            verify_receipt(&policy, &tampered, None),
+            Err(VerifyError::InvalidRecipient)
+        );
+    }
+}
