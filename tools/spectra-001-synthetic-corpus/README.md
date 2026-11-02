@@ -14,6 +14,10 @@ target truth.
   synthetic channels exposes the target index: RF, low-frequency magnetic,
   acoustic, optical, vibration, thermal/airflow, conducted power, network
   timing, or procedural trial-ID metadata.
+- Confounded: response rankings remain target-independent, but participant ID
+  is coupled to the target assignment. The procedural attacker recovers this
+  association, demonstrating a design/metadata confound rather than a physical
+  transmission mechanism.
 - Adversarial mutation: the response-seal timestamp follows target reveal and
   the existing T0 validator must reject the affected trials.
 
@@ -74,8 +78,8 @@ tests replay the exact null and signal scores; the leakage tests require
 1,000-permille recovery on the channel deliberately wired to the target.
 
 The current implementation covers W0 null, W1 injected response signal, W2
-single-channel leakage, and W4 response-after-reveal integrity mutation. W3
-session/operator/day/instrument confounding, repeated-target imbalance,
-outcome-dependent stopping, and selective missingness remain explicit follow-up
-work under issue 10046. No false-positive rate or statistical power claim is
-made from one frozen seed.
+single-channel leakage, a narrow W3 participant-ID assignment confound, and W4
+response-after-reveal integrity mutation. Broader session/operator/day/instrument
+common-mode confounding, repeated-target imbalance, outcome-dependent stopping
+and selective missingness remain follow-up work under issue 10046. No false-
+positive rate or statistical power claim is made from one frozen seed.
