@@ -992,4 +992,46 @@ mod tests {
             Err(AuditError::ManifestMismatch)
         );
     }
+
+    #[test]
+    fn zero_assignment_receipt_digest_is_rejected() {
+        let mut pairs = vec![
+            pair(1, true, completed(100, 0, 0), completed(0, 0, 0), PredictedBenefit {
+                wrong_belief_us: 1, abstention_us: 0, missing_output_us: 0,
+            }),
+            pair(2, false, completed(100, 0, 0), completed(0, 0, 0), PredictedBenefit {
+                wrong_belief_us: 1, abstention_us: 0, missing_output_us: 0,
+            }),
+        ];
+        pairs[0].assignment_receipt_sha256 = [0; 32];
+        let study = input(pairs);
+        assert!(matches!(
+            audit_randomized_interventions(&study),
+            Err(AuditError::ZeroDigest { field: "assignment receipt", pair_id: 1 })
+        ));
+    }
+
+    #[test]
+    fn exact_mode_rejects_more_than_twenty_pairs_without_sampling() {
+        let pairs = (1..=21)
+            .map(|id| {
+                pair(
+                    id,
+                    id % 2 == 0,
+                    completed(100, 0, 0),
+                    completed(0, 0, 0),
+                    PredictedBenefit {
+                        wrong_belief_us: 100,
+                        abstention_us: 0,
+                        missing_output_us: 0,
+                    },
+                )
+            })
+            .collect();
+        assert!(matches!(
+            audit_randomized_interventions(&input(pairs)),
+            Err(AuditError::TooManyPairs { actual: 21, maximum: 20 })
+        ));
+    }
+
 }
