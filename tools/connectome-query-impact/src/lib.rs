@@ -1616,6 +1616,99 @@ mod tests {
     }
 
     #[test]
+    fn finite_world_closure_receipt_must_bind_query_metric_and_threshold() {
+        let mut item = evaluation(
+            "pathway", "h1", interval(0.1, 0.9), interval(0.1, 0.9), Some(0.5), 0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        item.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+        item.paired_world_set_coverage.as_mut().unwrap().query_definition_sha256 = SHA_D.to_owned();
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                field: "query definition", ..
+            })
+        ));
+
+        let mut item = evaluation(
+            "pathway", "h1", interval(0.1, 0.9), interval(0.1, 0.9), Some(0.5), 0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        item.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+        item.paired_world_set_coverage.as_mut().unwrap().decision_threshold = 0.6;
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                field: "decision threshold", ..
+            })
+        ));
+    }
+
+    #[test]
+    fn finite_world_closure_receipt_must_bind_exact_graph_and_candidate_patch() {
+        let mut item = evaluation(
+            "pathway", "h1", interval(0.1, 0.9), interval(0.1, 0.9), Some(0.5), 0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        item.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+        item.paired_world_set_coverage.as_mut().unwrap().base_graph_snapshot_sha256 = SHA_D.to_owned();
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                field: "base graph snapshot", ..
+            })
+        ));
+
+        let mut input = candidate(vec![{
+            let mut item = evaluation(
+                "pathway", "h1", interval(0.1, 0.9), interval(0.1, 0.9), Some(0.5), 0.1,
+            );
+            item.paired_effect = Some(PairedEffectBounds {
+                effect_interval: interval(-0.1, 0.1),
+                evidence_sha256: SHA_C.to_owned(),
+                decision_worlds: Some(vec![PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.3,
+                }]),
+            });
+            item.paired_world_set_coverage = Some(world_set_coverage(&["world-a"]));
+            item
+        }]);
+        input.candidate_patch_sha256 = SHA_D.to_owned();
+        assert!(matches!(
+            analyze_candidate(&input),
+            Err(QueryImpactError::PairedWorldCoverageBindingMismatch {
+                field: "candidate patch", ..
+            })
+        ));
+    }
+
+    #[test]
     fn world_set_coverage_requires_actual_paired_decision_worlds() {
         let mut item = evaluation(
             "pathway",
