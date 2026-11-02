@@ -52,6 +52,7 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
                 "mip_default_resolved_tie_count",
                 "mip_default_resolved_cut_sha256s",
                 "mip_default_resolved_lex_key_hex",
+                "state_pair_tie_count",
                 "minimum_numeric_tie_lex_key_hex",
                 "lex_resolution_matches_numeric_ties",
                 "numeric_tie_contains_default_representative",
