@@ -464,11 +464,12 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
 fn verify_metrics_and_scores<'a>(
     value: &Value,
     models: &HashMap<String, &'a Value>,
+    test_set: &HashSet<String>,
     errors: &mut Vec<String>,
 ) -> (
     HashMap<String, &'static str>,
     HashMap<String, String>,
-    HashMap<(String, String, String), (f64, f64, f64, usize)>,
+    HashMap<(String, String, String), (f64, f64, f64, usize, HashSet<String>)>,
 ) {
     let mut directions = HashMap::new();
     let mut metric_families = HashMap::new();
@@ -527,8 +528,43 @@ fn verify_metrics_and_scores<'a>(
             let low = item.get("ci_low").and_then(Value::as_f64);
             let high = item.get("ci_high").and_then(Value::as_f64);
             let key = (model.to_owned(), metric.to_owned(), stratum.to_owned());
+            let raw_units = item.get("unit_tokens").and_then(Value::as_array);
+            let mut unit_tokens = HashSet::new();
+            let mut token_values = Vec::new();
+            if let Some(raw_units) = raw_units {
+                for (unit_index, raw_unit) in raw_units.iter().enumerate() {
+                    match raw_unit.as_str() {
+                        Some(token) if is_sha256(token) => {
+                            if !unit_tokens.insert(token.to_owned()) {
+                                errors.push(format!("scorecards[{index}].unit_tokens[{unit_index}]: duplicate unit token"));
+                            }
+                            if !test_set.contains(token) {
+                                errors.push(format!("scorecards[{index}].unit_tokens[{unit_index}]: token is outside held-out test membership"));
+                            }
+                            token_values.push(token.to_owned());
+                        }
+                        Some(_) => errors.push(format!("scorecards[{index}].unit_tokens[{unit_index}]: malformed token")),
+                        None => errors.push(format!("scorecards[{index}].unit_tokens[{unit_index}]: token must be a string")),
+                    }
+                }
+            } else {
+                errors.push(format!("scorecards[{index}].unit_tokens: missing"));
+            }
+            if !token_values.is_empty() {
+                check_digest(
+                    item,
+                    &["unit_manifest_sha256"],
+                    &format!("scorecards[{index}].unit_manifest_sha256"),
+                    &membership_digest(&token_values),
+                    errors,
+                );
+            }
             match state {
                 "measured" => {
+                    let declared_n = item.get("n_independent_units").and_then(Value::as_u64).unwrap_or(0) as usize;
+                    if token_values.len() < 2 || declared_n != token_values.len() {
+                        errors.push(format!("scorecards[{index}]: measured score token count must equal n_independent_units and be at least two"));
+                    }
                     if score.map_or(true, |x| !x.is_finite())
                         || low.map_or(true, |x| !x.is_finite())
                         || high.map_or(true, |x| !x.is_finite()) {
@@ -541,7 +577,8 @@ fn verify_metrics_and_scores<'a>(
                             score.unwrap(),
                             low.unwrap(),
                             high.unwrap(),
-                            item.get("n_independent_units").and_then(Value::as_u64).unwrap_or(0) as usize,
+                            declared_n,
+                            unit_tokens,
                         ),
                     ).is_some() {
                         errors.push(format!("scorecards[{index}]: duplicate model/metric/stratum"));
@@ -598,7 +635,7 @@ fn verify_paired(
     value: &Value,
     models: &HashMap<String, &Value>,
     directions: &HashMap<String, &'static str>,
-    scores: &HashMap<(String, String, String), (f64, f64, f64, usize)>,
+    scores: &HashMap<(String, String, String), (f64, f64, f64, usize, HashSet<String>)>,
     test_set: &HashSet<String>,
     errors: &mut Vec<String>,
 ) {
@@ -671,6 +708,10 @@ fn verify_paired(
             }
             if candidate_score.3 != token_values.len() || baseline_score.3 != token_values.len() {
                 errors.push(format!("paired_comparisons[{index}]: paired token count must equal both scorecard independent-unit counts"));
+            }
+            if candidate_score.4 != baseline_score.4
+                || candidate_score.4 != unique {
+                errors.push(format!("paired_comparisons[{index}]: paired units must exactly match the candidate and baseline scorecard cohorts"));
             }
 
             let outcome = item.get("outcome").and_then(Value::as_str).unwrap_or("");
@@ -783,7 +824,7 @@ fn verify_complete(value: &Value) -> Vec<String> {
     if at(value, &["evaluation", "uncertainty", "minimum_independent_units"]).and_then(Value::as_u64).is_none_or(|n| n < 2) {
         errors.push("evaluation.uncertainty.minimum_independent_units: requires at least two".to_owned());
     }
-    let (directions, metric_families, scores) = verify_metrics_and_scores(value, &models, &mut errors);
+    let (directions, metric_families, scores) = verify_metrics_and_scores(value, &models, &test_set, &mut errors);
     verify_paired(value, &models, &directions, &scores, &test_set, &mut errors);
     verify_calibration(value, &models, &metric_families, &mut errors);
     errors
@@ -890,9 +931,11 @@ mod tests {
     }
 
     fn fixture_scorecard(model_id: &str, score: f64, low: f64, high: f64) -> Value {
+        let units = vec![token(4), token(5)];
         json!({
             "model_id":model_id,"metric_id":"nll","stratum":"overall",
-            "n_independent_units":2,"score":score,"ci_low":low,"ci_high":high,"score_state":"measured"
+            "n_independent_units":2,"score":score,"ci_low":low,"ci_high":high,"score_state":"measured",
+            "unit_tokens":units,"unit_manifest_sha256":membership_digest(&units)
         })
     }
 
