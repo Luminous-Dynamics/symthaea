@@ -1,0 +1,202 @@
+{
+  "schema": "symthaea.detector_conformal_fusion_request.v1",
+  "study_id": "study-001",
+  "benchmark_id": "benchmark-001",
+  "benchmark_version": "v1",
+  "calibration_protocol_sha256": "10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010",
+  "detector_registry_sha256": "9fc1b93b60a44e42424b907af71e6d796ab3766ce8d5e9e4b1dbe7fa70539114",
+  "target_alpha_permille": 500,
+  "fusion_method_id": "weighted_sum_negative_log_empirical_detector_pvalues_v2",
+  "detector_specs": [
+    {
+      "detector_id": "ftd",
+      "direction": "higher_means_contaminated",
+      "weight_permille": 500,
+      "feature_contract_sha256": "12121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212"
+    },
+    {
+      "detector_id": "dvd",
+      "direction": "higher_means_contaminated",
+      "weight_permille": 500,
+      "feature_contract_sha256": "13131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313"
+    }
+  ],
+  "calibration_a": [
+    {
+      "calibration_unit_id": "a-1",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.1
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.1
+        }
+      ]
+    },
+    {
+      "calibration_unit_id": "a-2",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.2
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.2
+        }
+      ]
+    },
+    {
+      "calibration_unit_id": "a-3",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.3
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.3
+        }
+      ]
+    },
+    {
+      "calibration_unit_id": "a-4",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.4
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.4
+        }
+      ]
+    }
+  ],
+  "calibration_b": [
+    {
+      "calibration_unit_id": "b-1",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.1
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.1
+        }
+      ]
+    },
+    {
+      "calibration_unit_id": "b-2",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.2
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.2
+        }
+      ]
+    },
+    {
+      "calibration_unit_id": "b-3",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.3
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.3
+        }
+      ]
+    },
+    {
+      "calibration_unit_id": "b-4",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.4
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.4
+        }
+      ]
+    }
+  ],
+  "evaluation": [
+    {
+      "evaluation_unit_id": "t-1",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.9
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.9
+        }
+      ],
+      "ground_truth_contaminated": true
+    },
+    {
+      "evaluation_unit_id": "t-2",
+      "task_family": "mathematics",
+      "model_regime": "qwen-rlvr",
+      "features": [
+        {
+          "detector_id": "ftd",
+          "direction": "higher_means_contaminated",
+          "score": 0.2
+        },
+        {
+          "detector_id": "dvd",
+          "direction": "higher_means_contaminated",
+          "score": 0.2
+        }
+      ],
+      "ground_truth_contaminated": false
+    }
+  ]
+}
