@@ -25,7 +25,11 @@ It applies a deterministic greedy budget rule, skips cases that do not fit the r
 - It allocates review time only. A review recommendation is not a completed edit.
 - A production run must pin the model, calibration, cost profile, dataset revision, view contract and prediction artifact. See `research/connectomics/PROOFREADING_POLICY_EVALUATION_V0.1.md`.
 
-## Exact small-cohort oracle\n\n\`plan_reviews_exact_small\` exhaustively evaluates all review subsets for at most 20 candidates. It maximizes total expected avoided error cost under the integer-second budget, then breaks ties by lower time and lexicographically smaller operation IDs. This is a regression oracle for small fixtures and sampled cohorts, not a large-dataset production scheduler.\n\n## API sketch
+## Exact small-cohort oracle
+
+`plan_reviews_exact_small` exhaustively evaluates all review subsets for at most 20 candidates. It maximizes total expected avoided error cost under the integer-second budget, then breaks ties by lower time and lexicographically smaller operation IDs. This is a regression oracle for small fixtures and sampled cohorts, not a large-dataset production scheduler.
+
+## API sketch
 
 ```rust
 use connectome_proofreading_policy::{
@@ -55,11 +59,11 @@ Run in an environment with Rust installed:
 cargo test --locked --manifest-path tools/connectome-proofreading-policy/Cargo.toml
 ```
 
-Twelve unit tests are authored, including the review-budget known answer, cost-sensitive ranking, review-resolution adjustment, deterministic tie-breaking, zero budget, non-fitting cases, a greedy-suboptimality counterexample and malformed-input rejection. They have **not** been compiled or executed in the current authoring environment.
+Fifteen unit tests are authored, including the review-budget known answer, cost-sensitive ranking, review-resolution adjustment, deterministic tie-breaking, zero budget, non-fitting cases, a greedy-suboptimality counterexample and malformed-input rejection. They have **not** been compiled or executed in the current authoring environment.
 
 ## Next implementation steps
 
-1. Add exact small-instance knapsack oracle and property tests to quantify greedy regret.
+1. Add randomized small-cohort property tests to quantify greedy regret and oracle agreement.
 2. Add evaluator functions for review recall/precision at time budgets, with explicit label and missingness semantics.
 3. Add cluster-bootstrap evaluation by volume/neuron.
 4. Add a separate acquisition policy using decision-value-of-information, not entropy alone.
