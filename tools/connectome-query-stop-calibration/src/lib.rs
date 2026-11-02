@@ -651,6 +651,27 @@ mod tests {
     }
 
     #[test]
+    fn calibration_trajectory_manifest_digest_is_required_and_returned() {
+        let mut value = input(19, 0.05);
+        value.calibration_trajectory_manifest_sha256 = "bad".to_owned();
+        assert!(matches!(
+            calibrate_query_stop(&value),
+            Err(StopCalibrationError::InvalidSha256 {
+                kind: "calibration trajectory manifest",
+                ..
+            })
+        ));
+
+        let value = input(19, 0.05);
+        let report = calibrate_query_stop(&value).unwrap();
+        assert_eq!(
+            report.calibration_trajectory_manifest_sha256,
+            value.calibration_trajectory_manifest_sha256
+        );
+        assert_eq!(report.materiality_threshold, value.materiality_threshold);
+    }
+
+    #[test]
     fn calibration_evidence_digest_is_required() {
         let mut value = input(19, 0.05);
         value.calibration_trajectories[0].evidence_sha256 = "bad".to_owned();
