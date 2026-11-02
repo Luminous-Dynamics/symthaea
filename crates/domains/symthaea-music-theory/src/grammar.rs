@@ -196,7 +196,10 @@ pub fn compose_with_grammar_plan(
                     return_obligation: "primary material returns before closure".into(),
                     typed_return_obligation: Some(ObligationKind::ReturnMotif {
                         motif_id: "motif-primary".into(),
-                        transformation: ReturnTransformation::Literal,
+                        // Period/Sentence promises restoration of the theme's
+                        // identity; the verifier accepts literal or transposed
+                        // realizations, but not an unrelated contour match.
+                        transformation: ReturnTransformation::Restored,
                     }),
                     ending_strategy: "motif-related cadential liquidation".into(),
                 }),
