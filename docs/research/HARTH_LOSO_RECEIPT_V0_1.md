@@ -78,6 +78,6 @@ The external papers' scores are reference values, not results reproduced by this
 
 ## Tests and status
 
-Ten synthetic tests cover label mapping, valid 22-fold receipt creation, 10-class dimensions, test/train leakage, duplicate held-out subjects, missing training subjects, invalid matrix shape/empty denominator, confusion-derived F1, receipt tamper detection and canonical sorting.
+Eleven synthetic tests cover label mapping, valid 22-fold receipt creation, 10-class dimensions, test/train leakage, duplicate held-out subjects, missing training subjects, invalid matrix shape/empty denominator, confusion-derived F1, receipt tamper detection and canonical sorting.
 
 **Execution status:** tests are authored but have not been compiled or run. No model, HARTH data archive or baseline has been executed. No accuracy or SOTA claim is made.
