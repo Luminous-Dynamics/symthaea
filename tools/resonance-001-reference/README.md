@@ -9,8 +9,8 @@ Included:
 - Two lossless magnetically coupled resonators, mutual inductance and lower /
   upper normal-mode frequencies.
 - Two driven, lossy series-RLC loops with complex primary input impedance,
-  secondary current/voltage transfer, winding-dot polarity and normalized
-  secondary resistor dissipation.
+  secondary current/voltage transfer, winding-dot polarity, normalized primary/
+  secondary resistor dissipation, input power and a passive power-balance residual.
 
 All quantities use SI units. Frequency arguments are in hertz.
 
@@ -32,6 +32,16 @@ of a Tesla coil or a qualified model for arbitrary resonator geometry.
 A matching result qualifies the formula implementation against its analytical
 known answers. It does not validate ngspice, FDTD, a physical circuit, a
 measurement instrument, or any claim of anomalous energy transfer.
+
+
+The driven-loop response uses RMS phasors. It reports power per squared RMS
+source volt and checks the passive identity:
+
+    P_input = P_primary_resistor + P_secondary_resistor
+
+The residual is reported rather than silently clamped to zero. Its expected
+magnitude is bounded by floating-point roundoff for the frozen analytical
+cases; it is not a physical calorimetry or instrument-uncertainty estimate.
 
 ## Run
 
