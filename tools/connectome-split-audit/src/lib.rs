@@ -57,9 +57,9 @@ pub enum ViewKind {
 pub struct GroupIdentity {
     pub source_archive_id: Option<String>,
     pub source_volume_id: Option<String>,
-    /// Upstream source_operation_id from the original proofreading event metadata.
+    /// Source-qualified upstream source_operation_id from original proofreading metadata.
     pub source_operation_id: Option<String>,
-    /// Spatial 50-micrometre cube identity from the pinned source split manifest.
+    /// Source-volume-qualified 50-micrometre cube identity from the pinned split manifest.
     pub spatial_cube_id: Option<String>,
     /// Union of before/after neuron root IDs, canonicalized by the data adapter.
     pub neuron_ids: Vec<String>,
@@ -155,6 +155,7 @@ pub enum SplitAuditError {
         first: DataSplit,
         second: DataSplit,
     },
+    SampleGroupIdentityMismatch { sample_hash: String },
     MissingGroupKey { operation_id: String, group_key: GroupKey },
     MissingViewPermission { task_route: TaskRoute, view_kind: ViewKind },
     ViewSampleMismatch { operation_id: String, view_id: String },
@@ -189,6 +190,10 @@ impl fmt::Display for SplitAuditError {
             } => write!(
                 f,
                 "sample {sample_hash} appears in multiple splits: {first:?} and {second:?}"
+            ),
+            Self::SampleGroupIdentityMismatch { sample_hash } => write!(
+                f,
+                "task routes for sample {sample_hash} disagree on source group identity"
             ),
             Self::MissingGroupKey { operation_id, group_key } => {
                 write!(f, "operation {operation_id} is missing group key {group_key:?}")
@@ -232,6 +237,7 @@ pub fn audit_splits(
     let mut view_ids = BTreeSet::new();
     let mut sample_task_pairs = BTreeSet::new();
     let mut sample_splits: BTreeMap<String, DataSplit> = BTreeMap::new();
+    let mut sample_group_identities: BTreeMap<String, GroupIdentity> = BTreeMap::new();
     let mut group_memberships: BTreeMap<(GroupKey, String), BTreeSet<DataSplit>> =
         BTreeMap::new();
     let mut split_operations: BTreeMap<DataSplit, usize> = BTreeMap::new();
@@ -257,6 +263,19 @@ pub fn audit_splits(
                 sample_hash: operation.sample_hash.clone(),
                 task_route: operation.task_route,
             });
+        }
+
+        if let Some(previous_groups) = sample_group_identities.get(&operation.sample_hash) {
+            if previous_groups != &operation.groups {
+                return Err(SplitAuditError::SampleGroupIdentityMismatch {
+                    sample_hash: operation.sample_hash.clone(),
+                });
+            }
+        } else {
+            sample_group_identities.insert(
+                operation.sample_hash.clone(),
+                operation.groups.clone(),
+            );
         }
 
         if let Some(previous_split) = sample_splits.get(&operation.sample_hash) {
@@ -509,7 +528,6 @@ fn validate_id(kind: &'static str, value: &str) -> Result<(), SplitAuditError> {
 mod tests {
     use super::*;
 
-    const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const SHA_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const SHA_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
@@ -750,6 +768,38 @@ mod tests {
         assert_eq!(report.unique_sample_count, 1);
         assert_eq!(report.view_instance_count, 2);
         assert_eq!(report.status, SplitAuditStatus::GroupDisjoint);
+    }
+
+    #[test]
+    fn same_sample_task_routes_must_have_identical_source_group_identity() {
+        let first = operation(
+            "op-split",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        let mut second = operation(
+            "op-merge",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseMergeIdentification,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::EmXy,
+        );
+        second.groups.source_operation_id = Some("different-source-operation".to_owned());
+
+        assert_eq!(
+            audit_splits(&policy(vec![GroupKey::SourceVolume]), &[first, second]),
+            Err(SplitAuditError::SampleGroupIdentityMismatch {
+                sample_hash: "00000000000000000000000000000001".to_owned(),
+            })
+        );
     }
 
     #[test]
@@ -1028,7 +1078,7 @@ mod tests {
 
     #[test]
     fn duplicate_view_id_is_rejected_globally() {
-        let mut a = operation(
+        let a = operation(
             "op-a",
             "00000000000000000000000000000001",
             DataSplit::Train,
