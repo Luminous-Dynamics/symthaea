@@ -206,6 +206,9 @@ These are hypotheses, not claims that HDC-LTC or active inference already outper
 - Existing #6254 owns the physical pilot ladder.
 - Existing #3779 owns reusable runtime-assurance semantics.
 - Existing #6256 owns the multi-benchmark portfolio and comparison methodology.
+- [SAM-SCENARIO-001 #10043](https://github.com/Luminous-Dynamics/symthaea/issues/10043) owns candidate generation, search algorithms, counterexample classification/minimization and holdout isolation.
+- [Symtropy ROAD-AUTONOMY-SCENARIO-001 #3387](https://github.com/Luminous-Dynamics/symtropy/issues/3387) owns bounded candidate execution, replay, capability reporting and synthetic outputs; it does not own search objectives or safety interpretation.
+- Symtropy #3385 supplies cluster-aware rare-event inference where a probabilistic estimand is justified.
 
 ## 10. Non-claims
 
