@@ -177,12 +177,12 @@ This benchmark illustrates an important frontier:
 
 The committed script also contains a separate Fraction-based check. It generates predictable share vectors before each donor's current evidence increment, allocates the source reserve only across strictly later IDs, and checks:
 
-- nonnegative shares and total share mass one when recipients exist;
+- nonnegative shares with total mass at most one; a zero-mass route leaves reserve unwithdrawn at the source;
 - cumulative donor reserve and own-increment caps;
 - prefix budgets after each round;
 - exact equality of incoming credits plus escrow and total outgoing capital.
 
-Default configuration: 1,000 traces, 8 donors, 25 rounds. This is an arithmetic/ledger screen, not an implementation test of the Rust writer and not a statistical validity experiment. Re-run the committed script to reproduce its exact assertion count and output.
+Default configuration: 1,000 traces, 8 donors, 25 rounds. A local execution of the same Fraction-based accounting logic completed 1,725,000 assertions. It checks the source and prefix inequalities, not an implementation test of the Rust writer or a statistical validity experiment. Re-run the committed script to reproduce the exact output.
 
 ## 6. Acceptance and benchmark programme
 
