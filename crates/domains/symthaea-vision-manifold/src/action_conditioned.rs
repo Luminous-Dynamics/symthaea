@@ -325,6 +325,7 @@ pub trait ActionConditionedVisualPredictor {
 pub struct BranchVisualObservation<'a> {
     pub history_sha256: &'a str,
     pub action_manifest_sha256: &'a str,
+    pub joint_draw_manifest_sha256: &'a str,
     pub action_id: u64,
     pub joint_draw_id: u64,
     pub branch_id: &'a str,
@@ -339,6 +340,7 @@ pub struct BranchVisualObservation<'a> {
 pub enum ForecastExpiryReason {
     TargetFrameSkipped,
     ObservationArrivedTooLate,
+    NoTargetObservationAtEpisodeEnd,
 }
 
 /// Score of one forecast against its exact later branch observation.
@@ -346,6 +348,7 @@ pub enum ForecastExpiryReason {
 pub struct ActionVisualForecastScore {
     pub history_sha256: String,
     pub action_manifest_sha256: String,
+    pub joint_draw_manifest_sha256: String,
     pub model_sha256: String,
     pub action_id: u64,
     pub joint_draw_id: u64,
@@ -435,6 +438,7 @@ impl ActionConditionedForecastEvaluator {
             staged.push(PendingForecast {
                 history_sha256: bank.history_sha256.clone(),
                 action_manifest_sha256: bank.action_manifest_sha256.clone(),
+                joint_draw_manifest_sha256: bank.joint_draw_manifest_sha256.clone(),
                 model_sha256: bank.model_sha256.clone(),
                 source_frame_sequence: bank.source_frame_sequence,
                 issued_at_seconds: bank.issued_at_seconds,
@@ -463,6 +467,7 @@ impl ActionConditionedForecastEvaluator {
     ) -> Result<ForecastObservationResult, String> {
         validate_sha256("history_sha256", observation.history_sha256)?;
         validate_sha256("action_manifest_sha256", observation.action_manifest_sha256)?;
+        validate_sha256("joint_draw_manifest_sha256", observation.joint_draw_manifest_sha256)?;
         validate_vector("observed branch belief", observation.observed_belief)?;
         if observation.branch_id.trim().is_empty() {
             return Err("branch observation requires a non-empty branch ID".into());
@@ -481,6 +486,7 @@ impl ActionConditionedForecastEvaluator {
         let pending = &self.pending[index];
         if pending.history_sha256 != observation.history_sha256
             || pending.action_manifest_sha256 != observation.action_manifest_sha256
+            || pending.joint_draw_manifest_sha256 != observation.joint_draw_manifest_sha256
             || pending.action_id != observation.action_id
             || pending.joint_draw_id != observation.joint_draw_id
         {
@@ -518,6 +524,7 @@ impl ActionConditionedForecastEvaluator {
         let score = ActionVisualForecastScore {
             history_sha256: pending.history_sha256.clone(),
             action_manifest_sha256: pending.action_manifest_sha256.clone(),
+            joint_draw_manifest_sha256: pending.joint_draw_manifest_sha256.clone(),
             model_sha256: pending.model_sha256.clone(),
             action_id: pending.action_id,
             joint_draw_id: pending.joint_draw_id,
@@ -536,6 +543,14 @@ impl ActionConditionedForecastEvaluator {
         Ok(ForecastObservationResult::Scored(score))
     }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnobservedForecastExpiry {
+    pub action_id: u64,
+    pub joint_draw_id: u64,
+    pub branch_id: String,
+    pub reason: ForecastExpiryReason,
+}
+
     pub fn pending_count(&self) -> usize {
         self.pending.len()
     }
@@ -546,6 +561,33 @@ impl ActionConditionedForecastEvaluator {
 
     pub fn expired_count(&self) -> u64 {
         self.expired_count
+    }
+
+    /// Close one source history and explicitly expire any branches whose exact
+    /// target observation was never supplied. This prevents unfinished branch
+    /// forecasts from silently leaking into later episodes or queue capacity.
+    pub fn finish_history(
+        &mut self,
+        history_sha256: &str,
+    ) -> Result<Vec<UnobservedForecastExpiry>, String> {
+        validate_sha256("history_sha256", history_sha256)?;
+        let mut retained = Vec::with_capacity(self.pending.len());
+        let mut expired = Vec::new();
+        for pending in self.pending.drain(..) {
+            if pending.history_sha256 == history_sha256 {
+                expired.push(UnobservedForecastExpiry {
+                    action_id: pending.action_id,
+                    joint_draw_id: pending.joint_draw_id,
+                    branch_id: pending.branch_id,
+                    reason: ForecastExpiryReason::NoTargetObservationAtEpisodeEnd,
+                });
+            } else {
+                retained.push(pending);
+            }
+        }
+        self.pending = retained;
+        self.expired_count = self.expired_count.saturating_add(expired.len() as u64);
+        Ok(expired)
     }
 }
 
@@ -777,6 +819,7 @@ mod tests {
         BranchVisualObservation {
             history_sha256: HISTORY,
             action_manifest_sha256: ACTION_MANIFEST_SHA,
+            joint_draw_manifest_sha256: JOINT_DRAW_MANIFEST_SHA,
             action_id,
             joint_draw_id: draw_id,
             branch_id,
@@ -1016,6 +1059,36 @@ mod tests {
         assert!(evaluator
             .observe_branch(&observation("b17-100", 17, 100, 45, 1.5, &invalid))
             .is_err());
+        assert_eq!(evaluator.pending_count(), 4);
+    }
+
+    #[test]
+    fn episode_close_expires_unobserved_target_branches_explicitly() {
+        let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
+        evaluator.issue(&bank()).unwrap();
+        let expired = evaluator.finish_history(HISTORY).unwrap();
+        assert_eq!(expired.len(), 4);
+        assert!(expired.iter().all(|item| {
+            item.reason == ForecastExpiryReason::NoTargetObservationAtEpisodeEnd
+        }));
+        assert_eq!(evaluator.pending_count(), 0);
+        assert_eq!(evaluator.expired_count(), 4);
+        assert_eq!(
+            evaluator.observe_branch(&observation("b17-100", 17, 100, 45, 1.5, &[0.0, 1.0, 0.0])).unwrap(),
+            ForecastObservationResult::Unmatched
+        );
+    }
+
+    #[test]
+    fn wrong_joint_draw_manifest_does_not_consume_branch_forecast() {
+        let mut evaluator = ActionConditionedForecastEvaluator::new(8, 0.01).unwrap();
+        evaluator.issue(&bank()).unwrap();
+        let actual = [0.0, 1.0, 0.0];
+        let wrong = BranchVisualObservation {
+            joint_draw_manifest_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            ..observation("b17-100", 17, 100, 45, 1.5, &actual)
+        };
+        assert!(evaluator.observe_branch(&wrong).is_err());
         assert_eq!(evaluator.pending_count(), 4);
     }
 
