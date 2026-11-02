@@ -30,11 +30,12 @@ class ProofCarryingEvidenceTests(unittest.TestCase):
         adjusted = [adjusted_integer(x, SCALE) for x in values]
         self.assertEqual(adjusted[0], 0)
         self.assertEqual(adjusted, sorted(adjusted))
+        # Verify floor_S(sqrt(x)-1) with exact squared inequalities.
         for x, value in zip(values, adjusted):
-            self.assertLessEqual(F(value, SCALE), F(x.numerator, x.denominator).numerator if False else x**0)
-        # Direct square-root lower-bound check without floating-point arithmetic.
-        for x, value in zip(values, adjusted):
-            self.assertLessEqual(F(value, SCALE) + 1, F(math.isqrt((x.numerator * SCALE * SCALE) // x.denominator), SCALE) + F(1, SCALE))
+            lower = F(value, SCALE) + 1
+            upper = F(value + 1, SCALE) + 1
+            self.assertLessEqual(lower * lower, x)
+            self.assertGreater(upper * upper, x)
 
     def test_complete_round_batches_replay(self):
         spec = build_spec(n=9, rounds=12)
