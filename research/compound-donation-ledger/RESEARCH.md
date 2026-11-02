@@ -192,6 +192,39 @@ and explicit out-of-grid stress tests. The calibrator's validity is retained
 because the total prior mass is one; the power benefit, if any, must be
 measured on matched independent confirmatory streams.
 
+### Universal dyadic threshold prior
+
+A useful non-trained, cross-horizon prior is
+\[
+K_j=2^j,\qquad \pi_j=\frac{1}{j(j+1)},\qquad j=1,2,\ldots.
+\]
+The masses sum to one exactly by telescoping. The contribution from threshold
+\(K_j\) alone is
+\[
+\pi_jK_j=\frac{2^j}{j(j+1)}.
+\]
+For any target adjusted threshold \(h\geq1\), choose the smallest \(j_h\)
+with \(2^{j_h}/[j_h(j_h+1)]\geq h\). Then the staircase calibrator reaches
+at least \(h\) by raw running supremum \(2^{j_h}\). For \(j_h>1\), minimality
+implies
+\[
+2^{j_h}<2h(j_h-1)j_h.
+\]
+Since \(j_h=\log_2 h+O(\log\log h)\), the raw-threshold overhead is
+\(O((\log h)^2)\) relative to \(h\), rather than the \(O(h)\) multiplicative
+overhead of the square-root adjuster, whose raw threshold is \((h+1)^2\).
+
+This is an asymptotic threshold-geometry result, not a claim of empirical
+power dominance. At moderate thresholds, the constants can make the dyadic
+prior less efficient than the square-root adjuster; at other scales it may
+be substantially better. A fixed mixture of the dyadic prior and smooth
+adjusters is valid and can hedge the regimes, at the cost of allocating less
+prior mass to each component. The finite Rust implementation includes a
+truncated dyadic prefix with each rational mass rounded down, so its total
+mass remains at most one. A finite prefix only covers a finite threshold
+range; thresholds beyond its largest grid point are unsupported until the
+prior is extended under a precommitted horizon-independent rule.
+
 ## 6. Prior art and software baselines
 
 The benchmark must keep guarantee classes separate.
