@@ -325,3 +325,60 @@ Expose the same core through thin adapters:
 The adapters must call the same core contracts and share the same known-answer corpus. They may differ in transport and delivery, but not in Evidence identity, operation semantics, authority or claim ceilings.
 
 MCP is not an authorization mechanism. The direct API also enforces capability/effect policy; using Rust internally must not bypass the read-only gateway or independent qualification requirements.
+
+
+## 12. Mobile archive inventory: port the reader contract, not just the ZIP parser
+
+A bounded APK/IPA inventory is the first native analyzer, but the upstream reference is more sophisticated than a conventional archive listing.
+
+Pinned REA source includes:
+- `src/artifacts/ArtifactReader.ts`: archive-neutral reader contract, entry facts, source identity, declared integrity, coverage, omissions, per-entry open, provenance, container integrity and explicit close.
+- `src/artifacts/ZipArtifactReader.ts`: ZIP64-capable lazy reader over `@zip.js/zip.js`, checking signature and overlapping entries, preserving duplicate occurrences through adapter identity, validating CP437/UTF-8 names, and distinguishing symlinks, directories, encrypted entries and regular files.
+- `src/artifacts/ArtifactResourceScope.ts`: cancellation, stream ownership, cleanup retry and retention of failed cleanup owners.
+- `src/artifacts/inventory/scanReader.ts`: shared path normalization, collision detection, parent resolution, streamed hashing, graph construction and integrity contradiction reporting.
+- `src/domain/zipEndOfCentralDirectory.ts` and `zipPackageFormat.ts`: candidate EOCD scanning and declared non-entry limitations.
+
+The Rust migration must preserve the behavior-bearing contracts:
+1. Entry occurrence identity is distinct from logical path; duplicate names are not silently collapsed.
+2. Entry metadata, actual bytes, declared integrity and content hash are separate observations.
+3. The original file identity is rechecked around random reads and streamed entry reads.
+4. Overlap, CRC, decompressed-size and archive-signature checks are recorded independently.
+5. Declared and observed expansion are bounded before and during decompression.
+6. Cancellation and cleanup are first-class outcomes; a failed close retains an owned resource for retry.
+7. Encrypted, unsupported and intentionally omitted entries are explicit partial/unavailable states.
+8. Inventory does not write extracted files. Extraction has a separate authority and owned output-tree lifecycle.
+9. Coverage indicates what was traversed, not whether every claim about the package is true.
+10. Leading stubs, APK Signing Block regions before the central directory and trailing ZIP comments remain outside entry inventory unless a separate region-analysis operation reports them.
+
+### Parser selection
+
+The Rust `zip` crate is a candidate parser and differential oracle, not an automatic replacement for this whole contract. Version 8.6.0 is documented with Rust 1.88 MSRV, lower than the workspace's Rust 1.96 toolchain. It supports ZIP64-related formats and common compression modes, but does not support multi-disk archives. Its default feature set enables more than metadata-only inventory needs; do not enable encryption/decompression backends without a separate use case and threat review.
+
+The current Symthaea lockfile already carries zip 1.1.4, 6.0.0 and 7.2.0 transitively. Compare their feature trees and security/lifecycle semantics before adding another direct ZIP version. For the first metadata-only operation, a small audited parser plus the mature crate as an independent differential oracle may be safer and lighter than enabling every codec. For member hashing, stream bytes through bounded readers; never buffer an archive member without an explicit size budget.
+
+Do not add `object` or `goblin` to the first ZIP inventory slice. Evaluate those later for ELF/Mach-O/PE semantic inspection, after archive occurrence and Evidence parity is qualified.
+
+### Archive-reader scorecard
+
+Add a separate archive contract suite with independent fixture IDs for:
+- EOCD/comment candidate ambiguity, ZIP64 locator/record, split/multi-disk refusal and trailing data;
+- prepended stubs and offset adjustment;
+- duplicate paths and duplicate content with distinct occurrence IDs;
+- CP437 names, UTF-8 flag, Unicode Path extra fields, invalid byte sequences and canonical path rejection;
+- central-directory/local-header mismatch and overlapping compressed extents;
+- encrypted entries, symlink entries and unsupported compression;
+- CRC mismatch, truncated streams, declared/observed size disagreement;
+- archive mutation between admission, enumeration and entry open;
+- cancellation during enumeration, member streaming and final cleanup;
+- declared-expansion and actual streamed-expansion budgets;
+- case and Unicode-normalization collision policy.
+
+Report inventory parity, source stability, false-accept/abstention rate, bytes read, peak memory, p50/p95 and cleanup failures independently. A ZIP parser passing its own archive test suite is not evidence of REA artifact-inventory parity.
+
+References:
+- REA ZIP reader: https://github.com/morluto/rea/blob/8250bf2320ea57aab4e664db4b4d44b8abd2004e/src/artifacts/ZipArtifactReader.ts
+- REA reader contract: https://github.com/morluto/rea/blob/8250bf2320ea57aab4e664db4b4d44b8abd2004e/src/artifacts/ArtifactReader.ts
+- REA scanner: https://github.com/morluto/rea/blob/8250bf2320ea57aab4e664db4b4d44b8abd2004e/src/artifacts/inventory/scanReader.ts
+- zip-rs 8.6.0: https://docs.rs/zip/8.6.0/zip/
+- object: https://docs.rs/object/latest/object/
+- goblin: https://docs.rs/goblin/latest/goblin/
