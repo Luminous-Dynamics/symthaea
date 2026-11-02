@@ -17,10 +17,10 @@ use super::noncompensatory_guardrails::{
     NoncompensatoryGuardrailRequest, GuardrailOverallDecision,
 };
 use super::policy_frontier_lp::{
-    analyze_policy_frontier_with_constraints, verify_policy_frontier_report_digest,
-    FrontierAdditionalLinearConstraint,
-    FrontierAlternativeMetrics, FrontierNullSize, FrontierPolicyWeight, PolicyFrontierError,
-    PolicyFrontierPlan, PolicyFrontierReport,
+    analyze_policy_frontier_with_constraints, frontier_solver_settings,
+    verify_policy_frontier_report_digest, FrontierAdditionalLinearConstraint,
+    FrontierAlternativeMetrics, FrontierNullSize, FrontierPolicyWeight,
+    FrontierSolverSettings, PolicyFrontierError, PolicyFrontierPlan, PolicyFrontierReport,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -191,8 +191,12 @@ pub struct GuardrailConstrainedFrontierReport {
     pub calibration_target_design_sha256: String,
     pub confirmatory_target_design_sha256: String,
     pub sampling_unit_contract_sha256: String,
+    /// Experiment null Type-I budget from the base frontier plan; distinct
+    /// from the guardrail false-safe confidence failure probability below.
+    pub frontier_significance_level: f64,
     pub simultaneous_guardrail_failure_probability: f64,
     pub simultaneous_coverage_receipt_sha256: String,
+    pub solver_settings: FrontierSolverSettings,
     pub policy_eligibility: Vec<PolicyEligibilityRecord>,
     pub selected_policy_weights: Vec<FrontierPolicyWeight>,
     pub optimizer_report: PolicyFrontierReport,
@@ -515,12 +519,14 @@ pub fn analyze_guardrail_constrained_frontier(
         calibration_target_design_sha256: request.guardrail_evidence.calibration_target_design_sha256,
         confirmatory_target_design_sha256: request.guardrail_evidence.confirmatory_target_design_sha256,
         sampling_unit_contract_sha256: request.guardrail_evidence.sampling_unit_contract_sha256,
+        frontier_significance_level: request.frontier_plan.significance_level,
         simultaneous_guardrail_failure_probability: request
             .guardrail_evidence
             .simultaneous_guardrail_failure_probability,
         simultaneous_coverage_receipt_sha256: request
             .guardrail_evidence
             .simultaneous_coverage_receipt_sha256,
+        solver_settings: frontier_solver_settings(),
         policy_eligibility: eligibility,
         selected_policy_weights: optimizer_report.policy_weights.clone(),
         optimizer_report,
@@ -567,10 +573,12 @@ pub fn verify_guardrail_constrained_frontier_report(
             != request.guardrail_evidence.confirmatory_target_design_sha256
         || report.sampling_unit_contract_sha256
             != request.guardrail_evidence.sampling_unit_contract_sha256
+        || report.frontier_significance_level != request.frontier_plan.significance_level
         || report.simultaneous_guardrail_failure_probability
             != request.guardrail_evidence.simultaneous_guardrail_failure_probability
         || report.simultaneous_coverage_receipt_sha256
             != request.guardrail_evidence.simultaneous_coverage_receipt_sha256
+        || report.solver_settings != frontier_solver_settings()
     {
         return Err(GuardrailFrontierError::new(
             "report.provenance",
