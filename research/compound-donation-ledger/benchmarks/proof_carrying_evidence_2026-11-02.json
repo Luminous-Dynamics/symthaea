@@ -1,0 +1,58 @@
+{
+  "benchmark": "proof_carrying_bernoulli_eprocess_receipts",
+  "scope": "Exact rational arithmetic, receipt integrity and declared-contract replay. Not proof of real-world conditional laws or source authenticity.",
+  "execution": {
+    "runner": "research/compound-donation-ledger/benchmarks/proof_carrying_evidence.py",
+    "local_execution": "A local copy of the committed runner logic was executed with the stated defaults.",
+    "traces": 100,
+    "candidates": 12,
+    "rounds_per_trace": 30,
+    "evidence_updates_replayed": 32400,
+    "verified_traces": 100,
+    "median_verifier_seconds": 0.0020825075,
+    "environment": "Python 3.13.5, container runtime"
+  },
+  "registered_model": {
+    "null_probability": "1/2",
+    "betting_probability": "7/10",
+    "success_lr_factor": "7/5",
+    "failure_lr_factor": "3/5",
+    "null_conditional_factor_expectation": "1",
+    "adjuster": "floor_1000000(sqrt(running_max_LR)-1)"
+  },
+  "dependence_schedule": "Independent, shared-uniform and balanced-negative; cyclic by trace.",
+  "negative_controls": {
+    "observation_bit_with_stale_digest": "rejected",
+    "adjusted_value_tamper": "rejected",
+    "previous_batch_hash_tamper": "rejected",
+    "active_roster_omission": "rejected",
+    "round_sequence_rollback": "rejected",
+    "observation_order_tamper": "rejected",
+    "spec_digest_tamper": "rejected",
+    "all_rejected": true
+  },
+  "trust_boundary": [
+    "Arithmetic factor/product/supremum/adjuster claims are independently recomputed.",
+    "Active roster, round ordering, precommitted specification and hash-chain consistency are verified.",
+    "The real conditional-null law is assumed, not proven.",
+    "The real global filtration and source completeness are declared, not independently established.",
+    "Unsigned SHA-256 chains are not source authentication."
+  ],
+  "claim_ceiling": "This is a Python reference replay result. No Rust build, production throughput, SupFDR proof, source-authentication result, or power improvement is claimed.",
+  "unit_tests": {
+    "suite": "benchmarks/test_proof_carrying_evidence.py",
+    "tests": 8,
+    "local_result": "passed",
+    "execution_note": "Executed locally against a local copy of the committed standalone runner; this is not GitHub Actions or Rust validation.",
+    "covered": [
+      "registered Bernoulli LR factors and conditional mean one",
+      "exact A2 fixed-point floor square inequalities",
+      "independent replay in independent/shared-uniform/balanced-negative modes",
+      "incomplete and out-of-order batch rejection",
+      "process-spec precommitment tamper",
+      "factor claim tamper",
+      "seven negative controls",
+      "hash-chain observation mutation"
+    ]
+  }
+}
