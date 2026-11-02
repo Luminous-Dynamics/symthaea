@@ -2,6 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use symthaea_rea_compat::mobile_tool_effects::{
+    DerivedToolAnnotations, MOBILE_TOOL_EFFECTS, ToolEffects, annotations_from_effects,
+};
 use symthaea_rea_compat::{
     EvidenceErrorKind, analysis_profile_digest, sha256_hex, verify_evidence_json,
 };
@@ -243,5 +246,58 @@ fn matches_pinned_upstream_rea_evidence_corpus() {
     assert_eq!(stricter_importer_cases.len(), 1);
     for stricter in stricter_importer_cases {
         verify_stricter_importer_case(&directory, stricter);
+    }
+
+    // Compare the complete bounded mobile catalog to the actual pinned
+    // upstream TOOL_EFFECTS table and its derived MCP annotations.
+    let effect_manifest = &manifest["mobile_tool_effects"];
+    assert_eq!(
+        effect_manifest["tool_count"].as_u64(),
+        Some(MOBILE_TOOL_EFFECTS.len() as u64)
+    );
+    assert_eq!(
+        receipt["mobile_tool_effects"], *effect_manifest,
+        "corpus provenance receipt must bind the effect fixture"
+    );
+    let effect_filename = effect_manifest["file"].as_str().unwrap();
+    let effect_bytes = fixture_file(&directory, effect_filename);
+    assert_eq!(
+        sha256_hex(&effect_bytes),
+        effect_manifest["raw_file_sha256"].as_str().unwrap()
+    );
+    let upstream_effects: Value = serde_json::from_slice(&effect_bytes).unwrap();
+    assert_eq!(
+        upstream_effects.as_object().map(|map| map.len()),
+        Some(MOBILE_TOOL_EFFECTS.len())
+    );
+    for entry in &MOBILE_TOOL_EFFECTS {
+        let upstream = &upstream_effects[entry.tool.as_str()];
+        assert!(
+            !upstream.is_null(),
+            "pinned upstream effect row missing for {}",
+            entry.tool.as_str()
+        );
+        let upstream_tool_effects: ToolEffects =
+            serde_json::from_value(upstream["effects"].clone()).unwrap();
+        assert_eq!(
+            upstream_tool_effects,
+            entry.effects,
+            "effect row differs from pinned upstream for {}",
+            entry.tool.as_str()
+        );
+        let upstream_annotations: DerivedToolAnnotations =
+            serde_json::from_value(upstream["annotations"].clone()).unwrap();
+        assert_eq!(
+            annotations_from_effects(entry.effects),
+            upstream_annotations,
+            "derived MCP annotation differs from pinned upstream for {}",
+            entry.tool.as_str()
+        );
+        assert_eq!(
+            upstream["returns_target_content"],
+            Value::Bool(entry.returns_target_content),
+            "target-content trust marker differs from pinned upstream for {}",
+            entry.tool.as_str()
+        );
     }
 }
