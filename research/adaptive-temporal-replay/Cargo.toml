@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-adaptive-temporal-replay"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Deterministic synthetic regime generator and bitemporal feedback replay for adaptive temporal calibration research"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[workspace]
