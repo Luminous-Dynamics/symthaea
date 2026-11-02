@@ -1116,6 +1116,60 @@ mod tests {
         envelope.to_json().unwrap()
     }
 
+
+    fn root_key_records(seeds: &[[u8; 32]], domain_prefix: &str) -> Vec<RootKeyRecord> {
+        seeds.iter().enumerate().map(|(index, seed)| {
+            let signing_key = SigningKey::from_bytes(seed);
+            let public_key = STANDARD.encode(signing_key.verifying_key().to_bytes());
+            RootKeyRecord {
+                keyid: canonical_key_id(&public_key).unwrap(),
+                algorithm: "ed25519".to_string(),
+                public_key,
+                administrative_domain: format!("{domain_prefix}-{index}"),
+                status: "active".to_string(),
+            }
+        }).collect()
+    }
+
+    fn witness_metadata_from_trust(
+        trust: &TrustStore,
+        previous: Option<String>,
+    ) -> WitnessSetMetadataPayload {
+        WitnessSetMetadataPayload {
+            record_type: "basalt.authority.witness-set-metadata".to_string(),
+            schema_version: 1,
+            authority_id: trust.authority_id.clone(),
+            witness_set_id: trust.witness_set_id.clone(),
+            witness_set_version: trust.witness_set_version.to_string(),
+            previous_witness_set_digest: previous,
+            trust_root_version: trust.trust_root_version.to_string(),
+            fault_tolerance: trust.fault_tolerance,
+            member_count: trust.member_count,
+            write_quorum: trust.write_quorum,
+            read_quorum: trust.read_quorum,
+            signature_algorithm_policy: "from-pinned-trust-metadata; never selected from an untrusted envelope".to_string(),
+            members: trust.members.clone(),
+        }
+    }
+
+    fn make_trust_root(
+        root_keys: Vec<RootKeyRecord>,
+        initial_set: &WitnessSetMetadataPayload,
+    ) -> TrustRootPayload {
+        TrustRootPayload {
+            record_type: "basalt.authority.witness-trust-root".to_string(),
+            schema_version: 1,
+            authority_id: initial_set.authority_id.clone(),
+            trust_root_version: "1".to_string(),
+            previous_trust_root_digest: None,
+            root_threshold: 3,
+            root_keys,
+            initial_witness_set_id: initial_set.witness_set_id.clone(),
+            initial_witness_set_version: initial_set.witness_set_version.clone(),
+            initial_witness_set_digest: witness_set_digest(initial_set).unwrap(),
+        }
+    }
+
     #[test]
     fn pae_matches_independent_checked_in_vector() {
         let payload_type = TEST_PAYLOAD_TYPE;
@@ -1703,6 +1757,109 @@ mod tests {
             &trust_bytes,
             &pin,
         ).is_err());
+    }
+
+
+    #[test]
+    fn offline_root_pin_authenticates_initial_witness_set_and_checkpoint_chain() {
+        let root_seeds = [test_seed(111), test_seed(112), test_seed(113), test_seed(114)];
+        let witness_seeds = [test_seed(121), test_seed(122), test_seed(123), test_seed(124)];
+        let root_keys = root_key_records(&root_seeds, "root-zone");
+        let trust = build_trust(&witness_seeds);
+        let metadata = witness_metadata_from_trust(&trust, None);
+        let root = make_trust_root(root_keys, &metadata);
+        let root_digest = trust_root_digest(&root).unwrap();
+        let root_bytes = serde_json_canonicalizer::to_vec(&root).unwrap();
+        let pinned = load_pinned_trust_root(&root_bytes, &root_digest).unwrap();
+
+        let set_payload = serde_json_canonicalizer::to_vec(&metadata).unwrap();
+        let set_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &set_payload, &root_seeds[..3]);
+        let verified_set = verify_witness_set_metadata(&set_envelope, &pinned, None).unwrap();
+        assert_eq!(verified_set.digest(), root.initial_witness_set_digest);
+
+        let state0 = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let state1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let genesis = checkpoint_fixture("0", "0", state0, None, None);
+        let genesis_digest = checkpoint_digest(&genesis).unwrap();
+        let next = checkpoint_fixture(
+            "1",
+            "1",
+            state1,
+            Some(genesis_digest),
+            Some("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string()),
+        );
+        let chain = verify_checkpoint_chain_with_witness_set(
+            &[
+                signed_checkpoint(&genesis, &witness_seeds[..3]),
+                signed_checkpoint(&next, &witness_seeds[..3]),
+            ],
+            &verified_set,
+        ).unwrap();
+        assert_eq!(chain.head.payload.state_digest, state1);
+    }
+
+    #[test]
+    fn trust_root_rotation_requires_both_old_and_new_key_thresholds() {
+        let old_seeds = [test_seed(131), test_seed(132), test_seed(133), test_seed(134)];
+        let new_seeds = [test_seed(141), test_seed(142), test_seed(143), test_seed(144)];
+        let witness_seeds = [test_seed(151), test_seed(152), test_seed(153), test_seed(154)];
+        let trust = build_trust(&witness_seeds);
+        let metadata = witness_metadata_from_trust(&trust, None);
+        let current = make_trust_root(root_key_records(&old_seeds, "old-root"), &metadata);
+        let current_digest = trust_root_digest(&current).unwrap();
+        let current_bytes = serde_json_canonicalizer::to_vec(&current).unwrap();
+        let pinned = load_pinned_trust_root(&current_bytes, &current_digest).unwrap();
+
+        let mut successor = current.clone();
+        successor.trust_root_version = "2".to_string();
+        successor.previous_trust_root_digest = Some(current_digest.clone());
+        successor.root_keys = root_key_records(&new_seeds, "new-root");
+        let successor_bytes = serde_json_canonicalizer::to_vec(&successor).unwrap();
+        let mut dual_signers = old_seeds[..3].to_vec();
+        dual_signers.extend_from_slice(&new_seeds[..3]);
+        let dual_signed = sign_payload(TRUST_ROOT_PAYLOAD_TYPE, &successor_bytes, &dual_signers);
+        let rotated = verify_trust_root_rotation(&pinned, &dual_signed).unwrap();
+        assert_eq!(rotated.payload().trust_root_version, "2");
+        assert_eq!(rotated.payload().previous_trust_root_digest.as_deref(), Some(current_digest.as_str()));
+
+        let old_only = sign_payload(TRUST_ROOT_PAYLOAD_TYPE, &successor_bytes, &old_seeds[..3]);
+        assert!(verify_trust_root_rotation(&pinned, &old_only).is_err());
+    }
+
+    #[test]
+    fn witness_set_rotation_requires_a_linked_incremented_metadata_version() {
+        let root_seeds = [test_seed(161), test_seed(162), test_seed(163), test_seed(164)];
+        let first_witness_seeds = [test_seed(171), test_seed(172), test_seed(173), test_seed(174)];
+        let next_witness_seeds = [test_seed(181), test_seed(182), test_seed(183), test_seed(184)];
+        let first_trust = build_trust(&first_witness_seeds);
+        let first_metadata = witness_metadata_from_trust(&first_trust, None);
+        let root = make_trust_root(root_key_records(&root_seeds, "root-domain"), &first_metadata);
+        let root_digest = trust_root_digest(&root).unwrap();
+        let root_bytes = serde_json_canonicalizer::to_vec(&root).unwrap();
+        let pinned = load_pinned_trust_root(&root_bytes, &root_digest).unwrap();
+
+        let first_payload = serde_json_canonicalizer::to_vec(&first_metadata).unwrap();
+        let first_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &first_payload, &root_seeds[..3]);
+        verify_witness_set_metadata(&first_envelope, &pinned, None).unwrap();
+
+        let next_trust = build_trust(&next_witness_seeds);
+        let mut next_metadata = witness_metadata_from_trust(
+            &next_trust,
+            Some(witness_set_digest(&first_metadata).unwrap()),
+        );
+        next_metadata.witness_set_id = "basalt-test-witness-set-2".to_string();
+        next_metadata.witness_set_version = "2".to_string();
+        let next_payload = serde_json_canonicalizer::to_vec(&next_metadata).unwrap();
+        let next_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &next_payload, &root_seeds[..3]);
+        let next = verify_witness_set_metadata(&next_envelope, &pinned, Some(&first_metadata)).unwrap();
+        assert_eq!(next.metadata().witness_set_version, "2");
+
+        next_metadata.previous_witness_set_digest = Some(
+            "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string()
+        );
+        let fork_payload = serde_json_canonicalizer::to_vec(&next_metadata).unwrap();
+        let fork_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &fork_payload, &root_seeds[..3]);
+        assert!(verify_witness_set_metadata(&fork_envelope, &pinned, Some(&first_metadata)).is_err());
     }
 
 }
