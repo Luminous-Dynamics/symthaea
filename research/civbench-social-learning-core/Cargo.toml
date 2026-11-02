@@ -19,4 +19,8 @@ path = "src/main.rs"
 name = "cultural-transmission-sweep"
 path = "src/bin/cultural_transmission_sweep.rs"
 
+[[bin]]
+name = "cultural-frontier-sweep"
+path = "src/bin/cultural_frontier_sweep.rs"
+
 [dependencies]
