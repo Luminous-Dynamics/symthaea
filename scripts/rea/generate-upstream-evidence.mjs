@@ -267,6 +267,7 @@ for (const [index, item] of cases.entries()) {
 }
 
 const displayOnlyMutations = [];
+const keyOrderMutations = [];
 for (const item of fixtureRecords) {
   const source = JSON.parse(
     await readFile(resolve(outputDirectory, item.file), "utf8"),
@@ -290,12 +291,36 @@ for (const item of fixtureRecords) {
     raw_file_sha256: digest(displayBytes),
     expected_evidence_id: item.evidence_id,
   });
+
+  const reverseObjectKeys = (value) => {
+    if (Array.isArray(value)) return value.map(reverseObjectKeys);
+    if (value === null || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.entries(value)
+        .reverse()
+        .map(([key, child]) => [key, reverseObjectKeys(child)]),
+    );
+  };
+  const reordered = reverseObjectKeys(source);
+  const reorderedBytes = Buffer.from(JSON.stringify(reordered, null, 2) + "\n");
+  const reorderedPath = item.file.replace(/\.json$/u, ".key-order.json");
+  await writeFile(resolve(outputDirectory, reorderedPath), reorderedBytes, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  keyOrderMutations.push({
+    name: item.name,
+    file: reorderedPath,
+    bytes: reorderedBytes.length,
+    raw_file_sha256: digest(reorderedBytes),
+    expected_evidence_id: item.evidence_id,
+  });
 }
 
-const invalidCases = [];
 const invalidInputs = [
   {
     name: "stale-id-after-semantic-mutation",
+    source: "apk-profile-complete",
     mutate(evidence) {
       evidence.predicate_type = evidence.predicate_type + ".tampered";
     },
@@ -303,6 +328,7 @@ const invalidInputs = [
   },
   {
     name: "unknown-top-level-field",
+    source: "apk-profile-complete",
     mutate(evidence) {
       evidence.unreviewed_field = true;
     },
@@ -310,6 +336,7 @@ const invalidInputs = [
   },
   {
     name: "missing-required-coverage-field",
+    source: "apk-profile-complete",
     mutate(evidence) {
       delete evidence.relationship_coverage;
     },
@@ -317,20 +344,36 @@ const invalidInputs = [
   },
   {
     name: "analysis-profile-digest-substitution",
+    source: "apk-profile-complete",
     mutate(evidence) {
-      if (evidence.analysis_profile !== null) {
-        evidence.analysis_profile.digest = "0".repeat(64);
-      } else {
-        evidence.predicate_type = evidence.predicate_type + ".tampered";
-      }
+      evidence.analysis_profile.digest = "0".repeat(64);
     },
     expected_error: "identity-mismatch",
   },
+  {
+    name: "safe-integer-offset-overflow",
+    source: "locations-and-safe-offset-boundary",
+    mutate(evidence) {
+      evidence.locations[3].offset = Number.MAX_SAFE_INTEGER + 1;
+    },
+    expected_error: "schema-violation",
+  },
+  {
+    name: "raw-only-architecture-on-apk",
+    source: "apk-profile-complete",
+    mutate(evidence) {
+      evidence.subject.architecture = "m68k";
+    },
+    expected_error: "schema-violation",
+  },
 ];
 
+const invalidCases = [];
 for (const invalid of invalidInputs) {
+  const selected = fixtureRecords.find((item) => item.name === invalid.source);
+  if (!selected) throw new Error("Missing source fixture for " + invalid.name);
   const source = JSON.parse(
-    await readFile(resolve(outputDirectory, fixtureRecords[0].file), "utf8"),
+    await readFile(resolve(outputDirectory, selected.file), "utf8"),
   );
   invalid.mutate(source);
   let upstreamRejected = false;
@@ -359,6 +402,24 @@ for (const invalid of invalidInputs) {
   });
 }
 
+const surrogateSource = JSON.parse(
+  await readFile(
+    resolve(
+      outputDirectory,
+      fixtureRecords.find((item) => item.name === "apk-profile-complete").file,
+    ),
+    "utf8",
+  ),
+);
+surrogateSource.normalized_result.surrogate_probe = String.fromCharCode(0xd800);
+parseEvidence(surrogateSource);
+const surrogateBytes = Buffer.from(JSON.stringify(surrogateSource, null, 2) + "\n");
+const surrogateFile = "stricter-unpaired-surrogate.json";
+await writeFile(resolve(outputDirectory, surrogateFile), surrogateBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+
 const manifest = {
   schema: "luminous.rea-upstream-evidence-corpus.v1",
   producer: {
@@ -378,7 +439,19 @@ const manifest = {
   fixture_count: fixtureRecords.length,
   fixtures: fixtureRecords,
   display_only_mutations: displayOnlyMutations,
+  key_order_mutations: keyOrderMutations,
   negative_controls: invalidCases,
+  stricter_importer_cases: [
+    {
+      name: "unpaired-utf16-surrogate",
+      file: surrogateFile,
+      bytes: surrogateBytes.length,
+      raw_file_sha256: digest(surrogateBytes),
+      upstream_object_parse_accepted: true,
+      expected_rust_error: "invalid-json",
+      policy: "Rust String cannot represent isolated UTF-16 surrogate code units; raw importer rejects rather than normalizes or replaces them.",
+    },
+  ],
 };
 const manifestBytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
 await writeFile(resolve(outputDirectory, "manifest.json"), manifestBytes, {
@@ -393,7 +466,9 @@ await writeFile(
       manifest_sha256: digest(manifestBytes),
       fixture_count: fixtureRecords.length,
       display_only_mutation_count: displayOnlyMutations.length,
+      key_order_mutation_count: keyOrderMutations.length,
       negative_control_count: invalidCases.length,
+      stricter_importer_count: 1,
       producer: manifest.producer,
       generator: manifest.generator,
     },
