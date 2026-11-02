@@ -51,10 +51,10 @@ impl DreamingService {
 
     fn stage_proposal(&self, candidate: TrainingPair) {
         let mut proposals = self.proposal_pool.lock();
-        let duplicate = proposals.pairs.iter().any(|existing| {
-            existing.target_text == candidate.target_text
-                && existing.channels == candidate.channels
-        });
+        let duplicate = proposals
+            .pairs
+            .iter()
+            .any(|existing| same_training_pair(existing, &candidate));
         if !duplicate {
             proposals.push(candidate);
         }
@@ -70,6 +70,27 @@ impl DreamingService {
     pub fn internalized_dreams(&self) -> TrainingDataset {
         self.dream_pool.lock().clone()
     }
+}
+
+fn same_training_pair(left: &TrainingPair, right: &TrainingPair) -> bool {
+    left.target_text == right.target_text
+        && left.target_ids == right.target_ids
+        && left.valence.to_bits() == right.valence.to_bits()
+        && left.arousal.to_bits() == right.arousal.to_bits()
+        && same_f32_slice(&left.channels, &right.channels)
+        && match (&left.semantic_hv, &right.semantic_hv) {
+            (Some(left), Some(right)) => same_f32_slice(left, right),
+            (None, None) => true,
+            _ => false,
+        }
+}
+
+fn same_f32_slice(left: &[f32], right: &[f32]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| left.to_bits() == right.to_bits())
 }
 
 impl Default for DreamingService {
