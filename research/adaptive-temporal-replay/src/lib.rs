@@ -492,7 +492,7 @@ pub struct DelayedAciFeedbackReceipt {
     pub target_step: u64,
     pub prediction_origin_step: u64,
     pub phase_index: usize,
-    pub alpha_used_ppm: i64,
+    pub alpha_used_numerator_1e12: i128,
     pub prediction_set_sha256: [u8; 32],
     pub miscovered: bool,
 }
@@ -502,8 +502,8 @@ pub struct DelayedAciStepReceipt {
     pub origin_step: u64,
     pub issued_target_step: u64,
     pub phase_index: usize,
-    pub alpha_used_ppm: i64,
-    pub updated_alpha_ppm: i64,
+    pub alpha_used_numerator_1e12: i128,
+    pub updated_alpha_numerator_1e12: i128,
     pub prediction_set_sha256: [u8; 32],
     pub consumed_feedback: Option<DelayedAciFeedbackReceipt>,
 }
@@ -1018,7 +1018,7 @@ mod tests {
         let mut state = DelayedAciBank::new(3, 100_000, 50_000).unwrap();
         for step in 0..3 {
             let receipt = state.advance(step, None, digest(step as u8 + 1)).unwrap();
-            assert_eq!(receipt.alpha_used_ppm, 100_000);
+            assert_eq!(receipt.alpha_used_numerator_1e12, 100_000_000_000);
         }
         let r3 = state.advance(3, Some(true), digest(4)).unwrap();
         let r4 = state.advance(4, Some(false), digest(5)).unwrap();
@@ -1061,7 +1061,7 @@ mod tests {
         let original = state.history_sha256();
         state.verify().unwrap();
         let mut tampered = state.clone();
-        tampered.history[3].alpha_used_ppm += 1;
+        tampered.history[3].alpha_used_numerator_1e12 += 1;
         assert!(tampered.verify().is_err());
         assert_ne!(original, tampered.history_sha256());
     }
