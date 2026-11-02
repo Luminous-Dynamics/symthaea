@@ -74,3 +74,10 @@ These are engineering targets, not achieved results or published SOTA standards:
 ## Limitations
 
 This synthetic channel validates the experiment's metric plumbing and controls only. Its drift equation is chosen for transparency and is not an empirical model of LLM generation. The numeric attributes do not encode text meaning, toxicity classifiers or human judgments. The ICLR paper's reported findings cannot be inferred from this module's outputs.
+
+
+## Branching-population extension now implemented
+
+The same module also supports a fixed-size branching population. Each generation creates a new cohort by selecting a parent uniformly from the previous cohort; the child inherits the parent's root lineage and transforms its signal through the configured channel. This allows measurement of lineage extinction and concentration, pairwise content distance and distance from the root source. It is distinct from a linear transmission chain and from the networked recommender model; this first branching mechanism uses uniform parent choice and no selection.
+
+The `branching-culture-sweep` binary evaluates 4 open-endedness settings × 4 generation depths with 128 replicate populations per condition and four initial source lineages. The experiment tracks unique surviving lineages, lineage HHI/effective diversity, extinction count, pairwise content distance and cumulative drift from the root. It tests a neutral parent-sampling baseline; future work should compare performance-biased, evidence-calibrated, novelty-preserving and adversarial parent selection.
