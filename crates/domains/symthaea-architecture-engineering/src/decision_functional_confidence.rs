@@ -138,7 +138,7 @@ pub struct DecisionFunctionalCalibrationRequest {
     pub calibration_independent_of_confirmatory_stream: bool,
     pub independent_sampling_units_declared: bool,
     /// V1 rejects unmodeled interference. This is a design declaration, not proof.
-    pub no_interference_within_sampling_unit_declared: bool,
+    pub no_cross_unit_interference_declared: bool,
     pub null_rows: Vec<NullPolicyModelSamples>,
     pub alternative_rows: Vec<AlternativePolicyModelSamples>,
 }
@@ -157,7 +157,7 @@ impl DecisionFunctionalCalibrationRequest {
         alternative_family_coverage_failure_probability: f64,
         calibration_independent_of_confirmatory_stream: bool,
         independent_sampling_units_declared: bool,
-        no_interference_within_sampling_unit_declared: bool,
+        no_cross_unit_interference_declared: bool,
         null_rows: Vec<NullPolicyModelSamples>,
         alternative_rows: Vec<AlternativePolicyModelSamples>,
     ) -> Result<Self, DecisionFunctionalError> {
@@ -175,7 +175,7 @@ impl DecisionFunctionalCalibrationRequest {
             alternative_family_coverage_failure_probability,
             calibration_independent_of_confirmatory_stream,
             independent_sampling_units_declared,
-            no_interference_within_sampling_unit_declared,
+            no_cross_unit_interference_declared,
             null_rows,
             alternative_rows,
         };
@@ -250,9 +250,9 @@ impl DecisionFunctionalCalibrationRequest {
                 "V1 requires independently sampled units; aggregate clusters before calibration",
             ));
         }
-        if !self.no_interference_within_sampling_unit_declared {
+        if !self.no_cross_unit_interference_declared {
             return Err(DecisionFunctionalError::new(
-                "request.no_interference_within_sampling_unit_declared",
+                "request.no_cross_unit_interference_declared",
                 "V1 does not qualify outcomes with unmodeled interference",
             ));
         }
@@ -290,6 +290,10 @@ impl DecisionFunctionalCalibrationRequest {
             validate_randomized_assignment(
                 self.alternative_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, row.sampling_unit_ids.as_slice())),
                 "request.alternative_rows",
+            )?;
+            validate_randomized_unit_ids_across_families(
+                &self.null_rows,
+                &self.alternative_rows,
             )?;
         }
 
@@ -555,6 +559,26 @@ fn validate_randomized_assignment<'a>(
             return Err(DecisionFunctionalError::new(
                 format!("{path}.{model_id}.assignment_probability"),
                 "randomized policy-arm assignment probabilities must sum to one per model",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_randomized_unit_ids_across_families(
+    null_rows: &[NullPolicyModelSamples],
+    alternative_rows: &[AlternativePolicyModelSamples],
+) -> Result<(), DecisionFunctionalError> {
+    let mut seen = BTreeSet::new();
+    for unit_id in null_rows
+        .iter()
+        .flat_map(|row| row.sampling_unit_ids.iter())
+        .chain(alternative_rows.iter().flat_map(|row| row.sampling_unit_ids.iter()))
+    {
+        if !seen.insert(unit_id.as_str()) {
+            return Err(DecisionFunctionalError::new(
+                "request.sampling_unit_ids",
+                "a randomized sampling unit is reused across policy/model evidence rows",
             ));
         }
     }
