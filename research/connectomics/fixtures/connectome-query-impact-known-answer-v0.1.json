@@ -31,7 +31,8 @@
               "lower": 0.8,
               "upper": 0.9
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -78,14 +79,16 @@
                 "materiality_exceeded_guaranteed": true,
                 "effect_method": "RectangularOuterBound",
                 "decision_flip_method": "MarginalIntervalOuterBound",
-                "paired_decision_world_count": 0
+                "paired_decision_world_count": 0,
+                "decision_flip_scope": "MarginalRectangularProduct"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.8,
             "worst_case_normalized_materiality": 8,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": true,
-            "aggregate_decision_flip": "Guaranteed"
+            "aggregate_decision_flip": "Guaranteed",
+            "aggregate_decision_flip_scope": "MarginalRectangularProduct"
           }
         ]
       }
@@ -119,7 +122,8 @@
               "lower": 0.8,
               "upper": 0.9
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           },
           {
             "query_id": "pathway-strength",
@@ -138,7 +142,8 @@
               "lower": 0.1,
               "upper": 0.2
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -185,7 +190,8 @@
                 "materiality_exceeded_guaranteed": true,
                 "effect_method": "RectangularOuterBound",
                 "decision_flip_method": "MarginalIntervalOuterBound",
-                "paired_decision_world_count": 0
+                "paired_decision_world_count": 0,
+                "decision_flip_scope": "MarginalRectangularProduct"
               },
               {
                 "scenario_id": "h2",
@@ -212,14 +218,16 @@
                 "materiality_exceeded_guaranteed": false,
                 "effect_method": "RectangularOuterBound",
                 "decision_flip_method": "MarginalIntervalOuterBound",
-                "paired_decision_world_count": 0
+                "paired_decision_world_count": 0,
+                "decision_flip_scope": "MarginalRectangularProduct"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.8,
             "worst_case_normalized_materiality": 8,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": false,
-            "aggregate_decision_flip": "Possible"
+            "aggregate_decision_flip": "Possible",
+            "aggregate_decision_flip_scope": "MarginalRectangularProduct"
           }
         ]
       }
@@ -253,7 +261,8 @@
               "lower": 105,
               "upper": 115
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           },
           {
             "query_id": "pathway-strength",
@@ -272,7 +281,8 @@
               "lower": 0.5,
               "upper": 0.6
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -319,14 +329,16 @@
                 "materiality_exceeded_guaranteed": true,
                 "effect_method": "RectangularOuterBound",
                 "decision_flip_method": "MarginalIntervalOuterBound",
-                "paired_decision_world_count": 0
+                "paired_decision_world_count": 0,
+                "decision_flip_scope": "MarginalRectangularProduct"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.39999999999999997,
             "worst_case_normalized_materiality": 3.9999999999999996,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": true,
-            "aggregate_decision_flip": "Guaranteed"
+            "aggregate_decision_flip": "Guaranteed",
+            "aggregate_decision_flip_scope": "MarginalRectangularProduct"
           },
           {
             "query_id": "synapse-count",
@@ -360,14 +372,16 @@
                 "materiality_exceeded_guaranteed": false,
                 "effect_method": "RectangularOuterBound",
                 "decision_flip_method": "NotConfigured",
-                "paired_decision_world_count": 0
+                "paired_decision_world_count": 0,
+                "decision_flip_scope": "NotApplicable"
               }
             ],
             "worst_case_maximum_absolute_effect": 15,
             "worst_case_normalized_materiality": 0.75,
             "materiality_exceeded_possible": false,
             "materiality_exceeded_guaranteed": false,
-            "aggregate_decision_flip": "NotConfigured"
+            "aggregate_decision_flip": "NotConfigured",
+            "aggregate_decision_flip_scope": "NotApplicable"
           }
         ]
       }
@@ -401,7 +415,8 @@
               "lower": 0.8,
               "upper": 0.9
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           },
           {
             "query_id": "pathway-strength",
@@ -420,7 +435,8 @@
               "lower": 0.8,
               "upper": 0.9
             },
-            "paired_effect": null
+            "paired_effect": null,
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -462,7 +478,8 @@
               },
               "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
               "decision_worlds": null
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -509,14 +526,16 @@
                 "materiality_exceeded_guaranteed": false,
                 "effect_method": "PairedSharedWorlds",
                 "decision_flip_method": "MarginalIntervalOuterBound",
-                "paired_decision_world_count": 0
+                "paired_decision_world_count": 0,
+                "decision_flip_scope": "MarginalRectangularProduct"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.2,
             "worst_case_normalized_materiality": 2,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": false,
-            "aggregate_decision_flip": "Possible"
+            "aggregate_decision_flip": "Possible",
+            "aggregate_decision_flip_scope": "MarginalRectangularProduct"
           }
         ]
       }
@@ -557,7 +576,8 @@
               },
               "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
               "decision_worlds": null
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -610,7 +630,8 @@
                   "after_edit_value": 0.7
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -657,14 +678,16 @@
                 "materiality_exceeded_guaranteed": false,
                 "effect_method": "PairedSharedWorlds",
                 "decision_flip_method": "PairedSharedWorlds",
-                "paired_decision_world_count": 2
+                "paired_decision_world_count": 2,
+                "decision_flip_scope": "SuppliedPairedWorldSet"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.1,
             "worst_case_normalized_materiality": 1,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": false,
-            "aggregate_decision_flip": "Impossible"
+            "aggregate_decision_flip": "Impossible",
+            "aggregate_decision_flip_scope": "SuppliedPairedWorldSet"
           }
         ]
       }
@@ -716,7 +739,8 @@
                   "after_edit_value": 0.2
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -763,14 +787,16 @@
                 "materiality_exceeded_guaranteed": false,
                 "effect_method": "PairedSharedWorlds",
                 "decision_flip_method": "PairedSharedWorlds",
-                "paired_decision_world_count": 2
+                "paired_decision_world_count": 2,
+                "decision_flip_scope": "SuppliedPairedWorldSet"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.6,
             "worst_case_normalized_materiality": 5.999999999999999,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": false,
-            "aggregate_decision_flip": "Guaranteed"
+            "aggregate_decision_flip": "Guaranteed",
+            "aggregate_decision_flip_scope": "SuppliedPairedWorldSet"
           }
         ]
       }
@@ -827,7 +853,8 @@
                   "after_edit_value": 0.3
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -874,14 +901,16 @@
                 "materiality_exceeded_guaranteed": false,
                 "effect_method": "PairedSharedWorlds",
                 "decision_flip_method": "PairedSharedWorlds",
-                "paired_decision_world_count": 3
+                "paired_decision_world_count": 3,
+                "decision_flip_scope": "SuppliedPairedWorldSet"
               }
             ],
             "worst_case_maximum_absolute_effect": 0.6,
             "worst_case_normalized_materiality": 5.999999999999999,
             "materiality_exceeded_possible": true,
             "materiality_exceeded_guaranteed": false,
-            "aggregate_decision_flip": "Possible"
+            "aggregate_decision_flip": "Possible",
+            "aggregate_decision_flip_scope": "SuppliedPairedWorldSet"
           }
         ]
       }
@@ -933,7 +962,8 @@
                   "after_edit_value": 0.7
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -981,7 +1011,8 @@
                   "after_edit_value": 0.1
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -1029,7 +1060,8 @@
                   "after_edit_value": 0.5
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -1077,7 +1109,8 @@
                   "after_edit_value": 0.3
                 }
               ]
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
@@ -1119,11 +1152,447 @@
               },
               "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
               "decision_worlds": []
-            }
+            },
+            "paired_world_set_coverage": null
           }
         ]
       },
       "expected_error": "PairedDecisionWorldsEmpty"
+    },
+    {
+      "case_id": "finite_universe_world_set_exactly_covered",
+      "input": {
+        "candidate_id": "finite-complete",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                },
+                {
+                  "world_id": "world-b",
+                  "baseline_value": 0.8,
+                  "after_edit_value": 0.7
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-universe-v1",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a",
+                "world-b"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "finite-complete",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_impacts": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "finite-worlds",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.1,
+                  "upper": 0.9
+                },
+                "effect_interval": {
+                  "lower": -0.1,
+                  "upper": 0.1
+                },
+                "minimum_absolute_effect": 0,
+                "maximum_absolute_effect": 0.1,
+                "normalized_materiality_lower": 0,
+                "normalized_materiality_upper": 1,
+                "baseline_decision": "Indeterminate",
+                "after_edit_decision": "Indeterminate",
+                "decision_flip": "Impossible",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": false,
+                "effect_method": "PairedSharedWorlds",
+                "decision_flip_method": "PairedSharedWorlds",
+                "paired_decision_world_count": 2,
+                "decision_flip_scope": "DeclaredFiniteUniverse"
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.1,
+            "worst_case_normalized_materiality": 1,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": false,
+            "aggregate_decision_flip": "Impossible",
+            "aggregate_decision_flip_scope": "DeclaredFiniteUniverse"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "finite_universe_missing_expected_world_rejected",
+      "input": {
+        "candidate_id": "finite-missing",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-universe-v1",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a",
+                "world-b"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "ExpectedWorldSetMismatch"
+    },
+    {
+      "case_id": "finite_universe_unverified_closure_rejected",
+      "input": {
+        "candidate_id": "finite-unverified",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-universe-v1",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": false
+            }
+          }
+        ]
+      },
+      "expected_error": "WorldSetCoverageNotVerified"
+    },
+    {
+      "case_id": "finite_universe_duplicate_expected_world_rejected",
+      "input": {
+        "candidate_id": "finite-duplicate",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-universe-v1",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a",
+                "world-a"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "DuplicateExpectedWorldId"
+    },
+    {
+      "case_id": "finite_universe_requires_paired_decision_worlds",
+      "input": {
+        "candidate_id": "finite-no-pairs",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": null
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-universe-v1",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "PairedWorldCoverageRequiresDecisionWorlds"
+    },
+    {
+      "case_id": "finite_universe_invalid_verifier_digest_rejected",
+      "input": {
+        "candidate_id": "finite-invalid-digest",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "finite-worlds",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.9
+            },
+            "paired_effect": {
+              "effect_interval": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "decision_worlds": [
+                {
+                  "world_id": "world-a",
+                  "baseline_value": 0.2,
+                  "after_edit_value": 0.3
+                }
+              ]
+            },
+            "paired_world_set_coverage": {
+              "universe_id": "finite-universe-v1",
+              "universe_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "admissibility_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "enumeration_input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "enumerator_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "expected_world_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "closure_proof_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "verifier_sha256": "bad",
+              "verification_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "expected_world_ids": [
+                "world-a"
+              ],
+              "closure_verified": true
+            }
+          }
+        ]
+      },
+      "expected_error": "InvalidSha256"
     }
   ]
 }
