@@ -267,7 +267,7 @@ Report confidence intervals and per-lane distributions, not only one aggregate p
 | Dimension | Metric | Initial target / guardrail |
 |---|---|---|
 | End-to-end task ability | Pass@1 and pass@k on repo-level tasks | Establish a frozen baseline first; then target +10 percentage points over the same foundation model without Symthaea's added reasoning/memory |
-| Terminal ability | Terminal-Bench 4.0 resolution rate | Stretch goal ≥70% with pinned harness and 5+ runs; also target ≥+10 pp vs. a matched base-model baseline on non-saturated lanes |
+| Terminal ability | Version-pinned, verifier-audited Terminal-Bench task subset | ≥+10 pp vs. the same model/harness baseline on the audited subset; 5+ runs and 95% intervals; publish raw v4.0.0 separately and do not treat its known-defect aggregate as clean ground truth |
 | Correctness | Independent hidden-test pass rate | No accepted change without independent acceptance evidence |
 | Grader integrity | False acceptance on deliberately invalid patches | Zero false accepts on a 1,000-case negative-control suite; report the one-sided confidence bound |
 | Regression resistance | Regressions introduced per accepted patch | Trend down; any critical regression blocks promotion |
