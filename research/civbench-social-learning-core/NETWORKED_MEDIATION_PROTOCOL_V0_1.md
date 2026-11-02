@@ -13,11 +13,11 @@ Czaplicka, A., Baumann, F. & Rahwan, I. (2025). *Mutual benefits of social learn
 
 The paper studies how localized social learning and global algorithmic mediation interact in cumulative culture. It reports that the impact of algorithmic mediation grows as social networks become less dense, and that the best ratio of peer and algorithmic learning depends on network density. The authors model a global mediator with knowledge of cultural traits and a peer-learning mechanism over a social network. Their cultural space distinguishes branches and complexity levels; agents have effort budgets and different costs for social copying, innovation and recommendation. They measure mean population payoff, number of distinct traits and maximum cultural complexity.
 
-The archived public C reference implementation is `modelQinn.c` at repository main blob SHA `8555ec4ad8bd7eec0605bcda28565fbfe2645957`. Its defaults in the supplied runner include N=100, T=20N, X=100, L=1000, social-copy cost Cs=5, innovation cost Ci=10, recommendation cost Cr=1, and sweeps recommendation probability r and Erdős–Rényi edge probability pER. The exact executable and source must be pinned before any replication claim; this protocol records the source identity but does not claim a full C-model reproduction.
+The archived public C reference implementation is `modelQinn.c` at repository main blob SHA `8555ec4ad8bd7eec0605bcda28565fbfe2645957`. Its runner script is pinned at blob SHA `e94d5999cc5a7c60ff072186d50febb6d87326a5`. The source-defined default grid uses N=100, T=20N, X=100, L=1000, social-copy cost Cs=5, innovation cost Ci=10, recommendation cost Cr=1 and Q=200; it sweeps recommendation probability r and Erdős–Rényi edge probability pER. A separate Rust semantic port now exists in `src/czaplicka_2025.rs`, with a dedicated protocol at `CZAPLICKA_2025_REFERENCE_PORT_PROTOCOL_V0_1.md`. The port is deterministic but not a bit-for-bit C RNG replay; no paper-result replication is claimed until source-to-source conformance and aggregate result checks pass.
 
 ## 2. Synthetic Rust model implemented here
 
-The current CivBench module is a deliberately simpler stage-separated mechanism model:
+The separate `src/networked_mediation.rs` module is a deliberately simpler stage-separated mechanism extension, not the authors' model:
 
 - A social graph begins as a connected ring; extra undirected shortcuts are added with a configured probability.
 - Each generation contains a new cohort at the same graph positions.
@@ -29,7 +29,7 @@ The current CivBench module is a deliberately simpler stage-separated mechanism 
 - Lineage IDs are retained to distinguish the spread of an original discovery from independent innovation.
 - The recommender fraction is an experimental control from 0 (peer-only) to 1 (recommender-only).
 
-This model is **not** a translation of `modelQinn.c`: it uses a ring-plus-shortcuts topology rather than a pure ER graph; it does not implement an effort budget, death/birth reset, branch-by-level trait table or the published innovation/payoff distribution; and its recommender is a top-k performance shortlist over prior-generation agents. These differences are intentional and explicit. The module is useful for isolating the interface between peer access, global curation, acquisition and lineage concentration, but its results cannot be reported as the 2025 paper's reproduced curves.
+This ring-plus-shortcuts model is **not** a translation of `modelQinn.c`: it uses a different topology, generation-cohort structure, trait abstraction and recommender shortlist. It does not implement the authors' within-generation asynchronous update order, effort budget, death/birth reset, level-indexed payoff archive or payoff distribution. These differences are intentional and explicit. The module is useful for isolating the interface between peer access, global curation, acquisition and lineage concentration, but its results cannot be reported as the 2025 paper's reproduced curves. For source-faithful baseline work, use `czaplicka_2025.rs`; for the new ring/shortcut mechanism experiment, use `networked_mediation.rs`. Keep their outputs in separate benchmark tracks.
 
 ## 3. Multi-seed sweep
 
