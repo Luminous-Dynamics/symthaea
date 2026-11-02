@@ -111,6 +111,29 @@ def projective_rank_points(family_size: int, alpha: float) -> list[tuple[float, 
     ]
 
 
+def projective_rank_hybrid_points(family_size: int, alpha: float) -> list[tuple[float, float]]:
+    """Half telescoping rank prior, half uniform over all 64 u64 dyadic ranks."""
+    prior_scale = 10**9
+    evidence_scale = 10**6
+    alpha_fraction = Fraction(str(alpha))
+    alpha_num, alpha_den = alpha_fraction.numerator, alpha_fraction.denominator
+    points: dict[int, int] = {}
+    for exponent in range(64):
+        rank = 1 << exponent
+        denominator = (exponent + 1) * (exponent + 2)
+        mass_ticks = prior_scale // (2 * denominator) + prior_scale // 128
+        target_num = family_size * alpha_den * evidence_scale
+        target_den = alpha_num * rank
+        target_ticks = (target_num + target_den - 1) // target_den
+        raw_num = target_ticks * prior_scale
+        raw_ticks = max(evidence_scale, (raw_num + mass_ticks - 1) // mass_ticks)
+        points[raw_ticks] = points.get(raw_ticks, 0) + mass_ticks
+    return [
+        (threshold / evidence_scale, mass / prior_scale)
+        for threshold, mass in sorted(points.items())
+    ]
+
+
 def calibrate(running_max: np.ndarray, family_size: int, alpha: float) -> dict[str, np.ndarray]:
     sqrt = np.sqrt(running_max) - 1.0
 
@@ -128,11 +151,16 @@ def calibrate(running_max: np.ndarray, family_size: int, alpha: float) -> dict[s
     for threshold, prior_mass in projective_rank_points(family_size, alpha):
         projective_rank += prior_mass * threshold * (running_max >= threshold)
 
+    projective_hybrid = np.zeros_like(running_max)
+    for threshold, prior_mass in projective_rank_hybrid_points(family_size, alpha):
+        projective_hybrid += prior_mass * threshold * (running_max >= threshold)
+
     return {
         "square_root": sqrt,
         "universal_dyadic_25": dyadic,
         "rank_geometric_fixed_family": rank_geometric,
         "rank_geometric_projective": projective_rank,
+        "rank_geometric_projective_hybrid": projective_hybrid,
     }
 
 
@@ -177,6 +205,7 @@ def run_cell(
         "universal_dyadic_25",
         "rank_geometric_fixed_family",
         "rank_geometric_projective",
+        "rank_geometric_projective_hybrid",
     )
     max_fdp = {name: np.zeros(streams, dtype=float) for name in names}
     terminal_fdp = {name: np.zeros(streams, dtype=float) for name in names}
@@ -246,6 +275,7 @@ def run_cell(
     raw_thresholds = {
         "fixed_family": [threshold for threshold, _mass in rank_geometric_points(family_size, alpha)],
         "projective": [threshold for threshold, _mass in projective_rank_points(family_size, alpha)],
+        "projective_hybrid": [threshold for threshold, _mass in projective_rank_hybrid_points(family_size, alpha)],
     }
     return {
         "metadata": {
