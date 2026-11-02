@@ -104,10 +104,11 @@ fn main() {
     ];
 
     println!(
-        "condition,generation,replicates,optimal_prevalence_mean,optimal_prevalence_ci95,observation_rate_mean,acquisition_rate_given_observation,optimal_acquisition_rate_given_observation,integration_rate_given_acquisition,top_teacher_selection_rate"
+        "condition,generation,replicates,individual_optimal_discovery_rate,integrated_optimal_prevalence,integrated_optimal_prevalence_ci95,observation_rate,acquisition_rate_given_observation,optimal_acquisition_rate_given_observation,integration_rate_given_acquisition,optimal_integration_rate_given_observation,top_teacher_selection_rate"
     );
 
     for condition in conditions {
+        let mut individual_optimal_discovery_rate = Vec::new();
         let mut optimal_prevalence = Vec::new();
         let mut observation_rate = Vec::new();
         let mut acquisition_rate = Vec::new();
@@ -116,6 +117,7 @@ fn main() {
         let mut top_teacher_rate = Vec::new();
 
         for _ in 0..5 {
+            individual_optimal_discovery_rate.push(OnlineStats::default());
             optimal_prevalence.push(OnlineStats::default());
             observation_rate.push(OnlineStats::default());
             acquisition_rate.push(OnlineStats::default());
@@ -136,6 +138,10 @@ fn main() {
 
             for metrics in run.metrics() {
                 let generation = metrics.generation;
+                individual_optimal_discovery_rate[generation].push(
+                    metrics.individually_discovered_optimal_count as f64
+                        / metrics.total_agents as f64,
+                );
                 optimal_prevalence[generation].push(metrics.optimal_prevalence);
                 if let Some(value) = metrics.demonstration_observation_rate {
                     observation_rate[generation].push(value);
@@ -158,16 +164,18 @@ fn main() {
         for generation in 0..5 {
             let optimal = &optimal_prevalence[generation];
             println!(
-                "{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{},{}",
                 condition.name,
                 generation,
                 REPLICATES,
+                fmt_optional(individual_optimal_discovery_rate[generation].mean()),
                 fmt_optional(optimal.mean()),
                 fmt_optional(optimal.ci95_half_width()),
                 fmt_optional(observation_rate[generation].mean()),
                 fmt_optional(acquisition_rate[generation].mean()),
                 fmt_optional(optimal_acquisition_rate[generation].mean()),
                 fmt_optional(integration_rate[generation].mean()),
+                fmt_optional(optimal_integration_rate[generation].mean()),
                 fmt_optional(top_teacher_rate[generation].mean()),
             );
         }
