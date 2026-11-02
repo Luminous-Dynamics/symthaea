@@ -962,13 +962,16 @@ mod tests {
             "capture_adb_screen",
             "collect_adb_bugreport",
         ] {
-            assert!(matches!(
-                authorize_mobile_device_observation(tool),
-                Err(ToolAuthorizationError::EffectExceedsCeiling {
-                    effect: EffectFlag::WritesFilesystem,
-                    ..
-                })
-            ), "{tool} must not write outside a bound output sink");
+            assert!(
+                matches!(
+                    authorize_mobile_device_observation(tool),
+                    Err(ToolAuthorizationError::EffectExceedsCeiling {
+                        effect: EffectFlag::WritesFilesystem,
+                        ..
+                    })
+                ),
+                "{tool} must not write outside a bound output sink"
+            );
         }
     }
 
