@@ -429,6 +429,7 @@ fn preflight_end_record(
         .map_err(|error| ReaderError::io("cannot read ZIP end record window", error))?;
 
     let mut candidates = Vec::new();
+    let mut candidate_errors = Vec::new();
     if tail_len >= EOCD_FIXED_BYTES {
         for index in (0..=(tail_len - EOCD_FIXED_BYTES)).rev() {
             if read_u32(&tail[index..index + 4]) != EOCD_SIGNATURE {
@@ -439,19 +440,29 @@ fn preflight_end_record(
                 continue;
             }
             let absolute = tail_start + index as u64;
-            if let Ok(candidate) =
-                parse_end_record_candidate(file, &tail[index..index + EOCD_FIXED_BYTES], absolute, file_len, limits)
-            {
-                candidates.push(candidate);
+            match parse_end_record_candidate(
+                file,
+                &tail[index..index + EOCD_FIXED_BYTES],
+                absolute,
+                file_len,
+                limits,
+            ) {
+                Ok(candidate) => candidates.push(candidate),
+                Err(error) => candidate_errors.push(error),
             }
         }
     }
 
     match candidates.len() {
-        0 => Err(ReaderError::new(
-            ReaderErrorKind::InvalidArchive,
-            "no unambiguous ZIP end-of-central-directory record was found",
-        )),
+        0 => Err(candidate_errors
+            .into_iter()
+            .find(|error| error.kind != ReaderErrorKind::InvalidArchive)
+            .unwrap_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "no unambiguous ZIP end-of-central-directory record was found",
+                )
+            })),
         1 => Ok(candidates[0]),
         _ => Err(ReaderError::new(
             ReaderErrorKind::AmbiguousEndRecord,
@@ -1380,6 +1391,42 @@ mod tests {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
 
+    fn build_zip64(entries: &[TestEntry<'_>], comment: &[u8]) -> Vec<u8> {
+        let mut bytes = build_zip(entries, &[]);
+        let eocd_offset = bytes.len() - EOCD_FIXED_BYTES;
+        let central_size = read_u32(&bytes[eocd_offset + 12..eocd_offset + 16]);
+        let central_offset = read_u32(&bytes[eocd_offset + 16..eocd_offset + 20]);
+        bytes.truncate(eocd_offset);
+        let zip64_eocd_offset = bytes.len() as u64;
+
+        push_u32(&mut bytes, ZIP64_EOCD_SIGNATURE);
+        bytes.extend_from_slice(&44u64.to_le_bytes());
+        push_u16(&mut bytes, (3 << 8) | 45);
+        push_u16(&mut bytes, 45);
+        push_u32(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        bytes.extend_from_slice(&(entries.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(&(entries.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(&(central_size as u64).to_le_bytes());
+        bytes.extend_from_slice(&(central_offset as u64).to_le_bytes());
+
+        push_u32(&mut bytes, ZIP64_LOCATOR_SIGNATURE);
+        push_u32(&mut bytes, 0);
+        bytes.extend_from_slice(&zip64_eocd_offset.to_le_bytes());
+        push_u32(&mut bytes, 1);
+
+        push_u32(&mut bytes, EOCD_SIGNATURE);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, u16::MAX);
+        push_u16(&mut bytes, u16::MAX);
+        push_u32(&mut bytes, u32::MAX);
+        push_u32(&mut bytes, u32::MAX);
+        push_u16(&mut bytes, comment.len() as u16);
+        bytes.extend_from_slice(comment);
+        bytes
+    }
+
     fn write_temp(bytes: &[u8]) -> PathBuf {
         let id = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
@@ -1403,6 +1450,72 @@ mod tests {
             }],
             &[],
         )
+    }
+
+    #[test]
+    fn parses_zip64_with_a_prepended_stub() {
+        let archive = build_zip64(
+            &[TestEntry {
+                name: b"Payload/App",
+                data: b"body",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        );
+        let mut bytes = b"binary-stub".to_vec();
+        bytes.extend_from_slice(&archive);
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        assert!(reader.inventory().regions.zip64);
+        assert_eq!(reader.inventory().regions.leading_bytes, 11);
+        assert_eq!(reader.inventory().entries.len(), 1);
+        assert_eq!(
+            reader.inventory().entries[0].decoded_name.as_deref(),
+            Some("Payload/App")
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_multi_disk_end_records_with_an_explicit_unsupported_reason() {
+        let mut bytes = single_entry(b"asset", b"data");
+        let eocd = bytes.len() - EOCD_FIXED_BYTES;
+        bytes[eocd + 4..eocd + 6].copy_from_slice(&1u16.to_le_bytes());
+        let path = write_temp(&bytes);
+        let error = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::Unsupported);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_a_plausible_false_eocd_inside_the_archive_comment() {
+        let fake_eocd = {
+            let mut fake = Vec::new();
+            push_u32(&mut fake, EOCD_SIGNATURE);
+            push_u16(&mut fake, 0);
+            push_u16(&mut fake, 0);
+            push_u16(&mut fake, 0);
+            push_u16(&mut fake, 0);
+            push_u32(&mut fake, 0);
+            push_u32(&mut fake, 0);
+            push_u16(&mut fake, 0);
+            fake
+        };
+        let path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"real-entry",
+                data: b"payload",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &fake_eocd,
+        ));
+        let error = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::AmbiguousEndRecord);
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
