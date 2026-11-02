@@ -221,6 +221,11 @@ pub enum EvalError {
     EmptyPlannedCohort,
     ResponseStatusCountOverflow,
     ResponseStatusCountTotalMismatch { planned_units: usize, classified_units: usize },
+    EmptyStructuralHypothesisId,
+    DuplicateStructuralHypothesisId(String),
+    InvalidStructuralEntityId(&'static str),
+    InvalidEvidenceManifestDigest(String),
+    NoAdmissibleStructuralHypotheses,
     NumericOverflow,
 }
 
@@ -246,6 +251,11 @@ impl fmt::Display for EvalError {
             Self::EmptyPlannedCohort => write!(f, "planned cohort must contain at least one unit"),
             Self::ResponseStatusCountOverflow => write!(f, "response-status counts overflow while summing the planned cohort"),
             Self::ResponseStatusCountTotalMismatch { planned_units, classified_units } => write!(f, "response-status counts cover {classified_units} units, but the planned cohort contains {planned_units}"),
+            Self::EmptyStructuralHypothesisId => write!(f, "structural hypothesis id must not be empty"),
+            Self::DuplicateStructuralHypothesisId(id) => write!(f, "duplicate structural hypothesis id: {id}"),
+            Self::InvalidStructuralEntityId(field) => write!(f, "{field} must not be empty"),
+            Self::InvalidEvidenceManifestDigest(digest) => write!(f, "evidence manifest digest must be 64 hexadecimal characters: {digest}"),
+            Self::NoAdmissibleStructuralHypotheses => write!(f, "at least one admissible structural hypothesis is required"),
             Self::NumericOverflow => write!(f, "numeric overflow while computing bounds"),
         }
     }
@@ -1452,3 +1462,14 @@ mod tests {
         assert!(!r.claim_boundary.conditional_kernel_transport_claimed);
     }
 }
+
+
+/// Structural-response propagation is kept separate from the one-graph response API.
+#[path = "structural_hypothesis.rs"]
+mod structural_hypothesis;
+pub use structural_hypothesis::{
+    StructuralHypothesisInput,
+    StructuralHypothesisResponseBounds,
+    StructuralResponseIdentifiedSet,
+    evaluate_structural_hypothesis_response_set,
+};
