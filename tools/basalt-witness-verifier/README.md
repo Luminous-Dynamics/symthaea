@@ -68,8 +68,14 @@ The trust-store shape is described in `benchmarks/basalt/schema/witness-verifier
 - Duplicate public-key identity under a second member ID fails.
 - Duplicate administrative failure domain fails.
 - Incorrect out-of-band trust-store pin fails.
+- Two-record checkpoint chain with 3-of-4 write signatures verifies.
+- Broken predecessor digest and skipped sequence are rejected even when the checkpoint signatures are valid.
+- Non-genesis checkpoint without a transition-bundle digest is rejected.
+- Incarnation substitution, policy revision rollback and policy-digest change without revision advance are rejected.
+- Nonce-bound read-quorum response matches the exact verified checkpoint head; replay with a different nonce is rejected.
+- A restored snapshot behind the independently witnessed head is rejected; exact matching authority/state/policy is classified fresh.
 
-These are authored tests. They are not described as passing until the exact-head Rust workflow reports success.
+These are authored tests. The initial DSSE/JCS/trust-store suite passed on the initial exact tested tree (`2c7f3419982d919da59ac884201da4d3d3dcd453`). The checkpoint-chain/head/restore tests were added afterwards and remain pending exact-head validation.
 
 ## Claim ceiling / what is not verified
 
