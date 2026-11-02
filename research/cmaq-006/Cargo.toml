@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-006-evidence-gate"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed policy gate for evidence-backed world-model use"
+
+[dependencies]
+
+[workspace]
