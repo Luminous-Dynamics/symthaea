@@ -102,6 +102,30 @@ The frozen two-parameter fixture uses an identity prior covariance and unit obse
 
 D-optimal selects the concentrated observation because it most reduces uncertainty volume. A-optimal selects the balanced design because it reduces the sum of marginal parameter variances more. Neither is universally best; the scientific estimand determines which parameter-uncertainty geometry matters.
 
+## Pareto frontier without a weighted-sum shortcut
+
+The `JointExperiment` type binds one hypothesis-likelihood experiment to one Fisher sensitivity/noise design. The ID and caller-declared cost must match exactly. `pareto_frontier(...)` evaluates EIG, Fisher D/A and EVSI for each joint candidate and returns the non-dominated set.
+
+The frontier uses five raw axes:
+- maximize EIG in bits;
+- maximize Fisher D-information in bits;
+- maximize Fisher A-optimal trace reduction;
+- maximize EVSI in the caller's utility units;
+- minimize the caller-declared scalar experiment cost.
+
+No cross-objective weighted sum is used. Cost-normalized scores are returned as useful descriptive fields but are not extra dominance axes, which would double-count cost. Candidates with a trade-off remain on the frontier; a candidate is removed only when another is no worse in every declared axis and strictly better in at least one.
+
+The current `cost` field is a single caller-defined scalar. When experiment time, energy, number of animals, monetary cost or risk are independent binding constraints, do not hide them inside an arbitrary scalar: either compare within a fixed budget stratum or extend the protocol with separately declared resource axes before interpreting the frontier.
+
+A Pareto frontier is not itself a decision. The scientific objective, minimum meaningful effect, safety/feasibility constraints and resource budget still determine which point is acceptable. EVSI can help when a downstream action set and utility are defensible; otherwise preserve the frontier for human/scientific selection.
+
+The synthetic fixture contains:
+- a within-group discriminator with 1 bit EIG but zero EVSI;
+- a decision-group experiment with lower EIG but 0.3 utility units EVSI and stronger A-optimal variance reduction;
+- a weak candidate dominated on every raw axis at equal cost.
+
+The first two remain on the frontier; the weak candidate is removed.
+
 ## Benchmark against current research
 
 The primary recent comparator is Ogino, Sekizawa, Kitazono and Oizumi, *Designing optimal perturbation inputs for system identification in neuroscience*, eLife 15:RP110030 (version of record 13 October 2026): https://doi.org/10.7554/eLife.110030.3
