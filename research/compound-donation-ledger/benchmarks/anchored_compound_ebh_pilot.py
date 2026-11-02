@@ -23,6 +23,8 @@ from typing import Any
 from anchored_compound_ebh import (
     anchored_rejections,
     closure_deficit,
+    finite_envelope_slack,
+    finite_envelope_weight_prefix,
     projective_weight_prefix,
     weighted_compound_ebh,
 )
@@ -192,9 +194,10 @@ def simulate_stream(
         for delta in deltas
     }
     # Full-mass reference is the globally summable telescoping prior.
-    full_weights = tuple(F(1, i * (i + 1)) for i in range(1, n + 1))
+    full_weights = finite_envelope_weight_prefix(n, F(1))
 
-    method_names = ["full_mass_e_bh"]
+    finite_delta = finite_envelope_slack(n, F(1))
+    method_names = ["full_mass_e_bh", "finite_envelope_anchored"]
     for delta in deltas:
         tag = f"scaled_e_bh_delta_{float(delta):.2f}"
         method_names.append(tag)
@@ -217,23 +220,45 @@ def simulate_stream(
         null_active = tuple(scenario["null"][i] for i in active_ids)
 
         full_scores = [
-            full_weights[i] * F(row[i], SCALE)
-            for i in active_ids
+            full_weights[i] * F(row.get(i, 0), SCALE)
+            for i in range(n)
         ]
-        full_reject_local = weighted_compound_ebh(full_scores, F(1, 10))
-        full_reject = tuple(active_ids[j] for j in full_reject_local)
+        full_reject = weighted_compound_ebh(full_scores, F(1, 10))
         fdp, power, has_false = fdp_and_power(
-            full_reject, active_ids, scenario["null"], total_alternatives
+            full_reject, tuple(range(n)), scenario["null"], total_alternatives
         )
         fdp_paths["full_mass_e_bh"].append(fdp)
         power_paths["full_mass_e_bh"].append(power)
         any_false["full_mass_e_bh"] |= has_false
 
+        finite_anchor_start = time.perf_counter()
+        finite_anchor = anchored_rejections(
+            full_scores, F(1, 10), finite_delta
+        )
+        finite_anchor_seconds = time.perf_counter() - finite_anchor_start
+        if not set(full_reject).issubset(finite_anchor):
+            raise AssertionError("finite-envelope anchor lost a baseline discovery")
+        if any(i not in active_ids for i in finite_anchor):
+            raise AssertionError("finite-envelope anchor selected a dormant candidate")
+        if closure_deficit(full_scores, F(1, 10), finite_anchor) > F(1, 10) * finite_delta:
+            raise AssertionError("finite-envelope anchor violates closure")
+        fdp, power, has_false = fdp_and_power(
+            finite_anchor, tuple(range(n)), scenario["null"], total_alternatives
+        )
+        fdp_paths["finite_envelope_anchored"].append(fdp)
+        power_paths["finite_envelope_anchored"].append(power)
+        any_false["finite_envelope_anchored"] |= has_false
+        finite_anchor_seconds_total += finite_anchor_seconds
+        finite_anchor_calls += 1
+        if t == looks - 1:
+            finite_baseline_terminal = len(full_reject)
+            finite_anchor_terminal = len(finite_anchor)
+
         for delta in deltas:
             weights = weight_vectors[delta]
             scores = [
-                weights[i] * F(row[i], SCALE)
-                for i in active_ids
+                weights[i] * F(row.get(i, 0), SCALE)
+                for i in range(n)
             ]
             base_local = weighted_compound_ebh(scores, F(1, 10))
             anchored_start = time.perf_counter()
@@ -245,8 +270,10 @@ def simulate_stream(
             if closure_deficit(scores, F(1, 10), anchored_local) > F(1, 10) * delta:
                 raise AssertionError("anchored output violates the exact closure deficit")
 
-            base_reject = tuple(active_ids[j] for j in base_local)
-            anchor_reject = tuple(active_ids[j] for j in anchored_local)
+            base_reject = tuple(base_local)
+            anchor_reject = tuple(anchored_local)
+            if any(i not in active_ids for i in anchor_reject):
+                raise AssertionError("global-slack anchor selected a dormant candidate")
 
             fdp, power, has_false = fdp_and_power(
                 base_reject, active_ids, scenario["null"], total_alternatives
@@ -280,6 +307,17 @@ def simulate_stream(
             "terminal_power": float(power_series[-1]) if power_series else 0.0,
         }
     result["allocation_diagnostics"] = {
+        "finite_envelope": {
+            "delta": float(finite_delta),
+            "baseline_terminal_discoveries": finite_baseline_terminal,
+            "anchored_terminal_discoveries": finite_anchor_terminal,
+            "added_terminal_discoveries": finite_anchor_terminal - finite_baseline_terminal,
+            "mean_anchor_solver_seconds_per_call": (
+                finite_anchor_seconds_total / finite_anchor_calls
+                if finite_anchor_calls else 0.0
+            ),
+        },
+        **{
         f"{float(delta):.2f}": {
             "baseline_terminal_discoveries": baseline_terminal[delta],
             "anchored_terminal_discoveries": anchored_terminal[delta],
@@ -290,6 +328,7 @@ def simulate_stream(
             ),
         }
         for delta in deltas
+        }
     }
     return result
 
@@ -372,13 +411,20 @@ def run(
             "adjuster": "floor_1e6(sqrt(running_max_LR)-1)",
             "global_weight_sequence": "gamma_i=lambda/[i(i+1)], i>=1; fixed and not renormalized",
             "delta_values": [str(delta) for delta in delta_values],
+            "finite_envelope": {
+                "maximum_candidates_precommitted": hypotheses,
+                "weights": "gamma_i=1/[i(i+1)] for i=1..n",
+                "anchor_slack": f"1/(n+1)={F(1, hypotheses+1)}",
+                "projectivity": "valid only within the precommitted finite envelope; extending beyond it requires a new policy contract"
+            },
             "dependence": list(DEPENDENCE),
             "arrival_policy": "deterministic predictable staggered arrivals",
         },
         "methods": [
             "full_mass_e_bh",
+            "finite_envelope_anchored_same_weights",
             "scaled_e_bh_delta",
-            "slack_anchored_compound_e_bh",
+            "countable_global_slack_anchored",
         ],
         "one_sided_95pct_hoeffding_halfwidth_per_bounded_mean": hoeffding,
         "simultaneous_uncertainty": "not applied",
