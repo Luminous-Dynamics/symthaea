@@ -39,7 +39,9 @@ The type split prevents accidental API mixing; it is not cryptographic custody.
 | SensitivityDrift | Sensitivity changes across sessions | Early-versus-late d-prime contrast |
 | CriterionDrift | Decision threshold changes across sessions | Early-versus-late response-criterion contrast |
 | ParticipantHeterogeneity | Participant sensitivity varies | Distribution of participant-level d-prime estimates |
-| OutcomeDependentMissingness | Positive signal responses are selectively missing | Missingness rates by known class |
+| MissingCompletelyAtRandom | Uniform 15% random dropout | Negative control: no class/session differential flag |
+| MissingAtRandomBySession | Dropout depends on visible session covariate | Across-session missingness-rate range |
+| OutcomeDependentMissingness | Positive signal responses are selectively missing | Missingness rates by known class and NotEvaluable gate |
 | CovariateLeakage | Main evidence is null; auxiliary channel encodes target | Auxiliary-channel AUC |
 
 The generator is a falsification fixture, not a biological or physical model.
@@ -57,14 +59,19 @@ not inferential tests:
 - early/late d-prime or criterion shift above 0.35;
 - between-participant d-prime SD above 0.40;
 - absolute signal/noise missingness-rate gap above 0.10;
+- across-session missingness-rate range above 0.15;
 - auxiliary-channel AUC outside [0.30, 0.70].
 
 These thresholds are benchmark configuration, not universal cut-offs. Their
 false-flag and miss rates must be estimated over independent campaigns and
 thresholds must be frozen before any real data are examined. A flag means
 "inspect this assumption"; absence of a flag does **not** prove the assumption.
-Missingness mechanisms are not identifiable from observed outcomes alone, so
-the known-truth synthetic sidecar is used only to measure detection limits.
+MCAR is a negative control for class-differential and session-varying flags.
+MAR is injected through the visible session covariate and tested by the
+across-session missingness-rate range. MNAR is injected through hidden
+target/response state. These worlds test different dropout mechanisms; the
+known-truth synthetic sidecar measures diagnostic detection limits, not whether
+observed data identify a missingness mechanism.
 
 The report never turns a flagged d-prime into an adjusted estimate. It returns
 one of:
@@ -112,6 +119,7 @@ Report, by world and across independent seeds: false-flag rate in the Gaussian
 reference; detection rate for each injected violation; confusion matrix between
 world family and diagnostic flags; uncertainty over campaign-level rates;
 d-prime/criterion bias only where the target is meaningful; AUC/AP recovery;
+missingness-mechanism detection and MCAR false-flag rate;
 abstention and false-abstention rates; runtime and memory at equal data budgets.
 Do not select thresholds on the same seeds used for the reported score.
 
