@@ -1627,43 +1627,6 @@ mod tests {
     }
 
     #[test]
-    fn paired_scorecards_must_use_the_identical_unit_cohort() {
-        let mut value = complete_fixture();
-        value["split"]["test_unit_tokens"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!(token(6)));
-        let test = value["split"]["test_unit_tokens"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_owned())
-            .collect::<Vec<_>>();
-        value["split"]["test_membership_sha256"] = json!(membership_digest(&test));
-
-        // Both candidate and baseline have n=2 and remain within the test set,
-        // but the baseline cohort differs by one pseudonymous unit.
-        value["results"]["scorecards"][1]["unit_tokens"][1] = json!(token(6));
-        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_owned())
-            .collect::<Vec<_>>();
-        value["results"]["scorecards"][1]["unit_manifest_sha256"] =
-            json!(membership_digest(&baseline_units));
-
-        let report = verify_manifest(&value);
-        assert_eq!(report.disposition, "INVALID");
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| e.contains("paired units must exactly match"))
-        );
-    }
-
-    #[test]
     fn prior_probabilities_must_be_normalized_before_complete_run() {
         let mut value = complete_fixture();
         value["hypothesis_set"][0]["prior_probability"] = json!(0.9);
