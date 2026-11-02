@@ -547,3 +547,52 @@ References:
 - Decompile-Bench: https://aims.stanford.edu/measurement-db/decompile_bench
 - OWASP assessment and automation limitations: https://mas.owasp.org/MASVS/04-Assessment_and_Certification/
 - MobSF dynamic analysis requirements: https://github.com/MobSF/docs/blob/master/develop.md
+
+
+## 14. External benchmark alignment (verified 2026-11-02)
+
+The comparison programme should anchor itself in independently maintained benchmarks instead of inventing one monolithic score.
+
+### SRE-Bench — agentic reverse engineering
+
+The official DAPLab SRE-Bench page reports its October 2026 release state:
+- 19 private programs and 262 binary instances;
+- 1,572 deterministic tasks, six per binary;
+- five domains (firmware, malware, game, file format, network protocol);
+- C, C++, Rust and Go targets and 44 in-house anti-analysis mechanisms.
+
+Its public-facing October scoreboard currently reports GPT-6-Astra at 5.55/6 on 181 graded instances, 149 fully solved, and 7 zero-credit instances. The denominator matters: 181 of 262 instances were graded (about 69.1%). A system that reports only its score on graded cases would conceal ungraded/refused instances. The benchmark manifest must publish eligible, attempted, completed, graded, refused, unsupported, timeout and abstained denominators alongside quality.
+
+Do not treat the official leaderboard as a benchmark we can reproduce locally. Use the official access/grader path or request participation. Do not copy or rehost private binaries, reference solutions or grading code. Run our own public/authorized cohort separately.
+
+### Stanford AIMS Decompile-Bench — output quality, not executable correctness
+
+The Stanford AIMS measurement database currently lists 72,059 released function-level outputs from IDA and Ghidra over HumanEval, MBPP and GitHub2025. The published text edit-similarity means are 0.206 for IDA (71,496 observations) and 0.202 for Ghidra (69,635 observations). The authors explicitly describe this metric as textual similarity, not executable correctness.
+
+Therefore the Symthaea evaluation needs two additional tracks:
+- reproduce the published metric exactly, with the released CC0 dataset and MIT metric code, keeping each original source project's license;
+- independently measure compile rate, test equivalence on held-out vectors, recovered control/data-flow edges, semantic localization and behavior-preserving edit cost.
+
+Do not use a decompiler text-similarity score as a substitute for recovered behavior or vulnerability discovery.
+
+### OWASP MAS Crackmes — public mobile task corpus
+
+The official OWASP collection includes Android UnCrackable L1-L4, Android UnCrackable DRM, Android License Validator, and iOS UnCrackable L1-L2. Use the official artifacts for a reproducible public evaluation, but keep platform and environment cohorts separate. In particular, the iOS challenge notes signing/provisioning and device/jailbreak constraints; an iOS result on a re-signed/jailbroken target is not comparable to stock iPhone behavior.
+
+Keep solution/source material out of hidden variants and run a source-to-binary mapped holdout where the grader is separated from the agent. Record artifact hashes, build and instrumentation scope.
+
+### Revised comparative strategy
+
+1. **Official external scoreboards:** SRE-Bench and Decompile-Bench, under their official protocols.
+2. **Public mobile task suite:** OWASP MAS Crackmes and selected MASTG tests.
+3. **Private Luminous holdout:** source-derived mobile apps, generated firmware and binary fixtures with deterministic oracles.
+4. **Reasoning ablations:** REA, Symthaea, REA + Symthaea, specialist tools, and human analyst comparison on matched tasks/budgets.
+
+Report success quality and denominators separately. A refusal is not a solved task; an unsupported operation is not a pass; an ungraded case is not absent from the report.
+
+References:
+- SRE-Bench official page: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+- Decompile-Bench: https://aims.stanford.edu/measurement-db/decompile_bench
+- OWASP MAS Crackmes: https://mas.owasp.org/crackmes/
+- OWASP Android crackmes: https://mas.owasp.org/crackmes/Android/
+- OWASP iOS crackmes: https://mas.owasp.org/crackmes/iOS/
