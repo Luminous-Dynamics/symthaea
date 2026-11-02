@@ -92,7 +92,7 @@ The committed standalone runner is benchmarks/proof_carrying_evidence.py. It has
 - the writer applies the registered LR update and emits immutable round receipts;
 - the verifier independently derives the success/failure factor from the registered rational pair, recomputes the product/running maximum/adjuster, validates the roster and hash chain, and compares the complete claim list.
 
-The local rerun of the committed runner logic used 100 traces, 12 candidates and 30 rounds (32,400 evidence updates), rotating among independent, shared-uniform and balanced-negative batches. All 100 traces replayed successfully. Median verifier time was approximately 2.1 ms per 12-candidate, 30-round trace in the local Python environment.
+The local rerun of a local copy of the committed runner used 100 traces, 12 candidates and 30 rounds (32,400 evidence updates), rotating among independent, shared-uniform and balanced-negative batches. All 100 traces replayed successfully. Median verifier time was approximately 2.1 ms per 12-candidate, 30-round trace in the local Python environment. Eight focused unittest cases also passed locally against that runner copy; this is not GitHub Actions or Rust validation.
 
 Seven deliberate tamper controls were rejected:
 1. observation bit changed with stale digest;
