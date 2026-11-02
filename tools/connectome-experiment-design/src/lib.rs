@@ -62,6 +62,30 @@ pub enum DesignError {
         action_index: usize,
         value: f64,
     },
+    EmptyParameterSet,
+    EmptyMeasurementSet,
+    MatrixDimensionMismatch {
+        matrix: String,
+        expected_rows: usize,
+        actual_rows: usize,
+        expected_columns: usize,
+        actual_columns: usize,
+    },
+    InvalidMatrixValue {
+        matrix: String,
+        row: usize,
+        column: usize,
+        value: f64,
+    },
+    NonSymmetricMatrix {
+        matrix: String,
+        row: usize,
+        column: usize,
+    },
+    MatrixNotPositiveDefinite {
+        matrix: String,
+        pivot: usize,
+    },
     NumericalInstability,
 }
 
@@ -144,6 +168,30 @@ impl fmt::Display for DesignError {
             } => write!(
                 f,
                 "utility for hypothesis {hypothesis_index}, action {action_index} is invalid: {value}"
+            ),
+            Self::EmptyParameterSet => write!(f, "parameter set must not be empty"),
+            Self::EmptyMeasurementSet => write!(f, "design must contain at least one measurement"),
+            Self::MatrixDimensionMismatch {
+                matrix,
+                expected_rows,
+                actual_rows,
+                expected_columns,
+                actual_columns,
+            } => write!(
+                f,
+                "{matrix} dimensions are {actual_rows}x{actual_columns}; expected {expected_rows}x{expected_columns}"
+            ),
+            Self::InvalidMatrixValue { matrix, row, column, value } => write!(
+                f,
+                "{matrix}[{row},{column}] is non-finite: {value}"
+            ),
+            Self::NonSymmetricMatrix { matrix, row, column } => write!(
+                f,
+                "{matrix} is not symmetric at ({row},{column})"
+            ),
+            Self::MatrixNotPositiveDefinite { matrix, pivot } => write!(
+                f,
+                "{matrix} is not positive definite at Cholesky pivot {pivot}"
             ),
             Self::NumericalInstability => {
                 write!(f, "information or decision-value calculation exceeded its numerical tolerance")
@@ -235,6 +283,485 @@ pub struct DecisionSelectionRegret {
     pub selected_expected_value_per_cost: f64,
     pub best_expected_value_per_cost: f64,
     pub regret_per_cost: f64,
+}
+
+/// Gaussian prior over an unknown parameter vector.
+///
+/// The covariance must be finite, symmetric and strictly positive definite.
+/// The prior mean is omitted because local linear-Gaussian information gain
+/// depends on covariance, not the location of the mean.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParameterPrior {
+    pub covariance: Vec<Vec<f64>>,
+}
+
+/// A candidate measurement design for a local linear-Gaussian observation model.
+///
+/// `sensitivities[measurement][parameter]` is the Jacobian of the expected
+/// observation with respect to the unknown parameter vector. The observation
+/// noise covariance may include temporal/spatial measurement correlations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinearGaussianDesign {
+    pub id: String,
+    pub cost: f64,
+    pub sensitivities: Vec<Vec<f64>>,
+    pub noise_covariance: Vec<Vec<f64>>,
+}
+
+/// Parameter-identification scores for both D- and A-optimal design.
+///
+/// D-optimal information is mutual information in bits under the stated
+/// Gaussian linear model. A-optimal reduction is the decrease in covariance
+/// trace, in the squared units of the parameter vector.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParameterInformationScore {
+    pub cost: f64,
+    pub prior_log_determinant_covariance: f64,
+    pub posterior_log_determinant_covariance: f64,
+    pub d_optimal_information_bits: f64,
+    pub d_optimal_bits_per_cost: f64,
+    pub prior_covariance_trace: f64,
+    pub posterior_covariance_trace: f64,
+    pub a_optimal_trace_reduction: f64,
+    pub a_optimal_reduction_per_cost: f64,
+}
+
+/// Objective used to rank parameter-identification experiments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParameterObjective {
+    DOptimal,
+    AOptimal,
+}
+
+/// Candidate and score after deterministic parameter-design ranking.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedParameterExperiment {
+    pub experiment_id: String,
+    pub score: ParameterInformationScore,
+}
+
+/// Opportunity regret against the best candidate in the supplied finite pool.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParameterSelectionRegret {
+    pub selected_experiment_id: String,
+    pub best_experiment_id: String,
+    pub objective: ParameterObjective,
+    pub selected_value_per_cost: f64,
+    pub best_value_per_cost: f64,
+    pub regret_per_cost: f64,
+}
+
+const MATRIX_SYMMETRY_TOLERANCE: f64 = 1.0e-10;
+
+/// Validate square finite matrix structure and numerical symmetry.
+fn validate_symmetric_matrix(
+    matrix: &[Vec<f64>],
+    name: &str,
+) -> Result<usize, DesignError> {
+    let dimension = matrix.len();
+    if dimension == 0 {
+        return Err(DesignError::EmptyParameterSet);
+    }
+    for (row_index, row) in matrix.iter().enumerate() {
+        if row.len() != dimension {
+            return Err(DesignError::MatrixDimensionMismatch {
+                matrix: name.to_owned(),
+                expected_rows: dimension,
+                actual_rows: dimension,
+                expected_columns: dimension,
+                actual_columns: row.len(),
+            });
+        }
+        for (column_index, &value) in row.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(DesignError::InvalidMatrixValue {
+                    matrix: name.to_owned(),
+                    row: row_index,
+                    column: column_index,
+                    value,
+                });
+            }
+            let transpose = matrix[column_index][row_index];
+            if !transpose.is_finite() {
+                return Err(DesignError::InvalidMatrixValue {
+                    matrix: name.to_owned(),
+                    row: column_index,
+                    column: row_index,
+                    value: transpose,
+                });
+            }
+            let scale = value.abs().max(transpose.abs()).max(1.0);
+            if (value - transpose).abs() > MATRIX_SYMMETRY_TOLERANCE * scale {
+                return Err(DesignError::NonSymmetricMatrix {
+                    matrix: name.to_owned(),
+                    row: row_index,
+                    column: column_index,
+                });
+            }
+        }
+    }
+    Ok(dimension)
+}
+
+/// Lower-triangular Cholesky factor L for A = L L^T.
+fn cholesky(
+    matrix: &[Vec<f64>],
+    name: &str,
+) -> Result<Vec<Vec<f64>>, DesignError> {
+    let dimension = validate_symmetric_matrix(matrix, name)?;
+    let mut lower = vec![vec![0.0; dimension]; dimension];
+    for row in 0..dimension {
+        for column in 0..=row {
+            let mut value = matrix[row][column];
+            for k in 0..column {
+                value -= lower[row][k] * lower[column][k];
+            }
+            if !value.is_finite() {
+                return Err(DesignError::NumericalInstability);
+            }
+            if row == column {
+                if value <= 0.0 {
+                    return Err(DesignError::MatrixNotPositiveDefinite {
+                        matrix: name.to_owned(),
+                        pivot: row,
+                    });
+                }
+                lower[row][column] = value.sqrt();
+            } else {
+                let diagonal = lower[column][column];
+                if diagonal <= 0.0 || !diagonal.is_finite() {
+                    return Err(DesignError::MatrixNotPositiveDefinite {
+                        matrix: name.to_owned(),
+                        pivot: column,
+                    });
+                }
+                lower[row][column] = value / diagonal;
+            }
+        }
+    }
+    Ok(lower)
+}
+
+/// Solve L L^T x = b for an SPD matrix using forward/back substitution.
+fn solve_cholesky(lower: &[Vec<f64>], rhs: &[f64]) -> Result<Vec<f64>, DesignError> {
+    let dimension = lower.len();
+    if rhs.len() != dimension {
+        return Err(DesignError::NumericalInstability);
+    }
+    let mut forward = vec![0.0; dimension];
+    for row in 0..dimension {
+        let mut value = rhs[row];
+        for column in 0..row {
+            value -= lower[row][column] * forward[column];
+        }
+        forward[row] = value / lower[row][row];
+        if !forward[row].is_finite() {
+            return Err(DesignError::NumericalInstability);
+        }
+    }
+    let mut result = vec![0.0; dimension];
+    for row in (0..dimension).rev() {
+        let mut value = forward[row];
+        for column in (row + 1)..dimension {
+            value -= lower[column][row] * result[column];
+        }
+        result[row] = value / lower[row][row];
+        if !result[row].is_finite() {
+            return Err(DesignError::NumericalInstability);
+        }
+    }
+    Ok(result)
+}
+
+fn inverse_spd(lower: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, DesignError> {
+    let dimension = lower.len();
+    let mut inverse = vec![vec![0.0; dimension]; dimension];
+    for column in 0..dimension {
+        let mut basis = vec![0.0; dimension];
+        basis[column] = 1.0;
+        let solution = solve_cholesky(lower, &basis)?;
+        for row in 0..dimension {
+            inverse[row][column] = solution[row];
+        }
+    }
+    // Remove only floating-point asymmetry introduced by independent solves.
+    for row in 0..dimension {
+        for column in 0..row {
+            let average = 0.5 * (inverse[row][column] + inverse[column][row]);
+            inverse[row][column] = average;
+            inverse[column][row] = average;
+        }
+    }
+    Ok(inverse)
+}
+
+fn log_determinant_from_cholesky(lower: &[Vec<f64>]) -> Result<f64, DesignError> {
+    let mut result = 0.0;
+    for index in 0..lower.len() {
+        let diagonal = lower[index][index];
+        if diagonal <= 0.0 || !diagonal.is_finite() {
+            return Err(DesignError::NumericalInstability);
+        }
+        result += 2.0 * diagonal.ln();
+    }
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err(DesignError::NumericalInstability)
+    }
+}
+
+fn matrix_trace(matrix: &[Vec<f64>]) -> f64 {
+    (0..matrix.len()).map(|index| matrix[index][index]).sum()
+}
+
+fn validate_parameter_design(
+    prior: &ParameterPrior,
+    design: &LinearGaussianDesign,
+) -> Result<(usize, usize), DesignError> {
+    if design.id.trim().is_empty() {
+        return Err(DesignError::EmptyExperimentId);
+    }
+    if !design.cost.is_finite() || design.cost <= 0.0 {
+        return Err(DesignError::InvalidExperimentCost { cost: design.cost });
+    }
+    let parameter_count = validate_symmetric_matrix(&prior.covariance, "prior covariance")?;
+    cholesky(&prior.covariance, "prior covariance")?;
+
+    let measurement_count = design.sensitivities.len();
+    if measurement_count == 0 {
+        return Err(DesignError::EmptyMeasurementSet);
+    }
+    for (row_index, row) in design.sensitivities.iter().enumerate() {
+        if row.len() != parameter_count {
+            return Err(DesignError::MatrixDimensionMismatch {
+                matrix: "sensitivities".to_owned(),
+                expected_rows: measurement_count,
+                actual_rows: measurement_count,
+                expected_columns: parameter_count,
+                actual_columns: row.len(),
+            });
+        }
+        for (column_index, &value) in row.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(DesignError::InvalidMatrixValue {
+                    matrix: "sensitivities".to_owned(),
+                    row: row_index,
+                    column: column_index,
+                    value,
+                });
+            }
+        }
+    }
+    let noise_dimension = validate_symmetric_matrix(&design.noise_covariance, "noise covariance")?;
+    if noise_dimension != measurement_count {
+        return Err(DesignError::MatrixDimensionMismatch {
+            matrix: "noise covariance".to_owned(),
+            expected_rows: measurement_count,
+            actual_rows: noise_dimension,
+            expected_columns: measurement_count,
+            actual_columns: noise_dimension,
+        });
+    }
+    cholesky(&design.noise_covariance, "noise covariance")?;
+    Ok((parameter_count, measurement_count))
+}
+
+/// Compute local Gaussian Fisher information and posterior parameter covariance.
+///
+/// Model: y = f(theta_0) + J (theta - theta_0) + epsilon,
+/// epsilon ~ Normal(0, R), theta ~ Normal(theta_0, Sigma).
+/// The expected Fisher information is J^T R^-1 J and the Gaussian posterior
+/// covariance is (Sigma^-1 + J^T R^-1 J)^-1.
+///
+/// D-optimal information is 0.5 * log2(det(Sigma) / det(Sigma_post)) bits.
+/// A-optimal utility is trace(Sigma) - trace(Sigma_post). This is a local
+/// linear-Gaussian design calculation; it does not estimate J or R.
+pub fn evaluate_parameter_design(
+    prior: &ParameterPrior,
+    design: &LinearGaussianDesign,
+) -> Result<ParameterInformationScore, DesignError> {
+    let (_parameter_count, measurement_count) = validate_parameter_design(prior, design)?;
+    let prior_factor = cholesky(&prior.covariance, "prior covariance")?;
+    let noise_factor = cholesky(&design.noise_covariance, "noise covariance")?;
+    let prior_precision = inverse_spd(&prior_factor)?;
+
+    // Solve R Z = J one parameter column at a time. This avoids explicitly
+    // forming R^-1, which is less stable and unnecessary.
+    let parameter_count = prior.covariance.len();
+    let mut noise_whitened_sensitivities = vec![vec![0.0; parameter_count]; measurement_count];
+    for parameter in 0..parameter_count {
+        let rhs: Vec<f64> = design
+            .sensitivities
+            .iter()
+            .map(|row| row[parameter])
+            .collect();
+        let solution = solve_cholesky(&noise_factor, &rhs)?;
+        for measurement in 0..measurement_count {
+            noise_whitened_sensitivities[measurement][parameter] = solution[measurement];
+        }
+    }
+
+    // F = J^T R^-1 J.
+    let mut fisher = vec![vec![0.0; parameter_count]; parameter_count];
+    for row in 0..parameter_count {
+        for column in 0..parameter_count {
+            fisher[row][column] = (0..measurement_count)
+                .map(|measurement| {
+                    design.sensitivities[measurement][row]
+                        * noise_whitened_sensitivities[measurement][column]
+                })
+                .sum();
+        }
+    }
+    for row in 0..parameter_count {
+        for column in 0..row {
+            let average = 0.5 * (fisher[row][column] + fisher[column][row]);
+            fisher[row][column] = average;
+            fisher[column][row] = average;
+        }
+    }
+
+    let mut posterior_precision = prior_precision.clone();
+    for row in 0..parameter_count {
+        for column in 0..parameter_count {
+            posterior_precision[row][column] += fisher[row][column];
+        }
+    }
+    let posterior_precision_factor = cholesky(&posterior_precision, "posterior precision")?;
+    let posterior_covariance = inverse_spd(&posterior_precision_factor)?;
+
+    let prior_log_determinant_covariance =
+        log_determinant_from_cholesky(&prior_factor)?;
+    let posterior_log_determinant_covariance =
+        -log_determinant_from_cholesky(&posterior_precision_factor)?;
+    let mut d_optimal_information_bits = 0.5
+        * (prior_log_determinant_covariance - posterior_log_determinant_covariance)
+        / std::f64::consts::LN_2;
+    if d_optimal_information_bits < 0.0
+        && d_optimal_information_bits >= -ROUND_OFF_TOLERANCE
+    {
+        d_optimal_information_bits = 0.0;
+    }
+    if !d_optimal_information_bits.is_finite() || d_optimal_information_bits < 0.0 {
+        return Err(DesignError::NumericalInstability);
+    }
+
+    let prior_covariance_trace = matrix_trace(&prior.covariance);
+    let posterior_covariance_trace = matrix_trace(&posterior_covariance);
+    let mut a_optimal_trace_reduction =
+        prior_covariance_trace - posterior_covariance_trace;
+    if a_optimal_trace_reduction < 0.0
+        && a_optimal_trace_reduction >= -ROUND_OFF_TOLERANCE
+    {
+        a_optimal_trace_reduction = 0.0;
+    }
+    if !prior_covariance_trace.is_finite()
+        || !posterior_covariance_trace.is_finite()
+        || !a_optimal_trace_reduction.is_finite()
+        || a_optimal_trace_reduction < 0.0
+    {
+        return Err(DesignError::NumericalInstability);
+    }
+
+    let d_optimal_bits_per_cost = d_optimal_information_bits / design.cost;
+    let a_optimal_reduction_per_cost = a_optimal_trace_reduction / design.cost;
+    if !d_optimal_bits_per_cost.is_finite()
+        || !a_optimal_reduction_per_cost.is_finite()
+    {
+        return Err(DesignError::NumericalInstability);
+    }
+
+    Ok(ParameterInformationScore {
+        cost: design.cost,
+        prior_log_determinant_covariance,
+        posterior_log_determinant_covariance,
+        d_optimal_information_bits,
+        d_optimal_bits_per_cost,
+        prior_covariance_trace,
+        posterior_covariance_trace,
+        a_optimal_trace_reduction,
+        a_optimal_reduction_per_cost,
+    })
+}
+
+fn parameter_score_values(
+    score: &ParameterInformationScore,
+    objective: ParameterObjective,
+) -> (f64, f64) {
+    match objective {
+        ParameterObjective::DOptimal => (
+            score.d_optimal_bits_per_cost,
+            score.d_optimal_information_bits,
+        ),
+        ParameterObjective::AOptimal => (
+            score.a_optimal_reduction_per_cost,
+            score.a_optimal_trace_reduction,
+        ),
+    }
+}
+
+/// Rank candidates by D-optimal or A-optimal information per cost, then the
+/// corresponding raw objective and stable ID.
+pub fn rank_parameter_candidates(
+    prior: &ParameterPrior,
+    candidates: &[LinearGaussianDesign],
+    objective: ParameterObjective,
+) -> Result<Vec<RankedParameterExperiment>, DesignError> {
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+    let mut identifiers = HashSet::with_capacity(candidates.len());
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !identifiers.insert(candidate.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: candidate.id.clone(),
+            });
+        }
+        ranked.push(RankedParameterExperiment {
+            experiment_id: candidate.id.clone(),
+            score: evaluate_parameter_design(prior, candidate)?,
+        });
+    }
+    ranked.sort_by(|left, right| {
+        let (left_cost_adjusted, left_raw) =
+            parameter_score_values(&left.score, objective);
+        let (right_cost_adjusted, right_raw) =
+            parameter_score_values(&right.score, objective);
+        right_cost_adjusted
+            .total_cmp(&left_cost_adjusted)
+            .then_with(|| right_raw.total_cmp(&left_raw))
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+    Ok(ranked)
+}
+
+/// Regret relative to the best candidate under the selected parameter objective.
+pub fn parameter_selection_regret(
+    prior: &ParameterPrior,
+    candidates: &[LinearGaussianDesign],
+    objective: ParameterObjective,
+    selected_experiment_id: &str,
+) -> Result<ParameterSelectionRegret, DesignError> {
+    let ranked = rank_parameter_candidates(prior, candidates, objective)?;
+    let best = ranked.first().ok_or(DesignError::NoCandidateExperiments)?;
+    let selected = ranked
+        .iter()
+        .find(|candidate| candidate.experiment_id == selected_experiment_id)
+        .ok_or_else(|| DesignError::SelectedExperimentNotFound {
+            experiment_id: selected_experiment_id.to_owned(),
+        })?;
+    let (best_value, _) = parameter_score_values(&best.score, objective);
+    let (selected_value, _) = parameter_score_values(&selected.score, objective);
+    Ok(ParameterSelectionRegret {
+        selected_experiment_id: selected.experiment_id.clone(),
+        best_experiment_id: best.experiment_id.clone(),
+        objective,
+        selected_value_per_cost: selected_value,
+        best_value_per_cost: best_value,
+        regret_per_cost: (best_value - selected_value).max(0.0),
+    })
 }
 
 /// Shannon entropy in bits. Input probabilities must be non-negative and sum
@@ -879,6 +1406,200 @@ mod tests {
             evaluate_decision_value(&[0.5, 0.5], &candidate, &bad_value),
             Err(DesignError::InvalidDecisionUtility { .. })
         ));
+    }
+
+    fn scalar_parameter_design(id: &str, sensitivity: f64, noise_variance: f64, cost: f64) -> LinearGaussianDesign {
+        LinearGaussianDesign {
+            id: id.to_owned(),
+            cost,
+            sensitivities: vec![vec![sensitivity]],
+            noise_covariance: vec![vec![noise_variance]],
+        }
+    }
+
+    #[test]
+    fn scalar_gaussian_design_matches_closed_form() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![4.0]],
+        };
+        let design = scalar_parameter_design("scalar", 2.0, 1.0, 1.0);
+        let score = evaluate_parameter_design(&prior, &design).unwrap();
+        close(score.posterior_covariance_trace, 4.0 / 17.0, 1.0e-12);
+        close(score.a_optimal_trace_reduction, 64.0 / 17.0, 1.0e-12);
+        close(score.d_optimal_information_bits, 0.5 * 17.0_f64.log2(), 1.0e-12);
+        close(score.prior_covariance_trace, 4.0, 1.0e-12);
+    }
+
+    #[test]
+    fn d_and_a_optimal_designs_can_select_different_experiments() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let concentrated = LinearGaussianDesign {
+            id: "concentrated".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![10.0, 0.0]],
+            noise_covariance: vec![vec![1.0]],
+        };
+        let balanced = LinearGaussianDesign {
+            id: "balanced".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![2.0, 0.0], vec![0.0, 2.0]],
+            noise_covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let candidates = vec![concentrated, balanced];
+        let d_ranked = rank_parameter_candidates(
+            &prior,
+            &candidates,
+            ParameterObjective::DOptimal,
+        ).unwrap();
+        let a_ranked = rank_parameter_candidates(
+            &prior,
+            &candidates,
+            ParameterObjective::AOptimal,
+        ).unwrap();
+        assert_eq!(d_ranked[0].experiment_id, "concentrated");
+        assert_eq!(a_ranked[0].experiment_id, "balanced");
+        close(d_ranked[0].score.d_optimal_information_bits, 0.5 * 101.0_f64.log2(), 1.0e-12);
+        close(a_ranked[0].score.a_optimal_trace_reduction, 1.6, 1.0e-12);
+    }
+
+    #[test]
+    fn zero_sensitivity_has_zero_parameter_information() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![2.0, 0.5], vec![0.5, 1.0]],
+        };
+        let design = LinearGaussianDesign {
+            id: "uninformative".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![0.0, 0.0], vec![0.0, 0.0]],
+            noise_covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let score = evaluate_parameter_design(&prior, &design).unwrap();
+        close(score.d_optimal_information_bits, 0.0, 1.0e-12);
+        close(score.a_optimal_trace_reduction, 0.0, 1.0e-12);
+    }
+
+    #[test]
+    fn correlated_observation_noise_is_accounted_for() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let design = LinearGaussianDesign {
+            id: "correlated-noise".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            noise_covariance: vec![vec![2.0, 0.5], vec![0.5, 1.0]],
+        };
+        let score = evaluate_parameter_design(&prior, &design).unwrap();
+        assert!(score.d_optimal_information_bits > 0.0);
+        assert!(score.a_optimal_trace_reduction > 0.0);
+        assert!(score.posterior_covariance_trace < score.prior_covariance_trace);
+    }
+
+    #[test]
+    fn parameter_design_rejects_non_positive_definite_prior_and_noise() {
+        let singular_prior = ParameterPrior {
+            covariance: vec![vec![1.0, 1.0], vec![1.0, 1.0]],
+        };
+        let valid_noise = LinearGaussianDesign {
+            id: "candidate".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![1.0, 0.0]],
+            noise_covariance: vec![vec![1.0]],
+        };
+        assert!(matches!(
+            evaluate_parameter_design(&singular_prior, &valid_noise),
+            Err(DesignError::MatrixNotPositiveDefinite { .. })
+        ));
+
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0]],
+        };
+        let singular_noise = scalar_parameter_design("noise-singular", 1.0, 0.0, 1.0);
+        assert!(matches!(
+            evaluate_parameter_design(&prior, &singular_noise),
+            Err(DesignError::MatrixNotPositiveDefinite { .. })
+        ));
+    }
+
+    #[test]
+    fn parameter_design_rejects_asymmetric_and_malformed_matrices() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0, 0.2], vec![0.1, 1.0]],
+        };
+        let design = LinearGaussianDesign {
+            id: "candidate".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![1.0, 0.0]],
+            noise_covariance: vec![vec![1.0]],
+        };
+        assert!(matches!(
+            evaluate_parameter_design(&prior, &design),
+            Err(DesignError::NonSymmetricMatrix { .. })
+        ));
+
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        };
+        let malformed = LinearGaussianDesign {
+            id: "bad-shape".into(),
+            cost: 1.0,
+            sensitivities: vec![vec![1.0]],
+            noise_covariance: vec![vec![1.0]],
+        };
+        assert!(matches!(
+            evaluate_parameter_design(&prior, &malformed),
+            Err(DesignError::MatrixDimensionMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn parameter_design_cost_and_duplicate_ids_fail_closed() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0]],
+        };
+        let zero_cost = scalar_parameter_design("zero-cost", 1.0, 1.0, 0.0);
+        assert!(matches!(
+            evaluate_parameter_design(&prior, &zero_cost),
+            Err(DesignError::InvalidExperimentCost { .. })
+        ));
+        let a = scalar_parameter_design("same", 1.0, 1.0, 1.0);
+        let b = scalar_parameter_design("same", 2.0, 1.0, 1.0);
+        assert!(matches!(
+            rank_parameter_candidates(&prior, &[a, b], ParameterObjective::DOptimal),
+            Err(DesignError::DuplicateExperimentId { .. })
+        ));
+    }
+
+    #[test]
+    fn parameter_selection_regret_is_zero_for_best_candidate() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0]],
+        };
+        let strong = scalar_parameter_design("strong", 2.0, 1.0, 1.0);
+        let weak = scalar_parameter_design("weak", 1.0, 1.0, 1.0);
+        let candidates = vec![strong, weak];
+        let regret = parameter_selection_regret(
+            &prior,
+            &candidates,
+            ParameterObjective::DOptimal,
+            "strong",
+        ).unwrap();
+        assert_eq!(regret.best_experiment_id, "strong");
+        close(regret.regret_per_cost, 0.0, 1.0e-12);
+    }
+
+    #[test]
+    fn parameter_information_per_cost_overflow_is_rejected() {
+        let prior = ParameterPrior {
+            covariance: vec![vec![1.0]],
+        };
+        let design = scalar_parameter_design("tiny-cost", 1.0, 1.0, f64::from_bits(1));
+        assert_eq!(
+            evaluate_parameter_design(&prior, &design),
+            Err(DesignError::NumericalInstability)
+        );
     }
 
     #[test]
