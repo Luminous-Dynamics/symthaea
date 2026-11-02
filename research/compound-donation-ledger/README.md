@@ -84,3 +84,22 @@ cargo test --offline
 
 No external crates are required. The crate is not yet added to the workspace,
 and no repository CI result is claimed by its existence.
+
+## Exploratory simulation harness
+
+A NumPy-only, research-only script is provided at
+`benchmarks/staircase_rank_geometric_exploratory.py`. It reproduces the
+fixed-family Bernoulli likelihood-ratio screening described in RESEARCH.md,
+including an independent mode and a balanced-negative-dependence null mode.
+It reports fixed-time FDR, SupFDR, terminal power and probability of any false
+discovery separately. Example commands:
+
+~~~sh
+python3 benchmarks/staircase_rank_geometric_exploratory.py --dependence independent
+python3 benchmarks/staircase_rank_geometric_exploratory.py --dependence balanced_negative_null
+~~~
+
+This is not production code and does not compute evidence processes from real
+data. It is an exploratory simulation harness; frozen confirmatory manifests,
+held-out seeds, broader dependence and alternative families are required
+before performance claims.
