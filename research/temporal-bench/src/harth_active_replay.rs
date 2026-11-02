@@ -98,6 +98,44 @@ pub trait HarthActiveReplayPolicy {
     fn decide(&mut self, observation: &HarthPublicObservation) -> HarthActiveReplayAction;
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HarthPrediction {
+    pub label_code: Option<u16>,
+    pub confidence_ppm: u32,
+}
+
+/// Model-only prediction adapter. Its implementation must use only the public
+/// observation; schedule choice is provided separately by HarthFixedSchedule.
+pub trait HarthObservationPredictor {
+    fn predict(&mut self, observation: &HarthPublicObservation) -> HarthPrediction;
+}
+
+/// Applies one fixed sensor/wake schedule around any predictor. This lets the
+/// benchmark change sensing cost without silently changing model inference.
+pub struct HarthFixedSchedule<P> {
+    pub predictor: P,
+    pub next_sensor_mask: HarthSensorMask,
+    pub next_wake_after_rows: u32,
+    pub declared_compute_cycles: u64,
+    pub declared_transmit_bytes: u64,
+    pub declared_memory_write_bytes: u64,
+}
+
+impl<P: HarthObservationPredictor> HarthActiveReplayPolicy for HarthFixedSchedule<P> {
+    fn decide(&mut self, observation: &HarthPublicObservation) -> HarthActiveReplayAction {
+        let prediction = self.predictor.predict(observation);
+        HarthActiveReplayAction {
+            prediction_label_code: prediction.label_code,
+            confidence_ppm: prediction.confidence_ppm,
+            next_sensor_mask: self.next_sensor_mask,
+            next_wake_after_rows: self.next_wake_after_rows,
+            declared_compute_cycles: self.declared_compute_cycles,
+            declared_transmit_bytes: self.declared_transmit_bytes,
+            declared_memory_write_bytes: self.declared_memory_write_bytes,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HarthReplayCandidateIdentity {
     pub policy_id: String,
@@ -1019,6 +1057,48 @@ mod tests {
             candidate(),
             policy,
         ).unwrap()
+    }
+
+    #[test]
+    fn fixed_schedule_wrapper_changes_only_acquisition_schedule() {
+        struct ConstantPredictor {
+            calls: u64,
+        }
+        impl HarthObservationPredictor for ConstantPredictor {
+            fn predict(&mut self, _: &HarthPublicObservation) -> HarthPrediction {
+                self.calls += 1;
+                HarthPrediction { label_code: Some(1), confidence_ppm: 800_000 }
+            }
+        }
+
+        let mut full_rate = HarthFixedSchedule {
+            predictor: ConstantPredictor { calls: 0 },
+            next_sensor_mask: HarthSensorMask::Both,
+            next_wake_after_rows: 1,
+            declared_compute_cycles: 500,
+            declared_transmit_bytes: 0,
+            declared_memory_write_bytes: 8,
+        };
+        let mut sparse_back = HarthFixedSchedule {
+            predictor: ConstantPredictor { calls: 0 },
+            next_sensor_mask: HarthSensorMask::Back,
+            next_wake_after_rows: 2,
+            declared_compute_cycles: 500,
+            declared_transmit_bytes: 0,
+            declared_memory_write_bytes: 8,
+        };
+        let full = run_harth_active_replay(
+            &rows(), [3; 32], [4; 32], [5; 32], [6; 32],
+            HarthLabelTrack::Native12, candidate(), &mut full_rate
+        ).unwrap();
+        let sparse = run_harth_active_replay(
+            &rows(), [3; 32], [4; 32], [5; 32], [6; 32],
+            HarthLabelTrack::Native12, candidate(), &mut sparse_back
+        ).unwrap();
+        assert_eq!(full_rate.predictor.calls, 6);
+        assert_eq!(sparse_back.predictor.calls, 3);
+        assert!(sparse.sampled_axis_count < full.sampled_axis_count);
+        assert_eq!(sparse.macro_f1_ppm, full.macro_f1_ppm);
     }
 
     #[test]
