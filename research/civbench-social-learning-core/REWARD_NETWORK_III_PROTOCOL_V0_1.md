@@ -140,3 +140,10 @@ The sweep reports **individual optimal discovery** separately from **integrated 
 
 
 The Rust task engine now preserves the article-level paper profile explicitly and a separate older-repository compatibility profile. Unit fixtures for each are synthetic. A structural pass on `validate_published_profile()` checks article-described invariants only; it does not prove archive origin, split membership, or exact reproduction of the v2.0 generator.
+
+
+## LiveCultureBench adapter boundary
+
+Pham et al. (ACL 2026) introduce LiveCultureBench as a multi-cultural dynamic-town simulation for goal completion and socio-cultural norm adherence, with a separate LLM verifier whose reliability is also evaluated. CivBench's `src/cultural_situation.rs` module now supplies reusable per-context metrics and verifier calibration (Brier, log loss, fixed-bin ECE, confusion matrix, audit coverage and abstention) plus Pareto comparisons that minimize norm violation without collapsing it into task completion.
+
+The official repository currently contains only a README placeholder saying the data-download link is still to be added: https://github.com/thanhpv2102/LiveCultureBench. This module is not an official simulator port or a reproduction. Follow [LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md](LIVECULTUREBENCH_ADAPTER_PROTOCOL_V0_1.md) and issue [#10038](https://github.com/Luminous-Dynamics/symthaea/issues/10038) for upstream pinning, data/split ingestion, verifier audits and exact reproduction gates.
