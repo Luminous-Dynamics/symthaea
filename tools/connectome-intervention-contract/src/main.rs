@@ -802,6 +802,32 @@ fn verify_calibration(
     }
 }
 
+fn verify_failures(value: &Value, models: &HashMap<String, &Value>, errors: &mut Vec<String>) {
+    let intervention_ids: HashSet<String> = arr_at(value, &["intervention_design", "selected_interventions"])
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item.get("intervention_id").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    if let Some(failures) = arr_at(value, &["results", "failures"]) {
+        for (index, failure) in failures.iter().enumerate() {
+            if let Some(model_id) = failure.get("model_id").and_then(Value::as_str) {
+                if !models.contains_key(model_id) {
+                    errors.push(format!("results.failures[{index}].model_id: unresolved"));
+                }
+            }
+            if let Some(intervention_id) = failure.get("intervention_id").and_then(Value::as_str) {
+                if !intervention_ids.contains(intervention_id) {
+                    errors.push(format!("results.failures[{index}].intervention_id: unresolved"));
+                }
+            }
+            if failure.get("count").and_then(Value::as_u64).is_none_or(|count| count == 0) {
+                errors.push(format!("results.failures[{index}].count: must be positive"));
+            }
+        }
+    }
+}
+
 fn verify_complete(value: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     verify_claim_ceiling(value, &mut errors);
@@ -827,6 +853,7 @@ fn verify_complete(value: &Value) -> Vec<String> {
     let (directions, metric_families, scores) = verify_metrics_and_scores(value, &models, &test_set, &mut errors);
     verify_paired(value, &models, &directions, &scores, &test_set, &mut errors);
     verify_calibration(value, &models, &metric_families, &mut errors);
+    verify_failures(value, &models, &mut errors);
     errors
 }
 
@@ -1094,6 +1121,26 @@ mod tests {
         let report = verify_manifest(&value);
         assert_eq!(report.disposition, "INVALID");
         assert!(report.errors.iter().any(|e| e.contains("outside held-out test membership")));
+    }
+
+    #[test]
+    fn paired_scorecards_must_use_the_identical_unit_cohort() {
+        let mut value = complete_fixture();
+        value["split"]["test_unit_tokens"].as_array_mut().unwrap().push(json!(token(6)));
+        let test = value["split"]["test_unit_tokens"].as_array().unwrap().iter()
+            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        value["split"]["test_membership_sha256"] = json!(membership_digest(&test));
+
+        // Candidate cohort is [4,5]; baseline cohort becomes [4,6]. Both have
+        // n=2, both are in the declared test split, but they are not paired.
+        value["results"]["scorecards"][1]["unit_tokens"][1] = json!(token(6));
+        let baseline_units = value["results"]["scorecards"][1]["unit_tokens"].as_array().unwrap().iter()
+            .map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        value["results"]["scorecards"][1]["unit_manifest_sha256"] = json!(membership_digest(&baseline_units));
+
+        let report = verify_manifest(&value);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|e| e.contains("paired units must exactly match")));
     }
 
     #[test]
