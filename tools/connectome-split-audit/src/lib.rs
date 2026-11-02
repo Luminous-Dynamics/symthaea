@@ -465,6 +465,23 @@ fn validate_sha(kind: &'static str, value: &str) -> Result<(), SplitAuditError> 
     Ok(())
 }
 
+fn validate_unique_ids<'a>(
+    kind: &'static str,
+    values: impl Iterator<Item = &'a str>,
+) -> Result<(), SplitAuditError> {
+    let mut seen = BTreeSet::new();
+    for value in values {
+        validate_id(kind, value)?;
+        if !seen.insert(value.to_owned()) {
+            return Err(SplitAuditError::DuplicateIdentifier {
+                kind,
+                value: value.to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
 fn validate_id(kind: &'static str, value: &str) -> Result<(), SplitAuditError> {
     if value.trim().is_empty() || value.trim() != value {
         return Err(SplitAuditError::InvalidIdentifier {
