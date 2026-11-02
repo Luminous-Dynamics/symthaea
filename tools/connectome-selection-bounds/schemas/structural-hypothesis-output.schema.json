@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-structural-hypothesis-output-v1.schema.json",
+  "title": "Structural response identified set report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "admissible_hypothesis_count",
+    "excluded_hypothesis_ids",
+    "hypotheses",
+    "joint_response_set",
+    "target_given_source_response_set",
+    "probability_weights_applied"
+  ],
+  "properties": {
+    "report_version": {
+      "const": "connectome-structural-response-set-v1"
+    },
+    "admissible_hypothesis_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "excluded_hypothesis_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hypothesisResult"
+      }
+    },
+    "joint_response_set": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/interval"
+      }
+    },
+    "target_given_source_response_set": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/interval"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "probability_weights_applied": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "hypothesisResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "source_entity_id",
+        "target_entity_id",
+        "evidence_manifest_sha256",
+        "source_prevalence",
+        "target_prevalence",
+        "joint_response_prevalence",
+        "target_given_source_prevalence"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_entity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_entity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "source_prevalence": {
+          "$ref": "#/$defs/interval"
+        },
+        "target_prevalence": {
+          "$ref": "#/$defs/interval"
+        },
+        "joint_response_prevalence": {
+          "$ref": "#/$defs/interval"
+        },
+        "target_given_source_prevalence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
