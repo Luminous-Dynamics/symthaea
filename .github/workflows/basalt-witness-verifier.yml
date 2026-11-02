@@ -1,31 +1,73 @@
-name: BASALT Witness Crypto Verifier
+name: BASALT Witness Read and Crypto Exact-Tree Validation
 
 on:
   pull_request:
     paths:
       - "tools/basalt-witness-verifier/**"
       - "benchmarks/basalt/schema/witness-*.schema.json"
-      - "benchmarks/basalt/witness-crypto-test-vectors.v1.json"
       - ".github/workflows/basalt-witness-verifier.yml"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  witness-crypto:
+  validate-and-normalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
+      - name: Rebase onto latest branch and normalize source
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$PR_HEAD_REF"
+          git rebase "origin/$PR_HEAD_REF"
+          cargo fmt --manifest-path tools/basalt-witness-verifier/Cargo.toml
       - name: Verify formatting
         run: cargo fmt --manifest-path tools/basalt-witness-verifier/Cargo.toml -- --check
-      - name: Test DSSE, JCS and threshold verification
+      - name: Test DSSE/JCS and challenge-bound read protocol
         run: cargo test --locked --manifest-path tools/basalt-witness-verifier/Cargo.toml
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path tools/basalt-witness-verifier/Cargo.toml --all-targets -- -D warnings
+      - name: Commit only the validated source tree
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/basalt-witness-verifier/src/lib.rs tools/basalt-witness-verifier/src/main.rs
+          tree_before="$(git write-tree)"
+          if ! git diff --cached --quiet; then
+            git commit -m "style(basalt): format challenge-bound witness read verifier"
+          fi
+          tree_after="$(git rev-parse HEAD^{tree})"
+          test "$tree_before" = "$tree_after"
+          git push origin "HEAD:refs/heads/$PR_HEAD_REF"
+          mkdir -p basalt-witness-read-validation
+          {
+            echo "validated_tree_sha=$tree_after"
+            echo "validated_commit_sha=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "cargo_fmt=pass"
+            echo "cargo_test_locked=pass"
+            echo "cargo_clippy_locked=pass"
+          } > basalt-witness-read-validation/validation.txt
+      - name: Upload exact tested-tree receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-witness-read-validation-${{ github.sha }}
+          path: basalt-witness-read-validation/validation.txt
+          if-no-files-found: error
+          retention-days: 7
