@@ -211,6 +211,10 @@ def simulate_stream(
     added_terminal: dict[F, int] = {delta: 0 for delta in deltas}
     baseline_terminal: dict[F, int] = {delta: 0 for delta in deltas}
     anchored_terminal: dict[F, int] = {delta: 0 for delta in deltas}
+    finite_anchor_seconds_total = 0.0
+    finite_anchor_calls = 0
+    finite_baseline_terminal = 0
+    finite_anchor_terminal = 0
 
     for t in range(looks):
         row = x_path[t]
