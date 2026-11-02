@@ -104,7 +104,11 @@ pub struct GenerationMetrics {
     pub demonstration_observations: usize,
     pub social_knowledge_acquisitions: usize,
     pub social_optimal_acquisitions: usize,
+    /// Optimal strategies acquired by learners who did not discover them individually.
+    pub social_only_optimal_acquisitions: usize,
     pub social_integrations: usize,
+    /// Optimal strategies newly integrated by learners who did not discover them individually.
+    pub social_only_optimal_integrations: usize,
     pub social_optimal_integrations: usize,
     pub selected_top_teacher_count: usize,
     pub demonstration_observation_rate: Option<f64>,
@@ -132,11 +136,20 @@ impl PopulationGeneration {
         let social_optimal_acquisitions = self.agents.iter()
             .filter(|agent| agent.strategy_acquisition_succeeded
                 && agent.social_strategy == Some(Strategy::Optimal)).count();
+        let social_only_optimal_acquisitions = self.agents.iter()
+            .filter(|agent| agent.strategy_acquisition_succeeded
+                && agent.individual_strategy != Strategy::Optimal
+                && agent.social_strategy == Some(Strategy::Optimal)).count();
         let social_integrations = self.agents.iter()
             .filter(|agent| agent.strategy_integrated).count();
         let social_optimal_integrations = self.agents.iter()
             .filter(|agent| agent.strategy_integrated
                 && agent.social_strategy == Some(Strategy::Optimal)).count();
+        let social_only_optimal_integrations = self.agents.iter()
+            .filter(|agent| agent.strategy_integrated
+                && agent.individual_strategy != Strategy::Optimal
+                && agent.social_strategy == Some(Strategy::Optimal)
+                && agent.integrated_strategy == Strategy::Optimal).count();
         let selected_top_teacher_count = self.agents.iter()
             .filter(|agent| agent.selected_top_teacher == Some(true)).count();
         let teacher_selection_trials = self.agents.iter()
@@ -154,8 +167,10 @@ impl PopulationGeneration {
             demonstration_observations,
             social_knowledge_acquisitions,
             social_optimal_acquisitions,
+            social_only_optimal_acquisitions,
             social_integrations,
             social_optimal_integrations,
+            social_only_optimal_integrations,
             selected_top_teacher_count,
             demonstration_observation_rate: if self.index == 0 {
                 None
@@ -636,16 +651,19 @@ pub fn simulate_transmission(
             } else {
                 None
             };
-            let strategy_integrated = strategy_acquisition_succeeded
-                && social_strategy
-                    .map(|strategy| strategy != Strategy::None)
-                    .unwrap_or(false)
+            let integration_gate_passed = strategy_acquisition_succeeded
                 && rng.bernoulli(config.strategy_integration_probability);
             let integrated_strategy = integrate_strategy(
                 individual_strategy,
                 social_strategy,
-                strategy_integrated,
+                integration_gate_passed,
             );
+            // Count integration only when the received strategy changes the
+            // active repertoire, not when it duplicates or loses to prior skill.
+            let strategy_integrated = integration_gate_passed
+                && social_strategy
+                    .map(|strategy| strategy.rank() > individual_strategy.rank())
+                    .unwrap_or(false);
             let score = demonstration_score(integrated_strategy, config, &mut rng);
             agents.push(TransmissionAgent {
                 kind: AgentKind::Human,
@@ -847,6 +865,56 @@ mod tests {
         assert_eq!(corrupt_strategy(Strategy::Optimal), Strategy::Myopic);
         assert_eq!(corrupt_strategy(Strategy::Myopic), Strategy::None);
         assert_eq!(corrupt_strategy(Strategy::None), Strategy::None);
+    }
+
+    #[test]
+    fn redundant_social_optimal_acquisition_is_not_counted_as_integration() {
+        let generation = PopulationGeneration {
+            index: 1,
+            agents: vec![TransmissionAgent {
+                kind: AgentKind::Human,
+                individual_strategy: Strategy::Optimal,
+                social_strategy: Some(Strategy::Optimal),
+                integrated_strategy: Strategy::Optimal,
+                teacher_index: Some(0),
+                teacher_strategy: Some(Strategy::Optimal),
+                demonstration_observed: true,
+                strategy_acquisition_succeeded: true,
+                strategy_integrated: false,
+                selected_top_teacher: Some(true),
+                demonstration_score: 0.0,
+            }],
+        };
+        let metrics = generation.metrics();
+        assert_eq!(metrics.social_optimal_acquisitions, 1);
+        assert_eq!(metrics.social_only_optimal_acquisitions, 0);
+        assert_eq!(metrics.social_integrations, 0);
+        assert_eq!(metrics.social_only_optimal_integrations, 0);
+        assert_eq!(metrics.integration_rate_given_acquisition, Some(0.0));
+    }
+
+    #[test]
+    fn social_only_optimal_acquisition_and_integration_are_reported() {
+        let generation = PopulationGeneration {
+            index: 1,
+            agents: vec![TransmissionAgent {
+                kind: AgentKind::Human,
+                individual_strategy: Strategy::Myopic,
+                social_strategy: Some(Strategy::Optimal),
+                integrated_strategy: Strategy::Optimal,
+                teacher_index: Some(0),
+                teacher_strategy: Some(Strategy::Optimal),
+                demonstration_observed: true,
+                strategy_acquisition_succeeded: true,
+                strategy_integrated: true,
+                selected_top_teacher: Some(true),
+                demonstration_score: 0.0,
+            }],
+        };
+        let metrics = generation.metrics();
+        assert_eq!(metrics.social_only_optimal_acquisitions, 1);
+        assert_eq!(metrics.social_only_optimal_integrations, 1);
+        assert_eq!(metrics.social_optimal_integrations, 1);
     }
 
     #[test]
