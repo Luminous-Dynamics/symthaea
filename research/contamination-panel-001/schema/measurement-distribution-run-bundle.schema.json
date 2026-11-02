@@ -56,6 +56,7 @@
             "required": [
               "item_id",
               "task_family",
+              "source_domain_id",
               "source_cluster_id",
               "source_lineage_sha256"
             ],
@@ -81,6 +82,12 @@
               "source_lineage_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
+              },
+              "source_domain_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
               }
             }
           }
