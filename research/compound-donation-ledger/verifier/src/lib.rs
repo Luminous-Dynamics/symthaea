@@ -427,7 +427,6 @@ pub fn verify_receipt_with_policy(
             }
             DonationReservePolicy::CappedOvershoot => {
                 spec.reserve_rate_numerator != 0
-                    || (spec.weight > 0 && spec.destination_id.is_none())
             }
         };
         if previous_id.is_some_and(|previous| spec.id <= previous)
@@ -521,7 +520,11 @@ pub fn verify_receipt_with_policy(
                         let cap = (spec.weight as u128)
                             .checked_mul(EVIDENCE_ONE)
                             .ok_or(VerifyError::Overflow)?;
-                        let target = raw.min(cap);
+                        let target = if spec.destination_id.is_some() {
+                            raw.min(cap)
+                        } else {
+                            0
+                        };
                         let reserve = target
                             .checked_sub(candidate.outgoing)
                             .ok_or(VerifyError::InvalidAmount)?;
