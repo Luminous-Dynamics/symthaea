@@ -285,7 +285,7 @@ impl DecisionFunctionalCalibrationRequest {
 
         if self.evidence_mode == CalibrationEvidenceMode::RandomizedPolicyExecution {
             validate_randomized_assignment(
-                self.null_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, &row.sampling_unit_ids)),
+                self.null_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, row.sampling_unit_ids.as_slice())),
                 "request.null_rows",
             )?;
             validate_randomized_assignment(
