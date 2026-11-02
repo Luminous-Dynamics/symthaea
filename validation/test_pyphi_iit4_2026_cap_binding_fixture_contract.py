@@ -54,8 +54,8 @@ class PyPhiIit42026CapBindingFixtureContractTests(unittest.TestCase):
         props = fixture["properties"]
         self.assertTrue(props["cap_binding"]["const"])
         self.assertTrue(props["mip_unchanged"]["const"])
-        self.assertGreater(props["phi_reduction_2023_minus_2026"]["exclusiveMinimum"], 0)
-        self.assertGreater(props["cap_gap_to_cause_effect_minimum"]["exclusiveMinimum"], 0)
+        self.assertEqual(props["phi_reduction_2023_minus_2026"]["exclusiveMinimum"], 0)
+        self.assertEqual(props["cap_gap_to_cause_effect_minimum"]["exclusiveMinimum"], 0)
 
     def test_same_fixed_candidate_state_is_frozen(self):
         fixture = self.schema["properties"]["selected_fixture"]["oneOf"][1]["properties"]
