@@ -137,6 +137,62 @@ A searchable passage describes an early copper-screen cage, a receiver/sender se
 
 **Archive reference:** https://www.projectinterloper.com/doc/CIA-RDP96-00787R000100190001-2 (printed p.42 in the hosted transcription; check the original CIA scan because the site warns that transcription can contain errors).
 
+## PH-015 — Puharich v. Brenner, 415 F.2d 979 (D.C. Cir. 1969)
+
+**Document:** United States Court of Appeals for the District of Columbia Circuit, argued 21 March 1969, decided 25 June 1969, No. 22286.
+
+**Primary opinion:** https://law.resource.org/pub/us/case/reporter/F2/415/415.F2d.979.22286.html
+**Parallel copy:** https://law.justia.com/cases/federal/appellate-courts/F2/415/979/280149/
+
+**Classification:** P1 for the judicial opinion and the evidence summarized in the litigation record. It is not the underlying trial transcript, laboratory notebook or raw data.
+
+### Device and application
+
+Puharich appealed the rejection of patent application Serial No. 291,096 (filed in 1963) for a device claimed to expand ESP and assist its study. The appellate opinion describes a cage-like booth with electrical installations in its screen casing for generating currents and impulses.
+
+### Experimental record summarized by the court
+
+The opinion says Puharich's trial presentation was largely confined to testimony and statistical data from tests on nine "sensitives" asked to identify the colors of face-down playing cards. It notes that in some instances subjects were allowed to pass a hand over the card.
+
+The experiment was reported in three run-throughs:
+1. subjects outside the cage;
+2. subjects in the cage without voltage ("untreated");
+3. subjects in the cage with voltage applied.
+
+The opinion's footnote gives one subject, Mr. Marion, as an example: in a series of 520 trials he scored 390 correct outside the cage, 413 in the uncharged cage and 455 in the electrically charged cage. These correspond to raw proportions of 75.0%, about 79.4% and 87.5%, respectively. The opinion does not provide enough detail to reconstruct the full chance model, target balance, card-generation procedure, trial independence, randomization or exact analysis. Do not calculate a modern p-value from those counts without the original protocol and trial-level records.
+
+### Why this source changes our research design
+
+The court explicitly observes that performance improved substantially simply by entering the *uncharged* cage. It says this is consistent with environmental novelty and the experimenter's demonstrated interest accounting for a substantial part of the improvement. It also notes:
+- tests were viewed solely by Puharich and his consultants;
+- the programme was limited in extent;
+- the applicant could not explain why the uncharged cage improved performance if electrical charge was the claimed crucial contribution;
+- the results were too inconclusive to establish that the claimed results would recur in another experiment.
+
+The court said duplication or a convincing theoretical explanation could have supported operability. It did not decide whether ESP exists: for purposes of the patent appeal it assumed, without deciding, that some people might have ESP, and held that the applicant had not shown that the device enhanced it reliably.
+
+### Task identity
+
+This is a distinct **face-down playing-card colour-identification task across outside / uncharged-cage / electrically charged-cage conditions**. Do not automatically identify it with:
+- the earlier Peter Hurkos hidden-object identification account in *Tomorrow* (1960);
+- the Garrett sender–receiver Zener-card task described in the later memoir;
+- the separate randomized cage-charge guessing task described in that memoir;
+- the one-mile matching-test claim repeated in the 1972 SRI proposal.
+
+The card-colour test may be related to the 1961/1968 Faraday-cage work, but that relationship must be demonstrated from primary records rather than assumed.
+
+### Modern design implications
+
+A modern reconstruction must independently separate:
+- ordinary practice/familiarity effects;
+- participant response bias and expectancy;
+- experimenter expectancy and scoring bias;
+- enclosure novelty and acoustic/thermal/light changes;
+- target-pool/card-order imbalance and hidden cues;
+- electrical-state effects from the effects of simply being inside the enclosure.
+
+Use randomized/counterbalanced conditions, sealed target/response records, blinded scoring, all-trial accounting and a preregistered primary endpoint. Do not reproduce the historical high-voltage apparatus. Any human-facing physical condition requires a separate electrical-safety and ethics review; initial work should be passive, low-power and instrument-characterization only.
+
 ## PH-012 — University of Calcutta, Rajabazar Campus Library: verified journal holding
 
 **Catalogue:** University of Calcutta, Rajabazar Journal Library list, official library PDF:
