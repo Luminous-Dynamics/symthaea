@@ -49,6 +49,20 @@ own leaderboard. Never compare different benchmark versions, agent scaffolds,
 effort settings, task splits or resource budgets as though they were the same
 experiment.
 
+**Verifier-integrity warning (updated 2026-11-02):** Epoch AI's review of Terminal-Bench
+4.0.0 labels the release flawed and reports publicly documented scoring defects in
+30 of 66 tasks (45.5%), including writable pass signals, answer leakage and false
+negatives. The maintainers' 4.0 notes describe task removals/fixes and a 4.1
+verifier-hardening direction. Retain 4.0.0 raw scores for historical comparison,
+but do not use its aggregate as unquestioned ground truth. Any local result must
+pin the exact task list and grader revision, disclose known defects/exclusions,
+and separate a task-level independently adjudicated clean subset from the raw
+score. Official maintainer-board results and Vals AI's independent Mini-SWE-agent
+results are different evaluations and must not be pooled. See
+[Epoch AI's review](https://epoch.ai/benchmarks/terminal-bench/review),
+[maintainer 4.0 notes](https://www.tbench.ai/news/terminal-bench-4-0), and
+[Vals AI](https://vals.ai/benchmarks/terminal-bench).
+
 The Symthaea-native [Computational Engineering Bench V0](../docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md)
 is currently design-only. Its task catalog does not yet constitute a runnable
 benchmark or produce a score.
