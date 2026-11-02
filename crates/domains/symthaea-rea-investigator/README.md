@@ -83,3 +83,29 @@ Scenario weights and likelihood matrices are still caller-supplied. They are not
 Do not pass ad hoc cell-wise lower/upper probability bounds and renormalize them as though they were a valid joint uncertainty set. If adding interval bounds later, use a mathematically valid simplex-constrained uncertainty set or a reviewed robust-optimization formulation.
 
 The robust tests are additive to the point-planner tests. The dedicated planner workflow runs both through the same isolated locked harness.
+
+
+## Decision-aware value of information (additive API)
+
+The new `decision` module evaluates whether an experiment improves a downstream choice, not just how many bits it removes from hypothesis entropy.
+
+Use `plan_next_experiment_decision_aware` with:
+- independently rooted REA Evidence provenance and competing hypotheses;
+- the same shared likelihood scenarios and safe experiment proposals used by robust EIG;
+- a finite terminal decision set, with one utility for every hypothesis;
+- explicit DecisionAwareConfig for EVSI, lower-tail/worst-case policy, decision stability and shared-policy regret limits.
+
+It reports:
+- baseline Bayes-optimal terminal decision and its expected utility;
+- scenario EVSI (expected posterior optimal utility minus baseline utility);
+- worst-case and lower-tail CVaR EVSI over the supplied scenario set;
+- a shared scenario-mixture outcome-to-decision policy;
+- expected and worst-case regret of that shared policy against each scenario's posterior-optimal decision;
+- decision agreement/stability over scenario/outcome probability mass;
+- all rejected experiments and explicit abstention.
+
+The module deliberately keeps EIG, EVSI and regret distinct. EIG is an intermediate uncertainty metric; EVSI values improved decisions under a declared utility model; regret measures how much a shared policy loses relative to scenario-specific posterior-optimal decisions.
+
+Utilities are caller-supplied and not validated against stakeholder outcomes or harms. Scenario likelihoods and weights remain uncalibrated unless a separate independent calibration receipt exists. No terminal decision or experiment is executed by this planner.
+
+A key regression test constructs a nuisance probe with **higher EIG but zero decision value**, and an actionable probe with lower EIG that changes the optimal remediation. The decision-aware planner must select the latter. This is the central hypothesis behind [#10109](https://github.com/Luminous-Dynamics/symthaea/issues/10109).
