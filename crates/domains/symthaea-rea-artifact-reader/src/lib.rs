@@ -7,7 +7,7 @@
 //! directory entry are semantically trustworthy. It preserves archive
 //! occurrences and keeps declared metadata separate from observed content.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -712,7 +712,6 @@ fn read_central_directory(
         .map_err(|error| ReaderError::io("cannot seek to central directory", error))?;
 
     let mut entries = Vec::with_capacity(end_record.entry_count as usize);
-    let mut seen_names: HashSet<Vec<u8>> = HashSet::new();
     let mut ranges = Vec::with_capacity(end_record.entry_count as usize);
     let mut total_declared_uncompressed = 0u64;
 
@@ -884,9 +883,8 @@ fn read_central_directory(
             limitations.push(format!("member path disposition is {path_disposition:?}"));
         }
 
-        if !seen_names.insert(raw_name.clone()) {
-            // Duplicate paths are distinct occurrences. Do not collapse or key by filename.
-        }
+        file.seek(SeekFrom::Start(next_record))
+            .map_err(|error| ReaderError::io("cannot resume central-directory traversal", error))?;
 
         entries.push(ArtifactEntry {
             occurrence_index: index,
