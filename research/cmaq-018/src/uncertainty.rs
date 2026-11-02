@@ -646,7 +646,7 @@ pub enum ConstrainedSelectionBasis {
     UtilityDominance,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConstrainedActionDecision {
     Selected {
         action_id: u64,
