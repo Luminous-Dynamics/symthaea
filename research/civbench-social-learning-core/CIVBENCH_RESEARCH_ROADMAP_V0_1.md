@@ -27,6 +27,7 @@ The field-level objective should be **reliable cumulative capability under bound
 | Track | Strong external reference | What it measures | Current CivBench contribution | What is required before a superiority claim |
 |---|---|---|---|---|
 | Human population-level transmission | Brinkmann et al. (2026), Reward Network III | Machine discovery, human demonstrator selection, skill adoption and persistence across generations | Local-observation Reward Network engine, synthetic task fixtures, baselines and generational reference model | Ingest exact Zenodo v2.0 data, network splits, DQN weights/config and author analysis; rerun on matched tasks |
+| Situated multi-cultural agent behavior | Pham et al. (2026), LiveCultureBench (ACL 2026) | Dynamic-town goal completion, local norm adherence, profile faithfulness, contextual awareness, coherence and verifier reliability | Adapter-neutral Rust metrics, context-stratified aggregation, verifier calibration and Pareto comparison | Official repository currently lacks its data download link; pin released runner/data/prompts, reproduce paper and human-audited verifier split before comparison |
 | Exploratory generational ABM | Brinkmann et al. (2026), paper Methods §Agent-based simulation | Discovery bias/capacity, demonstrator selection, learnability, strategy integration, machine lineage and stochastic cultural persistence over 20 generations | Separate Rust `paper_abm` reference model and 50-replicate parameter sweep, with 1,945 CivBench conditions | Verify exact supplementary parameter grid, candidate sampling, machine-placement schemes and random process against archived implementation; reproduce source curves before extensions |
 | Networked cultural accumulation | Czaplicka, Baumann & Rahwan (2025) | Interaction of local peer learning, innovation and global algorithmic mediation under varying network density | Ring-plus-shortcut mediation model, acquisition/adoption telemetry, lineage concentration and performance-vs-diversity recommender sweep | Port the published ER network, trait branches/levels, effort budget, costs, payoff distribution and death-birth semantics; reproduce paper curves first |
 | Agent-to-agent few-shot transfer | Platonov et al. (2023), MEDAL-ADR | Demonstration fidelity, recall after expert dropout, generalization to held-out tasks | Not yet implemented as an exact benchmark; current task protocol names the comparison | Use equivalent procedural task families and budgets; compare memory, expert dropout, attention, ADR and teach-back with held-out context splits |
@@ -37,6 +38,7 @@ The field-level objective should be **reliable cumulative capability under bound
 ### Source references
 
 - Brinkmann et al., *Propagation and preservation of AI-discovered problem-solving strategies in human culture*, Nature Communications (2026): https://www.nature.com/articles/s41467-026-76113-2
+- Pham et al., *LiveCultureBench: a Multi-Agent, Multi-Cultural Benchmark for Large Language Models in Dynamic Social Simulations*, ACL 2026: https://aclanthology.org/2026.acl-long.1247/ (DOI 10.18653/v1/2026.acl-long.1247)
 - Czaplicka et al., *Mutual benefits of social learning and algorithmic mediation for cumulative culture*, Journal of the Royal Society Interface (2025): https://pmc.ncbi.nlm.nih.gov/articles/PMC11978438/
 - Platonov et al., *Learning few-shot imitation as cultural transmission*, Nature Communications (2023): https://www.nature.com/articles/s41467-023-42875-2
 - Perez et al., *When LLMs Play the Telephone Game*, ICLR (2025): https://proceedings.iclr.cc/paper_files/paper/2025/hash/dbdea7859f1d2fc10f2c9e79b8f5ae54-Abstract-Conference.html
@@ -129,6 +131,7 @@ No target should be declared achieved from synthetic unit fixtures alone.
 
 ### P0: exact source reproduction
 - Reward Network III final Zenodo v2.0 ingest and paper reanalysis, separately for the human population experiment and the 20-generation exploratory ABM.
+- LiveCultureBench official artifact ingestion and exact ACL 2026 reproduction once its public data/runner release is available; keep adapter-neutral situation metrics separate from official-paper results.
 - Rust port of the Czaplicka et al. model, kept separate from the simplified networked mediation mechanism.
 - Real-LLM telephone-game source/model/prompt chain runner, with a metadata and retention policy.
 
@@ -148,4 +151,4 @@ No target should be declared achieved from synthetic unit fixtures alone.
 
 ## Current status and limits
 
-This roadmap is included in a research PR. The Rust modules and sensitivity sweeps are authored, but their compile/test status is pending the dedicated workflow. The current paper ABM is a transparent reference interpretation, not an exact reproduction of the supplementary implementation; the human-task graph fixtures are synthetic despite matching the published structural constraints. The final Reward Network III Zenodo archive has not yet been ingested, the published Czaplicka model has not yet been ported, and the telephone-game channel does not call an LLM. No SOTA superiority, empirical human effect or exact paper reproduction is claimed.
+This roadmap is included in a research PR. The Rust modules and sensitivity sweeps are authored, but their compile/test status is pending the dedicated workflow. The current paper ABM is a transparent reference interpretation, not an exact reproduction of the supplementary implementation; the human-task graph fixtures are synthetic despite matching the published structural constraints. The final Reward Network III Zenodo archive has not yet been ingested, the published Czaplicka model has not yet been ported, and the telephone-game channel does not call an LLM. The official LiveCultureBench repository currently lacks its data-download link, so its simulator is not yet reproduced; only adapter-neutral metrics are implemented. No SOTA superiority, empirical human effect or exact paper reproduction is claimed.
