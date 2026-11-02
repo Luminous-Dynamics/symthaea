@@ -630,7 +630,7 @@ mod tests {
             human_optimality_bias: 0.0,
             machine_optimality_bias: 1.0,
             optimal_discovery_probability: 1.0,
-            myopic_discovery_probability: 0.0,
+            myopic_discovery_probability: 1.0,
             teacher_candidate_count: 8,
             teacher_selection_temperature: 0.001,
             social_learning_probability: 1.0,
