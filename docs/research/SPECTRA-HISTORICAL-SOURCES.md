@@ -102,6 +102,31 @@ The entry discusses Puharich's medical and biophysical work, patents, Round Tabl
 
 A searchable passage describes an early copper-screen cage, a receiver/sender setup, grounding and an electrically charged cage. Treat this as a retrospective description, not the original lab notebook, not independently authenticated raw data and not a direct replication record.
 
+## PH-011 — *Tomorrow* magazine, Summer 1960: "TV Gilds a Lily"
+
+**Document:** *Tomorrow*, Vol. 8, No. 3, Summer 1960, Susy Smith, "TV Gilds a Lily," printed pp. 50–53.
+
+**Scan:** https://iapsop.com/archive/materials/tomorrow_garrett/tomorrow_2s_v8_n3_summer_1960.pdf
+
+**Classification:** P2 contemporaneous secondary account. This is a publication from 1960, but the article is not Puharich's lab notebook or raw experimental record.
+
+### What it reports
+
+- The article discusses television dramatizations of Peter Hurkos and Puharich's testing at the Round Table Foundation in Glen Cove, Maine.
+- It describes a Faraday-cage arrangement with a wire-mesh outer enclosure and an inner wooden compartment in which the subject sat alone.
+- It reports that the outer enclosure was charged by a Van de Graaff generator; the article gives 25,000 V as the charge applied in the described demonstration and notes the generator could produce 400,000 V.
+- It says Puharich asked Hurkos to identify objects on a desk outside the cage and attributes claimed accuracy of 80%, sometimes up to 95%, to Puharich.
+- The author explicitly criticizes the television dramatization and questions whether the program's version of events is factual, fictional or mixed. The article is therefore especially valuable as a contemporary account that warns against treating a TV reenactment as an experimental record.
+
+### What it does not establish
+
+- No raw trial series, target list, randomization, response sheets, scoring method, independent scorer records, instrument calibration, field measurements or full safety documentation are supplied.
+- The percentages are claims attributed to Puharich, not an independently reconstructed result.
+- The article's account concerns Hurkos and object identification, not the same described protocol as Garrett's Zener-card sender–receiver task or the memoir's randomized cage-charge discrimination task.
+- Do not reproduce the historical high-voltage arrangement. It is not a modern experimental recipe and is outside SPECTRA's initial safe scope.
+
+**Research treatment:** use this as a separate historical profile lead, provisionally PH-HURKOS-OBJECT-001 (caged receiver identifies objects located outside), pending primary-source recovery. Do not pool it with Zener-card transfer or cage-state discrimination.
+
 ## PH-007 — "Experiments with Faraday Cage Apparatus" (Darshana, April 1961)
 
 **Bibliographic lead:** Puharich's own later research-program background paper, archived as CIA-RDP96-00787R000100190001-2, lists "Experiments with Faraday Cage Apparatus," *Darshana* (India), Vol. 1, pp. 30–43, April 1961 (the pagination differs slightly in a later memoir bibliography, which gives pp. 30–42).
