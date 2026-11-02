@@ -212,7 +212,7 @@ fn quick_cases() -> Vec<Case> {
 
     let mut preserve = base_case("quick_preserve_individual_ablation");
     preserve.generations = 5;
-    preserve.social_failure_fallback = SocialFailureFallback::PreserveIndividual;
+    preserve.fallback = SocialFailureFallback::PreserveIndividual;
     cases.push(preserve);
     cases
 }
@@ -352,7 +352,7 @@ fn cases_for_profile(profile: &str) -> Vec<Case> {
     }
 }
 
-fn parse_args() -> (String, u64, Option<u64>) {
+fn parse_args() -> (String, u64, Option<usize>) {
     let mut profile = "quick".to_owned();
     let mut replications = None;
     let mut seed = 0x524E_3341_424D_u64;
@@ -361,7 +361,7 @@ fn parse_args() -> (String, u64, Option<u64>) {
         if argument == "--profile" {
             profile = args.next().expect("--profile requires a value");
         } else if argument == "--replications" {
-            replications = Some(args.next().expect("--replications requires a value").parse().expect("replications must be an integer"));
+            replications = Some(args.next().expect("--replications requires a value").parse::<usize>().expect("replications must be a usize"));
         } else if argument == "--seed" {
             seed = args.next().expect("--seed requires a value").parse().expect("seed must be an integer");
         } else {
@@ -414,14 +414,14 @@ fn emit_case(case_index: usize, case: &Case, replications: usize, base_seed: u64
             fmt(stats.human_optimal.ci95_half_width()),
             fmt(stats.machine_optimal.mean()),
             fmt(stats.machine_optimal.ci95_half_width()),
-            fmt(stats.human_individual_optimal_discovery_rate.mean()),
-            fmt(stats.human_social_optimal_acquisition_rate.mean()),
-            fmt(stats.human_social_only_optimal_integration_rate.mean()),
-            fmt(stats.human_machine_lineage_optimal_prevalence.mean()),
-            fmt(stats.human_myopic_prevalence.mean()),
-            fmt(stats.human_random_prevalence.mean()),
-            fmt(stats.mean_demonstration_reward.mean()),
-            fmt(stats.social_learning_rate_observed.mean()),
+            fmt(stats.individual_optimal.mean()),
+            fmt(stats.social_optimal.mean()),
+            fmt(stats.social_only_optimal.mean()),
+            fmt(stats.machine_lineage_optimal.mean()),
+            fmt(stats.human_myopic.mean()),
+            fmt(stats.human_random.mean()),
+            fmt(stats.mean_reward.mean()),
+            fmt(stats.social_success.mean()),
         ];
         println!("{}", fields.join(","));
     }
