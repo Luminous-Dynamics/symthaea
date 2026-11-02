@@ -332,7 +332,7 @@ pub fn plan_reviews_exact_small(
     let deferred_operation_ids = ordered
         .iter()
         .enumerate()
-        .filter(|(index, _)| best_mask & (1_u64 << index) == 0)
+        .filter(|(index, _)| best_mask & (1_u64 << *index) == 0)
         .map(|(_, candidate)| candidate.operation_id.clone())
         .collect();
 
@@ -355,7 +355,7 @@ fn selected_ids(mask: u64, ordered: &[&ReviewCandidate]) -> Vec<String> {
     ordered
         .iter()
         .enumerate()
-        .filter(|(index, _)| mask & (1_u64 << index) != 0)
+        .filter(|(index, _)| mask & (1_u64 << *index) != 0)
         .map(|(_, candidate)| candidate.operation_id.clone())
         .collect()
 }
