@@ -204,7 +204,7 @@ fn main() {
         Condition::DiversityAware,
     ];
     println!(
-        "condition,replicates,attempted_items,teacher_offered_items,observation_rate,acquisition_rate,integration_rate,correct_execution_rate,false_adoption_rate,retention_rate,held_out_transfer_rate,unique_lineages_offered,learning_cost,realized_benefit,unused_budget"
+        "condition,replicates,attempted_items,teacher_offered_items,observation_rate,acquisition_rate,integration_rate,correct_execution_rate,correct_execution_ci95,false_adoption_rate,retention_rate,held_out_transfer_rate,unique_lineages_offered,learning_cost,realized_benefit,realized_benefit_ci95,unused_budget"
     );
 
     for condition in conditions {
@@ -227,7 +227,7 @@ fn main() {
         }
 
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             condition.label(),
             REPLICATES,
             fmt(aggregate.attempted_items.mean()),
@@ -236,12 +236,14 @@ fn main() {
             fmt(aggregate.acquisitions.mean()),
             fmt(aggregate.integrations.mean()),
             fmt(aggregate.correct_executions.mean()),
+            fmt(aggregate.correct_executions.ci95_half_width()),
             fmt(aggregate.false_adoptions.mean()),
             fmt(aggregate.retention.mean()),
             fmt(aggregate.transfer.mean()),
             fmt(aggregate.lineages_offered.mean()),
             fmt(aggregate.cost.mean()),
             fmt(aggregate.benefit.mean()),
+            fmt(aggregate.benefit.ci95_half_width()),
             fmt(aggregate.unused_budget.mean()),
         );
     }
