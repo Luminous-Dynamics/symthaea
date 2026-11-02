@@ -427,13 +427,20 @@ impl EngineeringManager {
                 );
             }
             ConstraintFitStatus::InvalidConstraintProfile => {
-                return Err("Build-volume check rejected: printer constraint profile is invalid.".into());
+                return Err(
+                    "Build-volume check rejected: printer constraint profile is invalid.".into(),
+                );
             }
             ConstraintFitStatus::InvalidGeometryBounds => {
-                return Err("Build-volume check rejected: resolved geometry bounds are invalid.".into());
+                return Err(
+                    "Build-volume check rejected: resolved geometry bounds are invalid.".into(),
+                );
             }
             ConstraintFitStatus::ExceedsDeclaredBuildVolume => {
-                return Err("Build-volume check rejected: geometry exceeds the declared printer volume.".into());
+                return Err(
+                    "Build-volume check rejected: geometry exceeds the declared printer volume."
+                        .into(),
+                );
             }
         }
         let mesh = thought.resolve();
