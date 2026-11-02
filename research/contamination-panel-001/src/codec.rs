@@ -18,6 +18,7 @@ use std::collections::BTreeSet;
 pub const CODEC_REQUEST_SCHEMA: &str = "symthaea.codec_dataset_request.v1";
 pub const CODEC_REPORT_SCHEMA: &str = "symthaea.codec_dataset_report.v1";
 pub const CODEC_DATASET_AUC_SCHEMA: &str = "symthaea.codec_dataset_level_auc.v1";
+pub const CODEC_DATASET_AUC_REQUEST_SCHEMA: &str = "symthaea.codec_dataset_level_auc_request.v1";
 pub const MAX_DATASET_ITEMS: usize = 100_000;
 pub const MAX_TARGET_TOKENS: usize = 32_768;
 pub const MAX_CONTEXT_ITEMS: usize = 8;
@@ -153,6 +154,13 @@ pub struct CoDecDatasetLabelledScoreV1 {
     /// randomized training intervention, not a detector-derived label.
     pub known_training_exposure: bool,
     pub codec_score_permille: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoDecDatasetLevelAucRequestV1 {
+    pub schema: String,
+    pub datasets: Vec<CoDecDatasetLabelledScoreV1>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -575,8 +583,12 @@ fn dataset_level_metrics(
 /// Compute AUROC across independently labelled datasets. The unit of analysis
 /// is each dataset report, never an individual target item.
 pub fn codec_dataset_level_auroc(
-    observations: &[CoDecDatasetLabelledScoreV1],
+    request: &CoDecDatasetLevelAucRequestV1,
 ) -> Result<CoDecDatasetLevelAucReportV1, String> {
+    if request.schema != CODEC_DATASET_AUC_REQUEST_SCHEMA {
+        return Err(format!("dataset-level AUC request schema must be {CODEC_DATASET_AUC_REQUEST_SCHEMA}"));
+    }
+    let observations = &request.datasets;
     if observations.len() < 2 || observations.len() > 100_000 {
         return Err("dataset-level AUROC requires 2..=100000 dataset observations".to_owned());
     }
@@ -766,9 +778,55 @@ mod tests {
                 codec_score_permille: 300.0,
             },
         ];
-        let report = codec_dataset_level_auroc(&rows).unwrap();
+        let report = codec_dataset_level_auroc(&CoDecDatasetLevelAucRequestV1 {
+            schema: CODEC_DATASET_AUC_REQUEST_SCHEMA.to_owned(),
+            datasets: rows,
+        })
+        .unwrap();
         assert_eq!(report.dataset_level_auroc, 1.0);
+        assert_eq!(report.dataset_level_auprc, 1.0);
+        assert_eq!(report.source_family_count, 4);
         assert_eq!(report.unit_of_analysis, "independent_dataset");
+    }
+
+    #[test]
+    fn five_seed_paper_robustness_mode_averages_per_target_deltas() {
+        let mut request = fixture();
+        request.dataset_item_ids.extend([
+            "context-seed-3".to_owned(),
+            "context-seed-4".to_owned(),
+            "context-seed-5".to_owned(),
+        ]);
+        request.dataset_item_set_sha256 =
+            compute_codec_item_set_sha256(&request.dataset_item_ids).unwrap();
+        request.sampling_mode = CoDecSamplingModeV1::FiveSeedPaperRobustness;
+        for (index, target) in request.targets.iter_mut().enumerate() {
+            let contextual = if index == 0 {
+                [-1.1, -1.2, -1.3, -1.4, -1.5]
+            } else {
+                [-0.5, -0.6, -0.7, -0.8, -0.9]
+            };
+            target.context_evaluations.clear();
+            for (seed_index, value) in contextual.into_iter().enumerate() {
+                let context_id = if seed_index < 2 {
+                    format!("context-{}-a", seed_index + 1)
+                } else {
+                    format!("context-seed-{}", seed_index + 1)
+                };
+                let ids = vec![context_id];
+                target.context_evaluations.push(CoDecContextEvaluationV1 {
+                    context_seed: seed_index as u64 + 10,
+                    context_item_set_sha256: compute_codec_context_item_set_sha256(&ids).unwrap(),
+                    context_item_ids: ids,
+                    target_token_logprobs: vec![value; 3],
+                });
+            }
+        }
+        let report = score_codec_dataset(&request).unwrap();
+        assert_eq!(report.context_seed_count_per_target, 5);
+        assert_eq!(report.negative_delta_count, 1);
+        assert_eq!(report.codec_score_permille, 500.0);
+        assert_eq!(report.per_item[0].per_seed_delta_nats_per_token.len(), 5);
     }
 
     #[test]
@@ -785,9 +843,18 @@ mod tests {
                 codec_score_permille: 100.0,
             },
         ];
-        assert!(codec_dataset_level_auroc(&rows).is_err());
+        let request = CoDecDatasetLevelAucRequestV1 {
+            schema: CODEC_DATASET_AUC_REQUEST_SCHEMA.to_owned(),
+            datasets: rows.clone(),
+        };
+        assert!(codec_dataset_level_auroc(&request).is_err());
         rows[1].dataset_id = "different".to_owned();
+        rows[1].source_family_id = "family-b".to_owned();
         rows[1].codec_score_permille = 100.0;
-        assert_eq!(codec_dataset_level_auroc(&rows).unwrap().dataset_level_auroc, 1.0);
+        let request = CoDecDatasetLevelAucRequestV1 {
+            schema: CODEC_DATASET_AUC_REQUEST_SCHEMA.to_owned(),
+            datasets: rows,
+        };
+        assert_eq!(codec_dataset_level_auroc(&request).unwrap().dataset_level_auroc, 1.0);
     }
 }
