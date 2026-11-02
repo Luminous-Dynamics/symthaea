@@ -210,7 +210,19 @@ fn monomial_destination(
 ) -> usize {
     let mut current = source;
     for (generator, &exponent) in generators.iter().zip(exponents.iter()) {
-        for _ in 0..exponent {
+        // Reduce the exponent modulo this point's cycle length. Since each
+        // generator has already been validated as a permutation, the orbit
+        // returns to the current point after at most dimension steps. This
+        // prevents a hostile certificate from making evaluation proportional
+        // to an arbitrarily large usize exponent.
+        let mut cursor = generator[current];
+        let mut cycle_length = 1usize;
+        while cursor != current {
+            cursor = generator[cursor];
+            cycle_length += 1;
+        }
+        let steps = exponent % cycle_length;
+        for _ in 0..steps {
             current = generator[current];
         }
     }
@@ -441,6 +453,21 @@ mod tests {
             evaluate_permutation_polynomial(1, &overflow),
             Err(PermutationPolynomialError::DenominatorLcmOverflow)
         ));
+    }
+
+    #[test]
+    fn huge_exponents_reduce_by_permutation_cycle() {
+        // On a 3-cycle, (usize::MAX - 1) mod 3 = 2 on supported 32/64-bit targets.
+        let claimed_p_squared = matrix(3, 3, &[0, 0, 1, 1, 0, 0, 0, 1, 0], 1);
+        let certificate = PermutationPolynomialCertificate {
+            generators: vec![vec![1, 2, 0]],
+            terms: vec![PermutationMonomial {
+                exponents: vec![usize::MAX - 1],
+                coefficient_numerator: 1,
+                coefficient_denominator: 1,
+            }],
+        };
+        assert!(verify_permutation_polynomial(&claimed_p_squared, &certificate).unwrap());
     }
 
     #[test]
