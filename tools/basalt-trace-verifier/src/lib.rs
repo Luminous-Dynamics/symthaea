@@ -1434,7 +1434,11 @@ pub fn verify_mutants(trace: &Trace) -> Vec<(String, bool)> {
 }
 
 mod observation;
-pub use observation::{BackendProvenance, ObservationEnvelope, ObservationReport, ObservedFault, ObservedOperation, RawEvent, RunnerClockWindow, canonical_raw_event_log_bytes, raw_event_log_digest, verify_backend_observation};
+pub use observation::{
+    BackendProvenance, ObservationEnvelope, ObservationReport, ObservedFault, ObservedOperation,
+    RawEvent, RunnerClockWindow, canonical_raw_event_log_bytes, raw_event_log_digest,
+    verify_backend_observation,
+};
 
 mod history;
 pub use history::{HistorySearchConfig, HistorySearchReport, verify_observed_history};

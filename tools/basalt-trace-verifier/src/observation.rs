@@ -141,14 +141,12 @@ struct ObservationValidation {
 }
 
 fn valid_sha256(value: &str) -> bool {
-    value
-        .strip_prefix("sha256:")
-        .is_some_and(|hex| {
-            hex.len() == 64
-                && hex
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        })
+    value.strip_prefix("sha256:").is_some_and(|hex| {
+        hex.len() == 64
+            && hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
 }
 
 fn sha256_prefixed_bytes(bytes: &[u8]) -> String {
@@ -229,7 +227,9 @@ pub fn canonical_raw_event_log_bytes(events: &[RawEvent]) -> Result<Vec<u8>, Str
 }
 
 pub fn raw_event_log_digest(events: &[RawEvent]) -> Result<String, String> {
-    Ok(sha256_prefixed_bytes(&canonical_raw_event_log_bytes(events)?))
+    Ok(sha256_prefixed_bytes(&canonical_raw_event_log_bytes(
+        events,
+    )?))
 }
 
 struct InvalidObservationContext {
@@ -272,7 +272,9 @@ fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
         .map_err(|error| vec![format!("observation JSON value parse failed: {error}")])?;
     let mut errors = Vec::new();
     let Some(root) = value.as_object() else {
-        return Err(vec!["observation envelope must be a JSON object".to_string()]);
+        return Err(vec![
+            "observation envelope must be a JSON object".to_string(),
+        ]);
     };
     let required_root = [
         "suite_id",
@@ -292,11 +294,16 @@ fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
     ];
     for key in required_root {
         if !root.contains_key(key) {
-            errors.push(format!("observation envelope is missing required field {key}"));
+            errors.push(format!(
+                "observation envelope is missing required field {key}"
+            ));
         }
     }
 
-    if let Some(operations) = root.get("observed_operations").and_then(|value| value.as_array()) {
+    if let Some(operations) = root
+        .get("observed_operations")
+        .and_then(|value| value.as_array())
+    {
         for (index, operation) in operations.iter().enumerate() {
             let Some(object) = operation.as_object() else {
                 errors.push(format!("observed_operations[{index}] must be an object"));
@@ -372,7 +379,9 @@ fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
                 "transaction_id",
             ] {
                 if !object.contains_key(key) {
-                    errors.push(format!("raw_events[{index}] is missing required field {key}"));
+                    errors.push(format!(
+                        "raw_events[{index}] is missing required field {key}"
+                    ));
                 }
             }
             for key in ["payload_sha256", "sqlstate", "fault_id"] {
@@ -387,7 +396,9 @@ fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
                     .get("fault_id")
                     .is_none_or(|value| value.as_str().is_none())
                 {
-                    errors.push(format!("raw_events[{index}] fault phase requires a string fault_id"));
+                    errors.push(format!(
+                        "raw_events[{index}] fault phase requires a string fault_id"
+                    ));
                 }
             } else if object.contains_key("fault_id") {
                 errors.push(format!(
@@ -397,7 +408,10 @@ fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
         }
     }
 
-    if let Some(witnesses) = root.get("witness_observations").and_then(|value| value.as_array()) {
+    if let Some(witnesses) = root
+        .get("witness_observations")
+        .and_then(|value| value.as_array())
+    {
         for (index, witness) in witnesses.iter().enumerate() {
             if !witness
                 .as_object()
@@ -423,9 +437,7 @@ fn validate_observation_envelope(
 ) -> Result<ObservationValidation, Vec<String>> {
     let mut errors = Vec::new();
 
-    if observation.suite_id != OBSERVATION_SUITE_ID
-        || observation.version != OBSERVATION_VERSION
-    {
+    if observation.suite_id != OBSERVATION_SUITE_ID || observation.version != OBSERVATION_VERSION {
         errors.push("unsupported observation suite_id/version".to_string());
     }
     if observation.trace_id.is_empty()
@@ -510,10 +522,10 @@ fn validate_observation_envelope(
                     || completed < window.capture_start_ns
                     || completed > window.capture_end_ns)
             {
-                    errors.push(format!(
-                        "{} completion is outside its valid runner interval",
-                        operation.op_id
-                    ));
+                errors.push(format!(
+                    "{} completion is outside its valid runner interval",
+                    operation.op_id
+                ));
             }
         } else {
             errors.push(format!(
@@ -547,7 +559,10 @@ fn validate_observation_envelope(
             .insert(operation.op_id.clone(), operation)
             .is_some()
         {
-            errors.push(format!("duplicate observed operation ID {}", operation.op_id));
+            errors.push(format!(
+                "duplicate observed operation ID {}",
+                operation.op_id
+            ));
         }
     }
 
@@ -559,7 +574,10 @@ fn validate_observation_envelope(
 
     for event in &observation.raw_events {
         if event.event_id.is_empty() || !event_ids.insert(event.event_id.clone()) {
-            errors.push(format!("raw event ID is empty or duplicated: {}", event.event_id));
+            errors.push(format!(
+                "raw event ID is empty or duplicated: {}",
+                event.event_id
+            ));
         }
         if !valid_event_phase(&event.phase) {
             errors.push(format!(
@@ -612,18 +630,17 @@ fn validate_observation_envelope(
             .as_deref()
             .is_some_and(|digest| !valid_sha256(digest))
         {
-            errors.push(format!("event {} has malformed payload_sha256", event.event_id));
+            errors.push(format!(
+                "event {} has malformed payload_sha256",
+                event.event_id
+            ));
         }
-        if event
-            .sqlstate
-            .as_deref()
-            .is_some_and(|sqlstate| {
-                sqlstate.len() != 5
-                    || !sqlstate
-                        .bytes()
-                        .all(|byte| byte.is_ascii_digit() || byte.is_ascii_uppercase())
-            })
-        {
+        if event.sqlstate.as_deref().is_some_and(|sqlstate| {
+            sqlstate.len() != 5
+                || !sqlstate
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || byte.is_ascii_uppercase())
+        }) {
             errors.push(format!("event {} has malformed SQLSTATE", event.event_id));
         }
         if event.phase == "fault" {
@@ -672,7 +689,9 @@ fn validate_observation_envelope(
         events.sort_by_key(|event| event.runner_sequence);
         for event in &events {
             if event.monotonic_ns < operation.invoked_at_ns
-                || operation.completed_at_ns.is_some_and(|completed| event.monotonic_ns > completed)
+                || operation
+                    .completed_at_ns
+                    .is_some_and(|completed| event.monotonic_ns > completed)
             {
                 errors.push(format!(
                     "event {} falls outside operation {} interval",
@@ -685,9 +704,9 @@ fn validate_observation_envelope(
             .filter(|event| event.phase == "invoke")
             .collect();
         if invocations.len() != 1
-            || invocations.first().is_none_or(|event| {
-                event.monotonic_ns != operation.invoked_at_ns
-            })
+            || invocations
+                .first()
+                .is_none_or(|event| event.monotonic_ns != operation.invoked_at_ns)
         {
             errors.push(format!(
                 "{} must have exactly one invoke event at invoked_at_ns",
@@ -726,7 +745,10 @@ fn validate_observation_envelope(
         ]
         .contains(&outcome)
         {
-            errors.push(format!("{} has an unsupported observed outcome", operation.op_id));
+            errors.push(format!(
+                "{} has an unsupported observed outcome",
+                operation.op_id
+            ));
         }
         if outcome == "indeterminate" {
             if !responses.is_empty() {
@@ -746,9 +768,9 @@ fn validate_observation_envelope(
                 ));
             }
         } else if responses.len() != 1
-            || responses.first().is_none_or(|event| {
-                Some(event.monotonic_ns) != operation.completed_at_ns
-            })
+            || responses
+                .first()
+                .is_none_or(|event| Some(event.monotonic_ns) != operation.completed_at_ns)
         {
             errors.push(format!(
                 "{} completed outcome requires exactly one response event at completed_at_ns",
@@ -834,10 +856,10 @@ fn validate_observation_envelope(
                         || aborts.len() != 1
                         || aborts[0].sqlstate.as_deref() != Some("40001"))
                 {
-                        errors.push(format!(
-                            "{} retryable_abort must end with one SQLSTATE 40001 abort and no commit",
-                            operation.op_id
-                        ));
+                    errors.push(format!(
+                        "{} retryable_abort must end with one SQLSTATE 40001 abort and no commit",
+                        operation.op_id
+                    ));
                 }
                 if outcome == "committed" || outcome == "indeterminate" {
                     if commits != 1 || !aborts.is_empty() {
@@ -872,7 +894,10 @@ fn validate_observation_envelope(
             }
             "receipt_lookup" => {
                 if !events.iter().any(|event| event.phase == "receipt_lookup") {
-                    errors.push(format!("{} is missing receipt_lookup event", operation.op_id));
+                    errors.push(format!(
+                        "{} is missing receipt_lookup event",
+                        operation.op_id
+                    ));
                 }
             }
             "restore_verify" if !events.iter().any(|event| event.phase == "witness_read") => {
@@ -890,7 +915,10 @@ fn validate_observation_envelope(
             || !valid_fault_class(&fault.fault_class)
             || fault.action.is_empty()
         {
-            errors.push(format!("fault {} has invalid identity/class/action", fault.fault_id));
+            errors.push(format!(
+                "fault {} has invalid identity/class/action",
+                fault.fault_id
+            ));
         }
         if !operations.contains_key(&fault.target_op_id) {
             errors.push(format!(
@@ -924,7 +952,9 @@ fn validate_observation_envelope(
     }
     for fault_id in events_by_fault.keys() {
         if !fault_ids.contains(fault_id.as_str()) {
-            errors.push(format!("raw fault event references unknown fault ID {fault_id}"));
+            errors.push(format!(
+                "raw fault event references unknown fault ID {fault_id}"
+            ));
         }
     }
 
@@ -1100,7 +1130,10 @@ fn observation_to_trace(observation: &ObservationEnvelope, reference_trace: &Tra
             happens_after: observed.happens_after.clone(),
             request: observed.request.clone(),
             expected_result: ExpectedResult {
-                outcome: observed.outcome.clone().unwrap_or_else(|| "compare_conflict".to_string()),
+                outcome: observed
+                    .outcome
+                    .clone()
+                    .unwrap_or_else(|| "compare_conflict".to_string()),
                 receipt_id: observed.receipt_id.clone(),
                 receipt_acceptance_revision: observed.receipt_acceptance_revision.clone(),
                 current_authority_revision: observed.current_authority_revision.clone(),
@@ -1162,15 +1195,15 @@ pub fn verify_backend_observation(
         Ok(value) => value,
         Err(error) => {
             return invalid_observation_report(InvalidObservationContext {
-            trace_id,
-            reference_sha256: expected_reference_trace_sha256.to_string(),
-            raw_event_sha256: raw_sha256,
-            operations: 0,
-            events: 0,
-            runners: 0,
-            faults: 0,
-            counterexamples: vec![format!("strict observation envelope parse failed: {error}")],
-        });
+                trace_id,
+                reference_sha256: expected_reference_trace_sha256.to_string(),
+                raw_event_sha256: raw_sha256,
+                operations: 0,
+                events: 0,
+                runners: 0,
+                faults: 0,
+                counterexamples: vec![format!("strict observation envelope parse failed: {error}")],
+            });
         }
     };
     trace_id = parsed.trace_id.clone();
@@ -1209,15 +1242,17 @@ pub fn verify_backend_observation(
         Ok(value) => value,
         Err(error) => {
             return invalid_observation_report(InvalidObservationContext {
-            trace_id,
-            reference_sha256: parsed.reference_trace_sha256.clone(),
-            raw_event_sha256: raw_sha256,
-            operations: parsed.observed_operations.len(),
-            events: parsed.raw_events.len(),
-            runners: parsed.runner_clock_windows.len(),
-            faults: parsed.observed_faults.len(),
-            counterexamples: vec![format!("caller reference trace failed strict parsing: {error}")],
-        });
+                trace_id,
+                reference_sha256: parsed.reference_trace_sha256.clone(),
+                raw_event_sha256: raw_sha256,
+                operations: parsed.observed_operations.len(),
+                events: parsed.raw_events.len(),
+                runners: parsed.runner_clock_windows.len(),
+                faults: parsed.observed_faults.len(),
+                counterexamples: vec![format!(
+                    "caller reference trace failed strict parsing: {error}"
+                )],
+            });
         }
     };
     let reference_report = verify_reference(&reference_trace, reference_trace_bytes);
@@ -1237,22 +1272,19 @@ pub fn verify_backend_observation(
         });
     }
 
-    let validation = match validate_observation_envelope(
-        &parsed,
-        expected_reference_trace_sha256,
-    ) {
+    let validation = match validate_observation_envelope(&parsed, expected_reference_trace_sha256) {
         Ok(value) => value,
         Err(errors) => {
             return invalid_observation_report(InvalidObservationContext {
-            trace_id,
-            reference_sha256: parsed.reference_trace_sha256.clone(),
-            raw_event_sha256: raw_sha256,
-            operations: parsed.observed_operations.len(),
-            events: parsed.raw_events.len(),
-            runners: parsed.runner_clock_windows.len(),
-            faults: parsed.observed_faults.len(),
-            counterexamples: errors,
-        });
+                trace_id,
+                reference_sha256: parsed.reference_trace_sha256.clone(),
+                raw_event_sha256: raw_sha256,
+                operations: parsed.observed_operations.len(),
+                events: parsed.raw_events.len(),
+                runners: parsed.runner_clock_windows.len(),
+                faults: parsed.observed_faults.len(),
+                counterexamples: errors,
+            });
         }
     };
 
@@ -1286,9 +1318,9 @@ pub fn verify_backend_observation(
         return report;
     }
     if !validation.incomplete_retry_groups.is_empty() {
-        report.counterexamples.push(
-            "one or more retry groups contain fewer than two captured attempts".to_string(),
-        );
+        report
+            .counterexamples
+            .push("one or more retry groups contain fewer than two captured attempts".to_string());
         report.status = "inconclusive".to_string();
         return report;
     }
@@ -1314,7 +1346,8 @@ mod tests {
     use super::*;
 
     fn valid_observation() -> (ObservationEnvelope, Vec<u8>, String) {
-        let raw_trace = include_bytes!("../../../benchmarks/basalt/storage-conformance-trace.v1.json");
+        let raw_trace =
+            include_bytes!("../../../benchmarks/basalt/storage-conformance-trace.v1.json");
         let trace: Trace = serde_json::from_slice(raw_trace).unwrap();
         let witness = trace.witness_observations.last().unwrap().clone();
         let mut operation = trace
@@ -1497,40 +1530,40 @@ mod tests {
         let read_two = format!("sha256:{}", "cc".repeat(32));
         let decision_two = format!("sha256:{}", "dd".repeat(32));
 
-        let observed_attempt = |operation: &Operation,
-                                attempt: u64,
-                                read_digest: &str,
-                                decision_digest: &str| ObservedOperation {
-            op_id: operation.op_id.clone(),
-            kind: operation.kind.clone(),
-            request: operation.request.clone(),
-            happens_after: if attempt == 1 {
-                Vec::new()
-            } else {
-                vec![first.op_id.clone()]
-            },
-            retry_group_id: Some("retry-group-postgres-40001".to_string()),
-            transaction_attempt: Some(attempt),
-            read_snapshot_sha256: Some(read_digest.to_string()),
-            decision_input_sha256: Some(decision_digest.to_string()),
-            scope: Some(operation.scope.clone()),
-            runner_id: "runner-postgres".to_string(),
-            client_id: operation.client_id.clone(),
-            client_sequence: operation.client_sequence,
-            invoked_at_ns: operation.invoked_at_ns,
-            completed_at_ns: Some(operation.completed_at_ns),
-            outcome: Some(operation.expected_result.outcome.clone()),
-            receipt_id: operation.expected_result.receipt_id.clone(),
-            receipt_acceptance_revision: operation
-                .expected_result
-                .receipt_acceptance_revision
-                .clone(),
-            current_authority_revision: operation
-                .expected_result
-                .current_authority_revision
-                .clone(),
-            observed_store_revision: None,
-        };
+        let observed_attempt =
+            |operation: &Operation, attempt: u64, read_digest: &str, decision_digest: &str| {
+                ObservedOperation {
+                    op_id: operation.op_id.clone(),
+                    kind: operation.kind.clone(),
+                    request: operation.request.clone(),
+                    happens_after: if attempt == 1 {
+                        Vec::new()
+                    } else {
+                        vec![first.op_id.clone()]
+                    },
+                    retry_group_id: Some("retry-group-postgres-40001".to_string()),
+                    transaction_attempt: Some(attempt),
+                    read_snapshot_sha256: Some(read_digest.to_string()),
+                    decision_input_sha256: Some(decision_digest.to_string()),
+                    scope: Some(operation.scope.clone()),
+                    runner_id: "runner-postgres".to_string(),
+                    client_id: operation.client_id.clone(),
+                    client_sequence: operation.client_sequence,
+                    invoked_at_ns: operation.invoked_at_ns,
+                    completed_at_ns: Some(operation.completed_at_ns),
+                    outcome: Some(operation.expected_result.outcome.clone()),
+                    receipt_id: operation.expected_result.receipt_id.clone(),
+                    receipt_acceptance_revision: operation
+                        .expected_result
+                        .receipt_acceptance_revision
+                        .clone(),
+                    current_authority_revision: operation
+                        .expected_result
+                        .current_authority_revision
+                        .clone(),
+                    observed_store_revision: None,
+                }
+            };
 
         let mut events = Vec::new();
         let mut sequence = 0_u64;
@@ -1556,7 +1589,14 @@ mod tests {
         };
 
         add(first, "invoke", first.invoked_at_ns, None, None, None);
-        add(first, "transaction_begin", 151, Some("tx-attempt-1"), None, None);
+        add(
+            first,
+            "transaction_begin",
+            151,
+            Some("tx-attempt-1"),
+            None,
+            None,
+        );
         add(
             first,
             "read_state",
@@ -1584,7 +1624,14 @@ mod tests {
         add(first, "response", first.completed_at_ns, None, None, None);
 
         add(second, "invoke", second.invoked_at_ns, None, None, None);
-        add(second, "transaction_begin", 163, Some("tx-attempt-2"), None, None);
+        add(
+            second,
+            "transaction_begin",
+            163,
+            Some("tx-attempt-2"),
+            None,
+            None,
+        );
         add(
             second,
             "read_state",
@@ -1609,14 +1656,7 @@ mod tests {
             None,
             None,
         );
-        add(
-            second,
-            "write_log",
-            167,
-            Some("tx-attempt-2"),
-            None,
-            None,
-        );
+        add(second, "write_log", 167, Some("tx-attempt-2"), None, None);
         add(
             second,
             "write_receipt",
@@ -1666,19 +1706,26 @@ mod tests {
         }
         observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
         let errors = validate_observation_envelope(&observation, &reference_pin).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("reused transaction ID")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("reused transaction ID"))
+        );
     }
 
     #[test]
     fn serialization_retry_rejects_missing_second_read() {
         let (mut observation, reference_pin) = retry_observation();
         observation.raw_events.retain(|event| {
-            !(event.operation_id == "op-serializable-attempt-2"
-                && event.phase == "read_state")
+            !(event.operation_id == "op-serializable-attempt-2" && event.phase == "read_state")
         });
         observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
         let errors = validate_observation_envelope(&observation, &reference_pin).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("missing transaction phase read_state")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("missing transaction phase read_state"))
+        );
     }
 
     #[test]
@@ -1705,20 +1752,24 @@ mod tests {
         assert_eq!(report.operations_observed, 1);
         assert_eq!(report.events_observed, 3);
         assert!(report.history_search.is_some());
-        assert_eq!(report.reference_trace_sha256, sha256_prefixed_bytes(&raw_trace));
+        assert_eq!(
+            report.reference_trace_sha256,
+            sha256_prefixed_bytes(&raw_trace)
+        );
     }
 
     #[test]
     fn mismatched_external_reference_pin_is_invalid_evidence() {
         let (observation, _, _) = valid_observation();
         let bytes = serde_json::to_vec(&observation).unwrap();
-        let report = verify_observation(
-            &bytes,
-            &format!("sha256:{}", "ff".repeat(32)),
-            &config(),
-        );
+        let report = verify_observation(&bytes, &format!("sha256:{}", "ff".repeat(32)), &config());
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("caller reference-trace bytes digest mismatch")));
+        assert!(
+            report
+                .counterexamples
+                .iter()
+                .any(|error| error.contains("caller reference-trace bytes digest mismatch"))
+        );
     }
 
     #[test]
@@ -1728,7 +1779,12 @@ mod tests {
         let bytes = serde_json::to_vec(&observation).unwrap();
         let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("raw_event_log_sha256 mismatch")));
+        assert!(
+            report
+                .counterexamples
+                .iter()
+                .any(|error| error.contains("raw_event_log_sha256 mismatch"))
+        );
     }
 
     #[test]
@@ -1736,7 +1792,9 @@ mod tests {
         let (mut observation, _, reference_pin) = valid_observation();
         observation.observed_operations[0].completed_at_ns = None;
         observation.observed_operations[0].outcome = None;
-        observation.raw_events.retain(|event| event.phase != "response");
+        observation
+            .raw_events
+            .retain(|event| event.phase != "response");
         observation.raw_event_log_sha256 = raw_event_log_digest(&observation.raw_events).unwrap();
         let bytes = serde_json::to_vec(&observation).unwrap();
         let report = verify_observation(&bytes, &reference_pin, &config());
@@ -1768,7 +1826,12 @@ mod tests {
         let bytes = serde_json::to_vec(&observation).unwrap();
         let report = verify_observation(&bytes, &reference_pin, &config());
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("clock regressed")));
+        assert!(
+            report
+                .counterexamples
+                .iter()
+                .any(|error| error.contains("clock regressed"))
+        );
     }
 
     #[test]
@@ -1786,7 +1849,12 @@ mod tests {
             &config(),
         );
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("outcome")));
+        assert!(
+            report
+                .counterexamples
+                .iter()
+                .any(|error| error.contains("outcome"))
+        );
     }
 
     #[test]
@@ -1804,7 +1872,12 @@ mod tests {
             &config(),
         );
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("transaction_id")));
+        assert!(
+            report
+                .counterexamples
+                .iter()
+                .any(|error| error.contains("transaction_id"))
+        );
     }
 
     #[test]
@@ -1819,7 +1892,12 @@ mod tests {
             &config(),
         );
         assert_eq!(report.status, "invalid_evidence");
-        assert!(report.counterexamples.iter().any(|error| error.contains("payload_sha256")));
+        assert!(
+            report
+                .counterexamples
+                .iter()
+                .any(|error| error.contains("payload_sha256"))
+        );
     }
 
     #[test]
@@ -1827,10 +1905,10 @@ mod tests {
         let (observation, _, reference_pin) = valid_observation();
         let mut value: serde_json::Value =
             serde_json::from_slice(&serde_json::to_vec(&observation).unwrap()).unwrap();
-        value
-            .as_object_mut()
-            .unwrap()
-            .insert("adapter_says_pass".to_string(), serde_json::Value::Bool(true));
+        value.as_object_mut().unwrap().insert(
+            "adapter_says_pass".to_string(),
+            serde_json::Value::Bool(true),
+        );
         let report = verify_observation(
             &serde_json::to_vec(&value).unwrap(),
             &reference_pin,
