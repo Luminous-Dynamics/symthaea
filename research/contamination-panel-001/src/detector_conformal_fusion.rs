@@ -1293,6 +1293,21 @@ mod tests {
     }
 
     #[test]
+    fn hand_checkable_json_fixture_round_trips_and_calibrates() {
+        let request: DetectorConformalFusionRequestV1 = serde_json::from_str(include_str!(
+            "../fixtures/detector-conformal-fusion-request.hand.v1.json"
+        ))
+        .unwrap();
+        let report = calibrate_detector_panel(&request).unwrap();
+        assert_eq!(report.evaluation_unit_count, 2);
+        assert_eq!(report.multiple_testing_method, "benjamini_yekutieli");
+        assert!(!report.confirmatory_eligible);
+        assert_eq!(report.calibration_a_manifest_sha256.len(), 64);
+        assert_eq!(report.calibration_b_manifest_sha256.len(), 64);
+        assert_eq!(report.evaluation_manifest_sha256.len(), 64);
+    }
+
+    #[test]
     fn outer_calibration_handles_dependent_detector_scores() {
         let report = calibrate_detector_panel(&sample_request()).unwrap();
         assert_eq!(report.score_rows.len(), 2);
