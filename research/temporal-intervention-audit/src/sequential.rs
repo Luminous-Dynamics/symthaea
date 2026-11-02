@@ -739,6 +739,26 @@ mod tests {
     }
 
     #[test]
+    fn model_digest_and_exposure_overrun_fail_closed_without_advancing() {
+        let mut state = AnytimeAuditState::new(config(10)).unwrap();
+
+        let mut wrong_model = positive_pair(1);
+        wrong_model.model_sha256 = digest(99);
+        assert!(matches!(
+            state.observe(1, &wrong_model),
+            Err(AnytimeAuditError::DesignDigestMismatch { field: "model" })
+        ));
+
+        let mut overrun = positive_pair(1);
+        overrun.first_outcome = completed(90, 20, 0);
+        assert!(matches!(
+            state.observe(1, &overrun),
+            Err(AnytimeAuditError::ExposureExceedsEpisode { .. })
+        ));
+        assert_eq!(state.observed_pairs(), 0);
+    }
+
+    #[test]
     fn exact_integer_evidence_is_safe_at_the_sixty_four_pair_limit() {
         let mut state = AnytimeAuditState::new(config(64)).unwrap();
         for sequence in 1..=64 {
