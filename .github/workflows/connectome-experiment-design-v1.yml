@@ -1,4 +1,4 @@
-name: Connectome Experiment Design Verification
+name: Connectome Experiment Design Verification (EIG, Fisher D/A, EVSI)
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       - ".github/workflows/connectome-experiment-design-v1.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+    branches: [main, "feat/connectome-experiment-design-evsi-v1"]
     paths:
       - "tools/connectome-experiment-design/**"
       - ".github/workflows/connectome-experiment-design-v1.yml"
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   standalone-rust:
-    name: EIG and EVSI isolated Rust verification
+    name: EIG, Fisher D/A and EVSI isolated Rust verification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

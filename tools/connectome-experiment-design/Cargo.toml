@@ -3,7 +3,7 @@ name = "connectome-experiment-design"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
-description = "Dependency-free expected-information-gain utilities for synthetic connectome experiment design"
+description = "Dependency-free EIG, Fisher D/A-optimal, and EVSI experiment design utilities"
 
 [lib]
 path = "src/lib.rs"
