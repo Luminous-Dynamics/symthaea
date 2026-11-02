@@ -115,6 +115,14 @@ pub struct DrivenCoupledResponseV1 {
     pub frequency_hz: f64,
     pub mutual_inductance_h: f64,
     pub primary_input_impedance_ohm: ComplexValueV1,
+    /// Primary current divided by source voltage, in A/V.
+    pub primary_current_per_volt_a_per_v: ComplexValueV1,
+    /// Source active power divided by squared RMS source voltage.
+    pub primary_input_power_w_per_v2: f64,
+    /// Primary series-resistor dissipation divided by squared RMS source voltage.
+    pub primary_resistor_power_w_per_v2: f64,
+    /// Source power minus primary and secondary resistor dissipation.
+    pub power_balance_residual_w_per_v2: f64,
     /// Secondary loop current divided by primary source voltage, in A/V.
     pub secondary_current_per_volt_a_per_v: ComplexValueV1,
     /// Voltage across the secondary series resistance divided by source voltage.
@@ -277,14 +285,34 @@ impl DrivenCoupledSeriesRlcV1 {
             real: 0.0,
             imaginary: -omega_m,
         }.divide(transfer_denominator)?;
+        let primary_current_per_volt = ComplexValueV1 {
+            real: 1.0,
+            imaginary: 0.0,
+        }.divide(input_impedance)?;
         let secondary_resistor_voltage_per_volt =
             secondary_current_per_volt.scale(self.secondary_resistance_ohm);
+
+        // RMS phasors: P_in / |V_source|^2 = Re(I_primary / V_source).
+        let primary_input_power_per_v2 = primary_current_per_volt.real;
+        let primary_resistor_power_per_v2 =
+            primary_current_per_volt.magnitude().powi(2) * self.primary_resistance_ohm;
         let secondary_resistor_power_per_v2 =
             secondary_current_per_volt.magnitude().powi(2) * self.secondary_resistance_ohm;
+        let power_balance_residual_per_v2 = primary_input_power_per_v2
+            - primary_resistor_power_per_v2
+            - secondary_resistor_power_per_v2;
 
         if !input_impedance.real.is_finite()
             || !input_impedance.imaginary.is_finite()
+            || !primary_current_per_volt.real.is_finite()
+            || !primary_current_per_volt.imaginary.is_finite()
+            || !primary_input_power_per_v2.is_finite()
+            || !primary_resistor_power_per_v2.is_finite()
             || !secondary_resistor_power_per_v2.is_finite()
+            || !power_balance_residual_per_v2.is_finite()
+            || primary_input_power_per_v2 < 0.0
+            || primary_resistor_power_per_v2 < 0.0
+            || secondary_resistor_power_per_v2 < 0.0
         {
             return Err(ModelErrorV1::NonFiniteParameter);
         }
@@ -293,6 +321,10 @@ impl DrivenCoupledSeriesRlcV1 {
             frequency_hz,
             mutual_inductance_h: mutual_inductance,
             primary_input_impedance_ohm: input_impedance,
+            primary_current_per_volt_a_per_v: primary_current_per_volt,
+            primary_input_power_w_per_v2: primary_input_power_per_v2,
+            primary_resistor_power_w_per_v2: primary_resistor_power_per_v2,
+            power_balance_residual_w_per_v2: power_balance_residual_per_v2,
             secondary_current_per_volt_a_per_v: secondary_current_per_volt,
             secondary_resistor_voltage_per_volt,
             secondary_resistor_power_w_per_v2: secondary_resistor_power_per_v2,
@@ -399,6 +431,34 @@ mod tests {
         close(response.secondary_resistor_voltage_per_volt.real, 0.0);
         close(response.secondary_resistor_voltage_per_volt.imaginary, -2.0 / 3.0);
         close(response.secondary_resistor_power_w_per_v2, 1.0 / 45.0);
+        close(response.primary_current_per_volt_a_per_v.real, 1.0 / 15.0);
+        close(response.primary_current_per_volt_a_per_v.imaginary, 0.0);
+        close(response.primary_input_power_w_per_v2, 1.0 / 15.0);
+        close(response.primary_resistor_power_w_per_v2, 2.0 / 45.0);
+        close(response.power_balance_residual_w_per_v2, 0.0);
+    }
+
+    #[test]
+    fn passive_power_balance_holds_across_a_frequency_sweep() {
+        let model = DrivenCoupledSeriesRlcV1 {
+            primary_resistance_ohm: 10.0,
+            primary_inductance_h: 0.01,
+            primary_capacitance_f: 1.0e-6,
+            secondary_resistance_ohm: 20.0,
+            secondary_inductance_h: 0.01,
+            secondary_capacitance_f: 1.0e-6,
+            coupling_coefficient: 0.1,
+            secondary_winding_polarity: 1,
+        };
+        for frequency in [500.0, 1_000.0, 1_591.5494309189535, 2_500.0, 5_000.0] {
+            let response = model.response_at(frequency).unwrap();
+            let scale = response.primary_input_power_w_per_v2.abs().max(1.0);
+            assert!(
+                response.power_balance_residual_w_per_v2.abs() <= 1.0e-12 * scale,
+                "frequency={frequency}, residual={}",
+                response.power_balance_residual_w_per_v2
+            );
+        }
     }
 
     #[test]
