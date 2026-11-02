@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectomebench2-v2-dataset-audit-report-v2.schema.json",
+  "title": "ConnectomeBench2 V2 metadata lineage audit report v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "input_sha256",
+    "dataset_id",
+    "dataset_revision",
+    "dataset_revision_commit_sha",
+    "pinned_upstream_commit",
+    "cube_edge_nm",
+    "row_count",
+    "split_counts",
+    "species_counts",
+    "sample_type_counts",
+    "route_counts",
+    "modality_coverage",
+    "denominator_audit",
+    "operation_lineage_group_count",
+    "spatial_cube_group_count",
+    "root_ids_shared_across_splits",
+    "rows_without_spatial_coordinate",
+    "status",
+    "errors",
+    "warnings",
+    "scope_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "tool": {
+      "const": "connectome-dataset-audit"
+    },
+    "input_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "dataset_id": {
+      "const": "jeffbbrown2/ConnectomeBench2"
+    },
+    "dataset_revision": {
+      "const": "v2"
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pinned_upstream_commit": {
+      "const": "5679b39aa2641d8d0afeed88b441e696f87a66df"
+    },
+    "cube_edge_nm": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "row_count": {
+      "$ref": "#/$defs/count"
+    },
+    "split_counts": {
+      "$ref": "#/$defs/countMap"
+    },
+    "species_counts": {
+      "$ref": "#/$defs/countMap"
+    },
+    "sample_type_counts": {
+      "$ref": "#/$defs/countMap"
+    },
+    "route_counts": {
+      "$ref": "#/$defs/countMap"
+    },
+    "modality_coverage": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/modalityCoverage"
+      }
+    },
+    "denominator_audit": {
+      "$ref": "#/$defs/denominatorAudit"
+    },
+    "operation_lineage_group_count": {
+      "$ref": "#/$defs/count"
+    },
+    "spatial_cube_group_count": {
+      "$ref": "#/$defs/count"
+    },
+    "root_ids_shared_across_splits": {
+      "$ref": "#/$defs/count"
+    },
+    "rows_without_spatial_coordinate": {
+      "$ref": "#/$defs/count"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "scope_note": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "countMap": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/count"
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "sample_id",
+        "detail"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "denominatorAudit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_rows",
+        "unique_legacy_combined_sample_hashes",
+        "unique_source_identity_sha256",
+        "task_operation_instances",
+        "task_operation_instances_by_route",
+        "available_legal_modality_view_instances",
+        "available_legal_modality_view_instances_by_route_and_view",
+        "em_best_excluded_task_operation_instances_by_route",
+        "legacy_md5_identity_collision_count",
+        "identity_scheme",
+        "scope_note"
+      ],
+      "properties": {
+        "dataset_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "unique_legacy_combined_sample_hashes": {
+          "$ref": "#/$defs/count"
+        },
+        "unique_source_identity_sha256": {
+          "$ref": "#/$defs/count"
+        },
+        "task_operation_instances": {
+          "$ref": "#/$defs/count"
+        },
+        "task_operation_instances_by_route": {
+          "$ref": "#/$defs/countMap"
+        },
+        "available_legal_modality_view_instances": {
+          "$ref": "#/$defs/count"
+        },
+        "available_legal_modality_view_instances_by_route_and_view": {
+          "$ref": "#/$defs/countMap"
+        },
+        "em_best_excluded_task_operation_instances_by_route": {
+          "$ref": "#/$defs/countMap"
+        },
+        "legacy_md5_identity_collision_count": {
+          "$ref": "#/$defs/count"
+        },
+        "identity_scheme": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "modalityCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_rows",
+        "geometry_rows",
+        "em_any_rows",
+        "em_missing_rows",
+        "em_usable_rows",
+        "em_xy_rows",
+        "em_xz_rows",
+        "em_yz_rows",
+        "em_full_triplet_rows",
+        "em_best_present_rows",
+        "em_best_only_rows",
+        "geometry_without_usable_em_rows",
+        "fused_geometry_em_rows",
+        "em_any_fraction",
+        "em_usable_fraction",
+        "em_full_triplet_fraction",
+        "fused_fraction"
+      ],
+      "properties": {
+        "total_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "geometry_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_any_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_missing_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_usable_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_xy_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_xz_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_yz_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_full_triplet_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_best_present_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_best_only_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "geometry_without_usable_em_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "fused_geometry_em_rows": {
+          "$ref": "#/$defs/count"
+        },
+        "em_any_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "em_usable_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "em_full_triplet_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "fused_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
