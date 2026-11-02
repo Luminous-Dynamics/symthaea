@@ -1,0 +1,955 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CPG_NUMERICAL_RUN_RECEIPT_V1.schema.json",
+  "title": "CPG Numerical Run Receipt V1",
+  "description": "Fail-closed numerical-integrity receipt for connectome-driven ODE simulations. A complete receipt verifies execution/provenance semantics only; it does not establish biological validity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_state",
+    "evidence_tier",
+    "claim_ceiling",
+    "created_at_utc",
+    "source",
+    "simulator",
+    "solver",
+    "simulation",
+    "perturbation",
+    "numerics",
+    "resources",
+    "artifacts",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "CPG-NUMERICAL-RUN-RECEIPT-V1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"
+    },
+    "run_state": {
+      "enum": [
+        "planned",
+        "incomplete",
+        "running",
+        "complete",
+        "failed",
+        "invalid"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "synthetic_known_answer",
+        "in_silico_intervention"
+      ]
+    },
+    "claim_ceiling": {
+      "enum": [
+        "synthetic_only",
+        "model_counterfactual_only"
+      ]
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "repository",
+        "immutable_code_ref",
+        "code_commit_sha",
+        "source_file_path",
+        "source_file_sha256",
+        "data_revision",
+        "data_manifest_sha256",
+        "rights_state",
+        "provenance_notes"
+      ],
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "synthetic",
+            "in_silico"
+          ]
+        },
+        "repository": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "immutable_code_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "code_commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "source_file_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_file_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "data_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "data_manifest_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rights_state": {
+          "enum": [
+            "synthetic",
+            "documented_permitted",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "permission_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance_notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    },
+    "simulator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_family",
+        "equation_manifest_sha256",
+        "parameter_manifest_sha256",
+        "state_semantics",
+        "observation_model_id"
+      ],
+      "properties": {
+        "model_family": {
+          "enum": [
+            "rate_network",
+            "leaky_integrate_fire",
+            "conductance_based",
+            "hybrid_neuromechanical",
+            "other_declared"
+          ]
+        },
+        "equation_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "parameter_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "state_semantics": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "observation_model_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "solver_id",
+        "library",
+        "library_version",
+        "dependency_lock_sha256",
+        "backend",
+        "dtype",
+        "rtol",
+        "atol",
+        "initial_step_seconds",
+        "max_steps",
+        "throw_on_failure",
+        "nonfinite_event_detection_enabled"
+      ],
+      "properties": {
+        "solver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "library": {
+          "type": "string",
+          "minLength": 1
+        },
+        "library_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependency_lock_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "backend": {
+          "enum": [
+            "cpu",
+            "cuda",
+            "rocm",
+            "tpu",
+            "other_declared"
+          ]
+        },
+        "dtype": {
+          "enum": [
+            "float32",
+            "float64",
+            "bfloat16",
+            "mixed",
+            "other_declared"
+          ]
+        },
+        "rtol": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "atol": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "initial_step_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "throw_on_failure": {
+          "type": "boolean"
+        },
+        "nonfinite_event_detection_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_time_seconds",
+        "end_time_seconds",
+        "nominal_save_interval_seconds",
+        "state_dimension",
+        "expected_saved_timepoints",
+        "actual_saved_timepoints",
+        "solver_status",
+        "attempted_steps",
+        "accepted_steps",
+        "rejected_steps",
+        "function_evaluations",
+        "random_seed",
+        "prng_id",
+        "deterministic_mode"
+      ],
+      "properties": {
+        "start_time_seconds": {
+          "type": "number"
+        },
+        "end_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "nominal_save_interval_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "state_dimension": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_saved_timepoints": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "actual_saved_timepoints": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "solver_status": {
+          "enum": [
+            "success",
+            "failed",
+            "max_steps_reached",
+            "interrupted",
+            "unknown"
+          ]
+        },
+        "attempted_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accepted_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "function_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "random_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prng_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deterministic_mode": {
+          "type": "boolean"
+        }
+      }
+    },
+    "perturbation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_sha256",
+        "waveform_sha256",
+        "stimulus_applied",
+        "input_noise",
+        "weight_noise"
+      ],
+      "properties": {
+        "protocol_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "waveform_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "stimulus_applied": {
+          "type": "boolean"
+        },
+        "input_noise": {
+          "$ref": "#/$defs/noiseChannel"
+        },
+        "weight_noise": {
+          "$ref": "#/$defs/noiseChannel"
+        }
+      }
+    },
+    "numerics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_state_sha256",
+        "raw_output_manifest_sha256",
+        "raw_state_finite_scan_performed",
+        "non_finite_value_count",
+        "post_solver_sanitized_value_count",
+        "post_solver_clipped_value_count",
+        "post_solver_transformed_value_count",
+        "minimum_raw_value",
+        "maximum_raw_value",
+        "maximum_absolute_raw_value",
+        "raw_state_artifact"
+      ],
+      "properties": {
+        "raw_state_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "raw_output_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "raw_state_finite_scan_performed": {
+          "type": "boolean"
+        },
+        "non_finite_value_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_solver_sanitized_value_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_solver_clipped_value_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_solver_transformed_value_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_raw_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maximum_raw_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maximum_absolute_raw_value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "raw_state_artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relative_path",
+            "encoding",
+            "byte_length",
+            "sha256",
+            "capture_stage",
+            "layout"
+          ],
+          "properties": {
+            "relative_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "encoding": {
+              "enum": [
+                "f32le",
+                "f64le"
+              ]
+            },
+            "byte_length": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256OrNull"
+            },
+            "capture_stage": {
+              "enum": [
+                "direct_solver_output_before_postprocessing",
+                "not_captured"
+              ]
+            },
+            "layout": {
+              "enum": [
+                "state_major_time_minor",
+                "time_major_state_minor"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_seconds",
+        "peak_memory_bytes",
+        "energy_joules"
+      ],
+      "properties": {
+        "wall_time_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "energy_joules": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolved_config_sha256",
+        "environment_sha256",
+        "logs_sha256"
+      ],
+      "properties": {
+        "resolved_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "logs_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "noiseChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested_mean",
+        "requested_stddev",
+        "applied",
+        "realized_mean",
+        "realized_stddev",
+        "sample_sha256",
+        "sample_count"
+      ],
+      "properties": {
+        "requested_mean": {
+          "type": "number"
+        },
+        "requested_stddev": {
+          "type": "number",
+          "minimum": 0
+        },
+        "applied": {
+          "type": "boolean"
+        },
+        "realized_mean": {
+          "type": "number"
+        },
+        "realized_stddev": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sample_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "requested_stddev": {
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "requested_stddev"
+                ]
+              },
+              {
+                "properties": {
+                  "requested_mean": {
+                    "not": {
+                      "const": 0
+                    }
+                  }
+                },
+                "required": [
+                  "requested_mean"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "applied": {
+                "const": true
+              },
+              "realized_stddev": {
+                "minimum": 0
+              },
+              "sample_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "requested_stddev": {
+                "const": 0
+              },
+              "requested_mean": {
+                "const": 0
+              }
+            },
+            "required": [
+              "requested_stddev",
+              "requested_mean"
+            ]
+          },
+          "then": {
+            "properties": {
+              "applied": {
+                "const": false
+              },
+              "realized_mean": {
+                "const": 0
+              },
+              "realized_stddev": {
+                "const": 0
+              },
+              "sample_sha256": {
+                "type": "null"
+              },
+              "sample_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sha256OrNull": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "synthetic_known_answer"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "synthetic_only"
+          },
+          "source": {
+            "properties": {
+              "source_kind": {
+                "const": "synthetic"
+              },
+              "rights_state": {
+                "const": "synthetic"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "in_silico_intervention"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "model_counterfactual_only"
+          },
+          "source": {
+            "properties": {
+              "source_kind": {
+                "const": "in_silico"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_state": {
+            "const": "complete"
+          }
+        },
+        "required": [
+          "run_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "code_commit_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "source_file_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "solver": {
+            "properties": {
+              "dependency_lock_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "rtol": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "atol": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "throw_on_failure": {
+              "const": true
+            }
+          },
+          "simulation": {
+            "properties": {
+              "solver_status": {
+                "const": "success"
+              },
+              "actual_saved_timepoints": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "accepted_steps": {
+                "minimum": 1
+              },
+              "function_evaluations": {
+                "minimum": 1
+              },
+              "state_dimension": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_time_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "attempted_steps": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "perturbation": {
+            "properties": {
+              "stimulus_applied": {
+                "const": true
+              },
+              "protocol_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "waveform_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "numerics": {
+            "properties": {
+              "raw_state_finite_scan_performed": {
+                "const": true
+              },
+              "non_finite_value_count": {
+                "const": 0
+              },
+              "post_solver_sanitized_value_count": {
+                "const": 0
+              },
+              "post_solver_clipped_value_count": {
+                "const": 0
+              },
+              "post_solver_transformed_value_count": {
+                "const": 0
+              },
+              "minimum_raw_value": {
+                "type": "number"
+              },
+              "maximum_raw_value": {
+                "type": "number"
+              },
+              "maximum_absolute_raw_value": {
+                "type": "number"
+              },
+              "raw_state_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "raw_output_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "raw_state_artifact": {
+                "properties": {
+                  "relative_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "byte_length": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "capture_stage": {
+                    "const": "direct_solver_output_before_postprocessing"
+                  }
+                }
+              }
+            }
+          },
+          "artifacts": {
+            "properties": {
+              "resolved_config_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "environment_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "logs_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "simulator": {
+            "properties": {
+              "equation_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "parameter_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "resources": {
+            "properties": {
+              "wall_time_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "peak_memory_bytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_state": {
+            "const": "complete"
+          },
+          "evidence_tier": {
+            "const": "in_silico_intervention"
+          }
+        },
+        "required": [
+          "run_state",
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "data_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "rights_state": {
+                "const": "documented_permitted"
+              },
+              "permission_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "immutable_code_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
