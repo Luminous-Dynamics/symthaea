@@ -900,7 +900,6 @@ mod tests {
         let train = vec![token(1), token(2)];
         let validation = vec![token(3)];
         let test = vec![token(4), token(5)];
-        let pair = test.clone();
         let budget = json!({
             "compute_units":100.0,"wall_time_seconds":10.0,"energy_joules":2.0,
             "memory_bytes":4096,"training_samples":100,"notes":"matched synthetic budget"
@@ -909,7 +908,12 @@ mod tests {
         let scope = digest("training-scope");
         let artifact = digest("model-artifact");
         let models = vec![
-            let selected_interventions = vec![
+            json!({"model_id":"candidate","role":"candidate","model_family":"graph_constrained_state_space","hypothesis_id":"H_GRAPH","code_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","config_sha256":config,"parameter_count":10,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("structural"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"candidate"}),
+            json!({"model_id":"activity","role":"baseline","model_family":"activity_only","hypothesis_id":null,"code_commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","config_sha256":config,"parameter_count":8,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"activity baseline"}),
+            json!({"model_id":"linear","role":"baseline","model_family":"linear_lds_var_glm","hypothesis_id":"H_LINEAR","code_commit_sha":"cccccccccccccccccccccccccccccccccccccccc","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"linear baseline"}),
+            json!({"model_id":"rewired","role":"negative_control","model_family":"degree_type_rewired","hypothesis_id":null,"code_commit_sha":"dddddddddddddddddddddddddddddddddddddddd","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("rewired"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"negative control"})
+        ];
+        let selected_interventions = vec![
             fixture_intervention("primary", "intervention", &["n-1"]),
             fixture_intervention("sham", "sham", &["n-1"]),
             fixture_intervention("single-control", "single_target_control", &["n-1"]),
@@ -925,11 +929,6 @@ mod tests {
             fixture_paired_comparison("activity", 1.0, -0.3, -0.1),
             fixture_paired_comparison("linear", 1.2, -0.5, -0.3),
             fixture_paired_comparison("rewired", 1.4, -0.7, -0.5),
-        ];
-        json!({"model_id":"candidate","role":"candidate","model_family":"graph_constrained_state_space","hypothesis_id":"H_GRAPH","code_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","config_sha256":config,"parameter_count":10,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("structural"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"candidate"}),
-            json!({"model_id":"activity","role":"baseline","model_family":"activity_only","hypothesis_id":null,"code_commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","config_sha256":config,"parameter_count":8,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"activity baseline"}),
-            json!({"model_id":"linear","role":"baseline","model_family":"linear_lds_var_glm","hypothesis_id":"H_LINEAR","code_commit_sha":"cccccccccccccccccccccccccccccccccccccccc","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":null,"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"linear baseline"}),
-            json!({"model_id":"rewired","role":"negative_control","model_family":"degree_type_rewired","hypothesis_id":null,"code_commit_sha":"dddddddddddddddddddddddddddddddddddddddd","config_sha256":config,"parameter_count":9,"training_data_scope_sha256":scope,"training_budget":budget.clone(),"observation_model_id":"obs","structural_channel_sha256":digest("rewired"),"latent_channel_sha256":null,"model_artifact_sha256":artifact,"training_seed":1,"training_complete":true,"notes":"negative control"})
         ];
         json!({
             "schema_version":"CONNECTOME-INTERVENTION-RUN-V1","run_id":"synthetic-run-001",
