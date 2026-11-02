@@ -10,13 +10,14 @@ A standard-library-only, bounded, read-only ZIP metadata inventory prototype for
 - Preserve raw filename bytes and decoded path separately.
 - Decode UTF-8 names and CP437 fallback names; honor a CRC-valid Unicode Path extra field.
 - Validate every listed local header against its central-directory record.
-- Reject overlapping local-header/compressed-data extents.
+- Parse and compare data-descriptor CRC and compressed/uncompressed sizes (with or without the optional signature; 32-bit and ZIP64 widths).
+- Reject overlapping local-header/compressed-data/data-descriptor extents.
 - Capture file identity for both the open descriptor and selected path, and revalidate it.
 - Report leading stubs, central-directory extent, trailing comment and opaque pre-central-directory bytes.
 
 ## Non-goals and claim ceiling
 
-This is metadata inventory, not a full REA ArtifactReader replacement. It does not extract, decrypt, decompress, hash member bytes, verify member CRCs, parse data descriptors, scan for unlisted local headers, validate Android APK Signing Blocks, inspect package signatures, or interpret native executable formats. It does not execute archive contents. It records encrypted members but never decrypts them.
+This is metadata inventory, not a full REA ArtifactReader replacement. It does not extract, decrypt, decompress, hash member bytes, or verify payload CRCs against decompressed bytes. It does parse data-descriptor metadata and checks its declared CRC/sizes against the central directory; that does not verify the member payload. It does not scan for unlisted local headers, validate Android APK Signing Blocks, inspect package signatures, or interpret native executable formats. It does not execute archive contents. It records encrypted members but never decrypts them.
 
 Traversal is reported as partial until the omitted checks above are implemented or explicitly excluded by a reviewed policy. A central-directory CRC or size is a producer declaration, not an observation over payload bytes.
 
