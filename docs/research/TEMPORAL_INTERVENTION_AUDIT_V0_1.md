@@ -126,6 +126,7 @@ Do not report only the three exposure means. Include source-family worst cases a
 The implementation is an evaluator-side reference engine. Tests written in source do not establish that Rust compiles or that the tests pass. A valid exact p-value requires a real independently randomized design and verified assignment receipts. A statistically significant contrast is local to the experimental protocol. No population-wide causal effect, temporal competence, calibration guarantee, hardware efficiency, production readiness or SOTA superiority follows from this PR alone.
 
 
+
 ## 10. Anytime-valid sequential paired inference
 
 ### Why a second inference path exists
@@ -136,30 +137,25 @@ This is not a generic optional-stopping fix for arbitrary randomization designs.
 
 ### Betting construction
 
-For one frozen policy contrast and one exposure axis, let (S_iin\{-1,+1\}) be the sign of control exposure minus treatment exposure for pair (i), omitting zero ties. Under Fisher's sharp no-effect null and fair-coin orientation, (S_i) is conditionally symmetric given the paired outcomes and past.
+For one frozen policy contrast and one exposure axis, let each informative pair produce a sign Sᵢ ∈ {−1,+1}, where +1 means control exposure exceeds treatment exposure. Zero differences are ties and do not change the process. Under Fisher's sharp no-effect null and fair-coin orientation, each nonzero sign is conditionally symmetric given the paired outcomes and prior history.
 
-Use the fixed betting fraction (\lambda=1/2):
+Use the fixed betting fraction λ = 1/2:
 
-[
-E_t = \prod_{i=1}^{t}(1+\lambda S_i)
-= (3/2)^{W_t}(1/2)^{L_t},
-]
+**Eₜ = ∏ᵢ(1 + 0.5 Sᵢ) = (3/2)ᵂᵗ × (1/2)ᴸᵗ,**
 
-where (W_t) and (L_t) count beneficial and harmful signs. A tie contributes one. Each factor is nonnegative and has conditional expectation one under the sharp null, so (E_t) is a nonnegative martingale. Ville's inequality therefore controls the probability that it ever crosses a fixed boundary, regardless of the stopping time.
+where Wₜ and Lₜ count beneficial and harmful signs. A tie contributes one. Each factor is nonnegative and has conditional expectation one under the sharp null, so Eₜ is a nonnegative martingale. Ville's inequality therefore controls the probability that it ever crosses a fixed boundary, regardless of the stopping time.
 
-For a predeclared family of (M) contrasts/axes and familywise level (alpha), use the Bonferroni boundary (M/\alpha) for each process. Then
+For a predeclared family of M contrasts/axes and familywise level α, use the Bonferroni boundary M/α for each process. Then:
 
-[
-\Pr_{H_0}\left(\exists t, j: E_{j,t}\ge M/\alpha\right)\le\alpha.
-]
+**P(there exists t and j such that Eⱼ,ₜ ≥ M/α) ≤ α.**
 
-The engine computes (E_t) as an exact integer numerator/denominator, not floating point. It reports current crossing and latches the first crossing look, since a martingale can later fall below its boundary. The integer representation is bounded to at most 64 pairs.
+The engine computes Eₜ as an exact integer numerator/denominator, not floating point. It reports current crossing and latches the first crossing look, since a martingale can later fall below its boundary. The integer representation is bounded to at most 64 pairs.
 
 ### Required assumptions and excluded designs
 
 - Every pair's treatment orientation is independently randomized with probability exactly 0.5, conditional on the pre-assignment history.
 - The sharp null is no treatment effect for every randomized unit. This is not a test of a weak average-effect null.
-- Pair construction is valid; treatment does not interfere with other randomized units. If interference or common carryover exists, randomize and analyze at the independent cluster level.
+- Pair construction is valid; treatment does not interfere with other randomized units or create unmodelled carryover. If interference exists, randomize and analyze at the independent cluster level.
 - Fixed-count/blocked assignment is not supported by this sign process. Use a design-specific assignment-space enumerator such as the blocked randomization work in #9670 instead.
 - Assignment receipts and randomization generation must be verified upstream. The module only checks the supplied design labels/digests.
 - All outcomes, including timeout, invalid, missing output and abstention, remain in the exposure record.
@@ -171,7 +167,7 @@ The implementation deliberately ignores effect magnitude and uses a single fixed
 
 The Rust module adds twelve authored tests: rational wealth under beneficial/harmful/tied signs; familywise threshold; latched first crossing; exact integer arithmetic at the 64-pair cap; non-fair assignment and design mismatch rejection; sequential-gap/replay/context failure controls; separate failure exposure; and exact dynamic-programming enumeration of crossing probability through a 20-look finite null tree.
 
-The finite-tree control checks that the probability of ever crossing under the fair-sign sharp null remains below the per-axis Bonferroni budget for every prefix. It is a mathematical regression test for this specific betting process, not empirical evidence about a real benchmark or a substitute for verifying the randomization receipts.
+An independent exhaustive sign-sequence calculation gives 4,186 crossings among 1,048,576 sequences by look 20 at familywise α = 0.05 and M = 3. This is 0.399% for one axis, below its 1.667% allocated bound. The authored Rust dynamic-programming test pins this count and verifies the bound at every prefix. This is a finite mathematical regression for the specified design, not evidence about real Symthaea effects.
 
 Compare the sequential process with:
 1. the fixed-sample exact sign-flip p-value after the preregistered final look;
