@@ -293,12 +293,21 @@ pub enum SelectionStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfidenceFailureAllocation {
+    /// The exact per-claim failure probability is numerator_ppm / denominator.
+    /// Keeping this rational avoids truncating delta/(3G) when it is not integral.
+    pub numerator_ppm: u32,
+    pub denominator: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComputeRiskReport {
     pub schema: String,
     pub design: CalibrationDesign,
     pub confidence_claim_eligible_under_declared_design: bool,
     pub simultaneous_claim_count: usize,
     pub confidence_delta_ppm: u32,
+    pub confidence_failure_allocation: ConfidenceFailureAllocation,
     pub risk_upper_budget_ppm: u32,
     pub risk_lower_budget_ppm: u32,
     pub risk_output_error_budget_ppm: u32,
@@ -582,6 +591,8 @@ pub fn calibrate_joint_candidate_grid(
         return Err(fail("candidates.signal_id", "candidate grid mixes different signal identities"));
     }
 
+    let simultaneous_claim_count = candidates.len().checked_mul(3)
+        .ok_or_else(|| fail("simultaneous_claim_count", "3G claim count overflow"))?;
     let correction = simultaneous_hoeffding_correction_ppm(candidates.len(), traces.len(), confidence_delta_ppm)?;
     let mut evaluations = Vec::with_capacity(candidates.len());
     for candidate in candidates {
@@ -602,8 +613,12 @@ pub fn calibrate_joint_candidate_grid(
         schema: "symthaea.compute_risk_joint_report.v0.1".to_string(),
         design,
         confidence_claim_eligible_under_declared_design: design == CalibrationDesign::IidHeldOutTasksDeclared,
-        simultaneous_claim_count: candidates.len() * 3,
+        simultaneous_claim_count,
         confidence_delta_ppm,
+        confidence_failure_allocation: ConfidenceFailureAllocation {
+            numerator_ppm: confidence_delta_ppm,
+            denominator: simultaneous_claim_count,
+        },
         risk_upper_budget_ppm,
         risk_lower_budget_ppm,
         risk_output_error_budget_ppm,
@@ -632,6 +647,74 @@ pub fn verify_compute_risk_report(report: &ComputeRiskReport) -> Result<(), Comp
     }
     if report.formal_theorem_verified {
         return Err(fail("formal_theorem_verified", "v0.1 cannot claim theorem verification"));
+    }
+    if report.sample_count == 0 || report.candidate_evaluations.is_empty() {
+        return Err(fail("report.counts", "sample and candidate counts must be positive"));
+    }
+    let expected_claim_count = report.candidate_evaluations.len().checked_mul(3)
+        .ok_or_else(|| fail("simultaneous_claim_count", "3G claim count overflow"))?;
+    if report.simultaneous_claim_count != expected_claim_count {
+        return Err(fail("simultaneous_claim_count", "must equal three risk channels times the complete candidate count"));
+    }
+    if report.confidence_failure_allocation.numerator_ppm != report.confidence_delta_ppm
+        || report.confidence_failure_allocation.denominator != expected_claim_count {
+        return Err(fail("confidence_failure_allocation", "must preserve the exact delta/(3G) allocation"));
+    }
+    if report.confidence_claim_eligible_under_declared_design
+        != (report.design == CalibrationDesign::IidHeldOutTasksDeclared) {
+        return Err(fail("confidence_claim_eligible_under_declared_design", "does not match the declared calibration design"));
+    }
+    if report.candidate_grid_sha256.len() != 64 || !is_sha256(&report.candidate_grid_sha256)
+        || report.validation_panel_sha256.len() != 64 || !is_sha256(&report.validation_panel_sha256) {
+        return Err(fail("source_digests", "candidate grid and validation panel digests must be SHA-256"));
+    }
+    let mut prior_id: Option<&str> = None;
+    for candidate in &report.candidate_evaluations {
+        if candidate.sample_count != report.sample_count
+            || candidate.simultaneous_ucb_correction_ppm != report.correction_ppm {
+            return Err(fail("candidate_evaluations", "candidate sample count or correction differs from report"));
+        }
+        if let Some(prior) = prior_id {
+            if prior >= candidate.candidate_id.as_str() {
+                return Err(fail("candidate_evaluations", "candidate evaluations must be uniquely sorted"));
+            }
+        }
+        prior_id = Some(&candidate.candidate_id);
+        if !is_sha256(&candidate.task_loss_receipt_sha256) {
+            return Err(fail("candidate_evaluations.task_loss_receipt_sha256", "must be lowercase hexadecimal SHA-256"));
+        }
+        let expected_upper = candidate.upper_mean_loss_ceil_ppm.saturating_add(report.correction_ppm).min(PPM as u32);
+        let expected_lower = candidate.lower_mean_loss_ceil_ppm.saturating_add(report.correction_ppm).min(PPM as u32);
+        let expected_output = candidate.emitted_answer_error_mean_ceil_ppm.saturating_add(report.correction_ppm).min(PPM as u32);
+        if candidate.upper_risk_ucb_ppm != expected_upper
+            || candidate.lower_risk_ucb_ppm != expected_lower
+            || candidate.emitted_answer_error_ucb_ppm != expected_output {
+            return Err(fail("candidate_evaluations", "risk UCBs do not equal rounded empirical means plus the common simultaneous correction"));
+        }
+        let expected_feasible = expected_upper <= report.risk_upper_budget_ppm
+            && expected_lower <= report.risk_lower_budget_ppm
+            && expected_output <= report.risk_output_error_budget_ppm;
+        if candidate.meets_all_three_risk_budgets != expected_feasible {
+            return Err(fail("candidate_evaluations.meets_all_three_risk_budgets", "feasibility flag does not match the three reported UCBs and budgets"));
+        }
+    }
+    let selected = report.candidate_evaluations.iter()
+        .filter(|evaluation| evaluation.meets_all_three_risk_budgets)
+        .min_by(|left, right| {
+            left.mean_tokens_used_ppm.cmp(&right.mean_tokens_used_ppm)
+                .then_with(|| left.candidate_id.cmp(&right.candidate_id))
+        })
+        .map(|evaluation| evaluation.candidate_id.clone());
+    if report.selected_candidate_id != selected {
+        return Err(fail("selected_candidate_id", "does not match the minimum-compute candidate among all three-risk-feasible candidates"));
+    }
+    let expected_status = if selected.is_some() {
+        SelectionStatus::FeasibleCandidateFoundOnValidationPanel
+    } else {
+        SelectionStatus::NoCandidateMeetsAllRiskBudgets
+    };
+    if report.selection_status != expected_status {
+        return Err(fail("selection_status", "does not match selected candidate presence"));
     }
     if report.report_sha256.len() != 64 || !is_sha256(&report.report_sha256) {
         return Err(fail("report_sha256", "must be lowercase hexadecimal SHA-256"));
@@ -880,6 +963,41 @@ mod tests {
         assert_eq!(loss.upper_wrong_answer_loss_ppm,0);
         assert_eq!(loss.lower_premature_abandon_loss_ppm,0);
         assert_eq!(loss.emitted_answer_error_ppm,1_000_000);
+    }
+
+    #[test]
+    fn confidence_failure_allocation_is_exactly_delta_over_three_g() {
+        let fixture=load_builtin_fixture().unwrap();
+        let traces=generate_synthetic_validation_panel(&fixture).unwrap();
+        let report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        assert_eq!(report.simultaneous_claim_count,12);
+        assert_eq!(report.confidence_failure_allocation.numerator_ppm,100_000);
+        assert_eq!(report.confidence_failure_allocation.denominator,12);
+        verify_compute_risk_report(&report).unwrap();
+    }
+
+    #[test]
+    fn verifier_rejects_incomplete_or_truncated_confidence_allocation() {
+        let fixture=load_builtin_fixture().unwrap();
+        let traces=generate_synthetic_validation_panel(&fixture).unwrap();
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.confidence_failure_allocation.denominator-=1;
+        assert!(verify_compute_risk_report(&report).is_err());
+        let mut report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,
+            fixture.risk_output_error_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        report.candidate_evaluations[0].meets_all_three_risk_budgets=!report.candidate_evaluations[0].meets_all_three_risk_budgets;
+        assert!(verify_compute_risk_report(&report).is_err());
     }
 
     #[test]
