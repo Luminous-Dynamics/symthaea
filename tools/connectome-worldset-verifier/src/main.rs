@@ -6,7 +6,7 @@
 //! It does not prove that the axes are biologically exhaustive or that the freeze
 //! attestation is authentic. Those claims require an operator-pinned trust policy.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -30,7 +30,8 @@ fn sha256(bytes: &[u8]) -> String {
 /// serde_json's default map representation is key ordered (preserve_order is not enabled).
 /// This is the pinned SERDE_JSON_ORDERED_CANONICAL_V1 wire encoding, not a claim of RFC 8785.
 fn canonical_bytes(value: &Value) -> Result<Vec<u8>, String> {
-    serde_json::to_vec(value).map_err(|error| format!("canonical JSON serialization failed: {error}"))
+    serde_json::to_vec(value)
+        .map_err(|error| format!("canonical JSON serialization failed: {error}"))
 }
 
 fn canonical_sha256(value: &Value) -> Result<String, String> {
@@ -96,11 +97,16 @@ fn contains(interval: (f64, f64), value: f64) -> bool {
 fn safe_artifact_path(root: &Path, relative: &str) -> Result<PathBuf, String> {
     let candidate = Path::new(relative);
     if candidate.is_absolute()
-        || candidate
-            .components()
-            .any(|component| matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+        || candidate.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
     {
-        return Err(format!("artifact path must be relative and cannot traverse directories: {relative}"));
+        return Err(format!(
+            "artifact path must be relative and cannot traverse directories: {relative}"
+        ));
     }
     let root = root
         .canonicalize()
@@ -110,13 +116,16 @@ fn safe_artifact_path(root: &Path, relative: &str) -> Result<PathBuf, String> {
         .canonicalize()
         .map_err(|error| format!("artifact {relative} cannot be read: {error}"))?;
     if !resolved.starts_with(&root) {
-        return Err(format!("artifact path escapes manifest directory: {relative}"));
+        return Err(format!(
+            "artifact path escapes manifest directory: {relative}"
+        ));
     }
     Ok(resolved)
 }
 
 fn file_sha256(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     Ok(sha256(&bytes))
 }
 
@@ -171,7 +180,10 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
         return Vec::new();
     }
     if items.len() > MAX_AXES {
-        errors.push(format!("axes: {} axes exceed the V1 safety cap of {MAX_AXES}", items.len()));
+        errors.push(format!(
+            "axes: {} axes exceed the V1 safety cap of {MAX_AXES}",
+            items.len()
+        ));
         return Vec::new();
     }
 
@@ -193,7 +205,9 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
             continue;
         };
         if alternatives_json.is_empty() {
-            errors.push(format!("axes[{axis_index}].alternatives: must not be empty"));
+            errors.push(format!(
+                "axes[{axis_index}].alternatives: must not be empty"
+            ));
         }
         let mut alternatives = Vec::new();
         let mut seen_alternatives = BTreeSet::new();
@@ -212,7 +226,10 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
                     "axes[{axis_index}]: duplicate alternative_id {alternative_id}"
                 ));
             }
-            let artifact_id = match alternative.get("evidence_artifact_id").and_then(Value::as_str) {
+            let artifact_id = match alternative
+                .get("evidence_artifact_id")
+                .and_then(Value::as_str)
+            {
                 Some(value) if !value.trim().is_empty() => value.to_owned(),
                 _ => {
                     errors.push(format!(
@@ -230,7 +247,11 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
                     continue;
                 }
             };
-            alternatives.push(Alternative { id: alternative_id, evidence_artifact_id: artifact_id, evidence_sha256 });
+            alternatives.push(Alternative {
+                id: alternative_id,
+                evidence_artifact_id: artifact_id,
+                evidence_sha256,
+            });
         }
         alternatives.sort_by(|left, right| left.id.cmp(&right.id));
         axes.push(Axis { id, alternatives });
@@ -277,7 +298,9 @@ fn validate_artifacts(
             continue;
         }
         if !paths.insert(relative.to_owned()) {
-            errors.push(format!("artifact_files: duplicate relative_path {relative}"));
+            errors.push(format!(
+                "artifact_files: duplicate relative_path {relative}"
+            ));
             continue;
         }
         match safe_artifact_path(root, relative).and_then(|path| file_sha256(&path)) {
@@ -299,7 +322,9 @@ fn validate_artifacts(
         "candidate_patch",
     ] {
         if !digests.contains_key(required) {
-            errors.push(format!("artifact_files: missing required artifact_id {required}"));
+            errors.push(format!(
+                "artifact_files: missing required artifact_id {required}"
+            ));
         }
     }
     digests
@@ -308,7 +333,9 @@ fn validate_artifacts(
 fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value, Vec<String>> {
     let mut errors = Vec::new();
     if !is_sha256(verifier_sha256) {
-        return Err(vec!["verifier_sha256: verifier binary digest is invalid".to_owned()]);
+        return Err(vec![
+            "verifier_sha256: verifier binary digest is invalid".to_owned(),
+        ]);
     }
     let bytes = fs::read(manifest_path).map_err(|error| {
         vec![format!(
@@ -369,7 +396,10 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     if !is_lower_hex(sample_hash, 32) {
         errors.push("context.sample_hash: expected 32 lowercase hexadecimal characters".to_owned());
     }
-    binding.insert("sample_hash".to_owned(), Value::String(sample_hash.to_owned()));
+    binding.insert(
+        "sample_hash".to_owned(),
+        Value::String(sample_hash.to_owned()),
+    );
     for field in [
         "query_definition_sha256",
         "base_graph_snapshot_sha256",
@@ -384,7 +414,10 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         }
     }
     let task_route = context.get("task_route").and_then(Value::as_str);
-    if !matches!(task_route, Some("false_split_correction" | "false_merge_identification" | "split_mask_generation")) {
+    if !matches!(
+        task_route,
+        Some("false_split_correction" | "false_merge_identification" | "split_mask_generation")
+    ) {
         errors.push("context.task_route: unsupported task route".to_owned());
     }
     let decision_threshold = finite_number(&context, "decision_threshold", &mut errors);
@@ -425,18 +458,33 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     {
         let rectangular = (after.0 - baseline.1, after.1 - baseline.0);
         if effect.0 < rectangular.0 - TOLERANCE || effect.1 > rectangular.1 + TOLERANCE {
-            errors.push("context.paired_effect_interval: exceeds the marginal rectangular outer bound".to_owned());
+            errors.push(
+                "context.paired_effect_interval: exceeds the marginal rectangular outer bound"
+                    .to_owned(),
+            );
         }
     }
 
     let freeze = manifest.get("freeze").cloned().unwrap_or(Value::Null);
-    if freeze.get("universe_frozen_before_query_scoring").and_then(Value::as_bool) != Some(true) {
+    if freeze
+        .get("universe_frozen_before_query_scoring")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
         errors.push("freeze.universe_frozen_before_query_scoring: must be true".to_owned());
     }
-    if freeze.get("query_scoring_opened_before_freeze").and_then(Value::as_bool) != Some(false) {
+    if freeze
+        .get("query_scoring_opened_before_freeze")
+        .and_then(Value::as_bool)
+        != Some(false)
+    {
         errors.push("freeze.query_scoring_opened_before_freeze: must be false".to_owned());
     }
-    if freeze.get("unresolved_frontier_count").and_then(Value::as_u64) != Some(0) {
+    if freeze
+        .get("unresolved_frontier_count")
+        .and_then(Value::as_u64)
+        != Some(0)
+    {
         errors.push("freeze.unresolved_frontier_count: must be exactly zero".to_owned());
     }
     let freeze_receipt_digest = freeze
@@ -448,18 +496,30 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
 
     let artifact_digests = validate_artifacts(&manifest, root, &mut errors);
     if let Some(receipt_sha) = freeze_receipt_digest {
-        if artifact_digests.get("prequery_freeze_receipt").map(String::as_str) != Some(receipt_sha) {
-            errors.push("freeze.prequery_freeze_receipt_sha256: does not match verified artifact".to_owned());
+        if artifact_digests
+            .get("prequery_freeze_receipt")
+            .map(String::as_str)
+            != Some(receipt_sha)
+        {
+            errors.push(
+                "freeze.prequery_freeze_receipt_sha256: does not match verified artifact"
+                    .to_owned(),
+            );
         }
     }
     for (context_field, artifact_id) in [
         ("base_graph_snapshot_sha256", "base_graph_snapshot"),
-        ("hypothetical_result_graph_snapshot_sha256", "hypothetical_result_graph_snapshot"),
+        (
+            "hypothetical_result_graph_snapshot_sha256",
+            "hypothetical_result_graph_snapshot",
+        ),
         ("candidate_patch_sha256", "candidate_patch"),
     ] {
         if let Some(value) = context.get(context_field).and_then(Value::as_str) {
             if artifact_digests.get(artifact_id).map(String::as_str) != Some(value) {
-                errors.push(format!("context.{context_field}: does not match verified artifact"));
+                errors.push(format!(
+                    "context.{context_field}: does not match verified artifact"
+                ));
             }
         }
     }
@@ -514,25 +574,36 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         .map(|axis| {
             (
                 axis.id.clone(),
-                axis.alternatives.iter().map(|alternative| alternative.id.clone()).collect(),
+                axis.alternatives
+                    .iter()
+                    .map(|alternative| alternative.id.clone())
+                    .collect(),
             )
         })
         .collect();
     for (index, world) in paired_worlds.iter().enumerate() {
         let Some(assignment_json) = world.get("assignment").and_then(Value::as_object) else {
-            errors.push(format!("paired_worlds[{index}].assignment: expected object"));
+            errors.push(format!(
+                "paired_worlds[{index}].assignment: expected object"
+            ));
             continue;
         };
         let assignment_keys: BTreeSet<String> = assignment_json.keys().cloned().collect();
         if assignment_keys != axis_ids {
-            errors.push(format!("paired_worlds[{index}].assignment: keys do not exactly match axes"));
+            errors.push(format!(
+                "paired_worlds[{index}].assignment: keys do not exactly match axes"
+            ));
             continue;
         }
         let mut valid_assignment = Map::new();
         let mut assignment_valid = true;
         for axis in &axes {
             match assignment_json.get(&axis.id).and_then(Value::as_str) {
-                Some(value) if axis_values.get(&axis.id).is_some_and(|values| values.contains(value)) => {
+                Some(value)
+                    if axis_values
+                        .get(&axis.id)
+                        .is_some_and(|values| values.contains(value)) =>
+                {
                     valid_assignment.insert(axis.id.clone(), Value::String(value.to_owned()));
                 }
                 _ => {
@@ -547,20 +618,25 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         if !assignment_valid {
             continue;
         }
-        let assignment_digest = canonical_sha256(&Value::Object(valid_assignment.clone()))
-            .unwrap_or_default();
+        let assignment_digest =
+            canonical_sha256(&Value::Object(valid_assignment.clone())).unwrap_or_default();
         if !evaluated_assignments.insert(assignment_digest) {
             errors.push(format!("paired_worlds[{index}]: duplicate assignment"));
         }
         let computed_id = world_id(&valid_assignment).unwrap_or_default();
-        let supplied_id = world.get("world_id").and_then(Value::as_str).unwrap_or_default();
+        let supplied_id = world
+            .get("world_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         if supplied_id != computed_id {
             errors.push(format!(
                 "paired_worlds[{index}].world_id: expected {computed_id}, found {supplied_id}"
             ));
         }
         if !evaluated_ids.insert(supplied_id.to_owned()) {
-            errors.push(format!("paired_worlds[{index}].world_id: duplicate world ID"));
+            errors.push(format!(
+                "paired_worlds[{index}].world_id: duplicate world ID"
+            ));
         }
 
         if let (Some(baseline_interval), Some(after_interval), Some(effect_interval)) =
@@ -570,13 +646,19 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
             let after = finite_number(world, "after_edit_value", &mut errors);
             if let (Some(baseline), Some(after)) = (baseline, after) {
                 if !contains(baseline_interval, baseline) {
-                    errors.push(format!("paired_worlds[{index}]: baseline value lies outside marginal interval"));
+                    errors.push(format!(
+                        "paired_worlds[{index}]: baseline value lies outside marginal interval"
+                    ));
                 }
                 if !contains(after_interval, after) {
-                    errors.push(format!("paired_worlds[{index}]: after-edit value lies outside marginal interval"));
+                    errors.push(format!(
+                        "paired_worlds[{index}]: after-edit value lies outside marginal interval"
+                    ));
                 }
                 if !contains(effect_interval, after - baseline) {
-                    errors.push(format!("paired_worlds[{index}]: paired difference lies outside effect interval"));
+                    errors.push(format!(
+                        "paired_worlds[{index}]: paired difference lies outside effect interval"
+                    ));
                 }
             }
         } else {
@@ -607,9 +689,13 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         "axes": axes_value,
         "source_universe_snapshot_sha256": artifact_digests.get("source_universe_snapshot")
     });
-    let enumeration_input_sha256 = canonical_sha256(&enumeration_input).map_err(|error| vec![error])?;
+    let enumeration_input_sha256 =
+        canonical_sha256(&enumeration_input).map_err(|error| vec![error])?;
     let expected_world_manifest = Value::Array(
-        expected_world_ids.iter().map(|id| Value::String(id.clone())).collect()
+        expected_world_ids
+            .iter()
+            .map(|id| Value::String(id.clone()))
+            .collect(),
     );
     let expected_world_manifest_sha256 =
         canonical_sha256(&expected_world_manifest).map_err(|error| vec![error])?;
@@ -703,14 +789,17 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
 }
 
 fn executable_sha256() -> Result<String, String> {
-    let path = env::current_exe().map_err(|error| format!("cannot locate verifier executable: {error}"))?;
+    let path = env::current_exe()
+        .map_err(|error| format!("cannot locate verifier executable: {error}"))?;
     file_sha256(&path)
 }
 
 fn main() {
     let arguments: Vec<String> = env::args().collect();
     if arguments.len() < 2 || arguments.len() > 3 {
-        eprintln!("usage: connectome-worldset-verifier <universe-manifest.json> [receipt-output.json]");
+        eprintln!(
+            "usage: connectome-worldset-verifier <universe-manifest.json> [receipt-output.json]"
+        );
         std::process::exit(64);
     }
     let verifier_sha = match executable_sha256() {
@@ -775,7 +864,8 @@ mod tests {
     }
 
     fn seal_manifest(mut manifest: Value) -> Value {
-        let digest = canonical_sha256(&without_field(&manifest, "manifest_sha256")).expect("manifest digest");
+        let digest = canonical_sha256(&without_field(&manifest, "manifest_sha256"))
+            .expect("manifest digest");
         manifest
             .as_object_mut()
             .expect("object")
@@ -785,10 +875,25 @@ mod tests {
 
     fn fixture(root: &Path) -> Value {
         let artifacts = vec![
-            add_artifact(root, "prequery_freeze_receipt", "freeze.json", br#"{"frozen":true}"#),
-            add_artifact(root, "source_universe_snapshot", "source.json", br#"{"source":"synthetic"}"#),
+            add_artifact(
+                root,
+                "prequery_freeze_receipt",
+                "freeze.json",
+                br#"{"frozen":true}"#,
+            ),
+            add_artifact(
+                root,
+                "source_universe_snapshot",
+                "source.json",
+                br#"{"source":"synthetic"}"#,
+            ),
             add_artifact(root, "base_graph_snapshot", "base.graph", b"base-graph"),
-            add_artifact(root, "hypothetical_result_graph_snapshot", "after.graph", b"after-graph"),
+            add_artifact(
+                root,
+                "hypothetical_result_graph_snapshot",
+                "after.graph",
+                b"after-graph",
+            ),
             add_artifact(root, "candidate_patch", "patch.bin", b"patch"),
             add_artifact(root, "a1_evidence", "a1.json", b"axis-a-one"),
             add_artifact(root, "a2_evidence", "a2.json", b"axis-a-two"),
@@ -799,8 +904,7 @@ mod tests {
             artifacts
                 .iter()
                 .find(|artifact| artifact["artifact_id"] == id)
-                .expect("artifact")
-                ["sha256"]
+                .expect("artifact")["sha256"]
                 .as_str()
                 .expect("digest")
                 .to_owned()
@@ -825,8 +929,14 @@ mod tests {
         for detector in ["high", "low"] {
             for structure in ["merge", "separate"] {
                 let mut assignment = Map::new();
-                assignment.insert("detector_state".to_owned(), Value::String(detector.to_owned()));
-                assignment.insert("structural_hypothesis".to_owned(), Value::String(structure.to_owned()));
+                assignment.insert(
+                    "detector_state".to_owned(),
+                    Value::String(detector.to_owned()),
+                );
+                assignment.insert(
+                    "structural_hypothesis".to_owned(),
+                    Value::String(structure.to_owned()),
+                );
                 worlds.push(json!({
                     "world_id": world_id(&assignment).expect("world ID"),
                     "assignment": Value::Object(assignment),
@@ -879,11 +989,19 @@ mod tests {
         let root = test_root();
         let path = root.join("universe.json");
         let manifest = fixture(&root);
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize"),
+        )
+        .expect("write manifest");
         let verifier = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
         let receipt = verify_manifest(&path, verifier).expect("verified finite universe");
         assert_eq!(receipt["disposition"], "VERIFIED");
-        assert!(receipt["coverage"]["closure_verified"].as_bool().expect("closure flag"));
+        assert!(
+            receipt["coverage"]["closure_verified"]
+                .as_bool()
+                .expect("closure flag")
+        );
         assert_eq!(receipt["expected_world_count"], 4);
         assert_eq!(receipt["evaluated_world_count"], 4);
         assert_eq!(
@@ -894,8 +1012,18 @@ mod tests {
             receipt["trust_boundary"]["universe_selection_independence"],
             "NOT_ASSESSED"
         );
-        assert_eq!(receipt["coverage"]["expected_world_ids"].as_array().expect("IDs").len(), 4);
-        assert!(is_sha256(receipt["coverage"]["verification_receipt_sha256"].as_str().expect("receipt digest")));
+        assert_eq!(
+            receipt["coverage"]["expected_world_ids"]
+                .as_array()
+                .expect("IDs")
+                .len(),
+            4
+        );
+        assert!(is_sha256(
+            receipt["coverage"]["verification_receipt_sha256"]
+                .as_str()
+                .expect("receipt digest")
+        ));
     }
 
     #[test]
@@ -903,11 +1031,18 @@ mod tests {
         let root = test_root();
         let path = root.join("universe.json");
         let mut manifest = fixture(&root);
-        manifest["paired_worlds"].as_array_mut().expect("worlds").pop();
+        manifest["paired_worlds"]
+            .as_array_mut()
+            .expect("worlds")
+            .pop();
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("missing world");
-        assert!(errors.iter().any(|error| error.contains("exact Cartesian coverage mismatch")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("exact Cartesian coverage mismatch"))
+        );
     }
 
     #[test]
@@ -916,11 +1051,18 @@ mod tests {
         let path = root.join("universe.json");
         let mut manifest = fixture(&root);
         let duplicate = manifest["paired_worlds"][0].clone();
-        manifest["paired_worlds"].as_array_mut().expect("worlds").push(duplicate);
+        manifest["paired_worlds"]
+            .as_array_mut()
+            .expect("worlds")
+            .push(duplicate);
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("duplicate world");
-        assert!(errors.iter().any(|error| error.contains("duplicate world ID")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate world ID"))
+        );
     }
 
     #[test]
@@ -931,7 +1073,11 @@ mod tests {
         fs::write(root.join("base.graph"), b"tampered").expect("mutate artifact");
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("artifact mismatch");
-        assert!(errors.iter().any(|error| error.contains("base_graph_snapshot")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("base_graph_snapshot"))
+        );
     }
 
     #[test]
@@ -943,7 +1089,11 @@ mod tests {
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("out of interval");
-        assert!(errors.iter().any(|error| error.contains("baseline value lies outside")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("baseline value lies outside"))
+        );
     }
 
     #[test]
@@ -955,7 +1105,11 @@ mod tests {
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("frontier remains");
-        assert!(errors.iter().any(|error| error.contains("unresolved_frontier_count")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("unresolved_frontier_count"))
+        );
     }
 
     #[test]
@@ -977,7 +1131,11 @@ mod tests {
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("path traversal");
-        assert!(errors.iter().any(|error| error.contains("cannot traverse directories")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("cannot traverse directories"))
+        );
     }
 
     #[test]
@@ -985,11 +1143,16 @@ mod tests {
         let root = test_root();
         let path = root.join("universe.json");
         let mut manifest = fixture(&root);
-        manifest["axes"][0]["alternatives"][0]["evidence_artifact_id"] = json!("base_graph_snapshot");
+        manifest["axes"][0]["alternatives"][0]["evidence_artifact_id"] =
+            json!("base_graph_snapshot");
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("wrong evidence artifact");
-        assert!(errors.iter().any(|error| error.contains("evidence digest mismatch")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("evidence digest mismatch"))
+        );
     }
 
     #[test]
@@ -1012,7 +1175,11 @@ mod tests {
         manifest = seal_manifest(manifest);
         fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("axis cap");
-        assert!(errors.iter().any(|error| error.contains("exceed the V1 safety cap")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("exceed the V1 safety cap"))
+        );
     }
 
 }
