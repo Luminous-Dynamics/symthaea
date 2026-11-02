@@ -52,7 +52,12 @@
               "QueryAuditPending",
               "QueryInsufficientHistory",
               "QueryUnstable",
-              "QueryReadyObservedWindow"
+              "QueryReadyObservedWindow",
+              "QueryStopCalibrationInsufficient",
+              "QueryStopCalibrationGroupOverlap",
+              "QueryStopCalibrationExchangeabilityUnsupported",
+              "QueryProjectedUnstableWithinHorizon",
+              "QueryProjectedStableWithinHorizon"
             ]
           },
           "expected_error": {
@@ -78,7 +83,12 @@
               "EditAnnotationContradiction",
               "QuerySnapshotMismatch",
               "QueryFutureClaimForbidden",
-              "QueryUniversalClaimForbidden"
+              "QueryUniversalClaimForbidden",
+              "QueryStopSnapshotMismatch",
+              "QueryStopQueryMismatch",
+              "QueryStopRankMismatch",
+              "QueryStopOutcomeContradiction",
+              "QueryStopSourceVolumeMismatch"
             ]
           },
           "expected_canonical_snapshot_sha256": {
@@ -93,6 +103,14 @@
             "items": {
               "type": "string"
             }
+          },
+          "expected_projected_stop_horizon_edits": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expected_projected_future_drift_upper_ratio": {
+            "type": "number",
+            "minimum": 0
           }
         },
         "oneOf": [
