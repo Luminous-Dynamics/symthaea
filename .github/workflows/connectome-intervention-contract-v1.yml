@@ -9,6 +9,7 @@ on:
       - "tools/connectome-intervention-contract/**"
       - ".github/workflows/connectome-intervention-contract-v1.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main, "feat/connectome-intervention-scorecard-v1"]
     paths:
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_*.json"
