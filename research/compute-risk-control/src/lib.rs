@@ -160,6 +160,16 @@ impl StoppingCandidate {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct ResearchReference {
+    pub paper_or_spec_url: String,
+    pub source_repository_url: String,
+    pub source_revision: String,
+    pub source_readiness: String,
+    pub audit_note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ComputeRiskFixture {
     pub schema: String,
     pub version: String,
@@ -174,6 +184,7 @@ pub struct ComputeRiskFixture {
     pub candidates: Vec<StoppingCandidate>,
     pub generator_id: String,
     pub scenario_ids: Vec<String>,
+    pub research_reference: ResearchReference,
 }
 
 impl ComputeRiskFixture {
@@ -205,6 +216,17 @@ impl ComputeRiskFixture {
         }
         if self.scenario_ids.is_empty() {
             return Err(fail("scenario_ids", "at least one synthetic scenario is required"));
+        }
+        if !self.research_reference.paper_or_spec_url.starts_with("https://")
+            || !self.research_reference.source_repository_url.starts_with("https://") {
+            return Err(fail("research_reference", "paper and source repository URLs must use HTTPS"));
+        }
+        if !is_git_sha(&self.research_reference.source_revision) {
+            return Err(fail("research_reference.source_revision", "must be a 40-character lowercase Git SHA"));
+        }
+        if self.research_reference.source_readiness != "preliminary_reference_paper_is_authoritative_code_not_used"
+            || self.research_reference.audit_note.trim().is_empty() {
+            return Err(fail("research_reference", "source readiness or audit note is invalid"));
         }
         let mut previous: Option<&str> = None;
         let mut ids = BTreeSet::new();
