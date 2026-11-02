@@ -45,7 +45,7 @@ pub struct RawEvent {
     pub fault_id: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ObservedOperation {
     pub op_id: String,
@@ -69,7 +69,7 @@ pub struct ObservedOperation {
     pub observed_store_revision: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ObservedFault {
     pub fault_id: String,
@@ -81,7 +81,7 @@ pub struct ObservedFault {
     pub runner_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ObservationEnvelope {
     pub suite_id: String,
