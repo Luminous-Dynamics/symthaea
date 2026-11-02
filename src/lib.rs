@@ -290,7 +290,11 @@ compile_error!(
 // Unified Error Types
 // ============================================================================
 
-/// Unified error types for cross-subsystem error handling.
+/// Native Rust REA Evidence compatibility API (opt-in; direct in-process calls).
+#[cfg(feature = "rea-compat")]
+pub mod rea_compat;
+
+// Unified error types for cross-subsystem error handling.
 pub mod errors;
 pub use errors::{SymthaeaError, SymthaeaResult};
 
