@@ -21,9 +21,8 @@ from fractions import Fraction as F
 from typing import Any
 
 from anchored_compound_ebh import (
-    anchor_slack,
     anchored_rejections,
-    is_closure_certified,
+    closure_deficit,
     projective_weight_prefix,
     weighted_compound_ebh,
 )
@@ -192,9 +191,7 @@ def simulate_stream(
         delta: projective_weight_prefix(n, lambdas[delta])
         for delta in deltas
     }
-    full_weights = projective_weight_prefix(n, F(999999, 1_000_000))
-    # Full-mass reference is the limit; using mass 1 is deliberately rejected by
-    # projective_weight_prefix, so construct the summable finite prefix directly.
+    # Full-mass reference is the globally summable telescoping prior.
     full_weights = tuple(F(1, i * (i + 1)) for i in range(1, n + 1))
 
     method_names = ["full_mass_e_bh"]
@@ -245,10 +242,8 @@ def simulate_stream(
             anchor_calls[delta] += 1
             if not set(base_local).issubset(anchored_local):
                 raise AssertionError("anchored closure lost a baseline discovery")
-            if not is_closure_certified(
-                scores, F(1, 10), delta, anchored_local
-            ):
-                raise AssertionError("anchored output violates a closure constraint")
+            if closure_deficit(scores, F(1, 10), anchored_local) > F(1, 10) * delta:
+                raise AssertionError("anchored output violates the exact closure deficit")
 
             base_reject = tuple(active_ids[j] for j in base_local)
             anchor_reject = tuple(active_ids[j] for j in anchored_local)
