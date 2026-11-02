@@ -1,0 +1,408 @@
+{
+  "schema_version": "0.1",
+  "synthetic_only": true,
+  "cases": [
+    {
+      "case_id": "guaranteed_pathway_decision_flip",
+      "input": {
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "h1",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.2
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.8,
+              "upper": 0.9
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_impacts": [
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "h1",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.2
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.8,
+                  "upper": 0.9
+                },
+                "effect_interval": {
+                  "lower": 0.6000000000000001,
+                  "upper": 0.8
+                },
+                "minimum_absolute_effect": 0.6000000000000001,
+                "maximum_absolute_effect": 0.8,
+                "normalized_materiality_lower": 6.000000000000001,
+                "normalized_materiality_upper": 8,
+                "baseline_decision": "BelowThreshold",
+                "after_edit_decision": "AtOrAboveThreshold",
+                "decision_flip": "Guaranteed",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": true
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.8,
+            "worst_case_normalized_materiality": 8,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": true,
+            "aggregate_decision_flip": "Guaranteed"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "scenario_disagreement_preserves_both_hypotheses",
+      "input": {
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "h1",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.2
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.8,
+              "upper": 0.9
+            }
+          },
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "h2",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.2
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.1,
+              "upper": 0.2
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_impacts": [
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "h1",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.2
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.8,
+                  "upper": 0.9
+                },
+                "effect_interval": {
+                  "lower": 0.6000000000000001,
+                  "upper": 0.8
+                },
+                "minimum_absolute_effect": 0.6000000000000001,
+                "maximum_absolute_effect": 0.8,
+                "normalized_materiality_lower": 6.000000000000001,
+                "normalized_materiality_upper": 8,
+                "baseline_decision": "BelowThreshold",
+                "after_edit_decision": "AtOrAboveThreshold",
+                "decision_flip": "Guaranteed",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": true
+              },
+              {
+                "scenario_id": "h2",
+                "baseline": {
+                  "lower": 0.1,
+                  "upper": 0.2
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.1,
+                  "upper": 0.2
+                },
+                "effect_interval": {
+                  "lower": -0.1,
+                  "upper": 0.1
+                },
+                "minimum_absolute_effect": 0,
+                "maximum_absolute_effect": 0.1,
+                "normalized_materiality_lower": 0,
+                "normalized_materiality_upper": 1,
+                "baseline_decision": "BelowThreshold",
+                "after_edit_decision": "BelowThreshold",
+                "decision_flip": "Impossible",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": false
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.8,
+            "worst_case_normalized_materiality": 8,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": false,
+            "aggregate_decision_flip": "Possible"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "different_queries_keep_distinct_units",
+      "input": {
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "synapse-count",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "synapse-count",
+            "unit_id": "synapses",
+            "materiality_threshold": 20,
+            "decision_threshold": null,
+            "scenario_id": "h1",
+            "baseline": {
+              "lower": 100,
+              "upper": 110
+            },
+            "hypothetical_after_edit": {
+              "lower": 105,
+              "upper": 115
+            }
+          },
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.4,
+            "scenario_id": "h1",
+            "baseline": {
+              "lower": 0.2,
+              "upper": 0.3
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.5,
+              "upper": 0.6
+            }
+          }
+        ]
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_impacts": [
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "scenarios": [
+              {
+                "scenario_id": "h1",
+                "baseline": {
+                  "lower": 0.2,
+                  "upper": 0.3
+                },
+                "hypothetical_after_edit": {
+                  "lower": 0.5,
+                  "upper": 0.6
+                },
+                "effect_interval": {
+                  "lower": 0.2,
+                  "upper": 0.39999999999999997
+                },
+                "minimum_absolute_effect": 0.2,
+                "maximum_absolute_effect": 0.39999999999999997,
+                "normalized_materiality_lower": 2,
+                "normalized_materiality_upper": 3.9999999999999996,
+                "baseline_decision": "BelowThreshold",
+                "after_edit_decision": "AtOrAboveThreshold",
+                "decision_flip": "Guaranteed",
+                "materiality_exceeded_possible": true,
+                "materiality_exceeded_guaranteed": true
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 0.39999999999999997,
+            "worst_case_normalized_materiality": 3.9999999999999996,
+            "materiality_exceeded_possible": true,
+            "materiality_exceeded_guaranteed": true,
+            "aggregate_decision_flip": "Guaranteed"
+          },
+          {
+            "query_id": "synapse-count",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "metric_id": "synapse-count",
+            "unit_id": "synapses",
+            "materiality_threshold": 20,
+            "scenarios": [
+              {
+                "scenario_id": "h1",
+                "baseline": {
+                  "lower": 100,
+                  "upper": 110
+                },
+                "hypothetical_after_edit": {
+                  "lower": 105,
+                  "upper": 115
+                },
+                "effect_interval": {
+                  "lower": -5,
+                  "upper": 15
+                },
+                "minimum_absolute_effect": 0,
+                "maximum_absolute_effect": 15,
+                "normalized_materiality_lower": 0,
+                "normalized_materiality_upper": 0.75,
+                "baseline_decision": "NotConfigured",
+                "after_edit_decision": "NotConfigured",
+                "decision_flip": "NotConfigured",
+                "materiality_exceeded_possible": false,
+                "materiality_exceeded_guaranteed": false
+              }
+            ],
+            "worst_case_maximum_absolute_effect": 15,
+            "worst_case_normalized_materiality": 0.75,
+            "materiality_exceeded_possible": false,
+            "materiality_exceeded_guaranteed": false,
+            "aggregate_decision_flip": "NotConfigured"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "query_unit_conflict_is_rejected",
+      "input": {
+        "candidate_id": "candidate-1",
+        "operation_id": "operation-1",
+        "sample_hash": "0123456789abcdef0123456789abcdef",
+        "task_route": "FalseMergeIdentification",
+        "source_volume_id": "volume-1",
+        "base_graph_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hypothetical_result_graph_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "candidate_patch_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_evaluations": [
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "normalized-strength",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "h1",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.2
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.8,
+              "upper": 0.9
+            }
+          },
+          {
+            "query_id": "pathway-strength",
+            "query_definition_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "pre_registered": true,
+            "metric_id": "pathway-strength-metric",
+            "unit_id": "synapses",
+            "materiality_threshold": 0.1,
+            "decision_threshold": 0.5,
+            "scenario_id": "h2",
+            "baseline": {
+              "lower": 0.1,
+              "upper": 0.2
+            },
+            "hypothetical_after_edit": {
+              "lower": 0.8,
+              "upper": 0.9
+            }
+          }
+        ]
+      },
+      "expected_error": "UnitMismatch"
+    }
+  ]
+}
