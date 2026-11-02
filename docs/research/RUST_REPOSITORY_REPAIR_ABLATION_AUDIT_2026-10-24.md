@@ -10,7 +10,7 @@ This is an analysis contract, not a result. It does not claim that GCS improves 
 
 A headline percentage is too easy to misread. A causal GCS-on/off comparison must preserve task assignment, compare matched environments, bind outcomes to the independent scored-run auditor, report unresolved work, and account for the fact that tasks from one repository are correlated.
 
-`rust-repair-ablation-audit` is a separate Rust analysis stage. It does not run agents or tests. It validates preregistered design fields, verifies the raw digest of each referenced score report, checks each report's task-manifest digest and task-level outcomes, then computes paired effects and repository-clustered uncertainty.
+The intended `rust-repair-ablation-audit` would be a separate Rust analysis stage. It would not run agents or tests; it would validate preregistration fields, score-report digests and task-level outcomes, then compute paired effects and repository-clustered uncertainty. Its Cargo manifest and binary source are absent from current `main`, so this functionality is not currently runnable.
 
 ## Preregister before trials
 
