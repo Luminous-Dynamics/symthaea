@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         CalibrationDesign::SyntheticFixedPanel,
         fixture.risk_upper_budget_ppm,
         fixture.risk_lower_budget_ppm,
+        fixture.risk_output_error_budget_ppm,
         fixture.confidence_delta_ppm,
     )?;
     verify_compute_risk_report(&report)?;
