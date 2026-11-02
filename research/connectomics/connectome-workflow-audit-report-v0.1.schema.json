@@ -13,7 +13,9 @@
     "canonical_graph_snapshot_sha256",
     "query_id",
     "future_stability_certified",
-    "universal_connectome_completeness_claimed"
+    "universal_connectome_completeness_claimed",
+    "projected_stop_horizon_edits",
+    "projected_future_drift_upper_ratio"
   ],
   "$defs": {
     "sha": {
@@ -44,7 +46,12 @@
         "QueryAuditPending",
         "QueryInsufficientHistory",
         "QueryUnstable",
-        "QueryReadyObservedWindow"
+        "QueryReadyObservedWindow",
+        "QueryStopCalibrationInsufficient",
+        "QueryStopCalibrationGroupOverlap",
+        "QueryStopCalibrationExchangeabilityUnsupported",
+        "QueryProjectedUnstableWithinHorizon",
+        "QueryProjectedStableWithinHorizon"
       ]
     },
     "completed_stages": {
@@ -63,7 +70,8 @@
           "EDIT_REJECTED",
           "EDIT_QUARANTINED",
           "EDIT_COMMITTED",
-          "QUERY_STABILITY_AUDIT"
+          "QUERY_STABILITY_AUDIT",
+          "QUERY_FUTURE_STOP_CALIBRATION"
         ]
       }
     },
@@ -85,7 +93,11 @@
           "EDIT_NOT_AUTHORIZED",
           "GRAPH_UPDATE",
           "QUERY_STABILITY_AUDIT",
-          "QUERY_READINESS"
+          "QUERY_READINESS",
+          "QUERY_FUTURE_STOP_CALIBRATION",
+          "QUERY_FUTURE_STOP_GROUP_DISJOINTNESS",
+          "QUERY_FUTURE_STOP_EXCHANGEABILITY",
+          "QUERY_FUTURE_STOP_READINESS"
         ]
       }
     },
@@ -107,6 +119,20 @@
     },
     "universal_connectome_completeness_claimed": {
       "const": false
+    },
+    "projected_stop_horizon_edits": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "projected_future_drift_upper_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
     }
   }
 }
