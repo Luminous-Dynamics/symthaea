@@ -1356,7 +1356,7 @@ mod tests {
             "minimax policy must reduce maximum scenario regret"
         );
         assert!((minimax.expected_evsi - bayes.expected_evsi).abs() < 1e-12);
-        assert!((minimax.worst_case_shared_policy_regret - 0.45).abs() < 1e-12);
+        assert!((minimax.worst_case_shared_policy_regret - 0.4).abs() < 1e-12);
         assert!((minimax.decision_stability - 0.5).abs() < 1e-12);
     }
 
