@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-pub mod bundle;
-
 //! Rust-native admission and semantic-identity verification for REA Evidence.
 //!
 //! This crate separates raw-file identity, REA semantic Evidence identity,
@@ -11,6 +9,8 @@ pub mod bundle;
 //! Raw-file ingestion rejects duplicate object keys and has a size bound. That
 //! is deliberately stricter than JavaScript JSON.parse, which resolves
 //! duplicate keys before REA's object-level schema sees the object.
+
+pub mod bundle;
 
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
