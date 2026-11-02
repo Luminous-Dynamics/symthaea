@@ -73,6 +73,18 @@ Each paired endpoint must lie inside its corresponding marginal interval, and it
 
 A paired-world result applies only to the supplied worlds. It is not a probability, and guaranteed / impossible mean only within that supplied set. The adapter must prove that the world manifest is complete for the declared admissible structural scenario and that each before/after pair shares the same latent graph world.
 
+## Matched decision-world evidence
+
+If a paired effect artifact supplies `decision_worlds`, each row gives a unique world ID and exact before/after query endpoint values from the same latent structural graph world. For a pre-registered decision threshold, the component compares decisions within each matched pair:
+
+- every paired world crosses the threshold -> `Guaranteed`;
+- no paired world crosses -> `Impossible`;
+- some cross and some do not -> `Possible`.
+
+The report identifies `PairedSharedWorlds` as the decision-flip method and records the number of worlds. Without paired decision worlds, the existing conservative marginal classification is used and labelled `MarginalIntervalOuterBound`. If no threshold is configured, the result is `NotConfigured` and paired decision worlds are rejected.
+
+Validation requires a non-empty world set, unique world IDs, baseline/post-edit values inside the declared marginal intervals, and each paired difference inside the paired effect interval (with a 1e-12 floating-point tolerance). The evidence digest must be valid. Guarantees and impossibility are **only over the supplied paired worlds**; they do not prove the world set is exhaustive. An independently pinned adapter must authenticate the paired-world manifest and its shared-latent-state mapping.
+
 ## Scenario handling
 
 - Each query/scenario row is preserved in the output.
@@ -100,7 +112,7 @@ Every query must be marked pre-registered. The same query must carry the same de
 - Fixture schema: `research/connectomics/connectome-query-impact-fixture-v0.1.schema.json`.
 - Known-answer cases: `research/connectomics/fixtures/connectome-query-impact-known-answer-v0.1.json`.
 
-The fixture checks paired-effect interval containment plus matched decision worlds: an impossible flip despite marginal intervals straddling the threshold, guaranteed and possible flips, duplicate world IDs, values outside marginal intervals, differences outside paired effect bounds, missing decision thresholds and empty world sets.
+The 14-case fixture checks paired-effect interval containment plus matched decision worlds: an impossible flip despite marginal intervals straddling the threshold, guaranteed and possible flips, duplicate world IDs, values outside marginal intervals, differences outside paired effect bounds, missing decision thresholds and empty world sets.
 
 The fixture covers guaranteed threshold flips, scenario disagreement, independent units across different queries and conflicting query-unit declarations.
 
