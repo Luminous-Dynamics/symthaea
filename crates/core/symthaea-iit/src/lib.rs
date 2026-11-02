@@ -3427,7 +3427,7 @@ pub fn primitive_repertoire_request_sha256(
 }
 
 /// Compute Eq. 13 from already evaluated full-system repertoires.
-fn compute_iit4_2026_intrinsic_information(
+pub(crate) fn compute_iit4_2026_intrinsic_information(
     specification: &Iit4SystemIntrinsicSpecification,
     system_state: &Iit4SystemState,
     cause_repertoire: &[f64],
@@ -3449,6 +3449,16 @@ fn compute_iit4_2026_intrinsic_information(
             direction: CausalDirection::Effect,
             expected,
             actual: system_state.effect_specified_state.len(),
+        });
+    }
+    if !specification.cause.specified_states.contains(&system_state.cause_specified_state) {
+        return Err(SystemPhiError::SpecifiedStateNotIntrinsicMaximizer {
+            direction: CausalDirection::Cause,
+        });
+    }
+    if !specification.effect.specified_states.contains(&system_state.effect_specified_state) {
+        return Err(SystemPhiError::SpecifiedStateNotIntrinsicMaximizer {
+            direction: CausalDirection::Effect,
         });
     }
     let expected_entries = 1usize.checked_shl(expected as u32)
