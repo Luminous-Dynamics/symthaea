@@ -1,0 +1,115 @@
+{
+  "schema_version": "CPG-NUMERICAL-RUN-RECEIPT-V1",
+  "run_id": "planned-cpg-numerical-receipt-v1",
+  "run_state": "incomplete",
+  "evidence_tier": "synthetic_known_answer",
+  "claim_ceiling": "synthetic_only",
+  "created_at_utc": "2026-11-02T00:00:00Z",
+  "source": {
+    "source_kind": "synthetic",
+    "repository": null,
+    "immutable_code_ref": null,
+    "code_commit_sha": null,
+    "source_file_path": "synthetic://cpg-numerics/reference-equations",
+    "source_file_sha256": null,
+    "data_revision": null,
+    "data_manifest_sha256": null,
+    "rights_state": "synthetic",
+    "permission_receipt_sha256": null,
+    "provenance_notes": "Planning example only. No simulator binary, connectome, dataset, solver run or output is bound."
+  },
+  "simulator": {
+    "model_family": "rate_network",
+    "equation_manifest_sha256": null,
+    "parameter_manifest_sha256": null,
+    "state_semantics": "Synthetic placeholder for a firing-rate network; no equation or parameter artifact is materialized.",
+    "observation_model_id": "not-instantiated"
+  },
+  "solver": {
+    "solver_id": "Dopri5",
+    "library": "Diffrax",
+    "library_version": "not-pinned",
+    "dependency_lock_sha256": null,
+    "backend": "cpu",
+    "dtype": "float64",
+    "rtol": 0.000002,
+    "atol": 5e-9,
+    "initial_step_seconds": 0.001,
+    "max_steps": 100000,
+    "throw_on_failure": false,
+    "nonfinite_event_detection_enabled": false
+  },
+  "simulation": {
+    "start_time_seconds": 0,
+    "end_time_seconds": 2,
+    "nominal_save_interval_seconds": 0.001,
+    "state_dimension": 0,
+    "expected_saved_timepoints": 2001,
+    "actual_saved_timepoints": 0,
+    "solver_status": "unknown",
+    "attempted_steps": 0,
+    "accepted_steps": 0,
+    "rejected_steps": 0,
+    "function_evaluations": 0,
+    "random_seed": 1,
+    "prng_id": "not-pinned",
+    "deterministic_mode": false
+  },
+  "perturbation": {
+    "protocol_sha256": null,
+    "waveform_sha256": null,
+    "stimulus_applied": false,
+    "input_noise": {
+      "requested_mean": 0,
+      "requested_stddev": 0,
+      "applied": false,
+      "realized_mean": 0,
+      "realized_stddev": 0,
+      "sample_sha256": null
+    },
+    "weight_noise": {
+      "requested_mean": 0,
+      "requested_stddev": 0,
+      "applied": false,
+      "realized_mean": 0,
+      "realized_stddev": 0,
+      "sample_sha256": null
+    }
+  },
+  "numerics": {
+    "raw_state_sha256": null,
+    "raw_output_manifest_sha256": null,
+    "raw_state_finite_scan_performed": false,
+    "non_finite_value_count": 0,
+    "post_solver_sanitized_value_count": 0,
+    "post_solver_clipped_value_count": 0,
+    "post_solver_transformed_value_count": 0,
+    "minimum_raw_value": null,
+    "maximum_raw_value": null,
+    "maximum_absolute_raw_value": null,
+    "raw_state_artifact": {
+      "relative_path": null,
+      "encoding": "f64le",
+      "byte_length": 0,
+      "sha256": null,
+      "capture_stage": "not_captured",
+      "layout": "state_major_time_minor"
+    }
+  },
+  "resources": {
+    "wall_time_seconds": 0,
+    "peak_memory_bytes": 0,
+    "energy_joules": null
+  },
+  "artifacts": {
+    "resolved_config_sha256": null,
+    "environment_sha256": null,
+    "logs_sha256": null
+  },
+  "limitations": [
+    "This is an incomplete planning manifest, not a completed solver run.",
+    "No biological data, connectome or empirical intervention outcome is present.",
+    "A passing numerical receipt establishes execution integrity only; it does not validate model equations or biological claims.",
+    "Requested nonzero noise must be demonstrated in the actual input or weight sample, not inferred from configuration."
+  ]
+}
