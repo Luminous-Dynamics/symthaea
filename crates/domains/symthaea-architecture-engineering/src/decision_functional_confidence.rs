@@ -125,6 +125,8 @@ pub struct DecisionFunctionalCalibrationRequest {
     pub source_plan_sha256: String,
     /// Shared semantic identity for the declared path-level functional definitions.
     pub functional_contract_sha256: String,
+    /// Defines the independent experimental/cluster unit represented by one sample ID.
+    pub sampling_unit_contract_sha256: String,
     /// Equal design digests encode the SAME_TARGET_LAW_BY_DESIGN assertion.
     /// They do not prove that the actual data follow this design.
     pub calibration_target_design_sha256: String,
@@ -149,6 +151,7 @@ impl DecisionFunctionalCalibrationRequest {
         calibration_id: impl Into<String>,
         source_plan_sha256: impl Into<String>,
         functional_contract_sha256: impl Into<String>,
+        sampling_unit_contract_sha256: impl Into<String>,
         calibration_target_design_sha256: impl Into<String>,
         confirmatory_target_design_sha256: impl Into<String>,
         target_relation: CalibrationTargetRelation,
@@ -167,6 +170,7 @@ impl DecisionFunctionalCalibrationRequest {
             calibration_id: calibration_id.into(),
             source_plan_sha256: source_plan_sha256.into(),
             functional_contract_sha256: functional_contract_sha256.into(),
+            sampling_unit_contract_sha256: sampling_unit_contract_sha256.into(),
             calibration_target_design_sha256: calibration_target_design_sha256.into(),
             confirmatory_target_design_sha256: confirmatory_target_design_sha256.into(),
             target_relation,
@@ -210,6 +214,10 @@ impl DecisionFunctionalCalibrationRequest {
         validate_hash(
             &self.functional_contract_sha256,
             "request.functional_contract_sha256",
+        )?;
+        validate_hash(
+            &self.sampling_unit_contract_sha256,
+            "request.sampling_unit_contract_sha256",
         )?;
         validate_hash(
             &self.calibration_target_design_sha256,
@@ -419,6 +427,7 @@ pub struct DecisionFunctionalCalibrationReport {
     pub source_plan_sha256: String,
     pub request_sha256: String,
     pub functional_contract_sha256: String,
+    pub sampling_unit_contract_sha256: String,
     pub calibration_target_design_sha256: String,
     pub confirmatory_target_design_sha256: String,
     pub evidence_mode: CalibrationEvidenceMode,
@@ -442,6 +451,7 @@ struct ReportPayload<'a> {
     source_plan_sha256: &'a str,
     request_sha256: &'a str,
     functional_contract_sha256: &'a str,
+    sampling_unit_contract_sha256: &'a str,
     calibration_target_design_sha256: &'a str,
     confirmatory_target_design_sha256: &'a str,
     evidence_mode: CalibrationEvidenceMode,
@@ -1050,6 +1060,7 @@ pub fn analyze_decision_functional_frontier(
         source_plan_sha256: &source_plan_sha256,
         request_sha256: &request_sha256,
         functional_contract_sha256: &request.functional_contract_sha256,
+        sampling_unit_contract_sha256: &request.sampling_unit_contract_sha256,
         calibration_target_design_sha256: &request.calibration_target_design_sha256,
         confirmatory_target_design_sha256: &request.confirmatory_target_design_sha256,
         evidence_mode: request.evidence_mode,
@@ -1072,6 +1083,7 @@ pub fn analyze_decision_functional_frontier(
         source_plan_sha256,
         request_sha256,
         functional_contract_sha256: request.functional_contract_sha256,
+        sampling_unit_contract_sha256: request.sampling_unit_contract_sha256,
         calibration_target_design_sha256: request.calibration_target_design_sha256,
         confirmatory_target_design_sha256: request.confirmatory_target_design_sha256,
         evidence_mode: request.evidence_mode,
@@ -1124,6 +1136,8 @@ mod tests {
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const FUNCTION_HASH: &str =
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const UNIT_HASH: &str =
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
     fn policy(
         id: &str,
@@ -1214,6 +1228,7 @@ mod tests {
             "dfce-calibration-fixture",
             plan.plan_sha256().unwrap(),
             FUNCTION_HASH,
+            UNIT_HASH,
             DESIGN_HASH,
             DESIGN_HASH,
             CalibrationTargetRelation::SameTargetLawByDesign,
