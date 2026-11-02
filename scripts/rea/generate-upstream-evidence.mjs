@@ -17,8 +17,8 @@ const importFromRea = async (relativePath) =>
 
 const [{ createEvidence, withEvidenceCallerInputPath }, { createAnalysisProfile }] =
   await Promise.all([
-    importFromRea("domain/evidence.js"),
-    importFromRea("domain/analysisProfile.js"),
+    importFromRea("domain/evidence.ts"),
+    importFromRea("domain/analysisProfile.ts"),
   ]);
 
 const provider = {
