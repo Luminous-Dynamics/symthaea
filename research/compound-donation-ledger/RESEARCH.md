@@ -513,6 +513,46 @@ must test family-size transfer with a fixed global weight sequence, multiple
 alpha values, heterogeneous and switching alternatives, time-varying
 dependence, delayed/predictable arrivals and 50,000+ frozen streams.
 
+### Fixed-weight family-size transfer screen
+
+A second exploratory screen checks the projective property under active-family
+growth. It uses one global weight sequence with \(\gamma_i=1/1000\) for every
+candidate, and compares initial prefixes of size \(m\in\{10,100,1000\}\).
+The weights are not renormalized at the smaller horizons. This is the correct
+way to test a projective weighted procedure; replacing \(\gamma_i\) by \(1/m\)
+at each prefix would change old candidates' calibrators and confound the test.
+
+The run used 300 streams per cell, 80 looks, alpha 0.05, null Bernoulli
+probability 0.5 and alternative probability 0.75. The data generator is the
+same likelihood-ratio test-martingale model as the previous screen. Power
+is terminal alternative rejection fraction.
+
+| Active prefix m | Alternative fraction | Square-root | Universal dyadic | Fixed-family rank | Projective rank | Hybrid projective rank |
+|---:|---:|---:|---:|---:|---:|---:|
+| 10 | 10% | 0.0% | 8.7% | 43.0% | 48.7% | 45.7% |
+| 10 | 50% | 1.8% | 18.4% | 60.8% | 55.5% | 49.9% |
+| 100 | 10% | 2.0% | 19.9% | 64.9% | 55.9% | 51.4% |
+| 100 | 50% | 14.4% | 42.4% | 78.6% | 62.6% | 61.8% |
+| 1,000 | 10% | 37.1% | 55.7% | 82.4% | 68.9% | 69.1% |
+| 1,000 | 50% | 80.3% | 75.7% | 90.9% | 75.4% | 79.3% |
+
+This is intentionally not presented as a win. The fixed-family specialist often
+has the greatest power, because it spends its whole prior budget on the
+currently known rank range. The projective prior beats the square-root and
+universal-dyadic calibrators in several sparse/short-prefix cells, but is
+worse in other cells. The hybrid is a little more robust at the highest ranks
+but loses some early-rank power. This is the expected price of preserving
+calibration under horizon extension.
+
+There were only 300 streams per cell. The one-sided Hoeffding half-width for
+a bounded SupFDR mean is about 7.06 percentage points, so the SupFDR point
+estimates in the JSON artifact are descriptive only. This screen is a
+projectivity/power-transfer experiment, not confirmatory error-rate evidence.
+The recorded output is
+\`benchmarks/projective_rank_horizon_transfer_2026-11-02.json\`, and the
+committed runner is
+\`benchmarks/projective_rank_horizon_transfer.py\`.
+
 ## 6. Prior art and software baselines
 
 The benchmark must keep guarantee classes separate.
