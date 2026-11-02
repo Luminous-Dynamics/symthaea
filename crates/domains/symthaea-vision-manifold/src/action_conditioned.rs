@@ -843,6 +843,24 @@ mod tests {
     }
 
     #[test]
+    fn action_forecast_bank_serializes_and_roundtrips_with_validated_content_hash() {
+        let original = bank();
+        let encoded = serde_json::to_vec(&original).unwrap();
+        let decoded: ActionForecastBank = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, original);
+        decoded.validate().unwrap();
+    }
+
+    #[test]
+    fn checked_in_json_fixture_matches_the_rust_canonical_bank_digest() {
+        let fixture: ActionForecastBank = serde_json::from_str(include_str!(
+            "../fixtures/action-forecast-bank.example.json"
+        )).unwrap();
+        fixture.validate().unwrap();
+        assert_eq!(fixture, bank());
+    }
+
+    #[test]
     fn request_rejects_bad_identity_timing_actions_and_draws() {
         let mut bad_horizon = request();
         assert!(bad_horizon.validate().is_ok());
