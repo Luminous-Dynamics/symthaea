@@ -56,6 +56,14 @@ pub enum AgentKind {
     Machine,
 }
 
+/// Initial-generation machine placement treatment. The paper varies placement
+/// in robustness analyses; the exact archived schemes remain to be imported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MachinePlacement {
+    ClusteredPrefix,
+    UniformRandom,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Agent {
     pub kind: AgentKind,
@@ -146,6 +154,7 @@ pub struct Config {
     pub generations: usize,
     pub population_size: usize,
     pub machine_count_generation_zero: usize,
+    pub machine_placement: MachinePlacement,
 
     /// Number of individual-learning trials allocated to human agents.
     pub human_exploration_capacity: u32,
@@ -182,6 +191,7 @@ impl Default for Config {
             generations: PAPER_ABM_GENERATIONS,
             population_size: PAPER_ABM_POPULATION_SIZE,
             machine_count_generation_zero: PAPER_ABM_MACHINE_COUNT,
+            machine_placement: MachinePlacement::ClusteredPrefix,
             human_exploration_capacity: 10,
             machine_exploration_capacity: 1_000,
             human_optimality_bias: 0.01,
@@ -364,14 +374,22 @@ fn discover_strategy(
     config: Config,
     rng: &mut Rng,
 ) -> Strategy {
-    // Continuous effective trial counts follow the paper's stated allocation
-    // of a finite exploration budget according to optimality bias.
-    let optimal_trials = f64::from(capacity) * optimality_bias;
-    let myopic_trials = f64::from(capacity) * (1.0 - optimality_bias);
-    let p_optimal = 1.0 - (1.0 - config.optimal_discovery_rate).powf(optimal_trials);
-    let p_myopic = 1.0 - (1.0 - config.myopic_discovery_rate).powf(myopic_trials);
-    let found_optimal = rng.bernoulli(p_optimal);
-    let found_myopic = rng.bernoulli(p_myopic);
+    // One explicit finite exploration trial at a time: q selects which
+    // strategy is attempted; its per-trial discovery rate determines whether
+    // that strategy is discovered. The archive/supplement must still be checked
+    // for the exact random draw ordering before calling this a reproduction.
+    let mut found_optimal = false;
+    let mut found_myopic = false;
+    for _ in 0..capacity {
+        if rng.bernoulli(optimality_bias) {
+            found_optimal |= rng.bernoulli(config.optimal_discovery_rate);
+        } else {
+            found_myopic |= rng.bernoulli(config.myopic_discovery_rate);
+        }
+        if found_optimal {
+            break;
+        }
+    }
 
     if found_optimal {
         Strategy::Optimal
@@ -442,9 +460,26 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
     let mut rng = Rng::new(seed);
     let mut generations = Vec::with_capacity(config.generations);
 
+    let mut machine_mask = vec![false; config.population_size];
+    let mut machine_indices: Vec<usize> = (0..config.population_size).collect();
+    match config.machine_placement {
+        MachinePlacement::ClusteredPrefix => {
+            machine_mask.iter_mut().take(config.machine_count_generation_zero).for_each(|slot| *slot = true);
+        }
+        MachinePlacement::UniformRandom => {
+            for index in 0..config.machine_count_generation_zero {
+                let selected = index + rng.index(machine_indices.len() - index);
+                machine_indices.swap(index, selected);
+            }
+            for index in machine_indices.into_iter().take(config.machine_count_generation_zero) {
+                machine_mask[index] = true;
+            }
+        }
+    }
+
     let mut seed_population = Vec::with_capacity(config.population_size);
     for index in 0..config.population_size {
-        let kind = if index < config.machine_count_generation_zero {
+        let kind = if machine_mask[index] {
             AgentKind::Machine
         } else {
             AgentKind::Human
@@ -551,6 +586,53 @@ mod tests {
         assert_eq!(config.machine_optimality_bias, 0.5);
         assert_eq!(config.myopic_discovery_rate, 0.5);
         assert_eq!(config.demonstration_count, 10);
+    }
+
+    #[test]
+    fn clustered_machine_placement_uses_declared_prefix() {
+        let config = Config {
+            machine_placement: MachinePlacement::ClusteredPrefix,
+            ..Config::default()
+        };
+        let run = simulate(config, 7).unwrap();
+        assert!(run.generations[0].agents[..PAPER_ABM_MACHINE_COUNT]
+            .iter().all(|agent| agent.kind == AgentKind::Machine));
+        assert!(run.generations[0].agents[PAPER_ABM_MACHINE_COUNT..]
+            .iter().all(|agent| agent.kind == AgentKind::Human));
+    }
+
+    #[test]
+    fn uniform_machine_placement_is_seeded_and_keeps_exact_count() {
+        let config = Config {
+            machine_placement: MachinePlacement::UniformRandom,
+            ..Config::default()
+        };
+        let first = simulate(config, 123).unwrap();
+        let second = simulate(config, 123).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            first.generations[0].agents.iter()
+                .filter(|agent| agent.kind == AgentKind::Machine).count(),
+            PAPER_ABM_MACHINE_COUNT
+        );
+    }
+
+    #[test]
+    fn optimality_bias_changes_trial_selection_not_strategy_priority() {
+        let mut config = Config::default();
+        config.human_exploration_capacity = 100;
+        config.optimal_discovery_rate = 1.0;
+        config.myopic_discovery_rate = 1.0;
+        let mut high_bias_rng = Rng::new(44);
+        let mut low_bias_rng = Rng::new(44);
+        assert_eq!(
+            discover_strategy(100, 1.0, config, &mut high_bias_rng),
+            Strategy::Optimal
+        );
+        assert_eq!(
+            discover_strategy(100, 0.0, config, &mut low_bias_rng),
+            Strategy::Myopic
+        );
     }
 
     #[test]
