@@ -2,6 +2,8 @@
 
 **Status:** research protocol and acceptance target; no benchmark run or performance claim is implied.
 
+**Machine-readable artifacts:** registry fixture `crates/domains/symthaea-capability-closure/fixtures/irregular_temporal_decision_benchmark_v0.1.json`; JSON Schema Draft 2020-12 `docs/research/IRREGULAR_TEMPORAL_DECISION_BENCHMARK_V0_1.schema.json`.
+
 ## 1. Purpose and scope
 
 ITDB evaluates temporal systems in the conditions that make production decisions difficult: observations arrive irregularly, different modalities are asynchronous, records can be delayed or revised, some sources are incomplete, and an action has consequences beyond forecast error.
