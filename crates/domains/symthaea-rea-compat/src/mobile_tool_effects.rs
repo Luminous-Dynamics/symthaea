@@ -581,6 +581,14 @@ pub fn authorize_reported_mobile_tool(
     report.validate()?;
     let tool = MobileTool::parse(name)
         .ok_or_else(|| ToolAuthorizationError::UnknownTool(name.to_owned()))?;
+    if report.availability == ProviderAvailability::Unknown {
+        return Err(ToolAuthorizationError::ProviderOperationUnavailable {
+            tool,
+            reason: report.reason.clone().unwrap_or_else(|| {
+                "provider availability is unknown; denied by default".to_owned()
+            }),
+        });
+    }
     let operation = report
         .operations
         .iter()
@@ -879,6 +887,23 @@ mod tests {
             EffectCeiling::MOBILE_DEVICE_READ_ONLY,
         ).unwrap_err();
         assert!(matches!(denied, ToolAuthorizationError::EffectExceedsCeiling { .. }));
+    }
+
+    #[test]
+    fn unknown_provider_availability_never_grants_a_tool() {
+        let mut capability = report(&[MobileTool::InspectAdbDevice], &[]);
+        capability.availability = ProviderAvailability::Unknown;
+        capability.reason = Some("capability discovery did not complete".to_owned());
+        let error = authorize_reported_mobile_tool(
+            "inspect_adb_device",
+            &capability,
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+            EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+        ).unwrap_err();
+        assert!(matches!(
+            error,
+            ToolAuthorizationError::ProviderOperationUnavailable { .. }
+        ));
     }
 
     #[test]
