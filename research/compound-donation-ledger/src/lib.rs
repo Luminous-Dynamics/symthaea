@@ -489,7 +489,7 @@ impl DonationLedger {
                 .checked_add(token.remaining_amount)
                 .ok_or(LedgerError::ArithmeticOverflow)?;
         }
-        if token_remaining > self.total_outgoing - self.total_incoming {
+        if token_remaining != self.total_outgoing - self.total_incoming {
             return Err(LedgerError::InvariantViolation);
         }
         Ok(())
