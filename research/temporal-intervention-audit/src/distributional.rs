@@ -346,7 +346,11 @@ mod tests {
         assert!(result.treatment_mean_lower);
         assert!(result.treatment_quantiles_us[3] > result.control_quantiles_us[3]);
         assert!(!result.first_order_lower_cost.treatment_dominates_control);
-        assert!(result.upper_tail_stop_loss.control_dominates_treatment);
+        assert!(!result.first_order_lower_cost.control_dominates_treatment);
+        assert!(!result.upper_tail_stop_loss.treatment_dominates_control);
+        assert!(!result.upper_tail_stop_loss.control_dominates_treatment);
+        assert_eq!(result.thresholds[1].treatment_stop_loss_numerator, 450);
+        assert_eq!(result.thresholds[1].control_stop_loss_numerator, 0);
     }
 
     #[test]
