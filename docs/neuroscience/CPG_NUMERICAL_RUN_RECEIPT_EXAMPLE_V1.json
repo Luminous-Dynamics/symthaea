@@ -86,7 +86,15 @@
     "post_solver_transformed_value_count": 0,
     "minimum_raw_value": null,
     "maximum_raw_value": null,
-    "maximum_absolute_raw_value": null
+    "maximum_absolute_raw_value": null,
+    "raw_state_artifact": {
+      "relative_path": null,
+      "encoding": "f64le",
+      "byte_length": 0,
+      "sha256": null,
+      "capture_stage": "not_captured",
+      "layout": "state_major_time_minor"
+    }
   },
   "resources": {
     "wall_time_seconds": 0,
