@@ -10,6 +10,8 @@
 //! is deliberately stricter than JavaScript JSON.parse, which resolves
 //! duplicate keys before REA's object-level schema sees the object.
 
+pub mod mobile_tool_effects;
+
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize};
