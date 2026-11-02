@@ -697,11 +697,19 @@ pub fn run_edge_adaptation_episode<M: UnsupervisedEdgeModel>(
         .filter(|update| update.update_applied)
         .count() as u64;
     let compute_operations_estimate = update_receipts.iter()
-        .map(|update| update.compute_operations_estimate)
-        .sum::<u64>();
+        .try_fold(0_u64, |total, update| {
+            total.checked_add(update.compute_operations_estimate)
+        })
+        .ok_or_else(|| EdgeAdaptationError::new(
+            "result.compute_operations_estimate", "aggregate operation estimate overflow",
+        ))?;
     let persistent_state_write_bytes = update_receipts.iter()
-        .map(|update| update.persistent_state_write_bytes)
-        .sum::<u64>();
+        .try_fold(0_u64, |total, update| {
+            total.checked_add(update.persistent_state_write_bytes)
+        })
+        .ok_or_else(|| EdgeAdaptationError::new(
+            "result.persistent_state_write_bytes", "aggregate state-write count overflow",
+        ))?;
 
     let mut receipt = EdgeAdaptationRunReceipt {
         scenario_sha256: scenario_digest(&scenario),
@@ -738,6 +746,7 @@ pub fn validate_edge_adaptation_receipt(
         || receipt.candidate_sha256 == [0; 32]
         || receipt.initial_state_sha256 == [0; 32]
         || receipt.final_state_sha256 == [0; 32]
+        || receipt.trace_sha256 == [0; 32]
     {
         return Err(EdgeAdaptationError::new(
             "receipt.identity",
@@ -955,6 +964,31 @@ mod tests {
         let result = run_edge_adaptation_episode(scenario, candidate_digest(6), &mut model).unwrap();
         assert_eq!(result.updates_applied_count, 0);
         assert_eq!(result.persistent_state_write_bytes, 0);
+    }
+
+    #[test]
+    fn malformed_update_cost_overflow_fails_closed() {
+        struct OverflowingCostModel {
+            state: [u8; 32],
+        }
+        impl UnsupervisedEdgeModel for OverflowingCostModel {
+            fn predict(&self, _: &PublicTargetSample) -> u8 { 0 }
+            fn adapt_after_batch(&mut self, batch: &PublicTargetBatch) -> AdaptationUpdateReceipt {
+                AdaptationUpdateReceipt {
+                    batch_index: batch.batch_index,
+                    adaptation_considered: true,
+                    update_applied: false,
+                    sample_count: batch.samples.len() as u32,
+                    compute_operations_estimate: u64::MAX,
+                    persistent_state_write_bytes: 0,
+                    previous_state_sha256: self.state,
+                    next_state_sha256: self.state,
+                }
+            }
+            fn state_sha256(&self) -> [u8; 32] { self.state }
+        }
+        let mut model = OverflowingCostModel { state: [9; 32] };
+        assert!(run_edge_adaptation_episode(scenario(), candidate_digest(11), &mut model).is_err());
     }
 
     #[test]
