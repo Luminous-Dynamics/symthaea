@@ -7,6 +7,7 @@
 
 pub mod design;
 pub mod matrix;
+pub mod permutation_polynomial;
 
 use std::error::Error;
 use std::fmt;
