@@ -447,8 +447,8 @@ fn analyze_scenario(
     let (effect_interval, effect_method) = match &evaluation.paired_effect {
         None => (rectangular_outer_bound, EffectMethod::RectangularOuterBound),
         Some(paired) => {
-            if paired.effect_interval.lower < rectangular_outer_bound.lower
-                || paired.effect_interval.upper > rectangular_outer_bound.upper
+            if paired.effect_interval.lower < rectangular_outer_bound.lower - 1e-12
+                || paired.effect_interval.upper > rectangular_outer_bound.upper + 1e-12
             {
                 return Err(QueryImpactError::PairedEffectOutsideConservativeBound {
                     query_id: evaluation.query_id.clone(),
@@ -701,8 +701,8 @@ fn validate_evaluation(
             paired.effect_interval.upper,
         )?;
         let outer = evaluation.hypothetical_after_edit.difference(evaluation.baseline)?;
-        if paired.effect_interval.lower < outer.lower
-            || paired.effect_interval.upper > outer.upper
+        if paired.effect_interval.lower < outer.lower - 1e-12
+            || paired.effect_interval.upper > outer.upper + 1e-12
         {
             return Err(QueryImpactError::PairedEffectOutsideConservativeBound {
                 query_id: evaluation.query_id.clone(),
@@ -734,10 +734,10 @@ fn validate_evaluation(
                 }
                 if !world.baseline_value.is_finite()
                     || !world.after_edit_value.is_finite()
-                    || world.baseline_value < evaluation.baseline.lower
-                    || world.baseline_value > evaluation.baseline.upper
-                    || world.after_edit_value < evaluation.hypothetical_after_edit.lower
-                    || world.after_edit_value > evaluation.hypothetical_after_edit.upper
+                    || world.baseline_value < evaluation.baseline.lower - 1e-12
+                    || world.baseline_value > evaluation.baseline.upper + 1e-12
+                    || world.after_edit_value < evaluation.hypothetical_after_edit.lower - 1e-12
+                    || world.after_edit_value > evaluation.hypothetical_after_edit.upper + 1e-12
                 {
                     return Err(QueryImpactError::PairedDecisionValueOutsideMarginal {
                         query_id: evaluation.query_id.clone(),
@@ -747,8 +747,8 @@ fn validate_evaluation(
                 }
                 let effect = world.after_edit_value - world.baseline_value;
                 if !effect.is_finite()
-                    || effect < paired.effect_interval.lower
-                    || effect > paired.effect_interval.upper
+                    || effect < paired.effect_interval.lower - 1e-12
+                    || effect > paired.effect_interval.upper + 1e-12
                 {
                     return Err(QueryImpactError::PairedDecisionDifferenceOutsideEffect {
                         query_id: evaluation.query_id.clone(),
