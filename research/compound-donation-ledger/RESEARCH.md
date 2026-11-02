@@ -430,14 +430,57 @@ decision-targeted adjuster for weighted SupFDR, along with a careful empirical
 comparison against horizon-specific calibration. It is not claimed as a new
 general e-process theorem.
 
+### Constant-factor finite-u64 rank prior
+
+The pure telescoping prior is more power-efficient at early ranks but assigns
+mass of order \(1/j^2\) to rank \(2^j\), which gives a worst-case factor of
+\(O((\log k)^2)\). Because this implementation already uses u64 candidate
+indices, we can explicitly cover all 64 dyadic rank scales with a fixed
+uniform component.
+
+Define
+\[
+\widetilde\pi_j=
+\frac12\frac{1}{(j+1)(j+2)}+\frac{1}{128},
+\qquad j=0,\ldots,63.
+\]
+The first component is half of the telescoping prior; the second is half of
+a uniform prior over the 64 representable dyadic scales. Its total mass is
+\[
+\sum_{j=0}^{63}\widetilde\pi_j
+=\frac12\frac{64}{65}+\frac12
+=\frac{129}{130}<1.
+\]
+The unspent mass is \(1/130\). In fixed-point arithmetic, each mass is
+rounded down, preserving validity.
+
+Since \(\widetilde\pi_j\ge1/128\), the raw threshold for rank \(2^j\) is no
+larger than \(128/(\alpha\gamma_i2^j)\), up to fixed-point rounding. For any
+actual rank \(k\), choose \(2^j\le k<2^{j+1}\), so
+\[
+K_{i,j}\lesssim
+\max\left\{1,\frac{256}{\alpha\gamma_i k}\right\}.
+\]
+This is a **uniform constant-factor (256) overhead** over the weighted e-BH
+boundary for every u64 rank, independent of the active family size. The
+finite-u64 cap is part of the theorem statement; it is not an infinite-rank
+result. The pure telescoping prior remains available for smaller early-rank
+overhead, and a precommitted fixed-prior mixture can trade early-rank power
+against the worst-case constant.
+
+The Rust constructor is
+\`projective_weighted_e_bh_rank_prior_hybrid_u64\`. It uses exact integer
+prior masses, threshold ceilings and the same binary-search evaluator. The
+independent verifier does not share the writer's staircase lookup structure.
+
 ### Exploratory projective-rank experiment
 
 We extended the Bernoulli likelihood-ratio screen with the horizon-independent
 projective rank prior. Fixed seed 20261102; 3,000 independent streams per
 cell; m=100; T=100; alpha=0.05; null p0=0.5; alternative p1=0.75; per-round
 LR factors 1.5 and 0.5. Compared square-root, 25-point universal dyadic,
-fixed-family equal-prior rank-geometric, and projective dyadic-rank
-calibrators. SupFDR is the mean over streams of max_t FDP_t; power is the
+fixed-family equal-prior rank-geometric, projective telescoping rank, and
+projective hybrid (half telescoping, half uniform-u64) calibrators. SupFDR is the mean over streams of max_t FDP_t; power is the
 terminal fraction of alternatives rejected. Balanced negative dependence
 uses a random floor/ceiling count of null successes with a uniformly selected
 subset, preserving conditional marginal success probability 0.5 for every
