@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/conformal-policy-control/run-receipt-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "scenario_id",
+    "code_commit",
+    "fixture_sha256",
+    "risk_budget_ppm",
+    "beta_grid_selection_is_formally_qualified",
+    "beta_evaluations",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.risk_qualified_policy_run_receipt.v0.1"
+    },
+    "status": {
+      "const": "synthetic_finite_support_reference_not_a_formal_guarantee"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "code_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "risk_budget_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "beta_grid_selection_is_formally_qualified": {
+      "const": false
+    },
+    "beta_evaluations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/betaEvaluation"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "fraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "signedFraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer"
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "beta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_ids",
+        "masses"
+      ],
+      "properties": {
+        "action_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "masses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "actionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "probability",
+        "reward_milli",
+        "loss_ppm"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "probability": {
+          "$ref": "#/$defs/fraction"
+        },
+        "reward_milli": {
+          "type": "integer"
+        },
+        "loss_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "policyEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_loss_ppm",
+        "expected_reward_milli",
+        "cvar_loss_ppm",
+        "total_variation_from_safe",
+        "actions"
+      ],
+      "properties": {
+        "expected_loss_ppm": {
+          "$ref": "#/$defs/fraction"
+        },
+        "expected_reward_milli": {
+          "$ref": "#/$defs/signedFraction"
+        },
+        "cvar_loss_ppm": {
+          "$ref": "#/$defs/fraction"
+        },
+        "total_variation_from_safe": {
+          "$ref": "#/$defs/fraction"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/actionReceipt"
+          }
+        }
+      }
+    },
+    "weightedDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "weighted_empirical_risk_with_worst_case_test",
+        "supremum_test_weight",
+        "sum_calibration_weights",
+        "calibration_sample_count",
+        "status"
+      ],
+      "properties": {
+        "weighted_empirical_risk_with_worst_case_test": {
+          "$ref": "#/$defs/fraction"
+        },
+        "supremum_test_weight": {
+          "$ref": "#/$defs/fraction"
+        },
+        "sum_calibration_weights": {
+          "$ref": "#/$defs/fraction"
+        },
+        "calibration_sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "betaEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "beta",
+        "clipped_policy",
+        "evaluator",
+        "weighted_calibration",
+        "evaluator_risk_within_budget",
+        "calibration_diagnostic_within_budget"
+      ],
+      "properties": {
+        "beta": {
+          "$ref": "#/$defs/beta"
+        },
+        "clipped_policy": {
+          "$ref": "#/$defs/policy"
+        },
+        "evaluator": {
+          "$ref": "#/$defs/policyEvaluation"
+        },
+        "weighted_calibration": {
+          "$ref": "#/$defs/weightedDiagnostic"
+        },
+        "evaluator_risk_within_budget": {
+          "type": "boolean"
+        },
+        "calibration_diagnostic_within_budget": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

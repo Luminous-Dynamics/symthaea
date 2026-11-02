@@ -1,0 +1,223 @@
+{
+  "schema": "symthaea.risk_qualified_policy_benchmark.v0.1",
+  "version": "0.1.0",
+  "status": "synthetic_finite_support_reference_not_a_formal_guarantee",
+  "scenario_id": "nonmonotone_action_risk_rare_catastrophe",
+  "risk_budget_ppm": 105000,
+  "cvar_alpha_ppm": 50000,
+  "worst_case_loss_ppm": 1000000,
+  "action_support": [
+    {
+      "action_id": 0,
+      "name": "safe_hold",
+      "reward_milli": 10000,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 1,
+      "name": "incremental",
+      "reward_milli": 25000,
+      "loss_ppm": 100000
+    },
+    {
+      "action_id": 2,
+      "name": "high_reward_hazard",
+      "reward_milli": 100000,
+      "loss_ppm": 900000
+    },
+    {
+      "action_id": 3,
+      "name": "specialist_safe",
+      "reward_milli": 55000,
+      "loss_ppm": 20000
+    }
+  ],
+  "safe_reference_policy": {
+    "action_ids": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "masses": [
+      700,
+      200,
+      90,
+      10
+    ]
+  },
+  "optimized_candidate_policy": {
+    "action_ids": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "masses": [
+      100,
+      200,
+      300,
+      400
+    ]
+  },
+  "calibration_mixture_policy": {
+    "action_ids": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "masses": [
+      700,
+      200,
+      90,
+      10
+    ]
+  },
+  "beta_grid": [
+    {
+      "numerator": 1,
+      "denominator": 16
+    },
+    {
+      "numerator": 1,
+      "denominator": 8
+    },
+    {
+      "numerator": 1,
+      "denominator": 4
+    },
+    {
+      "numerator": 1,
+      "denominator": 2
+    },
+    {
+      "numerator": 1,
+      "denominator": 1
+    },
+    {
+      "numerator": 2,
+      "denominator": 1
+    },
+    {
+      "numerator": 10,
+      "denominator": 1
+    },
+    {
+      "numerator": 40,
+      "denominator": 1
+    }
+  ],
+  "calibration_samples": [
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 1,
+      "loss_ppm": 100000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 1,
+      "loss_ppm": 100000
+    },
+    {
+      "action_id": 2,
+      "loss_ppm": 1000000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 3,
+      "loss_ppm": 20000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 1,
+      "loss_ppm": 100000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 2,
+      "loss_ppm": 1000000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 3,
+      "loss_ppm": 20000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 1,
+      "loss_ppm": 100000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    },
+    {
+      "action_id": 3,
+      "loss_ppm": 20000
+    },
+    {
+      "action_id": 0,
+      "loss_ppm": 0
+    }
+  ],
+  "notes": [
+    "Synthetic finite-support diagnostic fixture only; action losses are evaluator-side ground truth.",
+    "The loss profile is non-monotonic across action IDs: the specialist action has high reward and low loss, while the high_reward_hazard action has high reward and high loss.",
+    "The calibration mixture is a declared discrete policy; its outcome records are synthetic and do not establish exchangeability or a CPC theorem.",
+    "The beta grid is preregistered; evaluating many beta values on one calibration set is not a formally qualified selection rule without a simultaneous-validity argument."
+  ],
+  "external_baseline_references": [
+    {
+      "id": "cpc_reference_cbo",
+      "role": "marginal_policy_risk_control",
+      "paper_url": "https://proceedings.mlr.press/v306/prinster26a.html",
+      "code_url": "https://github.com/samuelstanton/conformal-policy-control",
+      "code_commit": "83ba982e14480f5e986cf7776de87a9b7e3d4245",
+      "code_commit_date": "2026-10-24",
+      "license": "MIT",
+      "status": "reference_implementation_pinned_reproduction_required",
+      "audit_note": "CBO source path uses Monte Carlo estimates for constrained-policy normalizers and proposal-sample maxima for the worst-case test weight. The finite-support Symthaea slice computes these discrete quantities exactly. Paper-matched reproduction remains required."
+    },
+    {
+      "id": "ac_rac_action_conditional",
+      "role": "action_conditional_risk_averse_decision",
+      "paper_url": "https://proceedings.mlr.press/v306/zhu26z.html",
+      "code_url": "https://github.com/Telvc/AC-RAC",
+      "code_commit": "df7194a6fa7b283108b96672833e3f85ecc25835",
+      "code_commit_date": "2026-05-20",
+      "license": "MIT",
+      "status": "reference_implementation_pinned_reproduction_required",
+      "audit_note": "Repository includes AC-RAC per-action lambda calibration, action-conditional coverage/FDR metrics, and tests comparing vectorized AC-RAC to a literal per-label loop. README documents fast mode using cached inputs and a full mode with paper-protocol COVID and three-seed MovieLens reruns. The pinned commit predates the July 2026 ICML proceedings; verify the final paper-to-code mapping before treating it as definitive."
+    }
+  ]
+}
