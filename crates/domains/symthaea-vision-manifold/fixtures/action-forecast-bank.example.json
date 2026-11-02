@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "action_manifest_sha256": "8cd89f9287f4cfe2f5b69b6e35fa8b33f74150f6f4850271ab283a95418b48aa",
+  "joint_draw_manifest_sha256": "f0fd63f7e8fbc17b1c19e93e7437488528f5db2d254507e93fac1595b7637616",
+  "model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "bank_sha256": "11c3ccc99d90771444ad3198ff5f6a87494ed167e2da3be2744acb2f64ba523e",
+  "source_frame_sequence": 40,
+  "issued_at_seconds": 1,
+  "horizon_seconds": 0.5,
+  "target_frame_sequence": 45,
+  "target_time_seconds": 1.5,
+  "action_ids": [
+    17,
+    9
+  ],
+  "joint_draw_ids": [
+    100,
+    101
+  ],
+  "coupling": "paired_exogenous_disturbance",
+  "persistence_belief": [
+    1,
+    0,
+    0
+  ],
+  "samples": [
+    {
+      "action_id": 17,
+      "joint_draw_id": 100,
+      "branch_id": "b17-100",
+      "predicted_belief": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "action_id": 17,
+      "joint_draw_id": 101,
+      "branch_id": "b17-101",
+      "predicted_belief": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "action_id": 9,
+      "joint_draw_id": 100,
+      "branch_id": "b9-100",
+      "predicted_belief": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "action_id": 9,
+      "joint_draw_id": 101,
+      "branch_id": "b9-101",
+      "predicted_belief": [
+        0,
+        1,
+        0
+      ]
+    }
+  ]
+}
