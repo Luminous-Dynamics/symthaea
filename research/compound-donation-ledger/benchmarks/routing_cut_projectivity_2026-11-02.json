@@ -1,0 +1,36 @@
+{
+  "arithmetic": "exact fractions; no floating-point accounting",
+  "assertions": [
+    "identical prefix candidate evidence/incoming/outgoing/score states",
+    "identical full token state for internal edges",
+    "stable source-scoped token IDs, destinations, creation rounds and face amounts",
+    "cut-equivalent state for edges crossing the prefix boundary",
+    "identical prefix reservations and internal credits",
+    "all prefix budgets",
+    "donor cap and own-increment cap",
+    "nonnegative and nondecreasing weighted scores",
+    "exact escrow conservation"
+  ],
+  "global_candidate_universe": 16,
+  "global_counter_negative_control": {
+    "extended_later_old_donor_token_id": 3,
+    "mismatch_expected": true,
+    "short_later_old_donor_token_id": 2,
+    "source_scoped_identity": [1, 2]
+  },
+  "higher_id_lookahead_negative_control": {
+    "donor_id": 1,
+    "extended_horizon_destination": 3,
+    "projectivity_broken": true,
+    "short_horizon_destination": 2
+  },
+  "pairs_with_literal_cross_boundary_remaining_difference": 250,
+  "prefix_horizons": "cycled 1..15",
+  "projected_replay_pairs_passed": 250,
+  "reserve_policy": "D_i,t = min((gamma_i * X_i,t - 1)_+, gamma_i); gamma_i = 1/universe",
+  "rounds": 40,
+  "routing_policy": "current-evidence-aware, using only IDs <= donor plus fixed-universe metadata",
+  "scope": "structural bookkeeping/projectivity only; not e-process validity, FDR, or SupFDR",
+  "seed_schedule": "20261102 + 17*trace; independent deterministic stream per (candidate, round)",
+  "traces": 250
+}
