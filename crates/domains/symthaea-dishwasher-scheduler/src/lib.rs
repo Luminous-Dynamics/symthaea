@@ -202,9 +202,10 @@ fn predicted_full_finish(
     Some(now_s.max(full_free_s).max(ready_at).saturating_add(full.duration_s))
 }
 
-/// True when cleaning a partial FullLoad batch in QuickCell is no worse
-/// on both modeled resource objectives and strictly better on at least one.
-/// This comparison is made per item and never trades cleaning eligibility away.
+/// True when processing a partial FullLoad batch serially in QuickCell is
+/// no worse on energy, fresh water and total queue service duration, and is
+/// strictly better on at least one. This prevents a resource-only switch from
+/// silently creating a much longer queue. Eligibility remains a hard gate.
 fn quick_dominates_partial_batch(
     quick: &ModeProfile,
     full: &ModeProfile,
@@ -217,12 +218,15 @@ fn quick_dominates_partial_batch(
     let quick_water = quick.water_for(1);
     let full_energy_per_item = full.energy_for(batch_item_count) / batch_item_count as f64;
     let full_water_per_item = full.water_for(batch_item_count) / batch_item_count as f64;
+    let quick_queue_duration_s = quick.duration_s.saturating_mul(batch_item_count as u64);
     let tolerance = 1.0e-12;
 
     let no_worse = quick_energy <= full_energy_per_item + tolerance
-        && quick_water <= full_water_per_item + tolerance;
+        && quick_water <= full_water_per_item + tolerance
+        && quick_queue_duration_s <= full.duration_s;
     let strictly_better = quick_energy < full_energy_per_item - tolerance
-        || quick_water < full_water_per_item - tolerance;
+        || quick_water < full_water_per_item - tolerance
+        || quick_queue_duration_s < full.duration_s;
     no_worse && strictly_better
 }
 
@@ -722,6 +726,13 @@ mod tests {
         assert!(individual.makespan_s < batch.makespan_s);
         assert!(individual.total_energy_kwh < batch.total_energy_kwh);
         assert!(individual.total_fresh_water_l < batch.total_fresh_water_l);
+    }
+
+    #[test]
+    fn quickcell_does_not_dominate_if_serial_queue_service_is_slower() {
+        let (mut quick, full) = profiles();
+        quick.duration_s = 900;
+        assert!(!quick_dominates_partial_batch(&quick, &full, 10));
     }
 
     #[test]
