@@ -19,13 +19,13 @@ It applies a deterministic greedy budget rule, skips cases that do not fit the r
 
 ## Explicit limitations
 
-- This is a **greedy value-density heuristic**, not an exact 0/1 knapsack optimizer. It can be suboptimal when review durations differ; a unit test preserves a counterexample. Compare it with an exact small-cohort oracle and other scheduling policies.
+- This is a **greedy value-density heuristic**, not an exact 0/1 knapsack optimizer. It can be suboptimal when review durations differ; a unit test preserves a counterexample. Compare it with the exact small-cohort enumeration oracle and other scheduling policies.
 - The probabilities and costs are supplied by the caller. The crate does not train or calibrate a model, estimate causal effects, infer anatomical connectivity, or inspect raw EM.
 - It does not know ground-truth labels and cannot calculate empirical review recall, precision, calibration, or human productivity. Those metrics belong to the evaluation harness.
 - It allocates review time only. A review recommendation is not a completed edit.
 - A production run must pin the model, calibration, cost profile, dataset revision, view contract and prediction artifact. See `research/connectomics/PROOFREADING_POLICY_EVALUATION_V0.1.md`.
 
-## API sketch
+## Exact small-cohort oracle\n\n\`plan_reviews_exact_small\` exhaustively evaluates all review subsets for at most 20 candidates. It maximizes total expected avoided error cost under the integer-second budget, then breaks ties by lower time and lexicographically smaller operation IDs. This is a regression oracle for small fixtures and sampled cohorts, not a large-dataset production scheduler.\n\n## API sketch
 
 ```rust
 use connectome_proofreading_policy::{
