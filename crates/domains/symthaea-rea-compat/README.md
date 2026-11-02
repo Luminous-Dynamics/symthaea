@@ -28,9 +28,8 @@ Then call the direct Rust API; MCP is not required for in-process use:
 ```rust,ignore
 use symthaea::rea_compat::verify_evidence_json;
 
-let verified = verify_evidence_json(include_bytes!(
-    "../tests/fixtures/rea-evidence-v1.json"
-))?;
+let input = std::fs::read("evidence.json")?;
+let verified = verify_evidence_json(&input)?;
 println!("semantic Evidence ID: {}", verified.evidence_id);
 println!("raw file SHA-256: {:?}", verified.raw_file_sha256);
 ```
