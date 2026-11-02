@@ -1,0 +1,523 @@
+{
+  "schema_version": "0.1",
+  "synthetic_only": true,
+  "cases": [
+    {
+      "case_id": "clean_volume_and_neuron_holdout",
+      "input": {
+        "schema_version": "0.1",
+        "policy": {
+          "policy_id": "synthetic-v1",
+          "group_keys": [
+            "SourceVolume",
+            "Neuron"
+          ],
+          "view_permissions": [
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "GeometryDual"
+            },
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "EmBest"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "EmXy"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "GeometrySingle"
+            }
+          ]
+        },
+        "operations": [
+          {
+            "operation_id": "train-op",
+            "sample_hash": "00000000000000000000000000000001",
+            "split": "Train",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-train",
+              "source_operation_id": "source-train",
+              "spatial_cube_id": "cube-train",
+              "neuron_ids": [
+                "neuron-train"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-train-op",
+                "sample_hash": "00000000000000000000000000000001",
+                "split": "Train",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          },
+          {
+            "operation_id": "test-op",
+            "sample_hash": "00000000000000000000000000000002",
+            "split": "Test",
+            "task_route": "FalseMergeIdentification",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-test",
+              "source_operation_id": "source-test",
+              "spatial_cube_id": "cube-test",
+              "neuron_ids": [
+                "neuron-test"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-test-op",
+                "sample_hash": "00000000000000000000000000000002",
+                "split": "Test",
+                "task_route": "FalseMergeIdentification",
+                "view_kind": "EmXy",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "status": "GroupDisjoint",
+        "operation_count": 2,
+        "unique_sample_count": 2,
+        "view_instance_count": 2,
+        "overlaps": []
+      }
+    },
+    {
+      "case_id": "source_volume_overlap",
+      "input": {
+        "schema_version": "0.1",
+        "policy": {
+          "policy_id": "synthetic-v1",
+          "group_keys": [
+            "SourceVolume"
+          ],
+          "view_permissions": [
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "GeometryDual"
+            },
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "EmBest"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "EmXy"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "GeometrySingle"
+            }
+          ]
+        },
+        "operations": [
+          {
+            "operation_id": "train-op",
+            "sample_hash": "00000000000000000000000000000001",
+            "split": "Train",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-shared",
+              "source_operation_id": "source-a",
+              "spatial_cube_id": "cube-a",
+              "neuron_ids": [
+                "neuron-a"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-train-op",
+                "sample_hash": "00000000000000000000000000000001",
+                "split": "Train",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          },
+          {
+            "operation_id": "test-op",
+            "sample_hash": "00000000000000000000000000000002",
+            "split": "Test",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-shared",
+              "source_operation_id": "source-b",
+              "spatial_cube_id": "cube-b",
+              "neuron_ids": [
+                "neuron-b"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-test-op",
+                "sample_hash": "00000000000000000000000000000002",
+                "split": "Test",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "status": "LeakageDetected",
+        "operation_count": 2,
+        "unique_sample_count": 2,
+        "view_instance_count": 2,
+        "overlaps": [
+          {
+            "group_key": "SourceVolume",
+            "group_value": "volume-shared",
+            "splits": [
+              "Train",
+              "Test"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "upstream_source_operation_overlap",
+      "input": {
+        "schema_version": "0.1",
+        "policy": {
+          "policy_id": "synthetic-v1",
+          "group_keys": [
+            "SourceOperation"
+          ],
+          "view_permissions": [
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "GeometryDual"
+            },
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "EmBest"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "EmXy"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "GeometrySingle"
+            }
+          ]
+        },
+        "operations": [
+          {
+            "operation_id": "train-op",
+            "sample_hash": "00000000000000000000000000000001",
+            "split": "Train",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-a",
+              "source_operation_id": "source-op-shared",
+              "spatial_cube_id": "cube-a",
+              "neuron_ids": [
+                "neuron-a"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-train-op",
+                "sample_hash": "00000000000000000000000000000001",
+                "split": "Train",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          },
+          {
+            "operation_id": "test-op",
+            "sample_hash": "00000000000000000000000000000002",
+            "split": "Test",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-b",
+              "source_operation_id": "source-op-shared",
+              "spatial_cube_id": "cube-b",
+              "neuron_ids": [
+                "neuron-b"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-test-op",
+                "sample_hash": "00000000000000000000000000000002",
+                "split": "Test",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "status": "LeakageDetected",
+        "operation_count": 2,
+        "unique_sample_count": 2,
+        "view_instance_count": 2,
+        "overlaps": [
+          {
+            "group_key": "SourceOperation",
+            "group_value": "source-op-shared",
+            "splits": [
+              "Train",
+              "Test"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "spatial_cube_overlap",
+      "input": {
+        "schema_version": "0.1",
+        "policy": {
+          "policy_id": "synthetic-v1",
+          "group_keys": [
+            "SpatialCube"
+          ],
+          "view_permissions": [
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "GeometryDual"
+            },
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "EmBest"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "EmXy"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "GeometrySingle"
+            }
+          ]
+        },
+        "operations": [
+          {
+            "operation_id": "train-op",
+            "sample_hash": "00000000000000000000000000000001",
+            "split": "Train",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-a",
+              "source_operation_id": "source-a",
+              "spatial_cube_id": "cube-50um-17",
+              "neuron_ids": [
+                "neuron-a"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-train-op",
+                "sample_hash": "00000000000000000000000000000001",
+                "split": "Train",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          },
+          {
+            "operation_id": "test-op",
+            "sample_hash": "00000000000000000000000000000002",
+            "split": "Test",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-a",
+              "source_operation_id": "source-b",
+              "spatial_cube_id": "cube-50um-17",
+              "neuron_ids": [
+                "neuron-b"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-test-op",
+                "sample_hash": "00000000000000000000000000000002",
+                "split": "Test",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "status": "LeakageDetected",
+        "operation_count": 2,
+        "unique_sample_count": 2,
+        "view_instance_count": 2,
+        "overlaps": [
+          {
+            "group_key": "SpatialCube",
+            "group_value": "cube-50um-17",
+            "splits": [
+              "Train",
+              "Test"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "same_sample_cross_split_across_task_routes",
+      "input": {
+        "schema_version": "0.1",
+        "policy": {
+          "policy_id": "synthetic-v1",
+          "group_keys": [
+            "SourceVolume"
+          ],
+          "view_permissions": [
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "GeometryDual"
+            },
+            {
+              "task_route": "FalseSplitCorrection",
+              "view_kind": "EmBest"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "EmXy"
+            },
+            {
+              "task_route": "FalseMergeIdentification",
+              "view_kind": "GeometrySingle"
+            }
+          ]
+        },
+        "operations": [
+          {
+            "operation_id": "split-task",
+            "sample_hash": "00000000000000000000000000000003",
+            "split": "Train",
+            "task_route": "FalseSplitCorrection",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-a",
+              "source_operation_id": "source-a",
+              "spatial_cube_id": "cube-a",
+              "neuron_ids": [
+                "neuron-a"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-split-task",
+                "sample_hash": "00000000000000000000000000000003",
+                "split": "Train",
+                "task_route": "FalseSplitCorrection",
+                "view_kind": "GeometryDual",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          },
+          {
+            "operation_id": "merge-task",
+            "sample_hash": "00000000000000000000000000000003",
+            "split": "Test",
+            "task_route": "FalseMergeIdentification",
+            "groups": {
+              "source_archive_id": "archive-a",
+              "source_volume_id": "volume-a",
+              "source_operation_id": "source-a",
+              "spatial_cube_id": "cube-a",
+              "neuron_ids": [
+                "neuron-a"
+              ],
+              "animal_id": "animal-a",
+              "session_id": "session-a",
+              "species": "mouse",
+              "workflow_id": "workflow-v1"
+            },
+            "label_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "views": [
+              {
+                "view_id": "view-merge-task",
+                "sample_hash": "00000000000000000000000000000003",
+                "split": "Test",
+                "task_route": "FalseMergeIdentification",
+                "view_kind": "EmXy",
+                "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ]
+          }
+        ]
+      },
+      "expected_error": "SampleAppearsInMultipleSplits"
+    }
+  ]
+}
