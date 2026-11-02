@@ -24,16 +24,33 @@ const ROUND_OFF_TOLERANCE: f64 = 1.0e-12;
 #[derive(Debug, Clone, PartialEq)]
 pub enum DesignError {
     EmptyHypothesisSet,
-    PriorCountMismatch { expected: usize, actual: usize },
-    InvalidPrior { index: usize, value: f64 },
-    PriorMassNotOne { sum: f64 },
+    PriorCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidPrior {
+        index: usize,
+        value: f64,
+    },
+    PriorMassNotOne {
+        sum: f64,
+    },
     EmptyExperimentId,
-    DuplicateExperimentId { experiment_id: String },
-    InvalidExperimentCost { cost: f64 },
+    DuplicateExperimentId {
+        experiment_id: String,
+    },
+    InvalidExperimentCost {
+        cost: f64,
+    },
     NoCandidateExperiments,
     EmptyOutcomeSet,
-    DuplicateOutcomeLabel { label: String },
-    LikelihoodRowCountMismatch { expected: usize, actual: usize },
+    DuplicateOutcomeLabel {
+        label: String,
+    },
+    LikelihoodRowCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     LikelihoodOutcomeCountMismatch {
         hypothesis_index: usize,
         expected: usize,
@@ -44,14 +61,29 @@ pub enum DesignError {
         outcome_index: usize,
         value: f64,
     },
-    LikelihoodMassNotOne { hypothesis_index: usize, sum: f64 },
-    OutcomeIndexOutOfRange { index: usize, outcome_count: usize },
-    ImpossibleObservedOutcome { outcome_index: usize },
-    SelectedExperimentNotFound { experiment_id: String },
+    LikelihoodMassNotOne {
+        hypothesis_index: usize,
+        sum: f64,
+    },
+    OutcomeIndexOutOfRange {
+        index: usize,
+        outcome_count: usize,
+    },
+    ImpossibleObservedOutcome {
+        outcome_index: usize,
+    },
+    SelectedExperimentNotFound {
+        experiment_id: String,
+    },
     EmptyActionSet,
     EmptyActionLabel,
-    DuplicateActionLabel { label: String },
-    DecisionUtilityRowCountMismatch { expected: usize, actual: usize },
+    DuplicateActionLabel {
+        label: String,
+    },
+    DecisionUtilityRowCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     DecisionUtilityActionCountMismatch {
         hypothesis_index: usize,
         expected: usize,
@@ -103,7 +135,10 @@ impl fmt::Display for DesignError {
         match self {
             Self::EmptyHypothesisSet => write!(f, "hypothesis set must not be empty"),
             Self::PriorCountMismatch { expected, actual } => {
-                write!(f, "expected {expected} hypothesis priors, received {actual}")
+                write!(
+                    f,
+                    "expected {expected} hypothesis priors, received {actual}"
+                )
             }
             Self::InvalidPrior { index, value } => write!(f, "prior {index} is invalid: {value}"),
             Self::PriorMassNotOne { sum } => {
@@ -114,12 +149,20 @@ impl fmt::Display for DesignError {
                 write!(f, "duplicate experiment id {experiment_id:?}")
             }
             Self::InvalidExperimentCost { cost } => {
-                write!(f, "experiment cost must be finite and positive, received {cost}")
+                write!(
+                    f,
+                    "experiment cost must be finite and positive, received {cost}"
+                )
             }
             Self::NoCandidateExperiments => write!(f, "candidate experiment set must not be empty"),
-            Self::EmptyOutcomeSet => write!(f, "candidate experiment must declare at least one outcome"),
+            Self::EmptyOutcomeSet => {
+                write!(f, "candidate experiment must declare at least one outcome")
+            }
             Self::DuplicateOutcomeLabel { label } => {
-                write!(f, "candidate experiment has duplicate outcome label {label:?}")
+                write!(
+                    f,
+                    "candidate experiment has duplicate outcome label {label:?}"
+                )
             }
             Self::LikelihoodRowCountMismatch { expected, actual } => {
                 write!(f, "expected {expected} likelihood rows, received {actual}")
@@ -140,18 +183,30 @@ impl fmt::Display for DesignError {
                 f,
                 "likelihood for hypothesis {hypothesis_index}, outcome {outcome_index} is invalid: {value}"
             ),
-            Self::LikelihoodMassNotOne { hypothesis_index, sum } => write!(
+            Self::LikelihoodMassNotOne {
+                hypothesis_index,
+                sum,
+            } => write!(
                 f,
                 "likelihoods for hypothesis {hypothesis_index} must sum to one, received {sum}"
             ),
-            Self::OutcomeIndexOutOfRange { index, outcome_count } => {
+            Self::OutcomeIndexOutOfRange {
+                index,
+                outcome_count,
+            } => {
                 write!(f, "outcome index {index} is outside 0..{outcome_count}")
             }
             Self::ImpossibleObservedOutcome { outcome_index } => {
-                write!(f, "outcome {outcome_index} has zero probability under every hypothesis")
+                write!(
+                    f,
+                    "outcome {outcome_index} has zero probability under every hypothesis"
+                )
             }
             Self::SelectedExperimentNotFound { experiment_id } => {
-                write!(f, "selected experiment {experiment_id:?} is not in the candidate set")
+                write!(
+                    f,
+                    "selected experiment {experiment_id:?} is not in the candidate set"
+                )
             }
             Self::EmptyActionSet => write!(f, "decision action set must not be empty"),
             Self::EmptyActionLabel => write!(f, "decision action label must not be empty"),
@@ -218,7 +273,10 @@ impl fmt::Display for DesignError {
                 "joint experiment {experiment_id:?} declares different costs: hypothesis {hypothesis_cost}, parameter {parameter_cost}"
             ),
             Self::NumericalInstability => {
-                write!(f, "information or decision-value calculation exceeded its numerical tolerance")
+                write!(
+                    f,
+                    "information or decision-value calculation exceeded its numerical tolerance"
+                )
             }
         }
     }
@@ -937,7 +995,10 @@ fn validate_priors(priors: &[f64]) -> Result<(), DesignError> {
     let mut sum = 0.0;
     for (index, &prior) in priors.iter().enumerate() {
         if !prior.is_finite() || prior < 0.0 {
-            return Err(DesignError::InvalidPrior { index, value: prior });
+            return Err(DesignError::InvalidPrior {
+                index,
+                value: prior,
+            });
         }
         sum += prior;
     }
@@ -958,7 +1019,9 @@ fn validate_candidate(
         return Err(DesignError::EmptyExperimentId);
     }
     if !candidate.cost.is_finite() || candidate.cost <= 0.0 {
-        return Err(DesignError::InvalidExperimentCost { cost: candidate.cost });
+        return Err(DesignError::InvalidExperimentCost {
+            cost: candidate.cost,
+        });
     }
     if candidate.outcomes.is_empty() {
         return Err(DesignError::EmptyOutcomeSet);
@@ -967,7 +1030,9 @@ fn validate_candidate(
     let mut labels = HashSet::with_capacity(candidate.outcomes.len());
     for label in &candidate.outcomes {
         if !labels.insert(label.as_str()) {
-            return Err(DesignError::DuplicateOutcomeLabel { label: label.clone() });
+            return Err(DesignError::DuplicateOutcomeLabel {
+                label: label.clone(),
+            });
         }
     }
 
@@ -1053,9 +1118,7 @@ pub fn evaluate_candidate(
     if information_gain < 0.0 && information_gain >= -ROUND_OFF_TOLERANCE {
         information_gain = 0.0;
     }
-    if information_gain > prior_entropy
-        && information_gain <= prior_entropy + ROUND_OFF_TOLERANCE
-    {
+    if information_gain > prior_entropy && information_gain <= prior_entropy + ROUND_OFF_TOLERANCE {
         information_gain = prior_entropy;
     }
     if !information_gain.is_finite()
@@ -1116,8 +1179,7 @@ pub fn posterior_for_observed_outcome(
         .iter()
         .enumerate()
         .map(|(hypothesis_index, &prior)| {
-            prior * candidate.likelihoods_by_hypothesis[hypothesis_index][outcome_index]
-                / marginal
+            prior * candidate.likelihoods_by_hypothesis[hypothesis_index][outcome_index] / marginal
         })
         .collect())
 }
@@ -1194,11 +1256,7 @@ pub fn selection_regret(
     })
 }
 
-
-fn validate_decision_problem(
-    priors: &[f64],
-    problem: &DecisionProblem,
-) -> Result<(), DesignError> {
+fn validate_decision_problem(priors: &[f64], problem: &DecisionProblem) -> Result<(), DesignError> {
     validate_priors(priors)?;
     if problem.actions.is_empty() {
         return Err(DesignError::EmptyActionSet);
@@ -1209,7 +1267,9 @@ fn validate_decision_problem(
             return Err(DesignError::EmptyActionLabel);
         }
         if !action_labels.insert(label.as_str()) {
-            return Err(DesignError::DuplicateActionLabel { label: label.clone() });
+            return Err(DesignError::DuplicateActionLabel {
+                label: label.clone(),
+            });
         }
     }
     if problem.utilities_by_hypothesis.len() != priors.len() {
@@ -1468,18 +1528,23 @@ mod tests {
             ],
         };
 
-        let eig_ranked = rank_candidates(
-            &priors,
-            &[within_group.clone(), group_signal.clone()],
-        )
-        .unwrap();
+        let eig_ranked =
+            rank_candidates(&priors, &[within_group.clone(), group_signal.clone()]).unwrap();
         assert_eq!(eig_ranked[0].experiment_id, "within-group-identity");
         close(eig_ranked[0].score.information_gain_bits, 1.0, 1.0e-12);
 
         let within_score = evaluate_decision_value(&priors, &within_group, &problem).unwrap();
         let group_score = evaluate_decision_value(&priors, &group_signal, &problem).unwrap();
-        close(within_score.expected_value_of_sample_information, 0.0, 1.0e-12);
-        close(group_score.expected_value_of_sample_information, 0.3, 1.0e-12);
+        close(
+            within_score.expected_value_of_sample_information,
+            0.0,
+            1.0e-12,
+        );
+        close(
+            group_score.expected_value_of_sample_information,
+            0.3,
+            1.0e-12,
+        );
 
         let decision_ranked = rank_candidates_by_decision_value(
             &priors,
@@ -1930,7 +1995,11 @@ mod tests {
     fn noisy_ninety_ten_discriminator_matches_analytic_eig() {
         let experiment = binary_experiment("noisy", 1.0, 0.9, 0.1);
         let score = evaluate_candidate(&[0.5, 0.5], &experiment).unwrap();
-        close(score.information_gain_bits, 0.531_004_406_410_718_8, 1.0e-12);
+        close(
+            score.information_gain_bits,
+            0.531_004_406_410_718_8,
+            1.0e-12,
+        );
     }
 
     #[test]
@@ -1943,7 +2012,11 @@ mod tests {
         };
         let score = evaluate_candidate(&[0.8, 0.2], &experiment).unwrap();
         close(score.prior_entropy_bits, 0.721_928_094_887_362_3, 1.0e-12);
-        close(score.information_gain_bits, score.prior_entropy_bits, 1.0e-12);
+        close(
+            score.information_gain_bits,
+            score.prior_entropy_bits,
+            1.0e-12,
+        );
     }
 
     #[test]
@@ -1974,8 +2047,14 @@ mod tests {
         let first = rank_candidates(&[0.5, 0.5], &[zeta.clone(), alpha.clone()]).unwrap();
         let second = rank_candidates(&[0.5, 0.5], &[alpha, zeta]).unwrap();
         assert_eq!(
-            first.iter().map(|item| &item.experiment_id).collect::<Vec<_>>(),
-            second.iter().map(|item| &item.experiment_id).collect::<Vec<_>>()
+            first
+                .iter()
+                .map(|item| &item.experiment_id)
+                .collect::<Vec<_>>(),
+            second
+                .iter()
+                .map(|item| &item.experiment_id)
+                .collect::<Vec<_>>()
         );
         assert_eq!(first[0].experiment_id, "alpha");
     }
@@ -1984,8 +2063,8 @@ mod tests {
     fn selection_regret_is_zero_for_best_candidate_and_positive_otherwise() {
         let expensive = binary_experiment("expensive", 5.0, 0.9, 0.1);
         let cheap = binary_experiment("cheap", 1.0, 0.8, 0.2);
-        let best = selection_regret(&[0.5, 0.5], &[expensive.clone(), cheap.clone()], "cheap")
-            .unwrap();
+        let best =
+            selection_regret(&[0.5, 0.5], &[expensive.clone(), cheap.clone()], "cheap").unwrap();
         close(best.regret_bits_per_cost, 0.0, 1.0e-12);
         let regret = selection_regret(&[0.5, 0.5], &[expensive, cheap], "expensive").unwrap();
         assert!(regret.regret_bits_per_cost > 0.0);
@@ -2007,7 +2086,10 @@ mod tests {
         experiment.likelihoods_by_hypothesis[0] = vec![0.9, 0.2];
         assert!(matches!(
             evaluate_candidate(&[0.5, 0.5], &experiment),
-            Err(DesignError::LikelihoodMassNotOne { hypothesis_index: 0, .. })
+            Err(DesignError::LikelihoodMassNotOne {
+                hypothesis_index: 0,
+                ..
+            })
         ));
     }
 
