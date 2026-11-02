@@ -337,6 +337,14 @@ pub struct ExpressedAffectEstimateV1 {
     pub evidence: PerceptualEvidenceRefV1,
 }
 
+impl ExpressedAffectEstimateV1 {
+    pub fn validate(&self) -> Result<(), AppraisalError> {
+        self.estimate.validate()?;
+        bounded("expressed.confidence", self.confidence, 0.0, 1.0)?;
+        self.evidence.validate()
+    }
+}
+
 /// A human's report of their own affect after hearing a particular artifact.
 ///
 /// This must be collected from the participant; a model prediction must never
@@ -348,6 +356,17 @@ pub struct HumanInducedAffectReportV1 {
     pub confidence: f32,
     pub audio_sha256: String,
     pub report_time_ms: u64,
+}
+
+impl HumanInducedAffectReportV1 {
+    pub fn validate(&self) -> Result<(), AppraisalError> {
+        if self.participant_pseudonym.trim().is_empty() {
+            return Err(AppraisalError::EmptyIdentifier("participant_pseudonym"));
+        }
+        self.affect.validate()?;
+        bounded("human_report.confidence", self.confidence, 0.0, 1.0)?;
+        validate_sha256("audio_sha256", &self.audio_sha256)
+    }
 }
 
 /// Human preference is a different target from emotion recognition.
@@ -366,6 +385,16 @@ pub struct HumanPreferenceJudgmentV1 {
     pub decision: HumanPreferenceDecisionV1,
     pub audio_a_sha256: String,
     pub audio_b_sha256: String,
+}
+
+impl HumanPreferenceJudgmentV1 {
+    pub fn validate(&self) -> Result<(), AppraisalError> {
+        if self.participant_pseudonym.trim().is_empty() {
+            return Err(AppraisalError::EmptyIdentifier("participant_pseudonym"));
+        }
+        validate_sha256("audio_a_sha256", &self.audio_a_sha256)?;
+        validate_sha256("audio_b_sha256", &self.audio_b_sha256)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -470,10 +499,10 @@ mod tests {
     }
 
     #[test]
-    fn composer_intended_affect_is_not_an_appraisal_input() {
-        // Two different composer targets cannot affect this result: the
-        // observation schema carries only audio-derived evidence and explicit
-        // non-emotional goal congruence.
+    fn identical_perceptual_streams_produce_identical_appraisal() {
+        // Composer targets are not represented in the observation schema:
+        // only audio-derived evidence and explicit non-emotional goal
+        // congruence are accepted by the appraisal API.
         let mut first = MelothaeaAppraisalV1::default();
         let mut second = MelothaeaAppraisalV1::default();
         let heard = observation(1);
