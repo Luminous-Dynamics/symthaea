@@ -8,6 +8,7 @@ on:
       - "Cargo.lock"
       - "src/lib.rs"
       - "src/rea_compat.rs"
+      - "src/rea_mobile_policy.rs"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
