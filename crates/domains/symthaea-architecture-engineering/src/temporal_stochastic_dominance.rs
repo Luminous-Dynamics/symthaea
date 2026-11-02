@@ -293,6 +293,8 @@ pub struct FirstOrderDominanceReport {
     pub contrast_id: String,
     pub axis: TemporalInterventionAxis,
     pub profile_sha256: String,
+    /// Present when this report was reconstructed from a verified append-only evidence ledger.
+    pub evidence_ledger_sha256: Option<String>,
     pub observed_pairs: u64,
     pub stream_alpha: f64,
     pub log_e_value: f64,
@@ -501,6 +503,7 @@ impl FirstOrderDominanceState {
             contrast_id: self.contrast_id.clone(),
             axis: self.axis,
             profile_sha256: self.profile_sha256.clone(),
+            evidence_ledger_sha256: None,
             observed_pairs: self.observed_pairs,
             stream_alpha: self.stream_alpha,
             log_e_value: self.log_e_value - self.numerical_guard,
@@ -578,7 +581,9 @@ pub fn replay_first_order_dominance_from_evidence_ledger(
             state.observe(sequence, pair)?;
         }
     }
-    Ok(state.report())
+    let mut report = state.report();
+    report.evidence_ledger_sha256 = Some(evidence_ledger.evidence_ledger_sha256.clone());
+    Ok(report)
 }
 
 fn validate_pair(
@@ -889,7 +894,9 @@ mod tests {
         for (index, pair) in pairs.iter().enumerate() {
             direct.observe(index as u64 + 1, pair).unwrap();
         }
-        assert_eq!(replayed, direct.report());
+        let mut expected = direct.report();
+        expected.evidence_ledger_sha256 = Some(evidence.evidence_ledger_sha256.clone());
+        assert_eq!(replayed, expected);
     }
 
     #[test]
