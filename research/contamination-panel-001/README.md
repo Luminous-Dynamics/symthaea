@@ -590,3 +590,74 @@ Initial replication gate: at least 300 independent clean negatives per preregist
 
 Paper: [LaRA, Findings of EMNLP 2026](https://aclanthology.org/2026.findings-emnlp.690/). Official implementation: https://github.com/talzoomanzoo/lara. Paper-faithful score semantics are separate from experimental robust-PCA/covariance-aware variants.
 
+## Policy-rigidity negative controls: separate global entropy collapse from exposure-specific excess (SCI-POLICY-RIGIDITY-CONTROLS-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9885
+
+### Research motivation
+
+Self-Critique's ICLR 2026 RL-MIA paper treats narrow reasoning paths and low output entropy after RL as a contamination signal:
+https://proceedings.iclr.cc/paper_files/paper/2026/hash/ab003a4f85ecb1b7b1514ff539dc7395-Abstract-Conference.html
+
+But exploration/entropy collapse is independently observed as a general consequence of reasoning post-training:
+- Latent Exploration Decoding reports low final-layer posterior entropy and reduced exploration after post-training: https://proceedings.mlr.press/v306/tan26d.html
+- STEER studies token-level entropy collapse as a general RLVR optimization issue across mathematical and coding tasks: https://aclanthology.org/2026.acl-long.1436/
+- Revisiting Entropy in RL for Large Reasoning Models analyzes how entropy relates to response diversity, calibration and performance, and identifies clipping, off-policy updates and data diversity as relevant factors: https://aclanthology.org/2026.findings-acl.1266/
+
+Therefore, a detector can mistake a generally rigid policy for an item-specific memory effect. It can also miss contaminated tasks where alternate reasoning paths remain easy. The control panel makes both cases mandatory.
+
+### Three-way decomposition
+
+The module src/policy_rigidity_controls.rs decomposes the probe envelope into:
+
+1. Baseline entropy: mean token entropy of the initial greedy response. An unexpectedly low value is calibrated against matched clean tasks.
+2. Global task/path rigidity: mean entropy-path similarity under prompt-only unfamiliar-method, semantic-preserving paraphrase, constraint-preserving reparameterization and (where applicable) alternate-valid-method interventions. Higher values indicate broader task/policy rigidity.
+3. Response-conditioned excess: answer-conditioned Self-Critique similarity minus the mean of the non-response-conditioned alternative probe scores. Higher values indicate that showing the model its first answer preserves the entropy path more than the other interventions.
+
+The first two axes identify general policy/task rigidity. The third is the item-specific hypothesis to test. None alone proves membership.
+
+### Four required control cells
+
+- Known clean × multiple valid paths: clean/flexible.
+- Known clean × single/few valid paths: clean/rigid hard negative.
+- Known exposed × multiple valid paths: exposed/flexible hard positive.
+- Known exposed × single/few valid paths: exposed/rigid positive.
+
+Path multiplicity is adjudicated before observing outputs. Accepted labels require at least three reviewers and 900/1000 agreement. Indeterminate labels abstain. An alternate-valid-method entropy score is required only for the multiple-valid-path stratum.
+
+### Matched clean-control calibration
+
+Each request pins one exact checkpoint, tokenizer, prompt harness and runtime environment. Clean controls are matched by task family × difficulty band × independently adjudicated path multiplicity. The evaluation set must use different unit IDs and source-cluster digests.
+
+For each matched group, the module reports:
+- lower-tail empirical p for baseline entropy (unexpectedly low entropy);
+- upper-tail empirical p for global task/path rigidity;
+- upper-tail empirical p for response-conditioned excess.
+
+Ties count as extreme. BY is applied to response-conditioned-excess p-values within each matched group. The FDR statement is conditional on clean-control exchangeability and valid super-uniform p-values; the module does not authenticate the clean cohort.
+
+At 1% nominal alpha, 99 independent clean controls per matched group are needed merely to resolve the smallest empirical p-value. This does not establish 1% FPR precision; a separate locked clean evaluation cohort and exact uncertainty bounds are required.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-policy-rigidity-controls \
+      policy-rigidity-controls-request.json \
+      policy-rigidity-controls-report.json
+
+The report keeps three axes separate, reports the four-cell labelled outcomes where available, and hard-sets independently_authenticated=false and confirmatory_eligible=false.
+
+### Qualification targets
+
+- No missing probe feature is zero-imputed.
+- No calibration/evaluation source-cluster overlap.
+- No unadjudicated path multiplicity is silently scored.
+- Clean-rigid hard negatives and exposed-flexible hard positives are both mandatory.
+- Report per-path-multiplicity FPR/TPR, exact uncertainty, coverage/abstention, AUPRC and TPR at fixed low-FPR operating points.
+- Model-pair replicates, not items or repeated generations, are the training-level uncertainty units.
+- Report the cost of all probes, token counts, logprob extraction width, latency and GPU memory.
+
+### Claim ceiling
+
+The decomposition can test whether answer-conditioned path invariance is more unusual than the matched alternative intervention envelope. It does not prove item-level training membership, causal exposure, semantic truth, reviewer independence, model custody or broad external validity. A high global-rigidity score is not evidence of contamination. A response-conditioned excess is a diagnostic contrast requiring randomized exposure experiments and independent calibration.
+
