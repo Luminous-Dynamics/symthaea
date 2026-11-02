@@ -327,7 +327,7 @@ fn main() {
         use symthaea_muse::collaborative::{
             BlendStrategy, CollaborativeComposer, HarmonyContribution,
         };
-        let mut composer = CollaborativeComposer::new(BlendStrategy::PhiWeighted);
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
         composer.contribute(HarmonyContribution {
             participant_id: 1,
             harmonies: [0.8; 8],
@@ -344,8 +344,8 @@ fn main() {
         check(
             &mut pass,
             &mut fail,
-            "Collaborative blends participants",
-            collective.consciousness_level != 0.5,
+            "Collaborative blends musical contributions",
+            collective.harmony_activations[0] > 0.3,
         );
 
         // Spectral vocoder

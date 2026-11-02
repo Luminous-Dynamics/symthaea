@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Collaborative consciousness composition: multiple nodes create shared music.
+//! Collaborative music composition from participant harmony contributions.
 //!
-//! Each participant runs their own consciousness engine. Harmony activations
-//! are shared (optionally encrypted via FHE) and blended into a collective
-//! musical state. The collective drives a shared composition where each
-//! participant hears the same music colored by their individual consciousness.
+//! This legacy composer aggregates feature vectors. It does not implement
+//! consent, attribution, authorship, or contribution provenance; new
+//! sympoietic workflows should use creative_ecology for those boundaries.
+//! A Phi-like value is retained for compatibility and an explicit legacy
+//! ablation, but is not a validated consciousness measure or social authority.
 //!
 //! # Architecture
 //!
@@ -31,7 +32,8 @@ pub struct HarmonyContribution {
     pub participant_id: u64,
     /// Harmony activations from this participant's consciousness.
     pub harmonies: [f32; 8],
-    /// Consciousness level (Phi proxy).
+    /// Legacy Phi-like proxy. Not a validated consciousness measure and not
+    /// suitable as a default influence, merit, or authority weight.
     pub phi: f32,
     /// Timestamp (cycle number).
     pub cycle: u64,
@@ -42,7 +44,8 @@ pub struct HarmonyContribution {
 pub enum BlendStrategy {
     /// Simple average of all contributions.
     Mean,
-    /// Weighted by each participant's Phi (more conscious = more influence).
+    /// Legacy research ablation weighted by a Phi-like proxy. Do not interpret
+    /// this as consciousness measurement or a legitimate social authority.
     PhiWeighted,
     /// Maximum activation per harmony (union of all experiences).
     Maximum,
@@ -52,7 +55,7 @@ pub enum BlendStrategy {
 
 impl Default for BlendStrategy {
     fn default() -> Self {
-        Self::PhiWeighted
+        Self::Mean
     }
 }
 
@@ -62,7 +65,6 @@ pub struct CollaborativeComposer {
     strategy: BlendStrategy,
     /// Smoothed collective harmony (EMA across updates).
     collective_harmonies: [f32; 8],
-    collective_phi: f32,
     ema_alpha: f32,
 }
 
@@ -72,7 +74,6 @@ impl CollaborativeComposer {
             contributions: Vec::with_capacity(MAX_PARTICIPANTS),
             strategy,
             collective_harmonies: [0.3; 8],
-            collective_phi: 0.5,
             ema_alpha: 0.15,
         }
     }
@@ -111,92 +112,92 @@ impl CollaborativeComposer {
             BlendStrategy::Minimum => self.blend_min(),
         };
 
-        // EMA smoothing
+        // EMA smoothing preserves a continuous aggregate without assigning
+        // extra social authority to any contributor under the default policy.
         let a = self.ema_alpha;
-        for i in 0..8 {
-            self.collective_harmonies[i] += a * (blended.0[i] - self.collective_harmonies[i]);
+        for (current, target) in self.collective_harmonies.iter_mut().zip(blended) {
+            *current += a * (target - *current);
         }
-        self.collective_phi += a * (blended.1 - self.collective_phi);
 
         let mut state = MusicalState::default();
         state.harmony_activations = self.collective_harmonies;
-        state.consciousness_level = self.collective_phi;
-        // Arousal from variance (disagreement = tension)
-        state.arousal = self.compute_disagreement();
-        // Valence from collective phi direction
-        state.valence = (self.collective_phi - 0.5) * 2.0;
         state
     }
 
-    fn blend_mean(&self) -> ([f32; 8], f32) {
+    fn blend_mean(&self) -> [f32; 8] {
         let n = self.contributions.len() as f32;
         let mut harmonies = [0.0f32; 8];
-        let mut phi = 0.0f32;
-        for c in &self.contributions {
-            for i in 0..8 {
-                harmonies[i] += c.harmonies[i];
+        for contribution in &self.contributions {
+            for (sum, value) in harmonies.iter_mut().zip(contribution.harmonies) {
+                *sum += value;
             }
-            phi += c.phi;
         }
-        for h in &mut harmonies {
-            *h /= n;
+        for value in &mut harmonies {
+            *value /= n;
         }
-        (harmonies, phi / n)
+        harmonies
     }
 
-    fn blend_phi_weighted(&self) -> ([f32; 8], f32) {
-        let total_phi: f32 = self.contributions.iter().map(|c| c.phi.max(0.01)).sum();
+    fn blend_phi_weighted(&self) -> [f32; 8] {
+        let total_phi: f32 = self
+            .contributions
+            .iter()
+            .map(|contribution| contribution.phi.max(0.01))
+            .sum();
         let mut harmonies = [0.0f32; 8];
-        let mut phi = 0.0f32;
-        for c in &self.contributions {
-            let weight = c.phi.max(0.01) / total_phi;
-            for i in 0..8 {
-                harmonies[i] += c.harmonies[i] * weight;
+        for contribution in &self.contributions {
+            let weight = contribution.phi.max(0.01) / total_phi;
+            for (sum, value) in harmonies.iter_mut().zip(contribution.harmonies) {
+                *sum += value * weight;
             }
-            phi += c.phi * weight;
         }
-        (harmonies, phi)
+        harmonies
     }
 
-    fn blend_max(&self) -> ([f32; 8], f32) {
+    fn blend_max(&self) -> [f32; 8] {
         let mut harmonies = [0.0f32; 8];
-        let mut phi = 0.0f32;
-        for c in &self.contributions {
-            for i in 0..8 {
-                harmonies[i] = harmonies[i].max(c.harmonies[i]);
+        for contribution in &self.contributions {
+            for (current, value) in harmonies.iter_mut().zip(contribution.harmonies) {
+                *current = (*current).max(value);
             }
-            phi = phi.max(c.phi);
         }
-        (harmonies, phi)
+        harmonies
     }
 
-    fn blend_min(&self) -> ([f32; 8], f32) {
+    fn blend_min(&self) -> [f32; 8] {
         let mut harmonies = [1.0f32; 8];
-        let mut phi = 1.0f32;
-        for c in &self.contributions {
-            for i in 0..8 {
-                harmonies[i] = harmonies[i].min(c.harmonies[i]);
+        for contribution in &self.contributions {
+            for (current, value) in harmonies.iter_mut().zip(contribution.harmonies) {
+                *current = (*current).min(value);
             }
-            phi = phi.min(c.phi);
         }
-        (harmonies, phi)
+        harmonies
     }
 
-    /// Compute disagreement (variance) across participants.
-    /// High disagreement → high arousal in the collective state.
+    /// Compute disagreement across participant harmony contributions.
+    /// This reports feature disagreement, not affective arousal.
     fn compute_disagreement(&self) -> f32 {
         if self.contributions.len() < 2 {
             return 0.0;
         }
         let n = self.contributions.len() as f32;
-        let mean_phi: f32 = self.contributions.iter().map(|c| c.phi).sum::<f32>() / n;
-        let variance: f32 = self
-            .contributions
-            .iter()
-            .map(|c| (c.phi - mean_phi).powi(2))
-            .sum::<f32>()
-            / n;
-        (variance.sqrt() * 3.0).clamp(0.0, 1.0) // scale to [0, 1]
+        let mut total_variance = 0.0f32;
+        for index in 0..8 {
+            let mean = self
+                .contributions
+                .iter()
+                .map(|contribution| contribution.harmonies[index])
+                .sum::<f32>()
+                / n;
+            let variance = self
+                .contributions
+                .iter()
+                .map(|contribution| (contribution.harmonies[index] - mean).powi(2))
+                .sum::<f32>()
+                / n;
+            total_variance += variance;
+        }
+        ((total_variance / 8.0).sqrt() * 3.0).clamp(0.0, 1.0)
     }
 
     /// Number of active participants.
@@ -207,6 +208,14 @@ impl CollaborativeComposer {
     /// Get collective harmony activations.
     pub fn collective_harmonies(&self) -> &[f32; 8] {
         &self.collective_harmonies
+    }
+
+    /// Measure disagreement between participants' harmony feature vectors.
+    ///
+    /// This is a descriptive feature-space statistic. It is not affective
+    /// arousal, social conflict, or an estimate of consciousness.
+    pub fn disagreement(&self) -> f32 {
+        self.compute_disagreement()
     }
 }
 
@@ -221,6 +230,24 @@ mod tests {
             phi,
             cycle: 0,
         }
+    }
+
+    #[test]
+    fn default_strategy_does_not_weight_by_phi_proxy() {
+        assert_eq!(BlendStrategy::default(), BlendStrategy::Mean);
+    }
+
+    #[test]
+    fn default_blend_is_invariant_to_legacy_phi_proxy() {
+        let mut first = CollaborativeComposer::new(BlendStrategy::default());
+        first.contribute(make_contribution(1, 0.01, [0.2; 8]));
+        first.contribute(make_contribution(2, 0.99, [0.8; 8]));
+
+        let mut second = CollaborativeComposer::new(BlendStrategy::default());
+        second.contribute(make_contribution(1, 0.99, [0.2; 8]));
+        second.contribute(make_contribution(2, 0.01, [0.8; 8]));
+
+        assert_eq!(first.blend(), second.blend());
     }
 
     #[test]
@@ -272,18 +299,25 @@ mod tests {
     }
 
     #[test]
-    fn disagreement_increases_arousal() {
+    fn disagreement_tracks_musical_contribution_vectors() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        // Very different Phi values = high disagreement
+        // Identical musical contributions have zero feature disagreement,
+        // regardless of different legacy Phi-like values.
         composer.contribute(make_contribution(1, 0.1, [0.5; 8]));
         composer.contribute(make_contribution(2, 0.9, [0.5; 8]));
-        let state = composer.blend();
+        assert_eq!(composer.disagreement(), 0.0);
 
+        let mut different = CollaborativeComposer::new(BlendStrategy::Mean);
+        different.contribute(make_contribution(1, 0.9, [0.1; 8]));
+        different.contribute(make_contribution(2, 0.1, [0.9; 8]));
         assert!(
-            state.arousal > 0.3,
-            "disagreement should increase arousal: {}",
-            state.arousal
+            different.disagreement() > 0.3,
+            "distinct music contributions should show feature disagreement"
         );
+
+        // The descriptive aggregate does not masquerade as affective arousal.
+        let state = different.blend();
+        assert_eq!(state.arousal, MusicalState::default().arousal);
     }
 
     #[test]
