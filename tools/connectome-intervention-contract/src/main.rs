@@ -468,7 +468,7 @@ fn verify_metrics_and_scores<'a>(
 ) -> (
     HashMap<String, &'static str>,
     HashMap<String, String>,
-    HashMap<(String, String, String), (f64, f64, f64)>,
+    HashMap<(String, String, String), (f64, f64, f64, usize)>,
 ) {
     let mut directions = HashMap::new();
     let mut metric_families = HashMap::new();
@@ -535,7 +535,15 @@ fn verify_metrics_and_scores<'a>(
                         errors.push(format!("scorecards[{index}]: measured score requires finite score and CI"));
                     } else if low.unwrap() > high.unwrap() || score.unwrap() < low.unwrap() || score.unwrap() > high.unwrap() {
                         errors.push(format!("scorecards[{index}]: score/CI interval is inconsistent"));
-                    } else if scores.insert(key, (score.unwrap(), low.unwrap(), high.unwrap())).is_some() {
+                    } else if scores.insert(
+                        key,
+                        (
+                            score.unwrap(),
+                            low.unwrap(),
+                            high.unwrap(),
+                            item.get("n_independent_units").and_then(Value::as_u64).unwrap_or(0) as usize,
+                        ),
+                    ).is_some() {
                         errors.push(format!("scorecards[{index}]: duplicate model/metric/stratum"));
                     }
                 }
@@ -590,7 +598,7 @@ fn verify_paired(
     value: &Value,
     models: &HashMap<String, &Value>,
     directions: &HashMap<String, &'static str>,
-    scores: &HashMap<(String, String, String), (f64, f64, f64)>,
+    scores: &HashMap<(String, String, String), (f64, f64, f64, usize)>,
     test_set: &HashSet<String>,
     errors: &mut Vec<String>,
 ) {
@@ -660,6 +668,9 @@ fn verify_paired(
             check_digest(item, &["paired_unit_manifest_sha256"], &format!("paired_comparisons[{index}].paired_unit_manifest_sha256"), &membership_digest(&token_values), errors);
             if item.get("n_independent_units").and_then(Value::as_u64) != Some(token_values.len() as u64) {
                 errors.push(format!("paired_comparisons[{index}]: declared independent count differs from token count"));
+            }
+            if candidate_score.3 != token_values.len() || baseline_score.3 != token_values.len() {
+                errors.push(format!("paired_comparisons[{index}]: paired token count must equal both scorecard independent-unit counts"));
             }
 
             let outcome = item.get("outcome").and_then(Value::as_str).unwrap_or("");
