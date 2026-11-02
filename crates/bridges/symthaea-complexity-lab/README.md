@@ -141,3 +141,26 @@ Dependency-aware reuse of exact lemmas and certificates is tracked in ETH-008:
 https://github.com/Luminous-Dynamics/symthaea/issues/10113
 
 The broader work plan is tracked in ETH-001.
+
+
+## Carry-free scalarization reference
+
+The reference directory also contains a carry-free scalarization micro-oracle:
+
+- reference/carry_free_scalarization.py
+- reference/carry_free_scalarization_results.json
+
+For a nonnegative profile P(W)=sum_j c_j W^j with a proven bound c_j < B,
+the base-B digits of P(B) are exactly the profile coefficients. The highest
+nonzero digit gives the optimum and its digit gives the number of optima.
+A mixed-radix exponent similarly gives an exact lexicographic optimum for a
+fixed number of bounded objectives.
+
+The local exact run passed 7/7 checks: Max-Cut, Max-2-SAT, independence
+polynomial, a code weight enumerator, two-objective lexicographic knapsack,
+and rejection of signed profiles / insufficient bases. This is a finite
+encoding experiment, not a solver or subexponential theorem. It does not
+recover a Pareto frontier and requires explicit coefficient bounds and
+bit-complexity accounting.
+
+Tracked in ETH-014 #10166.
