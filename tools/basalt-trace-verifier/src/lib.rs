@@ -1938,6 +1938,76 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn bounded_history_checker_accepts_the_reference_history() {
+        let (trace, _) = fixture();
+        let report = check_linearizable_history(&trace, 100_000);
+        assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
+        assert_eq!(report.linearization.len(), trace.operations.len());
+    }
+
+    #[test]
+    fn bounded_history_checker_finds_an_alternative_order_for_overlapping_commits() {
+        let (mut trace, _) = fixture();
+        let op_a = trace.operations.iter_mut().find(|x| x.op_id == "op-a-commit").unwrap();
+        op_a.invoked_at_ns = 10;
+        op_a.completed_at_ns = 35;
+        op_a.expected_result.receipt_acceptance_revision = Some("rev-2".to_string());
+        op_a.expected_result.current_authority_revision = Some("rev-2".to_string());
+
+        let op_b = trace.operations.iter_mut().find(|x| x.op_id == "op-b-commit").unwrap();
+        op_b.invoked_at_ns = 15;
+        op_b.completed_at_ns = 30;
+        op_b.expected_result.receipt_acceptance_revision = Some("rev-1".to_string());
+        op_b.expected_result.current_authority_revision = Some("rev-1".to_string());
+
+        trace.final_observation.accepted_receipts.iter_mut()
+            .find(|receipt| receipt.receipt_id == "receipt-A").unwrap()
+            .receipt_acceptance_revision = "rev-2".to_string();
+        trace.final_observation.accepted_receipts.iter_mut()
+            .find(|receipt| receipt.receipt_id == "receipt-B").unwrap()
+            .receipt_acceptance_revision = "rev-1".to_string();
+
+        // The fixture's declared order is A then B, but this observed history
+        // is legal only when B is linearized before A. Their intervals overlap.
+        let report = check_linearizable_history(&trace, 100_000);
+        assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
+        let pos_a = report.linearization.iter().position(|id| id == "op-a-commit").unwrap();
+        let pos_b = report.linearization.iter().position(|id| id == "op-b-commit").unwrap();
+        assert!(pos_b < pos_a, "checker reused the fixture's arbitrary tie-break");
+    }
+
+    #[test]
+    fn bounded_history_checker_returns_inconclusive_on_search_exhaustion() {
+        let (trace, _) = fixture();
+        let report = check_linearizable_history(&trace, 1);
+        assert_eq!(report.status, "inconclusive");
+        assert!(report.explored_states <= 1);
+    }
+
+    #[test]
+    fn bounded_history_checker_rejects_a_validly_shaped_but_unlinearizable_history() {
+        let (mut trace, _) = fixture();
+        trace.operations.iter_mut()
+            .find(|x| x.op_id == "op-stale-policy-rejected").unwrap()
+            .expected_result.outcome = "committed".to_string();
+        let report = check_linearizable_history(&trace, 100_000);
+        assert_eq!(report.status, "fail");
+        assert!(report.semantic_prunes > 0);
+    }
+
+    #[test]
+    fn bounded_history_checker_rejects_a_cyclic_causal_graph() {
+        let (mut trace, _) = fixture();
+        trace.operations.iter_mut()
+            .find(|x| x.op_id == "op-a-commit").unwrap()
+            .happens_after.push("op-b-commit".to_string());
+        let report = check_linearizable_history(&trace, 100_000);
+        assert_eq!(report.status, "invalid_evidence");
+        assert!(report.counterexamples.iter().any(|x| x.contains("cycle")));
+    }
+
     #[test]
     fn same_runner_real_time_precedence_is_enforced() {
         let (mut trace, _) = fixture();
