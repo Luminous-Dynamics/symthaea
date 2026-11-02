@@ -36,6 +36,7 @@
 pub mod adaptive_experiment;
 #[cfg(feature = "theory")]
 pub mod adaptive_prediction;
+pub mod affective_appraisal;
 #[cfg(feature = "theory")]
 pub mod analysis_crosscheck;
 #[cfg(feature = "theory")]
