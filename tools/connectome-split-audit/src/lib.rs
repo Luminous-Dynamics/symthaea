@@ -33,6 +33,8 @@ pub enum TaskRoute {
 pub enum GroupKey {
     SourceArchive,
     SourceVolume,
+    SourceOperation,
+    SpatialCube,
     Neuron,
     Animal,
     Session,
@@ -55,6 +57,11 @@ pub enum ViewKind {
 pub struct GroupIdentity {
     pub source_archive_id: Option<String>,
     pub source_volume_id: Option<String>,
+    /// Upstream source_operation_id from the original proofreading event metadata.
+    pub source_operation_id: Option<String>,
+    /// Spatial 50-micrometre cube identity from the pinned source split manifest.
+    pub spatial_cube_id: Option<String>,
+    /// Union of before/after neuron root IDs, canonicalized by the data adapter.
     pub neuron_ids: Vec<String>,
     pub animal_id: Option<String>,
     pub session_id: Option<String>,
@@ -283,6 +290,10 @@ pub fn audit_splits(
                     group_key: *key,
                 });
             }
+            validate_unique_ids(
+                "group identity",
+                values.iter().map(String::as_str),
+            )?;
             for value in values {
                 validate_id("group identity", &value)?;
                 group_memberships
@@ -432,6 +443,8 @@ fn group_values(groups: &GroupIdentity, key: GroupKey) -> Vec<String> {
     match key {
         GroupKey::SourceArchive => groups.source_archive_id.iter().cloned().collect(),
         GroupKey::SourceVolume => groups.source_volume_id.iter().cloned().collect(),
+        GroupKey::SourceOperation => groups.source_operation_id.iter().cloned().collect(),
+        GroupKey::SpatialCube => groups.spatial_cube_id.iter().cloned().collect(),
         GroupKey::Neuron => groups.neuron_ids.clone(),
         GroupKey::Animal => groups.animal_id.iter().cloned().collect(),
         GroupKey::Session => groups.session_id.iter().cloned().collect(),
@@ -504,6 +517,8 @@ mod tests {
         GroupIdentity {
             source_archive_id: Some("archive-001".to_owned()),
             source_volume_id: Some(volume.to_owned()),
+            source_operation_id: Some(format!("source-op-{neuron}")),
+            spatial_cube_id: Some(format!("cube-{volume}-{neuron}")),
             neuron_ids: vec![neuron.to_owned()],
             animal_id: Some("animal-001".to_owned()),
             session_id: Some("session-001".to_owned()),
@@ -855,6 +870,78 @@ mod tests {
         let report = audit_splits(&policy(vec![GroupKey::Neuron]), &[train, test]).unwrap();
         assert_eq!(report.status, SplitAuditStatus::LeakageDetected);
         assert_eq!(report.group_overlaps[0].group_value, "neuron-shared");
+    }
+
+    #[test]
+    fn source_operation_lineage_cannot_cross_group_held_out_splits() {
+        let mut train = operation(
+            "op-train",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        let mut test = operation(
+            "op-test",
+            "00000000000000000000000000000002",
+            DataSplit::Test,
+            TaskRoute::FalseSplitCorrection,
+            "volume-b",
+            "neuron-b",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        train.groups.source_operation_id = Some("upstream-edit-42".to_owned());
+        test.groups.source_operation_id = Some("upstream-edit-42".to_owned());
+
+        let report = audit_splits(
+            &policy(vec![GroupKey::SourceOperation]),
+            &[train, test],
+        )
+        .unwrap();
+
+        assert_eq!(report.status, SplitAuditStatus::LeakageDetected);
+        assert_eq!(report.group_overlaps[0].group_key, GroupKey::SourceOperation);
+        assert_eq!(report.group_overlaps[0].group_value, "upstream-edit-42");
+    }
+
+    #[test]
+    fn spatial_cube_identity_is_checked_across_splits() {
+        let mut train = operation(
+            "op-train",
+            "00000000000000000000000000000001",
+            DataSplit::Train,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-a",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        let mut test = operation(
+            "op-test",
+            "00000000000000000000000000000002",
+            DataSplit::Test,
+            TaskRoute::FalseSplitCorrection,
+            "volume-a",
+            "neuron-b",
+            "mouse",
+            ViewKind::GeometryDual,
+        );
+        train.groups.spatial_cube_id = Some("cube-50um-001".to_owned());
+        test.groups.spatial_cube_id = Some("cube-50um-001".to_owned());
+
+        let report = audit_splits(
+            &policy(vec![GroupKey::SpatialCube]),
+            &[train, test],
+        )
+        .unwrap();
+
+        assert_eq!(report.status, SplitAuditStatus::LeakageDetected);
+        assert_eq!(report.group_overlaps[0].group_key, GroupKey::SpatialCube);
+        assert_eq!(report.group_overlaps[0].group_value, "cube-50um-001");
     }
 
     #[test]
