@@ -158,7 +158,7 @@ impl CollaborativeComposer {
         let mut harmonies = [0.0f32; 8];
         for contribution in &self.contributions {
             for (current, value) in harmonies.iter_mut().zip(contribution.harmonies) {
-                *current = current.max(value);
+                *current = (*current).max(value);
             }
         }
         harmonies
@@ -168,7 +168,7 @@ impl CollaborativeComposer {
         let mut harmonies = [1.0f32; 8];
         for contribution in &self.contributions {
             for (current, value) in harmonies.iter_mut().zip(contribution.harmonies) {
-                *current = current.min(value);
+                *current = (*current).min(value);
             }
         }
         harmonies
@@ -235,6 +235,19 @@ mod tests {
     #[test]
     fn default_strategy_does_not_weight_by_phi_proxy() {
         assert_eq!(BlendStrategy::default(), BlendStrategy::Mean);
+    }
+
+    #[test]
+    fn default_blend_is_invariant_to_legacy_phi_proxy() {
+        let mut first = CollaborativeComposer::new(BlendStrategy::default());
+        first.contribute(make_contribution(1, 0.01, [0.2; 8]));
+        first.contribute(make_contribution(2, 0.99, [0.8; 8]));
+
+        let mut second = CollaborativeComposer::new(BlendStrategy::default());
+        second.contribute(make_contribution(1, 0.99, [0.2; 8]));
+        second.contribute(make_contribution(2, 0.01, [0.8; 8]));
+
+        assert_eq!(first.blend(), second.blend());
     }
 
     #[test]
