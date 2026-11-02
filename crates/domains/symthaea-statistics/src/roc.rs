@@ -159,6 +159,106 @@ pub fn try_roc_curve(observations: &[RocObservation]) -> Result<RocCurve, RocErr
     })
 }
 
+/// One point on a precision–recall curve.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PrecisionRecallPoint {
+    /// Positive predictive value: TP / (TP + FP).
+    pub precision: f64,
+    /// Recall / sensitivity: TP / (TP + FN).
+    pub recall: f64,
+    /// Decision threshold. Positive infinity is the no-positive-call endpoint.
+    pub threshold: f64,
+}
+
+/// A precision–recall curve and non-interpolated average precision.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrecisionRecallCurve {
+    pub signal_count: usize,
+    pub noise_count: usize,
+    /// Includes the conventional (precision=1, recall=0) starting point.
+    pub points: Vec<PrecisionRecallPoint>,
+    /// Sum of each recall increment times precision at that operating point.
+    ///
+    /// This is non-interpolated average precision, not trapezoidal PR area.
+    pub average_precision: f64,
+}
+
+/// Construct a tie-correct precision–recall curve from scored observations.
+///
+/// This is particularly useful when event-present intervals are rare. It uses
+/// the same score direction and exact tie grouping as the ROC routine, and
+/// requires both classes to be present. Average precision is calculated as
+/// sum(delta_recall * precision_at_group), with no interpolation.
+pub fn try_precision_recall_curve(
+    observations: &[RocObservation],
+) -> Result<PrecisionRecallCurve, RocError> {
+    if observations.is_empty() {
+        return Err(RocError::EmptyInput);
+    }
+    if observations.iter().any(|item| !item.score.is_finite()) {
+        return Err(RocError::NonFiniteScore);
+    }
+
+    let signal_count = observations.iter().filter(|item| item.is_signal).count();
+    let noise_count = observations.len() - signal_count;
+    if signal_count == 0 {
+        return Err(RocError::MissingSignalClass);
+    }
+    if noise_count == 0 {
+        return Err(RocError::MissingNoiseClass);
+    }
+
+    let mut sorted = observations.to_vec();
+    sorted.sort_by(|a, b| b.score.total_cmp(&a.score));
+
+    let mut points = Vec::with_capacity(sorted.len() + 1);
+    points.push(PrecisionRecallPoint {
+        precision: 1.0,
+        recall: 0.0,
+        threshold: f64::INFINITY,
+    });
+
+    let mut tp = 0usize;
+    let mut fp = 0usize;
+    let mut index = 0usize;
+    let mut previous_recall = 0.0;
+    let mut average_precision = 0.0;
+
+    while index < sorted.len() {
+        let threshold = sorted[index].score;
+        let mut end = index + 1;
+        while end < sorted.len() && sorted[end].score == threshold {
+            end += 1;
+        }
+
+        for item in &sorted[index..end] {
+            if item.is_signal {
+                tp += 1;
+            } else {
+                fp += 1;
+            }
+        }
+
+        let recall = tp as f64 / signal_count as f64;
+        let precision = tp as f64 / (tp + fp) as f64;
+        average_precision += (recall - previous_recall) * precision;
+        points.push(PrecisionRecallPoint {
+            precision,
+            recall,
+            threshold,
+        });
+        previous_recall = recall;
+        index = end;
+    }
+
+    Ok(PrecisionRecallCurve {
+        signal_count,
+        noise_count,
+        points,
+        average_precision: average_precision.clamp(0.0, 1.0),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,6 +317,60 @@ mod tests {
         ])
         .unwrap();
         assert!((curve.auc - 0.75).abs() < 1e-12);
+    }
+
+    #[test]
+    fn perfect_ranking_has_average_precision_one() {
+        let curve = try_precision_recall_curve(&[
+            item(0.9, true),
+            item(0.8, true),
+            item(0.2, false),
+            item(0.1, false),
+        ])
+        .unwrap();
+        assert!((curve.average_precision - 1.0).abs() < 1e-12);
+        assert_eq!(curve.points.first().unwrap().precision, 1.0);
+        assert_eq!(curve.points.first().unwrap().recall, 0.0);
+        assert_eq!(curve.points.last().unwrap().recall, 1.0);
+    }
+
+    #[test]
+    fn tied_positive_and_negative_scores_have_half_average_precision() {
+        let curve = try_precision_recall_curve(&[item(1.0, true), item(1.0, false)]).unwrap();
+        assert!((curve.average_precision - 0.5).abs() < 1e-12);
+        assert_eq!(curve.points.len(), 2);
+    }
+
+    #[test]
+    fn average_precision_penalizes_early_false_alarms() {
+        let clean = try_precision_recall_curve(&[
+            item(0.9, true),
+            item(0.8, true),
+            item(0.2, false),
+            item(0.1, false),
+        ])
+        .unwrap();
+        let noisy = try_precision_recall_curve(&[
+            item(0.9, false),
+            item(0.8, true),
+            item(0.7, false),
+            item(0.6, true),
+        ])
+        .unwrap();
+        assert!(clean.average_precision > noisy.average_precision);
+        assert!((noisy.average_precision - (1.0 / 3.0 + 1.0 / 2.0) / 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_single_class_for_precision_recall() {
+        assert_eq!(
+            try_precision_recall_curve(&[item(0.9, true), item(0.8, true)]),
+            Err(RocError::MissingNoiseClass)
+        );
+        assert_eq!(
+            try_precision_recall_curve(&[item(0.9, false), item(0.8, false)]),
+            Err(RocError::MissingSignalClass)
+        );
     }
 
     #[test]
