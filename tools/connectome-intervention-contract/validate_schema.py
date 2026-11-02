@@ -92,6 +92,7 @@ def cpg_complete_synthetic_fixture() -> dict:
                 "realized_mean": 0.0,
                 "realized_stddev": 0.0,
                 "sample_sha256": None,
+                "sample_count": 0,
             },
             "weight_noise": {
                 "requested_mean": 0.0,
@@ -100,6 +101,7 @@ def cpg_complete_synthetic_fixture() -> dict:
                 "realized_mean": 0.0,
                 "realized_stddev": 0.0,
                 "sample_sha256": None,
+                "sample_count": 0,
             },
         },
         "numerics": {
@@ -195,6 +197,12 @@ def main() -> None:
     cpg_noise_noop = copy.deepcopy(cpg_example)
     cpg_noise_noop["perturbation"]["input_noise"]["requested_stddev"] = 0.1
     rejected(cpg_validator, cpg_noise_noop, "CPG requested non-zero noise marked unapplied")
+
+    cpg_noise_missing_sample_count = copy.deepcopy(cpg_example)
+    cpg_noise_missing_sample_count["perturbation"]["input_noise"]["requested_stddev"] = 0.1
+    cpg_noise_missing_sample_count["perturbation"]["input_noise"]["applied"] = True
+    cpg_noise_missing_sample_count["perturbation"]["input_noise"]["sample_sha256"] = "a" * 64
+    rejected(cpg_validator, cpg_noise_missing_sample_count, "CPG applied noise missing sample count")
 
     print(
         "OK: both Draft 2020-12 schemas are valid; both incomplete examples and a "
