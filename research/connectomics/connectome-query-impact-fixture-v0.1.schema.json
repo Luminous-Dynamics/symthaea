@@ -55,7 +55,12 @@
               "DecisionThresholdMismatch",
               "NonFiniteDerivedValue",
               "NoQueryScenarios",
-              "PairedEffectOutsideConservativeBound"
+              "PairedEffectOutsideConservativeBound",
+              "PairedDecisionWorldsEmpty",
+              "PairedDecisionWorldsRequireThreshold",
+              "DuplicatePairedDecisionWorld",
+              "PairedDecisionValueOutsideMarginal",
+              "PairedDecisionDifferenceOutsideEffect"
             ]
           }
         },
