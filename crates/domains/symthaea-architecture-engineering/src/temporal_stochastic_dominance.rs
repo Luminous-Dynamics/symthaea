@@ -738,6 +738,58 @@ mod tests {
     }
 
     #[test]
+    fn predictable_mixture_is_a_one_step_supermartingale_on_a_stochastic_dominance_null() {
+        // Independent paired outcomes with control exposure C~Bernoulli(0.5)
+        // and treatment exposure T~Bernoulli(0.75). Lower exposure is better,
+        // so treatment is stochastically worse and the null is true.
+        // At the active threshold, E[D]=P(C=1,T=0)-P(C=0,T=1)
+        // = 0.125-0.375=-0.25. Other thresholds have D=0.
+        fn explore(state: FirstOrderDominanceState, depth: u64) {
+            if depth >= 4 {
+                return;
+            }
+            let prior_log = state.report().log_e_value;
+            let outcomes = [
+                (0_u64, 0_u64, 0.125_f64),
+                (1_u64, 0_u64, 0.375_f64),
+                (0_u64, 1_u64, 0.125_f64),
+                (1_u64, 1_u64, 0.375_f64),
+            ];
+            let mut conditional_mean = 0.0_f64;
+            for (treatment, control, probability) in outcomes {
+                let mut child = state.clone();
+                let report = child.observe(depth + 1, &pair(depth + 1, treatment, control)).unwrap();
+                let incremental_wealth = (report.log_e_value - prior_log).exp();
+                conditional_mean += probability * incremental_wealth;
+                explore(child, depth + 1);
+            }
+            assert!(conditional_mean <= 1.0 + 1e-10);
+        }
+
+        let family = fsd_family();
+        let state = FirstOrderDominanceState::new(
+            &family,
+            "pareto-vs-greedy",
+            TemporalInterventionAxis::WrongBelief,
+            10_000,
+            8,
+        ).unwrap();
+        explore(state, 0);
+    }
+
+    #[test]
+    fn non_fair_pair_assignment_probability_is_rejected() {
+        let family = fsd_family();
+        let mut state = FirstOrderDominanceState::new(
+            &family, "pareto-vs-greedy", TemporalInterventionAxis::WrongBelief, 10_000, 100,
+        ).unwrap();
+        let mut biased = pair(1, 0, 10);
+        biased.treatment_probability_ppm = 250_000;
+        assert!(state.observe(1, &biased).is_err());
+        assert_eq!(state.observed_pairs, 0);
+    }
+
+    #[test]
     fn sequential_look_gap_does_not_advance_evidence() {
         let family = fsd_family();
         let mut state = FirstOrderDominanceState::new(
