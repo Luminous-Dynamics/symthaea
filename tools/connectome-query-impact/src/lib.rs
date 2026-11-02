@@ -963,6 +963,7 @@ mod tests {
         item.paired_effect = Some(PairedEffectBounds {
             effect_interval: interval(0.0, 0.2),
             evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: None,
         });
 
         let report = analyze_candidate(&candidate(vec![item])).unwrap();
@@ -985,6 +986,7 @@ mod tests {
         outside.paired_effect = Some(PairedEffectBounds {
             effect_interval: interval(-1.1, 0.2),
             evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: None,
         });
         assert_eq!(
             analyze_candidate(&candidate(vec![outside])),
@@ -1005,6 +1007,7 @@ mod tests {
         missing_digest.paired_effect = Some(PairedEffectBounds {
             effect_interval: interval(0.0, 0.2),
             evidence_sha256: "bad".to_owned(),
+            decision_worlds: None,
         });
         assert!(matches!(
             analyze_candidate(&candidate(vec![missing_digest])),
@@ -1012,6 +1015,218 @@ mod tests {
                 kind: "paired effect evidence",
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn matched_worlds_can_prove_no_flip_when_marginals_straddle_threshold() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![
+                PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.3,
+                },
+                PairedDecisionWorld {
+                    world_id: "world-b".to_owned(),
+                    baseline_value: 0.8,
+                    after_edit_value: 0.7,
+                },
+            ]),
+        });
+
+        let report = analyze_candidate(&candidate(vec![item])).unwrap();
+        let scenario = &report.query_impacts[0].scenarios[0];
+        // Marginal intervals straddle 0.5, but matched worlds never cross it.
+        assert_eq!(scenario.baseline_decision, DecisionClass::Indeterminate);
+        assert_eq!(scenario.after_edit_decision, DecisionClass::Indeterminate);
+        assert_eq!(scenario.decision_flip, DecisionFlipStatus::Impossible);
+        assert_eq!(scenario.decision_flip_method, DecisionFlipMethod::PairedSharedWorlds);
+        assert_eq!(scenario.paired_decision_world_count, 2);
+    }
+
+    #[test]
+    fn matched_worlds_can_guarantee_or_make_a_flip_possible() {
+        let mut guaranteed = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        guaranteed.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.6, 0.6),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![
+                PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.8,
+                },
+                PairedDecisionWorld {
+                    world_id: "world-b".to_owned(),
+                    baseline_value: 0.8,
+                    after_edit_value: 0.2,
+                },
+            ]),
+        });
+        let report = analyze_candidate(&candidate(vec![guaranteed])).unwrap();
+        assert_eq!(
+            report.query_impacts[0].scenarios[0].decision_flip,
+            DecisionFlipStatus::Guaranteed
+        );
+
+        let mut possible = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        possible.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.6),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![
+                PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.8,
+                },
+                PairedDecisionWorld {
+                    world_id: "world-b".to_owned(),
+                    baseline_value: 0.8,
+                    after_edit_value: 0.7,
+                },
+                PairedDecisionWorld {
+                    world_id: "world-c".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.3,
+                },
+            ]),
+        });
+        let report = analyze_candidate(&candidate(vec![possible])).unwrap();
+        assert_eq!(
+            report.query_impacts[0].scenarios[0].decision_flip,
+            DecisionFlipStatus::Possible
+        );
+    }
+
+    #[test]
+    fn paired_decision_world_ids_must_be_unique() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![
+                PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.2,
+                    after_edit_value: 0.3,
+                },
+                PairedDecisionWorld {
+                    world_id: "world-a".to_owned(),
+                    baseline_value: 0.8,
+                    after_edit_value: 0.7,
+                },
+            ]),
+        });
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::DuplicatePairedDecisionWorld { .. })
+        ));
+    }
+
+    #[test]
+    fn paired_decision_world_values_must_fit_marginal_intervals() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.05,
+                after_edit_value: 0.1,
+            }]),
+        });
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedDecisionValueOutsideMarginal { .. })
+        ));
+    }
+
+    #[test]
+    fn paired_decision_world_difference_must_fit_paired_effect_interval() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            Some(0.5),
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.5,
+            }]),
+        });
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedDecisionDifferenceOutsideEffect { .. })
+        ));
+    }
+
+    #[test]
+    fn paired_decision_worlds_require_a_pre_registered_threshold() {
+        let mut item = evaluation(
+            "pathway",
+            "h1",
+            interval(0.1, 0.9),
+            interval(0.1, 0.9),
+            None,
+            0.1,
+        );
+        item.paired_effect = Some(PairedEffectBounds {
+            effect_interval: interval(-0.1, 0.1),
+            evidence_sha256: SHA_C.to_owned(),
+            decision_worlds: Some(vec![PairedDecisionWorld {
+                world_id: "world-a".to_owned(),
+                baseline_value: 0.2,
+                after_edit_value: 0.3,
+            }]),
+        });
+        assert!(matches!(
+            analyze_candidate(&candidate(vec![item])),
+            Err(QueryImpactError::PairedDecisionWorldsRequireThreshold { .. })
         ));
     }
 
