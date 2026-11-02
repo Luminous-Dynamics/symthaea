@@ -388,6 +388,65 @@
         "separate_observation_and_inference": true
       },
       "claim_ceiling": "Results apply only to the preregistered corpus, budgets, providers and named target configurations; they do not establish general causal reasoning superiority."
+    },
+    {
+      "id": "evidence_bundle_graph",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9908",
+      "upstream_reference": {
+        "repository": "https://github.com/morluto/rea",
+        "commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
+        "files": [
+          "src/domain/evidenceBundle.ts",
+          "src/domain/residualUnknown.ts",
+          "src/domain/residualUnknownGraphError.ts",
+          "src/domain/evidence.ts"
+        ]
+      },
+      "fixtures": [
+        "valid_canonical_bundle",
+        "duplicate_evidence_id",
+        "manifest_omission_and_substitution",
+        "noncanonical_manifest_order",
+        "unknown_id_mismatch",
+        "revision_digest_mismatch",
+        "revision_gap",
+        "previous_revision_digest_mismatch",
+        "missing_mutation_evidence",
+        "missing_supporting_evidence",
+        "missing_related_unknown",
+        "dependency_cycle",
+        "verified_resolution_without_support",
+        "verified_resolution_with_conflicting_evidence",
+        "verified_resolution_wrong_authority",
+        "verified_resolution_wrong_confidence",
+        "verified_resolution_wrong_environment",
+        "target_scope_projection_preserves_full_unknown_history",
+        "evidence_link_external_target_separate_stricter_audit",
+        "duplicate_raw_json_keys"
+      ],
+      "metrics": [
+        "schema_acceptance_and_rejection_parity",
+        "manifest_derivation_exact_match",
+        "record_evidence_id_preservation",
+        "revision_digest_parity",
+        "graph_constraint_disposition_parity",
+        "canonical_bundle_bytes_match",
+        "history_and_unknown_retention",
+        "false_accept_rate",
+        "abstention_and_error_category",
+        "p50_p95_validation_latency",
+        "peak_memory_bytes"
+      ],
+      "targets": {
+        "supported_schema_parity": "100_percent",
+        "manifest_derivation": "100_percent",
+        "unknown_revision_chain": "100_percent",
+        "malformed_graph_false_accepts": 0,
+        "silent_unknown_history_drops": 0,
+        "deterministic_projection": "100_percent"
+      },
+      "claim_ceiling": "Internal bundle consistency only; no producer signature, source authenticity, attested device identity or observation-truth claim."
     }
   ],
   "promotion_policy": {
