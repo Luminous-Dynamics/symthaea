@@ -7,7 +7,7 @@
 //! directory entry are semantically trustworthy. It preserves archive
 //! occurrences and keeps declared metadata separate from observed content.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -505,12 +505,6 @@ fn parse_end_record_candidate(
             ));
         }
         let directory_offset = directory_end - directory_bytes;
-        let archive_start = directory_offset.checked_sub(central_offset as u64).ok_or_else(|| {
-            ReaderError::new(
-                ReaderErrorKind::InvalidArchive,
-                "central-directory offset is inconsistent with the end record",
-            )
-        })?;
         (
             total_entries as u64,
             directory_bytes,
@@ -951,10 +945,14 @@ fn read_central_directory(
         }
     }
 
-    let duplicate_raw_names_present = seen_names.len() != entries.len();
+    let mut name_counts: HashMap<Vec<u8>, u64> = HashMap::new();
+    for entry in &entries {
+        *name_counts.entry(entry.raw_name.clone()).or_default() += 1;
+    }
+    let duplicate_raw_names_present = name_counts.values().any(|count| *count > 1);
     if duplicate_raw_names_present {
         for entry in &mut entries {
-            if entries.iter().filter(|candidate| candidate.raw_name == entry.raw_name).count() > 1 {
+            if name_counts.get(&entry.raw_name).copied().unwrap_or(0) > 1 {
                 entry.limitations.push(
                     "duplicate raw member name; occurrence identity is the central-directory index"
                         .to_owned(),
