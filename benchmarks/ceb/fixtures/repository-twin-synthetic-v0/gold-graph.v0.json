@@ -125,7 +125,7 @@
       "source_anchor": {
         "line": 20,
         "kind": "declaration_anchor",
-        "text": "fn can_read(&self, user: &User) -> bool;",
+        "text": "fn can_read(&self, user: &User) -> bool {",
         "authority": "source_text_anchor"
       }
     },
