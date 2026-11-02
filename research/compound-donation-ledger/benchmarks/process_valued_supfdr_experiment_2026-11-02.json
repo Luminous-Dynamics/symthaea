@@ -1,0 +1,73 @@
+{
+  "benchmark": "process_valued_compound_donation_supfdr_exploratory",
+  "execution_note": "500-stream local NumPy reimplementation of the committed runner logic. The exact checked-in script itself was not invoked from a connected checkout; scenario definitions, seeds, reserve formulas, routes, rejection rule and invariant checks were aligned to the committed runner. Treat as preliminary and independently reproduce.",
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5"
+  },
+  "configuration": {
+    "streams_per_cell": 500,
+    "hypotheses": 32,
+    "looks": 80,
+    "alpha": 0.1,
+    "seed": 10033,
+    "weights": "gamma_i=1/[(i+1)(i+2)]",
+    "total_weight": "32/33",
+    "null_lr_factors": "1.4 on success, 0.6 on failure; conditional mean is exactly 1 at p0=0.5",
+    "adjuster": "A(x)=sqrt(x)-1 applied to the running maximum of the coordinate LR martingale",
+    "dependence": ["independent", "shared uniform common shock", "balanced negative null shock"],
+    "scenarios": ["all null", "strong donor plus weak alternatives", "donation bridge target", "strong donor plus far cluster", "switching alternatives", "deterministic delayed arrivals"]
+  },
+  "methods": ["no donation", "fixed next recipient", "fixed telescoping distance prior", "fixed geometric distance prior", "prior-weighted Hedge", "fixed-share Hedge", "raw running supremum (invalid-control diagnostic)"],
+  "uncertainty": {
+    "one_sided_95pct_Hoeffding_halfwidth_per_bounded_mean": 0.0547,
+    "simultaneous_correction": "not applied",
+    "paired_power_difference_interval": "not computed"
+  },
+  "accounting_diagnostics": {
+    "maximum_absolute_numeric_error": 8.88e-16,
+    "maximum_share_mass_excess": 8.88e-16,
+    "checked": ["donor cap", "own-increment cap", "nonnegative scores", "nondecreasing scores", "forward prefix budgets", "escrow conservation", "share mass <= 1"],
+    "result": "all passed in the local float model within numerical tolerance; not a fixed-point Rust verifier run"
+  },
+  "key_results": {
+    "all_null_supfdr": {
+      "independent": {"adjusted_donation_and_no_donation_methods": 0.0, "raw_supremum_diagnostic": 0.066},
+      "shared_uniform": {"adjusted_donation_and_no_donation_methods": 0.0, "raw_supremum_diagnostic": 0.054},
+      "balanced_negative": {"adjusted_donation_and_no_donation_methods": 0.0, "raw_supremum_diagnostic": 0.086}
+    },
+    "donation_bridge_target_terminal_power": {
+      "description": "20 alternatives: a strong donor at ID 0, one borderline immediate recipient at ID 1, and 18 strong alternatives at later IDs; 12 nulls. This is a purpose-built allocation diagnostic.",
+      "independent": {"no_donation": 0.9185, "fixed_next": 0.9424, "telescope": 0.9298, "geometric": 0.9290, "hedge": 0.9207, "fixed_share": 0.9213},
+      "shared_uniform": {"no_donation": 0.8972, "fixed_next": 0.9160, "telescope": 0.9040, "geometric": 0.9039, "hedge": 0.8992, "fixed_share": 0.9002},
+      "balanced_negative": {"no_donation": 0.9159, "fixed_next": 0.9389, "telescope": 0.9248, "geometric": 0.9242, "hedge": 0.9182, "fixed_share": 0.9192}
+    },
+    "donation_bridge_target_supfdr": {
+      "all adjusted methods in all three dependence modes": 0.0,
+      "raw_supremum_diagnostic": {"independent": 0.0014, "shared_uniform": 0.0, "balanced_negative": 0.001}
+    },
+    "far_cluster_terminal_power": {
+      "description": "One strong donor and 10 far-offset alternatives. This probes recipient-distance mismatch.",
+      "independent": {"no_donation": 0.0933, "fixed_next": 0.0933, "telescope": 0.0933, "hedge": 0.0933},
+      "shared_uniform": {"no_donation": 0.1122, "fixed_next": 0.1122, "telescope": 0.1122, "hedge": 0.1122},
+      "balanced_negative": {"no_donation": 0.0931, "fixed_next": 0.0931, "telescope": 0.0931, "hedge": 0.0933}
+    },
+    "far_cluster_supfdr": {
+      "adjusted_methods": {"independent": 0.0, "shared_uniform": 0.0006, "balanced_negative": 0.0},
+      "raw_supremum_diagnostic": {"independent": 0.0547, "shared_uniform": 0.0335, "balanced_negative": 0.0593}
+    },
+    "other_scenario_power_ranges": {
+      "strong_donor_many_weak": {"no_donation": [0.1313, 0.1518], "fixed_next": [0.1333, 0.1544], "telescope": [0.1324, 0.1522]},
+      "switching_alternatives": {"no_donation": [0.0483, 0.0500], "fixed_next": [0.0484, 0.0502], "fixed_share": [0.0484, 0.0500]},
+      "delayed_arrivals": {"no_donation": [0.1258, 0.1585], "fixed_next": [0.1269, 0.1597], "fixed_share": [0.1266, 0.1591]}
+    }
+  },
+  "interpretation": [
+    "The immediate-next-recipient donation wins in the purpose-built bridge case; the telescope and geometric priors dilute the reserve over offsets and have lower power there.",
+    "In the far-cluster case, none of the donation policies improves power; recipient distance matters and capital allocation is not automatically useful.",
+    "Adaptive Hedge methods do not consistently beat fixed routing in this small suite.",
+    "The raw running supremum is included only as a theoretically invalid diagnostic. This finite experiment does not establish a universal miscalibration counterexample.",
+    "All reported power differences are exploratory. The per-cell Hoeffding half-width is 5.47 percentage points, and there is no simultaneous correction."
+  ],
+  "claim_boundary": "No proof, confirmatory FDR/SupFDR result, Rust implementation, production benchmark or SOTA claim. The simulation only supports further experiments under the stated global-filtration and e-process assumptions."
+}
