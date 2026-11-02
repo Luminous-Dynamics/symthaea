@@ -1,0 +1,58 @@
+{
+  "benchmark": "two_phase_source_escrow_independent_replay",
+  "scope": "Exact Fraction accounting/protocol replay only; not e-process validity, FDR/SupFDR, statistical power, Rust implementation, or source authenticity.",
+  "configuration": {
+    "traces": 250,
+    "hypotheses": 16,
+    "rounds_per_trace": 40,
+    "gamma": "1/16 per candidate; total mass exactly 1",
+    "activation": "predictable blocks of four candidates, staggered every five rounds",
+    "assignment": "past-only allocation; each assignment occurs strictly after reserve creation; destination immutable",
+    "credit": "partial credit permitted only after recipient activation",
+    "arithmetic": "fractions.Fraction exact",
+    "policy_digest": "f1d6f650131bba0c62ec2299807f35b2d8958834b9eb86c78a24f3300d353fab"
+  },
+  "event_counts": {
+    "Activate": 4000,
+    "Assigned": 14936,
+    "Credited": 29621,
+    "Evidence": 130000,
+    "UnassignedReserved": 7203,
+    "LookCommit": 10000,
+    "total": 195760
+  },
+  "independent_replay": {
+    "base_traces_passed": 250,
+    "all_events_replayed": true,
+    "checks": [
+      "source-only reserve derived from own evidence",
+      "donor cap",
+      "own-increment cap",
+      "strictly forward destination",
+      "assignment only after source reserve",
+      "immutable destination",
+      "source-scoped token ordinal",
+      "source-scoped assignment ordinal",
+      "assignment does not exceed unassigned token balance",
+      "credit does not exceed assigned remaining balance",
+      "credit only after recipient activation",
+      "prefix budget after every event",
+      "nonnegative scores after every event",
+      "nondecreasing scores at each atomic LookCommit",
+      "per-token conservation",
+      "global unassigned + assigned + credited conservation",
+      "policy digest and event sequence integrity",
+      "incoming credit cannot fund a new reserve"
+    ]
+  },
+  "negative_controls": {
+    "policy_digest_tamper": "rejected",
+    "backward_destination": "rejected",
+    "overassignment": "rejected",
+    "duplicate_assignment_id": "rejected",
+    "credit_overdraw": "rejected",
+    "incoming_credit_cannot_fund_reserve": "rejected",
+    "all_rejected": true
+  },
+  "interpretation": "The replay validates the two-phase accounting state machine on deterministic exact-rational traces. It does not validate the statistical e-process assumptions or a production Rust implementation."
+}
