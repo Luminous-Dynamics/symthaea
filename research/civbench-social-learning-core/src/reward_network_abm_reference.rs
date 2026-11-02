@@ -393,32 +393,56 @@ impl DeterministicRng {
         (self.next_u64() as usize) % upper
     }
 
-    fn binomial(&mut self, trials: u32, probability: f64) -> u32 {
-        let mut successes = 0;
-        for _ in 0..trials {
-            if self.bernoulli(probability) { successes += 1; }
-        }
-        successes
-    }
 }
 
-fn discover_individually(config: Config, is_machine: bool, rng: &mut DeterministicRng) -> StrategyState {
+/// Exact marginal terminal-strategy probabilities after integrating out the
+/// notebook's latent Binomial(k_optimal ~ Binomial(K_ind, q_opt)) allocation.
+/// This preserves the per-agent categorical outcome distribution without
+/// spending O(K_ind) random draws per agent.
+///
+/// P(optimal) = 1 - (1 - q*d_opt)^K
+/// P(random)  = [q(1-d_opt) + (1-q)(1-d_myo)]^K
+/// P(myopic)  = (1 - q*d_opt)^K - P(random)
+fn terminal_strategy_probabilities(
+    trials: u32,
+    optimality_bias: f64,
+    d_optimal: f64,
+    d_myopic: f64,
+) -> [f64; 3] {
+    let k = f64::from(trials);
+    let p_no_optimal = (1.0 - optimality_bias * d_optimal).powf(k);
+    let p_random_base = optimality_bias * (1.0 - d_optimal)
+        + (1.0 - optimality_bias) * (1.0 - d_myopic);
+    let p_random = p_random_base.powf(k);
+    let p_optimal = (1.0 - p_no_optimal).clamp(0.0, 1.0);
+    let p_myopic = (p_no_optimal - p_random).clamp(0.0, 1.0 - p_optimal);
+    let p_random = (1.0 - p_optimal - p_myopic).clamp(0.0, 1.0);
+    [p_random, p_myopic, p_optimal]
+}
+
+fn discover_individually(
+    config: Config,
+    is_machine: bool,
+    rng: &mut DeterministicRng,
+) -> StrategyState {
     let (trials, bias) = if is_machine {
         (config.machine_exploration_trials, config.machine_optimality_bias)
     } else {
         (config.human_exploration_trials, config.human_optimality_bias)
     };
-    let k_optimal = rng.binomial(trials, bias);
-    let k_myopic = trials - k_optimal;
-    let p_optimal = 1.0 - (1.0 - config.optimal_discovery_probability).powf(f64::from(k_optimal));
-    let p_myopic = 1.0 - (1.0 - config.myopic_discovery_probability).powf(f64::from(k_myopic));
+    let [p_random, p_myopic, _p_optimal] = terminal_strategy_probabilities(
+        trials,
+        bias,
+        config.optimal_discovery_probability,
+        config.myopic_discovery_probability,
+    );
     let draw = rng.uniform();
-    if draw < p_optimal {
-        StrategyState::Optimal
-    } else if draw < p_optimal + (1.0 - p_optimal) * p_myopic {
+    if draw < p_random {
+        StrategyState::Random
+    } else if draw < p_random + p_myopic {
         StrategyState::Myopic
     } else {
-        StrategyState::Random
+        StrategyState::Optimal
     }
 }
 
@@ -631,6 +655,43 @@ mod tests {
         assert_eq!(c.teacher_selection_temperature, 0.1);
         assert_eq!(c.demonstration_count, 1);
         assert_eq!(c.demonstration_noise_epsilon, 0.1);
+    }
+
+    #[test]
+    fn closed_form_matches_explicit_binomial_marginalization() {
+        fn binomial_probability(n: u32, k: u32, q: f64) -> f64 {
+            let mut choose = 1.0;
+            for j in 0..k {
+                choose *= f64::from(n - j) / f64::from(j + 1);
+            }
+            choose * q.powf(f64::from(k)) * (1.0 - q).powf(f64::from(n - k))
+        }
+
+        for n in 1..=12 {
+            for q in [0.0, 0.01, 0.2, 0.5, 0.99, 1.0] {
+                for d_opt in [0.0, 0.001, 0.1, 0.9, 1.0] {
+                    for d_myo in [0.0, 0.1, 0.5, 1.0] {
+                        let mut explicit = [0.0_f64; 3];
+                        for k_opt in 0..=n {
+                            let pk = binomial_probability(n, k_opt, q);
+                            let p_opt_cond = 1.0 - (1.0 - d_opt).powf(f64::from(k_opt));
+                            let p_myo_cond = 1.0 - (1.0 - d_myo).powf(f64::from(n - k_opt));
+                            explicit[2] += pk * p_opt_cond;
+                            explicit[1] += pk * (1.0 - p_opt_cond) * p_myo_cond;
+                            explicit[0] += pk * (1.0 - p_opt_cond) * (1.0 - p_myo_cond);
+                        }
+                        let exact = terminal_strategy_probabilities(n, q, d_opt, d_myo);
+                        for index in 0..3 {
+                            assert!(
+                                (explicit[index] - exact[index]).abs() < 1e-10,
+                                "n={n} q={q} d_opt={d_opt} d_myo={d_myo} category={index}: explicit={} exact={}",
+                                explicit[index], exact[index]
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]
