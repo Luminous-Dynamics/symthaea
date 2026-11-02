@@ -96,19 +96,37 @@ pub struct Generation {
 pub struct GenerationMetrics {
     pub generation: usize,
     pub population_size: usize,
+    pub human_count: usize,
+    pub machine_count: usize,
     pub optimal_count: usize,
     pub myopic_count: usize,
     pub null_count: usize,
     pub optimal_prevalence: f64,
+    /// Undefined when a treatment has no human agents in a generation.
+    pub human_optimal_prevalence: Option<f64>,
+    /// Undefined when a treatment has no machine agents in a generation.
+    pub machine_optimal_prevalence: Option<f64>,
     pub mean_demonstration_reward: f64,
     pub social_transmissions: usize,
     pub successful_non_null_transmissions: usize,
     pub optimal_transmissions: usize,
     pub machine_originated_optimal_count: usize,
+    /// Machine-originated optimal strategies among human agents only.
+    pub human_machine_originated_optimal_count: usize,
 }
 
 impl Generation {
     pub fn metrics(&self) -> GenerationMetrics {
+        let human_count = self.agents.iter()
+            .filter(|agent| agent.kind == AgentKind::Human).count();
+        let machine_count = self.agents.iter()
+            .filter(|agent| agent.kind == AgentKind::Machine).count();
+        let human_optimal_count = self.agents.iter()
+            .filter(|agent| agent.kind == AgentKind::Human
+                && agent.integrated_strategy == Strategy::Optimal).count();
+        let machine_optimal_count = self.agents.iter()
+            .filter(|agent| agent.kind == AgentKind::Machine
+                && agent.integrated_strategy == Strategy::Optimal).count();
         let optimal_count = self.agents.iter()
             .filter(|agent| agent.integrated_strategy == Strategy::Optimal)
             .count();
@@ -135,19 +153,37 @@ impl Generation {
             .filter(|agent| agent.integrated_strategy == Strategy::Optimal
                 && agent.machine_originated_strategy)
             .count();
+        let human_machine_originated_optimal_count = self.agents.iter()
+            .filter(|agent| agent.kind == AgentKind::Human
+                && agent.integrated_strategy == Strategy::Optimal
+                && agent.machine_originated_strategy)
+            .count();
 
         GenerationMetrics {
             generation: self.index,
             population_size: self.agents.len(),
+            human_count,
+            machine_count,
             optimal_count,
             myopic_count,
             null_count,
             optimal_prevalence: optimal_count as f64 / self.agents.len() as f64,
+            human_optimal_prevalence: if human_count == 0 {
+                None
+            } else {
+                Some(human_optimal_count as f64 / human_count as f64)
+            },
+            machine_optimal_prevalence: if machine_count == 0 {
+                None
+            } else {
+                Some(machine_optimal_count as f64 / machine_count as f64)
+            },
             mean_demonstration_reward,
             social_transmissions,
             successful_non_null_transmissions,
             optimal_transmissions,
             machine_originated_optimal_count,
+            human_machine_originated_optimal_count,
         }
     }
 }
@@ -593,8 +629,10 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
             let integrated_strategy = integrate(individual_strategy, social_strategy);
             let score = demonstration_reward(integrated_strategy, config, &mut rng);
             let machine_originated_strategy = integrated_strategy == Strategy::Optimal
-                && social_strategy == Some(Strategy::Optimal)
-                && previous[teacher_index].machine_originated_strategy;
+                && ((kind == AgentKind::Machine
+                    && individual_strategy == Strategy::Optimal)
+                    || (social_strategy == Some(Strategy::Optimal)
+                        && previous[teacher_index].machine_originated_strategy));
 
             agents.push(Agent {
                 kind,
@@ -741,6 +779,75 @@ mod tests {
     fn optimal_strategy_dominates_myopic_when_both_are_available() {
         assert_eq!(integrate(Strategy::Optimal, Some(Strategy::Myopic)), Strategy::Optimal);
         assert_eq!(integrate(Strategy::Myopic, Some(Strategy::Optimal)), Strategy::Optimal);
+    }
+
+    #[test]
+    fn prevalence_metrics_separate_humans_and_machines() {
+        let generation = Generation {
+            index: 1,
+            agents: vec![
+                Agent {
+                    kind: AgentKind::Machine,
+                    individual_strategy: Strategy::Optimal,
+                    social_strategy: None,
+                    integrated_strategy: Strategy::Optimal,
+                    teacher_index: None,
+                    social_transmission_event: false,
+                    demonstration_reward: 10.0,
+                    machine_originated_strategy: true,
+                },
+                Agent {
+                    kind: AgentKind::Human,
+                    individual_strategy: Strategy::Myopic,
+                    social_strategy: None,
+                    integrated_strategy: Strategy::Myopic,
+                    teacher_index: None,
+                    social_transmission_event: false,
+                    demonstration_reward: 5.0,
+                    machine_originated_strategy: false,
+                },
+                Agent {
+                    kind: AgentKind::Human,
+                    individual_strategy: Strategy::Optimal,
+                    social_strategy: None,
+                    integrated_strategy: Strategy::Optimal,
+                    teacher_index: None,
+                    social_transmission_event: false,
+                    demonstration_reward: 10.0,
+                    machine_originated_strategy: false,
+                },
+            ],
+        };
+        let metrics = generation.metrics();
+        assert_eq!(metrics.optimal_prevalence, 2.0 / 3.0);
+        assert_eq!(metrics.human_optimal_prevalence, Some(0.5));
+        assert_eq!(metrics.machine_optimal_prevalence, Some(1.0));
+        assert_eq!(metrics.human_machine_originated_optimal_count, 0);
+    }
+
+    #[test]
+    fn machine_discoveries_in_later_generations_are_machine_originated() {
+        let config = Config {
+            generations: 3,
+            machine_count_generation_zero: 5,
+            machine_availability: MachineAvailability::AllGenerations,
+            machine_exploration_capacity: 100,
+            machine_optimality_bias: 1.0,
+            human_exploration_capacity: 1,
+            human_optimality_bias: 0.0,
+            optimal_discovery_rate: 1.0,
+            myopic_discovery_rate: 0.0,
+            social_transmission_probability: 0.0,
+            ..Config::default()
+        };
+        let run = simulate(config, 17).unwrap();
+        for generation in run.generations.iter().skip(1) {
+            assert!(generation.agents.iter()
+                .filter(|agent| agent.kind == AgentKind::Machine)
+                .all(|agent| agent.integrated_strategy == Strategy::Optimal
+                    && agent.machine_originated_strategy));
+            assert_eq!(generation.metrics().machine_optimal_prevalence, Some(1.0));
+        }
     }
 
     #[test]
