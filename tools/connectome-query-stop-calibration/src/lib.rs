@@ -468,8 +468,8 @@ mod tests {
             trajectory.future_max_drift_ratio = trajectory.observed_max_drift_ratio + 0.10;
         }
         let report = calibrate_query_stop(&value).unwrap();
-        assert_eq!(report.residual_quantile_ratio, Some(0.10));
-        assert_eq!(report.projected_future_drift_upper_ratio, Some(0.30));
+        assert!((report.residual_quantile_ratio.unwrap() - 0.10).abs() < 1e-12);
+        assert!((report.projected_future_drift_upper_ratio.unwrap() - 0.30).abs() < 1e-12);
         assert_eq!(report.status, StopCalibrationStatus::ProjectedStableWithinHorizon);
     }
 
@@ -480,7 +480,7 @@ mod tests {
             trajectory.future_max_drift_ratio = trajectory.observed_max_drift_ratio + 0.90;
         }
         let report = calibrate_query_stop(&value).unwrap();
-        assert_eq!(report.projected_future_drift_upper_ratio, Some(1.10));
+        assert!((report.projected_future_drift_upper_ratio.unwrap() - 1.10).abs() < 1e-12);
         assert_eq!(report.status, StopCalibrationStatus::ProjectedUnstableWithinHorizon);
     }
 
@@ -492,7 +492,7 @@ mod tests {
         }
         value.target_current_uncertainty_width_ratio = 1.01;
         let report = calibrate_query_stop(&value).unwrap();
-        assert_eq!(report.projected_future_drift_upper_ratio, Some(0.20));
+        assert!((report.projected_future_drift_upper_ratio.unwrap() - 0.20).abs() < 1e-12);
         assert_eq!(report.status, StopCalibrationStatus::ProjectedUnstableWithinHorizon);
     }
 
