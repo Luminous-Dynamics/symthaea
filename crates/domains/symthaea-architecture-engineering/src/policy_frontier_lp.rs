@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, error::Error, fmt};
+use std::{collections::{BTreeMap, BTreeSet}, error::Error, fmt};
 
 const PLAN_SCHEMA: &str = "symthaea.architecture-engineering.policy-frontier-lp-plan";
 const PLAN_VERSION: &str = "0.1.0";
