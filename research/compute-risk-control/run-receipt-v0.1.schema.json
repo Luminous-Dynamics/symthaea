@@ -50,6 +50,7 @@
         "confidence_delta_ppm",
         "risk_upper_budget_ppm",
         "risk_lower_budget_ppm",
+        "risk_output_error_budget_ppm",
         "correction_ppm",
         "sample_count",
         "candidate_grid_sha256",
@@ -76,7 +77,7 @@
         },
         "simultaneous_claim_count": {
           "type": "integer",
-          "minimum": 2
+          "minimum": 3
         },
         "confidence_delta_ppm": {
           "type": "integer",
@@ -111,7 +112,77 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "candidate_id",
+              "upper_loss_sum_ppm",
+              "lower_loss_sum_ppm",
+              "emitted_answer_error_sum_ppm",
+              "sample_count",
+              "upper_mean_loss_ceil_ppm",
+              "lower_mean_loss_ceil_ppm",
+              "emitted_answer_error_mean_ceil_ppm",
+              "emitted_answer_error_ucb_ppm",
+              "simultaneous_ucb_correction_ppm",
+              "upper_risk_ucb_ppm",
+              "lower_risk_ucb_ppm",
+              "mean_tokens_used_ppm",
+              "meets_all_three_risk_budgets",
+              "task_loss_receipt_sha256"
+            ],
+            "properties": {
+              "candidate_id": {
+                "type": "string"
+              },
+              "upper_loss_sum_ppm": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lower_loss_sum_ppm": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "emitted_answer_error_sum_ppm": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "upper_mean_loss_ceil_ppm": {
+                "type": "integer"
+              },
+              "lower_mean_loss_ceil_ppm": {
+                "type": "integer"
+              },
+              "emitted_answer_error_mean_ceil_ppm": {
+                "type": "integer"
+              },
+              "emitted_answer_error_ucb_ppm": {
+                "type": "integer"
+              },
+              "simultaneous_ucb_correction_ppm": {
+                "type": "integer"
+              },
+              "upper_risk_ucb_ppm": {
+                "type": "integer"
+              },
+              "lower_risk_ucb_ppm": {
+                "type": "integer"
+              },
+              "mean_tokens_used_ppm": {
+                "type": "integer"
+              },
+              "meets_all_three_risk_budgets": {
+                "type": "boolean"
+              },
+              "task_loss_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
           }
         },
         "selected_candidate_id": {
@@ -123,7 +194,7 @@
         "selection_status": {
           "enum": [
             "feasible_candidate_found_on_validation_panel",
-            "no_candidate_meets_both_risk_budgets"
+            "no_candidate_meets_all_risk_budgets"
           ]
         },
         "formal_theorem_verified": {
@@ -135,6 +206,11 @@
         "report_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "risk_output_error_budget_ppm": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
         }
       }
     }
