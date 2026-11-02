@@ -145,6 +145,7 @@ struct Report {
     route_counts: BTreeMap<String, u64>,
     /// Metadata-sidecar declared modality coverage by deterministic population stratum.
     modality_coverage: BTreeMap<String, ModalityCoverage>,
+    denominator_audit: DenominatorAudit,
     operation_lineage_group_count: usize,
     spatial_cube_group_count: usize,
     root_ids_shared_across_splits: usize,
@@ -473,7 +474,7 @@ fn md5_sample_hash(source_archive: &str, source_hash: &str) -> String {
 /// it only binds the archive and sample-hash fields without delimiter ambiguity.
 fn source_identity_sha256(source_archive: &str, source_hash: &str) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"connectomebench2-source-identity-v1\\0");
+    hasher.update(b"connectomebench2-source-identity-v1\0");
     hasher.update((source_archive.len() as u64).to_be_bytes());
     hasher.update(source_archive.as_bytes());
     hasher.update((source_hash.len() as u64).to_be_bytes());
@@ -833,7 +834,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         // Reconcile nested denominator levels without counting a routed operation
         // as a new dataset row or a modality view as an independent sample.
         for route in &row.task_routing {
-            let operation_key = (row.combined_sample_hash.clone(), route.clone());
+            let operation_key = (identity_digest.clone(), route.clone());
             if task_operation_keys.insert(operation_key) {
                 *task_operation_counts.entry(route.clone()).or_default() += 1;
                 let geometry_view = match route.as_str() {
@@ -843,7 +844,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
                 };
                 if let Some(view) = geometry_view {
                     if present_slot_set.contains(view) {
-                        let key = (row.combined_sample_hash.clone(), route.clone(), view.to_string());
+                        let key = (identity_digest.clone(), route.clone(), view.to_string());
                         if legal_view_instance_keys.insert(key) {
                             *legal_view_instance_counts
                                 .entry(format!("{route}|{view}"))
@@ -853,7 +854,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
                 }
                 for view in ["em_xy", "em_xz", "em_yz"] {
                     if present_slot_set.contains(view) {
-                        let key = (row.combined_sample_hash.clone(), route.clone(), view.to_string());
+                        let key = (identity_digest.clone(), route.clone(), view.to_string());
                         if legal_view_instance_keys.insert(key) {
                             *legal_view_instance_counts
                                 .entry(format!("{route}|{view}"))
@@ -1186,6 +1187,79 @@ mod tests {
 
     fn report(rows: &[ParsedRow]) -> Report {
         audit_rows(rows, "0".repeat(64), CUBE_EDGE_NM, "1".repeat(40))
+    }
+
+
+    #[test]
+    fn denominator_audit_separates_rows_task_operations_and_available_views() {
+        let mut rows = valid_dataset();
+
+        // A row can route to more than one task, so it contributes one row but
+        // multiple task-operation instances and route-specific view instances.
+        rows[0].row.present_slots.push("em_xy".to_string());
+        rows[0].row.has_em = true;
+        rows[1].row.present_slots.push("em_xy".to_string());
+        rows[1].row.has_em = true;
+        rows[3].row.present_slots.push("em_best".to_string());
+        rows[3].row.has_em = true;
+
+        let report = report(&rows);
+        assert_eq!(report.status, "PASS", "{:?}", report.errors);
+        let denominators = report.denominator_audit;
+        assert_eq!(denominators.dataset_rows, 5);
+        assert_eq!(denominators.unique_legacy_combined_sample_hashes, 5);
+        assert_eq!(denominators.unique_source_identity_sha256, 5);
+        assert_eq!(denominators.task_operation_instances, 6);
+        assert_eq!(
+            denominators.task_operation_instances_by_route["false_split_correction"],
+            3
+        );
+        assert_eq!(
+            denominators.task_operation_instances_by_route["false_merge_identification"],
+            2
+        );
+        assert_eq!(
+            denominators.task_operation_instances_by_route["split_mask_generation"],
+            1
+        );
+        assert_eq!(denominators.available_legal_modality_view_instances, 9);
+        assert_eq!(
+            denominators.available_legal_modality_view_instances_by_route_and_view
+                ["false_split_correction|geometry"],
+            3
+        );
+        assert_eq!(
+            denominators.available_legal_modality_view_instances_by_route_and_view
+                ["false_merge_identification|geometry_single"],
+            2
+        );
+        assert_eq!(
+            denominators.available_legal_modality_view_instances_by_route_and_view
+                ["split_mask_generation|geometry_single"],
+            1
+        );
+        assert_eq!(
+            denominators.em_best_excluded_task_operation_instances_by_route
+                ["false_merge_identification"],
+            1
+        );
+        assert_eq!(denominators.legacy_md5_identity_collision_count, 0);
+    }
+
+    #[test]
+    fn source_identity_sha256_is_stable_and_length_delimited() {
+        let first = source_identity_sha256("archive-ab", "123456789abc");
+        assert_eq!(first, source_identity_sha256("archive-ab", "123456789abc"));
+        assert_ne!(
+            first,
+            source_identity_sha256("archive-a", "b123456789abc")
+        );
+        assert_ne!(
+            source_identity_sha256("ab", "c"),
+            source_identity_sha256("a", "bc")
+        );
+        assert_eq!(first.len(), 64);
+        assert!(is_lower_hex(&first, 64));
     }
 
     #[test]
