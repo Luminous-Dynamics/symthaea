@@ -143,7 +143,8 @@ fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, Evide
 }
 
 fn nul_free_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, EvidenceError> {
-    let value = nonempty_string(value, context)?;
+    let value = value.as_str()
+        .ok_or_else(|| schema_error(format!("{context} must be a string")))?;
     if value.contains('\0') {
         return Err(schema_error(format!("{context} must not contain NUL")));
     }
@@ -186,7 +187,10 @@ fn validate_provider(value: &Value, context: &str, nullable_version: bool) -> Re
     nonempty_string(field(map, "id", context)?, &format!("{context}.id"))?;
     nonempty_string(field(map, "name", context)?, &format!("{context}.name"))?;
     let version = field(map, "version", context)?;
-    if nullable_version && version.is_null() {
+    if nullable_version {
+        if !version.is_null() && version.as_str().is_none() {
+            return Err(schema_error(format!("{context}.version must be a string or null")));
+        }
         return Ok(());
     }
     nonempty_string(version, &format!("{context}.version"))?;
