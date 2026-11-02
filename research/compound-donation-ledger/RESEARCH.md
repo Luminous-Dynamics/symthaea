@@ -10,7 +10,9 @@ finite staircase-calibrator implementation for Issue
 It does not calculate or validate the input e-processes, establish the global
 filtration, authenticate arrival timestamps, run a discovery optimizer, or
 certify FDR/SupFDR in production. It is intentionally not a workspace member.
-No compile, test, CI, or performance result is claimed here.
+No compile, test, CI, or performance result is claimed here. The independent
+verifier source and its two differential/tamper tests are authored but also
+not compiled or executed in this environment.
 
 The prototype uses a deliberately restricted routing rule: each donor's
 recipient ID is committed in its candidate specification. Adaptive recipient
@@ -284,8 +286,9 @@ matched guarantees and data assumptions.
 
 1. Compile and run this standalone crate in a connected Rust checkout; record
    exact source SHA, toolchain, test command and result.
-2. Add a separately implemented verifier using a different data structure,
-   not just replay through the same transition engine.
+2. Compile and run the separate linear-scan verifier crate; add cross-implementation
+   differential tests against the writer and verify that its code never invokes
+   DonationLedger or writer transition helpers.
 3. Add negative controls for missing/duplicate reservation rows, wrong
    recipient, repeated/overdrawn credit, evidence rollback, round rollback,
    invalid weights/rates, overflow and altered final snapshots.
