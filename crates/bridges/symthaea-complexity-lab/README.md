@@ -141,3 +141,60 @@ Dependency-aware reuse of exact lemmas and certificates is tracked in ETH-008:
 https://github.com/Luminous-Dynamics/symthaea/issues/10113
 
 The broader work plan is tracked in ETH-001.
+
+
+## Exact semiring factor elimination
+
+The `semiring` module adds a generic exact bucket variable-elimination
+reference engine. A factor graph is evaluated using explicitly supplied
+additive and multiplicative identities and a fallible `ExactSemiring`
+implementation. It reports induced-bucket width, joined assignment count,
+maximum generated table size, and semiring operation counts.
+
+Included algebras:
+- Boolean OR/AND for feasibility;
+- checked `u128` natural counts;
+- MaxCount for optimum score plus number of optima;
+- ParetoCount for nondominated objective vectors and their multiplicities;
+- the existing bounded `WeightProfile` ring for complete objective profiles.
+
+The evaluator is exact but exponential in induced width. It is a separate
+reference backend from the f64 sum-product / max-product belief-propagation
+crate. It does not implement the subexponential shared-measurement routine.
+
+Algorithm compatibility is explicit: generic semiring variable elimination
+needs distributivity; shared-measurement Taylor/Hermite interpolation needs a
+commutative Q-algebra and rational subtraction; signed SNS identities need
+additive inverses unless a weaker-algebra theorem is separately proved. A
+planner must not silently send MaxCount/Pareto/Boolean values through a
+Q-algebra-only algorithm.
+
+Tests cover triangle independent-set feasibility/count, MaxCut optimum and
+multiplicity, a Pareto tradeoff, a triangle MaxCut polynomial profile,
+malformed factor and elimination inputs, count overflow, empty factor systems,
+MaxCount tie aggregation, and Pareto-pruning compatibility under Minkowski
+addition. Rust compilation remains unverified in environments without
+Cargo/Rust.
+
+
+The semiring module also exposes `check_algorithm_compatibility` and
+capability declarations. The initial planner guard distinguishes:
+- bucket variable elimination: commutative semiring operations;
+- shared-measurement interpolation: commutative multiplication, additive
+  inverses and rational scalar multiplication (a commutative Q-algebra);
+- signed network sums: commutative multiplication and additive inverses;
+- carry-free scalarization: exact ordered scalar embedding, nonnegative final
+  coefficients and a proved coefficient bound.
+
+These are fail-closed category checks, not proofs that a caller's claimed
+algebra laws hold. Noncommutative coefficient products are not supported by
+this factor-elimination engine.
+
+
+The reference folder also contains `semiring_law_oracle.py` and
+`semiring_law_results.json`. The standard-library oracle performs 256
+deterministic algebra-law cases each for MaxCount, ParetoCount, and the
+truncated bivariate polynomial ring (768/768 total), checking identity,
+associativity, commutativity and distributivity. It tests the mathematical
+reference operations only; it does not execute the Rust code or replace Lean
+formalization.
