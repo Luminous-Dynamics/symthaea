@@ -32,7 +32,6 @@
     },
     "scope": {
       "enum": [
-        "SYNTHETIC_KNOWN_ANSWER",
         "CACHED_CB2_REPLAY",
         "PROSPECTIVE_ACQUISITION"
       ]
@@ -209,7 +208,7 @@
     },
     "view_candidates": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -377,7 +376,7 @@
         },
         "per_view_costs": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -516,20 +515,98 @@
     {
       "if": {
         "properties": {
-          "scope": {
-            "const": "SYNTHETIC_KNOWN_ANSWER"
+          "decision_receipt": {
+            "properties": {
+              "result_status": {
+                "const": "VIEW_SELECTED"
+              }
+            },
+            "required": [
+              "result_status"
+            ]
           }
         },
         "required": [
-          "scope"
+          "decision_receipt"
         ]
       },
       "then": {
         "properties": {
-          "dataset": {
+          "decision_receipt": {
             "properties": {
-              "kind": {
-                "const": "CONNECTOMEBENCH2"
+              "selected_view_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "stop_reason": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision_receipt": {
+            "properties": {
+              "result_status": {
+                "const": "STOPPED"
+              }
+            },
+            "required": [
+              "result_status"
+            ]
+          }
+        },
+        "required": [
+          "decision_receipt"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decision_receipt": {
+            "properties": {
+              "selected_view_id": {
+                "type": "null"
+              },
+              "stop_reason": {
+                "enum": [
+                  "NO_ADMISSIBLE_VIEWS",
+                  "NO_POSITIVE_NET_VALUE",
+                  "NO_ROBUSTLY_POSITIVE_VIEW"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision_receipt": {
+            "properties": {
+              "result_status": {
+                "const": "NOT_ESTIMABLE"
+              }
+            },
+            "required": [
+              "result_status"
+            ]
+          }
+        },
+        "required": [
+          "decision_receipt"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decision_receipt": {
+            "properties": {
+              "selected_view_id": {
+                "type": "null"
               }
             }
           }
