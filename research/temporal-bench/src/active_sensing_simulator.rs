@@ -582,11 +582,34 @@ pub fn validate_active_sensing_result(
             "scenario and policy digests must be nonzero",
         ));
     }
-    if result.steps == 0
-        || result.detected_events + result.missed_events != result.event_count
-        || result.on_time_detected_events + result.late_detected_events != result.detected_events
+    if result.steps == 0 {
+        return Err(ActiveSensingSimulationError::new(
+            "result.steps",
+            "episode step count must be nonzero",
+        ));
+    }
+
+    // Treat receipts as untrusted input. Checked arithmetic prevents forged
+    // counters from panicking the verifier or exploiting saturating equality.
+    let detected_plus_missed = result.detected_events
+        .checked_add(result.missed_events)
+        .ok_or_else(|| ActiveSensingSimulationError::new(
+            "result.event_count", "detected + missed count overflow",
+        ))?;
+    let on_time_plus_late = result.on_time_detected_events
+        .checked_add(result.late_detected_events)
+        .ok_or_else(|| ActiveSensingSimulationError::new(
+            "result.on_time_detected_events", "on-time + late count overflow",
+        ))?;
+    let sensor_sample_total = result.low_power_samples
+        .checked_add(result.high_fidelity_samples)
+        .ok_or_else(|| ActiveSensingSimulationError::new(
+            "result.samples_acquired", "sensor sample count overflow",
+        ))?;
+    if detected_plus_missed != result.event_count
+        || on_time_plus_late != result.detected_events
         || result.detection_delays_steps.len() as u64 != result.detected_events
-        || result.low_power_samples + result.high_fidelity_samples != result.samples_acquired
+        || sensor_sample_total != result.samples_acquired
         || result.wake_count == 0
         || result.wake_count > result.steps
     {
@@ -595,19 +618,27 @@ pub fn validate_active_sensing_result(
             "event, delay, sensor-sample, or wake denominators are inconsistent",
         ));
     }
-    if result.modeled_sensor_wake_energy_nj
-        != result.sensor_energy_nj.saturating_add(result.wake_energy_nj)
-    {
+
+    let expected_energy = result.sensor_energy_nj
+        .checked_add(result.wake_energy_nj)
+        .ok_or_else(|| ActiveSensingSimulationError::new(
+            "result.resources", "sensor + wake energy overflow",
+        ))?;
+    if result.modeled_sensor_wake_energy_nj != expected_energy {
         return Err(ActiveSensingSimulationError::new(
             "result.resources",
-            "modeled energy accounting is inconsistent",
+            "modeled sensor/wake energy does not equal its component sum",
         ));
     }
+
+    let alarm_count = result.detected_events
+        .checked_add(result.false_alarms)
+        .and_then(|count| count.checked_add(result.duplicate_alarms))
+        .ok_or_else(|| ActiveSensingSimulationError::new(
+            "result.alarm_count", "alarm count overflow",
+        ))?;
     let expected_recall = ppm(result.detected_events, result.event_count);
     let expected_on_time_recall = ppm(result.on_time_detected_events, result.event_count);
-    let alarm_count = result.detected_events
-        .saturating_add(result.false_alarms)
-        .saturating_add(result.duplicate_alarms);
     let expected_precision = ppm(result.detected_events, alarm_count);
     let expected_false_alarm_rate = (u128::from(result.false_alarms) * 1_000
         / u128::from(result.steps)) as u64;
@@ -636,7 +667,6 @@ pub fn validate_active_sensing_result(
     }
     Ok(())
 }
-
 /// Run one deterministic episode. The policy never receives the scenario,
 /// seed, event schedule, current hidden label, or evaluator result.
 pub fn run_active_sensing_episode<P: ActiveSensingPolicy>(
@@ -1027,6 +1057,33 @@ mod tests {
         )
         .unwrap();
         result.on_time_detected_events = result.on_time_detected_events.saturating_add(1);
+        assert!(validate_active_sensing_result(&result).is_err());
+    }
+
+    #[test]
+    fn forged_overflowing_result_counters_fail_closed_without_panicking() {
+        let mut policy = FixedRateBaseline {
+            sensor: ActiveSensingSensor::LowPower,
+            interval_steps: 2,
+        };
+        let mut result = run_active_sensing_episode(
+            scenario(ActiveSensingShift::Stable),
+            policy_digest(11),
+            &mut policy,
+        )
+        .unwrap();
+        result.detected_events = u64::MAX;
+        result.missed_events = u64::MAX;
+        assert!(validate_active_sensing_result(&result).is_err());
+
+        let mut result = run_active_sensing_episode(
+            scenario(ActiveSensingShift::Stable),
+            policy_digest(12),
+            &mut policy,
+        )
+        .unwrap();
+        result.sensor_energy_nj = u64::MAX;
+        result.wake_energy_nj = 1;
         assert!(validate_active_sensing_result(&result).is_err());
     }
 
