@@ -1364,3 +1364,4 @@ pub mod adjudication_attrition;
 pub mod causal_analysis;
 pub mod exposure_transfer;
 pub mod training_receipt;
+pub mod measurement_distribution;
