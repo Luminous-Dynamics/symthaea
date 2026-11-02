@@ -254,6 +254,7 @@ pub struct CandidateTaskLoss {
     pub task_id: String,
     pub upper_wrong_answer_loss_ppm: u32,
     pub lower_premature_abandon_loss_ppm: u32,
+    pub emitted_answer_error_ppm: u32,
     pub tokens_used: u64,
     pub stop_index: usize,
     pub stop_cause: StopCause,
@@ -266,9 +267,12 @@ pub struct CandidateEvaluation {
     pub candidate_id: String,
     pub upper_loss_sum_ppm: u128,
     pub lower_loss_sum_ppm: u128,
+    pub emitted_answer_error_sum_ppm: u128,
     pub sample_count: usize,
     pub upper_mean_loss_ceil_ppm: u32,
     pub lower_mean_loss_ceil_ppm: u32,
+    /// Descriptive output error rate; not part of the two stopping-risk UCBs.
+    pub emitted_answer_error_mean_ceil_ppm: u32,
     pub simultaneous_ucb_correction_ppm: u32,
     pub upper_risk_ucb_ppm: u32,
     pub lower_risk_ucb_ppm: u32,
@@ -417,6 +421,7 @@ pub fn evaluate_candidate_on_trace(
         task_id: trace.task_id.clone(),
         upper_wrong_answer_loss_ppm,
         lower_premature_abandon_loss_ppm,
+        emitted_answer_error_ppm: if trace.steps[stop_index].correct { 0 } else { PPM as u32 },
         tokens_used,
         stop_index,
         stop_cause,
@@ -455,6 +460,7 @@ fn aggregate_candidate(
     let mut losses = Vec::with_capacity(traces.len());
     let mut upper_sum = 0u128;
     let mut lower_sum = 0u128;
+    let mut emitted_error_sum = 0u128;
     let mut tokens_fraction_sum = 0u128;
     let mut upper_efficiency_sum = 0u128;
     let mut lower_efficiency_sum = 0u128;
@@ -465,6 +471,8 @@ fn aggregate_candidate(
             .ok_or_else(|| fail("upper_sum", "overflow"))?;
         lower_sum = lower_sum.checked_add(u128::from(loss.lower_premature_abandon_loss_ppm))
             .ok_or_else(|| fail("lower_sum", "overflow"))?;
+        emitted_error_sum = emitted_error_sum.checked_add(u128::from(loss.emitted_answer_error_ppm))
+            .ok_or_else(|| fail("emitted_error_sum", "overflow"))?;
         let token_fraction = ceil_div(
             u128::from(loss.tokens_used) * u128::from(PPM),
             u128::from(trace.budget_tokens),
@@ -482,6 +490,8 @@ fn aggregate_candidate(
         .map_err(|_| fail("upper_mean", "overflow"))?;
     let lower_mean = u32::try_from(ceil_div(lower_sum, n)?)
         .map_err(|_| fail("lower_mean", "overflow"))?;
+    let emitted_error_mean = u32::try_from(ceil_div(emitted_error_sum, n)?)
+        .map_err(|_| fail("emitted_error_mean", "overflow"))?;
     let upper_ucb = upper_mean.saturating_add(correction_ppm).min(PPM as u32);
     let lower_ucb = lower_mean.saturating_add(correction_ppm).min(PPM as u32);
     let mean_tokens = u32::try_from(ceil_div(tokens_fraction_sum, n)?)
@@ -496,9 +506,11 @@ fn aggregate_candidate(
         candidate_id: candidate.candidate_id.clone(),
         upper_loss_sum_ppm: upper_sum,
         lower_loss_sum_ppm: lower_sum,
+        emitted_answer_error_sum_ppm: emitted_error_sum,
         sample_count: traces.len(),
         upper_mean_loss_ceil_ppm: upper_mean,
         lower_mean_loss_ceil_ppm: lower_mean,
+        emitted_answer_error_mean_ceil_ppm: emitted_error_mean,
         simultaneous_ucb_correction_ppm: correction_ppm,
         upper_risk_ucb_ppm: upper_ucb,
         lower_risk_ucb_ppm: lower_ucb,
@@ -825,6 +837,31 @@ mod tests {
         verify_compute_risk_report(&report).unwrap();
         let mut tampered=report.clone(); tampered.correction_ppm+=1;
         assert!(verify_compute_risk_report(&tampered).is_err());
+    }
+
+    #[test]
+    fn full_budget_wrong_answer_remains_visible_as_output_error() {
+        let c=candidate("full",1_000_000,0,0,0);
+        let t=trace(&[true,true,true,true,true,true,true,false], &[100_000,200_000,300_000,400_000,500_000,600_000,700_000,800_000]);
+        let loss=evaluate_candidate_on_trace(&c,&t).unwrap();
+        assert_eq!(loss.stop_cause,StopCause::FullBudget);
+        assert_eq!(loss.upper_wrong_answer_loss_ppm,0);
+        assert_eq!(loss.lower_premature_abandon_loss_ppm,0);
+        assert_eq!(loss.emitted_answer_error_ppm,1_000_000);
+    }
+
+    #[test]
+    fn builtin_joint_grid_selects_by_compute_only_after_both_risks_pass() {
+        let fixture=load_builtin_fixture().unwrap();
+        let traces=generate_synthetic_validation_panel(&fixture).unwrap();
+        let report=calibrate_joint_candidate_grid(
+            &fixture.candidates,&traces,CalibrationDesign::SyntheticFixedPanel,
+            fixture.risk_upper_budget_ppm,fixture.risk_lower_budget_ppm,fixture.confidence_delta_ppm
+        ).unwrap();
+        assert_eq!(report.candidate_evaluations.len(),fixture.candidates.len());
+        assert_eq!(report.selected_candidate_id.as_deref(),Some("a_fast_aggressive"));
+        assert!(!report.confidence_claim_eligible_under_declared_design);
+        assert!(report.candidate_evaluations.iter().all(|x|x.emitted_answer_error_mean_ceil_ppm<=PPM as u32));
     }
 
     #[test]
