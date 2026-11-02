@@ -283,7 +283,25 @@ The local exact-rational research checks completed:
 
 These were executed as local exact-rational reference checks in a separate Python reimplementation of the committed algorithms, not as the committed unittest file, Rust tests or GitHub Actions. The test suite is authored for independent reproduction.
 
-## 8. Projectivity and limitations
+## 8. Exploratory finite-envelope pilot
+
+A separate local Python reimplementation of the committed pilot logic examined the finite-envelope mode with 24 precommitted candidates, 40 looks, \(\alpha=0.1\), and \(\delta_{24}=1/25\). The base null process used Bernoulli \(p_0=1/2\) likelihood-ratio factors \(7/5\) and \(3/5\), with the downward-rounded square-root running-maximum adjuster. It covered independent, shared-uniform and balanced-negative null batches.
+
+In the late-arriving cluster scenario, the finite-envelope anchor showed only small observed terminal-power differences over the ordinary same-weight baseline:
+
+| Dependence | Ordinary finite-envelope e-BH | Finite-envelope anchored |
+|---|---:|---:|
+| Independent | 12.2% | 12.3% |
+| Shared-uniform | 11.5% | 11.8% |
+| Balanced-negative | 13.2% | 13.4% |
+
+No additional terminal discoveries appeared in the all-null, sparse-strong, dense-weak or switching cells in this pilot. No false discoveries were observed in the pilot cells, but this is not a calibration result.
+
+The 100-stream-per-cell one-sided 95% Hoeffding half-width is approximately 12.24 percentage points. There was no simultaneous correction across the grid. The observed 0.1–0.3 percentage-point differences are much smaller than this uncertainty. This is a hypothesis-generating result only; it does not show that anchoring improves power or beats ordinary compound e-BH.
+
+The checked-in runner has not been executed in a connected checkout. The reported pilot values came from a separate local Python reimplementation using the same LR, adjuster, fixed-envelope weights, closure deficit, scenarios and seed schedule. The committed runner and tests are provided for independent reproduction.
+
+## 9. Projectivity and limitations
 
 The *weight sequence* and \(\delta\) are horizon-independent. The compound score for an existing candidate remains stable only if the underlying evidence and fixed-destination transfer rules preserve that candidate's prior history under extension.
 
@@ -295,16 +313,23 @@ The anchored rejection set itself is **not automatically initial-segment project
 
 The current algorithm operates on the finite active set at each reporting time and checks all its subsets. For the countable global null set, the SupFDR proof uses the monotone limit of the local processes over finite intersections. It does not assume that every finite-horizon rejection set remains unchanged when new evidence arrives.
 
-## 9. Benchmark programme
+## 10. Benchmark programme
 
-Compare on paired, valid base-process streams:
-1. weighted compound e-BH with total global weight mass one (where an anchor slack is not available);
-2. weighted compound e-BH with fixed global mass \(1-\delta\), no closure augmentation;
-3. slack-anchored compound e-BH for a predeclared grid \(\delta\in\{0.01,0.05,0.10,0.20\}\);
-4. two-phase exact-minimum-credit allocation;
-5. two-phase allocation plus slack-anchored closure.
+Compare on paired, valid base-process streams, keeping the two weight-budget modes separate:
 
-The δ grid must be fixed before confirmatory testing or tuned on separate training seeds. Use independent, shared-control/common-shock, balanced-negative, block-dependent and time-varying conditionally valid nulls. Include sparse, dense weak, heterogeneous, immediate-borderline, late-arrival, far-recipient, switching and no-useful-recipient alternatives.
+**Precommitted finite envelope** (maximum family size \(n_{\max}\) fixed before observations):
+1. Ordinary compound e-BH with \(\gamma_i=1/[i(i+1)]\), \(i\le n_{\max}\).
+2. Finite-envelope slack-anchored compound e-BH with the same unscaled weights and fixed \(\delta_{n_{\max}}=1/(n_{\max}+1)\).
+3. Two-phase exact-minimum-credit allocation with and without finite-envelope anchored closure.
+
+**Open-ended countable universe**:
+4. Compound e-BH with \(\gamma_i=(1-\delta)/[i(i+1)]\), without closure augmentation.
+5. Slack-anchored compound e-BH for a predeclared global slack grid \(\delta\in\{0.01,0.05,0.10,0.20\}\).
+6. Two-phase exact-minimum-credit allocation with and without open-ended anchored closure.
+
+The finite-envelope anchor does not scale down the candidate weights, but it is valid only for the precommitted maximum universe. The open-ended anchor supports arbitrarily many future IDs with a fixed \(\delta\), but it scales every candidate weight by \(1-\delta\). Do not compare these modes without reporting the different baseline weight allocation.
+
+The open-ended δ grid must be fixed before confirmatory testing or tuned on separate training seeds. Use independent, shared-control/common-shock, balanced-negative, block-dependent and time-varying conditionally valid nulls. Include sparse, dense weak, heterogeneous, immediate-borderline, late-arrival, far-recipient, switching and no-useful-recipient alternatives.
 
 Report SupFDR, terminal FDR, stopped-FDR, FDX and P(any false) separately; power, time-to-first-discovery, additional rejections beyond baseline, reserve/credit utilization, worst-regime regret, and p50/p95/p99 decision/verifier latency. Freeze at least 50,000 paired streams per confirmatory cell, with more for rare-event targets and simultaneous intervals across the preregistered grid.
 
