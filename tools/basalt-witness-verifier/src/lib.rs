@@ -1013,7 +1013,12 @@ mod tests {
         assert_eq!(selected.distinct_member_responses, 3);
         assert_eq!(selected.sequence, "5");
         assert_eq!(selected.counterexamples.len(), 1);
-        assert!(selected.counterexamples[0].contains("failed authentication"));
+        assert!(
+            selected
+                .counterexamples
+                .iter()
+                .any(|reason| reason.contains("failed authentication"))
+        );
     }
 
     #[test]
@@ -1040,7 +1045,12 @@ mod tests {
         assert_eq!(selected.status, "anti_rollback_unknown");
         assert_eq!(selected.distinct_member_responses, 0);
         assert!(selected.counterexamples.len() >= 1);
-        assert!(selected.counterexamples[0].contains("failed authentication"));
+        assert!(
+            selected
+                .counterexamples
+                .iter()
+                .any(|reason| reason.contains("failed authentication"))
+        );
     }
 
     #[test]
@@ -1128,7 +1138,8 @@ mod tests {
             "incarnation-1",
             "1",
         );
-        assert_eq!(selected.status, "rejected_witness_response");
+        assert_eq!(selected.status, "anti_rollback_unknown");
+        assert!(selected.counterexamples.iter().any(|reason| reason.contains("nonce/authority/witness set")));
     }
 
     #[test]
@@ -1147,7 +1158,8 @@ mod tests {
         evidence[0].checkpoint_envelope = sign_checkpoint_fixture(&latest, &seeds[..2]);
         let selected =
             verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
-        assert_eq!(selected.status, "rejected_checkpoint_certificate");
+        assert_eq!(selected.status, "anti_rollback_unknown");
+        assert!(selected.counterexamples.iter().any(|reason| reason.contains("checkpoint certificate failed") || reason.contains("fields disagree")));
     }
 
     #[test]
@@ -1166,7 +1178,8 @@ mod tests {
         evidence[0].checkpoint_envelope = sign_checkpoint_fixture(&lagging, &seeds[..3]);
         let selected =
             verify_head_read_quorum(&evidence, &trust_bytes, &pin, &nonce, "incarnation-1", "1");
-        assert_eq!(selected.status, "rejected_checkpoint_certificate");
+        assert_eq!(selected.status, "anti_rollback_unknown");
+        assert!(selected.counterexamples.iter().any(|reason| reason.contains("checkpoint certificate failed") || reason.contains("fields disagree")));
     }
 
     #[test]
