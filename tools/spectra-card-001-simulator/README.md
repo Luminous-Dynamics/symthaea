@@ -64,6 +64,14 @@ claims. Bind the participant-level effects to the exact blocked-randomization
 inference owner (#9670 / PR #9673) only after the allocation and analysis
 manifest are frozen.
 
+
+The raw four-outcome counts are preserved per condition so the shared
+`symthaea-statistics` signal-detection implementation in PR #10086 can compute
+d-prime/criterion and ROC/PR summaries. This crate does not compute d-prime,
+AUC, p-values or confidence intervals itself. The signal-detection equal-
+variance Gaussian assumption and loglinear correction are owned by that shared
+statistics API; raw counts remain the primary auditable data.
+
 ## Run
 
     cargo test --manifest-path tools/spectra-card-001-simulator/Cargo.toml
