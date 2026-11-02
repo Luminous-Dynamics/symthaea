@@ -232,7 +232,7 @@ pub fn raw_event_log_digest(events: &[RawEvent]) -> Result<String, String> {
     Ok(sha256_prefixed_bytes(&canonical_raw_event_log_bytes(events)?))
 }
 
-fn invalid_observation_report(
+struct InvalidObservationContext {
     trace_id: String,
     reference_sha256: String,
     raw_event_sha256: String,
@@ -241,25 +241,27 @@ fn invalid_observation_report(
     runners: usize,
     faults: usize,
     counterexamples: Vec<String>,
-) -> ObservationReport {
+}
+
+fn invalid_observation_report(context: InvalidObservationContext) -> ObservationReport {
     ObservationReport {
         report_version: 1,
         status: "invalid_evidence".to_string(),
-        trace_id,
-        reference_trace_sha256: reference_sha256,
-        raw_event_log_sha256: raw_event_sha256,
+        trace_id: context.trace_id,
+        reference_trace_sha256: context.reference_sha256,
+        raw_event_log_sha256: context.raw_event_sha256,
         backend_id: None,
         backend_engine: None,
         backend_version: None,
         adapter_commit_sha: None,
-        operations_observed: operations,
-        events_observed: events,
-        runners_observed: runners,
-        faults_observed: faults,
+        operations_observed: context.operations,
+        events_observed: context.events,
+        runners_observed: context.runners,
+        faults_observed: context.faults,
         retry_groups_validated: 0,
         pending_operation_ids: Vec::new(),
         incomplete_retry_groups: Vec::new(),
-        counterexamples,
+        counterexamples: context.counterexamples,
         history_search: None,
         claim_ceiling: "Observation evidence failed strict envelope, provenance, digest, clock, event, fault or transaction validation. No consistency or freshness claim is made.".to_string(),
     }
@@ -381,7 +383,10 @@ fn validate_json_required_presence(bytes: &[u8]) -> Result<(), Vec<String>> {
                 }
             }
             if object.get("phase").and_then(|value| value.as_str()) == Some("fault") {
-                if !object.get("fault_id").is_some_and(|value| value.as_str().is_some()) {
+                if object
+                    .get("fault_id")
+                    .is_none_or(|value| value.as_str().is_none())
+                {
                     errors.push(format!("raw_events[{index}] fault phase requires a string fault_id"));
                 }
             } else if object.contains_key("fault_id") {
@@ -429,7 +434,7 @@ fn validate_observation_envelope(
     {
         errors.push("observation or authority identity is empty".to_string());
     }
-    if !valid_sha256(&expected_reference_trace_sha256) {
+    if !valid_sha256(expected_reference_trace_sha256) {
         errors.push("caller-supplied reference-trace pin is malformed".to_string());
     }
     if observation.reference_trace_sha256 != expected_reference_trace_sha256 {
@@ -500,16 +505,15 @@ fn validate_observation_envelope(
                     operation.op_id, operation.runner_id
                 ));
             }
-            if let Some(completed) = operation.completed_at_ns {
-                if completed < operation.invoked_at_ns
+            if let Some(completed) = operation.completed_at_ns
+                && (completed < operation.invoked_at_ns
                     || completed < window.capture_start_ns
-                    || completed > window.capture_end_ns
-                {
+                    || completed > window.capture_end_ns)
+            {
                     errors.push(format!(
                         "{} completion is outside its valid runner interval",
                         operation.op_id
                     ));
-                }
             }
         } else {
             errors.push(format!(
@@ -617,7 +621,7 @@ fn validate_observation_envelope(
                 sqlstate.len() != 5
                     || !sqlstate
                         .bytes()
-                        .all(|byte| byte.is_ascii_digit() || (b'A'..=b'Z').contains(&byte))
+                        .all(|byte| byte.is_ascii_digit() || byte.is_ascii_uppercase())
             })
         {
             errors.push(format!("event {} has malformed SQLSTATE", event.event_id));
@@ -825,16 +829,15 @@ fn validate_observation_envelope(
                         operation.op_id
                     ));
                 }
-                if outcome == "retryable_abort" {
-                    if commits != 0
+                if outcome == "retryable_abort"
+                    && (commits != 0
                         || aborts.len() != 1
-                        || aborts[0].sqlstate.as_deref() != Some("40001")
-                    {
+                        || aborts[0].sqlstate.as_deref() != Some("40001"))
+                {
                         errors.push(format!(
                             "{} retryable_abort must end with one SQLSTATE 40001 abort and no commit",
                             operation.op_id
                         ));
-                    }
                 }
                 if outcome == "committed" || outcome == "indeterminate" {
                     if commits != 1 || !aborts.is_empty() {
@@ -872,11 +875,10 @@ fn validate_observation_envelope(
                     errors.push(format!("{} is missing receipt_lookup event", operation.op_id));
                 }
             }
-            "restore_verify" => {
-                if !events.iter().any(|event| event.phase == "witness_read") {
-                    errors.push(format!("{} is missing witness_read event", operation.op_id));
-                }
+            "restore_verify" if !events.iter().any(|event| event.phase == "witness_read") => {
+                errors.push(format!("{} is missing witness_read event", operation.op_id));
             }
+            "restore_verify" => {}
             _ => {}
         }
     }
@@ -1021,13 +1023,13 @@ fn validate_observation_envelope(
                     "retry group {} attempt {} must use exactly one fresh transaction ID",
                     group_id, attempt_number
                 ));
-            } else if let Some(tx_id) = tx_ids.first() {
-                if !seen_transaction_ids.insert(*tx_id) {
-                    errors.push(format!(
-                        "retry group {} reused transaction ID {} across attempts",
-                        group_id, tx_id
-                    ));
-                }
+            } else if let Some(tx_id) = tx_ids.first()
+                && !seen_transaction_ids.insert(*tx_id)
+            {
+                errors.push(format!(
+                    "retry group {} reused transaction ID {} across attempts",
+                    group_id, tx_id
+                ));
             }
             if position + 1 < attempts.len()
                 && attempt.outcome.as_deref() != Some("retryable_abort")
@@ -1159,80 +1161,80 @@ pub fn verify_backend_observation(
     let parsed: ObservationEnvelope = match serde_json::from_slice(observation_bytes) {
         Ok(value) => value,
         Err(error) => {
-            return invalid_observation_report(
-                trace_id,
-                expected_reference_trace_sha256.to_string(),
-                raw_sha256,
-                0,
-                0,
-                0,
-                0,
-                vec![format!("strict observation envelope parse failed: {error}")],
-            );
+            return invalid_observation_report(InvalidObservationContext {
+            trace_id: trace_id,
+            reference_sha256: expected_reference_trace_sha256.to_string(),
+            raw_event_sha256: raw_sha256,
+            operations: 0,
+            events: 0,
+            runners: 0,
+            faults: 0,
+            counterexamples: vec![format!("strict observation envelope parse failed: {error}")],
+        });
         }
     };
     trace_id = parsed.trace_id.clone();
     raw_sha256 = parsed.raw_event_log_sha256.clone();
 
     if let Err(errors) = validate_json_required_presence(observation_bytes) {
-        return invalid_observation_report(
-            trace_id,
-            parsed.reference_trace_sha256.clone(),
-            raw_sha256,
-            parsed.observed_operations.len(),
-            parsed.raw_events.len(),
-            parsed.runner_clock_windows.len(),
-            parsed.observed_faults.len(),
-            errors,
-        );
+        return invalid_observation_report(InvalidObservationContext {
+            trace_id: trace_id,
+            reference_sha256: parsed.reference_trace_sha256.clone(),
+            raw_event_sha256: raw_sha256,
+            operations: parsed.observed_operations.len(),
+            events: parsed.raw_events.len(),
+            runners: parsed.runner_clock_windows.len(),
+            faults: parsed.observed_faults.len(),
+            counterexamples: errors,
+        });
     }
 
     let actual_reference_trace_sha256 = sha256_prefixed_bytes(reference_trace_bytes);
     if actual_reference_trace_sha256 != expected_reference_trace_sha256 {
-        return invalid_observation_report(
-            trace_id,
-            parsed.reference_trace_sha256.clone(),
-            raw_sha256,
-            parsed.observed_operations.len(),
-            parsed.raw_events.len(),
-            parsed.runner_clock_windows.len(),
-            parsed.observed_faults.len(),
-            vec![format!(
+        return invalid_observation_report(InvalidObservationContext {
+            trace_id: trace_id,
+            reference_sha256: parsed.reference_trace_sha256.clone(),
+            raw_event_sha256: raw_sha256,
+            operations: parsed.observed_operations.len(),
+            events: parsed.raw_events.len(),
+            runners: parsed.runner_clock_windows.len(),
+            faults: parsed.observed_faults.len(),
+            counterexamples: vec![format!(
                 "caller reference-trace bytes digest mismatch: expected {}, got {}",
                 expected_reference_trace_sha256, actual_reference_trace_sha256
             )],
-        );
+        });
     }
     let reference_trace: Trace = match serde_json::from_slice(reference_trace_bytes) {
         Ok(value) => value,
         Err(error) => {
-            return invalid_observation_report(
-                trace_id,
-                parsed.reference_trace_sha256.clone(),
-                raw_sha256,
-                parsed.observed_operations.len(),
-                parsed.raw_events.len(),
-                parsed.runner_clock_windows.len(),
-                parsed.observed_faults.len(),
-                vec![format!("caller reference trace failed strict parsing: {error}")],
-            );
+            return invalid_observation_report(InvalidObservationContext {
+            trace_id: trace_id,
+            reference_sha256: parsed.reference_trace_sha256.clone(),
+            raw_event_sha256: raw_sha256,
+            operations: parsed.observed_operations.len(),
+            events: parsed.raw_events.len(),
+            runners: parsed.runner_clock_windows.len(),
+            faults: parsed.observed_faults.len(),
+            counterexamples: vec![format!("caller reference trace failed strict parsing: {error}")],
+        });
         }
     };
     let reference_report = verify_reference(&reference_trace, reference_trace_bytes);
     if reference_report.status != "pass" {
-        return invalid_observation_report(
-            trace_id,
-            parsed.reference_trace_sha256.clone(),
-            raw_sha256,
-            parsed.observed_operations.len(),
-            parsed.raw_events.len(),
-            parsed.runner_clock_windows.len(),
-            parsed.observed_faults.len(),
-            vec![format!(
+        return invalid_observation_report(InvalidObservationContext {
+            trace_id: trace_id,
+            reference_sha256: parsed.reference_trace_sha256.clone(),
+            raw_event_sha256: raw_sha256,
+            operations: parsed.observed_operations.len(),
+            events: parsed.raw_events.len(),
+            runners: parsed.runner_clock_windows.len(),
+            faults: parsed.observed_faults.len(),
+            counterexamples: vec![format!(
                 "caller-pinned reference trace is not a passing reference: {:?}",
                 reference_report.counterexamples
             )],
-        );
+        });
     }
 
     let validation = match validate_observation_envelope(
@@ -1241,16 +1243,16 @@ pub fn verify_backend_observation(
     ) {
         Ok(value) => value,
         Err(errors) => {
-            return invalid_observation_report(
-                trace_id,
-                parsed.reference_trace_sha256.clone(),
-                raw_sha256,
-                parsed.observed_operations.len(),
-                parsed.raw_events.len(),
-                parsed.runner_clock_windows.len(),
-                parsed.observed_faults.len(),
-                errors,
-            );
+            return invalid_observation_report(InvalidObservationContext {
+            trace_id: trace_id,
+            reference_sha256: parsed.reference_trace_sha256.clone(),
+            raw_event_sha256: raw_sha256,
+            operations: parsed.observed_operations.len(),
+            events: parsed.raw_events.len(),
+            runners: parsed.runner_clock_windows.len(),
+            faults: parsed.observed_faults.len(),
+            counterexamples: errors,
+        });
         }
     };
 
