@@ -308,7 +308,11 @@
         "model_selection_blind_to_test",
         "target_identity_split_before_preprocessing",
         "overlap_audit_sha256",
-        "status"
+        "status",
+        "unit_tokenization",
+        "train_unit_tokens",
+        "validation_unit_tokens",
+        "test_unit_tokens"
       ],
       "properties": {
         "split_id": {
@@ -409,6 +413,50 @@
         "leakage_notes": {
           "type": "string",
           "maxLength": 4000
+        },
+        "unit_tokenization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "key_commitment_sha256",
+            "canonicalization_version"
+          ],
+          "properties": {
+            "algorithm": {
+              "const": "HMAC-SHA256"
+            },
+            "key_commitment_sha256": {
+              "$ref": "#/$defs/sha256OrNull"
+            },
+            "canonicalization_version": {
+              "const": "UNIT-TOKEN-V1"
+            }
+          }
+        },
+        "train_unit_tokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "validation_unit_tokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "test_unit_tokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
         }
       }
     },
@@ -1488,7 +1536,8 @@
         "ci_high",
         "minimum_meaningful_effect",
         "non_inferiority_margin",
-        "outcome"
+        "outcome",
+        "paired_unit_tokens"
       ],
       "properties": {
         "candidate_model_id": {
@@ -1555,6 +1604,14 @@
             "not_assessed",
             "incomplete"
           ]
+        },
+        "paired_unit_tokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
         }
       }
     },
@@ -1817,6 +1874,23 @@
               "overlap_audit_sha256": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
+              },
+              "unit_tokenization": {
+                "properties": {
+                  "key_commitment_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "train_unit_tokens": {
+                "minItems": 2
+              },
+              "validation_unit_tokens": {
+                "minItems": 1
+              },
+              "test_unit_tokens": {
+                "minItems": 2
               }
             }
           },
@@ -1835,6 +1909,9 @@
                     },
                     "n_independent_units": {
                       "minimum": 2
+                    },
+                    "paired_unit_tokens": {
+                      "minItems": 2
                     }
                   }
                 }
