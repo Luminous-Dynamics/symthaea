@@ -1,36 +1,33 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! C. elegans Connectome Validation Module
+//! Legacy C. elegans-inspired synthetic topology fixture.
 //!
-//! This module implements Revolutionary #100: Biological validation of consciousness
-//! topology theory using the C. elegans connectome - the only complete connectome
-//! of any organism.
+//! IMPORTANT: This module does NOT load a source-verified C. elegans connectome.
+//! `CElegansConnectome::new()` creates 279 representative neuron entries and
+//! seeded pseudo-random connectivity. Its generated weights are not measured
+//! synapse counts or calibrated physiological efficacies.
 //!
-//! # Background
+//! The fixture is useful only for deterministic graph/topology experiments. It
+//! does not establish anatomical completeness, neural dynamics, sensorimotor
+//! function, animal behaviour, or biological/consciousness validation.
 //!
-//! C. elegans is a 1mm nematode worm with exactly 302 neurons (hermaphrodite).
-//! Its connectome was first mapped by White et al. (1986) and refined by
-//! Cook et al. (2019) and Brittin et al. (2021).
+//! The source-bound import and validation work is tracked in Symthaea issue #9902.
 //!
-//! Key statistics:
-//! - 302 neurons total
-//! - ~7,000 chemical synapses
-//! - ~900 gap junctions (electrical synapses)
-//! - Modular organization: sensory → interneuron → motor
+//! # Biological context
 //!
-//! # Scientific Purpose
-//!
-//! This module validates our HDC-based Φ calculations against real biological
-//! neural architecture, testing whether our consciousness topology predictions
-//! hold for actual nervous systems.
+//! The adult hermaphrodite C. elegans has 302 neurons. Published whole-animal
+//! connectome resources include White et al. (1986) and Cook et al. (2019).
+//! Those biological reference facts must not be interpreted as properties of
+//! this 279-entry synthetic fixture.
 //!
 //! # References
 //!
-//! - White et al. (1986) "The Structure of the Nervous System of C. elegans"
-//! - Cook et al. (2019) "Whole-animal connectomes of both C. elegans sexes"
-//! - Varshney et al. (2011) "Structural properties of the C. elegans neuronal network"
-//! - WormWiring.org - Official connectome database
+//! - White et al. (1986), "The Structure of the Nervous System of C. elegans"
+//! - Cook et al. (2019), "Whole-animal connectomes of both C. elegans sexes"
+//! - Varshney et al. (2011), "Structural properties of the C. elegans neuronal network"
+//! - Randi et al. (2023), C. elegans neural signal propagation atlas
+//! - WormWiring.org / OpenWorm: source resources requiring version and rights pinning
 
 use super::consciousness_topology_generators::{ConsciousnessTopology, TopologyType};
 use super::spectral_connectivity::ConnectivityCalculator;
@@ -98,32 +95,33 @@ pub struct CElegansNeuron {
     pub gap_junctions: Vec<(usize, f64)>,
 }
 
-/// The complete C. elegans connectome
+/// Legacy C. elegans-inspired synthetic topology fixture; not a source graph.
 #[derive(Debug, Clone)]
 pub struct CElegansConnectome {
     /// All neurons
     pub neurons: Vec<CElegansNeuron>,
     /// Neuron name to index mapping
     pub name_to_index: HashMap<String, usize>,
-    /// Total chemical synapses
+    /// Number of generated directed chemical edges (not biological synapse contacts).
     pub total_chemical_synapses: usize,
-    /// Total gap junctions
+    /// Number of generated bidirectional gap-junction pairs (not a source count).
     pub total_gap_junctions: usize,
 }
 
 impl CElegansConnectome {
-    /// Create the C. elegans connectome from embedded data
+    /// Create the deterministic C. elegans-inspired synthetic topology fixture.
     ///
-    /// This uses a simplified but accurate representation based on
-    /// published connectome data (Varshney et al., 2011; Cook et al., 2019)
+    /// This constructor generates representative nodes and pseudo-random edges.
+    /// It is not a biologically accurate or source-verified connectome and must
+    /// not be used as evidence of anatomical completeness or animal behaviour.
     pub fn new() -> Self {
         Self::from_embedded_data()
     }
 
-    /// Create from embedded simplified connectome data
+    /// Build the legacy synthetic fixture with deterministic pseudo-random connectivity.
     ///
-    /// This encodes the essential structure of the C. elegans nervous system
-    /// based on published literature. For full accuracy, load from WormWiring.org
+    /// The generated graph is topology-only and does not encode the measured
+    /// source connectome. A source importer is tracked in issue #9902.
     fn from_embedded_data() -> Self {
         // We'll create a representative 279-neuron connectome
         // (excluding pharyngeal neurons for initial validation)
