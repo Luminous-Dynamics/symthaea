@@ -946,6 +946,7 @@ mod tests {
             compute_action_forecast_bank_sha256(&original),
             compute_action_forecast_bank_sha256(&permuted)
         );
+        permuted.validate().unwrap();
         let mut tampered = original;
         tampered.samples[0].predicted_belief[0] = 0.25;
         assert_ne!(
