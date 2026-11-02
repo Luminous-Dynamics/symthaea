@@ -270,6 +270,16 @@ pub fn verify_receipt(
         return Err(VerifyError::ReceiptMismatch);
     }
 
+    let state_incoming = state.values().try_fold(0_u128, |sum, candidate| {
+        sum.checked_add(candidate.incoming).ok_or(VerifyError::Overflow)
+    })?;
+    let state_outgoing = state.values().try_fold(0_u128, |sum, candidate| {
+        sum.checked_add(candidate.outgoing).ok_or(VerifyError::Overflow)
+    })?;
+    if state_incoming != total_incoming || state_outgoing != total_outgoing {
+        return Err(VerifyError::PrefixBudget);
+    }
+
     let mut result_candidates = Vec::with_capacity(state.len());
     for (id, candidate) in &state {
         let spec = spec_map.get(id).ok_or(VerifyError::UnknownCandidate)?;
@@ -334,8 +344,8 @@ pub fn verify_receipt(
                 weighted_score: candidate.weighted_score,
             }).collect(),
             escrow: {
-                // The reference snapshot omits the fixed destination field. Reconstruct
-                // it from the precommitted candidate specification.
+                // Destinations are part of the reference snapshot and are compared
+                // directly with the independent replay result.
                 expected.escrow.iter().map(|token| {
                     VerifiedToken {
                         token_id: token.token_id,
@@ -416,6 +426,30 @@ mod tests {
         assert_eq!(verified.candidates.len(), 3);
         assert_eq!(verified.escrow[0].remaining_amount, 0);
         assert_eq!(verified.candidates[1].incoming, token_amount);
+    }
+
+    #[test]
+    fn independent_verifier_rejects_destination_tampering() {
+        let policy = specs();
+        let mut writer = DonationLedger::new(policy.clone()).unwrap();
+        writer.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+        writer.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: EVIDENCE_ONE,
+        }).unwrap();
+
+        let mut tampered = writer.audit_log().to_vec();
+        let reservation = tampered.iter_mut()
+            .find(|event| matches!(event, AuditEvent::Reserved { .. }))
+            .unwrap();
+        if let AuditEvent::Reserved { destination_id, .. } = reservation {
+            *destination_id = 30;
+        }
+        assert_eq!(
+            verify_receipt(&policy, &tampered, None),
+            Err(VerifyError::ReceiptMismatch)
+        );
     }
 
     #[test]
