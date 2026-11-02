@@ -321,7 +321,7 @@ fn validate_closed_failure_probability(
     value: f64,
     path: &str,
 ) -> Result<(), FiniteTvTransportError> {
-    if !value.is_finite() || !(0.0..1.0).contains(&value) && value != 0.0 {
+    if !value.is_finite() || value < 0.0 || value >= 1.0 {
         return Err(FiniteTvTransportError::new(
             path,
             "failure probability must be finite and lie in [0, 1)",
@@ -820,6 +820,10 @@ mod tests {
         let mut reused = request(vec![80, 20], vec![50, 50]);
         reused.target_sample_pre_outcome_only = false;
         assert!(reused.validate().is_err());
+
+        let mut confirmation_dependent = request(vec![80, 20], vec![50, 50]);
+        confirmation_dependent.reference_samples_independent_of_confirmatory_stream = false;
+        assert!(confirmation_dependent.validate().is_err());
     }
 
     #[test]
