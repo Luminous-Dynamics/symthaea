@@ -550,6 +550,7 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
     // The C source first gives every agent one sequential innovation attempt.
     let mut prefix_max_payoff = 0u64;
     let mut legacy_prefix_max_payoff_sum = 0u64;
+    let mut legacy_initial_max_achievable_sum = 0u64;
     for agent_id in 0..config.population_size {
         create_innovation(
             agent_id,
@@ -563,10 +564,21 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
             prefix_max_payoff = agents[agent_id].cumulative_payoff;
         }
         legacy_prefix_max_payoff_sum += prefix_max_payoff;
+        // The C source updates max_pos_pay[0] inside this same sequential
+        // seeding loop. Later discoveries therefore do not retroactively
+        // change an earlier agent's contribution to the step-zero metric.
+        for level in 1..=agents[agent_id].level {
+            if let Some(best_trait_id) = traits_by_level.get(level).and_then(|items| {
+                items.iter().max_by_key(|&&trait_id| traits[trait_id].payoff)
+            }) {
+                legacy_initial_max_achievable_sum +=
+                    u64::from(traits[*best_trait_id].payoff);
+            }
+        }
         cumulative_unique_innovations = traits.len() as u64;
     }
     let legacy_initial_prefix_level_sum = config.population_size as u64;
-    steps.push(step_metrics(
+    let mut initial_metrics = step_metrics(
         0,
         &agents,
         &traits,
@@ -577,7 +589,10 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
         legacy_prefix_max_payoff_sum,
         legacy_initial_prefix_level_sum,
         true,
-    ));
+    );
+    initial_metrics.legacy_max_achievable_payoff_mean =
+        legacy_initial_max_achievable_sum as f64 / config.population_size as f64;
+    steps.push(initial_metrics);
 
     // The author implementation updates agents sequentially within each time
     // step. Later agents can observe innovations and copies made earlier in
