@@ -127,12 +127,53 @@ pub struct ActionProfile { pub action_id: u32, pub name: String, pub reward_mill
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CalibrationSample { pub action_id: u32, pub loss_ppm: u32 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExternalBaselineReference {
+    pub id: String,
+    pub role: String,
+    pub paper_url: String,
+    pub code_url: String,
+    pub code_commit: String,
+    pub code_commit_date: String,
+    pub license: String,
+    pub status: String,
+    pub audit_note: String,
+}
+
+impl ExternalBaselineReference {
+    fn validate(&self) -> Result<(), PolicyError> {
+        if self.id.is_empty() || self.role.is_empty() || self.license.is_empty() || self.audit_note.is_empty() {
+            return Err(fail("external baseline reference has empty required text"));
+        }
+        if !self.paper_url.starts_with("https://") || !self.code_url.starts_with("https://") {
+            return Err(fail("external baseline paper/code URLs must use HTTPS"));
+        }
+        if self.code_commit.len() != 40
+            || !self.code_commit.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            return Err(fail("external baseline commit must be 40 lowercase hexadecimal characters"));
+        }
+        if self.code_commit_date.len() != 10
+            || !self.code_commit_date.as_bytes().get(4).is_some_and(|b| *b == b'-')
+            || !self.code_commit_date.as_bytes().get(7).is_some_and(|b| *b == b'-') {
+            return Err(fail("external baseline commit date must use YYYY-MM-DD"));
+        }
+        if !matches!(self.status.as_str(),
+            "reference_implementation_pinned_reproduction_required"
+            | "paper_matched_reproduction_verified"
+            | "preliminary_reference_only_no_license") {
+            return Err(fail("external baseline reference status is unsupported"));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PolicyFixture {
     pub schema: String, pub version: String, pub status: String, pub scenario_id: String,
     pub risk_budget_ppm: u32, pub cvar_alpha_ppm: u32, pub worst_case_loss_ppm: u32,
     pub action_support: Vec<ActionProfile>, pub safe_reference_policy: DiscretePolicy,
     pub optimized_candidate_policy: DiscretePolicy, pub calibration_mixture_policy: DiscretePolicy,
     pub beta_grid: Vec<Beta>, pub calibration_samples: Vec<CalibrationSample>, pub notes: Vec<String>,
+    pub external_baseline_references: Vec<ExternalBaselineReference>,
 }
 impl PolicyFixture {
     pub fn validate(&self) -> Result<(), PolicyError> {
@@ -161,6 +202,16 @@ impl PolicyFixture {
             if self.calibration_mixture_policy.probability(sample.action_id)?.numerator == 0 { return Err(fail("sampled action has zero mixture probability")); }
         }
         if self.calibration_samples.is_empty() { return Err(fail("calibration sample must be non-empty")); }
+        if self.external_baseline_references.len() < 2 {
+            return Err(fail("at least two pinned external baseline references are required"));
+        }
+        let mut reference_ids = BTreeSet::new();
+        for reference in &self.external_baseline_references {
+            reference.validate()?;
+            if !reference_ids.insert(reference.id.as_str()) {
+                return Err(fail("duplicate external baseline reference ID"));
+            }
+        }
         Ok(())
     }
 }
@@ -424,6 +475,20 @@ mod tests{
     }
     #[test]fn beta_grid_order_is_preregistered(){
         let mut f=load_builtin_fixture().unwrap();f.beta_grid.swap(0,1);assert!(f.validate().is_err());
+    }
+    #[test]fn external_baseline_provenance_is_pinned_and_retained(){
+        let fixture=load_builtin_fixture().unwrap();
+        assert_eq!(fixture.external_baseline_references.len(),2);
+        assert!(fixture.external_baseline_references.iter().any(|x|x.id=="cpc_reference_cbo"));
+        assert!(fixture.external_baseline_references.iter().any(|x|x.id=="ac_rac_action_conditional"));
+    }
+    #[test]fn malformed_or_duplicate_external_baseline_reference_fails_closed(){
+        let mut fixture=load_builtin_fixture().unwrap();
+        fixture.external_baseline_references[0].code_commit="not-a-commit".into();
+        assert!(fixture.validate().is_err());
+        let mut fixture=load_builtin_fixture().unwrap();
+        fixture.external_baseline_references[1].id=fixture.external_baseline_references[0].id.clone();
+        assert!(fixture.validate().is_err());
     }
     #[test]fn total_variation_is_exact(){
         let safe=p(vec![0,1],vec![1,1]);let candidate=ExactPolicy{action_ids:vec![0,1],masses:vec![3,1]};
