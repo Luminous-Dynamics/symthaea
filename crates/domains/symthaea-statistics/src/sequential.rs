@@ -90,6 +90,11 @@ impl BernoulliSprt {
             return Err(SequentialError::AlreadyStopped);
         }
 
+        self.successes
+            .checked_add(self.failures)
+            .and_then(|total| total.checked_add(1))
+            .ok_or(SequentialError::CountOverflow)?;
+
         let next_count = if success {
             self.successes.checked_add(1).ok_or(SequentialError::CountOverflow)?
         } else {
@@ -139,7 +144,7 @@ impl BernoulliSprt {
     }
 
     pub fn observations(&self) -> u64 {
-        self.successes.saturating_add(self.failures)
+        self.successes + self.failures
     }
 
     pub fn upper_log_boundary(&self) -> f64 {
@@ -380,6 +385,28 @@ mod tests {
             cs.observe(f64::NAN),
             Err(SequentialError::ObservationOutOfBounds)
         );
+    }
+
+    #[test]
+    fn bounded_mean_sequence_matches_reference_radius_at_two_thousand() {
+        let mut cs = BoundedMeanConfidenceSequence::new(0.0, 1.0, 0.05).unwrap();
+        let mut interval = None;
+        for _ in 0..2000 {
+            interval = Some(cs.observe(0.75).unwrap());
+        }
+        let interval = interval.unwrap();
+        assert!((interval.radius - 0.069_621_089_972_200_32).abs() < 1e-14);
+        assert!((interval.lower - (0.75 - interval.radius)).abs() < 1e-14);
+        assert!((interval.upper - (0.75 + interval.radius)).abs() < 1e-14);
+        assert_eq!(interval.observations, 2000);
+    }
+
+    #[test]
+    fn sprt_total_count_overflow_is_rejected() {
+        let mut test = BernoulliSprt::new(0.3, 0.7, 0.05, 0.05).unwrap();
+        test.successes = u64::MAX;
+        assert_eq!(test.observe(false), Err(SequentialError::CountOverflow));
+        assert_eq!(test.failures, 0);
     }
 
     #[test]
