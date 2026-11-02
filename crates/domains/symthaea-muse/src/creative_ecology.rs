@@ -1121,7 +1121,9 @@ mod tests {
         assert!(report.functionally_recurrent);
         assert!(report.process_network_strongly_connected);
         assert!(report.required_components_without_producer.is_empty());
+        assert!(report.required_components_without_consumer.is_empty());
         assert!(report.boundary_components_without_producer.is_empty());
+        assert!(report.boundary_components_without_consumer.is_empty());
         assert!(report.internal_feedback_edge_count >= 7);
     }
 
