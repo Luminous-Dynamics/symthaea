@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use spectra_001_qualifier::{
     evaluate_trial_v1, BoundedTimeV1, EvaluatorTruthV1 as TrialTruthV1,
-    JudgeRankingV1, LeakageModalityV1, SyntheticWorldV1, TrialV1,
+    JudgeRankingV1, LeakageModalityV1, TrialV1,
     ValidationErrorV1,
 };
 use std::collections::BTreeMap;
@@ -44,6 +44,16 @@ pub struct CampaignConfigV1 {
     pub candidate_count: u8,
     /// Probability that a synthetic injected signal ranks the target first.
     pub signal_hit_rate_permille: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CampaignWorldV1 {
+    Null,
+    SignalInjected,
+    KnownLeakageInjected,
+    Confounded,
+    AdversarialMutation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,7 +101,7 @@ pub struct PublicCampaignV1 {
 #[serde(deny_unknown_fields)]
 pub struct CampaignTruthV1 {
     pub schema: String,
-    pub world: SyntheticWorldV1,
+    pub world: CampaignWorldV1,
     pub seed: u64,
     pub injected_leakage_modality: Option<LeakageModalityV1>,
     pub evaluation_target_indices: Vec<u8>,
@@ -213,7 +223,7 @@ fn modality_index(modality: &LeakageModalityV1) -> usize {
 
 fn validate_config(
     config: CampaignConfigV1,
-    world: &SyntheticWorldV1,
+    world: &CampaignWorldV1,
     leakage: &Option<LeakageModalityV1>,
 ) -> Result<(), CorpusErrorV1> {
     if !(MIN_CAMPAIGN_TRIALS..=MAX_CAMPAIGN_TRIALS).contains(&config.calibration_trials)
@@ -228,7 +238,7 @@ fn validate_config(
         return Err(CorpusErrorV1::InvalidSignalRate);
     }
     let annotation_matches = match world {
-        SyntheticWorldV1::KnownLeakageInjected => leakage.is_some(),
+        CampaignWorldV1::KnownLeakageInjected => leakage.is_some(),
         _ => leakage.is_none(),
     };
     if !annotation_matches {
@@ -275,6 +285,7 @@ fn make_observation(
     target_index: u8,
     inject_signal: bool,
     leakage: &Option<LeakageModalityV1>,
+    confounded: bool,
     invalid_chronology: bool,
 ) -> (PublicObservationV1, TrialTruthV1) {
     let ids = candidate_ids(config.candidate_count);
@@ -317,7 +328,11 @@ fn make_observation(
 
     let trial = TrialV1 {
         trial_id,
-        participant_id: format!("participant-{:02}", trial_index % 4),
+        participant_id: if confounded {
+            format!("participant-{target_index:02}")
+        } else {
+            format!("participant-{:02}", trial_index % 4)
+        },
         operator_id: "operator-01".to_owned(),
         target_custodian_id: "custodian-01".to_owned(),
         evaluator_id: "evaluator-01".to_owned(),
@@ -366,11 +381,13 @@ fn make_observation(
 /// Null: target-independent response and telemetry.
 /// SignalInjected: target is ranked first with the configured probability.
 /// KnownLeakageInjected: one declared synthetic telemetry channel encodes target.
+/// Confounded: participant identity is associated with target assignment while
+///             the response remains target-independent.
 /// AdversarialMutation: response-seal time follows target-reveal time.
 pub fn generate_campaign_v1(
     config: CampaignConfigV1,
     seed: u64,
-    world: SyntheticWorldV1,
+    world: CampaignWorldV1,
     leakage: Option<LeakageModalityV1>,
 ) -> Result<GeneratedCampaignV1, CorpusErrorV1> {
     validate_config(config, &world, &leakage)?;
@@ -384,8 +401,9 @@ pub fn generate_campaign_v1(
             config,
             index,
             target_index,
-            world == SyntheticWorldV1::SignalInjected,
+            world == CampaignWorldV1::SignalInjected,
             &leakage,
+            world == CampaignWorldV1::Confounded,
             false,
         );
         calibration_rows.push(CalibrationRowV1 {
@@ -407,16 +425,17 @@ pub fn generate_campaign_v1(
             config,
             index,
             target_index,
-            world == SyntheticWorldV1::SignalInjected,
+            world == CampaignWorldV1::SignalInjected,
             &leakage,
-            world == SyntheticWorldV1::AdversarialMutation,
+            world == CampaignWorldV1::Confounded,
+            world == CampaignWorldV1::AdversarialMutation,
         );
         evaluation_rows.push(EvaluationRowV1 { observation });
         evaluation_target_ids.push(truth.target_id);
         evaluation_target_indices.push(target_index);
     }
 
-    let expected_protocol_valid = world != SyntheticWorldV1::AdversarialMutation;
+    let expected_protocol_valid = world != CampaignWorldV1::AdversarialMutation;
 
     Ok(GeneratedCampaignV1 {
         public: PublicCampaignV1 {
@@ -449,7 +468,14 @@ fn observable_code(
             .trial
             .trial_id
             .rsplit_once("-target-")
-            .and_then(|(_, suffix)| suffix.parse::<u8>().ok()),
+            .and_then(|(_, suffix)| suffix.parse::<u8>().ok())
+            .or_else(|| {
+                observation
+                    .trial
+                    .participant_id
+                    .strip_prefix("participant-")
+                    .and_then(|suffix| suffix.parse::<u8>().ok())
+            }),
         _ => observation.telemetry.channel_codes[modality_index(modality)],
     }
 }
@@ -675,14 +701,14 @@ mod tests {
         let first = generate_campaign_v1(
             config(),
             0x5eed_1234_9876_abcd,
-            SyntheticWorldV1::Null,
+            CampaignWorldV1::Null,
             None,
         )
         .expect("valid null campaign");
         let second = generate_campaign_v1(
             config(),
             0x5eed_1234_9876_abcd,
-            SyntheticWorldV1::Null,
+            CampaignWorldV1::Null,
             None,
         )
         .expect("same null campaign");
@@ -707,7 +733,7 @@ mod tests {
             let campaign = generate_campaign_v1(
                 config(),
                 0xface_1000_0000_0001 + modality_index(modality) as u64,
-                SyntheticWorldV1::KnownLeakageInjected,
+                CampaignWorldV1::KnownLeakageInjected,
                 Some(modality.clone()),
             )
             .expect("valid leakage campaign");
@@ -739,7 +765,7 @@ mod tests {
         let campaign = generate_campaign_v1(
             config(),
             0x1111_2222_3333_4444,
-            SyntheticWorldV1::SignalInjected,
+            CampaignWorldV1::SignalInjected,
             None,
         )
         .expect("valid signal campaign");
@@ -766,7 +792,7 @@ mod tests {
         let campaign = generate_campaign_v1(
             config(),
             0x7777_8888_9999_aaaa,
-            SyntheticWorldV1::AdversarialMutation,
+            CampaignWorldV1::AdversarialMutation,
             None,
         )
         .expect("valid adversarial campaign");
@@ -782,7 +808,7 @@ mod tests {
         let campaign = generate_campaign_v1(
             config(),
             123,
-            SyntheticWorldV1::Null,
+            CampaignWorldV1::Null,
             None,
         )
         .expect("valid campaign");
@@ -814,7 +840,7 @@ mod tests {
             16
         ).expect("valid null seed");
         let null_campaign = generate_campaign_v1(
-            config, null_seed, SyntheticWorldV1::Null, None
+            config, null_seed, CampaignWorldV1::Null, None
         ).expect("null campaign");
         assert_eq!(
             top_rank_accuracy_permille_v1(&null_campaign.public, &null_campaign.evaluator_truth).unwrap(),
@@ -839,7 +865,7 @@ mod tests {
             16
         ).expect("valid signal seed");
         let signal_campaign = generate_campaign_v1(
-            config, signal_seed, SyntheticWorldV1::SignalInjected, None
+            config, signal_seed, CampaignWorldV1::SignalInjected, None
         ).expect("signal campaign");
         assert_eq!(
             top_rank_accuracy_permille_v1(&signal_campaign.public, &signal_campaign.evaluator_truth).unwrap(),
@@ -860,13 +886,46 @@ mod tests {
         assert!(signal_report.detected_modalities.is_empty());
     }
 
+
+    #[test]
+    fn confounded_participant_assignment_is_detected_as_procedural() {
+        let campaign = generate_campaign_v1(
+            config(),
+            0x3333_4444_5555_6666,
+            CampaignWorldV1::Confounded,
+            None,
+        ).expect("valid confounded campaign");
+        let response_accuracy =
+            top_rank_accuracy_permille_v1(&campaign.public, &campaign.evaluator_truth)
+                .expect("response score");
+        assert!(response_accuracy < 430, "the response itself should remain null-like");
+
+        let model = fit_red_team_v1(&campaign.public).expect("fit red team");
+        let predictions = predict_red_team_v1(&model, &campaign.public).expect("predict");
+        let report = score_red_team_v1(
+            &campaign.public,
+            &campaign.evaluator_truth,
+            &predictions,
+            RED_TEAM_THRESHOLD_PERMILLE,
+            RED_TEAM_MINIMUM_PREDICTIONS,
+        ).expect("score");
+        assert_eq!(
+            report.detected_modalities,
+            vec![LeakageModalityV1::Procedural]
+        );
+        let procedural = report.channel_scores.iter()
+            .find(|row| row.modality == LeakageModalityV1::Procedural)
+            .expect("procedural score");
+        assert_eq!(procedural.accuracy_permille, Some(1_000));
+    }
+
     #[test]
     fn invalid_world_leakage_pairs_are_rejected() {
         assert_eq!(
             generate_campaign_v1(
                 config(),
                 1,
-                SyntheticWorldV1::Null,
+                CampaignWorldV1::Null,
                 Some(LeakageModalityV1::Rf),
             ),
             Err(CorpusErrorV1::WorldLeakageMismatch)
@@ -878,13 +937,13 @@ mod tests {
         let mut invalid = config();
         invalid.candidate_count = 1;
         assert_eq!(
-            generate_campaign_v1(invalid, 1, SyntheticWorldV1::Null, None),
+            generate_campaign_v1(invalid, 1, CampaignWorldV1::Null, None),
             Err(CorpusErrorV1::InvalidCandidateCount)
         );
         invalid = config();
         invalid.signal_hit_rate_permille = 1_001;
         assert_eq!(
-            generate_campaign_v1(invalid, 1, SyntheticWorldV1::Null, None),
+            generate_campaign_v1(invalid, 1, CampaignWorldV1::Null, None),
             Err(CorpusErrorV1::InvalidSignalRate)
         );
     }
