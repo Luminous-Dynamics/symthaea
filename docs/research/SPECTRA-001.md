@@ -1,0 +1,280 @@
+# SPECTRA-001 — Shielding-characterized information-acquisition benchmark
+
+**Status:** protocol design draft; no human-subject experiment preregistered; no physical measurements claimed.
+
+**Parent issue:** https://github.com/Luminous-Dynamics/symthaea/issues/10013
+
+## Executive definition
+
+SPECTRA is a falsifiable research programme at the intersection of electromagnetic compatibility, experimental psychology, neurophysiology and scientific inference.
+
+Its first benchmark asks two separate questions:
+
+1. What physical signals does a particular enclosure attenuate, transmit, distort or leave unchanged?
+2. Does a prospectively specified hidden-target task produce reproducible information about a target that was unavailable through admitted ordinary channels?
+
+Question 2 is not interpretable until question 1 has been characterized. A conductive enclosure is not a binary condition called “shielded.” It is a frequency-, field-mode-, geometry-, orientation-, position- and configuration-dependent physical system.
+
+The programme must be successful as engineering even if the behavioural result is null.
+
+## 1. Claim and evidence ladder
+
+Keep the following evidence planes separate:
+
+| Plane | Meaning | Does not establish |
+|---|---|---|
+| Declared | A planned apparatus, hypothesis, target pool or protocol | That it was built or followed |
+| Configured | Exact as-configured geometry, cabling, grounding, software and instruments | That the configuration performs as intended |
+| Predicted | Analytical or solver output | A physical measurement |
+| Inferred | Derived quantity or model-based interpretation | Direct sensor observation |
+| Measured | Calibrated instrument observation with uncertainty and provenance | A causal mechanism |
+| Scored | Blinded application of a frozen behavioural scoring rule | A physical transmission mechanism |
+
+No representation, HDC similarity, Phi estimate, neural classifier, or model confidence may promote one plane into another.
+
+A positive behavioural result is initially an information-acquisition observation under a bounded protocol. It is not a measurement of an unknown field.
+
+## 2. Physical characterization contract
+
+### 2.1 The enclosure is a configuration, not a label
+
+Bind every test article and measurement run to:
+
+- enclosure identity, revision, geometry and material batch;
+- conductivity, permeability and thickness evidence where known;
+- seams, apertures, doors, joints, gaskets and cable/vent penetrations;
+- bond/ground topology and exact test state;
+- source and receiver identities, operating modes and positions;
+- sensor identity, calibration record, range, bandwidth, sampling and orientation;
+- stimulus waveform, field mode, frequency, modulation, amplitude and duty;
+- coordinate frame, clock domain, timestamp and uncertainty model;
+- temperature, humidity, vibration, acoustic, optical, airflow and power state;
+- exact configuration digest and test-procedure revision.
+
+A nominal material specification, “copper cage” description or continuity check is not a shielding-effectiveness result.
+
+### 2.2 Do not collapse the electromagnetic regimes
+
+Separate at least:
+
+| Regime | What must be measured | Common interpretive trap |
+|---|---|---|
+| Electrostatic / quasi-static E | Electric field or potential, geometry and grounding state | Assuming all conductive enclosure configurations are equivalent |
+| Low-frequency magnetic B/H | Three-axis field, source geometry, orientation, frequency and material response | Assuming an ordinary copper screen blocks slowly varying magnetic fields |
+| RF magnetic/electric near field | Separate E/H probes or a justified probe system, frequency and near-field geometry | Treating near-field E and H as interchangeable |
+| Radiated RF / plane wave | Incident and internal field or calibrated antenna transfer measurement | Using a planar coupon result as a complete enclosure result |
+| Conducted/common impedance | Cable, supply, grounding and return-path measurements | Mistaking a conducted path for radiated transmission |
+
+For an amplitude quantity such as electric or magnetic field, report shielding effectiveness as:
+
+SE_dB(f, position, orientation) = 20 log10(reference amplitude / internal amplitude)
+
+For a power quantity, use 10 log10(reference power / internal power). State the measured quantity and method. Do not mix field-amplitude and power ratios.
+
+When the internal value is at or below the instrument noise floor, report a bound determined by that floor and its uncertainty; do not report an arbitrarily large finite attenuation value.
+
+Report raw reference and internal readings, background/noise floor, probe transfer function, dynamic range, calibration, repeatability, uncertainty budget, spatial variation and failed measurements. Preserve frequency-resolved results rather than a single average shielding number.
+
+### 2.3 Frequency range and standards mapping
+
+IEEE P299 describes uniform procedures for enclosure effectiveness measurements from 9 kHz to 40 GHz, with extension down to 50 Hz and up to 100 GHz. It is a method reference, not evidence that a small prototype tested with arbitrary probes conforms to the standard.
+
+ASTM D4935-18R26 is a planar-material method over 30 MHz to 1.5 GHz. It is not a substitute for enclosure testing, low-frequency magnetic-field characterization or cable/connector testing.
+
+Select bands from the specific historical claim and the physical apparatus. Do not sweep arbitrary frequencies and then select the most favourable post hoc result.
+
+### 2.4 Reference apparatus and controls
+
+The initial measurement plan should include:
+
+- calibrated low-power signal source and independent reference monitor;
+- three-axis magnetometer appropriate to the selected band;
+- suitable E-field and H-field probes for each RF regime;
+- calibrated spectrum receiver/analyser or vector network analyser as appropriate;
+- current/voltage probes for conducted/common-impedance paths;
+- acoustic microphone, optical/light sensor, temperature/humidity sensor and vibration sensor;
+- synchronized data acquisition with explicit clock-domain identity;
+- reference source-off runs and sham configurations;
+- positive-control injection at known frequencies/positions/orientations;
+- negative controls for disconnected, deliberately compromised or misconfigured paths.
+
+Do not use one sensor as both the only source monitor and the only detector. Independently verify the stimulus at the reference plane.
+
+Grounded and electrically isolated configurations need exact, safe, reviewed definitions. Early work is passive and low-power. This document does not authorize high-voltage Tesla coils, high-power RF transmission, human exposure or automatic hardware actuation.
+
+### 2.5 Leakage inventory
+
+The leakage audit must cover more than EM:
+
+- optical: windows, LEDs, displays, reflections and indicator states;
+- acoustic: fans, voices, relays, footsteps, equipment tones and room coupling;
+- mechanical: structure-borne vibration, floor coupling and cable motion;
+- thermal/airflow: heat gradients, fans, vents and HVAC states;
+- electrical: power, grounding, common impedance, data cables and contact paths;
+- digital: Wi-Fi, Bluetooth, Ethernet, cellular, USB, clocks, logs, telemetry and device status;
+- procedural: operator behaviour, timing, experimenter expectancy and target custody;
+- statistical: target imbalance, repeated-target leakage, scoring flexibility, selective exclusions and optional stopping.
+
+The environmental telemetry is itself a measurement system and needs calibration, currentness, uncertainty and provenance.
+
+## 3. Behavioural protocol
+
+### 3.1 Keep paradigms separate
+
+A hidden-target/remote-viewing task has no sender. A telepathy task has a sender and receiver with separate stimulus custody. A precognition task has a target generated after the response. These are different experimental propositions and must not share a pooled primary endpoint.
+
+The first human protocol should select exactly one paradigm. SPECTRA-001 begins with hidden-target acquisition because it directly tests the claim that information is acquired despite the receiver's physical isolation.
+
+### 3.2 Role separation
+
+Use four operational roles:
+
+1. participant/receiver, who never sees the target or target pool during the session;
+2. session operator, who configures the room and apparatus but cannot access target selection;
+3. independent remote target custodian, who cannot communicate with the receiver or operator during the trial;
+4. independent scorer/evaluator, who receives sealed responses and candidate targets without knowing the true target or enclosure condition.
+
+The target custodian should not be the scorer. The participant and operator should not have access to target selection services, logs, network credentials or target metadata.
+
+### 3.3 Target selection and chronology
+
+Before data collection, freeze and hash the target pool, candidate-matching procedure, software version and selection code.
+
+After the receiver and apparatus are locked, derive the target index from a future public randomness-beacon value. Record the exact beacon round, target-pool digest, selection-code digest and resulting target ID in a sealed custody record. The public commitment to the target-selection procedure and pool must predate the trial; the selected target remains undisclosed until the participant response and session record are sealed.
+
+A cryptographic hash proves byte identity and can help expose later tampering. It does not prove that a target was selected randomly, that roles were independent, or that the chronology was honest. Those are separate procedural and custody claims.
+
+### 3.4 Scoring
+
+For free-response remote viewing, use a small, frozen candidate set containing the true target and matched decoys. The participant response is written before target reveal. Independent judges rank candidate matches while blind to the target identity and enclosure condition.
+
+One workable primary endpoint is the mean rank assigned to the true target, with lower rank better and chance expectation fixed by the candidate-set size. Freeze the number of candidates, judge instructions, tie handling and aggregation before confirmation. Report inter-rater agreement and preserve each judge's ranking. Do not silently replace the rank endpoint with a binary hit rate or a neural endpoint.
+
+A forced-choice task may be useful as a separate paradigm, but it must have its own protocol, chance model and replication record.
+
+### 3.5 Randomization, blocking and replication
+
+Randomize/counterbalance condition order. Block where appropriate by participant, session, day, operator, instrument and enclosure reassembly. Record the actual physical experimental unit, observation unit and analysis unit.
+
+Repeated sensor samples within a trial are not independent trials. Repeated trials within one participant are not independent participants. Multiple participants in one laboratory are not multiple independent laboratories. The model and confidence interval must reflect the declared hierarchy.
+
+Preserve all assigned trials, aborts, missing responses, exclusions, equipment failures, sensor dropouts and protocol deviations. Use a predeclared disposition for each.
+
+### 3.6 Confirmatory statistics
+
+Before the confirmatory study:
+
+- define one primary contrast and endpoint;
+- specify the smallest effect of interest and an equivalence/null region;
+- plan sample size for at least 90% power under explicitly stated effect, variance and dependence assumptions;
+- freeze randomization, blocking, exclusions, scoring, stopping and multiplicity policy;
+- register the analysis and make the protocol available for independent review;
+- define the randomization/permutation test at the level that was actually randomized;
+- report effect sizes and uncertainty intervals, not only a p-value;
+- retain a separately labelled exploratory analysis set.
+
+A nonsignificant difference is not evidence of equivalence. Evidence for the null requires an appropriately powered equivalence procedure and a predeclared region. Adaptive experiment selection belongs in exploration; confirmatory targets and thresholds remain locked.
+
+## 4. Competing explanations and decision table
+
+| Outcome | Required evidence | Permitted conclusion |
+|---|---|---|
+| Known-channel explanation | A measured ordinary leakage path predicts the condition/outcome relationship and controlled intervention changes it | The tested effect is explained or materially confounded by that path |
+| Unexplained behavioural effect | Pre-registered behavioural endpoint replicates, leakage audit is complete, independent scorer/evaluator agrees, and external replication succeeds | Bounded unexplained information-acquisition result; mechanism unknown |
+| Null/equivalence | Confidence interval lies inside the preregistered smallest-effect-of-interest region | No effect of at least that declared size under this task/population/protocol |
+| Inconclusive | Design, instrument, sample size, missingness or interval does not distinguish the above | No promotion; redesign or better measurement may be justified |
+
+A positive behavioural result does not establish an electromagnetic-like field, a new force, nonlocality, or a consciousness mechanism. Any proposed mechanism must produce novel quantitative predictions that distinguish it from existing physics and from procedural/statistical alternatives.
+
+## 5. Symthaea, Symtropy and Mycelix responsibilities
+
+**Symthaea**
+- consume validated FIELD observations and their evidence identities;
+- manage preregistered experiment profiles and exact estimands through SCI-EXP;
+- compare causal/leakage/null models without hiding model misspecification;
+- quantify uncertainty, calibration, missingness and sensitivity;
+- rank exploratory measurements by expected information gain only when likelihoods are calibrated;
+- keep the confirmatory test locked and report all competing baselines.
+
+**Symtropy**
+- represent exact enclosure geometry, material regions, seams, penetrations, probes and sources;
+- run pinned external 3D full-wave solvers when the model requires them;
+- bind solver inputs, mesh, materials, boundary conditions, solver build and outputs;
+- compare simulation with measured transfer functions and preserve discrepancy.
+
+**Mycelix**
+- preserve preregistration, target-pool, custody, protocol, analysis and replication provenance;
+- support independent multi-lab data custody and versioned access;
+- record authorship and correction history without treating provenance as scientific validation.
+
+Do not duplicate FIELD, SCI-EXP, ENG-EMC, ENG-MEAS or the shared evidence system.
+
+## 6. Physics solver and analysis ecosystem
+
+Symthaea's current Maxwell module implements 1D and 2D FDTD demonstrations. Its current unit tests cover basic propagation, dielectric activity, CFL and lossy-medium attenuation; they do not validate a complete enclosure, seam leakage, low-frequency magnetic shielding or a laboratory measurement method.
+
+Use the native solver as a transparent educational/reference implementation and improve its numerical verification separately. Do not treat it as a qualified 3D enclosure solver.
+
+For 3D full-wave RF cases, evaluate a pinned openEMS adapter rather than immediately writing a new production solver. openEMS is an open-source 3D FDTD solver with Cartesian/cylindrical grids, graded meshes, absorbing boundaries, field dumps and near-to-far-field processing. Compare selected simple cases with analytical solutions and physical measurements. Symtropy should own the exact geometry/run/evidence composition, not claim that a solver's output is a measurement.
+
+If EEG/MEG is added later, preserve raw data and standard metadata using BIDS-compatible organization. Use established MNE-BIDS/MNE pipelines as an independent reference implementation, and compare Symthaea-derived features only on a frozen, held-out analysis. Do not make an unregistered neural endpoint a fallback primary result after behavioural failure.
+
+## 7. Benchmark ladder and comparison policy
+
+| Tier | Benchmark | Required comparators | Main metrics |
+|---|---|---|---|
+| T0 | Protocol and semantic fixtures | Independent stdlib/reference validator | Determinism, invalid-input rejection, evidence-plane preservation |
+| T1 | Synthetic null/positive/leakage worlds | Random, fixed design, conventional permutation, simple Bayesian/hierarchical baseline | Type-I error, power, effect recovery, calibration, coverage |
+| T2 | Enclosure transfer characterization | Analytical RLC/plane-wave references where applicable; pinned openEMS; independent instrument measurements | SE by mode/frequency/orientation/position, uncertainty, repeatability, discrepancy |
+| T3 | Blinded behavioural pilot | Chance/permutation baseline; fixed protocol; blinded judges | Mean rank, effect size, interval, rater agreement, protocol deviations |
+| T4 | Locked confirmatory replication | Independent evaluator and independently administered cohort/lab | Replication, false-positive control, equivalence, cross-lab heterogeneity |
+| T5 | Neurophysiology (optional) | BIDS/MNE reference analysis and preregistered conventional signal features | Feature stability, leakage sensitivity, out-of-sample prediction, multiplicity control |
+
+Report each metric separately. Never collapse scientific performance, shielding quality, statistical validity and engineering cost into one score.
+
+## 8. SOTA comparison: what would count as better
+
+SPECTRA should be compared to mature practice rather than claim a new SOTA from architectural novelty.
+
+- Shielding: align enclosure measurements with IEEE P299 where applicable; use ASTM D4935 only for the planar-material cases inside its scope.
+- Experimental psychology: preregistration, registered reports, blinding, power planning, full trial accounting, independent scoring and independent replication.
+- Neurophysiology: BIDS data organization and established MNE/FieldTrip/Brainstorm pipelines; publish raw/preprocessed provenance and multiplicity policy.
+- Computational electromagnetics: compare a small, independently checked case suite against a pinned mature 3D solver; report mesh and time-step convergence, boundary-condition sensitivity and measured discrepancy.
+- Statistical inference: compare a conventional fixed design, random selection, a preregistered permutation/randomization test and any Bayesian/hierarchical model. Symthaea wins only if held-out calibration, error control or decision value improves under equal budgets.
+
+Proposed SPECTRA advantage is the integration of calibrated environmental observability, adversarial leakage testing, frozen behavioural inference and immutable experiment lineage. That is a testable engineering objective, not a present performance claim.
+
+## 9. First executable milestones
+
+1. **Protocol freeze:** translate this document into the existing SCI-EXP and ENG-EMC profile owners; freeze the exact task and apparatus configuration.
+2. **Synthetic qualifier:** build null, known-effect and each-modality-leakage fixtures; include adversarial custody, clock, sensor and exclusion mutations.
+3. **Numerical reference cases:** verify simple conductive sheet / aperture / loop-source / low-frequency magnetic cases against independent analytical or solver references where their assumptions apply.
+4. **Measurement-system review:** specify actual instruments, calibration, frequency bands, geometry and safe operating limits. No human-subject trial before this gate.
+5. **Pilot and independent protocol review:** only after T0–T2, with ethics approval and registered protocol.
+6. **Confirmation and replication:** separate, independently administered, and analysed by a frozen evaluator.
+
+The first deliverable should be a reproducible report that can return Better, Worse, Inconclusive or NotEvaluable. “Unknown” is an acceptable and sometimes correct result.
+
+## 10. References
+
+- IEEE SA, P299, Standard Method for Measuring the Effectiveness of Electromagnetic Shielding Enclosures: https://standards.ieee.org/ieee/299/11952/
+- ASTM D4935-18R26, Standard Test Method for Measuring the Electromagnetic Shielding Effectiveness of Planar Materials: https://store.astm.org/d4935-18r26.html
+- Acunzo et al. (2026), Neuroimaging studies of extra-sensory perception: A systematic and critical review, NeuroImage 333, 121937: https://doi.org/10.1016/j.neuroimage.2026.121937
+- Tressoldi & Storm (2024), Stage 2 Registered Report: Anomalous perception in a Ganzfeld condition: https://pubmed.ncbi.nlm.nih.gov/38813059/
+- Tressoldi & Storm (2026 preprint), Outcomes of Preregistered Studies Related to ESP and Mind-Matter Interaction: https://doi.org/10.31234/osf.io/ha4np
+- Marks & Kammann (1978), Information transmission in remote viewing experiments: https://www.nature.com/articles/274680a0
+- Center for Open Science, Registered Reports: https://www.cos.io/initiatives/registered-reports
+- openEMS documentation: https://docs.openems.de/en/latest/intro.html
+- BIDS specification: https://bids-specification.readthedocs.io/en/stable/
+- MNE-BIDS documentation: https://mne.tools/mne-bids/stable/index.html
+
+## 11. Explicit non-claims
+
+This document does not claim:
+- that ESP or psychotronics has been demonstrated;
+- that any proposed non-EM field exists;
+- that copper cages block every EM regime;
+- that Symthaea's current Maxwell code is a qualified laboratory solver;
+- that a simulation or HDC representation is physical evidence;
+- that a synthetic benchmark implies human-subject or operational validity;
+- that a single positive study supports a mechanism or universal capability.
