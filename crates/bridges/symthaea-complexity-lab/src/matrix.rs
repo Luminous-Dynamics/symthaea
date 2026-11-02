@@ -251,6 +251,44 @@ pub fn verify_rank_factorization(
     Ok(true)
 }
 
+/// Verify exact equality of two rational matrices, each represented with one
+/// positive common denominator. A shape mismatch is a mathematical mismatch
+/// and returns Ok(false); overflow remains an explicit error.
+pub fn verify_rational_matrix_equality(
+    left: &RationalMatrix,
+    right: &RationalMatrix,
+) -> Result<bool, MatrixCertificateError> {
+    if left.rows != right.rows || left.columns != right.columns {
+        return Ok(false);
+    }
+
+    for row in 0..left.rows {
+        for column in 0..left.columns {
+            let lhs = left
+                .numerator_at(row, column)
+                .checked_mul(right.denominator)
+                .ok_or(MatrixCertificateError::ArithmeticOverflow {
+                    row,
+                    column,
+                    operation: "cross-multiplying left matrix equality operand",
+                })?;
+            let rhs = right
+                .numerator_at(row, column)
+                .checked_mul(left.denominator)
+                .ok_or(MatrixCertificateError::ArithmeticOverflow {
+                    row,
+                    column,
+                    operation: "cross-multiplying right matrix equality operand",
+                })?;
+            if lhs != rhs {
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
+}
+
 /// Verify a supplied factorization I - M0 = U * V over Q.
 ///
 /// On success, the certificate establishes rank(I - M0) <= U.columns.
