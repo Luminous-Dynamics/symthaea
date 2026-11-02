@@ -55,7 +55,7 @@ For an additional-view action, estimate value of information as the expected red
 4. Keep the natural-mix full test, balanced mouse/fly comparison and unseen-species transfer as separate regimes. Report species × task strata and denominators.
 5. Group splits by source volume/neuron/session as appropriate. Repeated views from one operation must never leak across train/validation/test.
 6. Evaluate review recall at 1%, 5%, 10%, 20% and 50% of the review budget, and at fixed reviewer-minute budgets. Report both item-count and time-based curves.
-7. Run seeded random review, fixed confidence threshold, uncertainty-only ranking, score × preregistered cost ranking, the best supervised CB2 model, LoRA VLM and timed human workflow baselines.
+7. Run seeded random review, fixed confidence threshold, uncertainty-only ranking, score × preregistered cost ranking, the exact small-cohort knapsack oracle on sampled batches of at most 20 cases, the best supervised CB2 model, LoRA VLM and timed human workflow baselines.
 8. Use cluster-aware confidence intervals (resample volumes or neurons, not individual correlated crops). Report worst-stratum results and small-support warnings.
 9. Keep model selection and cost-profile selection on validation data. Freeze both before test evaluation. No repeated tuning on test outcomes.
 10. Publish all negative controls and raw per-operation decisions, subject to dataset licensing and access policy.
@@ -120,7 +120,7 @@ The field already has strong components:
 - **CAVE** demonstrates the importance of versioned annotation state and reproducible edits at scale.
 - **SynAnno** demonstrates that guided workflows can improve expert throughput and reduce cognitive load; a seven-expert evaluation is an operational comparator, not a direct CB2 classifier leaderboard.
 
-The differentiation opportunity is to join these ideas into a verifiable operating loop:
+The Rust policy crate now contains both a deterministic greedy value-density allocator and an exhaustive exact oracle for at most 20 candidates. The oracle is for regression tests and sampled-batch regret measurement; it is not intended to enumerate the full CB2 test set.\n\nThe differentiation opportunity is to join these ideas into a verifiable operating loop:
 
 1. graph-aware detection and candidate localization;
 2. calibrated uncertainty with structural alternatives preserved;
@@ -135,7 +135,7 @@ A system that is 0.5 points below a classifier on balanced accuracy but delivers
 ## Immediate work sequence
 
 - Complete the V2 pinning and denominator reconciliation in #9936 / PR #9962.
-- Implement a deterministic policy evaluator using operation predictions and a frozen cost profile.
+- Compare greedy allocations against the exact small-cohort oracle and quantify regret before selecting a production scheduling policy.
 - Run the known-answer, negative-control and leakage fixtures before touching CB2 test labels.
 - Reproduce the ViT-B and LoRA baselines under the same operation-level unit and view contract.
 - Add cluster-aware uncertainty and selective calibration.
