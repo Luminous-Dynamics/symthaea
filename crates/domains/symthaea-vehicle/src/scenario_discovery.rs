@@ -4,7 +4,7 @@
 //! Deterministic candidate generation for a synthetic road-crossing scenario.
 //!
 //! This module owns scenario *design*, not execution or vehicle physics. It
-//! creates a reproducible stratified candidate set for Symtropy to execute.
+//! provides reproducible stratified and seeded-pseudorandom candidate sets for Symtropy.
 //! Every range is a synthetic design assumption, not an empirical distribution
 //! or a claim about real-world frequency.
 
@@ -54,7 +54,7 @@ pub enum ScenarioRangeSemantics {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IntersectionScenarioCandidate {
     pub schema_version: String,
-    /// BLAKE3 identity over the schema, exact factor bits and fixed geometry.
+    /// BLAKE3 identity over schema, policy, seed/budget, exact factor bits and fixed geometry.
     pub candidate_id: String,
     pub seed: u64,
     pub ordinal: u32,
