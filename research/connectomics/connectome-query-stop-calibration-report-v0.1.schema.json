@@ -26,7 +26,9 @@
     "projected_future_drift_upper_ratio",
     "status",
     "universal_connectome_completeness_claimed",
-    "all_future_edits_certified"
+    "all_future_edits_certified",
+    "exchangeability_assessment_sha256",
+    "target_exchangeability_supported"
   ],
   "$defs": {
     "sha": {
@@ -116,7 +118,8 @@
         "InsufficientCalibration",
         "NotCalibratedGroupOverlap",
         "ProjectedStableWithinHorizon",
-        "ProjectedUnstableWithinHorizon"
+        "ProjectedUnstableWithinHorizon",
+        "NotCalibratedExchangeability"
       ]
     },
     "universal_connectome_completeness_claimed": {
@@ -124,6 +127,12 @@
     },
     "all_future_edits_certified": {
       "const": false
+    },
+    "exchangeability_assessment_sha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "target_exchangeability_supported": {
+      "type": "boolean"
     }
   }
 }
