@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 pub const INTERSECTION_CANDIDATE_SCHEMA: &str =
     "symthaea.vehicle.intersection-candidate.v0.1";
+const GENERATOR_POLICY_ID: &str = "stratified-affine-lhs-v0.1";
 pub const MAX_INTERSECTION_CANDIDATES: u32 = 4096;
 
 const ROAD_GEOMETRY_ID: &str = "two-approach-one-marked-crossing-synthetic-v0.1";
@@ -56,6 +57,8 @@ pub struct IntersectionScenarioCandidate {
     pub candidate_id: String,
     pub seed: u64,
     pub ordinal: u32,
+    pub generation_budget: u32,
+    pub generator_policy_id: String,
     pub road_geometry_id: String,
     /// Ego origin: x=-40 m, y=0 m; +x is direction of travel.
     pub ego_spawn_x_m: f64,
@@ -148,6 +151,8 @@ pub fn generate_stratified_intersection_candidates(
             candidate_id: String::new(),
             seed,
             ordinal,
+            generation_budget: budget,
+            generator_policy_id: GENERATOR_POLICY_ID.into(),
             road_geometry_id: ROAD_GEOMETRY_ID.into(),
             ego_spawn_x_m: EGO_SPAWN_X_M,
             ego_lane_center_y_m: EGO_LANE_CENTER_Y_M,
@@ -178,6 +183,10 @@ impl IntersectionScenarioCandidate {
     /// Verify immutable scenario fields and the candidate's content identity.
     pub fn identity_is_valid(&self) -> bool {
         self.schema_version == INTERSECTION_CANDIDATE_SCHEMA
+            && self.generation_budget > 0
+            && self.generation_budget <= MAX_INTERSECTION_CANDIDATES
+            && self.ordinal < self.generation_budget
+            && self.generator_policy_id == GENERATOR_POLICY_ID
             && self.road_geometry_id == ROAD_GEOMETRY_ID
             && self.ego_spawn_x_m.to_bits() == EGO_SPAWN_X_M.to_bits()
             && self.ego_lane_center_y_m.to_bits() == EGO_LANE_CENTER_Y_M.to_bits()
@@ -255,6 +264,8 @@ fn candidate_identity(candidate: &IntersectionScenarioCandidate) -> String {
     hasher.update(candidate.schema_version.as_bytes());
     hasher.update(&candidate.seed.to_le_bytes());
     hasher.update(&candidate.ordinal.to_le_bytes());
+    hasher.update(&candidate.generation_budget.to_le_bytes());
+    hasher.update(candidate.generator_policy_id.as_bytes());
     hasher.update(candidate.road_geometry_id.as_bytes());
     for value in [
         candidate.ego_spawn_x_m,
@@ -311,11 +322,11 @@ mod tests {
     #[test]
     fn each_factor_covers_every_stratum_once() {
         let budget = 64;
-        for dimension in 0..7 {
+        for dimension in 0_u64..7 {
             let strata = (0..budget)
                 .map(|ordinal| {
                     let n = budget as u64;
-                    let mixed = mix64(42 ^ dimension * 0x9E37_79B9_7F4A_7C15);
+                    let mixed = mix64(42 ^ dimension.wrapping_mul(0x9E37_79B9_7F4A_7C15));
                     let mut multiplier = (mixed % n).max(1);
                     while gcd(multiplier, n) != 1 {
                         multiplier += 1;
@@ -323,7 +334,7 @@ mod tests {
                             multiplier = 1;
                         }
                     }
-                    let offset = mix64(42_u64.rotate_left(23) ^ dimension * 0xD1B5_4A32_D192_ED03) % n;
+                    let offset = mix64(42_u64.rotate_left(23) ^ dimension.wrapping_mul(0xD1B5_4A32_D192_ED03)) % n;
                     ((ordinal as u64 * multiplier) + offset) % n
                 })
                 .collect::<BTreeSet<_>>();
