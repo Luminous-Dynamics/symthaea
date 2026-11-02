@@ -312,7 +312,10 @@ weight_numerator, weight_denominator, alpha_numerator, alpha_denominator)
 for arbitrary precommitted candidate weights. Both use O(log m) prior points,
 exact rational ceiling arithmetic, merge coincident integer thresholds, and
 precompute prefix numerators so evaluation is O(log log m) (binary search
-over O(log m) points). The independent verifier continues to use a linear scan.
+over O(log m) points). The new projective_weighted_e_bh_rank_prior constructor
+instead uses a fixed 64-point rank prior, does not take family size as input,
+and is unchanged when higher-ID hypotheses arrive. The independent verifier
+continues to use a linear scan.
 
 ### Exploratory rank-calibration experiment
 
