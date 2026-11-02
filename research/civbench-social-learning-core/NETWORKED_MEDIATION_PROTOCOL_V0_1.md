@@ -54,6 +54,17 @@ Per-generation outputs include:
 - demonstration observations and successful acquisitions;
 - peer versus mediated adoptions, separately from peer versus mediated acquisitions.
 
+
+## Diversity-aware recommender comparison now implemented
+
+The Rust model exposes two recommender objectives:
+- `PerformanceOnly`: rank the global candidate pool by normalized observed capability quality.
+- `PerformanceDiversity { novelty_weight }`: add a bounded bonus for lineages that are underrepresented among candidates with non-zero knowledge.
+
+The rarity bonus is calculated from the frequency of each lineage in the previous-generation candidate pool. Unknown/empty candidates receive no novelty bonus. This is not an epistemic truth score and does not reward popularity or provenance; it is an explicit diversity intervention. The default remains PerformanceOnly, making the baseline comparison clear.
+
+The sweep now crosses 4 graph shortcut probabilities × 5 mediation fractions × 2 recommender objectives = 40 conditions, with 256 common seeds per condition. Compare mean quality/maximum quality with knowledge coverage, unique lineages, effective diversity and lineage HHI. The desired result is a Pareto frontier, not one arbitrary scalar winner: identify when diversity gains are worth a capability trade-off and whether that trade-off changes with graph sparsity. The novelty bonus is a synthetic experimental treatment, not a proven optimal recommender.
+
 ## 4. Paradigm-shifting questions
 
 1. **Complementarity frontier:** Is there an interior mediation share that maximizes cumulative capability at each network density?
