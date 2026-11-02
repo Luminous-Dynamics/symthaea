@@ -843,15 +843,19 @@ mod tests {
     fn conservative_hybrid_is_independent_of_future_arrival_oracle() {
         let (quick, full) = profiles();
         let first = sample_job(1, 0, 9_000);
-        let later = sample_job(2, 1, 20_000);
+        // Thirteen later arrivals make a 14-item FullLoad batch available at t=1.
+        let later_jobs: Vec<Job> = (2..15).map(|id| sample_job(id, 1, 20_000)).collect();
         let policy = Policy::HybridConservativeNoOracle {
             max_batch_wait_s: 3_600,
         };
 
         let one_job = simulate(&[first], &quick, &full, policy).unwrap();
-        let with_later_arrival = simulate(&[first, later], &quick, &full, policy).unwrap();
+        let mut trace_with_later_arrivals = vec![first];
+        trace_with_later_arrivals.extend(later_jobs.iter().copied());
+        let with_later_arrival =
+            simulate(&trace_with_later_arrivals, &quick, &full, policy).unwrap();
         let offline_lookahead = simulate(
-            &[first, later],
+            &trace_with_later_arrivals,
             &quick,
             &full,
             Policy::HybridResourceAware {
