@@ -8,7 +8,7 @@ on:
       - ".github/workflows/connectome-experiment-design-v1.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+    branches: [main, "feat/connectome-experiment-design-evsi-v1"]
     paths:
       - "tools/connectome-experiment-design/**"
       - ".github/workflows/connectome-experiment-design-v1.yml"
