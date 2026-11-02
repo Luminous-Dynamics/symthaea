@@ -33,6 +33,8 @@ Wake scheduling advances by source-row index, but all intervals and sample age s
 
 It does not include activity labels, future rows/timestamps, skipped sensor values, subject/fold identity, the source archive path, dataset manifest internals or evaluator confusion counts.
 
+`HarthFixedSchedule<P>` wraps any `HarthObservationPredictor` in a fixed sensor/wake schedule. This preserves the predictor's inference behavior while changing only its acquisition cadence or modality, enabling matched full-rate, back-only, thigh-only and sparse-schedule ablations.
+
 `HarthActiveReplayAction` includes:
 - a predicted class code on the selected label track, or `None` to abstain;
 - confidence from 0 to 1,000,000 ppm (abstention requires zero);
@@ -102,6 +104,6 @@ The data are a frozen high-rate recording used as an emulated sensor source. Thi
 
 ## Authored tests and execution status
 
-Twelve synthetic tests are authored for deterministic replay, modality privacy under back-only selection, sleep/stale measurements, explicit abstention accounting, invalid labels/action bounds, participant row identity, transition metrics, timestamp-gap retention and result tamper detection.
+Thirteen synthetic tests are authored for deterministic replay, modality privacy under back-only selection, sleep/stale measurements, explicit abstention accounting, invalid labels/action bounds, participant row identity, transition metrics, timestamp-gap retention and result tamper detection, and matched predictor-versus-schedule ablation.
 
 **Execution status:** the Rust module and tests have not been compiled or run in this environment. No dataset archive has been acquired or scored here; no accuracy, energy, battery-life or SOTA result is claimed.
