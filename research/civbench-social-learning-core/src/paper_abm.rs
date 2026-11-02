@@ -27,8 +27,10 @@ pub const PAPER_ABM_REPLICATIONS: usize = 50;
 pub const PAPER_ABM_GENERATIONS: usize = 20;
 pub const PAPER_ABM_POPULATION_SIZE: usize = 20;
 pub const PAPER_ABM_MACHINE_COUNT: usize = 5;
-pub const PAPER_ABM_DEMONSTRATIONS: u32 = 10;
+pub const PAPER_ABM_HUMAN_EXPLORATION_CAPACITY: u32 = 10;
+pub const PAPER_ABM_HUMAN_OPTIMALITY_BIAS: f64 = 0.01;
 pub const PAPER_ABM_MYOPIC_DISCOVERY_RATE: f64 = 0.5;
+pub const PAPER_ABM_DEMONSTRATIONS: u32 = 10;
 pub const PAPER_ABM_OPTIMAL_REWARD: f64 = 1.0;
 pub const PAPER_ABM_MYOPIC_REWARD: f64 = 0.5;
 pub const PAPER_ABM_REWARD_NOISE_EPSILON: f64 = 0.1;
@@ -172,6 +174,8 @@ pub struct Config {
     pub myopic_discovery_rate: f64,
 
     /// Number of demonstrator candidates sampled from the prior generation.
+    /// The article's main-text ABM description does not specify this count;
+    /// V0 defaults to five as a sensitivity baseline, not a reproduction claim.
     pub teacher_candidate_count: usize,
     /// Softmax choice temperature over candidate demonstration rewards.
     pub teacher_selection_temperature: f64,
@@ -192,10 +196,11 @@ impl Default for Config {
             population_size: PAPER_ABM_POPULATION_SIZE,
             machine_count_generation_zero: PAPER_ABM_MACHINE_COUNT,
             machine_placement: MachinePlacement::ClusteredPrefix,
-            human_exploration_capacity: 10,
+            human_exploration_capacity: PAPER_ABM_HUMAN_EXPLORATION_CAPACITY,
             machine_exploration_capacity: 1_000,
-            human_optimality_bias: 0.01,
+            human_optimality_bias: PAPER_ABM_HUMAN_OPTIMALITY_BIAS,
             machine_optimality_bias: 0.5,
+            // V0 sensitivity reference only; the paper manipulates d_opt.
             optimal_discovery_rate: 0.001,
             myopic_discovery_rate: PAPER_ABM_MYOPIC_DISCOVERY_RATE,
             teacher_candidate_count: 5,
