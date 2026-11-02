@@ -22,11 +22,12 @@ The crate implements three bounded research primitives:
    family-size growth without changing earlier candidates' calibrators.
 
 
-3. An exact persistent SCORE-style overshoot-refund account for one
-   already-valid, time-monotone e-process. It tracks a capped cumulative refund,
-   releases only the newly earned increment, stores exact rational numerators,
-   and reports the effective test cost and threshold-crossing bit. It does not
-   implement the global alpha-wealth/FDR spending algorithm.
+3. Exact persistent overshoot-refund accounts for one already-valid,
+   time-monotone e-process. Both a capped exposure-limited variant and an
+   uncapped SCORE-style variant are implemented. Each tracks cumulative refund
+   and releases only the newly earned increment, stores exact rational
+   numerators, and reports the effective test cost and threshold-crossing bit.
+   Neither implements the global alpha-wealth/FDR spending algorithm.
 
 The ledger receives already-calibrated, nondecreasing evidence values. It does
 not compute likelihood ratios, test martingales, e-processes, null models,
@@ -161,15 +162,30 @@ under one horizon-coherent weight sequence.
 ## Persistent SCORE-style overshoot refund
 
 For a precommitted rational level alpha and an already-valid time-monotone
-e-process V_t, the Rust reference defines
+e-process V_t, the Rust reference supports two refund policies.
+
+The capped exposure-limited policy is
 
 ~~~text
 O_t = min(max(alpha * V_t - 1, 0), alpha)
 C_t = alpha * V_t - O_t
 ~~~
 
-Only the difference O_t - O_(t-1) is released on an update, so old overshoot
-is never credited again. The writer uses a common exact rational denominator
+It guarantees O_t <= alpha pathwise and has a conditional null expectation
+bound alpha * log(1 + alpha) <= alpha^2.
+
+The uncapped SCORE-style policy is
+
+~~~text
+O_t = max(alpha * V_t - 1, 0)
+C_t = min(alpha * V_t, 1)
+~~~
+
+It matches the published one-shot SCORE overshoot identity; its conditional
+null expectation is at most alpha, although its realized refund is unbounded.
+
+For both policies only the difference O_t - O_(t-1) is released on an update,
+so old overshoot is never credited again. The writer uses a common exact rational denominator
 for the refund and effective cost; it rejects evidence or round rollback and
 commits each update atomically.
 
