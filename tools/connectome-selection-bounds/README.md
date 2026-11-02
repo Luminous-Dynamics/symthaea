@@ -145,3 +145,8 @@ The reference-positive and reference-negative denominators must both be non-zero
 **Statistical qualification:** the Wilson interval assumes independent Bernoulli validation units. It is suitable only when the validation sampling unit and design support that assumption. Repeated trials nested within animal/session are not independent simply because they are separate rows. For clustered calibration, use animal/session-level resampling or another design-appropriate method and pass the resulting sensitivity/specificity ranges into the prevalence inversion. The crate does not automatically infer clustering or turn a trial-level Wilson interval into a cluster-robust interval.
 
 A synthetic validation fixture uses TP=90, FN=10, TN=95, FP=5 at z=1.9599639845. It produces sensitivity [0.825634, 0.944771] and specificity [0.888250, 0.978456]. These counts are illustrative, not empirical detector performance.
+
+
+Detector-count calibration contracts:
+- `schemas/detector-validation-counts-input.schema.json` defines the TP/FN/TN/FP counts and Wilson z-score.
+- `schemas/detector-validation-counts-fixture.schema.json` validates the wrapper for `fixtures/detector-validation-counts-known-answer.json`.

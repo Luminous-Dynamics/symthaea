@@ -274,7 +274,8 @@ fn intersect_linear_leq(lower: &mut f64, upper: &mut f64, coefficient: f64, rhs:
     *lower <= *upper
 }
 
-// Joint source-target response identification is separate from the two marginal detector inversions.\n
+// Joint source-target response identification is separate from the two marginal detector inversions.
+
 /// Validate a closed probability interval.
 
 /// Two-sided Wilson score interval for a binomial proportion.
