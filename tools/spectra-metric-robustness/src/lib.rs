@@ -47,7 +47,7 @@ pub enum StressWorld {
 }
 
 impl StressWorld {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::GaussianReference,
         Self::UnequalVariance,
         Self::HeavyTailed,
