@@ -60,6 +60,10 @@ cargo clippy -p symthaea-dishwasher-scheduler --all-targets -- -D warnings
 
 Synthetic workload generators use fixed seeds and explicit scenario families. They are reproducible but are not representative household-use data until calibrated.
 
+## Illustrative crossover example
+
+See [illustrative-crossover.md](docs/illustrative-crossover.md) for the arithmetic showing why QuickCell is most compelling on very sparse loads, while FullLoad wins resource efficiency on dense loads under the current hypothetical inputs. This is not a measured result.
+
 ## Interpreting output
 
 Compare energy, fresh water, p95 end-to-end latency, deadline misses, unprocessed jobs and cycle counts together. Do not reduce the comparison to one weighted score. Keep eco-label tests separate from per-item QuickCell experiments.
