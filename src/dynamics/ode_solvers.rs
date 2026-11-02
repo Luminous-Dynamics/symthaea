@@ -205,7 +205,6 @@ pub enum OdeSolveFailureKind {
     InitialStateDimensionMismatch,
     NonFiniteInitialState,
     NonFiniteStage,
-    NonFiniteErrorEstimate,
     NonFiniteAcceptedState,
     MinimumStepToleranceUnmet,
     MaximumAttemptsExceeded,
@@ -800,18 +799,12 @@ impl OdeSolverEngine {
             );
 
             if !err.is_finite() {
-                let finite_outputs = y4
-                    .iter()
-                    .chain(y5.iter())
-                    .chain(k7.iter())
-                    .all(|value| value.is_finite());
-                let reason = if finite_outputs {
-                    OdeSolveFailureKind::NonFiniteErrorEstimate
-                } else {
-                    OdeSolveFailureKind::NonFiniteStageOrErrorEstimate
-                };
+                // The step routine intentionally returns a scalar error estimate,
+                // not a separate stage-status flag, so report the combined
+                // non-finite computation category without guessing which
+                // intermediate produced it.
                 return Err(fail(
-                    reason,
+                    OdeSolveFailureKind::NonFiniteStageOrErrorEstimate,
                     Some(t),
                     attempts,
                     Some(h),
