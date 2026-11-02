@@ -127,6 +127,13 @@ pub struct RmiAgentActionV1 {
     pub features: RmiMusicalFeaturesV1,
 }
 
+/// One subsequent partner action in the controlled simulator track.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiPartnerResponseV1 {
+    pub response_id: String,
+    pub features: RmiMusicalFeaturesV1,
+}
+
 /// A paired counterfactual trial: both observations share the same frozen
 /// pre-intervention state and differ only in the declared target feature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -231,12 +238,79 @@ pub fn validate_rmi_intervention_pair(
 pub trait RmiPolicyV1 {
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
+    /// Implementations must behave as a pure function of the frozen history,
+    /// observation and seed. Stateful adaptation belongs in an explicit state
+    /// snapshot included in the history, never in hidden mutable policy state.
     fn respond(
         &self,
         history: &[RmiHistoryEventV1],
         observation: &RmiPartnerObservationV1,
         seed: u64,
     ) -> RmiAgentActionV1;
+}
+
+/// Controlled partner policy for measuring agent-to-partner influence.
+/// It receives the same frozen history and the agent's current action.
+pub trait RmiPartnerPolicyV1 {
+    fn policy_id(&self) -> &str;
+    fn policy_version(&self) -> &str;
+    /// Must be a pure function of the frozen history, agent action and seed.
+    fn respond(
+        &self,
+        history: &[RmiHistoryEventV1],
+        agent_action: &RmiAgentActionV1,
+        seed: u64,
+    ) -> RmiPartnerResponseV1;
+}
+
+/// Fixed partner baseline: ignores the agent's current action.
+#[derive(Debug, Clone)]
+pub struct FixedPartnerResponsePolicyV1 {
+    pub id: String,
+    pub version: String,
+    pub response: RmiPartnerResponseV1,
+}
+
+impl RmiPartnerPolicyV1 for FixedPartnerResponsePolicyV1 {
+    fn policy_id(&self) -> &str { &self.id }
+    fn policy_version(&self) -> &str { &self.version }
+
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        _agent_action: &RmiAgentActionV1,
+        _seed: u64,
+    ) -> RmiPartnerResponseV1 {
+        self.response.clone()
+    }
+}
+
+/// Synthetic partner positive control. Its one target-specific transformation
+/// exists only to qualify the directionality oracle, not to model human agency.
+#[derive(Debug, Clone)]
+pub struct SyntheticResponsivePartnerPolicyV1 {
+    pub id: String,
+    pub version: String,
+    pub target: RmiTargetFeatureV1,
+}
+
+impl RmiPartnerPolicyV1 for SyntheticResponsivePartnerPolicyV1 {
+    fn policy_id(&self) -> &str { &self.id }
+    fn policy_version(&self) -> &str { &self.version }
+
+    fn respond(
+        &self,
+        _history: &[RmiHistoryEventV1],
+        agent_action: &RmiAgentActionV1,
+        _seed: u64,
+    ) -> RmiPartnerResponseV1 {
+        let mut features = agent_action.features.clone();
+        transform_target_feature(&mut features, self.target);
+        RmiPartnerResponseV1 {
+            response_id: format!("{}:{}", self.id, agent_action.action_id),
+            features,
+        }
+    }
 }
 
 /// Fixed response baseline: returns exactly the same action for every input.
@@ -354,11 +428,30 @@ impl RmiPolicyV1 for ImitationOnlyPolicyV1 {
     }
 }
 
+/// Apply a known bijective transformation to exactly one configured feature.
+/// Shared by synthetic agent and partner positive controls.
+fn transform_target_feature(features: &mut RmiMusicalFeaturesV1, target: RmiTargetFeatureV1) {
+    match target {
+        RmiTargetFeatureV1::Motif => {
+            for interval in &mut features.motif_intervals {
+                *interval = interval.saturating_neg();
+            }
+        }
+        RmiTargetFeatureV1::Rhythm => features.rhythm_onsets.rotate_left(1),
+        RmiTargetFeatureV1::Tempo => {
+            // Reflection is a bijection over the admitted [30, 300] BPM range.
+            features.tempo_milli_bpm = 330_000 - features.tempo_milli_bpm;
+        }
+        RmiTargetFeatureV1::Role => {
+            features.role = complementary_role(features.role);
+        }
+    }
+}
+
 /// Synthetic positive-control policy.
 ///
-/// It applies fixed, declared transformations to current input features. It is
-/// included only to verify that the benchmark can detect a known contingent
-/// policy. It is not a candidate musical agent or a claim of musical quality.
+/// It applies a fixed, declared transformation to one configured feature of
+/// current input. It proves only that the oracle detects known contingency.
 #[derive(Debug, Clone)]
 pub struct SyntheticContingentPolicyV1 {
     pub id: String,
@@ -384,21 +477,7 @@ impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
         _seed: u64,
     ) -> RmiAgentActionV1 {
         let mut features = observation.features.clone();
-        match self.target {
-            RmiTargetFeatureV1::Motif => {
-                for interval in &mut features.motif_intervals {
-                    *interval = interval.saturating_neg();
-                }
-            }
-            RmiTargetFeatureV1::Rhythm => features.rhythm_onsets.rotate_left(1),
-            RmiTargetFeatureV1::Tempo => {
-                // Reflection is a bijection over the admitted [30, 300] BPM range.
-                features.tempo_milli_bpm = 330_000 - features.tempo_milli_bpm;
-            }
-            RmiTargetFeatureV1::Role => {
-                features.role = complementary_role(features.role);
-            }
-        }
+        transform_target_feature(&mut features, self.target);
         RmiAgentActionV1 {
             action_id: format!("{}:{}", self.id, observation.source_event_id),
             features,
@@ -487,6 +566,31 @@ pub struct RmiEvaluationEnvelopeV1 {
     pub payload_sha256: String,
 }
 
+/// Bidirectional response record for one paired intervention.
+/// This measures two directions separately; it is not a quality score.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiReciprocalEvaluationPayloadV1 {
+    pub schema_version: u32,
+    pub trial_id: String,
+    pub seed: u64,
+    pub agent_evaluation_sha256: String,
+    pub partner_policy_id: String,
+    pub partner_policy_version: String,
+    pub target: RmiTargetFeatureV1,
+    pub control_partner_response: RmiPartnerResponseV1,
+    pub treatment_partner_response: RmiPartnerResponseV1,
+    pub partner_action_delta: RmiActionDeltaV1,
+    /// Agent-to-partner input sensitivity only; musical relevance remains separate.
+    pub targeted_partner_sensitivity: bool,
+    pub partner_collateral_changed_feature_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiReciprocalEvaluationEnvelopeV1 {
+    pub payload: RmiReciprocalEvaluationPayloadV1,
+    pub payload_sha256: String,
+}
+
 /// Error returned before a trial can be scored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RmiEvaluationErrorV1 {
@@ -495,6 +599,10 @@ pub enum RmiEvaluationErrorV1 {
     EmptyPolicyVersion,
     InvalidActionId { arm: String },
     InvalidActionFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
+    EmptyPartnerPolicyId,
+    EmptyPartnerPolicyVersion,
+    InvalidPartnerResponseId { arm: String },
+    InvalidPartnerResponseFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
     SerializationFailure(String),
 }
 
@@ -576,6 +684,93 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
     })
 }
 
+/// Evaluate the second direction: how the controlled partner changes its next
+/// action in response to the agent's control versus treatment action.
+///
+/// This simulator track establishes agent-to-partner sensitivity only. A human
+/// causal claim requires a separately randomized and ethically approved study.
+pub fn evaluate_rmi_reciprocal_pair<P, H>(
+    agent_policy: &P,
+    partner_policy: &H,
+    pair: &RmiInterventionPairV1,
+) -> Result<RmiReciprocalEvaluationEnvelopeV1, RmiEvaluationErrorV1>
+where
+    P: RmiPolicyV1,
+    H: RmiPartnerPolicyV1,
+{
+    let agent = evaluate_rmi_pair(agent_policy, pair)?;
+    if partner_policy.policy_id().trim().is_empty() {
+        return Err(RmiEvaluationErrorV1::EmptyPartnerPolicyId);
+    }
+    if partner_policy.policy_version().trim().is_empty() {
+        return Err(RmiEvaluationErrorV1::EmptyPartnerPolicyVersion);
+    }
+
+    let control_partner_response = partner_policy.respond(
+        &pair.pre_intervention_history,
+        &agent.payload.control_action,
+        pair.seed,
+    );
+    let treatment_partner_response = partner_policy.respond(
+        &pair.pre_intervention_history,
+        &agent.payload.treatment_action,
+        pair.seed,
+    );
+    for (arm, response) in [
+        ("control", &control_partner_response),
+        ("treatment", &treatment_partner_response),
+    ] {
+        if response.response_id.trim().is_empty() {
+            return Err(RmiEvaluationErrorV1::InvalidPartnerResponseId {
+                arm: arm.to_string(),
+            });
+        }
+        let issues = response.features.validation_issues(arm);
+        if !issues.is_empty() {
+            return Err(RmiEvaluationErrorV1::InvalidPartnerResponseFeatures {
+                arm: arm.to_string(),
+                issues,
+            });
+        }
+    }
+
+    let partner_action_delta = RmiActionDeltaV1::between(
+        &RmiAgentActionV1 {
+            action_id: control_partner_response.response_id.clone(),
+            features: control_partner_response.features.clone(),
+        },
+        &RmiAgentActionV1 {
+            action_id: treatment_partner_response.response_id.clone(),
+            features: treatment_partner_response.features.clone(),
+        },
+    );
+    let targeted_partner_sensitivity =
+        partner_action_delta.targeted_feature_changed(pair.target);
+    let partner_collateral_changed_feature_count =
+        partner_action_delta.collateral_changed_count(pair.target);
+
+    let payload = RmiReciprocalEvaluationPayloadV1 {
+        schema_version: RMI_BENCH_SCHEMA_VERSION,
+        trial_id: pair.trial_id.clone(),
+        seed: pair.seed,
+        agent_evaluation_sha256: agent.payload_sha256,
+        partner_policy_id: partner_policy.policy_id().to_string(),
+        partner_policy_version: partner_policy.policy_version().to_string(),
+        target: pair.target,
+        control_partner_response,
+        treatment_partner_response,
+        partner_action_delta,
+        targeted_partner_sensitivity,
+        partner_collateral_changed_feature_count,
+    };
+    let payload_bytes = serde_json::to_vec(&payload)
+        .map_err(|error| RmiEvaluationErrorV1::SerializationFailure(error.to_string()))?;
+    Ok(RmiReciprocalEvaluationEnvelopeV1 {
+        payload,
+        payload_sha256: sha256_hex(&payload_bytes),
+    })
+}
+
 fn is_lowercase_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -643,6 +838,47 @@ mod tests {
             action_id: "fixed-action".into(),
             features: base_features(),
         }
+    }
+
+    #[test]
+    fn fixed_partner_does_not_show_agent_to_partner_sensitivity() {
+        let pair = pair_for(RmiTargetFeatureV1::Role);
+        let agent = SyntheticContingentPolicyV1 {
+            id: "agent".into(),
+            version: "1".into(),
+            target: RmiTargetFeatureV1::Role,
+        };
+        let partner = FixedPartnerResponsePolicyV1 {
+            id: "fixed-partner".into(),
+            version: "1".into(),
+            response: RmiPartnerResponseV1 {
+                response_id: "same-response".into(),
+                features: base_features(),
+            },
+        };
+        let result = evaluate_rmi_reciprocal_pair(&agent, &partner, &pair).unwrap();
+        assert!(result.payload.agent_evaluation_sha256.len() == 64);
+        assert!(!result.payload.targeted_partner_sensitivity);
+    }
+
+    #[test]
+    fn responsive_partner_positive_control_detects_agent_to_partner_influence() {
+        let pair = pair_for(RmiTargetFeatureV1::Role);
+        let agent = SyntheticContingentPolicyV1 {
+            id: "agent".into(),
+            version: "1".into(),
+            target: RmiTargetFeatureV1::Role,
+        };
+        let partner = SyntheticResponsivePartnerPolicyV1 {
+            id: "responsive-partner".into(),
+            version: "1".into(),
+            target: RmiTargetFeatureV1::Role,
+        };
+        let result = evaluate_rmi_reciprocal_pair(&agent, &partner, &pair).unwrap();
+        assert!(result.payload.targeted_partner_sensitivity);
+        assert_eq!(result.payload.partner_collateral_changed_feature_count, 0);
+        assert_eq!(result.payload.agent_evaluation_sha256.len(), 64);
+        assert_eq!(result.payload_sha256.len(), 64);
     }
 
     #[test]
