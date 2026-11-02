@@ -29,8 +29,10 @@ impl fmt::Display for SemiringError {
 }
 impl Error for SemiringError {}
 
-/// Values implement addition and multiplication; the evaluator receives
-/// explicit domain-specific zero and one values.
+/// Values implement a commutative semiring: associative/commutative addition,
+/// associative/commutative multiplication, distributivity, and identities.
+/// The evaluator receives explicit domain-specific zero and one values. The
+/// current factor engine does not support noncommutative coefficient products.
 pub trait ExactSemiring: Clone {
     fn checked_add(&self, other: &Self) -> Result<Self, SemiringError>;
     fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError>;
@@ -576,6 +578,83 @@ mod tests {
         assert_eq!(left, right);
         assert_eq!(left, CheckedCount(16));
         assert!(left_stats.maximum_bucket_variables <= right_stats.maximum_bucket_variables);
+    }
+
+
+    #[test]
+    fn planner_rejects_interpolation_over_max_count_but_allows_variable_elimination() {
+        let max_count = AlgebraCapabilities {
+            semiring_operations: true,
+            commutative_multiplication: true,
+            additive_inverses: false,
+            rational_scalars: false,
+            exact_scalar_embedding: false,
+            final_coefficients_nonnegative: false,
+            coefficient_bound_proven: false,
+        };
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::BucketVariableElimination, max_count),
+            Ok(())
+        );
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::SharedMeasurementInterpolation, max_count),
+            Err(CompatibilityError::AdditiveInversesRequired)
+        );
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::SignedNetworkSum, max_count),
+            Err(CompatibilityError::AdditiveInversesRequired)
+        );
+    }
+
+    #[test]
+    fn planner_distinguishes_integer_ring_from_q_algebra() {
+        let integer_profile_ring = AlgebraCapabilities {
+            semiring_operations: true,
+            commutative_multiplication: true,
+            additive_inverses: true,
+            rational_scalars: false,
+            exact_scalar_embedding: true,
+            final_coefficients_nonnegative: true,
+            coefficient_bound_proven: true,
+        };
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::SignedNetworkSum, integer_profile_ring),
+            Ok(())
+        );
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::SharedMeasurementInterpolation, integer_profile_ring),
+            Err(CompatibilityError::RationalScalarsRequired)
+        );
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::CarryFreeScalarization, integer_profile_ring),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn planner_rejects_carry_free_without_positive_profile_and_bound() {
+        let signed_profile = AlgebraCapabilities {
+            semiring_operations: true,
+            commutative_multiplication: true,
+            additive_inverses: true,
+            rational_scalars: false,
+            exact_scalar_embedding: true,
+            final_coefficients_nonnegative: false,
+            coefficient_bound_proven: true,
+        };
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::CarryFreeScalarization, signed_profile),
+            Err(CompatibilityError::NonnegativeFinalCoefficientsRequired)
+        );
+        let unbounded = AlgebraCapabilities {
+            final_coefficients_nonnegative: true,
+            coefficient_bound_proven: false,
+            ..signed_profile
+        };
+        assert_eq!(
+            check_algorithm_compatibility(ExactAlgorithm::CarryFreeScalarization, unbounded),
+            Err(CompatibilityError::ProvenCoefficientBoundRequired)
+        );
     }
 
     #[test]
