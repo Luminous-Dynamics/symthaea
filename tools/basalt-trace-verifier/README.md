@@ -1,8 +1,8 @@
-# BASALT trace verifier
+# BASALT trace and observation verifier
 
-**Status:** reference-model verifier plus a first typed backend-observation ingest prototype. A passing result validates captured evidence and a bounded history model; it is not a physical durability or full anti-rollback proof.
+**Status:** reference-model reducer, bounded history search and first typed backend-observation ingest prototype. A passing result means that the submitted evidence is internally well-formed and admits a bounded legal sequential interpretation under the BASALT model. It is not a physical durability or end-to-end anti-rollback proof.
 
-## Run
+## Run the standalone Rust package
 
 From the repository root:
 
@@ -16,73 +16,79 @@ cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- \
   --out basalt-reference-report.json
 ```
 
-The standalone package is intentionally not a root workspace member. It uses a private lockfile so the repository-wide workspace glob/manifest problems do not contaminate this focused check. The source is normalized with the repository-pinned Rust 1.96 formatter; the dedicated verifier workflow checks formatting again on every exact PR head.
+The standalone package is not a root workspace member. It has a private lockfile. The exact-tree CI workflow regenerates the lockfile when dependencies change, then runs formatting, locked tests, strict Clippy and the reference CLI before committing a tested source tree.
 
-## What it verifies
+## Reference reducer
 
-- Strict typed deserialization with unknown fields rejected.
-- Unique operation IDs, exact reference linearization membership, dependencies, per-client sequence and same-runner real-time precedence.
-- Bounded legal-linearization search over fully completed trace-shaped histories (up to 32 operations), independent of the fixture's declared tie-break.
-- No comparison of monotonic clock values across different runner IDs.
-- Fault-to-operation identity, runner, interval, class and expected outcome.
-- Explicit fixture digest preimages against SHA-256.
-- Deterministic replay of source generation/predecessor, log checkpoint, policy compare, exact receipt identity, current authority revision and receipt acceptance revision.
-- Lost-response commit as a server-side state transition with an indeterminate client result, followed by exact-receipt recovery.
-- Full transaction retry grouping and identical request replay after injected serialization failure.
-- Witness sequence, authority/incarnation, predecessor digest chain, strictly advancing authority revisions, final state binding and the exact witness sequence consulted by restore verification.
-- Final source cursors, log cursors, policy head and immutable accepted receipt set.
-- Six deliberately seeded faulty reference traces; every one must be rejected.
+The deterministic reference reducer checks strict typed trace deserialization, operation identities, dependency order, per-client sequence, same-runner real-time precedence, fault schedules, fixture digest preimages, source generations/predecessors, log checkpoints, policy compare, immutable receipts, current authority revision, receipt acceptance revision, retry grouping, witness sequence/incarnation/predecessor links and final source/log/policy/receipt state.
 
-## What it does not verify
+Six seeded faulty reference traces are required to be rejected. The exact-head reference CLI report from the checked-in 12-operation fixture recorded 11 invariant expectations and all 6 mutants detected, with no counterexamples. That report's claim ceiling is reference-trace semantics only: no backend run, cryptographic witness signature, physical durability or engine qualification.
 
-- It does not execute SQLite, PostgreSQL, Turso or etcd.
-- It does not execute SQLite, PostgreSQL, Turso or etcd; the observation adapter validates supplied event evidence and does not connect to a backend.
-- It does not implement a complete JSON Schema Draft 2020-12 validator. It uses strict typed Serde parsing plus explicit structural/semantic checks; schema/adapter parity needs a separate corpus and validator.
-- The v1 search is limited to fully completed operations and at most 32 operations. A pending observation envelope returns `inconclusive` before search; it is never rewritten as abort or success.
-- Search-budget exhaustion returns `inconclusive`; it never becomes a pass or a definitive fail.
-- The raw observation artifact is adapter-supplied evidence. Hash verification proves artifact consistency, not that the adapter faithfully instrumented the backend or that hardware honored flushes.
-- It does not verify witness signatures, key rotation, quorum independence or trust-root authorization. The witness digests are symbolic fixture records.
-- It does not test process crashes, filesystem ordering, power loss, hardware flush behavior, replication or physical restore.
-- It does not qualify performance, availability or any storage engine.
+## Bounded legal-linearization search
 
-The optional `--schema` argument binds the schema file's SHA-256 into the report. The current CLI runs the deterministic reference fixture. The history-search API ignores the fixture's declared reference order; `reference_linearization_order` defaults empty when deserializing an observed history. The library additionally exposes `verify_observed_history(&Trace, &HistorySearchConfig)`, which searches for a legal order subject to causal constraints and a hard state-expansion budget. It currently uses the same strict Rust Trace types; it does not claim to ingest the backend-observation JSON schema or implement full JSON Schema Draft 2020-12 validation.
+The library exposes:
+
+```rust
+verify_observed_history(&Trace, &HistorySearchConfig)
+```
+
+It searches for a sequential order satisfying per-client program order, explicit `happens_after` edges and same-runner real-time precedence. Monotonic clocks from different runners are never compared. The search branches only on currently enabled operations, memoizes by remaining-operation bitset plus deterministic model-state digest, and has a hard expansion budget.
+
+The v1 search is limited to 32 fully completed operations. Its statuses are:
+- `pass`: a legal ordering was found and the modeled final revision/cursors/policy/receipt state agrees;
+- `fail`: exhaustive search found no legal ordering;
+- `invalid_evidence`: the operation set or its causal constraints are malformed;
+- `inconclusive`: the operation or search bound prevents a verdict.
+
+Budget exhaustion never becomes pass. The final opaque state digest is not yet recomputed from a full canonical state manifest.
+
+The unoptimized exhaustive enumerator and memoized search use the same `apply_operation` transition function. Their agreement checks that the optimized search finds the same legal-order set for small histories; it is **not** an independent second implementation of BASALT business semantics. An independent model implementation and differential backend testing remain future work.
 
 ## Backend observation ingestion
 
-The library exposes `verify_backend_observation(bytes, expected_reference_trace_sha256, config)`. The caller supplies the reference-trace SHA-256 pin through a separate test manifest; the observation cannot nominate its own expected reference.
-
-The v1 observation envelope checks:
-- backend ID, engine/version, adapter commit SHA, executable/configuration digests and durability-profile label;
-- runner-local monotonic clock windows, unique event IDs, unique per-runner sequence numbers and non-regressing time within each runner;
-- operation identity, invocation/completion boundaries, explicit source/log scope for `advance`, and event-to-operation/runner binding;
-- fault application against a raw `fault_id` event (unapplied faults must not appear in the log);
-- event-log integrity using RFC 8785 JCS over events sorted by `(runner_id, runner_sequence, event_id)`;
-- transaction begin/read/decision/commit-or-abort phases and atomic source/log/receipt write phases for accepted advances;
-- whole-transaction SQLSTATE 40001 retries: each attempt must have a distinct transaction ID, begin/read/decision events, matching read/decision fingerprints and unchanged request intent/scope;
-- response-loss uncertainty and pending-operation handling.
-
-An operation with `completed_at_ns = null` and `outcome = null` is listed as pending and forces `inconclusive`; a missing response is never converted into a definite abort. A `retry_group_id` with fewer than two observed attempts also forces `inconclusive`.
-
-Example:
+The library exposes:
 
 ```rust
-let report = verify_backend_observation(
-    &observation_bytes,
-    &test_manifest.reference_trace_sha256,
-    &HistorySearchConfig {
-        max_search_states: 100_000,
-        max_operations: 32,
-    },
-);
+verify_backend_observation(
+    observation_bytes,
+    expected_reference_trace_sha256,
+    &HistorySearchConfig,
+)
 ```
 
-The CLI still runs the deterministic reference fixture; observation ingestion is a library API in this increment. The current parser does not claim full JSON Schema Draft 2020-12 validation.
+The caller supplies the expected reference-trace digest from an external test manifest. The observation cannot nominate its own expected reference. The v1 envelope requires:
+
+- backend ID, engine/version, adapter commit SHA, executable/configuration digests and durability-profile label;
+- a runner-local monotonic clock window for every participating runner;
+- raw events with unique IDs and unique per-runner sequence numbers;
+- observed operations, request intent, retry metadata, explicit source/log scope for `advance`, applied fault records, witness observations and a final state observation;
+- a raw event-log digest recomputed using RFC 8785 JCS after sorting events by `(runner_id, runner_sequence, event_id)`.
+
+The validator checks runner-local clock monotonicity, event/operation/runner binding, operation boundaries, raw event digest, transaction begin/read/decision and commit/abort evidence, atomic source/log/receipt writes for committed advances, and applied/unapplied faults against explicit `fault_id` events.
+
+### Whole-transaction serialization retries
+
+A captured SQLSTATE 40001 retry group must show, for each attempt, a transaction begin, state read and decision. Each attempt must use a different transaction ID. The read-snapshot and decision-input fingerprints must match their raw events, while request intent and source/log scope remain unchanged. A retry that repeats only the final write without beginning a new transaction, rereading and recomputing is rejected.
+
+### Pending operations
+
+An operation with `completed_at_ns = null` and `outcome = null` is listed as pending and forces `inconclusive`. Even when a raw commit event exists but the response/capture is incomplete, the verifier does not synthesize success or abort. A declared retry group with only one captured attempt is also `inconclusive`.
+
+### Validation boundary
+
+The Rust parser uses strict Serde structs with unknown-field rejection and explicit structural/semantic checks. It does **not** yet implement a complete JSON Schema Draft 2020-12 validator or prove schema/adapter parity across an independently generated positive/negative corpus. The CLI currently runs the deterministic reference fixture; backend observation ingestion is a library API in this increment.
+
+## What this verifier does not prove
+
+- It does not execute SQLite, PostgreSQL, Turso or etcd; the observation adapter validates supplied events and does not connect to a backend.
+- The raw event artifact is adapter-supplied evidence. A matching hash proves that the submitted artifact is self-consistent, not that the adapter faithfully instrumented the engine.
+- It does not prove that an fsync reached stable hardware, that a power-loss event was physically induced, or that a restored snapshot is fresh.
+- It does not verify DSSE witness signatures, offline trust-root rotation, a complete checkpoint predecessor chain to pinned genesis, quorum-member operational independence or persist-before-sign behavior.
+- It does not resolve pending commit/no-commit branches or verify histories larger than 32 operations.
+- It does not qualify throughput, tail latency, availability or any storage engine.
+
+These are deliberate claim boundaries. BASALT backend qualification must still run the same scenarios and observation contract against pinned SQLite, Turso, PostgreSQL and etcd builds with independently controlled process-crash, power-loss, I/O-failure, network-partition, stale-snapshot and restore interventions.
 
 ## Result interpretation
 
-- `pass`: a legal sequential interpretation was found, final state matches, and all relevant operation outcomes agree. For reference CLI mode, every seeded negative control is also detected.
-- `fail`: a fully explored, well-formed history has no legal sequential interpretation, or the reference fixture contradicts the reducer.
-- `invalid_evidence`: strict deserialization, required-field, dependency, ordering, digest, fault-schedule or witness-chain validation failed.
-- `inconclusive`: the search bound was reached before a legal order was found or all candidate orders were eliminated.
-
-A `pass` is not a backend result or a cryptographic/storage durability claim. Live adapter observations must be written separately and checked by the next verifier increment.
+Observation reports use `pass`, `fail`, `invalid_evidence` and `inconclusive`. A missing acknowledgement or missing capture is never interpreted as a definite abort. A passing observation report does not supersede the separate storage durability and witness freshness gates.
