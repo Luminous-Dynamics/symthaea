@@ -90,6 +90,8 @@ Three non-duplicate outer policy classes produce:
 
 The selected robust-utility policy continues at root and early, achieving worst-case power 0.576, P0 size 0.0225, maximum expected cost 3.7 and worst-case utility 2.292. It does not maximize worst-case power: the middle policy has worst-case power 0.66. It wins only because the declared false-positive loss is high enough to reward its lower null size.
 
+There are two internal decision histories, so the exhaustive engine enumerates four bit masks. When the root policy stops immediately, the early-history bit is unreachable; those two masks encode the same realized stopping rule. This is why the three distinct pathwise policy classes appear in the table while the report records four enumerated masks.
+
 When the hard worst-case evaluator-cost cap is 3.5, the more expensive policy becomes infeasible and the selected policy changes to the middle policy (P0 size 0.035; maximum expected cost 3.0). This demonstrates that a hard resource constraint and a soft cost penalty do different jobs.
 
 ### Alternative-misspecification control
