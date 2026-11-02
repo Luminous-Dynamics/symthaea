@@ -90,22 +90,22 @@ fn items() -> Vec<KnowledgeItem> {
     // Deliberately includes overclaimed low-quality items, context-mismatched
     // skills, multiple lineages and different learning costs.
     let raw = [
-        (1, 10, "navigation", 8.0, 9.0, 0.90, 0.10, 2.0, 0.95, 0.80),
-        (2, 10, "navigation", 2.0, 10.0, 0.25, 0.70, 2.0, 0.40, 0.30),
-        (3, 20, "navigation", 6.0, 7.0, 0.95, 0.05, 3.0, 0.98, 0.90),
-        (4, 30, "ecology", 5.0, 8.0, 0.80, 0.20, 4.0, 0.90, 0.70),
-        (5, 30, "navigation", 4.0, 6.0, 0.75, 0.20, 1.0, 0.85, 0.75),
-        (6, 40, "navigation", 7.0, 7.5, 0.90, 0.10, 4.0, 0.95, 0.85),
-        (7, 50, "ecology", 9.0, 9.5, 0.30, 0.60, 2.5, 0.35, 0.40),
-        (8, 60, "navigation", 3.0, 4.0, 0.95, 0.05, 1.5, 0.99, 0.95),
-        (9, 60, "navigation", 5.0, 5.0, 0.85, 0.15, 3.0, 0.90, 0.90),
-        (10, 70, "navigation", 6.5, 6.0, 0.70, 0.15, 2.0, 0.92, 0.80),
-        (11, 80, "ecology", 7.5, 8.5, 0.88, 0.12, 3.5, 0.93, 0.70),
-        (12, 90, "navigation", 2.5, 3.0, 0.98, 0.02, 1.0, 0.99, 0.98),
+        (1, 10, "navigation", 8.0, 9.0, 0.90, 0.10, 2.0, 0.10, 0.95, 0.80),
+        (2, 10, "navigation", 2.0, 10.0, 0.25, 0.70, 2.0, 0.80, 0.40, 0.30),
+        (3, 20, "navigation", 6.0, 7.0, 0.95, 0.05, 3.0, 0.20, 0.98, 0.90),
+        (4, 30, "ecology", 5.0, 8.0, 0.80, 0.20, 4.0, 0.40, 0.90, 0.70),
+        (5, 30, "navigation", 4.0, 6.0, 0.75, 0.20, 1.0, 0.35, 0.85, 0.75),
+        (6, 40, "navigation", 7.0, 7.5, 0.90, 0.10, 4.0, 0.65, 0.95, 0.85),
+        (7, 50, "ecology", 9.0, 9.5, 0.30, 0.60, 2.5, 0.75, 0.35, 0.40),
+        (8, 60, "navigation", 3.0, 4.0, 0.95, 0.05, 1.5, 0.05, 0.99, 0.95),
+        (9, 60, "navigation", 5.0, 5.0, 0.85, 0.15, 3.0, 0.45, 0.90, 0.90),
+        (10, 70, "navigation", 6.5, 6.0, 0.70, 0.15, 2.0, 0.30, 0.92, 0.80),
+        (11, 80, "ecology", 7.5, 8.5, 0.88, 0.12, 3.5, 0.55, 0.93, 0.70),
+        (12, 90, "navigation", 2.5, 3.0, 0.98, 0.02, 1.0, 0.15, 0.99, 0.98),
     ];
     raw.into_iter().map(|(id, lineage, family, true_benefit, declared_benefit,
-                          evidence_reliability, uncertainty, learning_cost, validity,
-                          transferability)| {
+                          evidence_reliability, uncertainty, learning_cost, difficulty,
+                          validity, transferability)| {
         KnowledgeItem {
             item_id: id,
             lineage_id: lineage,
@@ -115,6 +115,7 @@ fn items() -> Vec<KnowledgeItem> {
             evidence_reliability,
             uncertainty,
             learning_cost,
+            difficulty,
             validity,
             transferability,
         }
@@ -153,7 +154,7 @@ fn run_condition(condition: Condition, replicate: u64) -> Summary {
         acquisition_base_probability: 0.90,
         integration_probability: 0.85,
         retention_probability: 0.90,
-        individual_discovery_probability_per_cost: 0.12,
+        individual_discovery_base_probability: 0.12,
         task_family_mismatch_penalty: 0.75,
     };
     let mode = match policy(condition) {
