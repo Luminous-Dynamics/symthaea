@@ -43,5 +43,32 @@
       "lower_mode_frequency_hz": 1452.8792078313684,
       "upper_mode_frequency_hz": 1779.4063585429428
     }
+  },
+  "driven_lossy_coupled_loops": {
+    "primary_resistance_ohm": 10,
+    "primary_inductance_h": 0.01,
+    "primary_capacitance_f": 0.000001,
+    "secondary_resistance_ohm": 20,
+    "secondary_inductance_h": 0.01,
+    "secondary_capacitance_f": 0.000001,
+    "coupling_coefficient": 0.1,
+    "secondary_winding_polarity": 1,
+    "frequency_hz": 1591.5494309189535,
+    "expected": {
+      "mutual_inductance_h": 0.001,
+      "primary_input_impedance_ohm": {
+        "real": 15,
+        "imaginary": 0
+      },
+      "secondary_current_per_volt_a_per_v": {
+        "real": 0,
+        "imaginary": -0.03333333333333333
+      },
+      "secondary_resistor_voltage_per_volt": {
+        "real": 0,
+        "imaginary": -0.6666666666666666
+      },
+      "secondary_resistor_power_w_per_v2": 0.022222222222222223
+    }
   }
 }
