@@ -687,7 +687,7 @@ fn validate_witness_set_payload(
 pub fn verify_witness_set_metadata(
     envelope: &[u8],
     root: &VerifiedTrustRoot,
-    previous: Option<&WitnessSetMetadataPayload>,
+    previous: Option<&VerifiedWitnessSet>,
 ) -> Result<VerifiedWitnessSet, String> {
     let verified = verify_root_signed_payload(envelope, &root.payload)?;
     let metadata: WitnessSetMetadataPayload = serde_json::from_slice(&verified.payload)
@@ -695,13 +695,14 @@ pub fn verify_witness_set_metadata(
     let trust_store = validate_witness_set_payload(&metadata, &root.payload)?;
     let digest = witness_set_digest(&metadata)?;
     if let Some(previous) = previous {
-        let expected_version = canonical_counter(&previous.witness_set_version, "previous witness_set_version", false)?
+        let previous_metadata = previous.metadata();
+        let expected_version = canonical_counter(&previous_metadata.witness_set_version, "previous witness_set_version", false)?
             .checked_add(1).ok_or_else(|| "witness-set version exhausted".to_string())?;
         if canonical_counter(&metadata.witness_set_version, "witness_set_version", false)? != expected_version
-            || metadata.authority_id != previous.authority_id
-            || metadata.previous_witness_set_digest.as_deref() != Some(witness_set_digest(previous)?.as_str())
+            || metadata.authority_id != previous_metadata.authority_id
+            || metadata.previous_witness_set_digest.as_deref() != Some(previous.digest())
         {
-            return Err("witness-set rotation must increment one version and link to the prior metadata digest".to_string());
+            return Err("witness-set rotation must increment one version and link to the prior verified metadata digest".to_string());
         }
     } else if metadata.witness_set_id != root.payload.initial_witness_set_id
         || metadata.witness_set_version != root.payload.initial_witness_set_version
@@ -1840,7 +1841,7 @@ mod tests {
 
         let first_payload = serde_json_canonicalizer::to_vec(&first_metadata).unwrap();
         let first_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &first_payload, &root_seeds[..3]);
-        verify_witness_set_metadata(&first_envelope, &pinned, None).unwrap();
+        let verified_first = verify_witness_set_metadata(&first_envelope, &pinned, None).unwrap();
 
         let next_trust = build_trust(&next_witness_seeds);
         let mut next_metadata = witness_metadata_from_trust(
@@ -1851,7 +1852,7 @@ mod tests {
         next_metadata.witness_set_version = "2".to_string();
         let next_payload = serde_json_canonicalizer::to_vec(&next_metadata).unwrap();
         let next_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &next_payload, &root_seeds[..3]);
-        let next = verify_witness_set_metadata(&next_envelope, &pinned, Some(&first_metadata)).unwrap();
+        let next = verify_witness_set_metadata(&next_envelope, &pinned, Some(&verified_first)).unwrap();
         assert_eq!(next.metadata().witness_set_version, "2");
 
         next_metadata.previous_witness_set_digest = Some(
@@ -1859,7 +1860,7 @@ mod tests {
         );
         let fork_payload = serde_json_canonicalizer::to_vec(&next_metadata).unwrap();
         let fork_envelope = sign_payload(WITNESS_SET_PAYLOAD_TYPE, &fork_payload, &root_seeds[..3]);
-        assert!(verify_witness_set_metadata(&fork_envelope, &pinned, Some(&first_metadata)).is_err());
+        assert!(verify_witness_set_metadata(&fork_envelope, &pinned, Some(&verified_first)).is_err());
     }
 
 }
