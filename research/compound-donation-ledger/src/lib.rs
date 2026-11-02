@@ -134,8 +134,17 @@ struct TokenState {
     remaining_amount: u128,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DonationReservePolicy {
+    /// Reserve a precommitted rational share of each donor's own evidence increments.
+    FixedRate,
+    /// Reserve only capped overshoot above the donor's weighted evidence threshold.
+    CappedOvershoot,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DonationLedger {
+    reserve_policy: DonationReservePolicy,
     specs: Vec<CandidateSpec>,
     index: BTreeMap<u64, usize>,
     states: Vec<CandidateState>,
@@ -149,6 +158,17 @@ pub struct DonationLedger {
 
 impl DonationLedger {
     pub fn new(specs: Vec<CandidateSpec>) -> Result<Self, LedgerError> {
+        Self::new_with_reserve_policy(specs, DonationReservePolicy::FixedRate)
+    }
+
+    pub fn new_capped_overshoot(specs: Vec<CandidateSpec>) -> Result<Self, LedgerError> {
+        Self::new_with_reserve_policy(specs, DonationReservePolicy::CappedOvershoot)
+    }
+
+    pub fn new_with_reserve_policy(
+        specs: Vec<CandidateSpec>,
+        reserve_policy: DonationReservePolicy,
+    ) -> Result<Self, LedgerError> {
         let mut index = BTreeMap::new();
         let mut weight_sum = 0_u64;
         let mut previous_id = None;
@@ -157,14 +177,26 @@ impl DonationLedger {
             if previous_id.is_some_and(|previous| spec.id <= previous) {
                 return Err(LedgerError::InvalidCandidateOrder);
             }
-            if spec.reserve_rate_denominator == 0
-                || spec.reserve_rate_numerator > spec.reserve_rate_denominator
-            {
+            if spec.reserve_rate_denominator == 0 {
                 return Err(LedgerError::InvalidReserveRate);
             }
-            if spec.destination_id.is_some_and(|destination| destination <= spec.id)
-                || (spec.destination_id.is_none() && spec.reserve_rate_numerator > 0)
-            {
+            match reserve_policy {
+                DonationReservePolicy::FixedRate => {
+                    if spec.reserve_rate_numerator > spec.reserve_rate_denominator
+                        || (spec.destination_id.is_none() && spec.reserve_rate_numerator > 0)
+                    {
+                        return Err(LedgerError::InvalidReserveRate);
+                    }
+                }
+                DonationReservePolicy::CappedOvershoot => {
+                    if spec.reserve_rate_numerator != 0
+                        || (spec.weight > 0 && spec.destination_id.is_none())
+                    {
+                        return Err(LedgerError::InvalidReserveRate);
+                    }
+                }
+            }
+            if spec.destination_id.is_some_and(|destination| destination <= spec.id) {
                 return Err(LedgerError::InvalidRecipient);
             }
             weight_sum = weight_sum
@@ -189,6 +221,7 @@ impl DonationLedger {
             .collect();
 
         Ok(Self {
+            reserve_policy,
             specs,
             index,
             states,
@@ -260,27 +293,47 @@ impl DonationLedger {
         }
 
         let delta = new_value - state.evidence_value;
-        let weighted_delta = (spec.weight as u128)
-            .checked_mul(delta)
-            .ok_or(LedgerError::ArithmeticOverflow)?;
-        let rate_product = weighted_delta
-            .checked_mul(spec.reserve_rate_numerator as u128)
-            .and_then(|value| value.checked_add(state.rate_remainder))
-            .ok_or(LedgerError::ArithmeticOverflow)?;
-        let requested = rate_product / (spec.reserve_rate_denominator as u128);
-        let next_remainder = rate_product % (spec.reserve_rate_denominator as u128);
-
-        let donor_cap = (spec.weight as u128)
-            .checked_mul(new_value.min(EVIDENCE_ONE))
-            .ok_or(LedgerError::ArithmeticOverflow)?;
-        let remaining_cap = donor_cap
-            .checked_sub(state.outgoing)
-            .ok_or(LedgerError::InvariantViolation)?;
-        let reserve = requested.min(remaining_cap);
-        let next_outgoing = state
-            .outgoing
-            .checked_add(reserve)
-            .ok_or(LedgerError::ArithmeticOverflow)?;
+        let (reserve, next_outgoing, next_remainder) = match self.reserve_policy {
+            DonationReservePolicy::FixedRate => {
+                let weighted_delta = (spec.weight as u128)
+                    .checked_mul(delta)
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                let rate_product = weighted_delta
+                    .checked_mul(spec.reserve_rate_numerator as u128)
+                    .and_then(|value| value.checked_add(state.rate_remainder))
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                let requested = rate_product / (spec.reserve_rate_denominator as u128);
+                let remainder = rate_product % (spec.reserve_rate_denominator as u128);
+                let donor_cap = (spec.weight as u128)
+                    .checked_mul(new_value.min(EVIDENCE_ONE))
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                let remaining_cap = donor_cap
+                    .checked_sub(state.outgoing)
+                    .ok_or(LedgerError::InvariantViolation)?;
+                let reserve = requested.min(remaining_cap);
+                let next = state.outgoing
+                    .checked_add(reserve)
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                (reserve, next, remainder)
+            }
+            DonationReservePolicy::CappedOvershoot => {
+                let weighted_value = (spec.weight as u128)
+                    .checked_mul(new_value)
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                let threshold = (WEIGHT_SCALE as u128)
+                    .checked_mul(EVIDENCE_ONE)
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                let raw = weighted_value.saturating_sub(threshold);
+                let cap = (spec.weight as u128)
+                    .checked_mul(EVIDENCE_ONE)
+                    .ok_or(LedgerError::ArithmeticOverflow)?;
+                let target = raw.min(cap);
+                let reserve = target
+                    .checked_sub(state.outgoing)
+                    .ok_or(LedgerError::InvariantViolation)?;
+                (reserve, target, 0)
+            }
+        };
         let next_total_outgoing = self
             .total_outgoing
             .checked_add(reserve)
@@ -533,7 +586,21 @@ impl DonationLedger {
         receipt: &[AuditEvent],
         expected_snapshot: Option<&LedgerSnapshot>,
     ) -> Result<LedgerSnapshot, LedgerError> {
-        let mut ledger = Self::new(specs)?;
+        Self::verify_receipt_with_reserve_policy(
+            specs,
+            DonationReservePolicy::FixedRate,
+            receipt,
+            expected_snapshot,
+        )
+    }
+
+    pub fn verify_receipt_with_reserve_policy(
+        specs: Vec<CandidateSpec>,
+        reserve_policy: DonationReservePolicy,
+        receipt: &[AuditEvent],
+        expected_snapshot: Option<&LedgerSnapshot>,
+    ) -> Result<LedgerSnapshot, LedgerError> {
+        let mut ledger = Self::new_with_reserve_policy(specs, reserve_policy)?;
         for event in receipt {
             match event {
                 AuditEvent::Activated { round, candidate_id } => {
@@ -1475,6 +1542,109 @@ mod tests {
             DonationLedger::verify_receipt(basic_specs(), &tampered, None),
             Err(LedgerError::ReceiptMismatch)
         );
+    }
+
+    #[test]
+    fn capped_overshoot_donation_reserves_only_after_weighted_threshold() {
+        let specs = vec![
+            CandidateSpec {
+                id: 10,
+                weight: 300_000_000,
+                destination_id: Some(20),
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+            CandidateSpec {
+                id: 20,
+                weight: 300_000_000,
+                destination_id: Some(30),
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+            CandidateSpec {
+                id: 30,
+                weight: 200_000_000,
+                destination_id: None,
+                reserve_rate_numerator: 0,
+                reserve_rate_denominator: 1,
+            },
+        ];
+        let mut ledger = DonationLedger::new_capped_overshoot(specs.clone()).unwrap();
+        ledger.apply(InputEvent::Activate { round: 0, candidate_id: 10 }).unwrap();
+
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 1,
+            candidate_id: 10,
+            new_value: 3 * EVIDENCE_ONE,
+        }).unwrap();
+        assert_eq!(ledger.snapshot().unwrap().candidates[0].outgoing, 0);
+
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 2,
+            candidate_id: 10,
+            new_value: 4 * EVIDENCE_ONE,
+        }).unwrap();
+        let first = ledger.snapshot().unwrap();
+        let first_token = &first.escrow[0];
+        assert_eq!(first_token.original_amount, 200_000_000_000_000);
+        assert_eq!(first.candidates[0].outgoing, first_token.original_amount);
+
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 3,
+            candidate_id: 10,
+            new_value: 5 * EVIDENCE_ONE,
+        }).unwrap();
+        let second = ledger.snapshot().unwrap();
+        assert_eq!(second.escrow.len(), 2);
+        assert_eq!(second.escrow[1].original_amount, 100_000_000_000_000);
+        assert_eq!(
+            second.candidates[0].outgoing,
+            300_000_000_000_000
+        );
+
+        // The capped overshoot reserve is exhausted at gamma_i; later
+        // evidence cannot withdraw any additional donor capital.
+        ledger.apply(InputEvent::EvidenceUpdate {
+            round: 4,
+            candidate_id: 10,
+            new_value: 100 * EVIDENCE_ONE,
+        }).unwrap();
+        let final_snapshot = ledger.snapshot().unwrap();
+        assert_eq!(final_snapshot.escrow.len(), 2);
+        assert_eq!(
+            final_snapshot.candidates[0].outgoing,
+            300_000_000_000_000
+        );
+        assert_eq!(
+            DonationLedger::verify_receipt_with_reserve_policy(
+                specs,
+                DonationReservePolicy::CappedOvershoot,
+                ledger.audit_log(),
+                Some(&final_snapshot),
+            ),
+            Ok(final_snapshot)
+        );
+        ledger.validate_invariants().unwrap();
+    }
+
+    #[test]
+    fn capped_overshoot_reserve_satisfies_donor_cap_and_own_increment() {
+        let weight = 300_000_000_u128;
+        let mut previous_value = 0_u128;
+        let mut previous_reserve = 0_u128;
+        for value in (0..=20_u128).map(|i| i * EVIDENCE_ONE / 2) {
+            let weighted = weight * value;
+            let target = weighted
+                .saturating_sub(WEIGHT_SCALE as u128 * EVIDENCE_ONE)
+                .min(weight * EVIDENCE_ONE);
+            let cap = weight * value.min(EVIDENCE_ONE);
+            assert!(target <= cap);
+            let delta = target - previous_reserve;
+            assert!(delta <= weight * (value - previous_value));
+            assert!(target >= previous_reserve);
+            previous_value = value;
+            previous_reserve = target;
+        }
     }
 
     #[test]
