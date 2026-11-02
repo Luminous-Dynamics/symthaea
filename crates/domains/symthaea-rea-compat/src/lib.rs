@@ -250,6 +250,10 @@ fn validate_subject(value: &Value) -> Result<(), EvidenceError> {
     Ok(())
 }
 
+fn providers_match(left: &Value, right: &Value) -> bool {
+    ["id", "name", "version"].into_iter().all(|key| left.get(key) == right.get(key))
+}
+
 fn validate_analysis_profile(value: &Value, provider: &Value) -> Result<(), EvidenceError> {
     if value.is_null() {
         return Ok(());
@@ -266,7 +270,7 @@ fn validate_analysis_profile(value: &Value, provider: &Value) -> Result<(), Evid
     object(profile_parameters, "analysis_profile.parameters")?;
     validate_sha256(field(map, "digest", context)?, "analysis_profile.digest")?;
 
-    if profile_provider != provider {
+    if !providers_match(profile_provider, provider) {
         return Err(schema_error("analysis_profile.provider must exactly match Evidence.provider"));
     }
 
@@ -787,6 +791,19 @@ mod tests {
         assert_eq!(verified.evidence_id, GOLDEN_EVIDENCE_ID);
         assert_eq!(verified.semantic_sha256, &GOLDEN_EVIDENCE_ID[3..]);
         assert_eq!(verified.raw_file_sha256, None);
+    }
+
+    #[test]
+    fn provider_object_key_order_does_not_change_profile_binding_or_identity() {
+        let mut evidence = golden();
+        let profile_provider = evidence["analysis_profile"]["provider"].as_object().unwrap();
+        let mut reordered = Map::new();
+        reordered.insert("version".to_owned(), profile_provider["version"].clone());
+        reordered.insert("name".to_owned(), profile_provider["name"].clone());
+        reordered.insert("id".to_owned(), profile_provider["id"].clone());
+        evidence["analysis_profile"]["provider"] = Value::Object(reordered);
+        assert!(verify_evidence_value(&evidence).is_ok());
+        assert_eq!(compute_evidence_id(&evidence).unwrap(), GOLDEN_EVIDENCE_ID);
     }
 
     #[test]
