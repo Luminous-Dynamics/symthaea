@@ -6,7 +6,7 @@
   "tokenizer_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
   "chat_template_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
   "dataset_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
-  "dataset_item_set_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "dataset_item_set_sha256": "c0d30a31aa02a74db9e6f3a3d641f20d38c1fa50526126615133f14ebb8c6a95",
   "context_policy_id": "random-one-example",
   "context_policy_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
   "inference_backend_id": "fixture-logprob-backend",
@@ -35,7 +35,7 @@
           "context_item_ids": [
             "context-1"
           ],
-          "context_item_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "context_item_set_sha256": "6a3ef3c06e867d073cf73f940b28849992ccc032992b66bdc888b5c236f6feae",
           "target_token_logprobs": [
             -1.2,
             -1.2,
@@ -59,7 +59,7 @@
           "context_item_ids": [
             "context-2"
           ],
-          "context_item_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "context_item_set_sha256": "24e96e956b8fe0ee4dfbcb7356a28c75e2060d87fbb609d30fbcfb1868b74862",
           "target_token_logprobs": [
             -0.8,
             -0.8,
