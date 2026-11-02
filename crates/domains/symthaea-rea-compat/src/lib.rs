@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+pub mod tool_policy;
+
 //! Rust-native admission and semantic-identity verification for REA Evidence.
 //!
 //! This crate separates raw-file identity, REA semantic Evidence identity,
