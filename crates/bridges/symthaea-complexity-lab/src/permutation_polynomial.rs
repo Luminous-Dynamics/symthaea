@@ -11,7 +11,10 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::matrix::{\n    MatrixCertificateError, RationalMatrix, verify_identity_minus_rank_factorization,\n    verify_rational_matrix_equality,\n};
+use crate::matrix::{
+    MatrixCertificateError, RationalMatrix, verify_identity_minus_rank_factorization,
+    verify_rational_matrix_equality,
+};
 
 /// One monomial term c * P_1^e1 * ... * P_s^es.
 #[derive(Clone, Debug, PartialEq, Eq)]
