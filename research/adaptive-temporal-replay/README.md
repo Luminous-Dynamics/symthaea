@@ -17,11 +17,11 @@ Standalone Rust research crate for executing the v0.1 adaptive temporal calibrat
 
 From this directory:
 
-    cargo run --locked --bin atcb-synthetic -- abrupt_location_shift 20261102
-    cargo run --locked --bin atcb-synthetic -- superseded_outcome_feedback 83
-    cargo test --locked
+    cargo run --bin atcb-synthetic -- abrupt_location_shift 20261102
+    cargo run --bin atcb-synthetic -- superseded_outcome_feedback 83
+    cargo test
 
-The crate is standalone and uses serde/serde_json for fixture parsing. Commit a Cargo.lock before treating a build as reproducible.
+The crate is standalone and uses serde/serde_json for fixture parsing. The first Cargo invocation must resolve dependencies and create Cargo.lock; commit that lockfile, then rerun with --locked for reproducible builds. No lockfile is claimed until cargo actually generates it.
 
 ## Limitations
 
