@@ -459,18 +459,31 @@ mod tests {
             ThresholdMass { threshold: 8 * EVIDENCE_ONE, prior_mass: 200_000_000 },
             ThresholdMass { threshold: 32 * EVIDENCE_ONE, prior_mass: 300_000_000 },
         ];
-        let expected = 2 * EVIDENCE_ONE;
+        let before_second_threshold = 200_000;
         assert_eq!(
-            verify_staircase_value(&points, 8 * EVIDENCE_ONE - 1, expected),
-            Ok(expected)
+            verify_staircase_value(
+                &points,
+                8 * EVIDENCE_ONE - 1,
+                before_second_threshold
+            ),
+            Ok(before_second_threshold)
         );
-        let at_boundary = 2 * EVIDENCE_ONE;
+        let at_second_threshold = 8 * EVIDENCE_ONE;
+        let exact_at_boundary = 1_800_000;
         assert_eq!(
-            verify_staircase_value(&points, at_boundary, 200_000),
-            Ok(200_000)
+            verify_staircase_value(
+                &points,
+                at_second_threshold,
+                exact_at_boundary
+            ),
+            Ok(exact_at_boundary)
         );
         assert_eq!(
-            verify_staircase_value(&points, at_boundary, expected),
+            verify_staircase_value(
+                &points,
+                at_second_threshold,
+                before_second_threshold
+            ),
             Err(VerifyError::StaircaseValueMismatch)
         );
     }
