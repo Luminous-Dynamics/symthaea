@@ -10,6 +10,7 @@ use contamination_panel_bench::{
         FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
         empirical_reference_p_values, ftd_weighted_cauchy_bh,
     },
+    fragility::{DetectorFragilityStudyV1, analyze_detector_fragility},
     generate_challenge_bundle,
     intervention::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
@@ -349,6 +350,31 @@ fn analyze_adjudication_attrition_cli(args: &[String]) -> Result<(), Box<dyn Err
     Ok(())
 }
 
+fn analyze_detector_fragility_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-detector-fragility <fragility-study.json> <fragility-report.json>"
+                .into(),
+        );
+    }
+    const MAX_FRAGILITY_STUDY_BYTES: u64 = 512 * 1024 * 1024;
+    let study_bytes = read_file_bounded(&args[1], MAX_FRAGILITY_STUDY_BYTES)?;
+    let study: DetectorFragilityStudyV1 = serde_json::from_slice(&study_bytes)?;
+    let report = analyze_detector_fragility(&study).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "pairs={} target_fpr={}‰ interventions={} study_sha256={} authenticated={} confirmatory_eligible={}",
+        report.independent_model_pair_replicate_count,
+        report.target_fpr_permille,
+        report.aggregate_interventions.len(),
+        report.study_sha256,
+        report.independently_authenticated,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -436,9 +462,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("analyze-adjudication-attrition") => analyze_adjudication_attrition_cli(&args),
+        Some("analyze-detector-fragility") => analyze_detector_fragility_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | analyze-detector-fragility | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
