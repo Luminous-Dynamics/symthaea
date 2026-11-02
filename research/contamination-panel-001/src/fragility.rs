@@ -127,6 +127,7 @@ impl InterventionComparisonV1 {
 #[serde(deny_unknown_fields)]
 pub struct DetectorScoreV1 {
     pub detector_id: String,
+    pub detector_spec_sha256: String,
     pub direction: DetectorDirectionV1,
     pub raw_score: f64,
 }
@@ -148,8 +149,11 @@ pub struct FragilityItemObservationV1 {
 pub struct FragilityCheckpointV1 {
     pub stage: TrainingStageV1,
     pub checkpoint_sha256: String,
+    pub parent_checkpoint_sha256: String,
     pub training_receipt_sha256: String,
     pub training_config_sha256: String,
+    pub objective_config_sha256: String,
+    pub training_data_manifest_sha256: String,
     pub optimizer_steps: u64,
     pub observations: Vec<FragilityItemObservationV1>,
 }
@@ -159,6 +163,7 @@ pub struct FragilityCheckpointV1 {
 pub struct FragilityModelPairV1 {
     pub replicate_id: String,
     pub base_checkpoint_sha256: String,
+    pub advanced_lrm_base_checkpoint_sha256: String,
     pub randomization_manifest_sha256: String,
     pub checkpoints: Vec<FragilityCheckpointV1>,
 }
@@ -189,6 +194,7 @@ pub struct WilsonIntervalV1 {
 #[serde(deny_unknown_fields)]
 pub struct DetectorCheckpointMetricsV1 {
     pub detector_id: String,
+    pub detector_spec_sha256: String,
     pub direction: DetectorDirectionV1,
     pub auroc: f64,
     pub auprc: f64,
@@ -389,6 +395,14 @@ fn validate_score_vector(
             if directions.get(&score.detector_id) != Some(&score.direction) {
                 return Err("detector IDs/directions must be identical across all items".to_owned());
             }
+            let reference_digest = first
+                .detector_scores
+                .iter()
+                .find(|first_score| first_score.detector_id == score.detector_id)
+                .map(|first_score| first_score.detector_spec_sha256.as_str());
+            if reference_digest != Some(score.detector_spec_sha256.as_str()) {
+                return Err("detector specification digests must be identical across all items".to_owned());
+            }
         }
     }
     Ok(directions)
@@ -544,8 +558,15 @@ fn checkpoint_detector_metrics(
             }
         }
         let (auroc, auprc) = auc_and_auprc(&test_scores)?;
+        let detector_spec_sha256 = checkpoint
+            .observations
+            .first()
+            .and_then(|item| item.detector_scores.iter().find(|score| score.detector_id == *detector_id))
+            .map(|score| score.detector_spec_sha256.clone())
+            .ok_or_else(|| "detector specification digest is missing".to_owned())?;
         output.push(DetectorCheckpointMetricsV1 {
             detector_id: detector_id.clone(),
+            detector_spec_sha256,
             direction: *direction,
             auroc,
             auprc,
@@ -602,12 +623,6 @@ fn retention_ratio(after: f64, before: f64) -> Option<f64> {
     }
 }
 
-fn checkpoint_by_stage(
-    checkpoints: &[FragilityCheckpointV1],
-) -> BTreeMap<TrainingStageV1, &FragilityCheckpointV1> {
-    checkpoints.iter().map(|checkpoint| (checkpoint.stage, checkpoint)).collect()
-}
-
 fn detector_metric<'a>(
     checkpoint: &'a FragilityCheckpointReportV1,
     detector_id: &str,
@@ -621,7 +636,6 @@ fn detector_metric<'a>(
 
 fn build_intervention_comparison(
     intervention: InterventionComparisonV1,
-    stages: &BTreeMap<TrainingStageV1, &FragilityCheckpointV1>,
     reports: &BTreeMap<TrainingStageV1, FragilityCheckpointReportV1>,
 ) -> Result<FragilityInterventionComparisonV1, String> {
     let (before_contaminated_stage, before_clean_control_stage, after_contaminated_stage, after_clean_control_stage) =
@@ -870,6 +884,10 @@ pub fn analyze_detector_fragility(
         }
         require_digest(&pair.base_checkpoint_sha256, "base_checkpoint_sha256")?;
         require_digest(
+            &pair.advanced_lrm_base_checkpoint_sha256,
+            "advanced_lrm_base_checkpoint_sha256",
+        )?;
+        require_digest(
             &pair.randomization_manifest_sha256,
             "randomization_manifest_sha256",
         )?;
@@ -913,6 +931,68 @@ pub fn analyze_detector_fragility(
         {
             return Err("model pair is missing a required training stage".to_owned());
         }
+        let expected_parent = |stage: TrainingStageV1| -> Result<&str, String> {
+            match stage {
+                TrainingStageV1::SftClean | TrainingStageV1::SftContaminated => {
+                    Ok(pair.base_checkpoint_sha256.as_str())
+                }
+                TrainingStageV1::SftCleanThenGrpoClean => Ok(
+                    &checkpoints[&TrainingStageV1::SftClean].checkpoint_sha256,
+                ),
+                TrainingStageV1::SftContaminatedThenGrpoClean => Ok(
+                    &checkpoints[&TrainingStageV1::SftContaminated].checkpoint_sha256,
+                ),
+                TrainingStageV1::SftCleanThenRaft => Ok(
+                    &checkpoints[&TrainingStageV1::SftClean].checkpoint_sha256,
+                ),
+                TrainingStageV1::SftContaminatedThenRaft => Ok(
+                    &checkpoints[&TrainingStageV1::SftContaminated].checkpoint_sha256,
+                ),
+                TrainingStageV1::SftCleanThenRaftPlusPlus => Ok(
+                    &checkpoints[&TrainingStageV1::SftClean].checkpoint_sha256,
+                ),
+                TrainingStageV1::SftContaminatedThenRaftPlusPlus => Ok(
+                    &checkpoints[&TrainingStageV1::SftContaminated].checkpoint_sha256,
+                ),
+                TrainingStageV1::AdvancedLrmClean
+                | TrainingStageV1::AdvancedLrmCotContaminated => {
+                    Ok(pair.advanced_lrm_base_checkpoint_sha256.as_str())
+                }
+            }
+        };
+        for stage in TrainingStageV1::ALL {
+            let checkpoint = checkpoints[&stage];
+            if checkpoint.parent_checkpoint_sha256 != expected_parent(stage)? {
+                return Err(format!("{stage:?} checkpoint has an unexpected lineage parent"));
+            }
+        }
+        let matched_objective_pairs = [
+            (TrainingStageV1::SftClean, TrainingStageV1::SftContaminated),
+            (
+                TrainingStageV1::SftCleanThenGrpoClean,
+                TrainingStageV1::SftContaminatedThenGrpoClean,
+            ),
+            (TrainingStageV1::SftCleanThenRaft, TrainingStageV1::SftContaminatedThenRaft),
+            (
+                TrainingStageV1::SftCleanThenRaftPlusPlus,
+                TrainingStageV1::SftContaminatedThenRaftPlusPlus,
+            ),
+            (
+                TrainingStageV1::AdvancedLrmClean,
+                TrainingStageV1::AdvancedLrmCotContaminated,
+            ),
+        ];
+        for (clean_stage, treatment_stage) in matched_objective_pairs {
+            let clean = checkpoints[&clean_stage];
+            let treatment = checkpoints[&treatment_stage];
+            if clean.objective_config_sha256 != treatment.objective_config_sha256
+                || clean.optimizer_steps != treatment.optimizer_steps
+            {
+                return Err(format!(
+                    "matched clean/treatment arms {clean_stage:?}/{treatment_stage:?} must use identical objective config and optimizer-step budgets"
+                ));
+            }
+        }
         if reference_item_contract
             .as_ref()
             .is_some_and(|previous| Some(previous) != pair_item_contract.as_ref())
@@ -953,7 +1033,7 @@ pub fn analyze_detector_fragility(
             checkpoint_reports.iter().cloned().map(|report| (report.stage, report)).collect();
         let comparisons = InterventionComparisonV1::ALL
             .into_iter()
-            .map(|intervention| build_intervention_comparison(intervention, &checkpoints, &report_map))
+            .map(|intervention| build_intervention_comparison(intervention, &report_map))
             .collect::<Result<Vec<_>, _>>()?;
         pair_reports.push(FragilityPairReportV1 {
             replicate_id: pair.replicate_id.clone(),
