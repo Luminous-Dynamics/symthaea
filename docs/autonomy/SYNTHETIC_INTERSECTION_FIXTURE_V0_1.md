@@ -33,7 +33,7 @@ The actor starts its crossing at the candidate's `actor_crossing_start_s`. This 
 
 ## Candidate factors
 
-The generator uses a deterministic, seed-specific, affine-permuted stratification with deterministic within-bin jitter. Every factor is stratified independently across the requested candidate budget.
+The generator exposes two deterministic search baselines: (1) affine-permuted stratification with deterministic within-bin jitter and (2) a seed-bound SplitMix64 pseudorandom sampler. Both generate the same typed candidate contract and enforce identical factor bounds. The random sampler is a reproducible search baseline, not a statement of real-world distributions.
 
 | Factor | Unit | Synthetic design range | Interpretation |
 |---|---|---:|---|
@@ -49,9 +49,9 @@ All ranges currently carry `SyntheticAssumption` semantics. No normal, uniform, 
 
 ## Candidate identity and reproducibility
 
-The Rust generator returns these identity inputs for each candidate:
+The Rust generators return these identity inputs for each candidate:
 
-- schema version and generator-policy ID (`stratified-affine-lhs-v0.1`);
+- schema version and generator-policy ID (`stratified-affine-lhs-v0.1` or `seeded-splitmix64-random-v0.1`);
 - seed, ordinal and complete generation budget;
 - fixed geometry and actor script;
 - exact IEEE-754 factor bit patterns, time step and horizon;
@@ -100,10 +100,10 @@ Do not use a search reward or the tested controller's own confidence to label av
 
 ## Benchmark sequence
 
-1. Freeze this schema and the candidate generator revision.
+1. Freeze this schema and both candidate-generator revisions.
 2. Add explicit positive-control fixtures and seeded challenge fixtures as separate named cases; do not assume a generated boundary candidate is a known failure.
 3. Execute the same exact candidates for every controller and RTA ablation. Pair runs by candidate ID, initial state, sensor stream and compute budget.
-4. Compare seeded random and stratified generation under identical execution budgets. Add boundary and controller-disagreement search only after the first two baselines replay.
+4. Add boundary and controller-disagreement search only after the random and stratified baselines replay.
 5. Minimize observed counterexamples while preserving an exact backend-defined trigger predicate and parent run lineage.
 6. Freeze minimized cases into regression. Keep final holdout families isolated by generator policy, topology, actor script and fault composition.
 7. Use cluster-aware inference from Symtropy #3385 only when the target estimand and sampling weights have been specified. Adversarial candidate counts are not exposure-weighted risk estimates.
