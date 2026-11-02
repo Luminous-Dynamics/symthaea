@@ -1035,3 +1035,7 @@ mod tests {
     }
 
 }
+
+
+/// Anytime-valid sequential paired randomization inference under a fair-coin design.
+pub mod sequential;
