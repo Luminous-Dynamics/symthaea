@@ -11,7 +11,8 @@
 //! duplicate keys before REA's object-level schema sees the object.
 
 use serde::de::{MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer};
+use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -563,9 +564,58 @@ pub fn semantic_evidence_content(value: &Value) -> Result<Value, EvidenceError> 
     Ok(Value::Object(semantic))
 }
 
-/// Serialize a JSON value using RFC 8785 JCS semantics.
+/// Serialize a JSON value using ECMAScript's binary64 JSON number semantics
+/// and RFC 8785 JCS property ordering/primitive serialization.
+///
+/// serde_json::Value can retain integer tokens as exact i64/u64 values, while
+/// JavaScript JSON.parse converts every JSON number to IEEE-754 binary64 before
+/// JSON.stringify. The adapter therefore serializes every Number as f64 rather
+/// than forwarding serde_json's integer serializer unchanged.
+struct EcmaJsonValue<'a>(&'a Value);
+
+impl Serialize for EcmaJsonValue<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.0 {
+            Value::Null => serializer.serialize_unit(),
+            Value::Bool(value) => serializer.serialize_bool(*value),
+            Value::Number(value) => {
+                let number = value.as_f64().ok_or_else(|| {
+                    <S::Error as serde::ser::Error>::custom(
+                        "JSON number cannot be represented as finite IEEE-754 binary64",
+                    )
+                })?;
+                if !number.is_finite() {
+                    return Err(<S::Error as serde::ser::Error>::custom(
+                        "JSON numbers must be finite",
+                    ));
+                }
+                serializer.serialize_f64(number)
+            }
+            Value::String(value) => serializer.serialize_str(value),
+            Value::Array(values) => {
+                let mut sequence = serializer.serialize_seq(Some(values.len()))?;
+                for value in values {
+                    sequence.serialize_element(&EcmaJsonValue(value))?;
+                }
+                sequence.end()
+            }
+            Value::Object(values) => {
+                let mut map = serializer.serialize_map(Some(values.len()))?;
+                for (key, value) in values {
+                    map.serialize_entry(key, &EcmaJsonValue(value))?;
+                }
+                map.end()
+            }
+        }
+    }
+}
+
+/// Serialize a JSON value using ECMAScript binary64 numbers and RFC 8785 JCS.
 pub fn canonical_jcs_bytes(value: &Value) -> Result<Vec<u8>, EvidenceError> {
-    serde_json_canonicalizer::to_vec(value).map_err(|error| {
+    serde_json_canonicalizer::to_vec(&EcmaJsonValue(value)).map_err(|error| {
         EvidenceError::new(
             EvidenceErrorKind::Canonicalization,
             format!("canonical JSON serialization failed: {error}"),
@@ -953,6 +1003,19 @@ mod tests {
         assert_eq!(
             canonical,
             r#"{"𐀀":2,"":1,"numbers":[0,333333333.3333333,1e+30,4.5,0.002,1e-27]}"#
+        );
+    }
+
+    #[test]
+    fn canonicalization_converts_integer_tokens_to_javascript_binary64() {
+        let value: Value = serde_json::from_str(
+            r#"{"large":9007199254740993,"u64":18446744073709551615,"minus":-9007199254740993}"#,
+        )
+        .unwrap();
+        let canonical = String::from_utf8(canonical_jcs_bytes(&value).unwrap()).unwrap();
+        assert_eq!(
+            canonical,
+            r#"{"large":9007199254740992,"minus":-9007199254740992,"u64":18446744073709552000}"#
         );
     }
 
