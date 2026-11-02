@@ -92,13 +92,13 @@ Hashes detect mutation relative to the frozen bytes. They are not digital signat
 
 ## 7. Synthetic reference case
 
-The bundled fixture has six claim declarations across two groups: a marginal prediction/compute/temporal group and a two-action complete conditional partition. It binds paper/source revisions for CPC, AC-RAC and Conformal Thinking, and includes an upstream anytime-ledger receipt reference.
+The bundled fixture has seven claim declarations across two groups: a marginal prediction/compute/temporal group and a two-action complete conditional partition. It treats the two compute-stopping failure events separately—wrong answer after early stopping and premature abandonment of a solvable task. It binds paper/source revisions for CPC, AC-RAC and Conformal Thinking, and includes an upstream anytime-ledger receipt reference.
 
 The fixture's evidence hashes are deterministic synthetic placeholders. The sample alpha/delta allocations demonstrate the ledger's arithmetic only. They are not measured risk values, verified theorem certificates, or evidence that any of the cited methods has been reproduced in Symthaea.
 
 Expected arithmetic for the fixture:
 
-- marginal group: 8 + 12 + 7 + 5 = 32 million PPB;
+- marginal group: 4 + 4 + 12 + 7 + 5 = 32 million PPB;
 - conditional action group: max(6, 10) = 10 million PPB;
 - overall arithmetic alpha: 42 million PPB against a 50 million PPB budget;
 - statistical delta: 10 million PPB against a 20 million PPB budget.
