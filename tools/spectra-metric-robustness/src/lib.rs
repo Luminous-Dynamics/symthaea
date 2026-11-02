@@ -278,8 +278,8 @@ pub fn simulate(
     let mut trial_id = 0u64;
 
     for participant in 0..design.participants {
-        let mut ar_state = 0.0;
         for session in 0..design.sessions_per_participant {
+            let mut ar_state = 0.0;
             let mut labels = vec![true; design.trials_per_session / 2];
             labels.extend(vec![false; design.trials_per_session / 2]);
             shuffle(&mut labels, &mut labels_rng)?;
@@ -344,7 +344,7 @@ pub fn simulate(
                 };
 
                 let is_missing = if world == StressWorld::OutcomeDependentMissingness {
-                    let probability = if is_signal && response { 0.99 } else { 0.05 };
+                    let probability = if is_signal && response { 1.0 } else { 0.05 };
                     missing_rng.uniform() < probability
                 } else {
                     false
@@ -644,7 +644,7 @@ fn residual_lag_one_correlation(
         return 0.0;
     };
 
-    let mut by_session: BTreeMap<(u32, u32), Vec<f64>> = BTreeMap::new();
+    let mut by_session: BTreeMap<(u32, u32), Vec<(u32, f64)>> = BTreeMap::new();
     for (row, is_signal) in candidate.trials.iter().zip(truth.event_present.iter().copied()) {
         let Some(score) = row.evidence_score else {
             continue;
@@ -653,15 +653,20 @@ fn residual_lag_one_correlation(
         by_session
             .entry((row.participant_id, row.session_id))
             .or_default()
-            .push(residual);
+            .push((row.period, residual));
     }
 
     let mut previous = Vec::new();
     let mut current = Vec::new();
-    for series in by_session.values() {
+    for series in by_session.values_mut() {
+        series.sort_by_key(|(period, _)| *period);
         for pair in series.windows(2) {
-            previous.push(pair[0]);
-            current.push(pair[1]);
+            // A dropout must not create an artificial lag-one pair across a
+            // missing period. Only compare observations adjacent in time.
+            if pair[1].0 == pair[0].0 + 1 {
+                previous.push(pair[0].1);
+                current.push(pair[1].1);
+            }
         }
     }
     correlation(&previous, &current).unwrap_or(0.0)
