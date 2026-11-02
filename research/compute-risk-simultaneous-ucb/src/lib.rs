@@ -620,7 +620,7 @@ mod tests {
         };
         let trajectory = CalibrationTrajectory {
             trajectory_id: "late-solve".into(), scenario_id: "test".into(),
-            confidence_ppm: vec![300_000, 450_000, 800_000],
+            confidence_ppm: vec![300_000, 350_000, 800_000],
             correct_by_step: vec![false, false, true],
             cumulative_tokens: vec![10, 20, 30],
         };
