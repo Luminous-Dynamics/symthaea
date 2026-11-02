@@ -621,6 +621,120 @@
         "held_out_fault_variants": true
       },
       "claim_ceiling": "Public OWASP challenge performance is not evidence of generalized Android or iOS reverse-engineering superiority."
+    },
+    {
+      "id": "sre_bench_external_agentic_reverse_engineering",
+      "status": "planned_access_and_participation_required",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10026",
+      "source_url": "https://daplab.cs.columbia.edu/benchmarks/sre-bench/",
+      "published_baseline_snapshot": {
+        "as_of": "2026-11-02",
+        "private_programs": 19,
+        "binary_instances": 262,
+        "graded_tasks": 1572,
+        "average_source_lines": 16900,
+        "domains": [
+          "firmware",
+          "malware",
+          "game",
+          "file_format",
+          "network_protocol"
+        ],
+        "source_languages": [
+          "C",
+          "C++",
+          "Rust",
+          "Go"
+        ],
+        "anti_analysis_mechanisms": 44,
+        "leading_public_facing_reference": {
+          "model": "GPT-6-Astra",
+          "mean_score_out_of_6": 5.55,
+          "fully_solved_fraction": 0.823,
+          "graded_instances": 181,
+          "corpus_instances": 262
+        }
+      },
+      "evaluation_arms": [
+        "REA_only",
+        "Symthaea_only_where_fair",
+        "REA_plus_Symthaea",
+        "specialist_tools_as_applicable"
+      ],
+      "metrics": [
+        "mean_tasks_passed_per_binary",
+        "fully_solved_rate",
+        "zero_credit_rate",
+        "graded_coverage_and_refusal_rate",
+        "per_domain_score",
+        "per_language_score",
+        "per_hardening_family_score",
+        "time_and_compute_cost",
+        "tool_calls",
+        "evidence_traceability"
+      ],
+      "target": "match_or_exceed_the_best_public_facing_baseline_on_matched_instances_and_budget; publish coverage_and_safety_refusal_denominator_separately",
+      "constraints": [
+        "benchmark instances are private; obey maintainer access and publication terms",
+        "do not mirror or redistribute private binaries/tasks",
+        "reproduce task/tool/budget/safety settings before comparison"
+      ]
+    },
+    {
+      "id": "decompile_bench_external_function_decompilation",
+      "status": "planned_public_dataset_scope_and_license_audit_required",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10026",
+      "source_url": "https://aims.stanford.edu/measurement-db/decompile_bench",
+      "published_baseline_snapshot": {
+        "released_items": 72059,
+        "decompiler_subjects": [
+          "IDA",
+          "Ghidra"
+        ],
+        "source_sets": [
+          "HumanEval",
+          "MBPP",
+          "GitHub2025"
+        ],
+        "ida_mean_edit_similarity": 0.206,
+        "ghidra_mean_edit_similarity": 0.202,
+        "metric_scope": "textual_edit_similarity_not_executable_correctness"
+      },
+      "metrics": [
+        "released_text_metric_exact_reproduction",
+        "compile_rate_where_feasible",
+        "test_equivalence_rate",
+        "semantic_graph_precision_recall",
+        "control_flow_data_flow_recovery",
+        "behavior_preserving_edit_cost"
+      ],
+      "target": "reproduce_the_published_text_metric_exactly_then_add_independent_semantic_and_executable_correctness_oracles",
+      "constraints": [
+        "respect released dataset CC0 terms and original project source licences",
+        "do not treat text similarity as program equivalence"
+      ]
+    },
+    {
+      "id": "owasp_mobile_test_evidence_external_baseline",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10026",
+      "standards": [
+        "OWASP MASVS",
+        "OWASP MASWE",
+        "OWASP MASTG"
+      ],
+      "source_url": "https://mas.owasp.org/MASVS/04-Assessment_and_Certification/",
+      "metrics": [
+        "selected_MASTG_test_precision_recall",
+        "MASVS_control_evidence_coverage",
+        "unsupported_oracle_rate",
+        "static_to_runtime_claim_upgrade_count",
+        "false_positive_rate",
+        "false_negative_rate",
+        "time_to_correct_finding"
+      ],
+      "target": "100_percent_selected_control_to_test_mapping_or_explicit_oracle_gap; zero automated_scanner_claims_as_full_control_verification",
+      "constraint": "Automated tools alone do not complete MASVS verification; contextual/manual assessment is a separate evidence class."
     }
   ],
   "promotion_policy": {
@@ -652,7 +766,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/9908",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9909",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/9969"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9969",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10026"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
