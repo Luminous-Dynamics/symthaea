@@ -596,3 +596,15 @@ References:
 - OWASP MAS Crackmes: https://mas.owasp.org/crackmes/
 - OWASP Android crackmes: https://mas.owasp.org/crackmes/Android/
 - OWASP iOS crackmes: https://mas.owasp.org/crackmes/iOS/
+
+
+## 15. Implementation snapshot (2026-11-02)
+
+The following work has moved beyond architecture-only status:
+
+- **Evidence identity core:** [PR #9910](https://github.com/Luminous-Dynamics/symthaea/pull/9910), exact dedicated run [#41409682777](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41409682777) passed: 16 Rust unit tests and one upstream-generated differential integration test. General repository CI was skipped; the isolated Cargo harness does not establish root workspace health or full REA schema/bundle parity.
+- **Offline verification CLI:** [PR #10058](https://github.com/Luminous-Dynamics/symthaea/pull/10058) adds bounded local file verification, stable JSON/text output and an explicit claim ceiling. Its dedicated exact-head workflow is pending as of this snapshot.
+- **Causal experiment planner:** [PR #10074](https://github.com/Luminous-Dynamics/symthaea/pull/10074) adds a pure-Rust Bayesian EIG planner, root-evidence lineage, authorization/reversibility/target-impact/resource budgets and abstention. Its dedicated exact-head workflow is queued as of this snapshot.
+- **ZIP metadata reader:** [PR #9965](https://github.com/Luminous-Dynamics/symthaea/pull/9965) separately implements a bounded std-only archive metadata reader and has a pending dedicated workflow. It remains distinct from full ArtifactReader parity.
+
+The Evidence core is the only one of these four implementation tracks with a completed passing dedicated workflow at this snapshot. Do not infer status from issue text or a parent PR; always bind a validation claim to the exact head SHA and completed run.
