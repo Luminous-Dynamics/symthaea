@@ -829,6 +829,387 @@ pub fn verify_head_read_quorum(
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WitnessHeadResponse {
+    pub record_type: String,
+    pub schema_version: u32,
+    pub challenge_nonce: String,
+    pub authority_id: String,
+    pub authority_incarnation_id: String,
+    pub authority_epoch: String,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub trust_root_version: String,
+    pub head_sequence: String,
+    pub head_checkpoint_digest: String,
+    pub head_authority_revision: String,
+    pub head_state_digest: String,
+    pub head_policy_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WitnessCheckpoint {
+    pub record_type: String,
+    pub schema_version: u32,
+    pub authority_id: String,
+    pub authority_incarnation_id: String,
+    pub authority_epoch: String,
+    pub sequence: String,
+    pub authority_revision: String,
+    pub state_schema: String,
+    pub state_digest: String,
+    pub policy_revision: String,
+    pub policy_digest: String,
+    pub previous_checkpoint_digest: Option<String>,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub trust_root_version: String,
+    pub transition_bundle_digest: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct VerifiedHeadResponse {
+    payload: WitnessHeadResponse,
+    member_key_id: String,
+    trust_store_sha256: String,
+    envelope_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct VerifiedCheckpoint {
+    payload: WitnessCheckpoint,
+    checkpoint_digest: String,
+    accepted_key_ids: Vec<String>,
+    trust_store_sha256: String,
+    envelope_sha256: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SelectedWitnessHead {
+    pub status: String,
+    pub authority_id: String,
+    pub authority_incarnation_id: String,
+    pub authority_epoch: String,
+    pub witness_set_id: String,
+    pub witness_set_version: String,
+    pub trust_root_version: String,
+    pub sequence: String,
+    pub checkpoint_digest: String,
+    pub authority_revision: String,
+    pub state_digest: String,
+    pub policy_digest: String,
+    pub read_quorum: usize,
+    pub response_member_key_ids: Vec<String>,
+    pub checkpoint_signer_key_ids: Vec<String>,
+    pub response_set_sha256: String,
+    pub checkpoint_envelope_sha256: String,
+    pub trust_store_sha256: String,
+    pub claim_ceiling: String,
+}
+
+fn canonical_decimal(value: &str, allow_zero: bool) -> bool {
+    if value.is_empty() || (value.len() > 1 && value.starts_with('0')) {
+        return false;
+    }
+    if !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    allow_zero || value != "0"
+}
+
+fn valid_digest_string(value: &str) -> bool {
+    value.strip_prefix("sha256:")
+        .is_some_and(is_lower_hex_64)
+}
+
+fn validate_checkpoint_payload(
+    checkpoint: &WitnessCheckpoint,
+    trust: &TrustStore,
+    expected_incarnation_id: &str,
+) -> Result<(), String> {
+    if checkpoint.record_type != "basalt.authority.witness-checkpoint"
+        || checkpoint.schema_version != 1
+    {
+        return Err("unsupported witness checkpoint record_type/schema_version".to_string());
+    }
+    if checkpoint.authority_id != trust.authority_id
+        || checkpoint.authority_incarnation_id != expected_incarnation_id
+        || checkpoint.witness_set_id != trust.witness_set_id
+        || checkpoint.witness_set_version != trust.witness_set_version.to_string()
+        || checkpoint.trust_root_version != trust.trust_root_version.to_string()
+    {
+        return Err("checkpoint authority/incarnation/witness-set identity mismatch".to_string());
+    }
+    for (field, value, allow_zero) in [
+        ("authority_epoch", checkpoint.authority_epoch.as_str(), true),
+        ("sequence", checkpoint.sequence.as_str(), true),
+        ("authority_revision", checkpoint.authority_revision.as_str(), true),
+        ("policy_revision", checkpoint.policy_revision.as_str(), true),
+        ("witness_set_version", checkpoint.witness_set_version.as_str(), false),
+        ("trust_root_version", checkpoint.trust_root_version.as_str(), false),
+    ] {
+        if !canonical_decimal(value, allow_zero) {
+            return Err(format!("checkpoint {field} is not a canonical decimal string"));
+        }
+    }
+    if checkpoint.state_schema.is_empty()
+        || !valid_digest_string(&checkpoint.state_digest)
+        || !valid_digest_string(&checkpoint.policy_digest)
+        || checkpoint.previous_checkpoint_digest.as_deref().is_some_and(|x| !valid_digest_string(x))
+        || checkpoint.transition_bundle_digest.as_deref().is_some_and(|x| !valid_digest_string(x))
+    {
+        return Err("checkpoint contains an empty schema or malformed digest".to_string());
+    }
+    let sequence: u64 = checkpoint.sequence.parse()
+        .map_err(|_| "checkpoint sequence exceeds u64".to_string())?;
+    if (sequence == 0) != checkpoint.previous_checkpoint_digest.is_none() {
+        return Err("only sequence zero may omit a predecessor checkpoint digest".to_string());
+    }
+    Ok(())
+}
+
+fn checkpoint_digest(payload: &WitnessCheckpoint) -> Result<String, String> {
+    let canonical = serde_json_canonicalizer::to_vec(payload)
+        .map_err(|error| format!("cannot canonicalize checkpoint payload: {error}"))?;
+    let mut preimage = b"BASALT-WITNESS-CHECKPOINT-V1\0".to_vec();
+    preimage.extend_from_slice(&canonical);
+    Ok(sha256_prefixed(&preimage))
+}
+
+/// Verifies an exactly one-member-signed head response against an externally pinned trust store.
+/// A single response authenticates only that member's statement; it does not prove commit.
+pub fn verify_member_head_response(
+    envelope_bytes: &[u8],
+    trust_store_bytes: &[u8],
+    expected_trust_store_sha256: &str,
+    expected_incarnation_id: &str,
+    expected_challenge_nonce: &str,
+) -> Result<VerifiedHeadResponse, String> {
+    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
+    let prepared = prepare_trust_store(&trust, sha256_prefixed(trust_store_bytes))?;
+    let strict: StrictEnvelope = serde_json::from_slice(envelope_bytes)
+        .map_err(|error| format!("invalid head-response DSSE envelope: {error}"))?;
+    if strict.payload_type != HEAD_RESPONSE_PAYLOAD_TYPE {
+        return Err("unexpected DSSE payload type for witness head response".to_string());
+    }
+    if strict.signatures.len() != 1 || strict.signatures.len() > MAX_SIGNATURES {
+        return Err("a head response must contain exactly one member signature".to_string());
+    }
+    if !is_lower_hex_64(&strict.signatures[0].keyid) || strict.signatures[0].sig.is_empty() {
+        return Err("head-response signature keyid or signature is malformed".to_string());
+    }
+    let envelope = Envelope {
+        payload: strict.payload,
+        payload_type: strict.payload_type,
+        signatures: strict.signatures.into_iter().map(|signature| Signature {
+            keyid: Some(signature.keyid),
+            sig: signature.sig,
+        }).collect(),
+    };
+    let verifier_refs: Vec<&dyn Verifier> = prepared.verifiers.iter()
+        .map(|verifier| verifier as &dyn Verifier).collect();
+    let verified = verify(&envelope, &verifier_refs, 1)
+        .map_err(|error| format!("head-response member signature invalid: {error}"))?;
+    if verified.accepted_keys.len() != 1 {
+        return Err("head response did not authenticate exactly one trusted member".to_string());
+    }
+    let json: Value = serde_json::from_slice(&verified.payload)
+        .map_err(|error| format!("head response payload is invalid JSON: {error}"))?;
+    let canonical = serde_json_canonicalizer::to_vec(&json)
+        .map_err(|error| format!("cannot JCS-canonicalize head response: {error}"))?;
+    if canonical != verified.payload {
+        return Err("head response payload is not byte-for-byte RFC 8785 JCS".to_string());
+    }
+    let payload: WitnessHeadResponse = serde_json::from_value(json)
+        .map_err(|error| format!("head response payload schema mismatch: {error}"))?;
+    if payload.record_type != "basalt.authority.witness-head-response" || payload.schema_version != 1 {
+        return Err("unsupported head response record_type/schema_version".to_string());
+    }
+    if payload.challenge_nonce != expected_challenge_nonce {
+        return Err("head response challenge nonce mismatch (replay or wrong challenge)".to_string());
+    }
+    if payload.authority_id != trust.authority_id
+        || payload.authority_incarnation_id != expected_incarnation_id
+        || payload.witness_set_id != trust.witness_set_id
+        || payload.witness_set_version != trust.witness_set_version.to_string()
+        || payload.trust_root_version != trust.trust_root_version.to_string()
+    {
+        return Err("head response authority/incarnation/witness-set identity mismatch".to_string());
+    }
+    for (field, value, allow_zero) in [
+        ("authority_epoch", payload.authority_epoch.as_str(), true),
+        ("head_sequence", payload.head_sequence.as_str(), true),
+        ("head_authority_revision", payload.head_authority_revision.as_str(), true),
+        ("witness_set_version", payload.witness_set_version.as_str(), false),
+        ("trust_root_version", payload.trust_root_version.as_str(), false),
+    ] {
+        if !canonical_decimal(value, allow_zero) {
+            return Err(format!("head response {field} is not canonical decimal"));
+        }
+    }
+    if !valid_digest_string(&payload.head_checkpoint_digest)
+        || !valid_digest_string(&payload.head_state_digest)
+        || !valid_digest_string(&payload.head_policy_digest)
+    {
+        return Err("head response contains malformed digest".to_string());
+    }
+    Ok(VerifiedHeadResponse {
+        payload,
+        member_key_id: verified.accepted_keys[0].clone(),
+        trust_store_sha256: prepared.trust_store_sha256,
+        envelope_sha256: sha256_prefixed(envelope_bytes),
+    })
+}
+
+/// Verifies a write-quorum DSSE certificate and computes the domain-separated checkpoint digest.
+pub fn verify_write_checkpoint(
+    envelope_bytes: &[u8],
+    trust_store_bytes: &[u8],
+    expected_trust_store_sha256: &str,
+    expected_incarnation_id: &str,
+) -> Result<VerifiedCheckpoint, String> {
+    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
+    let verified = verify_witness_envelope(
+        envelope_bytes,
+        trust_store_bytes,
+        expected_trust_store_sha256,
+        CHECKPOINT_PAYLOAD_TYPE,
+        QuorumKind::Write,
+    )?;
+    let payload: WitnessCheckpoint = serde_json::from_value(verified.json.clone())
+        .map_err(|error| format!("checkpoint payload schema mismatch: {error}"))?;
+    validate_checkpoint_payload(&payload, &trust, expected_incarnation_id)?;
+    let digest = checkpoint_digest(&payload)?;
+    if verified.accepted_key_ids.len() < trust.write_quorum {
+        return Err("checkpoint does not have the configured write quorum".to_string());
+    }
+    Ok(VerifiedCheckpoint {
+        payload,
+        checkpoint_digest: digest,
+        accepted_key_ids: verified.accepted_key_ids,
+        trust_store_sha256: verified.trust_store_sha256,
+        envelope_sha256: sha256_prefixed(envelope_bytes),
+    })
+}
+
+/// Aggregates nonce-bound member responses and their write-quorum-certified checkpoints.
+/// Lagging replicas are allowed. Highest certified sequence wins; same-sequence forks reject.
+pub fn aggregate_witness_read(
+    responses: &[VerifiedHeadResponse],
+    checkpoints: &[VerifiedCheckpoint],
+    trust_store_bytes: &[u8],
+    expected_trust_store_sha256: &str,
+    expected_incarnation_id: &str,
+    expected_challenge_nonce: &str,
+) -> Result<SelectedWitnessHead, String> {
+    let trust = load_pinned_trust_store(trust_store_bytes, expected_trust_store_sha256)?;
+    let actual_trust_digest = sha256_prefixed(trust_store_bytes);
+    if responses.len() < trust.read_quorum {
+        return Err("anti_rollback_unknown: fewer than read_quorum member responses".to_string());
+    }
+
+    let mut seen_members = HashSet::new();
+    let mut response_digests = Vec::new();
+    let mut checkpoint_by_digest = std::collections::BTreeMap::new();
+    let mut sequence_heads = std::collections::BTreeMap::<u64, String>::new();
+
+    for checkpoint in checkpoints {
+        if checkpoint.trust_store_sha256 != actual_trust_digest {
+            return Err("checkpoint was verified under different trust-store bytes".to_string());
+        }
+        if checkpoint.accepted_key_ids.len() < trust.write_quorum {
+            return Err("checkpoint certificate is below write quorum".to_string());
+        }
+        let sequence = checkpoint.payload.sequence.parse::<u64>()
+            .map_err(|_| "checkpoint sequence exceeds u64".to_string())?;
+        if let Some(existing) = sequence_heads.insert(sequence, checkpoint.checkpoint_digest.clone()) {
+            if existing != checkpoint.checkpoint_digest {
+                return Err("rejected_witness_equivocation: two certified digests at same sequence".to_string());
+            }
+        }
+        checkpoint_by_digest.insert(checkpoint.checkpoint_digest.clone(), checkpoint);
+    }
+
+    let mut highest: Option<&VerifiedCheckpoint> = None;
+    let mut signer_keys = Vec::new();
+    for response in responses {
+        if response.trust_store_sha256 != actual_trust_digest {
+            return Err("head response was verified under different trust-store bytes".to_string());
+        }
+        if response.payload.challenge_nonce != expected_challenge_nonce {
+            return Err("head response challenge nonce mismatch".to_string());
+        }
+        if response.payload.authority_id != trust.authority_id
+            || response.payload.authority_incarnation_id != expected_incarnation_id
+            || response.payload.witness_set_id != trust.witness_set_id
+            || response.payload.witness_set_version != trust.witness_set_version.to_string()
+            || response.payload.trust_root_version != trust.trust_root_version.to_string()
+        {
+            return Err("head response identity mismatch during quorum aggregation".to_string());
+        }
+        if !seen_members.insert(response.member_key_id.clone()) {
+            return Err("duplicate witness member response; a signer counts once".to_string());
+        }
+        let checkpoint = checkpoint_by_digest.get(&response.payload.head_checkpoint_digest)
+            .copied()
+            .ok_or_else(|| "anti_rollback_unknown: head response references a missing write-quorum checkpoint".to_string())?;
+        let payload = &checkpoint.payload;
+        if payload.authority_id != response.payload.authority_id
+            || payload.authority_incarnation_id != response.payload.authority_incarnation_id
+            || payload.authority_epoch != response.payload.authority_epoch
+            || payload.sequence != response.payload.head_sequence
+            || payload.authority_revision != response.payload.head_authority_revision
+            || payload.state_digest != response.payload.head_state_digest
+            || payload.policy_digest != response.payload.head_policy_digest
+            || payload.witness_set_id != response.payload.witness_set_id
+            || payload.witness_set_version != response.payload.witness_set_version
+            || payload.trust_root_version != response.payload.trust_root_version
+        {
+            return Err("head response fields do not match its certified checkpoint".to_string());
+        }
+        let sequence = payload.sequence.parse::<u64>()
+            .map_err(|_| "checkpoint sequence exceeds u64".to_string())?;
+        if highest.is_none_or(|current| {
+            current.payload.sequence.parse::<u64>().unwrap_or(0) < sequence
+        }) {
+            highest = Some(checkpoint);
+        }
+        response_digests.push(response.envelope_sha256.clone());
+        signer_keys.push(response.member_key_id.clone());
+    }
+
+    let selected = highest.ok_or_else(|| "anti_rollback_unknown: no certified head selected".to_string())?;
+    response_digests.sort();
+    signer_keys.sort();
+    let response_set = serde_json_canonicalizer::to_vec(&response_digests)
+        .map_err(|error| format!("cannot canonicalize witness response set: {error}"))?;
+
+    Ok(SelectedWitnessHead {
+        status: "highest_write_certified_head_selected".to_string(),
+        authority_id: selected.payload.authority_id.clone(),
+        authority_incarnation_id: selected.payload.authority_incarnation_id.clone(),
+        authority_epoch: selected.payload.authority_epoch.clone(),
+        witness_set_id: selected.payload.witness_set_id.clone(),
+        witness_set_version: selected.payload.witness_set_version.clone(),
+        trust_root_version: selected.payload.trust_root_version.clone(),
+        sequence: selected.payload.sequence.clone(),
+        checkpoint_digest: selected.checkpoint_digest.clone(),
+        authority_revision: selected.payload.authority_revision.clone(),
+        state_digest: selected.payload.state_digest.clone(),
+        policy_digest: selected.payload.policy_digest.clone(),
+        read_quorum: trust.read_quorum,
+        response_member_key_ids: signer_keys,
+        checkpoint_signer_key_ids: selected.accepted_key_ids.clone(),
+        response_set_sha256: sha256_prefixed(&response_set),
+        checkpoint_envelope_sha256: selected.envelope_sha256.clone(),
+        trust_store_sha256: actual_trust_digest,
+        claim_ceiling: "Selects the highest checkpoint with a verified write-quorum DSSE certificate referenced by a fresh nonce-bound read quorum of distinct trusted member signatures. Does not verify predecessor-chain continuity to pinned genesis, trust-root rotation, durable witness persistence behavior, physical failure-domain independence, or database anti-rollback end-to-end.".to_string(),
+    })
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
