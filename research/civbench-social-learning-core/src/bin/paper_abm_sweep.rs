@@ -19,6 +19,7 @@ struct Condition {
     machine_capacity: u32,
     machine_bias: f64,
     optimal_discovery_rate: f64,
+    teacher_candidate_count: usize,
     transmission_probability: f64,
     teacher_temperature: f64,
     reward_noise_epsilon: f64,
@@ -75,14 +76,14 @@ fn build_conditions() -> Vec<Condition> {
         machine_capacity: 1_000,
         machine_bias: 0.5,
         optimal_discovery_rate: 0.001,
+        teacher_candidate_count: 5,
         transmission_probability: 0.9,
         teacher_temperature: 0.25,
         reward_noise_epsilon: 0.1,
     }];
 
-    // The article explicitly varies discovery difficulty, machine capacity,
-    // machine optimality bias, learnability, selectivity temperature and noise.
-    // Placement treatments here are a CivBench sensitivity extension.
+    // The article specifies sampled teachers but its main-text ABM methods
+    // do not state the candidate-set size. Compare 5, 10 and all 20 agents.
     let placements = [
         ("clustered", MachinePlacement::ClusteredPrefix),
         ("random", MachinePlacement::UniformRandom),
@@ -90,6 +91,7 @@ fn build_conditions() -> Vec<Condition> {
     let capacities = [1_000_u32, 10_000, 100_000];
     let biases = [0.01_f64, 0.25, 0.5];
     let optimal_discovery_rates = [0.0001_f64, 0.001, 0.01];
+    let teacher_candidate_counts = [5_usize, 10, 20];
     let transmission = [0.3_f64, 0.6, 0.9];
     let temperatures = [0.1_f64, 0.5];
     let noise = [0.1_f64, 0.5];
@@ -98,23 +100,26 @@ fn build_conditions() -> Vec<Condition> {
         for capacity in capacities {
             for bias in biases {
                 for optimal_discovery_rate in optimal_discovery_rates {
-                    for lambda in transmission {
-                        for temperature in temperatures {
-                            for epsilon in noise {
-                                conditions.push(Condition {
-                                    name: format!(
-                                        "machine_{placement_name}_k{capacity}_q{:.2}_dopt{:.4}_lambda{:.1}_tau{:.1}_eps{:.1}",
-                                        bias, optimal_discovery_rate, lambda, temperature, epsilon
-                                    ).replace('.', "p"),
-                                    machine_count: 5,
-                                    machine_placement: placement,
-                                    machine_capacity: capacity,
-                                    machine_bias: bias,
-                                    optimal_discovery_rate,
-                                    transmission_probability: lambda,
-                                    teacher_temperature: temperature,
-                                    reward_noise_epsilon: epsilon,
-                                });
+                    for teacher_candidate_count in teacher_candidate_counts {
+                        for lambda in transmission {
+                            for temperature in temperatures {
+                                for epsilon in noise {
+                                    conditions.push(Condition {
+                                        name: format!(
+                                            "machine_{placement_name}_k{capacity}_q{:.2}_dopt{:.4}_c{teacher_candidate_count}_lambda{:.1}_tau{:.1}_eps{:.1}",
+                                            bias, optimal_discovery_rate, lambda, temperature, epsilon
+                                        ).replace('.', "p"),
+                                        machine_count: 5,
+                                        machine_placement: placement,
+                                        machine_capacity: capacity,
+                                        machine_bias: bias,
+                                        optimal_discovery_rate,
+                                        teacher_candidate_count,
+                                        transmission_probability: lambda,
+                                        teacher_temperature: temperature,
+                                        reward_noise_epsilon: epsilon,
+                                    });
+                                }
                             }
                         }
                     }
@@ -128,7 +133,7 @@ fn build_conditions() -> Vec<Condition> {
 fn main() {
     let conditions = build_conditions();
     println!(
-        "condition,replications,generation,machine_placement,machine_capacity,machine_bias,d_opt,lambda,tau,epsilon,optimal_prevalence_mean,optimal_prevalence_ci95,myopic_prevalence_mean,null_prevalence_mean,machine_originated_optimal_prevalence,mean_demonstration_reward,non_null_social_transmission_rate"
+        "condition,replications,generation,machine_placement,machine_capacity,machine_bias,d_opt,teacher_candidate_count,lambda,tau,epsilon,optimal_prevalence_mean,optimal_prevalence_ci95,myopic_prevalence_mean,null_prevalence_mean,machine_originated_optimal_prevalence,mean_demonstration_reward,non_null_social_transmission_rate"
     );
 
     for (condition_index, condition) in conditions.iter().enumerate() {
@@ -142,6 +147,7 @@ fn main() {
                 machine_exploration_capacity: condition.machine_capacity,
                 machine_optimality_bias: condition.machine_bias,
                 optimal_discovery_rate: condition.optimal_discovery_rate,
+                teacher_candidate_count: condition.teacher_candidate_count,
                 social_transmission_probability: condition.transmission_probability,
                 teacher_selection_temperature: condition.teacher_temperature,
                 reward_noise_epsilon: condition.reward_noise_epsilon,
@@ -174,7 +180,7 @@ fn main() {
 
         for (generation, stats) in generation_stats.iter().enumerate() {
             println!(
-                "{},{},{},{},{},{:.3},{:.4},{:.3},{:.3},{:.3},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{:.3},{:.4},{},{:.3},{:.3},{:.3},{},{},{},{},{},{},{}",
                 condition.name,
                 PAPER_ABM_REPLICATIONS,
                 generation,
@@ -185,6 +191,7 @@ fn main() {
                 condition.machine_capacity,
                 condition.machine_bias,
                 condition.optimal_discovery_rate,
+                condition.teacher_candidate_count,
                 condition.transmission_probability,
                 condition.teacher_temperature,
                 condition.reward_noise_epsilon,
