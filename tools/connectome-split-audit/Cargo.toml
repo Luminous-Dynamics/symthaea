@@ -1,0 +1,11 @@
+[package]
+name = "connectome-split-audit"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Group-disjoint split and view-leakage auditing for connectomic proofreading benchmarks"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
