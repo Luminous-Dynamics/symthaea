@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 
 use symthaea_compound_donation_ledger::{
     AuditEvent, CandidateSpec, LedgerSnapshot, ThresholdMass, WEIGHT_SCALE,
-    EVIDENCE_ONE, PRIOR_MASS_SCALE,
+    EVIDENCE_ONE, PRIOR_MASS_SCALE, OvershootRefundReceipt,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,6 +34,8 @@ pub enum VerifyError {
     InvalidStaircase,
     StaircaseBudgetExceeded,
     StaircaseValueMismatch,
+    InvalidRefundPolicy,
+    RefundReplayMismatch,
 }
 
 impl std::fmt::Display for VerifyError {
@@ -87,6 +89,61 @@ pub struct VerifiedSnapshot {
     pub escrow: Vec<VerifiedToken>,
 }
 
+
+
+/// Independently verifies one cumulative overshoot-refund transition.
+///
+/// The verifier recomputes the exact rational SCORE-style refund from
+/// alpha, previous evidence, previous cumulative refund, and the new
+/// time-monotone e-process value. The receipt is data only; it is not trusted.
+pub fn verify_overshoot_refund_transition(
+    alpha_numerator: u64,
+    alpha_denominator: u64,
+    previous_round: Option<u64>,
+    previous_evidence_value: u128,
+    previous_refund_numerator: u128,
+    receipt: &OvershootRefundReceipt,
+) -> Result<(), VerifyError> {
+    if alpha_numerator == 0 || alpha_denominator == 0 || alpha_numerator >= alpha_denominator {
+        return Err(VerifyError::InvalidRefundPolicy);
+    }
+    if previous_round.is_some_and(|round| receipt.round < round)
+        || receipt.evidence_value < previous_evidence_value
+    {
+        return Err(VerifyError::RefundReplayMismatch);
+    }
+
+    let denominator = (alpha_denominator as u128)
+        .checked_mul(EVIDENCE_ONE)
+        .ok_or(VerifyError::Overflow)?;
+    let cap = (alpha_numerator as u128)
+        .checked_mul(EVIDENCE_ONE)
+        .ok_or(VerifyError::Overflow)?;
+    let alpha_scaled_evidence = (alpha_numerator as u128)
+        .checked_mul(receipt.evidence_value)
+        .ok_or(VerifyError::Overflow)?;
+    let raw_overshoot = alpha_scaled_evidence.saturating_sub(denominator);
+    let expected_cumulative = raw_overshoot.min(cap);
+    if expected_cumulative < previous_refund_numerator {
+        return Err(VerifyError::RefundReplayMismatch);
+    }
+    let expected_increment = expected_cumulative - previous_refund_numerator;
+    let expected_cost = alpha_scaled_evidence
+        .checked_sub(expected_cumulative)
+        .ok_or(VerifyError::RefundReplayMismatch)?;
+    let expected_rejected = alpha_scaled_evidence >= denominator;
+
+    if receipt.denominator != denominator
+        || receipt.cumulative_refund_numerator != expected_cumulative
+        || receipt.refund_increment_numerator != expected_increment
+        || receipt.effective_cost_numerator != expected_cost
+        || receipt.rejected != expected_rejected
+        || (expected_rejected && expected_cost < denominator)
+    {
+        return Err(VerifyError::RefundReplayMismatch);
+    }
+    Ok(())
+}
 
 /// Independently verifies a finite staircase calibrator using a linear scan.
 ///
@@ -451,6 +508,56 @@ mod tests {
         ]
     }
 
+
+
+    #[test]
+    fn independent_verifier_accepts_hand_authored_process_refund() {
+        let receipt = OvershootRefundReceipt {
+            round: 1,
+            evidence_value: 21 * EVIDENCE_ONE,
+            refund_increment_numerator: EVIDENCE_ONE,
+            cumulative_refund_numerator: EVIDENCE_ONE,
+            effective_cost_numerator: 20 * EVIDENCE_ONE,
+            denominator: 20 * EVIDENCE_ONE,
+            rejected: true,
+        };
+        assert_eq!(
+            verify_overshoot_refund_transition(
+                1, 20, Some(0), EVIDENCE_ONE, 0, &receipt
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn independent_verifier_rejects_repeated_or_forged_refund() {
+        let receipt = OvershootRefundReceipt {
+            round: 2,
+            evidence_value: 40 * EVIDENCE_ONE,
+            refund_increment_numerator: EVIDENCE_ONE,
+            cumulative_refund_numerator: 2 * EVIDENCE_ONE,
+            effective_cost_numerator: 38 * EVIDENCE_ONE,
+            denominator: 20 * EVIDENCE_ONE,
+            rejected: true,
+        };
+        assert_eq!(
+            verify_overshoot_refund_transition(
+                1, 20, Some(1), 21 * EVIDENCE_ONE, EVIDENCE_ONE, &receipt
+            ),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+
+        let tampered = OvershootRefundReceipt {
+            refund_increment_numerator: 0,
+            ..receipt.clone()
+        };
+        assert_eq!(
+            verify_overshoot_refund_transition(
+                1, 20, Some(1), 21 * EVIDENCE_ONE, EVIDENCE_ONE, &tampered
+            ),
+            Err(VerifyError::RefundReplayMismatch)
+        );
+    }
 
     #[test]
     fn independently_verifies_staircase_at_exact_inclusive_boundaries() {
