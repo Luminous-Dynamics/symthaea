@@ -1,0 +1,48 @@
+{
+  "schema": "symthaea.temporal-intervention-family-adapter",
+  "version": "0.1.0",
+  "tracking_issue": 9929,
+  "implementation": "crates/domains/symthaea-architecture-engineering/src/temporal_intervention_family.rs",
+  "generic_ledger_owner": "crates/domains/symthaea-architecture-engineering/src/anytime_confidence_ledger.rs",
+  "contrast_axes": [
+    "wrong_belief_exposure",
+    "abstention_exposure",
+    "missing_output_exposure"
+  ],
+  "mapping": {
+    "positive_benefit": 1,
+    "zero_benefit": 0.5,
+    "negative_benefit": 0,
+    "support": [
+      0,
+      1
+    ],
+    "threshold": 0.5,
+    "stream_count": "3 * preregistered_contrast_count"
+  },
+  "validity": {
+    "null": "Fisher_sharp_no_treatment_effect",
+    "assignment": "independently_randomized_fair_coin_within_pair",
+    "replicate_unit": "independent_randomized_pair",
+    "confidence_sequence": "Hoeffding_alpha_spending_Bonferroni",
+    "blocked_or_clustered_design_supported": false,
+    "interference_or_carryover_supported": false
+  },
+  "evidence_binding": {
+    "pair_ids": true,
+    "context_sha256": true,
+    "source_family_sha256": true,
+    "assignment_receipt_sha256": true,
+    "pair_batch_sha256": true,
+    "generic_look_receipt_sha256": true,
+    "generic_ledger_replay": true,
+    "outer_evidence_ledger_sha256": true
+  },
+  "tests": {
+    "rust_test_functions_authored": 14,
+    "rust_tests_executed": false,
+    "benchmark_executed": false,
+    "external_preregistration_timestamp_verified": false,
+    "randomization_signatures_verified": false
+  }
+}
