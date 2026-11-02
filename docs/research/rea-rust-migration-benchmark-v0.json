@@ -447,6 +447,160 @@
         "deterministic_projection": "100_percent"
       },
       "claim_ceiling": "Internal bundle consistency only; no producer signature, source authenticity, attested device identity or observation-truth claim."
+    },
+    {
+      "id": "external_agentic_reverse_engineering",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9969",
+      "reference": {
+        "name": "SRE-Bench",
+        "url": "https://daplab.cs.columbia.edu/benchmarks/sre-bench/",
+        "snapshot": "2026-10",
+        "public_reported_scale": {
+          "private_programs": 19,
+          "binary_instances": 262,
+          "graded_tasks": 1572,
+          "domains": [
+            "firmware",
+            "malware",
+            "game",
+            "file_format",
+            "network_protocol"
+          ],
+          "source_languages": [
+            "C",
+            "C++",
+            "Rust",
+            "Go"
+          ],
+          "anti_analysis_mechanisms": 44,
+          "expert_hours": 5000
+        },
+        "scoring_contract": {
+          "tasks_per_binary": 6,
+          "score": "mean passed tasks per binary out of six",
+          "report": [
+            "fully_solved_instances",
+            "zero_credit_instances",
+            "graded_instance_coverage"
+          ]
+        }
+      },
+      "access_policy": {
+        "official_benchmark_only": true,
+        "require_authorized_evaluation_access": true,
+        "no_private_artifact_rehosting": true,
+        "no_reference_solution_or_grader_copying": true,
+        "no_sre_bench_score_without_official_grader": true
+      },
+      "evaluation": {
+        "arms": [
+          "REA_only",
+          "Symthaea_only",
+          "REA_plus_Symthaea",
+          "specialist_tools",
+          "combined_stack"
+        ],
+        "budget_matched": true,
+        "blinded_grading": true,
+        "exact_tool_and_model_versions": true,
+        "report_refusal_and_abstention": true,
+        "report_eligible_attempted_completed_graded_denominators": true
+      },
+      "metrics": [
+        "tasks_passed_per_binary",
+        "fully_solved_instance_rate",
+        "zero_credit_instance_rate",
+        "graded_instance_coverage",
+        "task_refusal_rate",
+        "task_abstention_rate",
+        "cost_per_passed_task",
+        "p50_p95_wall_clock",
+        "tool_invocations",
+        "token_budget",
+        "cpu_hours",
+        "peak_memory_bytes",
+        "evidence_citation_completeness"
+      ],
+      "claim_ceiling": "An official SRE-Bench score applies to the exact benchmark snapshot, access regime, tool/model configuration, and graded instances; it is not a mobile-specific result."
+    },
+    {
+      "id": "public_mobile_reverse_engineering",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9969",
+      "corpus": {
+        "name": "OWASP MAS Crackmes",
+        "url": "https://mas.owasp.org/crackmes/",
+        "platforms": [
+          "Android",
+          "iOS"
+        ],
+        "android": [
+          "UnCrackable_L1",
+          "UnCrackable_L2",
+          "UnCrackable_L3",
+          "UnCrackable_L4",
+          "UnCrackable_DRM",
+          "Android_License_Validator"
+        ],
+        "ios": [
+          "UnCrackable_L1",
+          "UnCrackable_L2"
+        ],
+        "corpus_policy": "pin challenge bytes and versions; retain upstream license/provenance; add newly source-built variants as held-out cases"
+      },
+      "baselines": [
+        "MobSF_static",
+        "MobSF_dynamic",
+        "Ghidra",
+        "JADX",
+        "apktool",
+        "REA",
+        "Symthaea",
+        "REA_plus_Symthaea",
+        "MobSF_Ghidra_JADX_apktool_specialist_stack",
+        "combined_specialist_REA_Symthaea"
+      ],
+      "task_families": [
+        "package_structure",
+        "manifest_permissions_and_components",
+        "resource_and_library_inventory",
+        "cross_language_function_localization",
+        "control_and_data_flow_reconstruction",
+        "runtime_behavior_and_network_hypotheses",
+        "anti_analysis_characterization",
+        "vulnerability_hypotheses_with_evidence_locations",
+        "causal_fault_localization",
+        "next_experiment_selection",
+        "unknown_and_ambiguous_case_abstention"
+      ],
+      "metrics": [
+        "deterministic_task_pass_rate",
+        "fully_solved_challenge_rate",
+        "zero_credit_challenge_rate",
+        "top1_top3_localization",
+        "mean_reciprocal_rank",
+        "cause_precision_recall",
+        "false_cause_rate",
+        "evidence_claim_precision_recall",
+        "citation_completeness",
+        "brier_score",
+        "expected_calibration_error",
+        "selective_risk_coverage",
+        "time_to_correct_diagnosis",
+        "cost_per_passed_task",
+        "p50_p95_latency",
+        "peak_memory",
+        "energy_per_investigation"
+      ],
+      "cohort_policy": {
+        "android_vs_ios_separate": true,
+        "static_vs_dynamic_separate": true,
+        "emulator_vs_physical_separate": true,
+        "no_pooled_headline_score": true,
+        "held_out_fault_variants": true
+      },
+      "claim_ceiling": "Public OWASP challenge performance is not evidence of generalized Android or iOS reverse-engineering superiority."
     }
   ],
   "promotion_policy": {
@@ -477,7 +631,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/9907",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9908",
     "https://github.com/Luminous-Dynamics/symthaea/issues/9909",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/9911"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9969"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
