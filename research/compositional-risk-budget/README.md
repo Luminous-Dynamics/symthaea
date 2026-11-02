@@ -2,6 +2,8 @@
 
 Standalone Rust research reference for typed composition of prediction, action, temporal and compute-stopping risk claims. Tracking: issue #10066.
 
+Full design and derivation: COMPOSITIONAL_RISK_BUDGET_V0_1.md.
+
 ## Run
 
     GIT_COMMIT_SHA=$(git rev-parse HEAD) cargo run --manifest-path research/compositional-risk-budget/Cargo.toml --bin risk-budget-replay
@@ -12,6 +14,7 @@ Generate Cargo.lock after the first dependency resolution, commit it, then use -
 ## What it does
 
 - Freezes a complete family of risk contracts and budget allocations in a canonical SHA-256 plan digest.
+- Pins both source paper/specification URLs and source repository URLs beside each exact source revision.
 - Separates operational risk alpha from statistical certification-failure delta; all arithmetic uses exact integer parts-per-billion.
 - Verifies all claims share one target population, execution scope, subject/policy digest and joint certification experiment.
 - Appends evidence receipts in preregistered order with contract digests, previous-receipt links and an aggregate ledger digest.
@@ -27,6 +30,8 @@ For an action partition with complete support A, alpha_g = max_{a in A} sum_i al
 Across groups, alpha_system = sum_g alpha_g. Confidence delta_system = sum_i delta_i across every certificate, including every action-specific certificate.
 
 The action-partition maximum is sound only when each conditional statement refers to the actual selected action, the declared support exhausts every possible action, and all claims share the same population/execution scope. It does not average away rare actions.
+
+The fixture has seven contracts: wrong-answer stopping and premature abandonment are separate compute failure events. It yields 42,000,000 PPB operational alpha and 10,000,000 PPB statistical delta under the synthetic allocation topology.
 
 ## Claim ceiling
 
