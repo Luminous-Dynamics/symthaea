@@ -21,6 +21,7 @@
 //! - [`inference`] — one- and two-sample (Welch) t-tests, chi-square
 //!   goodness-of-fit, confidence intervals
 //! - [`regression`] — ordinary-least-squares simple linear regression
+//! - [`signal_detection`] — binary signal-detection counts, d-prime and response criterion with explicit finite-sample correction
 //! - [`bayes`] — Bayesian updating and binary-classifier / diagnostic metrics
 //!   (sensitivity, specificity, PPV, likelihood ratios) — the calibration hook
 //!
@@ -40,6 +41,7 @@ pub mod distributions;
 pub mod inference;
 pub mod regression;
 pub mod special;
+pub mod signal_detection;
 
 pub use bayes::{Confusion, posterior, posterior_positive};
 pub use descriptive::{correlation, covariance, mean, median, quantile, std_dev, variance};
@@ -52,3 +54,4 @@ pub use inference::{
     z_confidence_interval_mean,
 };
 pub use regression::{LinearFit, linear_regression};
+pub use signal_detection::{SignalDetectionCounts, SignalDetectionMetrics};
