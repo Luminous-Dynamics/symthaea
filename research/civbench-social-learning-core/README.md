@@ -26,6 +26,20 @@ See [REWARD_NETWORK_III_PROTOCOL_V0_1.md](REWARD_NETWORK_III_PROTOCOL_V0_1.md) f
 
 The current 12-node/30-edge test graph is synthetic. It checks the published task shape and reproduces the 2,000-versus-2,650 reward contrast under a deliberately constructed three-loss route. It is not an original Reward Network III network. The Zenodo v2.0 archive has not been downloaded or hashed in this branch; no paper replication is claimed.
 
+
+## Generational cultural-transmission model
+
+The separate `src/cultural_evolution.rs` module is a parameterized reference ABM with:
+- individual discovery of optimal/myopic/none strategies;
+- different human/machine learning budgets and exploration biases;
+- noisy demonstration scores;
+- sampled teacher candidates and softmax performance-based teacher choice;
+- probabilistic social acquisition;
+- integration where optimal dominates myopic if acquired;
+- generation-by-generation strategy prevalence and acquisition metrics.
+
+It follows the broad mechanism sequence described in the 2026 Reward Network III paper but is **not** a reproduction of the authors' ABM. The published supplementary parameters and archived implementation must be ingested before claiming replication. A fixed-seed test checks reproducibility; synthetic tests check perfect transmission, no-transmission controls and the distinction between individual discovery and social acquisition.
+
 ## Run
 
 ```sh
