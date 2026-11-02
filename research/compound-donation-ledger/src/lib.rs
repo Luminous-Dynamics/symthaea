@@ -159,7 +159,9 @@ impl DonationLedger {
             {
                 return Err(LedgerError::InvalidReserveRate);
             }
-            if spec.destination_id.is_some_and(|destination| destination <= spec.id) {
+            if spec.destination_id.is_some_and(|destination| destination <= spec.id)
+                || (spec.destination_id.is_none() && spec.reserve_rate_numerator > 0)
+            {
                 return Err(LedgerError::InvalidRecipient);
             }
             weight_sum = weight_sum
@@ -641,13 +643,14 @@ mod tests {
         CandidateSpec {
             id,
             weight,
-            reserve_rate_numerator: rate_num,
+            reserve_rate_numerator: if id == 30 { 0 } else { rate_num },
             reserve_rate_denominator: rate_den,
             destination_id: match id {
                 10 => Some(20),
                 20 => Some(30),
                 _ => None,
             },
+
         }
     }
 
