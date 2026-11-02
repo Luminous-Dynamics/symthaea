@@ -588,6 +588,7 @@ impl DelayedAciBank {
         let phase_index = usize::try_from(origin_step % self.horizon_steps)
             .map_err(|_| invalid("delayed-ACI phase index overflow"))?;
         let mut consumed_feedback = None;
+        let mut alpha_used_ppm = self.phase_alpha_ppm[phase_index];
         let mut updated_alpha_ppm = self.phase_alpha_ppm[phase_index];
 
         if origin_step < self.horizon_steps {
@@ -610,6 +611,7 @@ impl DelayedAciBank {
             if self.phase_alpha_ppm[phase_index] != pending.alpha_used_ppm {
                 return Err(invalid("phase alpha state differs from alpha stored with due prediction"));
             }
+            alpha_used_ppm = pending.alpha_used_ppm;
             let error_ppm = if observed_miss { SCALE_PPM } else { 0 };
             let delta = div_round_away_from_zero(
                 i128::from(self.gamma_ppm) * i128::from(self.target_alpha_ppm - error_ppm),
@@ -647,7 +649,7 @@ impl DelayedAciBank {
             origin_step,
             issued_target_step,
             phase_index,
-            alpha_used_ppm: updated_alpha_ppm,
+            alpha_used_ppm,
             updated_alpha_ppm,
             prediction_set_sha256,
             consumed_feedback,
@@ -990,9 +992,11 @@ mod tests {
         let errors = [true, false, false, true, true, false];
         for (step, error) in errors.iter().enumerate() {
             let feedback = if step == 0 { None } else { Some(errors[step - 1]) };
+            let alpha_used = scalar.current_alpha_ppm();
             let record = delayed.advance(step as u64, feedback, digest(step as u8 + 1)).unwrap();
+            assert_eq!(record.alpha_used_ppm, alpha_used);
             if step > 0 { scalar.update_on_delivered_feedback(errors[step - 1]).unwrap(); }
-            assert_eq!(record.alpha_used_ppm, scalar.current_alpha_ppm());
+            assert_eq!(record.updated_alpha_ppm, scalar.current_alpha_ppm());
         }
         delayed.verify().unwrap();
     }
@@ -1007,11 +1011,11 @@ mod tests {
         let r3 = state.advance(3, Some(true), digest(4)).unwrap();
         let r4 = state.advance(4, Some(false), digest(5)).unwrap();
         let r5 = state.advance(5, Some(true), digest(6)).unwrap();
-        assert_eq!((r3.phase_index, r3.alpha_used_ppm), (0, 55_000));
-        assert_eq!((r4.phase_index, r4.alpha_used_ppm), (1, 105_000));
-        assert_eq!((r5.phase_index, r5.alpha_used_ppm), (2, 55_000));
+        assert_eq!((r3.phase_index, r3.alpha_used_ppm, r3.updated_alpha_ppm), (0, 100_000, 55_000));
+        assert_eq!((r4.phase_index, r4.alpha_used_ppm, r4.updated_alpha_ppm), (1, 100_000, 105_000));
+        assert_eq!((r5.phase_index, r5.alpha_used_ppm, r5.updated_alpha_ppm), (2, 100_000, 55_000));
         let r6 = state.advance(6, Some(false), digest(7)).unwrap();
-        assert_eq!((r6.phase_index, r6.alpha_used_ppm), (0, 60_000));
+        assert_eq!((r6.phase_index, r6.alpha_used_ppm, r6.updated_alpha_ppm), (0, 55_000, 60_000));
         assert_eq!(state.phase_alpha_ppm(1), Some(105_000));
         assert_eq!(state.phase_alpha_ppm(2), Some(55_000));
         state.verify().unwrap();
@@ -1051,10 +1055,10 @@ mod tests {
         let mut state = DelayedAciBank::new(1, 100_000, 1_000_000).unwrap();
         state.advance(0, None, digest(1)).unwrap();
         let r1 = state.advance(1, Some(true), digest(2)).unwrap();
-        assert_eq!(r1.alpha_used_ppm, -800_000);
-        assert_eq!(aci_set_regime(r1.alpha_used_ppm), AciSetRegime::AllReal);
+        assert_eq!((r1.alpha_used_ppm, r1.updated_alpha_ppm), (100_000, -800_000));
+        assert_eq!(aci_set_regime(r1.updated_alpha_ppm), AciSetRegime::AllReal);
         let r2 = state.advance(2, Some(false), digest(3)).unwrap();
-        assert_eq!(r2.alpha_used_ppm, -700_000);
+        assert_eq!((r2.alpha_used_ppm, r2.updated_alpha_ppm), (-800_000, -700_000));
         assert_eq!(aci_set_regime(1_000_001), AciSetRegime::Empty);
     }
 
