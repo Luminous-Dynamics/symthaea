@@ -49,6 +49,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vis005-contract-cargo-lock
-          path: crates/domains/symthaea-vision-manifold/contract-tests/Cargo.lock
+          path: |
+            crates/domains/symthaea-vision-manifold/src/action_conditioned.rs
+            crates/domains/symthaea-vision-manifold/contract-tests/Cargo.lock
           if-no-files-found: ignore
           retention-days: 14
