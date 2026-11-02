@@ -29,11 +29,16 @@ impl Strategy {
         }
     }
 
-    fn demonstration_reward(self, demonstrations: u32) -> f64 {
+    fn demonstration_reward(
+        self,
+        demonstrations: u32,
+        myopic_reward: f64,
+        optimal_reward: f64,
+    ) -> f64 {
         let reward_per_demo = match self {
             Self::None => 0.0,
-            Self::Myopic => 0.5,
-            Self::Optimal => 1.0,
+            Self::Myopic => myopic_reward,
+            Self::Optimal => optimal_reward,
         };
         f64::from(demonstrations) * reward_per_demo
     }
@@ -217,6 +222,11 @@ pub struct TransmissionConfig {
     pub strategy_integration_probability: f64,
     pub teacher_candidate_count: usize,
     pub teacher_selection: TeacherSelectionRule,
+    /// Expected per-demonstration reward signal for a myopic strategy.
+    pub myopic_demonstration_reward: f64,
+    /// Expected per-demonstration reward signal for an optimal strategy.
+    /// The difference from the myopic reward is the demonstrable selective advantage.
+    pub optimal_demonstration_reward: f64,
     pub demonstration_count: u32,
     /// Standard deviation per demonstration is epsilon; aggregate noise is
     /// epsilon * sqrt(demonstration_count).
@@ -244,6 +254,8 @@ impl Default for TransmissionConfig {
             teacher_selection: TeacherSelectionRule::PerformanceSoftmax {
                 temperature: 0.25,
             },
+            myopic_demonstration_reward: 0.5,
+            optimal_demonstration_reward: 1.0,
             demonstration_count: 10,
             reward_noise_epsilon: 0.1,
         }
@@ -263,6 +275,7 @@ pub enum TransmissionError {
     InvalidBias { name: &'static str },
     InvalidTemperature,
     InvalidNoiseScale,
+    InvalidRewardSignal { name: &'static str },
 }
 
 impl fmt::Display for TransmissionError {
@@ -283,6 +296,7 @@ impl fmt::Display for TransmissionError {
             Self::InvalidBias { name } => write!(f, "{name} must be finite and within [0, 1]"),
             Self::InvalidTemperature => write!(f, "teacher-selection temperature must be finite and positive"),
             Self::InvalidNoiseScale => write!(f, "reward noise epsilon must be finite and non-negative"),
+            Self::InvalidRewardSignal { name } => write!(f, "{name} must be finite and non-negative"),
         }
     }
 }
@@ -349,6 +363,14 @@ impl TransmissionConfig {
         }
         if !self.reward_noise_epsilon.is_finite() || self.reward_noise_epsilon < 0.0 {
             return Err(TransmissionError::InvalidNoiseScale);
+        }
+        for (name, value) in [
+            ("myopic demonstration reward", self.myopic_demonstration_reward),
+            ("optimal demonstration reward", self.optimal_demonstration_reward),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(TransmissionError::InvalidRewardSignal { name });
+            }
         }
         Ok(())
     }
@@ -443,7 +465,11 @@ fn demonstration_score(
     config: TransmissionConfig,
     rng: &mut DeterministicRng,
 ) -> f64 {
-    let base = strategy.demonstration_reward(config.demonstration_count);
+    let base = strategy.demonstration_reward(
+        config.demonstration_count,
+        config.myopic_demonstration_reward,
+        config.optimal_demonstration_reward,
+    );
     let noise_std = config.reward_noise_epsilon * f64::from(config.demonstration_count).sqrt();
     base + noise_std * rng.normal()
 }
@@ -668,6 +694,8 @@ mod tests {
             teacher_selection: TeacherSelectionRule::PerformanceSoftmax {
                 temperature: 0.01,
             },
+            myopic_demonstration_reward: 0.5,
+            optimal_demonstration_reward: 1.0,
             demonstration_count: 10,
             reward_noise_epsilon: 0.0,
         }
@@ -751,6 +779,8 @@ mod tests {
             strategy_integration_probability: 1.0,
             teacher_candidate_count: 3,
             teacher_selection: TeacherSelectionRule::Uniform,
+            myopic_demonstration_reward: 0.5,
+            optimal_demonstration_reward: 1.0,
             demonstration_count: 10,
             reward_noise_epsilon: 0.0,
         };
