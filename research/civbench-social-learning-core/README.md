@@ -81,6 +81,16 @@ cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.
 
 The Reward Network engine exposes `evaluate_zero_shot_transfer`, which applies one frozen policy to multiple named graph profiles and reports policy reward, full-information oracle reward, regret, oracle fraction and invalid moves. Tests compare the same loss-seeking and immediate-greedy rules across two distinct synthetic profiles: the abstract 10-move incentive fixture and a historical-shape 8-transition fixture. The result is a *rule-transfer sanity check*, not evidence that Symthaea's learned representations or human cultural skills transfer across real graph families. Final v2.0 transfer tests must use held-out Zenodo networks grouped by topology/reward-family, not the synthetic fixtures.
 
+## Held-out few-shot cultural transfer
+
+The `src/few_shot_transfer.rs` adapter implements the cultural-transmission metric used by the MEDAL-ADR line of work. For held-out task score (E) from the expert, learner score (A_{full}) with the expert present throughout, learner score (A_{half}) with the expert present for the first half then absent, and solo learner score (A_{solo}):
+
+`CT = 0.5 * ((A_full - A_solo)/E + (A_half - A_solo)/E)`
+
+The adapter reports the two gain terms separately, the CT score, the half-exposure score normalized by expert score, and optional action fidelity. It rejects non-finite or non-positive expert scores, duplicate task IDs, task-ID train/test leakage, and (when requested) test tasks from non-held-out families. It macro-averages per task and supplies a simulation/task-level confidence interval. This is a metric and split validator only; it is not a MEDAL-ADR implementation or GoalCycle3D environment.
+
+The metric is deliberately distinct from Reward Network III population persistence. CT asks whether an agent can acquire and retain a demonstrated skill on held-out tasks after the expert leaves. Reward Network III asks whether strategies are discovered, selected, propagated and preserved across generations of people and agents. Keep both tracks.
+
 ## Reward Network III protocol
 
 See [REWARD_NETWORK_III_PROTOCOL_V0_1.md](REWARD_NETWORK_III_PROTOCOL_V0_1.md) for the empirical task definition, study design, published result references, baseline ladder, transfer/correction experiments, and Zenodo ingestion gates. The Rust module `src/reward_network.rs` implements Random, ImmediateGreedy, LossSeeking and LossThenGreedy policies plus a full-information finite-horizon oracle. The oracle is an upper bound, not a participant policy.
